@@ -5,6 +5,7 @@ import subprocess
 import traceback
 import pdb
 import SCons.Util
+import atexit
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -535,3 +536,37 @@ SConscript('./SConscript')
 Import(['verify_options', 'verify_paths'])
 
 env.VerifyFilesIn(verify_paths)
+
+# extract a string filename out of a build failure
+def bf_to_filename(bf):
+    import SCons.Errors
+    if bf is None: # unknown targets product None in list
+        return '(unknown tgt)'
+    elif isinstance(bf, SCons.Errors.StopError):
+        return str(bf)
+    elif bf.node:
+        return str(bf.node)
+    elif bf.filename:
+        return bf.filename
+    return '(unknown failure)'
+
+def report_verification_failures():
+    from SCons.Script import GetBuildFailures
+    bf = GetBuildFailures()
+    if bf:
+        # bf is normally a list of build failures; if an element is None,
+        # it's because of a target that scons doesn't know anything about.
+        for x in bf:
+          if x is not None:
+            filename = bf_to_filename(x)
+            if filename.endswith('.tmp'):
+              print '##### Verification error.  Printing contents of ' + filename + ' #####'
+              with open (filename, 'r') as myfile:
+                lines = myfile.read().splitlines()
+                for line in lines:
+                  print line
+
+def display_build_status():
+    report_verification_failures()
+
+atexit.register(display_build_status)
