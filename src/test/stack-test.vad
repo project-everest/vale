@@ -1,0 +1,41 @@
+include "../arch/x86/decls.vad"
+include{:verbatim} "../arch/x86/print.s.dfy"
+
+#verbatim
+import opened x86def_s_temp = x86_def_s
+import opened x86vale_temp = x86_vale_i
+import opened x86print_s_temp = x86_print_s
+import opened x86decls_temp = x86_decls_i
+#endverbatim
+
+procedure {:refined} foo()
+  requires/ensures
+    HasStackSlots(stack, 2);
+  requires
+    1 <= stack[0][0];
+  modifies stack; eax;
+  ensures
+    stack[0][1] == stack[0][0];
+{
+    LoadStack(eax, 0);
+    StoreStack(1, eax);
+}
+
+procedure {:refined} main()
+  requires/ensures
+    HasStackSlots(stack, 2);
+  requires
+    1 <= stack[0][0];
+  modifies stack; eax;
+{
+    foo();
+}
+
+#verbatim
+method Main()
+{
+    printHeader(MASM);
+    printProc("stack_test", va_code_main(), 0, 8, "", MASM, Win);
+    printFooter(MASM);
+}
+#endverbatim

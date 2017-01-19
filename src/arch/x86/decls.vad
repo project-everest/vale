@@ -1,0 +1,625 @@
+include{:verbatim} "vale.i.dfy"
+include{:verbatim} "../../lib/util/dafny_wrappers.i.dfy"
+include{:verbatim} "../../lib/util/words_and_bytes.i.dfy"
+include{:verbatim} "../../lib/util/operations.i.dfy"
+
+#verbatim
+module x86_decls_i {
+
+import opened declsX86vale = x86_vale_i
+import opened x86_decls_i_parser_help_i = dafny_wrappers_i
+import opened words_and_bytes_i_temp = words_and_bytes_i
+import opened operations_i_temp = operations_i
+#endverbatim
+
+var{:state ok()} ok:bool;
+var{:state reg(X86Eax)} eax:uint32;
+var{:state reg(X86Ebx)} ebx:uint32;
+var{:state reg(X86Ecx)} ecx:uint32;
+var{:state reg(X86Edx)} edx:uint32;
+var{:state reg(X86Esi)} esi:uint32;
+var{:state reg(X86Edi)} edi:uint32;
+var{:state reg(X86Ebp)} ebp:uint32;
+var{:state Quadword(0)} xmm0:Quadword;
+var{:state Quadword(1)} xmm1:Quadword;
+var{:state Quadword(2)} xmm2:Quadword;
+var{:state Quadword(3)} xmm3:Quadword;
+var{:state Quadword(4)} xmm4:Quadword;
+var{:state Quadword(5)} xmm5:Quadword;
+var{:state flags()} efl:uint32;
+var{:state mem()}   mem:Heaplets;
+var{:state memory()}memory:heap;
+var{:state stack()} stack:Stack;
+
+#verbatim
+function MaybeUpdateOk(s:State, r:State) : State
+{
+    if !(s.ok && r.ok) then s.(ok := false) else r
+}
+#endverbatim
+
+procedure {:refined} {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset, taint))) } 
+          Load(out operand dst:uint32, operand src:uint32, inline offset:int, 
+               inline taint:taint, ghost id:heaplet_id)
+    requires/ensures
+        ValidSrcAddr(mem, id, src + offset, 32, taint);
+    reads
+        mem;
+    ensures
+        dst == mem[id].words[src + offset].v;
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := this.(heaplets := old(this).heaplets);
+    this := MaybeUpdateOk(old(this), this);
+}
+
+procedure {:refined} {:instruction Ins(Mov32(MakeHeapOp(dst, offset, taint), src)) } 
+          Store(operand dst:uint32, operand src:uint32, inline offset:int, 
+                inline taint:taint, ghost id:heaplet_id)
+    requires/ensures
+        ValidDstAddr(mem, id, dst + offset, 32);
+    modifies
+        mem;
+    ensures
+        mem == old(mem)[id := old(mem)[id].(words := old(mem)[id].words[dst + offset := WordHeapletEntry(src, taint)])];
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    ghost var v := old(src);
+
+    ghost if (old(this).ok) { 
+        ghost if (exists id :: ValidDstAddr(old(this).heaplets, id, old(dst) + offset, 32)) {
+            exists id :: ValidDstAddr(old(this).heaplets, id, old(dst) + offset, 32);
+            this := this.(heaplets := UpdateHeaplets(old(this), dst + offset, id, taint, v));
+            lemma_HeapletsUpdatedCorrectly32(old(this), this, dst + offset, id, taint, v);
+        } else {
+            this := old(this).(ok := false);
+        }
+    } else {
+      this := old(this);
+    }
+    this := MaybeUpdateOk(old(this), this);
+
+    lemma_WordToBytes_BytesToWord_inverses(v);
+}
+
+procedure {:refined} {:instruction Ins(Mov32(dst, stack(slot))) } 
+          LoadStack(out operand dst:uint32, inline slot:int)
+    requires/ensures
+        HasStackSlot(stack, slot);
+    reads
+        stack;
+    ensures
+        dst == stack[0][slot];
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := this.(heaplets := old(this).heaplets);
+    this := MaybeUpdateOk(old(this), this);
+}
+
+procedure {:refined} {:instruction Ins(Mov32(stack(slot), src)) } 
+          StoreStack(inline slot:int, operand src:uint32)
+    requires/ensures
+        HasStackSlot(stack, slot);
+    modifies
+        stack;
+    ensures
+        stack[0] == old(stack[0][slot := src]);
+        SeqTail(stack, 1) == old(SeqTail(stack, 1));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := this.(heaplets := old(this).heaplets);
+    this := MaybeUpdateOk(old(this), this);
+}
+
+procedure{:refined}{:instruction Ins(Add32(dst, OConst(1)))} incr(inout operand dst:uint32)
+  requires
+    0 <= dst <= 1000;
+  modifies 
+    efl;
+  ensures
+    dst == old(dst) + 1;
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32(inout operand dst:uint32, operand src:uint32)
+  requires
+    src + dst < 0x1_0000_0000;
+  modifies 
+    efl;
+  ensures
+    dst == old(dst) + old(src);
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+    lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
+}
+
+procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32Wrap(inout operand dst:uint32, operand src:uint32)
+  modifies 
+    efl;
+  ensures
+    dst == (old(dst) + old(src)) % 0x1_0000_0000;
+    dst == old(BitwiseAdd32(dst, src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+    lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
+}
+
+procedure{:refined}{:instruction Ins(Mov32(dst, src))} Mov32(inout operand dst:uint32, operand src:uint32)
+  ensures
+    dst == old(src);
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(BSwap32(dst))} BSwap32(inout operand dst:uint32)
+  ensures
+    dst == bswap32(old(dst));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined}  LoadBSwap(out operand dst:uint32, operand src:uint32, inline offset:int, 
+                                inline taint:taint, ghost id:heaplet_id)
+    requires/ensures
+        ValidSrcAddr(mem, id, src + offset, 32, taint);
+    reads
+        mem;
+    ensures
+        dst == bswap32(mem[id].words[src + offset].v);
+{
+    Load(dst, src, offset, taint, id);
+    BSwap32(dst);
+}
+
+/*
+
+procedure MovBSwap32(out operand dst:int, operand src:int)
+  requires/ensures
+    x86_ValidState(this);
+  requires
+    x86_Valid32BitSourceOperand(this, @src);
+    x86_Valid32BitDestinationOperand(this, @dst);
+    RegOperand(@dst);
+  ensures
+    x86_evalUpdateAndMaintainFlags(old(this), @dst, bswap32(old(src)), this);
+{
+     Mov32(dst, src);
+     BSwap32(dst);
+}
+*/
+
+procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout operand dst:uint32, operand src:uint32)
+  modifies efl;
+  ensures
+    dst == xor32(old(dst), old(src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(And32(dst, src))} And32(inout operand dst:uint32, operand src:uint32)
+  modifies efl;
+  ensures
+    dst == and32(old(dst), old(src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout operand dst:uint32)
+  modifies efl;
+  ensures
+    dst == not32(old(dst));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout operand dst:uint32, inline amount:uint32)
+  requires 
+    0 <= amount < 32;
+  modifies efl;
+  ensures
+    dst == rol32(old(dst), old(amount));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout operand dst:uint32, inline amount:uint32)
+  requires 
+    0 <= amount < 32;
+  modifies efl;
+  ensures
+    dst == ror32(old(dst), old(amount));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout operand dst:uint32, inline amount:uint32)
+  requires 
+    0 <= amount < 32;
+  modifies efl;
+  ensures
+    dst == shl32(old(dst), old(amount));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout operand dst:uint32, inline amount:uint32)
+  requires 
+    0 <= amount < 32;
+  modifies efl;
+  ensures
+    dst == shr32(old(dst), old(amount));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+
+/*
+
+procedure{:instruction Ins(AddCarry(dst, src))} AddCarry(inout operand dst:int, operand src:int)
+  requires/ensures
+    x86_ValidState(this);
+    x86_Valid32BitSourceOperand(this, @dst);
+  requires
+    x86_Valid32BitSourceOperand(this, @src);
+    x86_Valid32BitDestinationOperand(this, @dst);
+  ensures
+    ValidInstruction(to_state(old(this)), AddCarry(to_operand(@dst), to_operand(@src)));
+    x86_evalUpdateAndHavocFlags(old(this), @dst, AddCarrySum(old(dst), old(src), old(this.flags)) % 0x1_0000_0000, this);
+    Cf(this.flags) ==  AddCarrySum(old(dst), old(src), old(this.flags)) >= 0x1_0000_0000;
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    reveal valid_state;
+    reveal Has;
+    reveal Get;
+    ghost var v := AddCarrySum(old(dst), old(src), old(this.flags)) % 0x1_0000_0000;
+    lemma_WordToBytes_BytesToWord_inverses(v);
+    this := this.(heaplets := UpdateHeaplets(old(this), @dst, v));
+    lemma_HeapletsUpdatedCorrectly32(old(this), this, @dst, v);
+}
+
+procedure{:instruction Ins(GetCf(dst))} GetCf(out operand dst:int)
+  requires/ensures
+    x86_ValidState(this);
+    x86_Valid32BitSourceOperand(this, @dst);
+  requires
+    x86_Valid32BitDestinationOperand(this, @dst);
+    0 <= dst < 256;
+  ensures 
+    ValidInstruction(to_state(old(this)), GetCf(to_operand(@dst)));
+    x86_evalUpdateAndMaintainFlags(old(this), @dst, clear_low_byte(old(dst)) + CarryBit(old(this.flags)), this);
+    //ensures  dst == CarryBit(old(this.flags));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    reveal valid_state;
+    reveal Has;
+    reveal Get;
+    ghost var v := if Cf(old(this).flags) then 1 else 0;
+    lemma_WordToBytes_BytesToWord_inverses(v);
+    this := this.(heaplets := UpdateHeaplets(old(this), @dst, v));
+    lemma_HeapletsUpdatedCorrectly32(old(this), this, @dst, v);
+}
+*/
+
+procedure {:refined} {:instruction Ins(AESNI_enc(dst, src))} AESNI_enc(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(QuadwordXor(MixColumns(SubBytes(ShiftRows(dst))), src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(AESNI_enc_last(dst, src))} AESNI_enc_last(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(QuadwordXor(SubBytes(ShiftRows(dst)), src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(AESNI_dec(dst, src))} AESNI_dec(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(QuadwordXor(InvMixColumns(InvSubBytes(InvShiftRows(dst))), src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(AESNI_dec_last(dst, src))} 
+          AESNI_dec_last(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(QuadwordXor(InvSubBytes(InvShiftRows(dst)), src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(AESNI_imc(dst, src))} AESNI_imc(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(InvMixColumns(src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} 
+          AESNI_keygen_assist(inout operand dst:Quadword, operand src:Quadword, operand imm8:imm8)
+  modifies efl;
+  ensures
+    dst == old(Quadword(SubWord(src.mid_lo),
+                   BitwiseXor(RotWord(SubWord(src.mid_lo)), imm8),
+                   SubWord(src.hi),
+                   BitwiseXor(RotWord(SubWord(src.hi)), imm8)
+                   ));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(QuadwordXor(dst, src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Pshufd(dst, src, permutation))} 
+          Pshufd(inout operand dst:Quadword, operand src:Quadword, operand permutation:imm8)
+  modifies efl;
+  ensures
+    dst == old(Quadword(select_word(src, byte_to_bits(permutation).lo),
+                        select_word(src, byte_to_bits(permutation).mid_lo),
+                        select_word(src, byte_to_bits(permutation).mid_hi),
+                        select_word(src, byte_to_bits(permutation).hi)));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout operand dst:Quadword, operand src:Quadword)
+  modifies efl;
+  ensures
+    dst == old(Quadword(0, src.lo, src.mid_lo, src.mid_hi));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+/*
+
+procedure {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} AESNI_keygen_assist(inout operand dst:int, operand src:int, operand imm8:int)
+  requires/ensures
+    x86_ValidState(this);
+    x86_ValidXmmDestinationOperand(this, @dst);
+    x86_ValidXmmSourceOperand(this, @src);
+    ValidImm8(to_state(this), to_operand(@imm8));
+  requires
+    Has(this, ResolveOperand(this, @imm8));
+  ensures
+    ValidInstruction(to_state(old(this)), AESNI_keygen_assist(to_operand(@dst), to_operand(@src), to_operand(@imm8)));
+    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(XMM(
+                                            SubWord(this.xmms[@src.r.xmm].mid_lo),
+                                            BitwiseXor(RotWord(SubWord(this.xmms[@src.r.xmm].mid_lo)), imm8),
+                                            SubWord(this.xmms[@src.r.xmm].hi),
+                                            BitwiseXor(RotWord(SubWord(this.xmms[@src.r.xmm].hi)), imm8)
+                                   )), this, x86_insObservations(old(this), Ins(AESNI_keygen_assist(to_operand(@dst), to_operand(@src), to_operand(@imm8)))));
+{
+    reveal evalCodeOpaque;
+    reveal va_code_AESNI_enc;
+    reveal x86_ValidState;
+    reveal valid_state;
+    reveal Has;
+    reveal Get;
+    this := this.(heaplets := old(this).heaplets);
+    ghost var v;
+    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
+}
+
+
+procedure {:instruction Ins(Pshufd(dst, src, permutation))} Pshufd(inout operand dst:int, operand src:int, operand permutation:int)
+  requires/ensures
+    x86_ValidState(this);
+    x86_ValidXmmDestinationOperand(this, @dst);
+    x86_ValidXmmSourceOperand(this, @src);
+    ValidImm8(to_state(this), to_operand(@permutation));
+    Has(this, ResolveOperand(this, @permutation));
+  ensures
+    ValidInstruction(to_state(old(this)), Pshufd(to_operand(@dst), to_operand(@src), to_operand(@permutation)));
+    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(XMM(
+                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).lo),
+                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).mid_lo),
+                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).mid_hi),
+                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).hi)
+                                            )), this, x86_insObservations(old(this), Ins(Pshufd(to_operand(@dst), to_operand(@src), to_operand(@permutation)))));
+{
+    reveal evalCodeOpaque;
+    reveal va_code_AESNI_enc;
+    reveal x86_ValidState;
+    reveal valid_state;
+    reveal Has;
+    reveal Get;
+    this := this.(heaplets := old(this).heaplets);
+    ghost var v;
+    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
+}
+
+procedure {:instruction Ins(VPSLLDQ(dst, src, count))} VPSLLDQ(inout operand dst:int, operand src:int, operand count:int)
+  requires/ensures
+    x86_ValidState(this);
+    x86_ValidXmmDestinationOperand(this, @dst);
+    x86_Valid32BitSourceOperand(this, @count);
+    x86_ValidXmmSourceOperand(this, @src);
+    ValidImm8(to_state(this), to_operand(@count));
+    count == 4;
+  ensures
+    ValidInstruction(to_state(old(this)), VPSLLDQ(to_operand(@dst), to_operand(@src), to_operand(@count)));
+    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(XMM(0, this.xmms[@src.r.xmm].lo, this.xmms[@src.r.xmm].mid_lo, this.xmms[@src.r.xmm].mid_hi)), this, x86_insObservations(old(this), Ins(VPSLLDQ(to_operand(@dst), to_operand(@src), to_operand(@count)))));
+{
+    reveal evalCodeOpaque;
+    reveal va_code_AESNI_enc;
+    reveal x86_ValidState;
+    reveal valid_state;
+    reveal Has;
+    reveal Get;
+    this := this.(heaplets := old(this).heaplets);
+    ghost var v;
+    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
+}
+
+procedure {:instruction Ins(MOVDQU(dst, src))} MOVDQU(inout operand dst:int, operand src:int)
+  requires/ensures
+    x86_ValidState(this);
+    x86_Valid128BitDestinationOperand(this, @dst);
+    x86_Valid128BitSourceOperand(this, @src);
+    !(to_operand(@src) is OConst);
+    IsXmmOperand(to_operand(@dst)) || IsXmmOperand(to_operand(@src));
+  ensures
+    ValidInstruction(to_state(old(this)), MOVDQU(to_operand(@dst), to_operand(@src)));
+    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(Eval128BitOperand(to_state(this), to_operand(@src))), this, x86_insObservations(old(this), Ins(MOVDQU(to_operand(@dst), to_operand(@src)))));
+{
+    reveal evalCodeOpaque;
+    reveal va_code_AESNI_enc;
+    reveal x86_ValidState;
+    reveal valid_state;
+    reveal Has;
+    reveal Get;
+
+    ghost var v := old(Eval128BitOperand(to_state(this), to_operand(@src)));
+    lemma_WordToBytes_BytesToWord_inverses(v.lo);
+    lemma_WordToBytes_BytesToWord_inverses(v.mid_lo);
+    lemma_WordToBytes_BytesToWord_inverses(v.mid_hi);
+    lemma_WordToBytes_BytesToWord_inverses(v.hi);
+    this := this.(heaplets := UpdateHeaplets128(old(this), @dst, v));
+    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
+}
+*/
+
+procedure{:refined}{:instruction Ins(MOVDQU(dst, src))} Mov128(inout operand dst:Quadword, operand src:Quadword)
+  modifies
+    efl;
+  ensures
+    dst == old(src);
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(MOVDQU(dst, MakeHeapOp(src, offset, taint))) } 
+          Load128(out operand dst:Quadword, operand src:uint32, inline offset:int, 
+                  inline taint:taint, ghost id:heaplet_id)
+    requires/ensures
+        ValidSrcAddr(mem, id, src + offset, 128, taint);
+    reads mem;
+    modifies efl;
+    ensures
+        dst == mem[id].quads[src + offset].v;
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := this.(heaplets := old(this).heaplets);
+    this := MaybeUpdateOk(old(this), this);
+}
+
+
+procedure {:refined} {:instruction Ins(MOVDQU(MakeHeapOp(dst, offset, taint), src)) } 
+          Store128(operand dst:uint32, operand src:Quadword, inline offset:int, 
+                   inline taint:taint, ghost id:heaplet_id)
+    requires/ensures
+        ValidDstAddr(mem, id, dst + offset, 128);
+    modifies
+        mem; efl;
+    ensures
+        mem == old(mem)[id := old(mem)[id].(quads := old(mem)[id].quads[dst + offset := QuadwordHeapletEntry(src, taint)])];
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    ghost var v := old(src);
+
+    ghost if (old(this).ok) { 
+        ghost if (exists id :: ValidDstAddr(old(this).heaplets, id, old(dst) + offset, 128)) {
+            exists id :: ValidDstAddr(old(this).heaplets, id, old(dst) + offset, 128);
+            this := this.(heaplets := UpdateHeaplets128(old(this), dst + offset, id, taint, v));
+            lemma_HeapletsUpdatedCorrectly128(old(this), this, dst + offset, id, taint, v);
+        } else {
+            this := old(this).(ok := false);
+        }
+    } else {
+      this := old(this);
+    }
+    this := MaybeUpdateOk(old(this), this);
+
+    //lemma_WordToBytes_BytesToWord_inverses(v);
+}
+
+#verbatim
+} // end module x86decls
+#endverbatim

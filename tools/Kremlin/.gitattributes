@@ -1,0 +1,4 @@
+*.txt eol=lf
+*.c eol=lf
+*.h eol=lf
+*.fst eol=lf

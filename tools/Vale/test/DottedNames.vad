@@ -1,0 +1,84 @@
+include "common.vad"
+
+#verbatim
+
+function method va_code_P(o:va_operand_code, k:int):va_code
+
+lemma va_refined_P(va_b0:va_codes, va_s0:va_state, va_sN:va_state, o:va_operand_lemma, k:int)
+    returns (va_bM:va_codes, va_sM:va_state)
+    requires va_require(va_b0, va_code_P(o, k), va_s0, va_sN)
+    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
+    ensures  forall id:int, g:int, eleven:MyModule.ParamType<int>, twelve:MyModule.ParamType<MyModule.MyType>
+               {:trigger va_trigger_P(id, g, eleven, twelve)} ::
+               va_trigger_P(id, g, eleven, twelve) ==>
+               va_spec_P(k, g, eleven, twelve,
+                         va_eval_op_int(va_s0, o), va_eval_op_int(va_sM, o),
+                         va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM))
+    ensures  va_sM == va_s0.(ok := va_sM.ok);
+
+predicate F(i:int)
+predicate G(i:int)
+
+lemma L(i:int)
+    requires F(i)
+    ensures  G(i)
+
+module MyModule {
+  type MyType = int
+  predicate va_is_src_MyType(x: MyType)
+
+  ghost method MyMethod(b: bool) returns (y: int) { }
+  function method MyFunction(x: int): int { x+x }
+  type ParamType<G> = seq<G>
+}
+datatype MyRecord = MakeRecord(a: int, b: bool)
+predicate va_is_src_MyRecord(dt: va_operand_lemma)
+function va_eval_op_MyRecord(s:state, o:va_operand_code): MyRecord
+#endverbatim
+
+procedure{:refined} P(inout operand o:MyModule.MyType, inline k:int, ghost g:int,
+                      ghost eleven: MyModule.ParamType(int),
+                      ghost twelve: MyModule.ParamType(MyModule.MyType))
+    requires
+        g >= 1;
+        MyModule.MyFunction(5) == 10;
+    ensures
+        eax == old(eax) + 1;
+        o == old(o) + 1;
+        g >= 0;
+    modifies
+        eax;
+
+procedure{:refined}{:bridge} Q(inline iii:MyModule.MyType, inout operand dummy:int, out operand dummy2:int,
+                               ghost g:int,
+                               ghost eleven: MyModule.ParamType(int),
+                               ghost twelve: MyModule.ParamType(MyModule.MyType),
+                               operand dt: MyRecord)
+    requires
+        F(eax + 3);
+        g >= 0;
+        MyModule.MyFunction(5) == 10;
+        dt.a < 17;
+    ensures
+        G(eax);
+    modifies
+        eax; ebx;
+{
+    P(ebx, 10, 100, eleven, twelve);
+    ghost var a1 := g + 1;
+    ghost var a2 := eax;
+    P(ebx, 20, a1, eleven, twelve);
+    assert ebx == old(ebx) + 2;
+    ghost var a3 := eax;
+    ghost var a4 := old(eax);
+    assert a3 == a2 + 1;
+    assert a3 == a4 + 2;
+    ghost if (a3 < 10)
+    {
+      a3 := a3 + 1;
+    }
+    ghost var u := MyModule.MyFunction(iii);
+    ghost var y := MyModule.MyMethod(false);
+    P(ebx, 30, a1 + a1, eleven, twelve);
+    L(eax);
+}

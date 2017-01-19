@@ -1,0 +1,11 @@
+// DafnyLanguageService.vsix copies this file to the Dafny Visual Studio Extension directory
+// Each line contains one command-line argument to the Dafny Visual Studio Extension
+// Blank lines and lines beginning with "//" are ignored
+
+/allowGlobals
+/noNLarith
+/autoTriggers:1
+/z3opt:nlsat.randomize=false
+/warnShadowing
+/ironDafny
+/allocated:1

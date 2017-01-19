@@ -1,0 +1,14 @@
+obj/
+bin/
+tmp/
+*-disabled
+*.csproj.user
+*.pyc
+*.swp
+flycheck_*
+*.vim
+nohup.out
+tools/Vale/src/packages/
+*.suo
+*~
+.sconsign.dblite

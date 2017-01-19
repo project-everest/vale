@@ -1,0 +1,120 @@
+var{:state ok()} ok:bool;
+var{:state reg(EAX)} eax:int;
+var{:state reg(EBX)} ebx:int;
+var{:state flags()} efl:int;
+
+#verbatim
+
+datatype reg = EAX | EBX
+
+datatype ins =
+  InsImm(dstImm:reg, imm:int)
+| InsIncr(dstIncr:opr)
+| InsAdd(dstAdd:reg, srcAdd:reg)
+
+datatype opr = OReg(r:reg) | OConst(n:int)
+type va_operand_code = opr
+type va_operand_lemma = opr
+function va_op(o:opr):opr { o }
+function method va_op_reg(r:reg):va_operand_code { OReg(r) }
+predicate va_is_src_int(o:opr) { true }
+predicate va_is_dst_int(o:opr) { o.OReg? }
+
+type va_bool = bool
+type va_int = int
+datatype va_codes = va_CNil() | va_CCons(hd:va_code, tl:va_codes)
+
+type code = /*don't care*/real
+datatype va_code = va_Block(block:va_codes) | Other(c:code)
+
+function method ins2code(i:ins):va_code
+{ Other(3.14) }
+
+datatype state = State(ok:bool, regs:map<reg, int>)
+type va_state = state
+function method RegMapId(r:reg):int { 0 }
+function va_get_ok(s:va_state):bool { s.ok }
+function va_get_reg(r:reg, s:va_state):int requires r in s.regs { s.regs[r] }
+
+function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
+
+function va_update(o:opr, sM:va_state, sK:va_state):va_state
+    requires o.OReg?
+    requires o.r in sM.regs
+{
+    match o
+        case OReg(r) => va_update_reg(r, sM, sK)
+}
+
+predicate va_state_eq(s0:va_state, s1:va_state)
+{
+    s0.ok == s1.ok
+ && s0.regs == s1.regs
+}
+
+function va_get_block(c:va_code):va_codes requires c.va_Block? { c.block }
+
+predicate eval_code(c:va_code, s0:state, sN:state)
+{
+  c == va_Block(va_CNil()) ==> s0 == sN
+}
+
+function va_eval_op_int(s:state, o:va_operand_code):int
+    requires o.OReg? ==> o.r in s.regs
+{
+    match o
+        case OReg(r) => s.regs[r]
+        case OConst(n) => n
+}
+
+predicate va_require(block0:va_codes, c:va_code, s0:va_state, sN:va_state)
+{
+    block0.va_CCons?
+ && block0.hd == c
+ && eval_code(va_Block(block0), s0, sN)
+ && (forall r:reg :: r in s0.regs)
+}
+
+predicate va_ensure(b0:va_codes, b1:va_codes, s0:va_state, s1:va_state, sN:va_state)
+{
+    b0.va_CCons?
+ && b0.tl == b1
+ && eval_code(b0.hd, s0, s1)
+ && eval_code(va_Block(b1), s1, sN)
+ && (forall r:reg :: r in s1.regs)
+}
+
+function method va_IfElse(g:bool, thn:va_code, els:va_code):va_code { Other(3.1415) }
+function method va_cmp_le(a:va_operand_code, b:va_operand_code):bool { a == b }
+function method va_op_const(x:int):va_operand_code { OConst(x) }
+
+/*
+lemma va_lemma_ifElse(g:va_code, thn:va_code, els:va_code, s0:state, s1:state) returns (b:bool, s2:va_state)
+function va_get_ifCond(c:va_code):va_code
+function va_get_ifTrue(c:va_code):va_code
+function va_get_ifFalse(c:va_code):va_code
+*/
+
+lemma va_lemma_block(b0:va_codes, s0:state, sN:state) returns(s1:state, c1:va_code, b1:va_codes)
+    requires b0.va_CCons?
+    requires eval_code(va_Block(b0), s0, sN)
+    ensures  b0 == va_CCons(c1, b1)
+    ensures  eval_code(c1, s0, s1)
+    ensures  eval_code(va_Block(b1), s1, sN)
+    ensures forall r:reg :: r in s1.regs
+{
+  c1, b1 := b0.hd, b0.tl;
+  s1 := State(true, map r:reg :: RegMapId(r));
+  assume eval_code(c1, s0, s1);
+  assume eval_code(va_Block(b1), s1, sN);
+}
+
+lemma va_lemma_empty(s0:va_state, sN:va_state) returns(sM:va_state)
+    requires eval_code(va_Block(va_CNil()), s0, sN)
+    ensures  s0 == sM == sN
+{
+  sM := s0;
+}
+
+#endverbatim

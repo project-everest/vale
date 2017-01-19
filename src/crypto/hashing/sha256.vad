@@ -1,0 +1,1087 @@
+include "../../arch/x86/decls.vad"
+include{:verbatim} "../../arch/x86/vale.i.dfy"
+include{:verbatim} "../../arch/x86/print.s.dfy"
+include{:verbatim} "sha256.i.dfy"
+include{:verbatim} "../../lib/util/heaplets.i.dfy"
+
+#verbatim
+module sha256_vale {
+
+import opened x86_def_s
+import opened x86_vale_i
+import opened x86_print_s
+import opened x86_decls_i
+import opened sha256_i
+import opened heaplets_i
+import opened operations_i
+#endverbatim
+
+#token += precedence :=
+#token &= precedence :=
+#token ^= precedence :=
+#token ~= precedence :=
+
+procedure operator(:=) (out operand dst:int, operand src:int) := Mov32
+procedure operator(+=) (inout operand dst:int, operand src:int) := Add32Wrap
+procedure operator(&=) (inout operand dst:int, operand src:int) := And32
+procedure operator(^=) (inout operand dst:int, operand src:int) := Xor32
+procedure operator(~=) (inout operand dst:int) := Not32   // Usage awaits the ability to say: edx ~= edx.
+
+procedure {:refined} {:timeLimitMultiplier 2} ComputeOneStep_SHA256_core(
+  inline offset:uint32,
+  inline K:uint32,    // Round constant
+  inline W_offset:uint32,
+  inline W_taint:taint,
+  ghost W_id:heaplet_id,
+  ghost atoh:atoh_Type,
+  ghost z:SHA256Trace,
+  ghost currentStep:uint32, 
+  ghost currentState:SHA256_state
+) returns (
+  ghost final_atoh:atoh_Type,
+  ghost final_z:SHA256Trace
+)
+  requires/ensures
+    // Vale requirements
+    HasStackSlots(stack, 19);
+    ValidSrcAddr(mem, W_id, esi + W_offset, 32, W_taint);
+  requires
+    offset == 0 || offset == 7;
+
+    // SHA requirements
+    SeqLength(z.H) > 0;
+    currentStep <= 63;
+    K == K_SHA256(currentStep); 
+    atoh == atoh_c(ebp,
+                   stack[0][offset + 0],
+                   stack[0][offset + 1],
+                   stack[0][offset + 2],
+                   stack[0][offset + 3],
+                   stack[0][offset + 4],
+                   stack[0][offset + 5],
+                   stack[0][offset + 6]);
+    currentState.atoh == atoh;
+    0 <= currentStep < SeqLength(currentState.W) && currentState.W[currentStep] == mem[W_id].words[esi + W_offset].v;
+    IsSHA256ReadyForStep(z, currentState, currentStep);
+  reads
+    mem; esi;
+  modifies
+    efl; stack; eax; ebx; ecx; edx; edi; ebp;
+  ensures
+    // SHA postconditions
+    final_atoh == atoh_c(ebp,
+                         stack[0][7 - offset],
+                         stack[0][8 - offset],
+                         stack[0][9 - offset],
+                         stack[0][10 - offset],
+                         stack[0][11 - offset],
+                         stack[0][12 - offset],
+                         stack[0][13 - offset]);
+    IsSHA256ReadyForStep(final_z, currentState.(atoh := final_atoh), currentStep+1);
+    SeqLength(final_z.H) == SeqLength(z.H);
+    final_z.M == z.M;
+    // Framing
+    forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+    forall slot :: HasStackSlot(stack, slot) && HasStackSlot(old(stack), slot) && (slot < 7 - offset || slot > 13 - offset) ==> stack[0][slot] == old(stack[0][slot]);
+    SeqTail(stack, 1) == old(SeqTail(stack, 1));
+{
+  ghost var a := ebp;
+  ghost var b := stack[0][offset + 0];
+  ghost var c := stack[0][offset + 1];
+  ghost var d := stack[0][offset + 2];
+  ghost var e := stack[0][offset + 3];
+  ghost var f := stack[0][offset + 4];
+  ghost var g := stack[0][offset + 5];
+  ghost var h := stack[0][offset + 6];
+
+  eax := ebp;
+  StoreStack(7 - offset, eax);     // b_final := a
+  LoadStack(ebx, offset);          // b
+  StoreStack(8 - offset, ebx);     // c_final := b
+  LoadStack(ecx, offset + 1);   // c
+  StoreStack(9 - offset, ecx);     // d_final := c
+  edx    := ebx;
+
+  lemma_BitwiseCommutative(ebx, eax);
+  ebx &= eax; // b & a
+  edx &= ecx; // b & c
+  lemma_BitwiseCommutative(ecx, eax);
+  ecx &= eax; // c & a
+  ebx ^= ecx;
+  ebx ^= edx; // my_maj
+  forall :: ebx == Maj(a, b, c)
+  {
+    reveal_Maj();
+  }
+  //    After above block, live: 
+  //    eax == a
+  //    ebx == my_maj
+
+  // Calculate bsig0
+  ecx := eax;
+  edx := eax;
+  Ror32(eax, 2);
+  Ror32(ecx, 13);
+  eax ^= ecx;
+  Ror32(edx, 22);
+  eax ^= edx;   // == bsig0
+  forall :: eax == BSIG0(a)
+  {
+    reveal_BSIG0();
+  }
+  eax += ebx; // == T2
+
+  // Calculate my_ch
+  LoadStack(ebx, offset + 3);  // e
+  StoreStack(11 - offset, ebx);    // f_final := e
+  edx    := ebx;
+  Not32(edx);
+  LoadStack(ecx, offset + 5);  // g
+  StoreStack(13 - offset, ecx);    // h_final := g
+  edx    &= ecx; // !e & g
+  LoadStack(ecx, offset + 4);  // f
+  StoreStack(12 - offset, ecx);    // g_final := f
+  lemma_BitwiseCommutative(ecx, ebx);
+  ecx    &= ebx; // f & e  // Need commutativity
+  lemma_BitwiseCommutative(ecx, edx);
+  ecx    ^= edx; // my_ch  // Need commutativity
+  forall :: ecx == Ch(e, f, g)
+  {
+    reveal_Ch();
+  }
+  //    After above block, live: 
+  //      eax == T2
+  //      ebx == e
+  //      ecx == my_ch
+
+  // Calculate bsig1
+  edx := ebx;
+  edi := ebx;
+  Ror32(edx, 6);
+  Ror32(edi, 11);
+  edx ^= edi;
+  Ror32(ebx, 25);
+  edx ^= ebx;   // == bsig1
+  forall :: edx == BSIG1(e)
+  {
+    reveal_BSIG1();
+  }
+  //    After above block, live: 
+  //      eax == T2
+  //      ecx == my_ch
+  //      edx == bsig1
+
+  // Calculate T1
+  LoadStack(ebx, offset + 6);      // h
+  ebx += edx; // Frees edx
+  ebx += ecx; // Frees ecx
+  Add32Wrap(ebx, K);
+  Load(ecx, esi, W_offset, W_taint, W_id);
+  ebx += ecx; // T1
+  lemma_BitwiseAdd32Commutative(eax, ebx);
+  eax += ebx; // T2 + T1 == a_final
+  ebp := eax;    // a_final := eax
+  LoadStack(eax, offset + 2);    // d
+  eax += ebx; // d + T1
+  StoreStack(10 - offset, eax);   // e_final := eax
+
+  // OBSERVE: Triggers
+  assert TBlk(SeqLength(z.H)-1) && TBlk(SeqLength(z.H)) && TStep(currentStep) && TStep(currentStep + 1);
+
+  ghost var a_final := ebp;
+  ghost var b_final := stack[0][7 - offset];
+  ghost var c_final := stack[0][8 - offset];
+  ghost var d_final := stack[0][9 - offset];
+  ghost var e_final := stack[0][10 - offset];
+  ghost var f_final := stack[0][11 - offset];
+  ghost var g_final := stack[0][12 - offset];
+  ghost var h_final := stack[0][13 - offset];
+
+  final_atoh := atoh_c(a_final, b_final, c_final, d_final, e_final, f_final, g_final, h_final);
+  final_z := SHA256Trace_c(z.M, z.H, z.W, SeqDrop(z.atoh, SeqLength(z.H)-1) + SeqBuild(SeqAppendElt(z.atoh[SeqLength(z.H)-1], final_atoh)));
+  ghost var final_s := currentState.(atoh := final_atoh); 
+  lemma_SHA256TransitionOKAfterSettingAtoH(z, currentState, final_z, final_s, currentStep);
+}
+
+procedure {:refined} ComputeTwoSteps_SHA256_core(
+  inline K1:uint32,
+  inline K2:uint32,
+  inline W_offset1:uint32,
+  inline W_offset2:uint32,
+  inline W_taint:taint,
+  ghost W_id:heaplet_id,
+  ghost atoh:atoh_Type,
+  ghost z:SHA256Trace,
+  ghost currentStep:uint32, 
+  ghost currentState:SHA256_state
+) returns (
+  ghost final_atoh:atoh_Type,
+  ghost final_z:SHA256Trace
+)
+  requires/ensures
+    // Vale requirements
+    HasStackSlots(stack, 19);
+    ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 256);
+    SeqLength(currentState.W) == 64;
+    // SHA requirements
+    SeqLength(z.H) > 0;
+    currentStep <= 62;
+    K1 == K_SHA256(currentStep);
+    K2 == K_SHA256(currentStep+1);
+  requires
+    atoh == atoh_c(ebp,
+                   stack[0][0],
+                   stack[0][1],
+                   stack[0][2],
+                   stack[0][3],
+                   stack[0][4],
+                   stack[0][5],
+                   stack[0][6]);
+    currentState.atoh == atoh;
+    forall j :: 0 <= j < 64 ==> currentState.W[j] == mem[W_id].words[esi + 4 * j].v;
+    IsSHA256ReadyForStep(z, currentState, currentStep);
+    W_offset1 == 4 * currentStep;
+    W_offset2 == 4 * (currentStep + 1);
+  reads
+    mem; esi;
+  modifies
+    efl; stack; eax; ebx; ecx; edx; edi; ebp;
+  ensures
+    // SHA postconditions
+    final_atoh == atoh_c(ebp,
+                         stack[0][0],
+                         stack[0][1],
+                         stack[0][2],
+                         stack[0][3],
+                         stack[0][4],
+                         stack[0][5],
+                         stack[0][6]);
+    IsSHA256ReadyForStep(final_z, currentState.(atoh := final_atoh), currentStep+2);
+    SeqLength(final_z.H) == SeqLength(z.H);
+    final_z.M == z.M;
+    // Framing
+    forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+    forall slot :: HasStackSlot(stack, slot) && slot > 13 ==> stack[0][slot] == old(stack[0][slot]);
+    SeqTail(stack, 1) == old(SeqTail(stack, 1));
+{
+    ghost var mid_atoh:atoh_Type;
+    ghost var mid_z:SHA256Trace;
+    mid_atoh, mid_z := ComputeOneStep_SHA256_core(0, K1, W_offset1, W_taint, W_id, atoh, z, currentStep, currentState);
+    ghost var mid_state := currentState.(atoh := mid_atoh);
+    ghost var mid_step := currentStep + 1;
+    final_atoh, final_z := ComputeOneStep_SHA256_core(7, K2, W_offset2, W_taint, W_id, mid_atoh, mid_z, mid_step, mid_state);
+    assert final_atoh == atoh_c(ebp, stack[0][0], stack[0][1], stack[0][2], stack[0][3], stack[0][4], stack[0][5], stack[0][6]);
+    assert IsSHA256ReadyForStep(final_z, currentState.(atoh := final_atoh), currentStep + 2);
+}
+
+procedure {:refined} {:recursive} SHA256_inner_loopUnrolled_recursive(
+    ghost W_id:heaplet_id,
+    inline W_taint:taint,
+    ghost current_z:SHA256Trace,
+    ghost current_state:SHA256_state,
+    inline n:uint8
+    ) returns (
+    ghost new_z:SHA256Trace,
+    ghost new_state:SHA256_state
+    )
+   requires/ensures
+        SeqLength(stack) > 0;
+        HasStackSlots(stack, 19);
+    requires
+        0 <= n <= 32;
+        ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 256);
+        SeqLength(current_state.W) == 64;
+        SeqLength(current_z.H) > 0;
+        current_state.atoh == atoh_c(ebp, stack[0][0], stack[0][1], stack[0][2], stack[0][3], stack[0][4], stack[0][5], stack[0][6]);
+        IsSHA256ReadyForStep(current_z, current_state, 0);
+        forall j :: 0 <= j < 64 ==> current_state.W[j] == mem[W_id].words[esi + 4*j].v;
+    ensures
+        new_state == current_state.(atoh := new_state.atoh);
+        new_state.atoh == atoh_c(ebp, stack[0][0], stack[0][1], stack[0][2], stack[0][3], stack[0][4], stack[0][5], stack[0][6]);
+        SeqLength(new_z.H) == SeqLength(current_z.H);
+        new_z.M == current_z.M;
+        forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+        forall slot :: HasStackSlot(stack, slot) && slot > 13 ==> stack[0][slot] == old(stack)[0][slot];
+        SeqTail(stack, 1) == SeqTail(old(stack), 1);
+        IsSHA256ReadyForStep(new_z, new_state, 2*n);
+    reads
+        esi; mem;
+    modifies
+        efl; stack; eax; ebx; ecx; edx; edi; ebp;
+{
+    inline if (0 < n <= 32) { // The <= 32 part is because the code-generation lemma doesn't get to see the requirements of this procedure
+        ghost var mid_z:SHA256Trace;
+        ghost var mid_state:SHA256_state;
+        mid_z, mid_state := SHA256_inner_loopUnrolled_recursive(W_id, W_taint, current_z, current_state, n-1);
+        ghost var new_atoh:atoh_Type;
+        new_atoh, new_z := ComputeTwoSteps_SHA256_core(K_SHA256(2*(n-1)), K_SHA256(2*(n-1)+1), 4*(2*(n-1)), 4*(2*(n-1)+1), W_taint, W_id, mid_state.atoh, mid_z, 2*(n-1), mid_state);
+        new_state := mid_state.(atoh := new_atoh);
+    } else {
+        new_state := current_state;
+        new_z := current_z;
+    }
+}
+
+procedure {:refined} SHA256_inner_loopUnrolled(
+    ghost W_id:heaplet_id,
+    inline W_taint:taint,
+    ghost current_z:SHA256Trace,
+    ghost current_state:SHA256_state
+    ) returns (
+    ghost new_z:SHA256Trace,
+    ghost new_state:SHA256_state
+    )
+   requires/ensures
+        SeqLength(stack) > 0;
+        HasStackSlots(stack, 19);
+    requires
+        ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 256);
+        SeqLength(current_state.W) == 64;
+        SeqLength(current_z.H) > 0;
+        current_state.atoh == atoh_c(ebp, stack[0][0], stack[0][1], stack[0][2], stack[0][3], stack[0][4], stack[0][5], stack[0][6]);
+        IsSHA256ReadyForStep(current_z, current_state, 0);
+        forall j :: 0 <= j < 64 ==> current_state.W[j] == mem[W_id].words[esi + 4*j].v;
+    ensures
+        new_state == current_state.(atoh := new_state.atoh);
+        new_state.atoh == atoh_c(ebp, stack[0][0], stack[0][1], stack[0][2], stack[0][3], stack[0][4], stack[0][5], stack[0][6]);
+        SeqLength(new_z.H) == SeqLength(current_z.H);
+        new_z.M == current_z.M;
+        forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+        forall slot :: HasStackSlot(stack, slot) && slot > 13 ==> stack[0][slot] == old(stack)[0][slot];
+        SeqTail(stack, 1) == SeqTail(old(stack), 1);
+        IsSHA256ReadyForStep(new_z, new_state, 64);
+    reads
+        esi; mem;
+    modifies
+        efl; stack; eax; ebx; ecx; edx; edi; ebp;
+{
+    new_z, new_state := SHA256_inner_loopUnrolled_recursive(W_id, W_taint, current_z, current_state, 32);
+}
+
+procedure {:refined} MoveFromHeapToStack(ghost H_id:heaplet_id, inline taint:taint)
+  requires/ensures
+    HasStackSlots(stack, 19);
+    ValidSrcAddrs(mem, H_id, eax, 32, taint, 32);
+  reads 
+    mem; eax;
+  modifies
+    stack; ebx; ebp;
+  ensures
+    ebp         == mem[H_id].words[eax + 0].v;
+    stack[0][0] == mem[H_id].words[eax + 4].v;
+    stack[0][1] == mem[H_id].words[eax + 8].v;
+    stack[0][2] == mem[H_id].words[eax + 12].v;
+    stack[0][3] == mem[H_id].words[eax + 16].v;
+    stack[0][4] == mem[H_id].words[eax + 20].v;
+    stack[0][5] == mem[H_id].words[eax + 24].v;
+    stack[0][6] == mem[H_id].words[eax + 28].v;
+
+    // Framing
+    forall slot :: HasStackSlot(stack, slot) <==> old(HasStackSlot(stack, slot));
+    forall slot :: HasStackSlot(stack, slot) && slot > 7 
+               ==> stack[0][slot] == old(stack[0][slot]);
+    SeqTail(stack, 1) == old(SeqTail(stack, 1));
+{
+    Load(ebp, eax, 0, taint, H_id);  // Temp value 'a' lives in ebp; the rest on the stack
+    Load(ebx, eax, 4, taint, H_id);
+    StoreStack(0, ebx);
+    Load(ebx, eax, 8, taint, H_id);
+    StoreStack(1, ebx);
+    Load(ebx, eax, 12, taint, H_id);
+    StoreStack(2, ebx);
+    Load(ebx, eax, 16, taint, H_id);
+    StoreStack(3, ebx);
+    Load(ebx, eax, 20, taint, H_id);
+    StoreStack(4, ebx);
+    Load(ebx, eax, 24, taint, H_id);
+    StoreStack(5, ebx);
+    Load(ebx, eax, 28, taint, H_id);
+    StoreStack(6, ebx);
+}
+
+procedure {:refined} {:timeLimitMultiplier 2} MoveFromStackToHeap(ghost H_id:heaplet_id, inline taint:taint)
+  requires/ensures
+    HasStackSlots(stack, 19);
+    ValidSrcAddrs(mem, H_id, eax, 32, taint, 32);
+  reads 
+    stack; eax;
+  modifies
+    mem; ebx; ebp; efl;
+  ensures
+    mem[H_id].words[eax + 0].v  == old(BitwiseAdd32(mem[H_id].words[eax + 0].v,  ebp        ));
+    mem[H_id].words[eax + 4].v  == old(BitwiseAdd32(mem[H_id].words[eax + 4].v,  stack[0][0]));
+    mem[H_id].words[eax + 8].v  == old(BitwiseAdd32(mem[H_id].words[eax + 8].v,  stack[0][1]));
+    mem[H_id].words[eax + 12].v == old(BitwiseAdd32(mem[H_id].words[eax + 12].v, stack[0][2]));
+    mem[H_id].words[eax + 16].v == old(BitwiseAdd32(mem[H_id].words[eax + 16].v, stack[0][3]));
+    mem[H_id].words[eax + 20].v == old(BitwiseAdd32(mem[H_id].words[eax + 20].v, stack[0][4]));
+    mem[H_id].words[eax + 24].v == old(BitwiseAdd32(mem[H_id].words[eax + 24].v, stack[0][5]));
+    mem[H_id].words[eax + 28].v == old(BitwiseAdd32(mem[H_id].words[eax + 28].v, stack[0][6]));
+
+    // Framing
+    mem == old(mem)[H_id := mem[H_id]];
+    forall addr :: mem[H_id].words?[addr] <==> old(mem)[H_id].words?[addr];
+    forall a :: (a < eax || a > eax + 28) && old(mem)[H_id].words?[a]
+             ==> mem[H_id].words?[a] && mem[H_id].words[a] == old(mem)[H_id].words[a];
+{
+    // Here's a spot where we're using a Load that would otherwise be a direct Add32 on a heap operand 
+    // (see previous version in git history for an example).
+    // Hopefully it doesn't hurt our perf too much.
+    Load(ebx, eax, 0, taint, H_id);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 0, taint, H_id);   // H[0] += a
+
+    Load(ebx, eax, 4, taint, H_id);
+    LoadStack(ebp, 0);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 4, taint, H_id);   // H[1] += b
+
+    Load(ebx, eax, 8, taint, H_id);
+    LoadStack(ebp, 1);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 8, taint, H_id);   // H[2] += c
+
+    Load(ebx, eax, 12, taint, H_id);
+    LoadStack(ebp, 2);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 12, taint, H_id);  // H[3] += c
+
+    Load(ebx, eax, 16, taint, H_id);
+    LoadStack(ebp, 3);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 16, taint, H_id);  // H[4] += c
+
+    Load(ebx, eax, 20, taint, H_id);
+    LoadStack(ebp, 4);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 20, taint, H_id);  // H[5] += c
+
+    Load(ebx, eax, 24, taint, H_id);
+    LoadStack(ebp, 5);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 24, taint, H_id);  // H[6] += c
+
+    Load(ebx, eax, 28, taint, H_id);
+    LoadStack(ebp, 6);
+    Add32Wrap(ebx, ebp); 
+    Store(eax, ebx, 28, taint, H_id);  // H[7] += c
+}
+
+procedure {:refined} scrub_stack()
+requires/ensures
+    HasStackSlots(stack, 19);
+modifies stack;
+ensures 
+    forall slot :: 0 <= slot < 19 ==> stack[0][slot] == 0;
+    forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+    forall slot :: !(0 <= slot < 19) && stack[0]?[slot] ==> old(stack)[0]?[slot] && stack[0][slot] == old(stack)[0][slot];
+    SeqTail(stack, 1) == old(SeqTail(stack, 1));
+{
+    StoreStack(0, 0);
+    StoreStack(1, 0);
+    StoreStack(2, 0);
+    StoreStack(3, 0);
+    StoreStack(4, 0);
+    StoreStack(5, 0);
+    StoreStack(6, 0);
+    StoreStack(7, 0);
+    StoreStack(8, 0);
+    StoreStack(9, 0);
+    StoreStack(10, 0);
+    StoreStack(11, 0);
+    StoreStack(12, 0);
+    StoreStack(13, 0);
+    StoreStack(14, 0);
+    StoreStack(15, 0);
+    StoreStack(16, 0);
+    StoreStack(17, 0);
+    StoreStack(18, 0);
+}
+
+// Entry-point for the Dafny-level SHA code
+// Note that we require 16 stack slots at present to provide scratch space for SHA calculations
+procedure {:refined} SHA256_Compute64StepsH(
+    ghost H_id:heaplet_id,      // Hash state
+    ghost W_id:heaplet_id,      // Expanded message words
+    inline H_taint:taint,
+    inline W_taint:taint,
+    ghost z:SHA256Trace,
+    ghost current_state:SHA256_state
+  ) returns (
+     ghost z':SHA256Trace,
+     ghost current_state':SHA256_state
+  )
+  requires
+    // Vale requirements
+    HasStackSlots(stack, 19);
+    ValidSrcAddrs(mem, H_id, stack[0][0], 32, H_taint, 32);
+    ValidSrcAddrs(mem, W_id, stack[0][1], 32, W_taint, 256);
+  requires
+    H_id != W_id;
+
+    // SHA requirements
+
+    // current_state.atoh == atoh_c(H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7]);
+    current_state.atoh == atoh_c(mem[H_id].words[stack[0][0] +  0].v,
+                                 mem[H_id].words[stack[0][0] +  4].v,
+                                 mem[H_id].words[stack[0][0] +  8].v,
+                                 mem[H_id].words[stack[0][0] + 12].v,
+                                 mem[H_id].words[stack[0][0] + 16].v,
+                                 mem[H_id].words[stack[0][0] + 20].v,
+                                 mem[H_id].words[stack[0][0] + 24].v,
+                                 mem[H_id].words[stack[0][0] + 28].v);
+    IsSHA256ReadyForStep(z, current_state, 0); 
+    forall i :: 0 <= i < SeqLength(current_state.W)
+            ==> mem[W_id].words[stack[0][1] + 4*i].v == current_state.W[i];
+  reads
+  modifies 
+    stack; mem; eax; ebx; ecx; edx; edi; ebp; esi; efl;
+  ensures
+    // Vale framing
+    HasStackSlots(stack, 19);
+    ValidSrcAddrs(mem, H_id, old(stack[0][0]), 32, H_taint, 32);
+    ValidSrcAddrs(mem, W_id, old(stack[0][1]), 32, W_taint, 256);
+
+    mem == old(mem)[H_id := mem[H_id]]; // Only H's are modified
+    forall addr :: mem[H_id].words?[addr] <==> old(mem)[H_id].words?[addr];
+    forall addr :: (addr < old(stack[0][0]) || addr >= old(stack[0][0]+32)) && mem[H_id].words?[addr]
+                ==> mem[H_id].words[addr] == old(mem[H_id].words[addr]);
+
+    forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+    forall slot :: HasStackSlot(stack, slot) && HasStackSlot(old(stack), slot) && slot >= 19
+                ==> stack[0][slot] == old(stack[0][slot]);
+    forall slot :: 0 <= slot < 19 ==> stack[0][slot] == 0;
+    SeqTail(stack, 1) == old(SeqTail(stack, 1));
+
+    // Calling convention
+    ebx == old(ebx);
+    esi == old(esi);
+    edi == old(edi);
+    ebp == old(ebp);
+
+    // SHA
+    IsSHA256ReadyForStep(z', current_state', 64);
+    current_state'.W == current_state.W;
+    current_state'.H == current_state.H;
+    mem[H_id].words[old(stack[0][0]) +  0].v == BitwiseAdd32(current_state'.atoh.a, old(mem[H_id].words[old(stack)[0][0] +  0].v));
+    mem[H_id].words[old(stack[0][0]) +  4].v == BitwiseAdd32(current_state'.atoh.b, old(mem[H_id].words[old(stack)[0][0] +  4].v));
+    mem[H_id].words[old(stack[0][0]) +  8].v == BitwiseAdd32(current_state'.atoh.c, old(mem[H_id].words[old(stack)[0][0] +  8].v));
+    mem[H_id].words[old(stack[0][0]) + 12].v == BitwiseAdd32(current_state'.atoh.d, old(mem[H_id].words[old(stack)[0][0] + 12].v));
+    mem[H_id].words[old(stack[0][0]) + 16].v == BitwiseAdd32(current_state'.atoh.e, old(mem[H_id].words[old(stack)[0][0] + 16].v));
+    mem[H_id].words[old(stack[0][0]) + 20].v == BitwiseAdd32(current_state'.atoh.f, old(mem[H_id].words[old(stack)[0][0] + 20].v));
+    mem[H_id].words[old(stack[0][0]) + 24].v == BitwiseAdd32(current_state'.atoh.g, old(mem[H_id].words[old(stack)[0][0] + 24].v));
+    mem[H_id].words[old(stack[0][0]) + 28].v == BitwiseAdd32(current_state'.atoh.h, old(mem[H_id].words[old(stack)[0][0] + 28].v));
+    SeqLength(z'.H) == SeqLength(z.H);
+    z'.M == z.M;
+{
+    // Save registers
+    StoreStack(15, ebp); 
+    StoreStack(16, ebx);
+    StoreStack(17, esi);
+    StoreStack(18, edi);
+
+    // Load W_ptr into esi, where inner loop expects it
+    LoadStack(esi, 1);
+
+    // Load H_ptr into a register and then use it to load values out of H and into the stack
+    LoadStack(eax, 0);
+    StoreStack(14, eax);      // Save a copy for after the inner loop
+    MoveFromHeapToStack(H_id, H_taint); 
+
+    z', current_state' := SHA256_inner_loopUnrolled(W_id, W_taint, z, current_state);
+    lemma_BitwiseAdd32CommutativeAlways();
+
+    // Now compute the BitwiseAdds and store the results back in H
+    LoadStack(eax, 14);      // Load H_ptr into a register so we can retrieve the original values
+
+    MoveFromStackToHeap(H_id, H_taint); 
+
+    // Restore registers
+    LoadStack(ebp, 15);
+    LoadStack(ebx, 16);
+    LoadStack(esi, 17);
+    LoadStack(edi, 18);
+
+    scrub_stack();
+}
+
+procedure {:refined} SHA256_ComputeInitialWs_bitwise(
+  ghost W_id:heaplet_id,     // Expanded message words
+  inline taint:taint,
+  inline t:uint8      // Using uint8 here (and addition below instead of subtraction) to avoid under/over-flow complaints from Dafny
+)
+  requires/ensures
+    // Vale requirements
+    ValidSrcAddr(mem, W_id, esi + 4*(t + 14), 32, taint);
+    ValidSrcAddr(mem, W_id, esi + 4*(t +  9), 32, taint);
+    ValidSrcAddr(mem, W_id, esi + 4*(t +  1), 32, taint);
+    ValidSrcAddr(mem, W_id, esi + 4*(t),      32, taint);
+  requires
+    ValidDstAddr(mem, W_id, esi + 4*(t + 16), 32);
+    0 <= t < 48;
+  ensures
+    ValidSrcAddr(mem, W_id, esi + 4*(t + 16), 32, taint);
+  reads 
+    esi;
+  modifies
+    efl; mem; eax; ebx; ecx; edx;
+  ensures
+    // Vale framing
+    mem == old(mem)[W_id := old(mem)[W_id].(words := old(mem)[W_id].words[esi + 4*(t + 16) := mem[W_id].words[esi + 4*(t + 16)]])];
+
+    // SHA
+    let W := mem[W_id].words in
+      W[esi + 4*(t + 16)].v == 
+        BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[esi + 4*(t + 14)].v), 
+                                               W[esi + 4*(t + 9)].v), 
+                                  SSIG0(W[esi + 4*(t + 1)].v)), 
+                     W[esi + 4*t].v);
+
+{
+    reveal_SSIG0();
+    reveal_SSIG1();
+    Load(eax, esi, 4*(t+14), taint, W_id);
+    ebx := eax;
+    ecx := eax;
+    Ror32(ebx, 17);
+    Ror32(ecx, 19);
+    ebx ^= ecx;
+    Shr32(eax, 10);
+    ebx ^= eax; // ebx == SSIG1(W[t-2])
+
+    Load(edx, esi, 4*(t+9), taint, W_id);
+    lemma_BitwiseAdd32Commutative(edx, ebx);
+    edx += ebx; // edx == W[t-7] + SSIG1(W[t-2])
+
+    Load(eax, esi, 4*(t+1), taint, W_id);
+    ebx := eax;
+    ecx := eax;
+    Ror32(ebx, 7);
+    Ror32(ecx, 18);
+    ebx ^= ecx;
+    Shr32(eax, 3);
+    ebx ^= eax; // ebx == SSIG0(W[t-15])
+    edx += ebx;
+
+    Load(eax, esi, 4*t, taint, W_id);
+    edx += eax; // edx == W[t-7] + SSIG1(W[t-2]) + SSIG0(W[t-15]) + W[t-16]
+
+    Store(esi, edx, 4*(t+16), taint, W_id);
+}
+
+procedure {:refined} {:recursive} SHA256_init_Ws_loopUnrolled_recursive(
+  ghost W_id:heaplet_id,     // Expanded message words
+  inline W_taint:taint,
+  inline n:uint8
+)
+  requires/ensures
+    ValidDstAddrs(mem, W_id, esi, 32, 256);
+  requires
+    esi % 4 == 0;
+    ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 64);
+    0 <= n <= 48;
+  ensures
+    ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 4*(n+16));
+  reads
+    edi; esi;
+  modifies
+    efl; mem; eax; ebx; ecx; edx;
+  ensures
+    // SHA
+    forall t:uint32 {TStep(t)} :: 
+           0 <= t < n && TStep(t)
+       ==> (let W := mem[W_id].words in
+               W[esi + 4*(t + 16)].v ==
+                 BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[esi + 4*(t + 14)].v), 
+                                                        W[esi + 4*(t + 9)].v), 
+                                           SSIG0(W[esi + 4*(t + 1)].v)),
+                              W[esi + 4*t].v));
+
+    // Framing
+    mem == old(mem)[W_id := mem[W_id]];   // Only W_id's heaplet changes
+    forall a :: (a < esi + 64 || a >= esi + 256) && old(mem)[W_id].words?[a] 
+             ==> mem[W_id].words?[a] && mem[W_id].words[a] == old(mem)[W_id].words[a];
+{
+    inline if (n > 0) {
+        SHA256_init_Ws_loopUnrolled_recursive(W_id, W_taint, n-1);
+        SHA256_ComputeInitialWs_bitwise(W_id, W_taint, n-1);
+    }
+}
+
+procedure {:refined} SHA256_init_Ws_loopUnrolled(
+  ghost W_id:heaplet_id,     // Expanded message words
+  inline W_taint:taint
+)
+  requires
+    esi % 4 == 0;
+    ValidDstAddrs(mem, W_id, esi, 32, 256);
+    ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 64);
+  ensures
+    ValidSrcAddrs(mem, W_id, esi, 32, W_taint, 256); 
+  reads
+    edi; esi;
+  modifies
+    efl; mem; eax; ebx; ecx; edx;
+  ensures
+    // SHA
+    forall t:uint32 {TStep(t)} :: 
+           0 <= t < 48 && TStep(t)
+       ==> (let W := mem[W_id].words in
+               W[esi + 4*(t + 16)].v ==
+                 BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[esi + 4*(t + 14)].v), 
+                                                        W[esi + 4*(t + 9)].v), 
+                                           SSIG0(W[esi + 4*(t + 1)].v)),
+                              W[esi + 4*t].v));
+
+    // Framing
+    mem == old(mem)[W_id := mem[W_id]];   // Only W_id's heaplet changes
+    forall a :: (a < esi + 64 || a >= esi + 256) && old(mem)[W_id].words?[a] 
+             ==> mem[W_id].words?[a] && mem[W_id].words[a] == old(mem)[W_id].words[a];
+{
+    SHA256_init_Ws_loopUnrolled_recursive(W_id, W_taint, 48);
+}
+
+procedure {:refined} {:timeLimitMultiplier 6} SHA256_ComputeInitialWs_memcpy(
+  ghost M_id:heaplet_id,     // Message words
+  ghost W_id:heaplet_id,     // Expanded message words
+  inline M_taint:taint
+)
+  requires
+    // Vale requirements
+    ValidSrcAddrs(mem, M_id, edi, 32, M_taint, 64);
+    ValidDstAddrs(mem, W_id, esi, 32, 64);
+  requires 
+    M_id != W_id;
+  reads
+    edi; esi;
+  modifies
+    mem; eax; ebx; ecx; edx; ebp;
+  ensures
+    ValidSrcAddrs(mem, M_id, edi, 32, M_taint, 64);
+    ValidSrcAddrs(mem, W_id, esi, 32, M_taint, 64);
+
+    // SHA
+    forall i :: 0 <= i < 64 && i % 4 == 0 ==> mem[W_id].words[esi + i].v == bswap32(old(mem[M_id].words[edi + i].v));
+    forall i :: 0 <= i < 64 && i % 4 == 0 ==> mem[W_id].words[esi + i].t == old(mem[M_id].words[edi + i].t);
+
+    // Framing
+    mem == old(mem)[W_id := mem[W_id]];   // Only W_id's heaplet changes
+    forall a :: (a < esi || a >= esi + 64) && old(mem)[W_id].words?[a] 
+             ==> mem[W_id].words?[a] && mem[W_id].words[a] == old(mem)[W_id].words[a];
+{
+    // Move M into W, 5 words at a time (maybe using different registers allows more/better pipelining?)
+    LoadBSwap(eax, edi,  0, M_taint, M_id);
+    LoadBSwap(ebx, edi,  4, M_taint, M_id);
+    LoadBSwap(ecx, edi,  8, M_taint, M_id);
+    LoadBSwap(edx, edi, 12, M_taint, M_id);
+    LoadBSwap(ebp, edi, 16, M_taint, M_id);
+
+    Store(esi, eax,  0, M_taint, W_id);
+    Store(esi, ebx,  4, M_taint, W_id);
+    Store(esi, ecx,  8, M_taint, W_id);
+    Store(esi, edx, 12, M_taint, W_id);
+    Store(esi, ebp, 16, M_taint, W_id);
+
+    LoadBSwap(eax, edi, 20, M_taint, M_id);
+    LoadBSwap(ebx, edi, 24, M_taint, M_id);
+    LoadBSwap(ecx, edi, 28, M_taint, M_id);
+    LoadBSwap(edx, edi, 32, M_taint, M_id);
+    LoadBSwap(ebp, edi, 36, M_taint, M_id);
+
+    Store(esi, eax, 20, M_taint, W_id);
+    Store(esi, ebx, 24, M_taint, W_id);
+    Store(esi, ecx, 28, M_taint, W_id);
+    Store(esi, edx, 32, M_taint, W_id);
+    Store(esi, ebp, 36, M_taint, W_id);
+
+    LoadBSwap(eax, edi, 40, M_taint, M_id);
+    LoadBSwap(ebx, edi, 44, M_taint, M_id);
+    LoadBSwap(ecx, edi, 48, M_taint, M_id);
+    LoadBSwap(edx, edi, 52, M_taint, M_id);
+    LoadBSwap(ebp, edi, 56, M_taint, M_id);
+
+    Store(esi, eax, 40, M_taint, W_id);
+    Store(esi, ebx, 44, M_taint, W_id);
+    Store(esi, ecx, 48, M_taint, W_id);
+    Store(esi, edx, 52, M_taint, W_id);
+    Store(esi, ebp, 56, M_taint, W_id);
+
+    LoadBSwap(eax, edi, 60, M_taint, M_id);
+    Store(esi, eax, 60, M_taint, W_id);
+}
+
+procedure {:refined} SHA256_ComputeInitialWs_internal(
+  ghost M_id:heaplet_id,     // Message words
+  ghost W_id:heaplet_id,     // Expanded message words
+  inline M_taint:taint
+)
+  requires
+    // Vale requirements
+    esi % 4 == 0;
+    ValidSrcAddrs(mem, M_id, edi, 32, M_taint, 64);
+    ValidDstAddrs(mem, W_id, esi, 32, 256); 
+  requires 
+    M_id != W_id;
+  reads
+    edi; esi;
+  modifies
+    efl; mem; eax; ebx; ecx; edx; ebp;
+  ensures
+    // Vale requirements
+    ValidSrcAddrs(mem, M_id, edi, 32, M_taint, 64);
+    ValidSrcAddrs(mem, W_id, esi, 32, M_taint, 256); 
+    // SHA
+    forall i :: 0 <= i < 64 && i % 4 == 0 ==> mem[W_id].words[esi + i].v == bswap32(old(mem[M_id].words[edi + i].v));
+    forall i :: 0 <= i < 64 && i % 4 == 0 ==> mem[W_id].words[esi + i].t == old(mem[M_id].words[edi + i].t);
+    forall t:uint32 {TStep(t)} :: 
+           0 <= t < 48 && TStep(t)
+       ==> (let W := mem[W_id].words in
+               W[esi + 4*(t + 16)].v == 
+                 BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[esi + 4*(t + 14)].v), 
+                                                        W[esi + 4*(t + 9)].v), 
+                                           SSIG0(W[esi + 4*(t + 1)].v)), 
+                              W[esi + 4*t].v));
+
+    // Framing
+    mem == old(mem)[W_id := mem[W_id]];   // Only W_id's heaplet changes
+    forall a :: (a < esi || a >= esi + 256) && old(mem)[W_id].words?[a] 
+             ==> mem[W_id].words?[a] && mem[W_id].words[a] == old(mem)[W_id].words[a];
+{
+    SHA256_ComputeInitialWs_memcpy(M_id, W_id, M_taint);
+    SHA256_init_Ws_loopUnrolled(W_id, M_taint);
+}
+
+#verbatim
+function GetBytesToWord(mem:Heaplets, bytes_id:heaplet_id, addr:int) : int
+    // We don't care about taint for this function's purposes, so call it a dst
+    requires ValidDstAddr(mem, bytes_id, addr,   8);
+    requires ValidDstAddr(mem, bytes_id, addr+1, 8);
+    requires ValidDstAddr(mem, bytes_id, addr+2, 8);
+    requires ValidDstAddr(mem, bytes_id, addr+3, 8);
+{
+    BytesToWord(mem[bytes_id].bytes[addr].v,
+                mem[bytes_id].bytes[addr+1].v,
+                mem[bytes_id].bytes[addr+2].v,
+                mem[bytes_id].bytes[addr+3].v)
+}
+
+predicate T<T>(x:T) { true }
+
+predicate IsWordHeaplet(h:Heaplet) { h.WordHeaplet? }
+
+function CastBytesToWordsSrc(addr:int, src:Heaplet, dst:Heaplet, num_words:nat) : Heaplet
+    requires src.ByteHeaplet?;
+    requires dst.WordHeaplet?;
+    requires forall a :: addr <= a < addr + 4*num_words && (a - addr) % 4 == 0
+                      ==> a + 0 in src.bytes
+                       && a + 1 in src.bytes
+                       && a + 2 in src.bytes
+                       && a + 3 in src.bytes;
+{
+    CastBytesToWords(addr, src, dst, num_words).0
+}
+
+function CastBytesToWordsDst(addr:int, src:Heaplet, dst:Heaplet, num_words:nat) : Heaplet
+    requires src.ByteHeaplet?;
+    requires dst.WordHeaplet?;
+    requires forall a :: addr <= a < addr + 4*num_words && (a - addr) % 4 == 0
+                      ==> a + 0 in src.bytes
+                       && a + 1 in src.bytes
+                       && a + 2 in src.bytes
+                       && a + 3 in src.bytes;
+{
+    CastBytesToWords(addr, src, dst, num_words).1
+}
+
+function EmptyWordHeaplet() : Heaplet { WordHeaplet(map[]) }
+
+// Code generated via Vale.  From the program's perspective, the cast is a no op
+function method{:opaque} va_code_CastBytesToWords(num_bytes:uint32, taint:taint):va_code
+{
+  Block(CNil())
+}
+
+// Signature generated via Vale.  Body filled in by hand.
+lemma va_refined_CastBytesToWords(va_b0:va_codes, va_s0:va_state, va_sN:va_state, num_bytes:uint32, taint:taint)
+  returns (va_bM:va_codes, va_sM:va_state)
+  requires va_require(va_b0, va_code_CastBytesToWords(num_bytes, taint), va_s0, va_sN)
+  ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
+  ensures  va_spec_CastBytesToWords(num_bytes, taint, va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(X86Edi, va_s0), va_get_mem(va_s0), va_get_mem(va_sM))
+  ensures  va_state_eq(va_sM, va_update_mem(va_sM, va_update_ok(va_sM, va_s0)))
+{
+  reveal_va_code_CastBytesToWords();
+  var va_old_s:va_state := va_s0;
+  ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
+  va_sM := va_ltmp1;
+  va_bM := va_ltmp2;
+  var va_b1:va_codes := va_get_block(va_cM);
+  va_sM := va_lemma_empty(va_s0, va_sM);
+
+  var addr := va_get_reg(X86Edi, va_s0);
+  var old_mem := va_get_mem(va_s0);
+  reveal_va_spec_CastBytesToWords();
+  reveal_x86_ValidState();
+  if va_s0.ok && (exists id :: ValidSrcAddrs(old_mem, id, addr, 8, taint, num_bytes)) 
+   && (0 < num_bytes && num_bytes % 4 == 0) {
+       var bytes_id :| ValidSrcAddrs(old_mem, bytes_id, addr, 8, taint, num_bytes);
+      var heaplets', W_id := lemma_CastBytesToWords(va_s0.heaplets, va_s0.heap, addr, bytes_id, taint, num_bytes);
+      va_sM := va_s0.(heaplets := heaplets');
+      reveal_x86_ValidState();
+      forall id | id in old_mem && AddrInHeaplet(addr, old_mem[id])
+          ensures id == bytes_id;
+      {
+      }
+      assert CastBytesResult(bytes_id, old_mem, va_get_mem(va_sM), addr, num_bytes, W_id, taint); // OBSERVE
+
+   } else {
+   }
+}
+
+predicate CastBytesResult(bytes_id:heaplet_id, va_old_mem:Heaplets, mem:Heaplets, va_old_edi:int, 
+                          num_bytes:uint32, W_id:heaplet_id, taint:taint)
+{
+    bytes_id in va_old_mem 
+ && ValidSrcAddrs(va_old_mem, bytes_id, va_old_edi, 8, taint, num_bytes)
+ && W_id !in va_old_mem && W_id in mem && IsWordHeaplet(mem[W_id]) 
+ && var new_bytes := CastBytesToWordsSrc(va_old_edi, va_old_mem[bytes_id], EmptyWordHeaplet(), num_bytes / 4); 
+    var new_words := CastBytesToWordsDst(va_old_edi, va_old_mem[bytes_id], EmptyWordHeaplet(), num_bytes / 4); 
+    mem == va_old_mem[W_id := new_words][bytes_id := new_bytes]
+ && ValidSrcAddrs(mem, W_id, va_old_edi, 32, taint, num_bytes)
+}
+
+#endverbatim
+
+procedure {:refined} CastBytesToWords(inline num_bytes:uint32, inline taint:taint)
+  requires
+      exists id :: ValidSrcAddrs(mem, id, edi, 8, taint, num_bytes); 
+      0 < num_bytes && num_bytes % 4 == 0;
+  reads
+      edi; 
+  modifies 
+      mem; 
+  ensures
+      exists bytes_id, W_id ::
+          CastBytesResult(bytes_id, old(mem), mem, old(edi), num_bytes, W_id, taint)
+      && (forall id :: old(mem)?[id] && AddrInHeaplet(old(edi), old(mem)[id]) ==> id == bytes_id);
+
+
+// Entry-point for the Dafny-level SHA code
+// Wrapper around the internal version
+// This handles taking arguments off the stack and casting bytes to words
+procedure {:refined} SHA256_ComputeInitialWs(
+  ghost bytes_id:heaplet_id,  // Message bytes
+  ghost W_id:heaplet_id,      // Expanded message words
+  inline bytes_taint:taint
+)
+  requires
+    // Vale requirements
+    HasStackSlots(stack, 7);
+    let bytes_ptr := stack[0][0] in
+    let offset    := stack[0][1] in
+    let W_ptr     := stack[0][2] in 
+         ValidSrcAddrs(mem, bytes_id, bytes_ptr + offset, 8, bytes_taint, 64)
+      && ValidDstAddrs(mem, W_id, W_ptr, 32, 256)
+      && W_ptr % 4 == 0
+      && bytes_ptr + offset + 64 < 0x1_0000_0000;
+  requires
+    bytes_id != W_id;
+  modifies
+    mem; stack; eax; ebx; ecx; edx; ebp; edi; esi; efl;
+  ensures
+    // Vale stack framing
+    HasStackSlots(stack, 7);
+    forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
+    forall slot :: HasStackSlot(stack, slot) && slot >= 7 ==> stack[0][slot] == old(stack[0][slot]);
+    SeqTail(stack, 1) == old(SeqTail(stack, 1));
+
+    // Calling convention
+    ebx == old(ebx);
+    esi == old(esi);
+    edi == old(edi);
+    ebp == old(ebp);
+
+    let bytes_ptr := old(stack[0][0]) in
+    let offset    := old(stack[0][1]) in
+    let W_ptr     := old(stack[0][2]) in 
+
+        // Vale heap framing
+        ValidSrcAddrs(mem, W_id, W_ptr, 32, bytes_taint, 256)
+     && (forall id :: old(mem)?[id] ==> mem?[id] && (id != bytes_id && id != W_id ==> mem[id] == old(mem)[id]))
+     && mem[bytes_id] == CastBytesToWordsSrc(bytes_ptr + offset, old(mem)[bytes_id], EmptyWordHeaplet(), 16)
+     && (forall a :: (a < W_ptr || a >= W_ptr + 256) && old(mem)[W_id].words?[a] 
+                 ==> mem[W_id].words?[a] && mem[W_id].words[a] == old(mem)[W_id].words[a])
+
+      // SHA                                    // W[t] == BSwap(M[t]);
+     && (forall i :: 0 <= i < 64 && i % 4 == 0 ==> mem[W_id].words[W_ptr + i] 
+                                                == WordHeapletEntry(old(GetBytesToWord(mem, bytes_id, bytes_ptr + offset + i)), bytes_taint))
+     && (forall t:uint32 {TStep(t)} :: 
+             0 <= t < 48 && TStep(t)
+         ==> (let W := mem[W_id].words in
+                 W[W_ptr + 4*(t + 16)].v == 
+                   BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[W_ptr + 4*(t + 14)].v), 
+                                                          W[W_ptr + 4*(t + 9)].v), 
+                                             SSIG0(W[W_ptr + 4*(t + 1)].v)), 
+                                W[W_ptr + 4*t].v)
+                 &&
+                 W[W_ptr + 4*(t + 16)].t == bytes_taint));
+{
+    // Save registers
+    StoreStack(3, ebp); 
+    StoreStack(4, ebx);
+    StoreStack(5, esi);
+    StoreStack(6, edi);
+
+    LoadStack(edi, 0);  // edi := bytes_ptr
+    LoadStack(eax, 1);  // eax := offset
+    Add32(edi, eax);    // edi := bytes_ptr + offset
+    LoadStack(esi, 2);  // esi := W_ptr;
+
+    ghost var pre_cast_mem := mem;
+    CastBytesToWords(64, bytes_taint);
+
+    exists b_id, M_id :: CastBytesResult(b_id, pre_cast_mem, mem, edi, 64, M_id, bytes_taint);
+
+    ghost var bytes := old(stack[0][0] + stack[0][1]);
+    forall i :| 0 <= i < 64 && i % 4 == 0 ::
+        mem[M_id].words[bytes + i] == 
+        WordHeapletEntry(old(BytesToWord(mem[bytes_id].bytes[bytes + i + 3].v,
+                                         mem[bytes_id].bytes[bytes + i + 2].v,
+                                         mem[bytes_id].bytes[bytes + i + 1].v,
+                                         mem[bytes_id].bytes[bytes + i + 0].v)), bytes_taint)
+    {
+      ghost var addr := bytes + i;
+      assert ValidDstAddr(old(mem), bytes_id, addr,     8);   // OBSERVE
+      assert ValidDstAddr(old(mem), bytes_id, addr + 1, 8);   // OBSERVE
+      assert ValidDstAddr(old(mem), bytes_id, addr + 2, 8);   // OBSERVE
+      assert ValidDstAddr(old(mem), bytes_id, addr + 3, 8);   // OBSERVE
+    }
+
+    SHA256_ComputeInitialWs_internal(M_id, W_id, bytes_taint);
+
+    forall i :| 0 <= i < 64 && i % 4 == 0 ::
+        mem[W_id].words[old(stack[0][2]) + i] == 
+        WordHeapletEntry(old(GetBytesToWord(mem, bytes_id, stack[0][0] + stack[0][1] + i)), bytes_taint)
+    {
+        ghost var addr := old(stack[0][0] + stack[0][1]) + i;
+        assert ValidDstAddr(old(mem), bytes_id, addr,     8);   // OBSERVE
+        assert ValidDstAddr(old(mem), bytes_id, addr + 1, 8);   // OBSERVE
+        assert ValidDstAddr(old(mem), bytes_id, addr + 2, 8);   // OBSERVE
+        assert ValidDstAddr(old(mem), bytes_id, addr + 3, 8);   // OBSERVE
+        lemma_BytesToWord_WordToBytes_inverses(old(mem)[bytes_id].bytes[addr+3].v, old(mem)[bytes_id].bytes[addr+2].v, old(mem)[bytes_id].bytes[addr+1].v, old(mem)[bytes_id].bytes[addr].v);
+    }
+
+    // Restore registers
+    LoadStack(ebp, 3);
+    LoadStack(ebx, 4);
+    LoadStack(esi, 5);
+    LoadStack(edi, 6);
+
+    // Scrub the stack
+    StoreStack(3, 0); 
+    StoreStack(4, 0);
+    StoreStack(5, 0);
+    StoreStack(6, 0);
+}
+
+#verbatim
+} // end module sha256_vale
+#endverbatim

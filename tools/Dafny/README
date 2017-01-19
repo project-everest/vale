@@ -1,0 +1,12 @@
+
+When upgrading to a new version of Boogie, it's important to increase the 
+stack size it uses, since some of Boogie's internals use way too much for
+some of our DafnyCC-generated files.
+
+You can accomplish this using a Visual Studio Command Prompt and the command:
+
+      editbin /stack:268435456 Boogie.exe
+
+which gives it a 256 MB stack.
+
+

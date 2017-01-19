@@ -1,0 +1,8 @@
+*.fs eol=lf
+*.fsl eol=lf
+*.fsy eol=lf
+*.dfy eol=lf
+*.vad eol=lf
+*.cs eol=lf
+*.html eol=lf
+*.bat eol=lf

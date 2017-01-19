@@ -1,0 +1,216 @@
+{
+module Lex
+
+open Ast
+open Microsoft.FSharp.Text.Lexing
+open Parse
+open Parse_util
+open System.Numerics
+
+let macros = ref (Map.empty:Map<string,token list>)
+let lexeme (lexbuf:LexBuffer<_>):(string) = System.Text.Encoding.ASCII.GetString lexbuf.Lexeme
+let next_line (lexbuf:LexBuffer<_>) = lexbuf.EndPos <- lexbuf.EndPos.NextLine
+
+// Note: main.fs may need to clear/save/restore this if we decide to support include files
+let custom_tokens = ref (Map.empty:Map<string, (loc -> token)>)
+
+let operatorToken (tok:string) (isCustom:bool) (s:string):(loc -> token) option =
+  match tok with
+  | "!" -> Some (fun loc -> BANG (loc, (isCustom, s)))
+  | "*" -> Some (fun loc -> STAR (loc, (isCustom, s)))
+  | "/" -> Some (fun loc -> SLASH (loc, (isCustom, s)))
+  | "%" -> Some (fun loc -> PERCENT (loc, (isCustom, s)))
+  | "+" -> Some (fun loc -> PLUS (loc, (isCustom, s)))
+  | "-" -> Some (fun loc -> MINUS (loc, (isCustom, s)))
+  | "<" -> Some (fun loc -> LT (loc, (isCustom, s)))
+  | ">" -> Some (fun loc -> GT (loc, (isCustom, s)))
+  | "=" -> Some (fun loc -> EQ (loc, (isCustom, s)))
+  | ":=" -> Some (fun loc -> COLONEQ (loc, (isCustom, s)))
+  | "<=" -> Some (fun loc -> LE (loc, (isCustom, s)))
+  | ">=" -> Some (fun loc -> GE (loc, (isCustom, s)))
+  | "==" -> Some (fun loc -> EQEQ (loc, (isCustom, s)))
+  | "!=" -> Some (fun loc -> NE (loc, (isCustom, s)))
+  | "&&" -> Some (fun loc -> AMPAMP (loc, (isCustom, s)))
+  | "||" -> Some (fun loc -> BARBAR (loc, (isCustom, s)))
+  | "<==" -> Some (fun loc -> LTEQEQ (loc, (isCustom, s)))
+  | "==>" -> Some (fun loc -> EQEQGT (loc, (isCustom, s)))
+  | "<==>" -> Some (fun loc -> LTEQEQGT (loc, (isCustom, s)))
+  | _ -> None
+
+}
+
+rule comment = parse
+| "*/" { () }
+| "*)" { () }
+| "/*" { comment lexbuf ; comment lexbuf }
+| "(*" { comment lexbuf ; comment lexbuf }
+| "\n\r" { next_line lexbuf; comment lexbuf }
+| "\r\n" { next_line lexbuf; comment lexbuf }
+| ['\n''\r'] { next_line lexbuf; comment lexbuf }
+| _ { comment lexbuf }
+and preprocess_skip deep = parse
+| "#else" { if deep then preprocess_skip deep lexbuf else () }
+| "#endif" { () }
+| "#ifdef" { preprocess_skip true lexbuf; preprocess_skip deep lexbuf }
+| "#ifndef" { preprocess_skip true lexbuf; preprocess_skip deep lexbuf }
+| "\n\r" { next_line lexbuf; preprocess_skip deep lexbuf }
+| "\r\n" { next_line lexbuf; preprocess_skip deep lexbuf }
+| ['\n''\r'] { next_line lexbuf; preprocess_skip deep lexbuf }
+| _ { preprocess_skip deep lexbuf }
+and file_name = parse
+| [' ']*[^' ''\n''\r']+[^'\n''\r']* { token lexbuf }
+| [^'\n''\r']* { token lexbuf }
+and line_number = parse
+| ['0'-'9']+ { file_name lexbuf }
+and verbatim loc lines line = parse
+| "\n\r" { next_line lexbuf; verbatim loc (line::lines) "" lexbuf }
+| "\r\n" { next_line lexbuf; verbatim loc (line::lines) "" lexbuf }
+| ['\n''\r'] { next_line lexbuf; verbatim loc (line::lines) "" lexbuf }
+| [^'\n''\r']*
+{
+  let s = (lexeme lexbuf) in
+  if s.Trim().StartsWith("#endverbatim") then VERBATIM_BLOCK (loc, List.rev lines)
+  else verbatim loc lines s lexbuf
+}
+and end_line = parse
+| "\n\r" { next_line lexbuf; token lexbuf }
+| "\r\n" { next_line lexbuf; token lexbuf }
+| ['\n''\r'] { next_line lexbuf; token lexbuf }
+and token = parse
+| "\n\r" { next_line lexbuf; token lexbuf }
+| "\r\n" { next_line lexbuf; token lexbuf }
+| ['\n''\r'] { next_line lexbuf; token lexbuf }
+| [' ']+ { token lexbuf }
+| "//"[^'\n''\r']* { token lexbuf }
+| "#line"[' ']+ { line_number lexbuf }
+| "/*" { comment lexbuf ; token lexbuf }
+| "(*" { comment lexbuf ; token lexbuf }
+| "#ifdef"[' ']+['A'-'Z''a'-'z''0'-'9''_''$''?']+
+{
+  let s = lexeme lexbuf in
+  let x = s.Substring("#ifdef".Length).Trim() in
+  if Map.containsKey x !macros then token lexbuf else (preprocess_skip false lexbuf ; token lexbuf)
+}
+| "#ifndef"[' ']+['A'-'Z''a'-'z''0'-'9''_''$''?']+
+{
+  let s = lexeme lexbuf in
+  let x = s.Substring("#ifndef".Length).Trim() in
+  if not (Map.containsKey x !macros) then token lexbuf else (preprocess_skip false lexbuf ; token lexbuf)
+}
+| "#else" { preprocess_skip false lexbuf ; token lexbuf }
+| "#endif" { token lexbuf }
+| "#token"[' ']+[^' ''\n''\r']+[' ']+"precedence"[' ']+[^' ''\n''\r']+[' ']*
+{
+  let s = lexeme lexbuf in
+  let s = s.Replace(" ", "") in
+  let sp = "precedence" in
+  let i1 = "#token".Length in
+  let i2 = s.IndexOf(sp) in
+  let name = s.Substring(i1, i2 - i1) in
+  let prec = s.Substring(i2 + sp.Length) in
+  ( match operatorToken prec true name with
+    | None -> parse_err ("unknown precedence: '" + prec + "'")
+    | Some f -> custom_tokens := Map.add name f !custom_tokens);
+  end_line lexbuf
+}
+| "#verbatim" { verbatim (curLoc lexbuf) [] "" lexbuf }
+| ";" { SEMI (curLoc lexbuf) }
+| "(" { LPAREN (curLoc lexbuf) }
+| ")" { RPAREN (curLoc lexbuf) }
+| "?[" { QLBRACKET (curLoc lexbuf) }
+| "[" { LBRACKET (curLoc lexbuf) }
+| "]" { RBRACKET (curLoc lexbuf) }
+| "{:" { LBRACECOLON (curLoc lexbuf) }
+| "{" { LBRACE (curLoc lexbuf) }
+| "}" { RBRACE (curLoc lexbuf) }
+| "," { COMMA (curLoc lexbuf) }
+| "/" { SLASH (curLoc lexbuf, (false, "/")) }
+| ['!''%''+''-''*''&''^''|''<''>''=''.''#'':''$''?''`''~''@']+
+  {
+    let s = lexeme lexbuf in
+    let loc = curLoc lexbuf in
+    match (s, operatorToken s false s, Map.tryFind s !custom_tokens) with
+    | ("@", _, _) -> AT loc
+    | (".", _, _) -> DOT loc
+    | (":", _, _) -> COLON loc
+    | (":|", _, _) -> COLONBAR loc
+    | ("::", _, _) -> COLONCOLON loc
+    | (_, None, None) -> parse_err ("unknown token '" + s + "'")
+    | (_, None, Some f) -> f loc
+    | (_, Some f, _) -> f loc
+  }
+| "type" { TYPE (curLoc lexbuf) }
+| "const" { CONST (curLoc lexbuf) }
+| "readonly" { READONLY (curLoc lexbuf) }
+| "function" { FUNCTION (curLoc lexbuf) }
+| "returns" { RETURNS (curLoc lexbuf) }
+| "axiom" { AXIOM (curLoc lexbuf) }
+| "procedure" { PROCEDURE (curLoc lexbuf) }
+| "implementation" { IMPLEMENTATION (curLoc lexbuf) }
+| "requires" { REQUIRES (curLoc lexbuf) }
+| "ensures" { ENSURES (curLoc lexbuf) }
+| "reads" { READS (curLoc lexbuf) }
+| "modifies" { MODIFIES (curLoc lexbuf) }
+| "decreases" { DECREASES (curLoc lexbuf) }
+| "invariant" { INVARIANT (curLoc lexbuf) }
+| "assert" { ASSERT (curLoc lexbuf) }
+| "by" { BY (curLoc lexbuf) }
+| "assume" { ASSUME (curLoc lexbuf) }
+| "calc" { CALC (curLoc lexbuf) }
+| "havoc" { HAVOC (curLoc lexbuf)}
+| "goto" { GOTO (curLoc lexbuf) }
+| "call" { CALL (curLoc lexbuf) }
+| "forall" { FORALL (curLoc lexbuf) }
+| "exists" { EXISTS (curLoc lexbuf) }
+| "lambda" { LAMBDA (curLoc lexbuf) }
+| "old" { OLD (curLoc lexbuf) }
+| "this" { THIS (curLoc lexbuf) }
+| "true" { LITBOOL ((curLoc lexbuf), true) }
+| "false" { LITBOOL ((curLoc lexbuf), false) }
+| "is" { IS (curLoc lexbuf) }
+| "let" { LET (curLoc lexbuf) }
+| "in" { IN (curLoc lexbuf) }
+| "out" { OUT (curLoc lexbuf) }
+| "inout" { INOUT (curLoc lexbuf) }
+| "var" { VAR (curLoc lexbuf) }
+| "if" { IF (curLoc lexbuf) }
+| "then" { THEN (curLoc lexbuf) }
+| "else" { ELSE (curLoc lexbuf) }
+| "while" { WHILE (curLoc lexbuf) }
+| "for" { FOR (curLoc lexbuf) }
+| "return" { RETURN (curLoc lexbuf) }
+| "reveal" { REVEAL (curLoc lexbuf) }
+| ":split_here" { SPLIT (curLoc lexbuf) }
+| "static" { STATIC (curLoc lexbuf) }
+| "module" { MODULE (curLoc lexbuf) }
+| "interface" { INTERFACE (curLoc lexbuf) }
+| "import" { IMPORT (curLoc lexbuf) }
+| "ghost" { GHOST (curLoc lexbuf) }
+| "inline" { INLINE (curLoc lexbuf) }
+| "operand" { OPERAND (curLoc lexbuf) }
+| "operator" { OPERATOR (curLoc lexbuf) }
+| "include" { INCLUDE (curLoc lexbuf) }
+| "bv"['0'-'9']+ { BV ((curLoc lexbuf), System.Int32.Parse((lexeme lexbuf).Substring(2))) }
+| ['"'][^'"''\n''\r''\t''\\']*['"'] { let s = lexeme lexbuf in STRING (curLoc lexbuf, s.Substring(1, s.Length - 2)) }
+| "0x"['0'-'9''a'-'f''A'-'F']['0'-'9''a'-'f''A'-'F''_']*
+  {
+    let s = lexeme lexbuf in
+    let s = s.Replace("_", "") in
+    let s = s.Substring(2, String.length s - 2) in
+    let explode (s:string) = [for c in s -> c] in
+    let digits = List.map (int << System.Char.ToLowerInvariant) (explode s) in
+    let rec hex digits n =
+      match digits with
+      | [] -> n
+      | h::t ->
+          let d = if h >= (int 'a') then h - (int 'a') + 10 else h - (int '0') in
+          hex t (bigint.Add (bigint d, bigint.Multiply (bigint 16, n))) in
+    LITINT ((curLoc lexbuf), hex digits bigint.Zero)
+  }
+| ['0'-'9']['0'-'9''_']* { LITINT ((curLoc lexbuf), bigint.Parse((lexeme lexbuf).Replace("_", ""))) }
+| ['0'-'9']+['.']['0'-'9']+ { LITREAL ((curLoc lexbuf), lexeme lexbuf) }
+| ['_''a'-'z''A'-'Z']+['_''a'-'z''A'-'Z''0'-'9''\'']* { ID ((curLoc lexbuf), lexeme lexbuf) }
+| eof { EOF }
+| '\000' { EOF }
+| _ { parse_err ("cannot parse character: \"" ^ (lexeme lexbuf) ^ "\"" ^ "\n(ascii code " ^ (string (int ((lexeme lexbuf).Chars 0))) ^ ")") }
+

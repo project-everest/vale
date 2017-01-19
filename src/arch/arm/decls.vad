@@ -1,0 +1,270 @@
+include{:verbatim} "vale.i.dfy"
+
+#verbatim
+module ARM_decls_i {
+import opened ARM_decls_i_ARM_vale_i = ARM_vale_i
+#endverbatim
+
+var{:state ok()}  ok:bool;
+var{:state mem()} mem:memmap;
+var{:state globals()} globals:map(opr, seq(uint32));
+var{:state osp()} sp:uint32;
+var{:state olr()} lr:uint32;
+
+var{:state reg(R0)}  r0:uint32;
+var{:state reg(R1)}  r1:uint32;
+var{:state reg(R2)}  r2:uint32;
+var{:state reg(R3)}  r3:uint32;
+var{:state reg(R4)}  r4:uint32;
+var{:state reg(R5)}  r5:uint32;
+var{:state reg(R6)}  r6:uint32;
+var{:state reg(R7)}  r7:uint32;
+var{:state reg(R8)}  r8:uint32;
+var{:state reg(R9)}  r9:uint32;
+var{:state reg(R10)} r10:uint32;
+var{:state reg(R11)} r11:uint32;
+var{:state reg(R12)} r12:uint32;
+
+
+procedure {:refined} {:instruction Ins(LDR(rd, base, ofs, t))}
+rLDR(out operand rd:uint32, operand base:uint32, operand ofs:uint32, inline t:taint)
+    requires
+        ValidSrcAddr(mem, base + ofs, t);
+    reads mem;
+    ensures
+        rd == mem[old(base) + old(ofs)].v;
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(LDR_reloc(rd, OSymbol(g)))}
+rLDRglobaladdr(out operand rd:uint32, inline g:global)
+    requires ValidGlobal(OSymbol(g));
+    ensures
+        rd == AddressOfGlobal(OSymbol(g));
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+#verbatim
+
+predicate ValidGlobals(globals:map<operand, seq<uint32>>)
+{
+      (forall g :: g in TheGlobalDecls() <==> g in globals)
+   && (forall g :: g in TheGlobalDecls()
+        ==> |globals[g]| == BytesToWords(TheGlobalDecls()[g]))
+}
+predicate ValidGlobalsAddr(globals:map<operand, seq<uint32>>, g:global, addr:int)
+{
+    ValidGlobals(globals)
+ && ValidGlobal(OSymbol(g)) && WordAligned(addr) 
+ && AddressOfGlobal(OSymbol(g)) <= addr < AddressOfGlobal(OSymbol(g)) + SizeOfGlobal(OSymbol(g))
+}
+#endverbatim
+
+procedure {:refined} {:instruction Ins(LDR_global(rd, OSymbol(g), base, ofs))}
+rLDRglobal(out operand rd:uint32, inline g:global,
+          operand base:uint32, operand ofs:uint32)
+    requires
+        ValidGlobalsAddr(globals, g, base + ofs);
+    reads
+        globals;
+    ensures
+        rd == globals[OSymbol(g)][BytesToWords(base + ofs - AddressOfGlobal(OSymbol(g)))];
+        //GlobalWord(this.m, g, base + ofs - g);
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(STR(rd, base, ofs, t))}
+rSTR(operand rd:reg, operand base:uint32, operand ofs:uint32, inline t:taint)
+    requires
+        ValidAddr(mem, base + ofs);
+    ensures
+        ValidSrcAddr(mem, base + ofs, t);
+        forall addr {ValidAddr(mem, addr)} :: ValidAddr(old(mem), addr) ==> ValidAddr(mem, addr);
+    modifies
+        mem;
+    ensures
+        mem == old(mem)[old(base+ofs) := mementry(rd, t)];
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(MOV(dst, src))}
+rMOV(out operand dst:uint32, operand src:uint32)
+    ensures
+        dst == old(src);
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
+rMOVShift(out operand dst:uint32, operand src:snd, inline shift:Shift)
+    ensures
+        dst == old(EvalShift(old(src), shift));
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(EOR(dst, src1, src2))}
+rEOR(out operand dst:uint32, operand src1:uint32, operand src2:uint32)
+    ensures
+        dst == BitwiseXor(old(src1), old(src2));
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))}
+rEORShift(out operand dst:uint32, operand src1:uint32, operand src2:snd, inline shift:Shift)
+    ensures
+        dst == BitwiseXor(old(src1), EvalShift(old(src2), shift));
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(ADD(dst, src1, src2))}
+rADD(out operand dst:uint32, operand src1:uint32, operand src2:uint32)
+    requires
+        src1 + src2 < 0x1_0000_0000;
+    ensures
+        dst == old(src1 + src2); 
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(SUB(dst, src1, src2))}
+rSUB(out operand dst:uint32, operand src1:uint32, operand src2:uint32)
+    requires
+        src1 - src2 >= 0;
+    ensures
+        dst == old(src1 - src2); 
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(ADD(dst, src1, src2))}
+rADDWrap(out operand dst:uint32, operand src1:uint32, operand src2:uint32)
+    ensures
+        dst == BitwiseAdd32(old(src1), old(src2));
+        //WordAligned(old(src1)) && WordAligned(old(src2)) ==> WordAligned(dst);
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+    reveal BitwiseAdd32;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
+rADDWrapShift(out operand dst:uint32, operand src1:uint32, operand src2:snd, inline shift:Shift)
+    ensures
+        dst == BitwiseAdd32(old(src1), EvalShift(old(src2), shift));
+        //WordAligned(old(src1)) && WordAligned(old(EvalShift(old(src2), shift))) ==> WordAligned(dst);
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+    reveal BitwiseAdd32;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+procedure {:refined} {:instruction Ins(AND(dst, src1, src2))}
+rAND(out operand dst:uint32, operand src1:uint32, operand src2:uint32)
+    ensures
+        dst == old(BitwiseAnd(src1, src2));
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+
+procedure {:refined} {:instruction Ins(REV(dst, src))}
+rREV(out operand dst:uint32, operand src:reg)
+    ensures
+        dst == old(bswap32(src));
+{
+    reveal eval_code;
+    reveal ValidRegState;
+    reveal ValidMemState;
+
+    ghost if (!(old(this).ok && this.ok)) {
+        this := old(this).(ok := false);
+    } 
+}
+
+#verbatim
+} // end module ARMdecls
+#endverbatim
+

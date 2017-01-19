@@ -1,0 +1,152 @@
+#
+# Main file for building the Vale tool
+#
+
+# Python imports
+import os, os.path
+import sys
+# Scons imports
+import SCons.Util
+
+# Imported identifiers defined in the SConstruct file
+Import('env')
+
+####################################################################
+#
+#   Code to drive F#, FSLEX, and FSYACC tools
+#
+####################################################################
+
+BUILD = '#tools/FsLexYacc/FsLexYacc.6.1.0/build'    # the '#' character makes this relative to the SConstruct file in the root of the repo
+FSLEX = BUILD+'/fslex.exe'
+FSYACC = BUILD+'/fsyacc.exe'
+FSC = 'fsc.exe'
+BIN = '../../bin'
+
+def fsyaccEmitter(target, source, env):
+  # assume the initial target is a .fs file.  Add the .fsi target
+  targetBase, targetExt = os.path.splitext(SCons.Util.to_String(target[0]))
+  target.append(targetBase+'.fsi')
+  return (target, source)
+
+def add_fslexyacc(env):
+  env['FSLEX'] = File(FSLEX)
+  fslex = Builder(action='$MONO $FSLEX $SOURCE -o $TARGET',
+                           suffix = '.fs',
+                           src_suffix = '.fsl')
+  env.Append(BUILDERS = {'FSLex' : fslex})
+ 
+  env['FSYACC'] = File(FSYACC)
+  fsyacc = Builder(action='$MONO $FSYACC --module "Parse" $SOURCE -o $TARGET',
+                           suffix = '.fs',
+                           src_suffix = '.fsy',
+                           emitter = fsyaccEmitter)
+  env.Append(BUILDERS = {'FSYacc' : fsyacc})
+
+def build_vale(sources, dafny_refs):
+  senv = env.Clone()
+  dafnyinterface = senv.CopyAs(BIN+'/DafnyInterface.dll', 'DafnyInterface/bin/DafnyInterface.dll')
+  # Wrap all paths in File() so they are appropriately adjusted to be relative to the SConstruct file
+  senv['DAFNY_REFS']=[]
+  for r in dafny_refs:
+    senv.Append(DAFNY_REFS = '-r')
+    senv.Append(DAFNY_REFS = File(r))
+  if sys.platform != 'win32':
+    senv['FSC']='fsharpc'
+  else:
+    senv['FSC']=FSC
+  vale_tool = senv.Command(BIN+'/vale.exe', sources,
+    '$FSC -g --platform:x86 --standalone --mlcompatibility -O $SOURCES -o $TARGET $DAFNY_REFS')
+
+  # add dependencies to vale.exe
+  for r in dafny_refs:
+    Depends(vale_tool, r)
+  Depends(vale_tool, dafnyinterface)
+  return vale_tool
+
+add_fslexyacc(env)
+
+####################################################################
+#
+#   Describe the files needed to build Vale
+#
+####################################################################
+
+DAFNY_REFS = [
+  '../Dafny/BoogieAbsInt.dll',
+  '../Dafny/BoogieBasetypes.dll',
+  '../Dafny/BoogieCodeContractsExtender.dll',
+  '../Dafny/BoogieConcurrency.dll',
+  '../Dafny/BoogieCore.dll',
+  '../Dafny/BoogieDoomed.dll',
+  '../Dafny/BoogieExecutionEngine.dll',
+  '../Dafny/BoogieGraph.dll',
+  '../Dafny/BoogieHoudini.dll',
+  '../Dafny/BoogieModel.dll',
+  '../Dafny/BoogieParserHelper.dll',
+  '../Dafny/BoogieVCExpr.dll',
+  '../Dafny/BoogieVCGeneration.dll',
+  '../Dafny/DafnyPipeline.dll',
+  '../Dafny/Newtonsoft.Json.dll',
+  '../Dafny/Dafny.exe',
+  '../../bin/DafnyInterface.dll',
+  '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'
+  ]
+
+SRC = [
+  'src/ast.fs',
+  'src/ast_util.fs',
+  'src/parse_util.fs',
+  '../../obj/Vale/parse.fs',
+  '../../obj/Vale/lex.fs',
+  'src/transform.fs',
+  'src/emit_common.fs',
+  'src/emit_dafny_text.fs',
+  'src/emit_dafny_direct.fs',
+  'src/emit_fstar_text.fs',
+  'src/emit_vale_text.fs',
+  'src/main.fs'
+  ]
+
+VALE_BIN = [
+  'BoogieAbsInt.dll',
+  'BoogieBasetypes.dll',
+  'BoogieCodeContractsExtender.dll',
+  'BoogieConcurrency.dll',
+  'BoogieCore.dll',
+  'BoogieDoomed.dll',
+  'BoogieExecutionEngine.dll',
+  'BoogieGraph.dll',
+  'BoogieHoudini.dll',
+  'BoogieModel.dll',
+  'BoogieModelViewer.dll',
+  'BoogieParserHelper.dll',
+  'BoogieVCExpr.dll',
+  'BoogieVCGeneration.dll',
+  'Dafny.exe',
+  'Dafny.pdb',
+  'DafnyMenu.dll',
+  'DafnyPipeline.dll',
+  'DafnyPrelude.bpl',
+  'DafnyRuntime.cs',
+  'Provers.SMTLib.dll',
+  'Provers.SMTLib.pdb',
+  'z3.exe'
+  ]
+
+# build vale.exe
+env.FSLex(target='../../obj/Vale/lex.fs', source='src/lex.fsl')
+env.FSYacc(target='../../obj/Vale/parse.fs', source='src/parse.fsy')
+vale_tool = build_vale(SRC, DAFNY_REFS)
+
+# copy the dependencies to the BIN directory, too
+dependencies = vale_tool
+for s in VALE_BIN:
+  b = env.CopyAs(BIN+'/'+s, '../Dafny/'+s)
+  Depends(vale_tool, b)
+  dependencies.append(b)
+
+# Return a list containing the vale.exe tool and its dependent DLLs, for
+# other scripts to use as additional dependencies.
+Return('dependencies')
+

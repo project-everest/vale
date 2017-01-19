@@ -1,0 +1,395 @@
+%{
+
+open Ast
+open Ast_util
+open Parse_util
+open Microsoft.FSharp.Math
+
+let makeUop (op:uop) (loc:loc, (isCustom:bool, s:string)) (e:exp):exp =
+  let op = if isCustom then UCustom s else op in
+  ELoc (loc, EOp (Uop op, [e]))
+
+let makeBop (op:bop) (loc:loc, (isCustom:bool, s:string)) (e1:exp) (e2:exp):exp =
+  let op = if isCustom then BCustom s else op in
+  ELoc (loc, EOp (Bop op, [e1; e2]))
+
+let storageAttrs (a:attrs):(var_storage * attrs) =
+  let rec r (a:attrs):(var_storage list * attrs) list =
+    match a with
+    | [] -> [[], []]
+    | (Id ("thread_local" | "register"), [e])::a -> ([XAlias (AliasThread, e)], [])::(r a)
+    | (Id "local", [e])::a -> ([XAlias (AliasLocal, e)], [])::(r a)
+    | (Id "state", [e])::a -> ([XState e], [])::(r a)
+    | attr::a -> ([], [attr])::(r a)
+  in
+  let (s, a) = List.unzip (r a) in
+  match (List.concat s, List.concat a) with
+  | ([], a) -> (XPhysical, a)
+  | ([s], a) -> (s, a)
+  | (_::_, a) -> parse_err "more than one storage specifier for variable"
+
+%}
+
+%start start
+%type <include_decl list * decls> start
+
+%token <loc * string> ID
+%token <loc * bigint> LITINT
+%token <loc * string> LITREAL
+%token <loc * bool> LITBOOL
+%token <loc * int> BV
+%token <loc> QLBRACKET LBRACKET RBRACKET LBRACE RBRACE LPAREN RPAREN LBRACECOLON
+%token <loc> AT COMMA DOT
+%token <loc * (bool * string)> BANG
+%token <loc * (bool * string)> LT GT EQ LE GE EQEQ NE
+%token <loc * (bool * string)> PLUS MINUS STAR SLASH PERCENT
+%token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
+%token <loc * (bool * string)> COLONEQ
+%token <loc> HAVOC OLD THIS COLONCOLON
+%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL SPLIT GHOST INLINE OPERAND
+%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
+%token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
+%token <loc> RETURNS REQUIRES ENSURES READS MODIFIES
+%token <loc> FORALL EXISTS LAMBDA
+%token <loc> INCLUDE
+%token <loc * string> STRING
+%token <loc * string list> VERBATIM_BLOCK
+
+%token EOF
+
+/* Precedence declarations. */
+
+%left LTEQEQGT
+%right EQEQGT
+%left LTEQEQ
+%left BARBAR
+%left AMPAMP
+%left EQEQ NE
+%left LT GT LE GE IS
+%left PLUS MINUS
+%left STAR SLASH PERCENT
+%right BANG
+%left LPAREN RPAREN QLBRACKET LBRACKET RBRACKET DOT
+
+%%
+
+start: Includes Decls EOF { ($1, $2) }
+
+Include
+  : INCLUDE Attrs STRING { {inc_loc = $1; inc_attrs = $2; inc_path = snd $3} }
+
+Includes
+  : { [] }
+  | Include Includes { $1::$2 }
+
+Type
+  : AnyQualifiedId { TName $1 }
+  | Type LPAREN RPAREN { TApp ($1, []) }
+  | Type LPAREN TypeArgs RPAREN { TApp ($1, $3) }
+  | LPAREN Type RPAREN { $2 }
+TypeArgs
+  : Type { [$1] }
+  | Type COMMA TypeArgs { $1::$3 }
+
+Triggers
+  : { [] }
+  | LBRACE Exps1 RBRACE Triggers { $2::$4 }
+
+BindOp
+  : FORALL { Forall }
+  | EXISTS { Exists }
+  | LAMBDA { Lambda }
+
+Exp
+  : Exp1 { $1 }
+  | IF Exp THEN Exp ELSE Exp { EOp (Cond, [$2; $4; $6]) }
+  | LET Formal COLONEQ Exp IN Exp { EBind (BindLet, [$4], [$2], [], $6) }
+  | BindOp Formals Triggers COLONCOLON Exp { EBind ($1, [], $2, $3, $5) }
+
+Exp1
+  : LPAREN Exp RPAREN { $2 }
+  | Exp1 LTEQEQGT Exp1 { makeBop BEquiv $2 $1 $3 }
+  | Exp1 EQEQGT Exp1 { makeBop BImply $2 $1 $3 }
+  | Exp1 LTEQEQ Exp1 { makeBop BExply $2 $1 $3 }
+  | Exp1 AMPAMP Exp1 { makeBop BAnd $2 $1 $3 }
+  | Exp1 BARBAR Exp1 { makeBop BOr $2 $1 $3 }
+  | Exp1 EQEQ Exp1 { makeBop BEq $2 $1 $3 }
+  | Exp1 NE Exp1 { makeBop BNe $2 $1 $3 }
+  | Exp1 LT Exp1 { makeBop BLt $2 $1 $3 }
+  | Exp1 GT Exp1 { makeBop BGt $2 $1 $3 }
+  | Exp1 LE Exp1 { makeBop BLe $2 $1 $3 }
+  | Exp1 GE Exp1 { makeBop BGe $2 $1 $3 }
+  | Exp1 IS AnyId { expAt $2 (EOp (Uop (UIs $3), [$1])) }
+  | Exp1 PLUS Exp1 { makeBop BAdd $2 $1 $3 }
+  | Exp1 MINUS Exp1 { makeBop BSub $2 $1 $3 }
+  | Exp1 STAR Exp1 { makeBop BMul $2 $1 $3 }
+  | Exp1 SLASH Exp1 { makeBop BDiv $2 $1 $3 }
+  | Exp1 PERCENT Exp1 { makeBop BMod $2 $1 $3 }
+  | LPAREN MINUS Exp1 RPAREN { makeUop UNeg $2 $3 }
+  | BANG Exp1 { makeUop UNot $1 $2 }
+  | Exp1 QLBRACKET Exp RBRACKET { expAt $2 (EOp (Bop BIn, [$3; $1])) }
+  | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3])) }
+  | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5])) }
+  | Exp1 DOT AnyId { expAt $2 (EOp (FieldOp $3, [$1])) }
+  | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (exp2id $1 $3, $5)) }
+  | Exp1 DOT LPAREN AnyId COLONEQ Exp RPAREN { expAt $2 (EOp (FieldUpdate $4, [$1; $6])) }
+  | LITBOOL { expAt (fst $1) (EBool (snd $1)) }
+  | LITINT { expAt (fst $1) (EInt (snd $1)) }
+  | LITREAL { expAt (fst $1) (EReal (snd $1)) }
+  | STRING { expAt (fst $1) (EString (snd $1)) }
+  | BV LPAREN LITINT RPAREN { expAt (fst $1) (EBitVector (snd $1, snd $3)) }
+  | OLD LPAREN Exp RPAREN { expAt $1 (EOp (Uop UOld, [$3])) }
+  | OLD LBRACKET Exp RBRACKET LPAREN Exp RPAREN { expAt $1 (EOp (Bop BOldAt, [$3; $6])) }
+  | THIS { expAt $1 (EVar (Reserved "this")) }
+  | AnyId LPAREN Exps RPAREN { expAt $2 (EApply ($1, $3)) }
+  | ID { expAt (fst $1) (EVar (Id (snd $1))) }
+  | AT ID { expAt $1 (EOp (Uop UToOperand, [expAt (fst $2) (EVar (Id (snd $2)))])) }
+Exps1
+  : Exp { [$1] }
+  | Exp COMMA Exps1 { $1::$3 }
+Exps
+  : { [] }
+  | Exps1 { $1 }
+AnyId
+  : ID { Id (snd $1) }
+AnyIds1
+  : AnyId { [$1] }
+  | AnyId COMMA AnyIds1 { $1::$3 }
+AnyIds
+  : { [] }
+  | AnyIds1 { $1 }
+AnyQualifiedId
+  : AnyId { $1 }
+  | AnyQualifiedId DOT ID { Id (string_of_id $1 + "." + (snd $3)) }
+
+OpToken
+  : BANG { $1 }
+  | STAR { $1 }
+  | SLASH { $1 }
+  | PERCENT { $1 }
+  | PLUS { $1 }
+  | MINUS { $1 }
+  | LT { $1 }
+  | GT { $1 }
+  | EQ { $1 }
+  | COLONEQ { $1 }
+  | LE { $1 }
+  | GE { $1 }
+  | EQEQ { $1 }
+  | NE { $1 }
+  | AMPAMP { $1 }
+  | BARBAR { $1 }
+  | LTEQEQ { $1 }
+  | EQEQGT { $1 }
+  | LTEQEQGT { $1 }
+AnyIdOrOp
+  : AnyId { $1 }
+  | OPERATOR LPAREN OpToken RPAREN { let (_, (_, s)) = $3 in Operator s }
+CalcOp
+  : LTEQEQGT { Some BEquiv }
+  | EQEQGT { Some BImply }
+  | LTEQEQ { Some BExply }
+  | AMPAMP { Some BAnd }
+  | BARBAR { Some BOr }
+  | EQEQ { Some BEq }
+  | LT { Some BLt }
+  | GT { Some BGt }
+  | LE { Some BLe }
+  | GE { Some BGe }
+
+Attrs
+  : { [] }
+  | LBRACECOLON AnyId Exps RBRACE Attrs { ($2, $3)::$5 }
+
+GhostOpt: { NotGhost } | GHOST { Ghost }
+StmtModifier: { SmPlain } | GHOST { SmGhost } | INLINE { SmInline }
+
+Var
+  : VAR { ($1, NotGhost) }
+  | GHOST VAR { ($1, Ghost) }
+VarAttrs
+  : VAR Attrs { let (s, a) = storageAttrs $2 in ($1, s, a) }
+  | GHOST VAR Attrs { ($1, XGhost, $3) }
+VarInit
+  : { None }
+  | COLONEQ Exp { Some $2 }
+VarType
+  : { None }
+  | COLON Type { Some $2 }
+
+Lhs
+// TODO:  : Exp1 { ($1, None) }
+  : AnyId { ($1, None) }
+  | THIS { (Reserved "this", None) }
+  | LPAREN Var AnyId VarType RPAREN { let (_, g) = $2 in ($3, Some ($4, g)) }
+Lhss1
+  : Lhs { [$1] }
+  | Lhs COMMA Lhss1 { $1::$3 }
+
+Decreases
+  : { parse_err "a while loop must contain zero or more invariants followed by exactly one decreases clause" }
+  | DECREASES STAR SEMI { ($1, []) }
+  | DECREASES Exps1 SEMI { ($1, $2) }
+ExpAssign
+  : AnyId BANG
+    {
+      let (loc, (isCustom, s)) = $2 in
+      if not isCustom then parse_err "unexpected postfix operator" else
+      stmtAt loc (SAssign ([], EOp (Uop (UCustomAssign s), [EVar $1])))
+    }
+  | Lhss1 COLONEQ Exp
+    {
+      let (loc, (isCustom, s)) = $2 in
+      if isCustom then stmtAt loc (SAssign ($1, EOp (Uop (UCustomAssign s), [$3])))
+      else stmtAt loc (SAssign ($1, $3))
+    }
+ExpAssigns1
+  : ExpAssign { $1 }
+  | ExpAssign COMMA ExpAssigns1 { $1 @ $3 }
+ExpAssigns
+  : { [] }
+  | ExpAssigns1 { $1 }
+Stmt
+  : ID COLON { stmtAt (fst $1) (SLabel (Id (snd $1))) }
+  | GOTO AnyId SEMI { stmtAt $1 (SGoto $2) }
+  | RETURN SEMI { stmtAt $1 SReturn }
+  | IfStmt { $1 }
+  | WHILE LPAREN Exp RPAREN Invariants Decreases LBRACE Block RBRACE
+    {
+      stmtAt $1 (SWhile ($3, $5, $6, $8))
+    }
+  | FOR LPAREN ExpAssigns SEMI Exp SEMI ExpAssigns RPAREN Invariants Decreases LBRACE Block RBRACE
+    {
+      $3 @ (stmtAt $1 (SWhile ($5, $9, $10, $12 @ $7)))
+    }
+  | FORALL Formals Triggers COLONCOLON Exp LBRACE Block RBRACE
+    {
+      stmtAt $1 (SForall ($2, $3, EBool true, $5, $7))
+    }
+  | FORALL Formals Triggers COLONBAR Exp COLONCOLON Exp LBRACE Block RBRACE
+    {
+      stmtAt $1 (SForall ($2, $3, $5, $7, $9))
+    }
+  | EXISTS Formals Triggers COLONCOLON Exp SEMI { stmtAt $1 (SExists ($2, $3, $5)) }
+  | INVARIANT Exp SEMI { stmtAt $1 (SAssert (IsInv, $2)) }
+  | ASSUME Exp SEMI { stmtAt $1 (SAssume $2) }
+  | ASSERT Exp SEMI { stmtAt $1 (SAssert (NotInv, $2)) }
+  | ASSERT Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], EBool true, $2, $5)) }
+  | ASSERT LBRACE SPLIT RBRACE LITBOOL SEMI { stmtAt $1 (if snd $5 then SSplit else parse_err "Must use: assert {:split_here} true;" ) }
+  | CALC LBRACE CalcContents0 RBRACE { stmtAt $1 (SCalc (None, $3)) }
+  | CALC CalcOp LBRACE CalcContents0 RBRACE { stmtAt $1 (SCalc ($2, $4)) }
+  | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp(Uop UReveal, [EVar $2]))) }
+  | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, g, a, $4)) }
+  | ExpAssign SEMI { $1 }
+  | Exp1 SEMI { stmtAt (one_loc_of_exp $2 $1) (SAssign ([], $1)) }
+IfStmt
+  : StmtModifier IF LPAREN Exp RPAREN LBRACE Block RBRACE ElseOpt
+    {
+      stmtAt $2 (SIfElse ($1, $4, $7, $9))
+    }
+ElseOpt
+  : { [] }
+  | ELSE LBRACE Block RBRACE { $3 }
+  | ELSE IfStmt { $2 }
+CalcContents0  /* if there's anything else coming, it must start with a Line */
+  : { [] }
+  | Exp SEMI CalcContents1 { CalcLine $1 :: $3 }
+CalcContents1  /* we parse another Line, or a CalcOp followed by a line, or a sequence of hints possibly preceded by a CalcOp, or we're done */
+  : { [] }
+  | Exp SEMI CalcContents1 { CalcLine $1 :: $3 }
+  | CalcOp Exp SEMI CalcContents1 { CalcHint ($1, []) :: CalcLine $2 :: $4 }
+  | CalcOp LBRACE Block RBRACE CalcContents2 { CalcHint ($1, $3) :: $5 }
+  | LBRACE Block RBRACE CalcContents2 { CalcHint (None, $2) :: $4 }
+CalcContents2  /* continue parsing as many hints (without any CalcOp) as possible, then return to the initial CalcContents state */
+  : LBRACE Block RBRACE CalcContents2 { CalcHint (None, $2) :: $4 }
+  | CalcContents0 { $1 }
+
+Block
+  : { [] }
+  | Stmt Block { $1 @ $2 }
+
+Formal
+  : AnyId { ($1, None) }
+  | AnyId COLON Type { ($1, Some $3) }
+Formals1
+  : Formal { [$1] }
+  | Formal COMMA Formals1 { $1::$3 }
+Formals
+  : { [] }
+  | Formals1 { $1 }
+
+InOut
+  : { In }
+  | OUT { Out }
+  | INOUT { InOut }
+ProcFormal
+  : InOut Attrs AnyId COLON Type { let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) }
+  | InOut OPERAND Attrs AnyId COLON Type { ($4, $6, XOperand, $1, $3) }
+  | GHOST Attrs AnyId COLON Type { ($3, $5, XGhost, In, $2) }
+  | INLINE Attrs AnyId COLON Type { ($3, $5, XInline, In, $2) }
+ProcFormals1
+  : ProcFormal { [$1] }
+  | ProcFormal COMMA ProcFormals1 { $1::$3 }
+ProcFormals
+  : { [] }
+  | ProcFormals1 { $1 }
+
+SemiExps
+  : { [] }
+  | Exp SEMI SemiExps { ($2, $1)::$3 }
+  | LET Formal COLONEQ Exp SEMI SemiExps
+    {
+      let es = List.map (fun (loc, e) -> ELoc (loc, e)) $6 in
+      let conj = and_of_list es in
+      [($1, EBind (BindLet, [$4], [$2], [], conj))]
+    }
+
+Req: REQUIRES Attrs {}
+
+Spec
+  : REQUIRES SemiExps { List_mapSnd Requires $2 }
+  | REQUIRES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
+    {
+      (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
+      List_mapSnd (fun e -> Requires (EOp (Uop UUnrefinedSpec, [e]))) $6
+    }
+  | ENSURES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
+    {
+      (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
+      List_mapSnd (fun e -> Ensures (EOp (Uop UUnrefinedSpec, [e]))) $6
+    }
+  | ENSURES SemiExps { List_mapSnd Ensures $2 }
+  | REQUIRES SLASH ENSURES SemiExps { (List_mapSnd Requires $4) @ (List_mapSnd Ensures $4) }
+  | READS SemiExps { List_mapSnd (fun e -> Modifies (false, e)) $2 }
+  | MODIFIES SemiExps { List_mapSnd (fun e -> Modifies (true, e)) $2 }
+Specs
+  : { [] }
+  | Spec Specs { $1 @ $2 }
+
+Invariants
+  : { [] }
+  | INVARIANT SemiExps Invariants { $2 @ $3 }
+
+Proc
+  : GhostOpt PROCEDURE { ($2, $1) }
+ProcRet
+  : { [] }
+  | RETURNS LPAREN ProcFormals RPAREN { $3 }
+Decl
+  : VERBATIM_BLOCK { (fst $1, DVerbatim (snd $1)) }
+  | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
+  | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId
+    { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = (Reserved "alias", [EVar $10])::$2}) }
+  | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
+    { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet COLONEQ AnyId
+    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $9])::$2}) }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs
+    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = None; pattrs = $2}) }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs LBRACE Block RBRACE
+    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = Some $10; pattrs = $2}) }
+
+Decls
+  : { [] }
+  | Decl Decls { $1::$2 }
+

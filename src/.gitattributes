@@ -1,0 +1,6 @@
+*.dfy eol=lf
+*.vad eol=lf
+*.cs eol=lf
+*.c eol=lf
+*.h eol=lf
+*.bat eol=lf
