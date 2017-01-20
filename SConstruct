@@ -52,7 +52,7 @@ AddOption('--DARGS',
   default=[],
   action='append',
   help='Supply temporary additional arguments to the Dafny compiler')
-AddOption('--SARGS',
+AddOption('--VARGS',
   dest='vale_user_args',
   type='string',
   default=[],
