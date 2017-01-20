@@ -5,6 +5,7 @@
 # Python imports
 import os, os.path
 import sys
+import collections
 # Scons imports
 import SCons.Util
 
@@ -21,7 +22,7 @@ BUILD = '#tools/FsLexYacc/FsLexYacc.6.1.0/build'    # the '#' character makes th
 FSLEX = BUILD+'/fslex.exe'
 FSYACC = BUILD+'/fsyacc.exe'
 FSC = 'fsc.exe'
-BIN = '../../bin'
+BIN = '#bin'
 
 def fsyaccEmitter(target, source, env):
   # assume the initial target is a .fs file.  Add the .fsi target
@@ -30,7 +31,12 @@ def fsyaccEmitter(target, source, env):
   return (target, source)
 
 def add_fslexyacc(env):
-  env['FSLEX'] = File(FSLEX)
+  # probe for fslexyacc to ensure it is installed ahead of trying to use it to build
+  fslexfile = File(FSLEX)
+  if not os.path.isfile(str(fslexfile)):
+    raise EnvironmentError('FsLexYacc missing.  Please install to: "%s"'%str(fslexfile))
+    
+  env['FSLEX'] = fslexfile
   fslex = Builder(action='$MONO $FSLEX $SOURCE -o $TARGET',
                            suffix = '.fs',
                            src_suffix = '.fsl')
@@ -108,6 +114,7 @@ SRC = [
   'src/main.fs'
   ]
 
+# Dafny and Boogie binaries.  Z3 is handled separately.
 VALE_BIN = [
   'BoogieAbsInt.dll',
   'BoogieBasetypes.dll',
@@ -131,7 +138,6 @@ VALE_BIN = [
   'DafnyRuntime.cs',
   'Provers.SMTLib.dll',
   'Provers.SMTLib.pdb',
-  'z3.exe'
   ]
 
 # build vale.exe
@@ -145,8 +151,20 @@ for s in VALE_BIN:
   b = env.CopyAs(BIN+'/'+s, '../Dafny/'+s)
   Depends(vale_tool, b)
   dependencies.append(b)
-
+if sys.platform == 'win32':
+  b = env.CopyAs(BIN+'/z3.exe', '../Dafny/z3.exe')
+  Depends(vale_tool, b)
+  dependencies.append(b)
+  z3 = b[0]
+else:
+  z3 = FindFile('z3', os.environ['PATH'].split(':'))
+  if z3 == None:
+    raise EnvironmentError('z3 missing from path.')
+  Depends(vale_tool, z3)
+  dependencies.append(z3)
+  
 # Return a list containing the vale.exe tool and its dependent DLLs, for
 # other scripts to use as additional dependencies.
-Return('dependencies')
-
+# Also return the path to z3 relative to the root Sconstruct file.
+vale_tool_results = collections.namedtuple('ValeToolResults', 'dependencies z3')(dependencies, z3)
+Return('vale_tool_results')

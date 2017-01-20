@@ -189,30 +189,6 @@ def vale_file_scan(node, env, path):
 #   Dafny-specific utilities
 #
 ####################################################################
-def add_dafny_exe_dependencies(verb):
-  script_dir = os.path.dirname(os.path.realpath('__file__'))
-  dafny_dir = os.path.normpath(os.path.join(script_dir, "..", "Dafny"))
-  Depends(verb, os.path.join(dafny_dir, "AbsInt.dll"))
-  Depends(verb, os.path.join(dafny_dir, "BaseTypes.dll"))
-  Depends(verb, os.path.join(dafny_dir, "CodeContractsExtender.dll"))
-  Depends(verb, os.path.join(dafny_dir, "Concurrency.dll"))
-  Depends(verb, os.path.join(dafny_dir, "Core.dll"))
-  Depends(verb, os.path.join(dafny_dir, "Dafny.exe.config"))
-  Depends(verb, os.path.join(dafny_dir, "DafnyPipeline.dll"))
-  Depends(verb, os.path.join(dafny_dir, "DafnyPrelude.bpl"))
-  Depends(verb, os.path.join(dafny_dir, "Doomed.dll"))
-  Depends(verb, os.path.join(dafny_dir, "ExecutionEngine.dll"))
-  Depends(verb, os.path.join(dafny_dir, "Graph.dll"))
-  Depends(verb, os.path.join(dafny_dir, "Model.dll"))
-  Depends(verb, os.path.join(dafny_dir, "msvcp100.dll"))
-  Depends(verb, os.path.join(dafny_dir, "msvcr100.dll"))
-  Depends(verb, os.path.join(dafny_dir, "ParserHelper.dll"))
-  Depends(verb, os.path.join(dafny_dir, "Provers.SMTLib.dll"))
-  Depends(verb, os.path.join(dafny_dir, "VCExpr.dll"))
-  Depends(verb, os.path.join(dafny_dir, "VCGeneration.dll"))
-  Depends(verb, os.path.join(dafny_dir, "vcomp100.dll"))
-  Depends(verb, os.path.join(dafny_dir, "DafnyRuntime.cs"))
-  Depends(verb, os.path.join(dafny_dir, "z3.exe"))
 
 ### Could try adding this to the scanner below...
 ### From: http://stackoverflow.com/questions/241327/python-snippet-to-remove-c-and-c-comments
@@ -291,7 +267,7 @@ env.Append(SCANNERS = dafny_scan)
 #  File representing the verification result
 def verify_dafny(env, targetfile, sourcefile):
   temptargetfile = os.path.splitext(targetfile)[0] + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $SOURCE $DAFNY_USER_ARGS >$TARGET")
+  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_USER_ARGS >$TARGET")
   return env.CopyAs(source=temptarget, target=targetfile)
   
 # Add env.Dafny(), to verify a .dfy file into a .vdfy
@@ -490,37 +466,6 @@ env.AddMethod(verify_files_in, "VerifyFilesIn")
 env.AddMethod(verify_vale_files, "VerifyValeFiles")
 env.AddMethod(verify_dafny_files, "VerifyDafnyFiles")
 
-
-#####################################################################
-##
-##   Automatically create the necessary Dafny Builders
-##
-#####################################################################
-#
-## Make one Dafny call (in dependency mode) with all of the roots
-## For each entry in the response, add a corresponding Dafny verb along with corresponding dependency edges
-#def add_dafny_dependencies(roots):
-#  add_dafny_to_path()
-#  output = docmd("dafny", "/nologo", "/ironDafny", "/noVerify", "/printIncludes:Transitive", "/deprecation:0", "/noNLarith", *roots)
-#  v_files = set()
-#  for line in output:
-#    files = line.split(';')
-#    if len(files) > 0 and files[0] != 'roots' and len(files[0]) > 0:
-#      base_file_name = make_cygwin_path(os.path.splitext(files[0])[0])
-#      print "Creating a verb for %s" % base_file_name
-#      dfy = env.Dafny(base_file_name + ".v", base_file_name + ".dfy")
-#      add_dafny_exe_dependencies(dfy) # Add Dafny and associated files as a universal dependency
-#      for file_name in files[1:]:
-#        if len(file_name) > 0: 
-#          file_name = make_cygwin_path(file_name)
-#          v_file_name = os.path.splitext(file_name)[0] + '.v'
-#          print "\tAdding %s as a dependency" % (v_file_name)
-#          Depends(dfy, v_file_name)
-#          v_files |= { v_file_name }
-#  print "Done computing Dafny dependencies\n"
-#  return v_files
-#
-
 #
 # Pull in the SConscript files which define actual build targets:
 #
@@ -529,7 +474,14 @@ env.AddMethod(verify_dafny_files, "VerifyDafnyFiles")
 Export('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarith')
 
 # Include the SConscript files themselves
-vale_deps = SConscript('tools/Vale/SConscript')
+vale_tool_results = SConscript('tools/Vale/SConscript')
+vale_deps = vale_tool_results.dependencies;
+env['Z3'] = vale_tool_results.z3
+if sys.platform == 'win32':
+  env['DAFNY_Z3_PATH'] = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
+else:  
+  env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
+
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
