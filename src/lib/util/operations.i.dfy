@@ -285,15 +285,6 @@ method ComputeBitwiseXor(x:uint, y:uint) returns (z:uint)
     z := BitsToWord(zb) as uint;
 }
 
-lemma lemma_BitShiftsSum(x: bv32, a: nat, b: nat)
-    requires 0 <= a + b < 32
-    ensures BitShiftLeft(x, a + b) == BitShiftLeft(BitShiftLeft(x, a), b)
-    ensures BitShiftRight(x, a + b) == BitShiftRight(BitShiftRight(x, a), b)
-{
-    reveal_BitShiftLeft();
-    reveal_BitShiftRight();
-}
-
 lemma lemma_BitShiftLeft1(x: bv32)
     requires x < 0x80000000;
     ensures  BitShiftLeft(x, 1) == BitMul(x, 2);
