@@ -9,6 +9,7 @@ flycheck_*
 *.vim
 nohup.out
 tools/Vale/src/packages/
+tools/FsLexYacc
 *.suo
 *~
 .sconsign.dblite
