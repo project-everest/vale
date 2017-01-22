@@ -21,7 +21,6 @@ Import('env')
 BUILD = '#tools/FsLexYacc/FsLexYacc.6.1.0/build'    # the '#' character makes this relative to the SConstruct file in the root of the repo
 FSLEX = BUILD+'/fslex.exe'
 FSYACC = BUILD+'/fsyacc.exe'
-FSC = 'fsc.exe'
 BIN = '#bin'
 
 def fsyaccEmitter(target, source, env):
@@ -60,7 +59,15 @@ def build_vale(sources, dafny_refs):
   if sys.platform != 'win32':
     senv['FSC']='fsharpc'
   else:
-    senv['FSC']=FSC
+    # probe for the F# compiler on the PATH
+    fsc = FindFile('fsc.exe', os.environ['PATH'].split(';'))
+    if fsc == None:
+      installdir = os.environ.get('FSHARPINSTALLDIR')
+      if installdir == None:
+        raise EnvironmentError('fsc,exe missing from path and FSHARPINSTALLDIR.')
+      senv['FSC']=File(os.path.join(installdir, 'fsc.exe'))
+    else:
+      senv['FSC']=fsc
   vale_tool = senv.Command(BIN+'/vale.exe', sources,
     '$FSC -g --platform:x86 --standalone --mlcompatibility -O $SOURCES -o $TARGET $DAFNY_REFS')
 
