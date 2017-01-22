@@ -1,16 +1,6 @@
 include "common.vad"
 
 #verbatim
-
-function method va_code_P(o:va_operand_code, k:int):va_code
-
-lemma va_refined_P(va_b0:va_codes, va_s0:va_state, va_sN:va_state, o:va_operand_lemma, k:int)
-    returns (va_bM:va_codes, va_sM:va_state)
-    requires va_require(va_b0, va_code_P(o, k), va_s0, va_sN)
-    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
-    ensures  forall id:int, g:int {:trigger va_trigger_P(id, g)} :: va_trigger_P(id, g) ==> va_spec_P(k, g, va_eval_op_int(va_s0, o), va_eval_op_int(va_sM, o), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM))
-    ensures  va_sM == va_s0.(ok := va_sM.ok);
-
 predicate F(i:int)
 predicate G(i:int)
 
@@ -18,25 +8,21 @@ lemma L(i:int)
     requires F(i)
     ensures  G(i)
 
-predicate{:opaque} OpaqueTruth(x: int)
+predicate{:opaque} OpaqueTruth(x:int)
 {
-  true
+    true
 }
-
 #endverbatim
 
-procedure{:refined} P(inout operand o:int, inline k:int, ghost g:int)
-    requires
-        g >= 1;
+procedure{:instruction Ins(InsIncr(x))} Increment(inout register x:int)
     ensures
-        eax == old(eax) + 1;
-        o == old(o) + 1;
-        g >= 0;
-    modifies
-        eax;
+        x == old(x) + 1;
+{
+}
 
-procedure{:refined} P_wrapper(inout operand o:int, inline k:int, ghost g:int)
+procedure P(inout register o:int, inline k:int, ghost g:int)
     requires
+        @o != EAX;
         g >= 1;
     ensures
         eax == old(eax) + 1;
@@ -45,10 +31,11 @@ procedure{:refined} P_wrapper(inout operand o:int, inline k:int, ghost g:int)
     modifies
         eax;
 {
-    P(o, k, g);
+    Increment(eax);
+    Increment(o);
 }
 
-procedure{:refined}{:bridge} Q(inline iii:int, operand dummy:int, operand dummy2:int, ghost g:int)
+procedure Q(inline iii:int, ghost g:int)
     requires
         F(eax + 3);
         g >= 0;
@@ -60,35 +47,24 @@ procedure{:refined}{:bridge} Q(inline iii:int, operand dummy:int, operand dummy2
     P(ebx, 10, 100);
     ghost var a1 := g + 1;
     ghost var a2 := eax;
-    P_wrapper(ebx, 20, a1);
+    P(ebx, 20, a1);
     assert ebx == old(ebx) + 2;
-    assert OpaqueTruth(65) by {
-      assert ebx - 2 == old(ebx);
-      reveal_OpaqueTruth();
+    assert OpaqueTruth(65) by
+    {
+        assert ebx - 2 == old(ebx);
+        reveal OpaqueTruth;
     }
     ghost var a3 := eax;
     ghost var a4 := old(eax);
-    assert a2 == a4 + 1 by {
-      assert a3 == a2 + 1;
-      assert a3 == a4 + 2;
+    assert a2 == a4 + 1 by
+    {
+        assert a3 == a2 + 1;
+        assert a3 == a4 + 2;
     }
     ghost if (a3 < 10)
     {
-      a3 := a3 + 1;
+        a3 := a3 + 1;
     }
     P(ebx, 30, a1 + a1);
     L(eax);
-}
-
-procedure unrefinedCallerOfQ(inline iii:int, operand dummy:int, operand dummy2:int)
-    requires
-        this.ok;
-        va_is_src_int(@dummy);
-        va_is_src_int(@dummy2);
-        F(this.regs[EAX] + 3);
-    ensures
-        this.ok;
-        G(this.regs[EAX]);
-{
-    Q(iii, dummy, dummy2, 7);
 }

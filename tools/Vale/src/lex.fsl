@@ -187,7 +187,6 @@ and token = parse
 | "import" { IMPORT (curLoc lexbuf) }
 | "ghost" { GHOST (curLoc lexbuf) }
 | "inline" { INLINE (curLoc lexbuf) }
-| "operand" { OPERAND (curLoc lexbuf) }
 | "operator" { OPERATOR (curLoc lexbuf) }
 | "include" { INCLUDE (curLoc lexbuf) }
 | "bv"['0'-'9']+ { BV ((curLoc lexbuf), System.Int32.Parse((lexeme lexbuf).Substring(2))) }

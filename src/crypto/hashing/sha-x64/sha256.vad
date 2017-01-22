@@ -515,7 +515,7 @@ ensures
 
 // Entry-point for the Dafny-level SHA code
 // Note that we require 16 stack slots at present to provide scratch space for SHA calculations
-procedure {:frame} SHA256_Compute64StepsH(
+procedure SHA256_Compute64StepsH(
     ghost H_id:heaplet_id,      // Hash state
     ghost W_id:heaplet_id,      // Expanded message words
     inline H_taint:taint,
@@ -1039,7 +1039,7 @@ procedure {:refined}{:bridge} CastBytesToWords(inline num_bytes:uint32, inline t
 // Entry-point for the Dafny-level SHA code
 // Wrapper around the internal version
 // This handles taking arguments off the stack and casting bytes to words
-procedure {:frame} SHA256_ComputeInitialWs(
+procedure SHA256_ComputeInitialWs(
   ghost bytes_id:heaplet_id,  // Message bytes
   ghost W_id:heaplet_id,      // Expanded message words
   inline bytes_taint:taint

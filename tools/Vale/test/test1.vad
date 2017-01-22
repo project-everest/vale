@@ -1,0 +1,114 @@
+include "common.vad"
+
+procedure{:instruction Ins(InsImm(x, y))} Imm(out register x:int, inline y:int)
+    ensures
+        x == y;
+{
+}
+
+procedure{:instruction Ins(InsIncr(x))} Increment(inout register x:int)
+    ensures
+        x == old(x) + 1;
+{
+}
+
+procedure{:instruction Ins(InsAdd(x, y))} Add(inout register x:int, operand y:int)
+    ensures
+        x == old(x + y);
+{
+}
+
+procedure AddReg(inout register x:int, register y:int)
+    ensures
+        x == old(x + y);
+{
+    Add(x, y); // coerces y from register to operand
+}
+
+#verbatim
+function method Double(x:int):int { x + x }
+#endverbatim
+
+procedure Calls()
+    modifies
+        eax; ebx;
+    ensures
+        eax == old(eax) + 10;
+{
+    Increment(eax);
+    Add(eax, 3);
+    Add(eax, const(2 + Double(1)));
+    Imm(ebx, Double(1));
+    assert ebx == 2;
+    Add(eax, ebx);
+}
+
+procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+    ensures
+        g2 == g1 + 1;
+{
+    g2 := g1 + 1;
+}
+
+procedure Ifs(inline i:int, ghost g:int)
+    modifies
+        eax; ebx;
+    requires
+        g < eax;
+    ensures
+        i < 10 ==> eax == old(eax) + i;
+        1 <= ebx <= 3;
+        eax <= old(ebx) ==> ebx == 1;
+{
+    (ghost var h) := Ghosts(g);
+    ghost if (eax < ebx)
+    {
+        assert eax <= ebx;
+        assert g < ebx;
+        assert h <= ebx;
+    }
+    else
+    {
+        assert eax >= ebx;
+    }
+
+    inline if (i < 10)
+    {
+        Add(eax, i);
+    }
+    else
+    {
+        Add(eax, 10);
+    }
+
+    if (eax <= ebx)
+    {
+        Imm(ebx, 1);
+    }
+    else if (eax <= 10)
+    {
+        Imm(ebx, 2);
+    }
+    else
+    {
+        Imm(ebx, 3);
+    }
+}
+
+procedure Whiles()
+    modifies
+        eax; ebx;
+    ensures
+        ebx == old(ebx) + 100;
+{
+    Imm(eax, 0);
+    while (eax <= 9)
+        invariant
+            0 <= eax <= 10;
+            ebx == old(ebx) + 10 * eax;
+        decreases 10 - eax;
+    {
+        Add(eax, 1);
+        Add(ebx, 10);
+    }
+}

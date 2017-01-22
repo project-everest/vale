@@ -66,8 +66,8 @@ let exp_of_conjuncts (es:exp list):exp =
 let gen_lemma_sym_count = ref 0
 let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count
 
-let get_code_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace ec | _ -> Unchanged) e
-let get_lemma_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace el | _ -> Unchanged) e
+let get_code_exp (e:exp):exp = e // map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace ec | _ -> Unchanged) e
+let get_lemma_exp (e:exp):exp = e // map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace el | _ -> Unchanged) e
 
 let stateToOp (e:exp):exp map_modify =
   match e with
@@ -85,6 +85,7 @@ type build_env =
     is_refined_while_ghosts:id list;
     is_inside_while:bool;
     is_bridge:bool;
+    is_framed:bool;
     code_name:id;
     spec_name:id;
     frame_exp:id -> exp;
@@ -155,8 +156,8 @@ and build_code_block (env:env) (stmts:stmt list):exp =
 let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 
 type proc_arg =
-| ArgOperand of formal
-| ArgState of formal
+| ArgOperand of id * string * typ
+| ArgState of id * typ
 | ArgExp of exp
 
 type es_call =
@@ -287,19 +288,19 @@ let area_fun_param (modifies:bool) (pfIsRet:bool) (area:emit_area_fun) (pf:pform
   match (area, storage, io, pfIsRet, modifies) with
   | (EmitCode, XInline, _, false, false) -> [fx]
   | (EmitCode, (XGhost | XAlias _), _, _, false) -> []
-  | (EmitCode, XOperand, _, _, false) -> [(x, Some tOperandCode)]
+  | (EmitCode, XOperand xo, _, _, false) -> [(x, Some (tOperand xo))]
   | (EmitCode, _, _, _, true) -> []
-  | (_, XOperand, _, _, false) -> []
+  | (_, XOperand _, _, _, false) -> []
   | (_, (XInline | XGhost), _, _, true) -> []
   | ((EmitReq | EmitEns), XInline, _, false, false) -> [fx]
   | ((EmitReq | EmitEns), XGhost, _, _, false) -> [fx]
-  | (EmitReq, XOperand, (In | InOut), false, true) -> [fOld]
-  | (EmitReq, XOperand, Out, false, true) -> []
-  | (EmitReq, XOperand, _, true, true) -> []
-  | (EmitEns, XOperand, In, false, true) -> [fOld]
-  | (EmitEns, XOperand, InOut, false, true) -> [fOld; fx]
-  | (EmitEns, XOperand, Out, false, true) -> [fx]
-  | (EmitEns, XOperand, _, true, true) -> [fx]
+  | (EmitReq, XOperand _, (In | InOut), false, true) -> [fOld]
+  | (EmitReq, XOperand _, Out, false, true) -> []
+  | (EmitReq, XOperand _, _, true, true) -> []
+  | (EmitEns, XOperand _, In, false, true) -> [fOld]
+  | (EmitEns, XOperand _, InOut, false, true) -> [fOld; fx]
+  | (EmitEns, XOperand _, Out, false, true) -> [fx]
+  | (EmitEns, XOperand _, _, true, true) -> [fx]
   | ((EmitReq | EmitEns), XAlias _, _, _, _) -> notImplemented "alias arguments not yet supported for {:refined true} procedures"
   | (_, XInline, _, true, _) -> internalErr "XInline"
   | (_, XState _, _, _, _) -> internalErr "XState"
@@ -319,18 +320,18 @@ let area_fun_params (area:emit_area_fun) (prets:pformal list) (pargs:pformal lis
 let area_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_proc) (pf:pformal):pformal list =
   let (x, t, storage, io, attrs) = pf in
   let pfOld () = (old_id x, t, storage, io, attrs) in
-  let pfOp () = (x, tOperandLemma, XPhysical, In, attrs) in
+  let pfOp xo = (x, tOperand xo, XPhysical, In, attrs) in
   match (ret, area, storage, io, pfIsRet, modifies) with
   | (_, (EmitAbstract | EmitConcrete), XGhost, _, _, _) -> []
   | (_, EmitLemma, XGhost, _, _, false) -> if ret = pfIsRet then [pf] else []
   | (false, EmitAbstract, XInline, _, false, false) -> [pf]
   | (false, EmitAbstract, XInline, _, false, true) -> []
-  | (false, EmitAbstract, XOperand, _, _, false) -> []
-  | (false, EmitAbstract, XOperand, _, _, true) -> [pfOld ()]
-  | (true, EmitAbstract, XOperand, _, _, _) -> []
+  | (false, EmitAbstract, XOperand _, _, _, false) -> []
+  | (false, EmitAbstract, XOperand _, _, _, true) -> [pfOld ()]
+  | (true, EmitAbstract, XOperand _, _, _, _) -> []
   | (_, (EmitConcrete | EmitLemma), _, _, _, true) -> []
   | (false, (EmitConcrete | EmitLemma), XInline, _, false, false) -> [pf]
-  | (_, (EmitConcrete | EmitLemma), XOperand, _, _, false) -> if ret = pfIsRet then [pfOp ()] else []
+  | (_, (EmitConcrete | EmitLemma), XOperand xo, _, _, false) -> if ret = pfIsRet then [pfOp xo] else []
   | (_, EmitLemma, XAlias _, _, _, false) -> []
   | (true, _, XInline, _, false, _) -> []
   | (_, (EmitAbstract | EmitConcrete), XAlias _, _, _, _) -> notImplemented "alias arguments not yet supported for {:refined true} procedures"
@@ -353,7 +354,7 @@ type connect_env =
   }
 
 let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(connect_env * estmt list) =
-  let operandMap = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, t)) (p.pargs @ p.prets)) in
+  let operandMap = Map.ofList (List.map (fun (x, t, s, _, _) -> (x, (t, s))) (p.pargs @ p.prets)) in
   let connect_estmt (cenv:connect_env) (s:estmt):(connect_env * estmt) =
     let rewrite (csubst:Map<id, exp>) (ss:stmt list):stmt list =
       map_stmts (subst_reserved_exp csubst) (fun _ -> Unchanged) ss in
@@ -365,27 +366,27 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
           let new_id (x:id) =
             match x with Id x -> Reserved (xn + x) | Reserved x -> Reserved (xn + x) | Operator _ -> internalErr "EApply: Operator" in
           let specModsIo = c.esc_specModsIo in
-          let getType u = match u with Some u -> u | None -> err "missing type annotation" in
+          let getOpt u = match u with Some u -> u | None -> internalErr "getOpt" in
           let rewrite_mod (cenv_read:connect_env) (cenv_write:connect_env) (io:inout, arg:proc_arg, formal_id:id option):(connect_env * (formal list * proc_arg list * (id * exp) list) * (id * exp) list) =
             match arg with
-            | ArgOperand (x, t) ->
-                let idExp = spEvalOp t c.esc_state (EVar x) in
+            | ArgOperand (x, xo, t) ->
+                let idExp = vaEvalOp xo t c.esc_state (EVar x) in
                 let x1 = match Map.tryFind x cenv_read.connect_map with None -> old_id x | Some y -> y in
                 match io with
                 | In ->
-                  let pairs = [(old_id (getType formal_id), EVar x1)] in
-                  (cenv_write, ([], [ArgOperand (x1, t)], []), pairs)
+                  let pairs = [(old_id (getOpt formal_id), EVar x1)] in
+                  (cenv_write, ([], [ArgOperand (x1, xo, t)], []), pairs)
                 | InOut | Out ->
                   let x2 = new_id x in
                   let cenv_write =
                     {
-                      connect_typs = Map.add x (getType t) cenv_write.connect_typs;
+                      connect_typs = Map.add x t cenv_write.connect_typs;
                       connect_map = Map.add x x2 cenv_write.connect_map;
                       connect_subst = cenv_write.connect_subst;
                       connect_subst_ghost = Map.add x (EVar x2) cenv_write.connect_subst_ghost;
                     } in
-                  let pairs = [(old_id (getType formal_id), EVar x1); (getType formal_id, EVar x2)] in
-                  (cenv_write, ([(x2, t)], (if io = InOut then [ArgOperand (x1, t); ArgOperand (x2, t)] else [ArgOperand (x2, t)]), [(x2,idExp)]), pairs)
+                  let pairs = [(old_id (getOpt formal_id), EVar x1); (getOpt formal_id, EVar x2)] in
+                  (cenv_write, ([(x2, Some t)], (if io = InOut then [ArgOperand (x1, xo, t); ArgOperand (x2, xo, t)] else [ArgOperand (x2, xo, t)]), [(x2, idExp)]), pairs)
             | ArgState (x, t) ->
                 let idExp = stateGet {env with state = c.esc_state} x in
                 //let x1 = match Map.tryFind x cenv.connect_map with None -> old_id x | Some y -> (match io with In -> old_id x | InOut | Out -> y) in
@@ -399,14 +400,14 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
                   let x2 = new_id x in
                   let cenv_write =
                     {
-                      connect_typs = Map.add x (getType t) cenv_write.connect_typs;
+                      connect_typs = Map.add x t cenv_write.connect_typs;
                       connect_map = Map.add x x2 cenv_write.connect_map;
                       connect_subst = Map.add x (EVar x2) cenv_write.connect_subst;
                       connect_subst_ghost = Map.add x (EVar x2) cenv_write.connect_subst_ghost;
                     } in
                   let pairs = [(old_id id, EVar x1); (id, EVar x2)] in
-                  (cenv_write, ([(x2, t)], (if io = InOut then [ArgState (x1, t); ArgState (x2, t)] else [ArgState (x2, t)]), [(x2,idExp)]), pairs)
-            | ArgExp e -> (cenv_write, ([], [ArgExp e], []), [(getType formal_id, e)])
+                  (cenv_write, ([(x2, Some t)], (if io = InOut then [ArgState (x1, t); ArgState (x2, t)] else [ArgState (x2, t)]), [(x2,idExp)]), pairs)
+            | ArgExp e -> (cenv_write, ([], [ArgExp e], []), [(getOpt formal_id, e)])
             in
           let rewrite_g_prev = rewrite cenv.connect_subst_ghost in
           let (cenv, idsSpecMods, pairs) = List_mapFoldFlip2 (rewrite_mod cenv) cenv specModsIo in
@@ -454,12 +455,12 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
           let merg_prefix = "merg" + (string (gen_lemma_sym ())) + "_" in
           let merge_connect_map id ax bx =
             match ax with Id x -> Reserved (merg_prefix + x) | Reserved x -> Reserved (merg_prefix + x) | Operator _ -> internalErr "EApply: Operator" in
-          let (mm,mm_new) = merge_maps m0.connect_map m1.connect_map merge_connect_map in
+          let (mm, mm_new) = merge_maps m0.connect_map m1.connect_map merge_connect_map in
           let mm = Map_combine mm mm_new in
           let merge_connect_expmap id ax bx =
             EVar (Map.find id mm)
-          let blend (A:Map<id,exp>) (B:Map<id,exp>):Map<id,exp> =
-            let (common_map,new_map) = merge_maps A B merge_connect_expmap in
+          let blend (a:Map<id,exp>) (b:Map<id,exp>):Map<id,exp> =
+            let (common_map,new_map) = merge_maps a b merge_connect_expmap in
             Map_combine common_map new_map in
           let cenv =
             {
@@ -470,29 +471,29 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
             } in
           let old_incarnation_exp id =
             match (Map.tryFind id operandMap, Map.tryFind id env.ids) with
-            | (Some t, _) -> spEvalOp (Some t) (EVar (Reserved "s0")) (EVar id)
+            | (Some (t, XOperand xo), _) -> vaEvalOp xo t (EVar (Reserved "s0")) (EVar id)
             | (_, Some (StateInfo _)) -> stateGet {env with state = EVar (Reserved "s0")} id
             | _ -> internalErr ("old_incarnation: " + (err_id id))
             in
           let incarnation_exp id mp = match Map.tryFind id mp with None -> old_incarnation_exp id | Some y -> EVar y in
           let incarnation id mp = match Map.tryFind id mp with None -> old_id id | Some y -> y in
           let add_assignments (es:estmt list) (mp:Map<id,id>):estmt list =
-            let f es id v = SAssign ([(v,None)], incarnation_exp id mp) :: es in
+            let f es id v = SAssign ([(v, None)], incarnation_exp id mp) :: es in
             let asgnmts = Map.fold f [] mm_new in
             es @ [EsStmts (List.rev asgnmts)]
             in
           let thn = add_assignments thn m0.connect_map in
           let els = add_assignments els m1.connect_map in
           let mm_new_list = Map.toList mm_new in
-          let frmls = List.map (fun (k,v) -> (v, Some (Map.find k cenv.connect_typs))) mm_new_list in
-          let replacements = List.map (fun (k,v) -> (e, v, incarnation k m0.connect_map, incarnation k m1.connect_map)) mm_new_list in
+          let frmls = List.map (fun (k, v) -> (v, Some (Map.find k cenv.connect_typs))) mm_new_list in
+          let replacements = List.map (fun (k, v) -> (e, v, incarnation k m0.connect_map, incarnation k m1.connect_map)) mm_new_list in
           (cenv, EsIfElse (e, thn, els, { esi_kind = SmInline; esi_formals = frmls; esi_replacements = replacements }))
       | EsIfElse _ -> raise (err "{:refined true} procedures may contain ghost and inline if/else anywhere, and may not contain ordinary if/else statements")
       | EsWhile _ -> raise (err "{:refined true} procedures with while statements must contain exactly one while statement, possible preceded by ghost statements, whose body consists of one procedure call")
       in
     f cenv s
   let subst_arg (x, _, storage, _, _):(id * exp) list =
-    match storage with XOperand -> [(x, EVar (old_id x))] | _ -> []
+    match storage with XOperand _ -> [(x, EVar (old_id x))] | _ -> []
     in
   let csubst_args = List.collect subst_arg p.pargs in
   let csubst_rets = List.collect subst_arg p.prets in
@@ -542,10 +543,10 @@ let specArgEns (inSpec:bool) (s0:id option) (sM:id) (modifies:bool) (x, t, g, io
   match g with
   | XGhost -> if inSpec && not modifies then [EVar x] else []
   | XInline -> if modifies then [] else [EVar x]
-  | XOperand ->
+  | XOperand xo ->
     (
       if not modifies then [] else
-      let f s = spEvalOp (Some t) (EVar s) (EVar x) in
+      let f s = vaEvalOp xo t (EVar s) (EVar x) in
       if inSpec then
         match (s0, io) with
         | (None, _) | (Some _, Out) -> [f sM]
@@ -564,7 +565,7 @@ let specArgEnss (inSpec:bool) (s0:id) (sM:id) (prets:pformal list) (pargs:pforma
   (List.collect (specArgEns inSpec None sM true) prets) @
   (List.collect (specArgEns inSpec (Some s0) sM true) pargs)
 
-let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * formal) list =
+let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * (id * typ)) list =
   let (useOld, useNew, suppressRead) =
     match area with
     | EmitModRefined | EmitModCall -> (false, true, false)
@@ -582,27 +583,26 @@ let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * formal) 
         (
           match Map.tryFind x env.ids with
           | Some (StateInfo (_, _, t)) ->
-            (if useOld then [(io, (old_id x, Some t))] else []) @
-            (if useNew && (not suppressRead || readWrite) then [(io, (x, Some t))] else [])
+            (if useOld then [(io, (old_id x, t))] else []) @
+            (if useNew && (not suppressRead || readWrite) then [(io, (x, t))] else [])
           | _ -> internalErr ("specMod: could not find variable " + (err_id x))
         )
       | _ -> []
     )
 
 let specMod (env:env) (area:emit_area_mod) (loc:loc, s:spec):formal list =
-  List.map snd (specModIo env area (loc, s))
+  List.map (fun (_, (x, t)) -> (x, Some t)) (specModIo env area (loc, s))
 
 let argModIo (e:exp) (formal_id, _, _, io:inout, _):(inout * proc_arg * id option) list =
   match skip_loc e with
-  | EOp (OperandArg t, [EVar x]) -> [(io, ArgOperand (x, Some t), Some formal_id)]
-  | EOp (StateOp (x, prefix, t), es) -> [(io, ArgState (x, Some t), Some formal_id)]
-  | EOp (CodeLemmaOp, (EApply (Reserved op, EApply (Id "OConst", z::_) :: _)) :: _) -> [(io, ArgExp z, Some formal_id)]
-  | EOp (CodeLemmaOp, (EApply (Reserved op, EApply (Reserved op_const, z::_) :: _)) :: _) -> [(io, ArgExp z, Some formal_id)]
+  | EOp (OperandArg (x, xo, t), _) -> [(io, ArgOperand (x, xo, t), Some formal_id)]
+  | EOp (StateOp (x, prefix, t), es) -> [(io, ArgState (x, t), Some formal_id)]
+  | EOp (RefineOp, [EOp (Uop UConst, [c]); _; _]) -> [(io, ArgExp c, Some formal_id)]
   | _ -> []
 
 let paramMod (pf:pformal):formal list =
   match pf with
-  | (x, t, XOperand, InOut, _) -> [(x, Some t)]
+  | (x, t, XOperand _, InOut, _) -> [(x, Some t)]
   | _ -> []
 
 let ghostFormal (pf:pformal):formal list =
@@ -743,7 +743,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
       let ccs = List.map (build_lemma_calcContents env benv src res loc sub_src) contents in
       (Ghost, false, [EsGhost [SCalc (oop, ccs)]])
   | SSplit -> (Ghost, false, [EsGhost [SSplit]])
-  | SVar (_, _, (XPhysical | XOperand | XInline | XAlias _), _, _) -> (Ghost, false, [])
+  | SVar (_, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
   | SVar (x, t, g, a, eOpt) -> (Ghost, false, [EsGhost [SVar (x, t, g, a, mapOpt sub_src eOpt)]])
   | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
   | SIfElse (SmGhost, e, ss1, ss2) ->
@@ -790,6 +790,8 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
       let n1Update = SAssign ([(n1, None)], EOp (Bop BSub, [EVar n1; EInt bigint.One])) in
       let sbBody = build_lemma_block env {benv with is_inside_while = true} codeBody s1 r2 loc ss in
       let nCond = EOp (Bop BGt, [EVar n1; EInt bigint.Zero]) in
+      let invFrame = (loc, benv.frame_exp r1) in
+      let invFrames = if benv.is_framed || benv.is_refined_while_proc then [invFrame] else [] in
       let (refinedStmts, wPre, wPost, invs, ed) =
         if not benv.is_refined_while_proc then ([], [], [], invs, ed) else
         let whileErr () = err "while statement in {:refined} procedure must contain exactly one procedure call with no return values, followed by zero or more ghost statements" in
@@ -850,7 +852,6 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
                     let fromInvs invs = and_of_list (List.map (fun (loc, e) -> ELoc (loc, e)) invs) in
                     let invExp = EOp (Bop BImply, [fromInvs invs0; ex (fromInvs invs1)]) in
                     let invInvs = (loc, makeSpecForalls [(benv.proc.pname, []); (xf, ghostExps)] None foralls invExp) in
-                    let invFrame = (loc, benv.frame_exp r1) in
                     let wPre = List.map (fun x -> SVar (prev_id x, None, XGhost, [], Some (EVar x))) ghosts in
                     // assert forall id, g :: va_trigger_P(va_id, g, i) ==> va_trigger_P(id, g, prev_i);
                     let esPost = (List.map (fun (x, _) -> EVar x) foralls) @ (List.map (fun x -> EVar (prev_id x)) ghosts) in
@@ -869,7 +870,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
                         [SForall (xs, triggers, lhs, rhs, [sAssert])]
                       | _ -> []
                       in
-                    (reveals @ ghostOlds, wPre, wPost @ sForall, [invInvs; invFrame], (loc, []))
+                    (reveals @ ghostOlds, wPre, wPost @ sForall, [invInvs], (loc, []))
                 | _ -> whileErr ()
               )
             | _ -> whileErr ()
@@ -883,7 +884,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
         | (loc, es) -> (loc, List.map (sub (EVar r1)) es)
         in
       let whileBody = (EsStmts (slemTrue::wPre))::sbBody @ [EsStmts (r1Update::n1Update::wPost)] in
-      let sWhile = EsWhile (nCond, (loc, whileInv)::invs, ed, whileBody) in
+      let sWhile = EsWhile (nCond, (loc, whileInv)::invs @ invFrames, ed, whileBody) in
       (NotGhost, true, [EsStmts (refinedStmts @ [slem]); sWhile; EsStmts [slemFalse]])
   | SAssign (lhss, e) -> assign lhss e
   | SForall (xs, ts, ex, e, ss) ->
@@ -965,7 +966,8 @@ let filter_proc_attr (x, es) =
 let fArg (x, t, g, io, a):exp list =
   match g with
   | XInline -> [EVar x]
-  | XOperand -> [vaApp "op" [EVar x]]
+  | XOperand _ -> [EVar x]
+//  | XOperand _ -> [vaApp "op" [EVar x]]
   | _ -> []
   in
 
@@ -975,7 +977,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
   let specModsIo = List.collect (specModIo env EmitModCall) p.pspecs in
   let frameArg (isRet:bool) e (x, _, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp "update" [EVar x; EVar sM; e]
+    | (true, XOperand xo, _) | (_, XOperand xo, (InOut | Out)) -> vaApp ("update_" + xo) [EVar x; EVar sM; e]
     | _ -> e
     in
   let frameMod e (io, (x, _)) =
@@ -995,7 +997,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
   vaApp "state_eq" [EVar sM; e]
 
 (* Build function for code for procedure Q
-function method{:opaque} va_code_Q(iii:int, dummy:va_operand_code, dummy2:va_operand_code):va_code
+function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand):va_code
 {
   va_Block(...)
 }
@@ -1037,7 +1039,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
   let spec_of_call c = Reserved ("spec_" + (string_of_id c.esc_proc.pname)) in
   let make_arg arg =
     match arg with
-    | ArgOperand (x, _) | ArgState (x, _) -> EVar x
+    | ArgOperand (x, _, _) | ArgState (x, _) -> EVar x
     | ArgExp e -> e
   let req_of_call aci =
     let rec add_antecedents_aux ants e =
@@ -1170,8 +1172,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   //   requires va_is_dst_int(dummy)
   let reqIsArg (isRet:bool) (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp "is_dst_" t [EVar x]]
-    | (false, XOperand, In) -> [vaAppOp "is_src_" t [EVar x]]
+    | (true, XOperand xo, _) | (false, XOperand xo, (InOut | Out)) -> [vaAppOp ("is_dst_" + xo + "_") t [EVar x]]
+    | (false, XOperand xo, In) -> [vaAppOp ("is_src_" + xo + "_") t [EVar x]]
     | _ -> []
     in
   let reqIsExps =
@@ -1193,7 +1195,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       requires va_is_dst_int(dummy)
       requires va_is_dst_int(dummy2)
       ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
-      ensures  forall va_id:va_int, g:int{:trigger va_trigger_Q(va_id, g)} :: va_trigger_Q(va_id, g) ==> va_spec_Q(iii, g, va_eval_op_int(va_s0, dummy), va_eval_op_int(va_sM, dummy), va_eval_op_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
+      ensures  forall va_id:va_int, g:int{:trigger va_trigger_Q(va_id, g)} :: va_trigger_Q(va_id, g) ==> va_spec_Q(iii, g, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
       ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
       {
         ...calls to other procedures P...
@@ -1213,7 +1215,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       List.collect g specModsIo
       in
     let ensForalls = List.collect ghostFormal p.pargs in // ensures forall va_id:va_int, g:int ...
-    let eEns = EApply (benv.spec_name, specArgsEns @ specModsEns) in // ensures ... va_spec_Q(iii, g, va_eval_op_int(va_s0, dummy), va_eval_op_int(va_sM, dummy), va_eval_op_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
+    let eEns = EApply (benv.spec_name, specArgsEns @ specModsEns) in // ensures ... va_spec_Q(iii, g, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
     let enss = [(loc, Ensures (makeSpecForall p.pname None ensForalls eEns)); (loc, Ensures eFrame)] in
 
     let (sLocalsToAbstract, sStmts) =
@@ -1237,7 +1239,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let sLocalsToAbstract = List.collect formals_of_call calls |> List.map (fun (x,t) -> SVar (x,t,XPhysical,[],None)) in
         let absArgs = absArgsIo @ absArgsMods @ absArgsCalls in
         // Generate call from concrete lemma to abstract lemma:
-        //   va_abstract_Q(iii, va_eval_op_int(va_s0, dummy), va_eval_op_int(va_sM, dummy), va_eval_op_int(va_sM, dummy2), va_get_ok(va_s0), va_get_reg(EAX, va_s0), ..., va_get_reg(EAX, va_s17));
+        //   va_abstract_Q(iii, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_reg(EAX, va_s0), ..., va_get_reg(EAX, va_s17));
         let sAbstract = SAssign ([], EApply (Reserved (benv.prefix + "abstract_" + (string_of_id p.pname)), absArgs)) in
         (sLocalsToAbstract, ss @ [sAbstract])
       in
@@ -1275,7 +1277,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
     *)
     let pargs = argB::pargs in
     let prets = retB::retR::prets in
-    let reqs = if benv.is_bridge then reqsIs else [] in
+    let reqs = if benv.is_bridge || benv.is_framed then reqsIs else [] in
     let sStmts =
       if benv.is_bridge then
         (* Generate body of bridge lemma:
@@ -1303,7 +1305,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let ss = stmts_refined (stmts_of_estmts true true estmts) in
         [sReveal; sOldS; sBlock; sb1] @ ss
       in
-    let ensFrame = if benv.is_bridge || attrs_get_bool (Id "frame") false p.pattrs then [(loc, Ensures eFrame)] else [] in
+    let ensFrame = if benv.is_bridge || benv.is_framed then [(loc, Ensures eFrame)] else [] in
     let (pspecs, pmods) = List.unzip (List.map (build_lemma_spec env s0 (EVar sM)) p.pspecs) in
     {
       pname = Reserved ("lemma_" + (string_of_id p.pname));
@@ -1437,6 +1439,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             is_instruction = isInstruction;
             is_refined = isRefined;
             is_bridge = false;
+            is_framed = attrs_get_bool (Id "frame") true p.pattrs;
             is_refined_while_proc = is_refined_while_proc;
             is_refined_while_ghosts = if is_refined_while_proc then List.concat (gather_stmts fGhost (fun _ _ -> []) stmts) else [];
             is_inside_while = false;

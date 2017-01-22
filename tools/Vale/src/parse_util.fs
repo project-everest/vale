@@ -15,14 +15,15 @@ let parse_require b = if b then () else parse_err "parse requirement violated"
 
 let setInitialPos (lexbuf:LexBuffer<_>) filename = lexbuf.EndPos <- { pos_bol = 0; pos_fname = filename; pos_cnum = 0; pos_lnum = 1 }
 
-let rec exp2id (e: exp) (i: id): id =
+let rec exp2id (e:exp) (i:id):id =
   match i with
   | Id s ->
-    (match e with
-    | ELoc(_, EVar (Id r)) ->
-      Id (r + "." + s)
-    | ELoc(_, EOp (FieldOp (Id r), [ee])) ->
-      exp2id ee (Id (r + "." + s))
-    | _ -> parse_err "malformed qualified function/method name"
+    (
+      match e with
+      | ELoc(_, EVar (Id r)) ->
+        Id (r + "." + s)
+      | ELoc(_, EOp (FieldOp (Id r), [ee])) ->
+        exp2id ee (Id (r + "." + s))
+      | _ -> parse_err "malformed qualified function/method name"
     )
   | _ -> parse_err "malformed qualified function/method name"

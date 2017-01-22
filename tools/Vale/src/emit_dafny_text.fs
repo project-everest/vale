@@ -70,7 +70,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("!" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
     | EOp (Bop op, [e1; e2]) ->
         let (pe, p1, p2) = prec_of_bop op in
@@ -84,7 +84,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2]) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
-    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
+    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
     | EApply (x, es) -> ((sid x) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" xs ts e

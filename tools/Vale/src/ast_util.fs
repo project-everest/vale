@@ -282,10 +282,4 @@ let attrs_get_id (x:id) (a:attrs):id =
   | EVar x -> x
   | _ -> err ("argument to attribute '" + (err_id x) + "' must be an identifier")
 
-(* prefix the last dotted component of "t" with "s" *)
-let qprefix (s: string) (t: string): string =
-  let n = t.LastIndexOf('.') in
-  if n < 0 then
-    s + t
-  else
-    t.Substring(0, n+1) + s + t.Substring(n+1)
+let qprefix (s:string) (t:string):string = s + (t.Replace(".", "__"))

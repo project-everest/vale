@@ -260,7 +260,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let exp = create_expression built_ins loc e in
           let id = create_token loc (sid x + "?") in
           new ExprDotName(id, exp, id.``val``, null) :> Expression
-      | EOp (Uop (UReveal | UOld | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
+      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
       | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
       | EOp (Bop op, [e1; e2]) ->
           if need_rel_chain x
@@ -327,7 +327,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let updates = new ResizeArray<IToken * string * Expression>() in
           updates.Add((id, id.``val``, e2))
           new DatatypeUpdateExpr(tok, e1, updates) :> Expression
-      | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
+      | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
       | EApply (x, es) ->
           let tok = create_token loc (sid x) in
           if (sid x).Equals("int")

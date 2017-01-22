@@ -18,12 +18,10 @@ var{:state mem()} mem:map(int, uint32);
 datatype reg = EAX | EBX | ECX | EDX | ESI | EDI | EBP
 
 datatype opr = OReg(r:reg) | OConst(n:uint32)
-type va_operand_code = opr
-type va_operand_lemma = opr
-function va_op(o:opr):opr { o }
-function method va_op_reg(r:reg):va_operand_code { OReg(r) }
-predicate va_is_src_uint32(o:opr) { true }
-predicate va_is_dst_uint32(o:opr) { o.OReg? }
+type va_operand = opr
+function method va_op_operand_reg(r:reg):va_operand { OReg(r) }
+predicate va_is_src_operand_uint32(o:opr) { true }
+predicate va_is_dst_operand_uint32(o:opr) { o.OReg? }
 
 type va_bool = bool
 type va_int = int
@@ -45,7 +43,7 @@ function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
 function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
 function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
 
-function va_update(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?
     requires o.r in sM.regs
 {
@@ -63,7 +61,7 @@ predicate va_state_eq(s0:va_state, s1:va_state)
 function va_get_block(c:va_code):va_codes requires c.va_Block? { c.block }
 
 predicate eval_code(c:va_code, s0:state, sN:state)
-function va_eval_op_uint32(s:state, o:va_operand_code):uint32
+function va_eval_operand_uint32(s:state, o:va_operand):uint32
     requires o.OReg? ==> o.r in s.regs
 {
     match o
@@ -98,25 +96,6 @@ lemma va_lemma_block(b0:va_codes, s0:state, sN:state) returns(s1:state, c1:va_co
 lemma va_lemma_empty(s0:va_state, sN:va_state) returns(sM:va_state)
     requires eval_code(va_Block(va_CNil()), s0, sN)
     ensures  s0 == sM == sN
-
-/*
-lemma va_refined_Load(va_b0:va_codes, va_s0:va_state, va_sN:va_state, dst:va_operand_lemma, ptr:va_operand_lemma, offset:int)
-    returns (va_bM:va_codes, va_sM:va_state)
-    requires va_require(va_b0, va_code_Load(dst, ptr, offset), va_s0, va_sN)
-    requires va_is_dst_uint32(dst)
-    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
-    ensures  va_spec_Load(offset, va_eval_op_uint32(va_sM, dst), va_eval_op_uint32(va_s0, ptr), va_get_ok(va_s0), va_get_ok(va_sM), va_get_mem(va_s0))
-//    ensures  va_sM == va_s0.(ok := va_sM.ok, regs := va_s0.regs[dst.r := va_sM.regs[dst.r]])
-    ensures  va_sM == va_update_ok(va_sM, va_update(dst, va_sM, va_s0))
-
-lemma va_refined_Store(va_b0:va_codes, va_s0:va_state, va_sN:va_state, ptr:va_operand_lemma, src:va_operand_lemma, offset:int)
-    returns (va_bM:va_codes, va_sM:va_state)
-    requires va_require(va_b0, va_code_Store(ptr, src, offset), va_s0, va_sN)
-    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
-    ensures  va_spec_Store(offset, va_eval_op_uint32(va_s0, ptr), va_eval_op_uint32(va_s0, src), va_get_ok(va_s0), va_get_ok(va_sM), va_get_mem(va_s0), va_get_mem(va_sM))
-//    ensures  va_sM == va_s0.(ok := va_sM.ok, mem := va_sM.mem)
-    ensures  va_sM == va_update_ok(va_sM, va_update_mem(va_sM, va_s0))
-*/
 
 predicate inMem(ptr:int, mem:map<int, uint32>) { ptr in mem }
 

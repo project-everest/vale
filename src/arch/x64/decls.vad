@@ -380,7 +380,7 @@ procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout operand dst:uint
 }
 
 procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout operand dst:uint32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); op32(this, @amount);
+  requires{:refined false} op32(this, @dst); IsUInt32(amount);
   ensures {:refined false} op32(this, @dst);
   requires 
     0 <= amount < 32;
@@ -395,7 +395,7 @@ procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout 
 }
 
 procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout operand dst:uint32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); op32(this, @amount);
+  requires{:refined false} op32(this, @dst); IsUInt32(amount);
   ensures {:refined false} op32(this, @dst);
   requires 
     0 <= amount < 32;
@@ -410,7 +410,7 @@ procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout 
 }
 
 procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout operand dst:uint32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); op32(this, @amount);
+  requires{:refined false} op32(this, @dst); IsUInt32(amount);
   ensures {:refined false} op32(this, @dst);
   requires 
     0 <= amount < 32;
@@ -425,7 +425,7 @@ procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout 
 }
 
 procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout operand dst:uint32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); op32(this, @amount);
+  requires{:refined false} op32(this, @dst); IsUInt32(amount);
   ensures {:refined false} op32(this, @dst);
   requires 
     0 <= amount < 32;
