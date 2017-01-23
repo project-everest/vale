@@ -19,6 +19,10 @@ See the [INSTALL](./INSTALL.md) file for installing Vale and its dependencies.
 
 See the [CODE](./CODE.md) file for more details on the various files in the repository.
 
+# Documentation
+
+See the [Vale documentation](./doc/index.html) for a description of the Vale language and Vale tool.
+
 # License
 
 Vale is licensed under the Apache license in the [LICENSE](./LICENSE) file.
