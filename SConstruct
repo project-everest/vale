@@ -70,10 +70,18 @@ AddOption('--CARGS',
   default=[],
   action='append',
   help='Supply temporary additional arguments to the C compiler')
+AddOption('--OPENSSL',
+  dest='openssl_path',
+  type='string',
+  default=None,
+  action='append',
+  help='Specify the path to the root of an OpenSSL source tree')
+  
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
 env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
 env.Append(CCFLAGS=GetOption('c_user_args'))
+env['OPENSSL_PATH'] = GetOption('openssl_path')
 
 # Useful Dafny command lines
 dafny_default_args =   '/ironDafny /allocated:1 /compile:0 /timeLimit:30 /trace'
