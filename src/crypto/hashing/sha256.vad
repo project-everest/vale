@@ -21,11 +21,11 @@ import opened operations_i
 #token ^= precedence :=
 #token ~= precedence :=
 
-procedure operator(:=) (out operand dst:int, operand src:int) := Mov32
-procedure operator(+=) (inout operand dst:int, operand src:int) := Add32Wrap
-procedure operator(&=) (inout operand dst:int, operand src:int) := And32
-procedure operator(^=) (inout operand dst:int, operand src:int) := Xor32
-procedure operator(~=) (inout operand dst:int) := Not32   // Usage awaits the ability to say: edx ~= edx.
+procedure operator(:=) (out operand dst:int, operand src:int) := Mov32;
+procedure operator(+=) (inout operand dst:int, operand src:int) := Add32Wrap;
+procedure operator(&=) (inout operand dst:int, operand src:int) := And32;
+procedure operator(^=) (inout operand dst:int, operand src:int) := Xor32;
+procedure operator(~=) (inout operand dst:int) := Not32;   // Usage awaits the ability to say: edx ~= edx.
 
 procedure {:refined} {:timeLimitMultiplier 2} ComputeOneStep_SHA256_core(
   inline offset:uint32,
@@ -962,6 +962,7 @@ procedure {:refined} CastBytesToWords(inline num_bytes:uint32, inline taint:tain
       exists bytes_id, W_id ::
           CastBytesResult(bytes_id, old(mem), mem, old(edi), num_bytes, W_id, taint)
       && (forall id :: old(mem)?[id] && AddrInHeaplet(old(edi), old(mem)[id]) ==> id == bytes_id);
+:= extern;
 
 
 // Entry-point for the Dafny-level SHA code

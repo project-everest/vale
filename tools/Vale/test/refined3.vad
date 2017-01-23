@@ -82,12 +82,11 @@ predicate evalCode(c:code, s0:state, sN:state)
 // Untrusted Vale interface
 
 type opr = reg
-type va_operand_code = opr
-type va_operand_lemma = opr
-function va_op(o:opr):opr { o }
-function method va_op_reg(r:reg):va_operand_code { r }
-predicate va_is_src_int(o:opr) { true }
-predicate va_is_dst_int(o:opr) { true }
+type va_operand = opr
+function method va_op_operand_reg(r:reg):va_operand { r }
+function method va_op_cmp_reg(r:reg):va_operand { r }
+predicate va_is_src_operand_int(o:opr) { true }
+predicate va_is_dst_operand_int(o:opr) { true }
 
 type va_bool = bool
 type va_int = int
@@ -101,7 +100,7 @@ function va_get_reg(r:reg, s:va_state):int { getReg(s, r) }
 function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
 function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
 
-function va_update(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state
     requires o in sM.regs
 {
     va_update_reg(o, sM, sK)
@@ -149,7 +148,7 @@ predicate{:opaque} evalCodeOpaque(c:code, s0:state, sN:state) { evalCode(c, s0, 
 predicate evalCode_lax(c:code, s0:state, sN:state) { s0.ok ==> evalCodeOpaque(c, s0, sN) }
 predicate evalWhile_lax(b:obool, c:code, n:nat, s0:state, sN:state) { s0.ok ==> evalWhileOpaque(b, c, n, s0, sN) }
 
-function va_eval_op_int(s:state, o:va_operand_code):int
+function va_eval_operand_int(s:state, o:va_operand):int
 {
     getReg(s, o)
 }
@@ -363,7 +362,7 @@ procedure{:refined} Loop(ghost g:int, ghost h1:int) returns(ghost h2:int)
     }
 }
 
-procedure{:frame} ULoopBody(ghost g:int, ghost i:int, ghost h1:int) returns(ghost h2:int)
+procedure ULoopBody(ghost g:int, ghost i:int, ghost h1:int) returns(ghost h2:int)
     requires
         g <= x;
         0 <= h1;
@@ -385,7 +384,6 @@ procedure{:frame} ULoopBody(ghost g:int, ghost i:int, ghost h1:int) returns(ghos
 
 procedure ULoop(ghost g:int, ghost h1:int) returns(ghost h2:int)
     requires/ensures
-        ok;
         g <= x;
     requires
         0 <= h1;
@@ -396,13 +394,12 @@ procedure ULoop(ghost g:int, ghost h1:int) returns(ghost h2:int)
     reads
         y;
     modifies
-        ok; x; z;
+        x; z;
 {
     ghost var i := 0;
     h2 := h1;
     while (x <= y)
         invariant
-            ok;
             g <= x;
             0 <= i;
             Inv(x, y, g, i);
@@ -423,7 +420,6 @@ function RotateReg(i:int):reg
     var n := i % 4;
     if n == 0 then W else if n == 1 then X else if n == 2 then Y else Z
 }
-
 #endverbatim
 
 procedure{:refined} RotateBody(inline n:nat, inout operand a:int, inout operand b:int, inout operand c:int, inout operand d:int)
@@ -482,7 +478,7 @@ procedure{:refined} InlineIfElse(inline n:nat)
         Imm(z, 0);
         Add(x, z);
     }
-    else inline if (n == 1)
+    else if (n == 1)
     {
         Imm(z, 1);
         Add(x, z);
@@ -626,7 +622,7 @@ procedure{:refined} GhostReturnCallerY(ghost kg:int, operand source:int)
     kh := GhostReturnY(kg, true, source, ki);
 }
 
-procedure{:frame} UGhostReturnY(ghost g:int, inline n:bool, operand src:int, ghost i:int)
+procedure UGhostReturnY(ghost g:int, inline n:bool, operand src:int, ghost i:int)
       returns (ghost h:int)
     reads
         y;
@@ -637,7 +633,7 @@ procedure{:frame} UGhostReturnY(ghost g:int, inline n:bool, operand src:int, gho
     Add(x, z);
 }
 
-procedure{:frame} UGhostReturnCallerY(ghost kg:int, operand source:int)
+procedure UGhostReturnCallerY(ghost kg:int, operand source:int)
     requires
         @source != X && @source != Z;
         Easy(x, y, kg, 0);

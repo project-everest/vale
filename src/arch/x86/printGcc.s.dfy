@@ -239,7 +239,7 @@ method printCode(c:code, n:int) returns(n':int)
 
 method printHeader()
 {
-  print(".section .text\n");
+  print(".text\n");
 }
 
 method printProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32)

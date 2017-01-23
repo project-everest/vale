@@ -16,6 +16,7 @@ type formal = id * typ option
 
 type uop = 
 | UNot | UNeg | UOld | UIs of id
+| UConst
 | UReveal | UGhostOnly | UToOperand | UUnrefinedSpec
 | UCustom of string | UCustomAssign of string
 
@@ -38,10 +39,10 @@ type op =
 | Cond
 | FieldOp of id
 | FieldUpdate of id
-| CodeLemmaOp // one expression for code, a different expression for lemmas
+//| CodeLemmaOp // one expression for code, a different expression for lemmas
 | RefineOp // one expression for abstract, one expression for abstract with optional oldness, one expression for refined
 | StateOp of id * string * typ // example: (eax, "reg", int) for va_get_reg(EAX, ...exps..., state):int
-| OperandArg of typ
+| OperandArg of id * string * typ
 
 type bindOp =
 | Forall
@@ -72,7 +73,7 @@ type var_alias =
 type var_storage =
 | XGhost // ghost, no storage space
 | XPhysical // ordinary non-ghost variable (supplies its own storage space)
-| XOperand // procedure operand argument (procedure caller determines storage)
+| XOperand of string // procedure operand argument (procedure caller determines storage)
 | XInline // inline procedure argument (procedure caller supplies constant that gets inlined)
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)

@@ -1,33 +1,33 @@
 include "common.vad"
 
-procedure{:instruction ins2code(InsIncr(o))} incr(operand o:int)
+procedure{:instruction Ins(InsIncr(o))} incr(inout register o:int)
 {
 }
 
-procedure P(ghost g: int, inline k: int, operand r: int)
+procedure P(ghost g:int, inline k:int, inout register r:int)
 {
-  /*
-  if (10 <= r) {
-    incr(r);
-  }
-  */
-  inline if (10 <= k) {
-    incr(r);
-  }
-  ghost if (10 <= g) {
-    ghost var h := g + 1;
-  }
+    /*
+    if (10 <= r) {
+        incr(r);
+    }
+    */
+    inline if (10 <= k) {
+        incr(r);
+    }
+    ghost if (10 <= g) {
+        ghost var h := g + 1;
+    }
 }
 
 procedure caller()
-  reads eax;
+    modifies eax;
 {
-  ghost var gg: int := 8;
-  P(gg, 9, eax);  // 8, 9, eax
+    ghost var gg:int := 8;
+    P(gg, 9, eax);  // 8, 9, eax
 
-  gg := gg + 1;
-  P(gg, 10, eax);  // 9, 10, eax
+    gg := gg + 1;
+    P(gg, 10, eax);  // 9, 10, eax
 
-  gg := gg + 1;
-  P(gg, 11, eax);  // 10, 11, eax
+    gg := gg + 1;
+    P(gg, 11, eax);  // 10, 11, eax
 }

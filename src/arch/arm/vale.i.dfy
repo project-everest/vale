@@ -4,15 +4,14 @@ module ARM_vale_i {
 
 import opened ARM_vale_i_ARM_def_s = ARM_def_s
 
-type opr = operand // operand is a Vale keyword
+type opr = operand
 
 //-----------------------------------------------------------------------------
 // Vale Types
 //-----------------------------------------------------------------------------
 type va_int = int
 type va_bool = bool
-type va_operand_code = operand
-type va_operand_lemma = operand
+type va_operand = operand
 type va_code = code
 type va_codes = codes
 type va_state = state
@@ -21,21 +20,19 @@ type va_state = state
 // Vale-Verification Interface
 //-----------------------------------------------------------------------------
 
-function method va_op(o:va_operand_lemma):va_operand_code { o }
-
 predicate {:opaque} eval_code(c:code, s:state, r:state)
 {
     s.ok ==> evalCode(c, s, r)
 }
 
-function va_eval_op_uint32(s:state, o:operand): uint32
+function va_eval_operand_uint32(s:state, o:operand): uint32
     requires ValidState(s)
     requires ValidOperand(o) || ValidSecondOperand(o)
 {
     OperandContents(s,o)
 }
 
-function va_eval_op_addr(s:state, o:operand): uint32
+function va_eval_operand_addr(s:state, o:operand): uint32
     requires ValidState(s)
     requires ValidOperand(o)
 {
@@ -78,7 +75,7 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
 }
 
 function method fromOperand(o:operand):operand { o }
-function method va_op_const(n:uint32):operand { OConst(n) }
+function method va_const_operand(n:uint32):operand { OConst(n) }
 
 function method va_cmp_eq(o1:operand, o2:operand):obool { OCmp(OEq, o1, o2) }
 function method va_cmp_ne(o1:operand, o2:operand):obool { OCmp(ONe, o1, o2) }
@@ -101,9 +98,10 @@ function method va_get_whileBody(c:code):code requires c.While? { c.whileBody }
 //-----------------------------------------------------------------------------
 // Vale-to-Dafny connections needed for refined mode
 //-----------------------------------------------------------------------------
-function method va_op_osp():operand { OSP }
-function method va_op_olr():operand { OLR }
-function method va_op_reg(r:ARMReg):operand { OReg(r) }
+function method va_op_operand_osp():operand { OSP }
+function method va_op_operand_olr():operand { OLR }
+function method va_op_operand_reg(r:ARMReg):operand { OReg(r) }
+function method va_op_cmp_reg(r:ARMReg):operand { OReg(r) }
 function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:ARMReg, s:va_state):uint32 requires r in s.regs { s.regs[r] }
 function va_get_mem(s:va_state):memmap { s.m.addresses }
@@ -137,7 +135,7 @@ function va_update_olr(sM:va_state, sK:va_state):va_state
     va_update_reg(LR, sM, sK)
 }
 
-function va_update(o:operand, sM:va_state, sK:va_state):va_state
+function va_update_operand(o:operand, sM:va_state, sK:va_state):va_state
     requires ValidRegOperand(o);
     requires match o
                 case OReg(r) => r in sM.regs
@@ -152,39 +150,39 @@ function va_update(o:operand, sM:va_state, sK:va_state):va_state
 
 function method GetProbableReg(o:operand) : ARMReg { if o.OReg? then o.r else R0 }
 
-predicate va_is_src_uint32(o:operand) { ValidOperand(o) }
-predicate va_is_dst_uint32(o:operand) { ValidRegOperand(o) }
+predicate va_is_src_operand_uint32(o:operand) { ValidOperand(o) }
+predicate va_is_dst_operand_uint32(o:operand) { ValidRegOperand(o) }
 
 type reg = uint32
-predicate va_is_src_reg(o:operand) { ValidRegOperand(o) }
+predicate va_is_src_operand_reg(o:operand) { ValidRegOperand(o) }
 
 type snd = uint32
-predicate va_is_src_snd(o:operand) { ValidOperand(o) && o.OReg? }
+predicate va_is_src_operand_snd(o:operand) { ValidOperand(o) && o.OReg? }
 
-predicate va_is_src_global(o:operand) { ValidGlobal(o) }
+predicate va_is_src_operand_global(o:operand) { ValidGlobal(o) }
 
-function va_eval_op_uint32(s:va_state, o:operand):uint32
-    requires va_is_src_uint32(o);
+function va_eval_operand_uint32(s:va_state, o:operand):uint32
+    requires va_is_src_operand_uint32(o);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
-function va_eval_op_reg(s:va_state, o:operand):reg
-    requires va_is_src_reg(o);
+function va_eval_operand_reg(s:va_state, o:operand):reg
+    requires va_is_src_operand_reg(o);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
-function va_eval_op_snd(s:va_state, o:operand):snd
-    requires va_is_src_snd(o);
+function va_eval_operand_snd(s:va_state, o:operand):snd
+    requires va_is_src_operand_snd(o);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
 
 type global = string
-function va_eval_op_global(s:va_state, o:operand):global
-    requires va_is_src_global(o);
+function va_eval_operand_global(s:va_state, o:operand):global
+    requires va_is_src_operand_global(o);
 {
     o.sym
 }

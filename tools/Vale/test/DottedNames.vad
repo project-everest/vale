@@ -1,21 +1,6 @@
 include "common.vad"
 
 #verbatim
-
-function method va_code_P(o:va_operand_code, k:int):va_code
-
-lemma va_refined_P(va_b0:va_codes, va_s0:va_state, va_sN:va_state, o:va_operand_lemma, k:int)
-    returns (va_bM:va_codes, va_sM:va_state)
-    requires va_require(va_b0, va_code_P(o, k), va_s0, va_sN)
-    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
-    ensures  forall id:int, g:int, eleven:MyModule.ParamType<int>, twelve:MyModule.ParamType<MyModule.MyType>
-               {:trigger va_trigger_P(id, g, eleven, twelve)} ::
-               va_trigger_P(id, g, eleven, twelve) ==>
-               va_spec_P(k, g, eleven, twelve,
-                         va_eval_op_int(va_s0, o), va_eval_op_int(va_sM, o),
-                         va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM))
-    ensures  va_sM == va_s0.(ok := va_sM.ok);
-
 predicate F(i:int)
 predicate G(i:int)
 
@@ -24,22 +9,33 @@ lemma L(i:int)
     ensures  G(i)
 
 module MyModule {
-  type MyType = int
-  predicate va_is_src_MyType(x: MyType)
+    type MyType = int
 
-  ghost method MyMethod(b: bool) returns (y: int) { }
-  function method MyFunction(x: int): int { x+x }
-  type ParamType<G> = seq<G>
+    ghost method MyMethod(b:bool) returns (y:int) { }
+    function method MyFunction(x:int): int { x + x }
+    type ParamType<G> = seq<G>
 }
-datatype MyRecord = MakeRecord(a: int, b: bool)
-predicate va_is_src_MyRecord(dt: va_operand_lemma)
-function va_eval_op_MyRecord(s:state, o:va_operand_code): MyRecord
+predicate va_is_src_register_MyModule__MyType(x:va_register) { true }
+predicate va_is_dst_register_MyModule__MyType(x:va_register) { true }
+function va_eval_register_MyModule__MyType(s:va_state, o:va_register):int { eval_reg(o, s) }
+
+datatype MyRecord = MakeRecord(a:int, b:bool)
+predicate va_is_src_operand_MyRecord(dt:va_operand)
+function va_eval_operand_MyRecord(s:state, o:va_operand):MyRecord
 #endverbatim
 
-procedure{:refined} P(inout operand o:MyModule.MyType, inline k:int, ghost g:int,
-                      ghost eleven: MyModule.ParamType(int),
-                      ghost twelve: MyModule.ParamType(MyModule.MyType))
+procedure{:instruction Ins(InsIncr(x))} Increment(inout register x:int)
+    ensures
+        x == old(x) + 1;
+{
+}
+
+procedure P(
+    inout register o:MyModule.MyType, inline k:int, ghost g:int,
+    ghost eleven:MyModule.ParamType(int),
+    ghost twelve:MyModule.ParamType(MyModule.MyType))
     requires
+        @o != EAX;
         g >= 1;
         MyModule.MyFunction(5) == 10;
     ensures
@@ -48,12 +44,17 @@ procedure{:refined} P(inout operand o:MyModule.MyType, inline k:int, ghost g:int
         g >= 0;
     modifies
         eax;
+{
+    Increment(eax);
+    Increment(o);
+}
 
-procedure{:refined}{:bridge} Q(inline iii:MyModule.MyType, inout operand dummy:int, out operand dummy2:int,
-                               ghost g:int,
-                               ghost eleven: MyModule.ParamType(int),
-                               ghost twelve: MyModule.ParamType(MyModule.MyType),
-                               operand dt: MyRecord)
+procedure Q(
+    inline iii:MyModule.MyType,
+    ghost g:int,
+    ghost eleven:MyModule.ParamType(int),
+    ghost twelve:MyModule.ParamType(MyModule.MyType),
+    operand dt:MyRecord)
     requires
         F(eax + 3);
         g >= 0;
