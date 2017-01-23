@@ -145,6 +145,7 @@ and token = parse
 | "function" { FUNCTION (curLoc lexbuf) }
 | "returns" { RETURNS (curLoc lexbuf) }
 | "axiom" { AXIOM (curLoc lexbuf) }
+| "extern" { EXTERN (curLoc lexbuf) }
 | "procedure" { PROCEDURE (curLoc lexbuf) }
 | "implementation" { IMPLEMENTATION (curLoc lexbuf) }
 | "requires" { REQUIRES (curLoc lexbuf) }

@@ -25,6 +25,18 @@ procedure AddReg(inout register x:int, register y:int)
     Add(x, y); // coerces y from register to operand
 }
 
+procedure p()
+    modifies
+        eax;
+    requires
+        eax >= 0;
+    ensures
+        eax >= 2;
+{
+    Increment(eax);
+    Increment(eax);
+}
+
 #verbatim
 function method Double(x:int):int { x + x }
 #endverbatim
@@ -67,7 +79,7 @@ procedure Ifs(inline i:int, ghost g:int)
         assert g < ebx;
         assert h <= ebx;
     }
-    else
+    else if (eax <= 10)
     {
         assert eax >= ebx;
     }

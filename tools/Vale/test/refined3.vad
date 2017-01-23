@@ -478,7 +478,7 @@ procedure{:refined} InlineIfElse(inline n:nat)
         Imm(z, 0);
         Add(x, z);
     }
-    else inline if (n == 1)
+    else if (n == 1)
     {
         Imm(z, 1);
         Add(x, z);

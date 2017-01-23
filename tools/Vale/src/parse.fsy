@@ -47,7 +47,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL SPLIT GHOST INLINE
-%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
+%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
 %token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS REQUIRES ENSURES READS MODIFIES
 %token <loc> FORALL EXISTS LAMBDA
@@ -254,7 +254,7 @@ Stmt
   : ID COLON { stmtAt (fst $1) (SLabel (Id (snd $1))) }
   | GOTO AnyId SEMI { stmtAt $1 (SGoto $2) }
   | RETURN SEMI { stmtAt $1 SReturn }
-  | IfStmt { $1 }
+  | StmtModifier IfStmt { $2 $1 }
   | WHILE LPAREN Exp RPAREN Invariants Decreases LBRACE Block RBRACE
     {
       stmtAt $1 (SWhile ($3, $5, $6, $8))
@@ -284,13 +284,13 @@ Stmt
   | ExpAssign SEMI { $1 }
   | Exp1 SEMI { stmtAt (one_loc_of_exp $2 $1) (SAssign ([], $1)) }
 IfStmt
-  : StmtModifier IF LPAREN Exp RPAREN LBRACE Block RBRACE ElseOpt
+  : IF LPAREN Exp RPAREN LBRACE Block RBRACE ElseOpt
     {
-      stmtAt $2 (SIfElse ($1, $4, $7, $9))
+      fun sm -> stmtAt $2 (SIfElse (sm, $3, $6, $8 sm))
     }
 ElseOpt
-  : { [] }
-  | ELSE LBRACE Block RBRACE { $3 }
+  : { fun sm -> [] }
+  | ELSE LBRACE Block RBRACE { fun sm -> $3 }
   | ELSE IfStmt { $2 }
 CalcContents0  /* if there's anything else coming, it must start with a Line */
   : { [] }
@@ -379,13 +379,15 @@ ProcRet
 Decl
   : VERBATIM_BLOCK { (fst $1, DVerbatim (snd $1)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
-  | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId
+  | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId SEMI
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = (Reserved "alias", [EVar $10])::$2}) }
+/*
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet COLONEQ AnyId
-    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $9])::$2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs
+*/
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ AnyId SEMI
+    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $10])::$2}) }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ EXTERN SEMI
     { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = None; pattrs = $2}) }
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs LBRACE Block RBRACE
     { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = Some $10; pattrs = $2}) }
