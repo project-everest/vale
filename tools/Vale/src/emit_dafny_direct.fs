@@ -597,7 +597,7 @@ let build_fun (built_ins:BuiltIns) (loc:loc) (f:fun_decl):Function =
     in
 
   // Assuming is not static or protected
-  let f = Function(tok, sid f.fname, false, false, not is_function_method, typeArgs, formals, resultType, reqs, reads, ens, new Specification<Expression>(decreases, null), body, attrs, null) in
+  let f = Function(tok, sid f.fname, false, false, not is_function_method, typeArgs, formals, null, resultType, reqs, reads, ens, new Specification<Expression>(decreases, null), body, attrs, null, null) in
   f.BodyStartTok <- create_token loc "{";
   f.BodyEndTok <- create_token loc "}";
   built_ins.CreateArrowTypeDecl(formals.Count);
