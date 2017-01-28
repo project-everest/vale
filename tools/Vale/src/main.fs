@@ -253,7 +253,7 @@ let main (argv) =
         // Initialize Dafny objects
         let mdl = new LiteralModuleDecl(new DefaultModuleDecl(), null) in
         let built_ins = new BuiltIns() in
-        let arg_list = List.rev (!cur_file::!dafny_opts_rev) in
+        let arg_list = List.rev ("dummy.dfy"::!dafny_opts_rev) in
         DafnyOptions.Install(new DafnyOptions(new ConsoleErrorReporter()));
         Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
         DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
