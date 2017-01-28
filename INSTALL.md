@@ -13,6 +13,9 @@ Vale relies on the following tools, which must be installed before building Vale
   * See https://www.visualstudio.com/vs/community/ or http://www.mono-project.com/
 * An installed C compiler, used by SCons to compile C files
 
+On an Ubuntu system, including Windows Subsystem for Linux, you can install the dependencies with:
+    sudo apt install scons fsharp nuget mono-devel
+
 Once these tools are installed, running SCons in the top-level directory will build the Vale tool
 and build and verify all sources in the [src](./src) directory:
 
