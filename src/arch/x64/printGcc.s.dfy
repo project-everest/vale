@@ -290,9 +290,9 @@ method printCode(c:code, n:int) returns(n':int)
             var n1 := n;
             var n2 := n + 1;
             print("  jmp L"); print(n2); print("\n");
-            print(".ALIGN 16\nL"); print(n1); print(":\n");
+            print(".align 16\nL"); print(n1); print(":\n");
             n' := printCode(loop, n + 2);
-            print(".ALIGN 16\nL"); print(n2); print(":\n");
+            print(".align 16\nL"); print(n2); print(":\n");
             print("  cmp "); printOprnd(b.o1); print(", "); printOprnd(b.o2); print("\n");
             printJcc(b.cmp); print("L"); print(n1); print("\n");
         }
