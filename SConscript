@@ -12,7 +12,7 @@ Import('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarit
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
 #
 verify_paths = [
-  'src/test/',
+  'src/',
   'tools/Vale/test'
 ]
 Export('verify_paths')
@@ -31,11 +31,17 @@ verify_options = {
   'src/lib/math/div.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:60'),
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:120'),
+  'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:120'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_nonlarith),
 
   'tools/Vale/test/vale-debug.vad': None,
+  'src/arch/arm/decls.vad': None,
+  'src/arch/arm/vale.i.dfy': None,
+  'src/arch/arm/leakage.i.dfy': None,
+  'src/arch/arm/nlarith.s.dfy': None,
+  'src/arch/arm/print.s.dfy': None,
 
   # .vad files default to this set of options when compiling .gen.dfy
   '.vad': BuildOptions(dafny_default_args_nonlarith)
@@ -65,8 +71,8 @@ env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sh
 #
 if env['TARGET_ARCH']=='x86':   # x86-only
   cbc_asm = env.ExtractValeCode(
-    ['src/crypto/aes/aes.vad', 'src/crypto/aes/cbc.vad'],       # Vale source
-    'src/crypto/aes/cbc_main.i.dfy',                            # Dafny main
+    ['src/crypto/aes/$AES_ARCH_DIR/aes.vad', 'src/crypto/aes/$AES_ARCH_DIR/cbc.vad'], # Vale source
+    'src/crypto/aes/$AES_ARCH_DIR/cbc_main.i.dfy',              # Dafny main
     'cbc'                                                       # Base name for the ASM files and EXE
     )
   env.BuildTest(['src/crypto/aes/testcbc.c', cbc_asm[0]], '', 'testcbc')
