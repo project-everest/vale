@@ -23,11 +23,11 @@ Export('verify_paths')
 verify_options = {
   'src/arch/arm/nlarith.s.dfy': BuildOptions(dafny_default_args),
   'src/arch/arm/bitvectors.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'src/crypto/aes/aes-x64/aes_main.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /compile:1'),
+  'src/crypto/aes/aes-x64/aes_main.i.dfy': BuildOptions(dafny_default_args_nonlarith),
   'src/lib/math/mul_nonlinear.i.dfy': BuildOptions(dafny_default_args),
   'src/lib/math/div_nonlinear.i.dfy': BuildOptions(dafny_default_args),
   'src/crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'src/crypto/hashing/sha-x64/sha256_vale_main.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /compile:1'),
+  'src/crypto/hashing/sha-x64/sha256_vale_main.i.dfy': BuildOptions(dafny_default_args_nonlarith),
   'src/lib/math/div.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:60'),
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:120'),
@@ -37,11 +37,6 @@ verify_options = {
   '.dfy': BuildOptions(dafny_default_args_nonlarith),
 
   'tools/Vale/test/vale-debug.vad': None,
-  'src/arch/arm/decls.vad': None,
-  'src/arch/arm/vale.i.dfy': None,
-  'src/arch/arm/leakage.i.dfy': None,
-  'src/arch/arm/nlarith.s.dfy': None,
-  'src/arch/arm/print.s.dfy': None,
 
   # .vad files default to this set of options when compiling .gen.dfy
   '.vad': BuildOptions(dafny_default_args_nonlarith)
