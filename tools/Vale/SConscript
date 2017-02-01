@@ -162,7 +162,7 @@ if sys.platform == 'win32':
   b = env.CopyAs(BIN+'/z3.exe', '../Dafny/z3.exe')
   Depends(vale_tool, b)
   dependencies.append(b)
-  z3 = b[0]
+  z3 = File(b[0])
 else:
   z3 = FindFile('z3', os.environ['PATH'].split(':'))
   if z3 == None:
