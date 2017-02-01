@@ -50,7 +50,6 @@ def add_fslexyacc(env):
 
 def build_vale(sources, dafny_refs):
   senv = env.Clone()
-  dafnyinterface = senv.CopyAs(BIN+'/DafnyInterface.dll', 'DafnyInterface/bin/DafnyInterface.dll')
   # Wrap all paths in File() so they are appropriately adjusted to be relative to the SConstruct file
   senv['DAFNY_REFS']=[]
   for r in dafny_refs:
@@ -74,7 +73,6 @@ def build_vale(sources, dafny_refs):
   # add dependencies to vale.exe
   for r in dafny_refs:
     Depends(vale_tool, r)
-  Depends(vale_tool, dafnyinterface)
   return vale_tool
 
 add_fslexyacc(env)
@@ -103,12 +101,6 @@ DAFNY_BIN = [
     'Dafny.exe'
   ]
 
-DAFNY_REFS = [os.path.join(env['DAFNY_PATH'], f) for f in DAFNY_BIN] + [
-  '../../bin/DafnyInterface.dll',
-  '../Dafny/Newtonsoft.Json.dll',
-  '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'
-  ]
-
 SRC = [
   'src/ast.fs',
   'src/ast_util.fs',
@@ -129,6 +121,40 @@ VALE_BIN = DAFNY_BIN + [
   'DafnyPrelude.bpl',
   'DafnyRuntime.cs',
   'Provers.SMTLib.dll',
+  ]
+
+# build DafnyInterface.dll
+DafnyInterface_dir = Dir('DafnyInterface/Source/DafnyInterface')
+DafnyInterface_src = [DafnyInterface_dir.File(f)
+                      for f in ['DafnyDriver.cs', 'Properties/AssemblyInfo.cs']]
+DafnyInterface_refs = [env.Dir(env['DAFNY_PATH']).File(f) for f in [
+    'BoogieAbsInt.dll',
+    'BoogieConcurrency.dll',
+    'BoogieCore.dll',
+    'BoogieExecutionEngine.dll',
+    'BoogieParserHelper.dll',
+    'BoogieVCGeneration.dll',
+    'Dafny.exe',
+    'DafnyPipeline.dll',
+    'Provers.SMTLib.dll',
+]]
+
+if sys.platform == 'win32':
+  env['CSC'] = env.Detect('csc')
+else: # mono
+  env['CSC'] = env.Detect('dmcs')
+
+DafnyInterface_dll = env.Command(
+  '#bin/DafnyInterface.dll',
+  DafnyInterface_src,
+  '$CSC -t:library -out:$TARGET $SOURCES '
+    + ' '.join(['-r:'+r.path for r in DafnyInterface_refs]))
+Depends(DafnyInterface_dll, DafnyInterface_refs)
+
+DAFNY_REFS = [os.path.join(env['DAFNY_PATH'], f) for f in DAFNY_BIN] + [
+  DafnyInterface_dll,
+  '../Dafny/Newtonsoft.Json.dll',
+  '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'
   ]
 
 # build vale.exe
