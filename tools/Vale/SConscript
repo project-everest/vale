@@ -85,24 +85,27 @@ add_fslexyacc(env)
 #
 ####################################################################
 
-DAFNY_REFS = [
-  '../Dafny/BoogieAbsInt.dll',
-  '../Dafny/BoogieBasetypes.dll',
-  '../Dafny/BoogieCodeContractsExtender.dll',
-  '../Dafny/BoogieConcurrency.dll',
-  '../Dafny/BoogieCore.dll',
-  '../Dafny/BoogieDoomed.dll',
-  '../Dafny/BoogieExecutionEngine.dll',
-  '../Dafny/BoogieGraph.dll',
-  '../Dafny/BoogieHoudini.dll',
-  '../Dafny/BoogieModel.dll',
-  '../Dafny/BoogieParserHelper.dll',
-  '../Dafny/BoogieVCExpr.dll',
-  '../Dafny/BoogieVCGeneration.dll',
-  '../Dafny/DafnyPipeline.dll',
-  '../Dafny/Newtonsoft.Json.dll',
-  '../Dafny/Dafny.exe',
+DAFNY_BIN = [
+    'BoogieAbsInt.dll',
+    'BoogieBasetypes.dll',
+    'BoogieCodeContractsExtender.dll',
+    'BoogieConcurrency.dll',
+    'BoogieCore.dll',
+    'BoogieDoomed.dll',
+    'BoogieExecutionEngine.dll',
+    'BoogieGraph.dll',
+    'BoogieHoudini.dll',
+    'BoogieModel.dll',
+    'BoogieParserHelper.dll',
+    'BoogieVCExpr.dll',
+    'BoogieVCGeneration.dll',
+    'DafnyPipeline.dll',
+    'Dafny.exe'
+  ]
+
+DAFNY_REFS = [os.path.join(env['DAFNY_PATH'], f) for f in DAFNY_BIN] + [
   '../../bin/DafnyInterface.dll',
+  '../Dafny/Newtonsoft.Json.dll',
   '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'
   ]
 
@@ -122,29 +125,10 @@ SRC = [
   ]
 
 # Dafny and Boogie binaries.  Z3 is handled separately.
-VALE_BIN = [
-  'BoogieAbsInt.dll',
-  'BoogieBasetypes.dll',
-  'BoogieCodeContractsExtender.dll',
-  'BoogieConcurrency.dll',
-  'BoogieCore.dll',
-  'BoogieDoomed.dll',
-  'BoogieExecutionEngine.dll',
-  'BoogieGraph.dll',
-  'BoogieHoudini.dll',
-  'BoogieModel.dll',
-  'BoogieModelViewer.dll',
-  'BoogieParserHelper.dll',
-  'BoogieVCExpr.dll',
-  'BoogieVCGeneration.dll',
-  'Dafny.exe',
-  'Dafny.pdb',
-  'DafnyMenu.dll',
-  'DafnyPipeline.dll',
+VALE_BIN = DAFNY_BIN + [
   'DafnyPrelude.bpl',
   'DafnyRuntime.cs',
   'Provers.SMTLib.dll',
-  'Provers.SMTLib.pdb',
   ]
 
 # build vale.exe
@@ -155,11 +139,11 @@ vale_tool = build_vale(SRC, DAFNY_REFS)
 # copy the dependencies to the BIN directory, too
 dependencies = vale_tool
 for s in VALE_BIN:
-  b = env.CopyAs(BIN+'/'+s, '../Dafny/'+s)
+  b = env.CopyAs(BIN+'/'+s, env['DAFNY_PATH']+'/'+s)
   Depends(vale_tool, b)
   dependencies.append(b)
 if sys.platform == 'win32':
-  b = env.CopyAs(BIN+'/z3.exe', '../Dafny/z3.exe')
+  b = env.CopyAs(BIN+'/z3.exe', env['DAFNY_PATH']+'/z3.exe')
   Depends(vale_tool, b)
   dependencies.append(b)
   z3 = File(b[0])
