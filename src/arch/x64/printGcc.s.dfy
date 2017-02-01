@@ -191,6 +191,7 @@ method printIns(ins:ins)
         case AddCarry(dst, src) => printName2("  add", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case BSwap32(dst)       => printName1("  bswap", dst);    printOprnd(dst); print("\n");
         case Xor32(dst, src)    => printName2("  xor", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
+        case Xor64(dst, src)    => printName2("  xor", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case And32(dst, src)    => printName2("  and", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Not32(dst)         => printName1("  not", dst);      printOprnd(dst); print("\n");
         case GetCf(dst)         => printName1("  setc", dst);     printSmallOprnd(dst); print("\n");

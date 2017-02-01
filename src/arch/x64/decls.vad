@@ -69,6 +69,12 @@ predicate op32(s:State, o:operand)
     o.OReg? ==> o.r in s.regs && IsUInt32(s.regs[o.r])
 }
 
+predicate op64(s:State, o:operand)
+{
+    // Only 64-bit registers are supported as op64() currently.
+    o.OReg? ==> o.r in s.regs// && IsUInt64(s.regs[o.r])
+}
+
 predicate reg32(s:State, r:x86reg)
 {
     r in s.regs && IsUInt32(s.regs[r])
@@ -346,6 +352,19 @@ procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout operand dst
   modifies efl;
   ensures
     dst == xor32(old(dst), old(src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
+procedure {:refined} {:instruction Ins(Xor64(dst, src))} Xor64(inout operand dst:uint64, operand src:uint64)
+  requires{:refined false} op64(this, @dst); op64(this, @src);
+  ensures {:refined false} op64(this, @dst);
+  modifies efl;
+  ensures
+    dst == xor64(old(dst), old(src));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;

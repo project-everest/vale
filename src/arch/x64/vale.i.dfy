@@ -749,8 +749,8 @@ predicate va_whileInv(b:obool, c:code, n:int, r1:va_state, r2:va_state)
 }
 
 lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':va_state)
-    requires va_is_src_operand_uint32(b.o1);
-    requires va_is_src_operand_uint32(b.o2);
+    requires va_is_src_operand_uint64(b.o1);
+    requires va_is_src_operand_uint64(b.o2);
     requires x86_ValidState(s);
     requires eval_code(While(b, c), s, r)
     ensures  evalWhileLax(b, c, n, to_state(s), to_state(r))
@@ -771,8 +771,8 @@ lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':
 }
 
 lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns(s':va_state, r':va_state)
-    requires va_is_src_operand_uint32(b.o1) && ValidSourceOperand(to_state(s), 32, b.o1);
-    requires va_is_src_operand_uint32(b.o2) && ValidSourceOperand(to_state(s), 32, b.o2);
+    requires va_is_src_operand_uint64(b.o1) && ValidSourceOperand(to_state(s), 64, b.o1);
+    requires va_is_src_operand_uint64(b.o2) && ValidSourceOperand(to_state(s), 64, b.o2);
     requires n > 0
     requires evalWhileLax(b, c, n, to_state(s), to_state(r))
     ensures  x86_ValidState(s) ==> x86_ValidState(s');
@@ -781,7 +781,7 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
     ensures  x86_ValidState(s) ==> if s.ok then x86_branchRelation(s, s', true) else s' == s;
     ensures  if s.ok && x86_ValidState(s) then
                     s'.ok
-                 && va_is_src_operand_uint32(b.o1)
+                 && va_is_src_operand_uint64(b.o1)
                  && evalOBool(to_state(s), b)
                  && (s.heaplets == s'.heaplets == r'.heaplets)
              else
@@ -811,8 +811,8 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
 }
 
 lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va_state)
-    requires va_is_src_operand_uint32(b.o1) && ValidSourceOperand(to_state(s), 32, b.o1);
-    requires va_is_src_operand_uint32(b.o2) && ValidSourceOperand(to_state(s), 32, b.o2);
+    requires va_is_src_operand_uint64(b.o1) && ValidSourceOperand(to_state(s), 64, b.o1);
+    requires va_is_src_operand_uint64(b.o2) && ValidSourceOperand(to_state(s), 64, b.o2);
     requires evalWhileLax(b, c, 0, to_state(s), to_state(r))
     ensures  if s.ok then
                 (if x86_ValidState(s) then

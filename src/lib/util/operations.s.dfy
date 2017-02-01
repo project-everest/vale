@@ -32,6 +32,11 @@ function method {:opaque} BitXor(x:bv32, y:bv32): bv32
     x ^ y
 }
 
+function method {:opaque} BitXor64(x:bv64, y:bv64): bv64
+{
+    x ^ y
+}
+
 function method {:opaque} BitMod(x:bv32, y:bv32): bv32
     requires y != 0
 {
@@ -102,6 +107,11 @@ function BitwiseNot(x:uint32) : uint32
 function BitwiseXor(x:uint32, y:uint32) : uint32
 {
     BitsToWord(BitXor(WordToBits(x), WordToBits(y)))
+}
+
+function BitwiseXor64(x:uint64, y:uint64) : uint64
+{
+    BitsToWord64(BitXor64(WordToBits64(x), WordToBits64(y)))
 }
 
 function RotateRight(x:uint32, amount:uint32) : uint32

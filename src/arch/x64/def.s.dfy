@@ -30,6 +30,7 @@ datatype ins =
 | AddCarry(dstAddCarry:operand, srcAddCarry:operand)
 | BSwap32(dstBSwap:operand)
 | Xor32(dstXor:operand, srcXor:operand)
+| Xor64(dstXorq:operand, srcXorq:operand)
 | And32(dstAnd:operand, srcAnd:operand)
 | Not32(dstNot:operand)
 | GetCf(dstCf:operand) // corresponds to SETC instruction
@@ -432,8 +433,8 @@ function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
 }
 
 function evalOBool(s:state, o:obool):bool
-    requires ValidSourceOperand(s, 32, o.o1);
-    requires ValidSourceOperand(s, 32, o.o2);
+    requires ValidSourceOperand(s, 64, o.o1);
+    requires ValidSourceOperand(s, 64, o.o2);
 {
     evalCmp(o.cmp, eval_op32(s, o.o1), eval_op32(s, o.o2))
 }
@@ -449,6 +450,8 @@ function bswap32(x:uint32) : uint32 {
 }
 
 function xor32(x:uint32, y:uint32) : uint32  { BitwiseXor(x, y) }
+
+function xor64(x:uint64, y:uint64) : uint64  { BitwiseXor64(x, y) }
 
 function and32(x:uint32, y:uint32) : uint32  { BitwiseAnd(x, y) }
 
@@ -486,6 +489,7 @@ predicate ValidInstruction(s:state, ins:ins)
         case AddCarry(dstAddCarry, srcAddCarry) => Valid32BitDestinationOperand(s, dstAddCarry) && Valid32BitSourceOperand(s, srcAddCarry) && Valid32BitSourceOperand(s, dstAddCarry)
         case BSwap32(dstBSwap) => Valid32BitDestinationOperand(s, dstBSwap) && dstBSwap.OReg?
         case Xor32(dstXor, srcXor) => Valid32BitDestinationOperand(s, dstXor) && Valid32BitSourceOperand(s, srcXor) && Valid32BitSourceOperand(s, dstXor)
+        case Xor64(dstXor, srcXor) => Valid64BitDestinationOperand(s, dstXor) && Valid64BitSourceOperand(s, srcXor) && Valid64BitSourceOperand(s, dstXor)
         case And32(dstAnd, srcAnd) => Valid32BitDestinationOperand(s, dstAnd) && Valid32BitSourceOperand(s, srcAnd) && Valid32BitSourceOperand(s, dstAnd)
         case Not32(dstNot) => Valid32BitDestinationOperand(s, dstNot) && Valid32BitSourceOperand(s, dstNot)
         case GetCf(dstCf) => Valid32BitDestinationOperand(s, dstCf) && Valid32BitSourceOperand(s, dstCf)
@@ -536,6 +540,7 @@ function insObs(s:state, ins:ins):seq<observation>
         case AddCarry(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
         case BSwap32(dst) => operandObs(s, 32, dst)
         case Xor32(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
+        case Xor64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
         case And32(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
         case Not32(dst) => operandObs(s, 32, dst)
         case GetCf(dst) => operandObs(s, 32, dst)
@@ -580,6 +585,7 @@ predicate evalIns(ins:ins, s:state, r:state)
                                     && Cf(r.flags) == (sum >= 0x1_0000_0000)
             case BSwap32(dst)    => evalUpdateAndMaintainFlags(s, dst, bswap32(eval_op32(s, dst)), r, obs)
             case Xor32(dst, src) => evalUpdateAndHavocFlags(s, dst, xor32(eval_op32(s, dst), eval_op32(s, src)), r, obs)
+            case Xor64(dst, src) => evalUpdateAndHavocFlags64(s, dst, xor64(eval_op64(s, dst), eval_op64(s, src)), r, obs)
             case And32(dst, src) => evalUpdateAndHavocFlags(s, dst, and32(eval_op32(s, dst), eval_op32(s, src)), r, obs)
             case Not32(dst)      => evalUpdateAndHavocFlags(s, dst, not32(eval_op32(s, dst)), r, obs)
             // Sticks the carry flag (CF) in a register (see SETC instruction)
@@ -639,9 +645,9 @@ predicate branchRelation(s:state, s':state, cond:bool)
 }
 
 predicate evalIfElse(cond:obool, ifT:code, ifF:code, s:state, r:state)
-    decreases if ValidSourceOperand(s, 32, cond.o1) && ValidSourceOperand(s, 32, cond.o2) && evalOBool(s, cond) then ifT else ifF;
+    decreases if ValidSourceOperand(s, 64, cond.o1) && ValidSourceOperand(s, 64, cond.o2) && evalOBool(s, cond) then ifT else ifF;
 {
-    if s.ok && ValidSourceOperand(s, 32, cond.o1) && ValidSourceOperand(s, 32, cond.o2) then
+    if s.ok && ValidSourceOperand(s, 64, cond.o1) && ValidSourceOperand(s, 64, cond.o2) then
         exists s' ::
            branchRelation(s, s', evalOBool(s, cond))
         && (if evalOBool(s, cond) then evalCode(ifT, s', r) else evalCode(ifF, s', r))
@@ -652,7 +658,7 @@ predicate evalIfElse(cond:obool, ifT:code, ifF:code, s:state, r:state)
 predicate evalWhile(b:obool, c:code, n:nat, s:state, r:state)
   decreases c, n
 {
-    if s.ok && ValidSourceOperand(s, 32, b.o1) && ValidSourceOperand(s, 32, b.o2) then
+    if s.ok && ValidSourceOperand(s, 64, b.o1) && ValidSourceOperand(s, 64, b.o2) then
         if n == 0 then
             !evalOBool(s, b) && branchRelation(s, r, false)
         else

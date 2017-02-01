@@ -37,6 +37,8 @@ verify_options = {
   '.dfy': BuildOptions(dafny_default_args_nonlarith),
 
   'tools/Vale/test/vale-debug.vad': None,
+  'src/crypto/aes/aes-x64/cbc.vad': None,
+  'src/crypto/aes/aes-x64/cbc_main.i.dfy': None,
 
   # .vad files default to this set of options when compiling .gen.dfy
   '.vad': BuildOptions(dafny_default_args_nonlarith)
