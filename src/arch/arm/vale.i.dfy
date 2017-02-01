@@ -25,12 +25,14 @@ predicate {:opaque} eval_code(c:code, s:state, r:state)
     s.ok ==> evalCode(c, s, r)
 }
 
+/*
 function va_eval_operand_uint32(s:state, o:operand): uint32
     requires ValidState(s)
     requires ValidOperand(o) || ValidSecondOperand(o)
 {
     OperandContents(s,o)
 }
+*/
 
 function va_eval_operand_addr(s:state, o:operand): uint32
     requires ValidState(s)
@@ -264,7 +266,7 @@ lemma va_lemma_empty(s:va_state, r:va_state) returns(r':va_state)
     ensures  s.ok ==> r == s
     ensures  forall b, s' :: eval_code(b, r, s') ==> eval_code(b, s, s')
 {
-    reveal_va_eval();
+    reveal_eval_code();
     r' := s;
 }
 
@@ -361,7 +363,7 @@ lemma va_lemma_block(b:codes, s0:va_state, r:va_state) returns(r1:va_state, c0:c
     ensures  eval_code(c0, s0, r1)
     ensures  eval_code(Block(b1), r1, r)
 {
-    reveal_va_eval();
+    reveal_eval_code();
     c0 := b.hd;
     b1 := b.tl;
     if s0.ok {
@@ -390,7 +392,7 @@ lemma va_lemma_ifElse(ifb:obool, ct:code, cf:code, s:va_state, r:va_state) retur
              else
                  true //!r.ok;
 {
-    reveal_va_eval();
+    reveal_eval_code();
     if s.ok {
         assert evalIfElse(ifb, ct, cf, s, r);
         cond := evalOBool(s, ifb);
@@ -435,7 +437,7 @@ lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':
     ensures  r' == s
     ensures  forall c', t, t' :: eval_code(c', t, t') == (t.ok ==> eval_code(c', t, t'));
 {
-    reveal_va_eval();
+    reveal_eval_code();
     reveal_evalWhileOpaque();
 //    unpack_eval_while(b, c, s, r);
     if s.ok {
@@ -447,7 +449,7 @@ lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':
     r' := s;
 }
 
-lemma va_lemma_whileTrue(b:obool, c:code, nint, s:va_state, r:va_state) returns(s':va_state, r':va_state)
+lemma va_lemma_whileTrue(b:obool, c:code, n:int, s:va_state, r:va_state) returns(s':va_state, r':va_state)
     requires ValidState(s) && ValidOperand(b.o1) && ValidOperand(b.o2);
     requires n > 0
     requires evalWhileLax(b, c, n, s, r)
@@ -466,7 +468,7 @@ lemma va_lemma_whileTrue(b:obool, c:code, nint, s:va_state, r:va_state) returns(
              else
                  true //!r.ok;
 {
-    reveal_va_eval();
+    reveal_eval_code();
     reveal_evalWhileOpaque();
 
     if !s.ok {
@@ -505,7 +507,7 @@ lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va
             else
                 r' == s
 {
-    reveal_va_eval();
+    reveal_eval_code();
     reveal_evalWhileOpaque();
 
     if !s.ok {
