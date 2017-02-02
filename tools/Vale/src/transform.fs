@@ -342,7 +342,13 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
       | None -> ec
       | Some xo -> codeLemma (EOp (RefineOp, [ec; ec; vaApp ("const_" + xo) [e]]))
       in
-    match (g, e) with
+    let operandProc xa io =
+      let xa = string_of_id xa in
+      match io with
+      | In | InOut -> Id (xa + "_in")
+      | Out -> Id (xa + "_out")
+      in
+    match (g, skip_loc e) with
     | (_, EVar x) when Map.containsKey x env.ids ->
       (
         match Map.find x env.ids with
@@ -382,6 +388,25 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
     | (NotGhost, ELoc _) -> Unchanged
     | (NotGhost, EOp (Uop UConst, [ec])) -> Replace (constOp (rewrite_vars_exp env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
+    | (NotGhost, EApply (xa, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
+      (
+        let p =
+          match io with
+          | In | InOut ->
+            let xa_in = operandProc xa In in
+            let p_in = Map.find xa_in env.procs in
+            let p_in = {p_in with prets = []} in
+            p_in
+          | Out ->
+            let xa_out = operandProc xa Out in
+            let p_out = Map.find xa_out env.procs in
+            let p_out = {p_out with pargs = List.take (List.length p_out.pargs - 1) p_out.pargs} in
+            p_out
+          in
+        let (lhss, es) = rewrite_vars_args env p [] args in
+        let xa_f = Reserved ("code_" + (string_of_id xa)) in
+        Replace (EApply (xa_f, es))
+      )
 (*
     | (NotGhost, EOp (Subscript, [ea; ei])) ->
       (
@@ -401,7 +426,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
       )
 *)
     | (NotGhost, _) ->
-        err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)')"
+        err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)'; if the expression is intended as a non-const operand, try declaring operand procedures)"
         // Replace (codeLemma e)
     | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg NotGhost None io env e)
 // TODO: this is a real error message, it should be uncommented
@@ -409,31 +434,12 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
 //        err ("cannot call a procedure from inside an expression or variable declaration")
     | (Ghost, _) -> Unchanged
     in
-  env_map_exp fe env e
+  try
+    env_map_exp fe env e
+  with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
 and rewrite_vars_exp (env:env) (e:exp):exp =
   rewrite_vars_arg Ghost None In env e
-
-// Turn
-//   ecx < 10
-// into
-//   va_cmp_lt(var_ecx(), va_const_operand(10))
-let rewrite_cond_exp (env:env) (e:exp):exp =
-  let r = rewrite_vars_arg NotGhost (Some "cmp") In env in
-  match skip_loc e with
-  | (EOp (op, es)) ->
-    (
-      match (op, es) with
-      | (Bop BEq, [e1; e2]) -> vaApp "cmp_eq" [r e1; r e2]
-      | (Bop BNe, [e1; e2]) -> vaApp "cmp_ne" [r e1; r e2]
-      | (Bop BLe, [e1; e2]) -> vaApp "cmp_le" [r e1; r e2]
-      | (Bop BGe, [e1; e2]) -> vaApp "cmp_ge" [r e1; r e2]
-      | (Bop BLt, [e1; e2]) -> vaApp "cmp_lt" [r e1; r e2]
-      | (Bop BGt, [e1; e2]) -> vaApp "cmp_gt" [r e1; r e2]
-      | _ -> err ("conditional expression must be a comparison operation")
-    )
-  | _ -> err ("conditional expression must be a comparison operation")
-
-let rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
+and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
   let (mrets, margs) = match_proc_args env p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
@@ -458,6 +464,26 @@ let rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
   let args = List.concat (List.map rewrite_arg margs) in
   let (retsR, retsA) = List.unzip (List.map rewrite_ret mrets) in
   (List.concat retsR, (List.concat retsA) @ args)
+
+// Turn
+//   ecx < 10
+// into
+//   va_cmp_lt(var_ecx(), va_const_operand(10))
+let rewrite_cond_exp (env:env) (e:exp):exp =
+  let r = rewrite_vars_arg NotGhost (Some "cmp") In env in
+  match skip_loc e with
+  | (EOp (op, es)) ->
+    (
+      match (op, es) with
+      | (Bop BEq, [e1; e2]) -> vaApp "cmp_eq" [r e1; r e2]
+      | (Bop BNe, [e1; e2]) -> vaApp "cmp_ne" [r e1; r e2]
+      | (Bop BLe, [e1; e2]) -> vaApp "cmp_le" [r e1; r e2]
+      | (Bop BGe, [e1; e2]) -> vaApp "cmp_ge" [r e1; r e2]
+      | (Bop BLt, [e1; e2]) -> vaApp "cmp_lt" [r e1; r e2]
+      | (Bop BGt, [e1; e2]) -> vaApp "cmp_gt" [r e1; r e2]
+      | _ -> err ("conditional expression must be a comparison operation")
+    )
+  | _ -> err ("conditional expression must be a comparison operation")
 
 let rec rewrite_vars_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
   match (lhss, e) with

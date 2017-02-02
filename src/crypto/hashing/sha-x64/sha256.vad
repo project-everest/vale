@@ -1034,7 +1034,7 @@ procedure {:refined}{:bridge} CastBytesToWords(inline num_bytes:uint32, inline t
       exists bytes_id, W_id ::
           CastBytesResult(bytes_id, old(mem), mem, old(r10), num_bytes, W_id, taint)
       && (forall id :: old(mem)?[id] && AddrInHeaplet(old(r10), old(mem)[id]) ==> id == bytes_id);
-:= extern;
+  extern;
 
 
 // Entry-point for the Dafny-level SHA code

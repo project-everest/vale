@@ -387,7 +387,7 @@ Decl
 */
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ AnyId SEMI
     { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $10])::$2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ EXTERN SEMI
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
     { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = None; pattrs = $2}) }
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs LBRACE Block RBRACE
     { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = Some $10; pattrs = $2}) }

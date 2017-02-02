@@ -80,6 +80,7 @@ type build_env =
     proc:proc_decl;
     loc:loc;
     is_instruction:bool;
+    is_operand:bool;
     is_refined:bool;
     is_refined_while_proc:bool;
     is_refined_while_ghosts:id list;
@@ -649,9 +650,11 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
     | EApply (x, es) when Map.containsKey x env.procs ->
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
+        let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand _ -> true | _ -> false) p.prets in
+        let pretsArgs = pretsOp @ pargs in
 //        let procArgs = (List.collect (area_proc_fret EmitCall) p.prets) @ (List.collect (area_proc_farg EmitCall) p.pargs) in
         let specModsIo:(inout * proc_arg * id option) list = List.map (fun (io, f) -> (io, ArgState f, None)) (List.collect (specModIo env EmitModCall) p.pspecs) in
-        let argModsIo = List.concat (List.map2 argModIo es pargs) in
+        let argModsIo = List.concat (List.map2 argModIo es pretsArgs) in
         let new_id (x:id) =
           let xn = "x" + (string (gen_lemma_sym ())) + "_" in
           match x with Id x -> Reserved (xn + x) | Reserved x -> Reserved (xn + x) | Operator _ -> internalErr "EApply: Operator" in
@@ -667,11 +670,11 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
           | XGhost -> if ghostExp then [e] else [EVar x]
           | _ -> []
           in
-        let esNonMod = List.concat (List.map2 (eNonMod false) pargs es) in
-        let esGhost = List.concat (List.map2 (eNonMod true) pargs es) in
+        let esNonMod = List.concat (List.map2 (eNonMod false) pretsArgs es) in
+        let esGhost = List.concat (List.map2 (eNonMod true) pretsArgs es) in
         let lemmaPrefix = if benv.is_refined then "refined_" else "lemma_" in
         let eLem (_, _, storage, _, _) e = match storage with XGhost -> [] | _ -> [e] in
-        let esLem = if benv.is_refined then List.concat (List.map2 eLem pargs es) else es in
+        let esLem = if benv.is_refined then List.concat (List.map2 eLem pretsArgs es) else es in
         let lem = vaApp (lemmaPrefix + (string_of_id x)) ([EVar block; EVar src; EVar resIn] @ esLem) in
         let blockLhss = List.map varLhsOfId [b1; res] in
         let (callId, sTrigger) =
@@ -692,8 +695,8 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
               let gtmp = Reserved ("gtmp" + itmp) in
               [(f,l,(gtmp,Some tp))]
           | _ -> [] in
-        let ghost_out_map = List.concat (List.map2 get_ghost_out_arg_actual_formal p.prets lhss) in
-        let lhss = List.concat (List.map2 drop_ghost_args p.prets lhss) in
+        let ghost_out_map = List.concat (List.map2 get_ghost_out_arg_actual_formal pretsNonOp lhss) in
+        let lhss = List.concat (List.map2 drop_ghost_args pretsNonOp lhss) in
         let assign_ghost_outs =
           match (benv.is_refined, benv.is_refined_while_proc, ghost_out_map) with
           | (false, _, _) | (_, true, _) | (_, _, []) -> (sTrigger, [], EBool true, [])
@@ -1169,11 +1172,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   let sb1 = SVar (b1, Some tCodes, XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);
 
   // Generate well-formedness for operands:
-  //   requires va_is_dst_int(dummy)
+  //   requires va_is_dst_int(dummy, s0)
   let reqIsArg (isRet:bool) (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand xo, _) | (false, XOperand xo, (InOut | Out)) -> [vaAppOp ("is_dst_" + xo + "_") t [EVar x]]
-    | (false, XOperand xo, In) -> [vaAppOp ("is_src_" + xo + "_") t [EVar x]]
+    | (true, XOperand xo, _) | (false, XOperand xo, (InOut | Out)) -> [vaAppOp ("is_dst_" + xo + "_") t [EVar x; EVar s0]]
+    | (false, XOperand xo, In) -> [vaAppOp ("is_src_" + xo + "_") t [EVar x; EVar s0]]
     | _ -> []
     in
   let reqIsExps =
@@ -1192,8 +1195,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
     lemma va_refined_Q(va_b0:va_codes, va_s0:va_state, va_sN:va_state, iii:int, dummy:va_operand_lemma, dummy2:va_operand_lemma)
       returns (va_bM:va_codes, va_sM:va_state)
       requires va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
-      requires va_is_dst_int(dummy)
-      requires va_is_dst_int(dummy2)
+      requires va_is_dst_int(dummy, s0)
+      requires va_is_dst_int(dummy2, s0)
       ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
       ensures  forall va_id:va_int, g:int{:trigger va_trigger_Q(va_id, g)} :: va_trigger_Q(va_id, g) ==> va_spec_Q(iii, g, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
       ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
@@ -1300,6 +1303,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         // Body of instruction lemma
         let ss = build_lemma_ghost_stmts env benv sM sM loc stmts in
         [sReveal; sOldS; sBlock] @ ss
+      else if benv.is_operand then
+        err "operand procedures must be declared extern"
       else
         // Body of ordinary lemma
         let ss = stmts_refined (stmts_of_estmts true true estmts) in
@@ -1321,6 +1326,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
 let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   gen_lemma_sym_count := 0;
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
+  let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let isRefined = attrs_get_bool (Id "refined") false p.pattrs in
   let codeName = Reserved ("code_" + (string_of_id p.pname)) in
 //  let specArgs = (List.collect specArg p.prets) @ (List.collect specArg p.pargs) in
@@ -1437,6 +1443,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             proc = p;
             loc = loc;
             is_instruction = isInstruction;
+            is_operand = isOperand;
             is_refined = isRefined;
             is_bridge = false;
             is_framed = attrs_get_bool (Id "frame") true p.pattrs;

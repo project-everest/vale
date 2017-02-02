@@ -75,28 +75,28 @@ function va_update_memory(sM:va_state, sK:va_state):va_state { sK.(heap := sM.he
 function va_update_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
 function va_update_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
 
-predicate va_is_src_operand_imm8(o:opr) { o.OConst? && 0 <= o.n < 256 }
+predicate va_is_src_operand_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
 
-predicate va_is_src_operand_uint32(o:opr) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
-predicate va_is_dst_operand_uint32(o:opr) { o.OReg? && !o.r.X86Xmm? }
+predicate va_is_src_operand_uint32(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
+predicate va_is_dst_operand_uint32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
 
-predicate va_is_src_operand_Quadword(o:opr) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
-predicate va_is_dst_operand_Quadword(o:opr) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
+predicate va_is_src_operand_Quadword(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
+predicate va_is_dst_operand_Quadword(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
 
 function va_eval_operand_imm8(s:va_state, o:opr):uint32
-    requires va_is_src_operand_imm8(o);
+    requires va_is_src_operand_imm8(o, s);
 {
     o.n
 }
 
 function va_eval_operand_uint32(s:va_state, o:opr):uint32
-    requires va_is_src_operand_uint32(o);
+    requires va_is_src_operand_uint32(o, s);
 {
     eval_op(to_state(s), o)
 }
 
 function va_eval_operand_Quadword(s:va_state, o:opr):Quadword
-    requires va_is_src_operand_Quadword(o);
+    requires va_is_src_operand_Quadword(o, s);
     requires o.r.xmm in s.xmms;
 {
     Eval128BitOperand(to_state(s), o)
@@ -700,8 +700,8 @@ lemma va_lemma_block(b:codes, s0:va_state, r:va_state) returns(r1:va_state, c0:c
 lemma va_lemma_ifElse(ifb:obool, ct:code, cf:code, s:va_state, r:va_state) returns(cond:bool, s':va_state)
     requires !ifb.o1.OHeap? && !ifb.o2.OHeap?;
     requires x86_ValidState(s);
-    requires va_is_src_operand_uint32(ifb.o1);
-    requires va_is_src_operand_uint32(ifb.o2);
+    requires va_is_src_operand_uint32(ifb.o1, s);
+    requires va_is_src_operand_uint32(ifb.o2, s);
     requires eval_code(IfElse(ifb, ct, cf), s, r)
     ensures  if s.ok then
                     s'.ok
@@ -733,8 +733,8 @@ predicate va_whileInv(b:obool, c:code, n:int, r1:va_state, r2:va_state)
 }
 
 lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':va_state)
-    requires va_is_src_operand_uint32(b.o1);
-    requires va_is_src_operand_uint32(b.o2);
+    requires va_is_src_operand_uint32(b.o1, s);
+    requires va_is_src_operand_uint32(b.o2, s);
     requires x86_ValidState(s);
     requires eval_code(While(b, c), s, r)
     ensures  evalWhileLax(b, c, n, to_state(s), to_state(r))
@@ -755,8 +755,8 @@ lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':
 }
 
 lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns(s':va_state, r':va_state)
-    requires va_is_src_operand_uint32(b.o1);
-    requires va_is_src_operand_uint32(b.o2);
+    requires va_is_src_operand_uint32(b.o1, s);
+    requires va_is_src_operand_uint32(b.o2, s);
     requires n > 0
     requires evalWhileLax(b, c, n, to_state(s), to_state(r))
     ensures  x86_ValidState(s) ==> x86_ValidState(s');
@@ -765,7 +765,7 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
     ensures  x86_ValidState(s) ==> if s.ok then x86_branchRelation(s, s', true) else s' == s;
     ensures  if s.ok && x86_ValidState(s) then
                     s'.ok
-                 && va_is_src_operand_uint32(b.o1)
+                 && va_is_src_operand_uint32(b.o1, s)
                  && evalOBool(to_state(s), b)
                  && (s.heaplets == s'.heaplets == r'.heaplets)
              else
@@ -795,8 +795,8 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
 }
 
 lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va_state)
-    requires va_is_src_operand_uint32(b.o1);
-    requires va_is_src_operand_uint32(b.o2);
+    requires va_is_src_operand_uint32(b.o1, s);
+    requires va_is_src_operand_uint32(b.o2, s);
     requires evalWhileLax(b, c, 0, to_state(s), to_state(r))
     ensures  if s.ok then
                 (if x86_ValidState(s) then

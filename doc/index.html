@@ -194,7 +194,7 @@ DECL ::=
   | <a href="#state">var</a> x : TYPE ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS := extern ;
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
@@ -524,6 +524,7 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     <ul>
       <li>{:verbatim} on include directives, which directs Vale to include a file written directly in the underlying verification language, rather than including another Vale file</li>
       <li>{:instruction EXP} on procedures, indicating a primitive procedure that is implemented with the code value specified by the expression EXP</li>
+      <li>{:operand} on procedures, indicating an operand constructor</li>
       <li>{:state f(EXP, ..., EXP)} on global variable declarations, indicating that the variable x corresponds to a field f(EXP, ..., EXP) of the state type.</li>
       <li>{:refined} and {:bridge} on procedures -- an experimental feature that uses a more complicated, but sometimes more efficient, Dafny encoding for generated lemmas</li>
     </ul>
@@ -678,8 +679,8 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     </code></pre>
 
   <p>
-    Operand parameters may be instantiated with constants, state variables, or operands.
-    Operand return values may be instantiated with state variables or operands.
+    Operand parameters may be instantiated with constants, state variables, operands, or operand constructor applications.
+    Operand return values may be instantiated with state variables, operands, or operand constructor applications.
     Constants passed as operand parameters may either be simple integer literals,
     or more complex expressions inside a "const(...)" expression.
 

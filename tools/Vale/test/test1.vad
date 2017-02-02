@@ -6,7 +6,7 @@ procedure{:instruction Ins(InsImm(x, y))} Imm(out register x:int, inline y:int)
 {
 }
 
-procedure{:instruction Ins(InsIncr(x))} Increment(inout register x:int)
+procedure{:instruction Ins(InsIncr(x))} Increment(inout mem_operand x:int)
     ensures
         x == old(x) + 1;
 {
@@ -18,6 +18,32 @@ procedure{:instruction Ins(InsAdd(x, y))} Add(inout register x:int, operand y:in
 {
 }
 
+procedure{:operand} Mem_in(register base:int, inline offset:int) returns(mem_operand o:int)
+/* not yet needed (currently handled by va_is_src_mem_operand_int, etc.):
+    reads
+        mem;
+    requires
+        mem?[base + offset];
+    ensures
+        o == mem[base + offset];
+*/
+    extern;
+
+procedure{:operand} Mem_out(register base:int, inline offset:int, mem_operand o:int)
+/* not yet needed (currently handled by va_is_dst_mem_operand_int, etc.):
+    modifies 
+        mem;
+    requires
+        mem?[base + offset];
+    ensures
+        mem == old(mem)[base + offset := o];
+*/
+    extern;
+
+#verbatim
+function method va_code_Mem(base:va_register, offset:int):va_mem_operand { OMem(base, offset) }
+#endverbatim
+
 procedure AddReg(inout register x:int, register y:int)
     ensures
         x == old(x + y);
@@ -28,13 +54,18 @@ procedure AddReg(inout register x:int, register y:int)
 procedure p()
     modifies
         eax;
+        mem;
     requires
         eax >= 0;
+        mem?[eax + 12];
     ensures
         eax >= 2;
+        mem?[old(eax + 12)];
+        mem[old(eax + 12)] == old(mem[eax + 12]) + 1;
 {
     Increment(eax);
     Increment(eax);
+    Increment(Mem(eax, 10));
 }
 
 #verbatim
