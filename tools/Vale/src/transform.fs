@@ -32,6 +32,7 @@ type env =
     mods:Map<id, bool>;
     state:exp;
     abstractOld:bool; // if true, x --> va_old_x in abstract lemma
+    checkMods:bool;
   }
 
 let empty_env:env =
@@ -43,6 +44,7 @@ let empty_env:env =
     mods = Map.empty;
     state = EVar (Reserved "s");
     abstractOld = false;
+    checkMods = false;
   }
 
 let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
@@ -325,9 +327,29 @@ let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
   EOp (RefineOp, [EVar x; EVar abs_x; e])
 
 let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
-  match Map.tryFind x env.mods with
-  | None -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
-  | Some readWrite -> refineOp env (if readWrite then InOut else In) x (stateGet env x)
+  match (env.checkMods, Map.tryFind x env.mods) with
+  | (true, None) -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
+  | (false, None) -> refineOp env InOut x (stateGet env x)
+  | (_, Some readWrite) -> refineOp env (if readWrite then InOut else In) x (stateGet env x)
+
+let check_mods (env:env) (p:proc_decl):unit =
+  let check_spec (_, s) =
+    match s with
+    | Modifies (m, e) ->
+      (
+        match skip_loc (exp_abstract false e) with
+        | EVar x ->
+          (
+            match (m, Map.tryFind x env.mods) with
+            | (false, None) -> err ("variable " + (err_id x) + " must be declared in reads clause or modifies clause")
+            | (true, (None | Some false)) -> err ("variable " + (err_id x) + " must be declared in modifies clause")
+            | (_, Some true) | (false, Some false) -> ()
+          )
+        | _ -> ()
+      )
+    | _ -> ()
+    in
+  if env.checkMods then List.iter check_spec p.pspecs
 
 let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env) (e:exp):exp =
   let rec fe (env:env) (e:exp):exp map_modify =
@@ -390,18 +412,28 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
     | (NotGhost, EInt _) -> Replace (constOp e)
     | (NotGhost, EApply (xa, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
       (
-        let p =
+        let xa_in = operandProc xa In in
+        let xa_out = operandProc xa Out in
+        let get_p io =
           match io with
           | In | InOut ->
-            let xa_in = operandProc xa In in
+            if (not (Map.containsKey xa_in env.procs)) then err ("could not find procedure " + (err_id xa_in)) else
             let p_in = Map.find xa_in env.procs in
             let p_in = {p_in with prets = []} in
+            check_mods env p_in;
             p_in
           | Out ->
-            let xa_out = operandProc xa Out in
+            if (not (Map.containsKey xa_out env.procs)) then err ("could not find procedure " + (err_id xa_out)) else
             let p_out = Map.find xa_out env.procs in
             let p_out = {p_out with pargs = List.take (List.length p_out.pargs - 1) p_out.pargs} in
+            check_mods env p_out;
             p_out
+          in
+        let p =
+          match io with
+          | In -> get_p In
+          | InOut -> let _ = get_p Out in get_p In
+          | Out -> get_p Out
           in
         let (lhss, es) = rewrite_vars_args env p [] args in
         let xa_f = Reserved ("code_" + (string_of_id xa)) in
@@ -495,6 +527,7 @@ let rec rewrite_vars_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
       match Map.tryFind x env.procs with
       | None -> (lhss, rewrite_vars_exp env e)
       | Some p ->
+          check_mods env p;
           let (lhss, args) = rewrite_vars_args env p lhss es in
           (lhss, EApply(x, args))
     )
@@ -664,6 +697,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
       let envpIn = {envpIn with mods = Map.ofList (List.map mod_id mods)} in
       let envpIn = {envpIn with ids = List.fold (addParam false) env.ids p.pargs} in
       let envp = {envpIn with ids = List.fold (addParam true) envpIn.ids p.prets} in
+      let envp = {envpIn with checkMods = isRefined || isFrame} in
       let envpIn = {envpIn with abstractOld = true} in
       let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
       let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in

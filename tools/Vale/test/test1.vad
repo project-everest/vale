@@ -19,9 +19,9 @@ procedure{:instruction Ins(InsAdd(x, y))} Add(inout register x:int, operand y:in
 }
 
 procedure{:operand} Mem_in(register base:int, inline offset:int) returns(mem_operand o:int)
-/* not yet needed (currently handled by va_is_src_mem_operand_int, etc.):
     reads
         mem;
+/* not yet needed (currently handled by va_is_src_mem_operand_int, etc.):
     requires
         mem?[base + offset];
     ensures
@@ -30,9 +30,9 @@ procedure{:operand} Mem_in(register base:int, inline offset:int) returns(mem_ope
     extern;
 
 procedure{:operand} Mem_out(register base:int, inline offset:int, mem_operand o:int)
-/* not yet needed (currently handled by va_is_dst_mem_operand_int, etc.):
     modifies 
         mem;
+/* not yet needed (currently handled by va_is_dst_mem_operand_int, etc.):
     requires
         mem?[base + offset];
     ensures
@@ -66,6 +66,16 @@ procedure p()
     Increment(eax);
     Increment(eax);
     Increment(Mem(eax, 10));
+}
+
+procedure{:frame false} pp()
+    // {:frame false} ==> no reads/modifies needed
+    requires
+        ok;
+        eax >= 0;
+        mem?[eax + 12];
+{
+    p();
 }
 
 #verbatim
