@@ -326,11 +326,22 @@ let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
   let abs_x = match (io, env.abstractOld) with (In, _) | (InOut, true) -> (old_id x) | (Out, _) | (InOut, false) -> x in
   EOp (RefineOp, [EVar x; EVar abs_x; e])
 
-let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
+let check_state_info (env:env) (x:id):bool = // returns readWrite
   match (env.checkMods, Map.tryFind x env.mods) with
   | (true, None) -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
-  | (false, None) -> refineOp env InOut x (stateGet env x)
-  | (_, Some readWrite) -> refineOp env (if readWrite then InOut else In) x (stateGet env x)
+  | (false, None) -> true
+  | (_, Some readWrite) -> readWrite
+
+let check_state_info_mod (env:env) (x:id) (io:inout):unit =
+  match (env.checkMods, io, check_state_info env x) with
+  | (false, _, _) -> ()
+  | (true, In, _) -> ()
+  | (true, (InOut | Out), true) -> ()
+  | (true, (InOut | Out), false) -> err ("variable " + (err_id x) + "must be declared in procedure's modifies clause")
+
+let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
+  let readWrite = check_state_info env x in
+  refineOp env (if readWrite then InOut else In) x (stateGet env x)
 
 let check_mods (env:env) (p:proc_decl):unit =
   let check_spec (_, s) =
@@ -403,7 +414,9 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           (
             match (g, asOperand) with
             | (Ghost, _) -> Replace (rewrite_state_info env x prefix es)
-            | (NotGhost, Some xo) -> Replace (EOp (StateOp (x, xo + "_" + prefix, t), es))
+            | (NotGhost, Some xo) ->
+                let readWrite = check_state_info_mod env x io in
+                Replace (EOp (StateOp (x, xo + "_" + prefix, t), es))
             | (NotGhost, None) -> err "this expression can only be passed to a ghost parameter or operand parameter"
           )
       )
