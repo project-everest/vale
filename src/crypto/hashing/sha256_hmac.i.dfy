@@ -32,6 +32,7 @@ lemma lemma_XorKeyIntoByteArrayHelper(key:seq<uint>, bytes:seq<byte>, value:uint
     {
         calc {
             bytes'[4*j..4*j+4];
+                { assert(true); }
             bytes[4*j+4..4*j+8];
                 { lemma_mul_is_distributive_add(4, j, 1); assert 4*(j+1) == 4*j + 4*1 == 4*j + 4; }
             bytes[4*(j+1)..4*(j+1)+4];

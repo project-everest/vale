@@ -152,31 +152,31 @@ function va_update_operand(o:operand, sM:va_state, sK:va_state):va_state
 
 function method GetProbableReg(o:operand) : ARMReg { if o.OReg? then o.r else R0 }
 
-predicate va_is_src_operand_uint32(o:operand) { ValidOperand(o) }
-predicate va_is_dst_operand_uint32(o:operand) { ValidRegOperand(o) }
+predicate va_is_src_operand_uint32(o:operand, s:va_state) { ValidOperand(o) }
+predicate va_is_dst_operand_uint32(o:operand, s:va_state) { ValidRegOperand(o) }
 
 type reg = uint32
-predicate va_is_src_operand_reg(o:operand) { ValidRegOperand(o) }
+predicate va_is_src_operand_reg(o:operand, s:va_state) { ValidRegOperand(o) }
 
 type snd = uint32
-predicate va_is_src_operand_snd(o:operand) { ValidOperand(o) && o.OReg? }
+predicate va_is_src_operand_snd(o:operand, s:va_state) { ValidOperand(o) && o.OReg? }
 
-predicate va_is_src_operand_global(o:operand) { ValidGlobal(o) }
+predicate va_is_src_operand_global(o:operand, s:va_state) { ValidGlobal(o) }
 
 function va_eval_operand_uint32(s:va_state, o:operand):uint32
-    requires va_is_src_operand_uint32(o);
+    requires va_is_src_operand_uint32(o, s);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
 function va_eval_operand_reg(s:va_state, o:operand):reg
-    requires va_is_src_operand_reg(o);
+    requires va_is_src_operand_reg(o, s);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
 function va_eval_operand_snd(s:va_state, o:operand):snd
-    requires va_is_src_operand_snd(o);
+    requires va_is_src_operand_snd(o, s);
     requires ValidState(s)
 {
     OperandContents(s,o)
@@ -184,7 +184,7 @@ function va_eval_operand_snd(s:va_state, o:operand):snd
 
 type global = string
 function va_eval_operand_global(s:va_state, o:operand):global
-    requires va_is_src_operand_global(o);
+    requires va_is_src_operand_global(o, s);
 {
     o.sym
 }

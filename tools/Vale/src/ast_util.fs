@@ -115,7 +115,7 @@ let rec skip_loc_apply (e:exp) (f:exp->'a):'a =
   | ELoc (loc, e) -> try skip_loc_apply e f with err -> raise (LocErr (loc, err))
   | _ -> f e
 
-let rec loc_apply (loc:loc) (e:exp) (f:exp->'a):'a =
+let rec loc_apply (loc:loc) (e:exp) (f:exp -> 'a):'a =
   try
     match e with
     | ELoc (loc, e) -> loc_apply loc e f

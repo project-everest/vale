@@ -1,6 +1,6 @@
 include "common.vad"
 
-procedure{:instruction Ins(InsIncr(o))} incr(inout register o:int)
+procedure{:instruction Ins(InsIncr(OOpr(OReg(o))))} incr(inout register o:int)
 {
 }
 
