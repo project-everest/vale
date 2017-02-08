@@ -82,12 +82,19 @@ aes_asm = env.ExtractValeCode(
   )
 env.BuildTest(['src/crypto/aes/testaes.c', aes_asm[0]], 'src/crypto/aes', 'testaes')
 
+if 'KREMLIN_HOME' in os.environ:
+  kremlin_path = os.environ['KREMLIN_HOME']
+else:
+  kremlin_path = '#tools/Kremlin'
+
+kremlib_path = kremlin_path + '/kremlib'
+
 #
 # Build the OpenSSL engine
 #
 if env['OPENSSL_PATH'] != None:
   engineenv = env.Clone()
-  engineenv.Append(CPPPATH=['#tools/Kremlin/Kremlib', '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
+  engineenv.Append(CPPPATH=[kremlib_path, '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
   cdeclenv = engineenv.Clone(CCFLAGS='/Ox /Zi /Gd /LD') # compile __cdecl so it can call OpenSSL code
   stdcallenv=engineenv.Clone(CCFLAGS='/Ox /Zi /Gz /LD') # compile __stdcall so it can call the Vale crypto code
   everest_sha256 = cdeclenv.Object('src/Crypto/hashing/EverestSha256.c')

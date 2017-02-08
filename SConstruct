@@ -88,8 +88,16 @@ env.Append(CCFLAGS=GetOption('c_user_args'))
 env['OPENSSL_PATH'] = GetOption('openssl_path')
 
 env['DAFNY'] = File(os.path.join(env['DAFNY_PATH'], 'Dafny.exe'))
-env['KREMLIN'] = File('#tools/Kremlin/Kremlin.native')
+
+if 'KREMLIN_HOME' in os.environ:
+  kremlin_path = os.environ['KREMLIN_HOME']
+else:
+  kremlin_path = '#tools/Kremlin'
+
+env['KREMLIN'] = File(kremlin_path + '/Kremlin.native')
 env['VALE'] = File('bin/vale.exe')
+
+kremlib_path = kremlin_path + '/kremlib'
 
 # Useful Dafny command lines
 dafny_default_args =   '/ironDafny /allocated:1 /compile:0 /timeLimit:30 /trace'
@@ -390,7 +398,7 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
 # returns the exe target and the stdout after executing the exe test target
 def build_test(env, inputs, include_dir, output_base_name):
   testenv = env.Clone()
-  testenv.Append(CPPPATH=['tools/Kremlin/kremlib', 'src/lib/util', include_dir])
+  testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
   inputs_obj = []
   for inp in inputs:
     inps = str(inp)

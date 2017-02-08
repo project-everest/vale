@@ -17,3 +17,7 @@ Once these tools are installed, running SCons in the top-level directory will bu
 and build and verify all sources in the [src](./src) directory:
 
 python.exe scons.py
+
+NOTE: You can override tools/Kremlin by setting the KREMLIN_HOME
+environment variable to point to the directory where KreMLin is
+installed.
