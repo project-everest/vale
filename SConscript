@@ -37,8 +37,6 @@ verify_options = {
   '.dfy': BuildOptions(dafny_default_args_nonlarith),
 
   'tools/Vale/test/vale-debug.vad': None,
-  'src/crypto/aes/aes-x64/cbc.vad': None,
-  'src/crypto/aes/aes-x64/cbc_main.i.dfy': None,
 
   # .vad files default to this set of options when compiling .gen.dfy
   '.vad': BuildOptions(dafny_default_args_nonlarith)
@@ -66,7 +64,7 @@ env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sh
 #
 # build cbc-exe
 #
-if env['TARGET_ARCH']=='x86':   # x86-only
+if env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
   cbc_asm = env.ExtractValeCode(
     ['src/crypto/aes/$AES_ARCH_DIR/aes.vad', 'src/crypto/aes/$AES_ARCH_DIR/cbc.vad'], # Vale source
     'src/crypto/aes/$AES_ARCH_DIR/cbc_main.i.dfy',              # Dafny main
