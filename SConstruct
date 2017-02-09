@@ -6,6 +6,7 @@ import traceback
 import pdb
 import SCons.Util
 import atexit
+import platform
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -17,7 +18,7 @@ target_arch='x86'
 target_x='86'
 sha_arch_dir=''
 aes_arch_dir=''
-if sys.platform == 'win32' and os.getenv('PLATFORM')=='X64':
+if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machine() == 'x86_64' :
   target_arch='amd64'
   target_x='64'
   sha_arch_dir='sha-x64'
