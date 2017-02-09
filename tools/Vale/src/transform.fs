@@ -390,6 +390,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
         | InlineLocal -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
         | OperandLocal (opIo, xo, t) ->
           (
+            if env.checkMods then (match (opIo, io) with (_, In) | ((InOut | Out), _) -> () | (In, (InOut | Out)) -> err ("cannot pass 'in' operand as 'out'/'inout'"));
             match g with
             | Ghost -> Replace (refineOp env opIo x (vaEvalOp xo t env.state e))
             | NotGhost ->
