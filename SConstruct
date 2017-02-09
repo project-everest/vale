@@ -410,7 +410,7 @@ def build_test(env, inputs, include_dir, output_base_name):
   testoutput = 'obj/'+output_base_name+'.txt'
   env.Command(target=testoutput,
               source=exe,
-              action = [exe, 'type NUL > ' + testoutput])
+              action = [exe, 'echo ABC > ' + testoutput])
   a = env.Alias('runtest', '', exe)
   #AlwaysBuild(a)
   return a
