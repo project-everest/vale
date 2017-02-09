@@ -83,10 +83,11 @@ sha256_main_i_SHA256_Complete(bytes, 0, 3, digest);
   printf("\n");
 }
 
-void main()
+int main(void)
 {
   demo();
   //speed_test(100000, 8192);
   //speed_test(10000, 10*1024);
+  return 0;
 }
 

@@ -23,8 +23,9 @@ void demo()
   }
 }
 
-void __cdecl main()
+int __cdecl main(void)
 {
   demo();
+  return 0;
 }
 
