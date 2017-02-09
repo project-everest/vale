@@ -79,6 +79,12 @@ AddOption('--OPENSSL',
   default=None,
   action='append',
   help='Specify the path to the root of an OpenSSL source tree')
+AddOption('--CACHEDIR',
+  dest='cache_dir',
+  type='string',
+  default=None,
+  action='store',
+  help='Specify the SCSons Shared Cache Directory')
 
 env['DAFNY_PATH'] = GetOption('dafny_path')
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
@@ -86,6 +92,11 @@ env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
 env.Append(CCFLAGS=GetOption('c_user_args'))
 env['OPENSSL_PATH'] = GetOption('openssl_path')
+
+cache_dir=GetOption('cache_dir')
+if cache_dir != None:
+  print('Using Shared Cache Directory %s'%cache_dir)
+  CacheDir(cache_dir)
 
 env['DAFNY'] = File(os.path.join(env['DAFNY_PATH'], 'Dafny.exe'))
 env['KREMLIN'] = File('#tools/Kremlin/Kremlin.native')
