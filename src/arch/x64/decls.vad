@@ -73,6 +73,14 @@ predicate reg32(s:State, r:x86reg)
 {
     r in s.regs && IsUInt32(s.regs[r])
 }
+
+lemma lemma_lowerUpper64(i:uint64)
+    ensures lowerUpper64(lower64(i), upper64(i)) == i
+{
+    reveal_lower64();
+    reveal_upper64();
+    reveal_lowerUpper64();
+}
 #endverbatim
 
 procedure {:refined} {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset, taint))) } 

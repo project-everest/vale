@@ -149,6 +149,8 @@ predicate ValidOperand(s:state, size:int, o:operand)
         case OHeap(addr, _) => 
             if size == 32 then
                 ValidHeapAddr(s, addr)
+            else if size == 64 then
+                Valid64BitHeapOperand(s, o)
             else if size == 128 then
                 Valid128BitHeapOperand(s, o)
             else false
@@ -260,6 +262,16 @@ predicate Valid128BitStackOperand(s:state, o:operand)
     && o.s+3 in s.stack[0]
 }
 
+predicate Valid64BitHeapOperand(s:state, o:operand)
+    requires o.OHeap?;
+{
+    ValidMemAddr(o.addr)
+  && var m0 := EvalMemAddr(s.regs, o.addr);
+     var m1 := m0 + 4;
+        ValidResolvedAddr(s.heap, m0)
+     && ValidResolvedAddr(s.heap, m1)
+}
+
 predicate Valid128BitHeapOperand(s:state, o:operand)
     requires o.OHeap?;
 {
@@ -288,13 +300,12 @@ function eval_op32(s:state, o:operand) : uint32
             case OHeap(addr, taint) => GetValueAtHeapAddress(s, addr)
 }
 
-function{:axiom} lower64(i:uint64):uint32
-function{:axiom} upper64(i:uint64):uint32
-function{:axiom} lowerUpper64(l:uint32, u:uint32):uint64
-lemma{:axiom} lemma_lowerUpper64(i:uint64) ensures lowerUpper64(lower64(i), upper64(i)) == i
+function{:opaque} lower64(i:uint64):uint32 { i % 0x1_0000_0000 }
+function{:opaque} upper64(i:uint64):uint32 { i / 0x1_0000_0000 }
+function{:opaque} lowerUpper64(l:uint32, u:uint32):uint64 { l + 0x1_0000_0000 * u }
 
 function eval_op64(s:state, o:operand) : uint64
-    requires !(o.OReg? && o.r.X86Xmm?) && !o.OHeap?;
+    requires !(o.OReg? && o.r.X86Xmm?)
 {
     if !ValidSourceOperand(s, 64, o) then
         42
@@ -303,6 +314,9 @@ function eval_op64(s:state, o:operand) : uint64
             case OConst(n) => n
             case OReg(r) => s.regs[r]
             case OStack(slot) => lowerUpper64(s.stack[0][slot], s.stack[0][slot + 1])
+            case OHeap(addr, taint) =>
+                var resolved_addr := EvalMemAddr(s.regs, addr);
+                lowerUpper64(GetValueAtResolvedAddress(s.heap, resolved_addr), GetValueAtResolvedAddress(s.heap, resolved_addr + 4))
 }
 
 function UpdateHeap32(h:heap, addr:int, v:uint32, t:taint) : heap
@@ -312,6 +326,11 @@ function UpdateHeap32(h:heap, addr:int, v:uint32, t:taint) : heap
      [addr + 1 := HeapEntry(big_endian_bytes[2], t)]
      [addr + 2 := HeapEntry(big_endian_bytes[1], t)]
      [addr + 3 := HeapEntry(big_endian_bytes[0], t)]
+}
+
+function UpdateHeap64(h:heap, resolved_addr:int, v:uint64, t:taint) : heap
+{
+    UpdateHeap32(UpdateHeap32(h, resolved_addr, lower64(v), t), resolved_addr + 4, upper64(v), t)
 }
 
 predicate evalUpdateAndMaintainFlags(s:state, o:operand, v:uint32, r:state, obs:seq<observation>)
@@ -331,7 +350,7 @@ predicate evalUpdateAndMaintainFlags64(s:state, o:operand, v:uint64, r:state, ob
     match o
         case OReg(reg)    => r == s.(regs := s.regs[reg := v], trace := s.trace + obs)
         case OStack(slot) => r == s.(stack := [s.stack[0][slot := lower64(v)][slot + 1 := upper64(v)]] + s.stack[1..], trace := s.trace + obs)
-        case OHeap(addr, taint)  => r == s.(ok := false) // not yet supported
+        case OHeap(addr, taint)  => r == s.(heap := UpdateHeap64(s.heap, EvalMemAddr(s.regs, addr), v, taint))
 }
 
 predicate evalUpdateAndHavocFlags(s:state, o:operand, v:uint32, r:state, obs:seq<observation>)
@@ -420,7 +439,7 @@ predicate evalUpdate128AndHavocFlags(s:state, o:operand, v:Quadword, r:state, ob
                                      trace := s.trace + obs)
 }
 
-function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
+function evalCmp(c:ocmp, i1:uint64, i2:uint64):bool
 {
     match c
         case OEq => i1 == i2
@@ -432,10 +451,10 @@ function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
 }
 
 function evalOBool(s:state, o:obool):bool
-    requires ValidSourceOperand(s, 32, o.o1);
-    requires ValidSourceOperand(s, 32, o.o2);
+    requires ValidSourceOperand(s, 64, o.o1);
+    requires ValidSourceOperand(s, 64, o.o2);
 {
-    evalCmp(o.cmp, eval_op32(s, o.o1), eval_op32(s, o.o2))
+    evalCmp(o.cmp, eval_op64(s, o.o1), eval_op64(s, o.o2))
 }
 
 function clear_low_byte(n:uint32) : uint32
@@ -639,9 +658,9 @@ predicate branchRelation(s:state, s':state, cond:bool)
 }
 
 predicate evalIfElse(cond:obool, ifT:code, ifF:code, s:state, r:state)
-    decreases if ValidSourceOperand(s, 32, cond.o1) && ValidSourceOperand(s, 32, cond.o2) && evalOBool(s, cond) then ifT else ifF;
+    decreases if ValidSourceOperand(s, 64, cond.o1) && ValidSourceOperand(s, 64, cond.o2) && evalOBool(s, cond) then ifT else ifF;
 {
-    if s.ok && ValidSourceOperand(s, 32, cond.o1) && ValidSourceOperand(s, 32, cond.o2) then
+    if s.ok && ValidSourceOperand(s, 64, cond.o1) && ValidSourceOperand(s, 64, cond.o2) then
         exists s' ::
            branchRelation(s, s', evalOBool(s, cond))
         && (if evalOBool(s, cond) then evalCode(ifT, s', r) else evalCode(ifF, s', r))
@@ -652,7 +671,7 @@ predicate evalIfElse(cond:obool, ifT:code, ifF:code, s:state, r:state)
 predicate evalWhile(b:obool, c:code, n:nat, s:state, r:state)
   decreases c, n
 {
-    if s.ok && ValidSourceOperand(s, 32, b.o1) && ValidSourceOperand(s, 32, b.o2) then
+    if s.ok && ValidSourceOperand(s, 64, b.o1) && ValidSourceOperand(s, 64, b.o2) then
         if n == 0 then
             !evalOBool(s, b) && branchRelation(s, r, false)
         else
