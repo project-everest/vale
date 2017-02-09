@@ -66,8 +66,8 @@ let exp_of_conjuncts (es:exp list):exp =
 let gen_lemma_sym_count = ref 0
 let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count
 
-let get_code_exp (e:exp):exp = e // map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace ec | _ -> Unchanged) e
-let get_lemma_exp (e:exp):exp = e // map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace el | _ -> Unchanged) e
+let get_code_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace ec | _ -> Unchanged) e
+let get_lemma_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace el | _ -> Unchanged) e
 
 let stateToOp (e:exp):exp map_modify =
   match e with
@@ -661,7 +661,8 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
 //        let procArgs = List.map (fun (x, t) -> (new_id x, t)) procArgs in
 //        let specMods = List.map (fun (x, t) -> (new_id x, t)) specMods in
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> sub_src e | _ -> e) es in
-        let es = List.map get_lemma_exp es in
+        let es = List.map (fun e -> match e with EOp (CodeLemmaOp, [_; e]) -> sub_src e | _ -> e) es in
+//        let es = List.map get_lemma_exp es in
         let es = List.map (map_exp stateToOp) es in
         let foralls = List.collect ghostFormal pargs in
         let eNonMod (ghostExp:bool) (x, _, storage, _, _) e =

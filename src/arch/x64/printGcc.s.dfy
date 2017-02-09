@@ -184,6 +184,13 @@ method printIns(ins:ins)
         case Rand(o)            => printName1("  rdrand", o);     printOprnd(o); print("\n");
         case Mov64(dst, src) =>    printName64("  mov", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case Add64(dst, src) =>    printName64("  add", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case AddLea64(dst, src1, src2) => print("not implemented\n");
+        case Sub64(dst, src) => print("not implemented\n");
+        case AddCarry64(dst, src) => print("not implemented\n");
+        case Mul64(src) => print("not implemented\n");
+        case IMul64(dst, src) => print("not implemented\n");
+        case And64(dst, src) => print("not implemented\n");
+        case Shr64(dst, src) => print("not implemented\n");
         case Mov32(dst, src)    => printName2("  mov", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Add32(dst, src)    => printName2("  add", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Sub32(dst, src)    => printName2("  sub", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");

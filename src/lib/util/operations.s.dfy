@@ -213,4 +213,9 @@ lemma {:axiom} lemma_BitShiftsSum(x: bv32, a: nat, b: nat)
     ensures BitShiftLeft(x, a + b) == BitShiftLeft(BitShiftLeft(x, a), b)
     ensures BitShiftRight(x, a + b) == BitShiftRight(BitShiftRight(x, a), b)
 
+function {:opaque} BitwiseMul64(x:uint64, y:uint64):uint64 { (x * y) % 0x1_0000_0000_0000_0000 }
+function {:opaque} BitwiseMul64hi(x:uint64, y:uint64):uint64 { ((x * y) / 0x1_0000_0000_0000_0000) % 0x1_0000_0000_0000_0000 }
+function {:axiom} BitwiseAnd64(x:uint64, y:uint64):uint64
+function {:axiom} BitwiseShr64(x:uint64, y:uint64):uint64
+
 } // end module operations_s
