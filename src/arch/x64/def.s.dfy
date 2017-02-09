@@ -421,7 +421,7 @@ predicate evalUpdate128AndHavocFlags(s:state, o:operand, v:Quadword, r:state, ob
                                      trace := s.trace + obs)
 }
 
-function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
+function evalCmp(c:ocmp, i1:uint64, i2:uint64):bool
 {
     match c
         case OEq => i1 == i2
@@ -436,7 +436,7 @@ function evalOBool(s:state, o:obool):bool
     requires ValidSourceOperand(s, 64, o.o1);
     requires ValidSourceOperand(s, 64, o.o2);
 {
-    evalCmp(o.cmp, eval_op32(s, o.o1), eval_op32(s, o.o2))
+    evalCmp(o.cmp, eval_op64(s, o.o1), eval_op64(s, o.o2))
 }
 
 function clear_low_byte(n:uint32) : uint32
