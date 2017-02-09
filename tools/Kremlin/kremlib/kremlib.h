@@ -8,6 +8,9 @@
 #include <stdbool.h>
 #include <time.h>
 
+// Required if using gcc and calling conventions
+#include "gcc_compat.h"
+
 // For types and values from C.fsti that do not exactly have the same name as
 // their C counterparts
 extern int exit_success;

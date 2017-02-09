@@ -1,5 +1,6 @@
 #include <math.h>
 #include <sha256_main_i.h>
+#include <stdint.h> // for uint64_t
 
 uint64_t GetRDTSC() {
   //VS on x64 doesn't support inline assembly
