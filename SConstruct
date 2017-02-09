@@ -77,7 +77,7 @@ AddOption('--OPENSSL',
   dest='openssl_path',
   type='string',
   default=None,
-  action='append',
+  action='store',
   help='Specify the path to the root of an OpenSSL source tree')
 AddOption('--CACHEDIR',
   dest='cache_dir',
