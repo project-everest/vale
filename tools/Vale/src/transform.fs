@@ -390,6 +390,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
         | InlineLocal -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
         | OperandLocal (opIo, xo, t) ->
           (
+            if env.checkMods then (match (opIo, io) with (_, In) | ((InOut | Out), _) -> () | (In, (InOut | Out)) -> err ("cannot pass 'in' operand as 'out'/'inout'"));
             match g with
             | Ghost -> Replace (refineOp env opIo x (vaEvalOp xo t env.state e))
             | NotGhost ->
@@ -449,8 +450,11 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           | Out -> get_p Out
           in
         let (lhss, es) = rewrite_vars_args env p [] args in
-        let xa_f = Reserved ("code_" + (string_of_id xa)) in
-        Replace (EApply (xa_f, es))
+        let ecs = List.collect (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> [] | _ -> [e]) es in
+        let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> e | _ -> e) es in
+        let xa_fc = Reserved ("opr_code_" + (string_of_id xa)) in
+        let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
+        Replace (EOp (CodeLemmaOp, [EApply (xa_fc, ecs); EApply (xa_fl, env.state::es)]))
       )
 (*
     | (NotGhost, EOp (Subscript, [ea; ei])) ->
