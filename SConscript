@@ -4,6 +4,7 @@
 
 # Python imports
 import os, os.path
+import sys
 
 # Imported identifiers defined in the SConstruct file
 Import('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarith')
@@ -52,14 +53,16 @@ Export('verify_options')
 #
 # build sha256-exe
 #
-sha_asm = env.ExtractValeCode(
+# TODO: Please fix calling conventions on Linux 64-bit and reenable Linux build.
+if sys.platform == "win32" :
+ sha_asm = env.ExtractValeCode(
   ['src/crypto/hashing/$SHA_ARCH_DIR/sha256.vad'],           # Vale source
   'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
   'sha256'                                                   # Base name for the ASM files and EXE
   )
-sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
-sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
-env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
+ sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
+ sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
+ env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
 
 #
 # build cbc-exe
