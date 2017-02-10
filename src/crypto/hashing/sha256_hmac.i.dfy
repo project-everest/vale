@@ -114,15 +114,7 @@ lemma lemma_CopyWordToByteArrayHelper(words:seq<uint>, bytes:seq<byte>)
     }
 }
 
-lemma {:timeLimitMultiplier 2} lemma_BreakdownOfUint(word:uint)
-    ensures word as int == ((((word / 0x1000000) as int) * 256 + ((word / 0x10000) % 0x100) as int) * 256 + ((word / 0x100) % 0x100) as int) * 256 + ((word % 0x100) as int);
-{
-    var w := word as int;
-    assert 0 <= w < 0x1_0000_0000;
-    assert w == (((w / 0x1000000) * 256 + (w / 0x10000) % 0x100) * 256 + (w / 0x100) % 0x100) * 256 + (w % 0x100);
-}
-
-method {:timeLimitMultiplier 3} CopyWordToByteArray(word:uint, bytes:array<byte>, pos:uint)
+method CopyWordToByteArray(word:uint, bytes:array<byte>, pos:uint)
     requires allocated(bytes);
     requires bytes != null;
     requires (pos as int) + 4 <= bytes.Length;
@@ -133,30 +125,9 @@ method {:timeLimitMultiplier 3} CopyWordToByteArray(word:uint, bytes:array<byte>
     bytes[pos], bytes[pos as int+1], bytes[pos as int+2], bytes[pos as int+3] := (word / 0x1000000) as byte, ((word / 0x10000) % 0x100) as byte, ((word / 0x100) % 0x100) as byte, (word % 0x100) as byte;
     ghost var bs := bytes[pos..pos as int+4];
     ghost var u8s := ToSeqUint8(bs);
-    ghost var i := pos as int;
-
-    calc {
-        u8s;
-            { reveal_ToSeqUint8(); }
-        [u8s[0] as uint8, u8s[1] as uint8, u8s[2] as uint8, u8s[3] as uint8];
-        [bs[0] as uint8, bs[1] as uint8, bs[2] as uint8, bs[3] as uint8];
-        [bytes[i] as uint8, bytes[i+1] as uint8, bytes[i+2] as uint8, bytes[i+3] as uint8];
-    }
-    calc {
-        BEByteSeqToInt(u8s);
-        BEByteSeqToInt(u8s[..3]) * 256 + (u8s[3] as int);
-        (BEByteSeqToInt(u8s[..3][..2]) * 256 + u8s[..3][2] as int) * 256 + (u8s[3] as int);
-        (BEByteSeqToInt(u8s[..2]) * 256 + u8s[2] as int) * 256 + (u8s[3] as int);
-        ((BEByteSeqToInt(u8s[..2][..1]) * 256 + u8s[..2][1] as int) * 256 + u8s[2] as int) * 256 + (u8s[3] as int);
-        ((BEByteSeqToInt(u8s[..1]) * 256 + u8s[1] as int) * 256 + u8s[2] as int) * 256 + (u8s[3] as int);
-        (((BEByteSeqToInt(u8s[..1][..0]) * 256 + u8s[..1][0] as int) * 256 + u8s[1] as int) * 256 + u8s[2] as int) * 256 + (u8s[3] as int);
-        (((BEByteSeqToInt([]) * 256 + u8s[0] as int) * 256 + u8s[1] as int) * 256 + u8s[2] as int) * 256 + (u8s[3] as int);
-        (((u8s[0] as int) * 256 + u8s[1] as int) * 256 + u8s[2] as int) * 256 + (u8s[3] as int);
-        (((bytes[i] as int) * 256 + bytes[i+1] as int) * 256 + bytes[i+2] as int) * 256 + (bytes[i+3] as int);
-        ((((word / 0x1000000) as int) * 256 + ((word / 0x10000) % 0x100) as int) * 256 + ((word / 0x100) % 0x100) as int) * 256 + ((word % 0x100) as int);
-            { lemma_BreakdownOfUint(word); }
-        word as int;
-    }
+    assert{:fuel BEUintToSeqByte, 5} u8s == BEUintToSeqByte(word as int, 4);
+    lemma_power2_32();
+    lemma_BEUintToSeqByte_invertability(u8s, word as int, 4);
 }
 
 method XorKeyIntoByteArray(key:array<uint>, bytes:array<byte>, value:uint)

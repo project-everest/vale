@@ -84,7 +84,7 @@ function va_update_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.st
 
 predicate va_is_src_operand_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
 
-predicate va_is_src_operand_uint32(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
+predicate va_is_src_operand_uint32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm?) }
 predicate va_is_dst_operand_uint32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
 
 predicate va_is_src_operand_uint64(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
@@ -175,7 +175,7 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
  && x86_ValidState(s1)
 }
 
-function method va_const_operand(n:uint32):opr { OConst(n) }
+function method va_const_operand(n:uint64):opr { OConst(n) }
 function method va_op_operand_reg32(r:x86reg):opr { OReg(r) }
 function method va_op_operand_reg64(r:x86reg):opr { OReg(r) }
 function method va_op_operand_Quadword(r:int):opr { OReg(X86Xmm(r)) }

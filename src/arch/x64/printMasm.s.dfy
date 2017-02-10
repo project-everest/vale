@@ -169,6 +169,13 @@ method printIns(ins:ins)
         case Mov64(dst, src) => print ("  mov "); printOprnd64(dst); print(", "); printOprnd64(src); print("\n");
         case Add32(dst, src) => print ("  add "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case Add64(dst, src) => print ("  add "); printOprnd64(dst); print(", "); printOprnd64(src); print("\n");
+        case AddLea64(dst, src1, src2) => print("not implemented\n");
+        case Sub64(dst, src) => print("not implemented\n");
+        case AddCarry64(dst, src) => print("not implemented\n");
+        case Mul64(src) => print("not implemented\n");
+        case IMul64(dst, src) => print("not implemented\n");
+        case And64(dst, src) => print("not implemented\n");
+        case Shr64(dst, src) => print("not implemented\n");
         case Sub32(dst, src) => print ("  sub "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case Mul32(src)      => print ("  mul "); printOprnd(src); print("\n");
         case AddCarry(dst, src) => print ("  add "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
