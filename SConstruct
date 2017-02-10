@@ -103,7 +103,7 @@ env['DAFNY'] = File(os.path.join(env['DAFNY_PATH'], 'Dafny.exe'))
 
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
-  env['KREMLIN'] = File(kremlin_path + '/krml')
+  env['KREMLIN'] = File(kremlin_path + '/_build/Kremlin.native')
 else:
   kremlin_path = '#tools/Kremlin'
   env['KREMLIN'] = File(kremlin_path + '/Kremlin.native')
