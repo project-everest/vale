@@ -1,16 +1,56 @@
 include "../../../arch/arm/vale.i.dfy"
 include "../../../arch/arm/globals.s.dfy"
-include "sha256.i.dfy"
-include "bit-vector-lemmas.i.dfy"
+include "../sha256.i.dfy"
 include "../../../../obj/arch/arm/decls.gen.dfy"
 
 module sha256_invariants_i {
 
-import opened sha256_helpers_i_ARM_vale_i = ARM_vale_i 
-import opened sha256_helpers_i_globals_s = globals_s 
-import opened sha256_helpers_i_sha256_i = sha256_i
-import opened sha256_helpers_i_bit_vector_lemmas_i = bit_vector_lemmas_i
-import opened sha256_helpers_i_ARM_decls_i = ARM_decls_i 
+import opened ARM_vale_i 
+import opened globals_s 
+import opened sha256_i
+import opened ARM_decls_i 
+
+ghost method ComputeWs(input:seq<uint32>) returns (W:seq<uint32>)
+    requires |input| == 16;
+    ensures |W| == 64;
+    ensures forall t:uint32 {:trigger TStep(t)} :: TStep(t) && 0 <= t < 64 ==>
+                     (0 <= t <= 15 ==> W[t] == input[t])
+                  && (16 <= t <= 63 ==> W[t] == BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[t-2]), 
+                                                                                       W[t-7]), 
+                                                                          SSIG0(W[t-15])), 
+                                                             W[t-16]));
+{
+    W := input;
+    var i := 16;
+    while i < 64
+        invariant 16 <= i <= 64;
+        invariant |W| == i;
+        invariant 
+            forall t:uint32 {:trigger TStep(t)} :: TStep(t) && 0 <= t < i ==>
+                     (0 <= t <= 15 ==> W[t] == input[t])
+                  && (16 <= t <= i ==> W[t] == BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[t-2]), 
+                                                                                      W[t-7]), 
+                                                                          SSIG0(W[t-15])), 
+                                                            W[t-16]));
+
+    {
+        var new_W := BitwiseAdd32(BitwiseAdd32(BitwiseAdd32(SSIG1(W[i-2]), 
+                                                            W[i-7]), 
+                                               SSIG0(W[i-15])), 
+                                 W[i-16]);
+        W := W + [new_W];
+        i := i + 1;
+    }
+
+}
+
+function {:opaque} bswap32_seq(input:seq<uint32>) : seq<uint32>
+    ensures |bswap32_seq(input)| == |input|;
+    ensures forall i :: 0 <= i < |bswap32_seq(input)| ==> bswap32_seq(input)[i] == bswap32(input[i]);
+{
+    if input == [] then []
+    else [bswap32(input[0])] + bswap32_seq(input[1..])
+}
 
 predicate BlockInvariant(
             trace:SHA256Trace, input:seq<uint32>, globals:map<operand, seq<uint32>>,

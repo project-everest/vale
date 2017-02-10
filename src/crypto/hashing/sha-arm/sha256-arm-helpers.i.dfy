@@ -1,16 +1,14 @@
 include "../../../arch/arm/vale.i.dfy"
 include "../../../arch/arm/globals.s.dfy"
 include "../../../arch/arm/nlarith.s.dfy"
-include "sha256.i.dfy"
-include "bit-vector-lemmas.i.dfy"
+include "../sha256.i.dfy"
 include "../../../../obj/arch/arm/decls.gen.dfy"
 
-module sha256_helpers_i {
+module sha256_arm_helpers_i {
 
 import opened ARM_vale_i 
 import opened globals_s 
 import opened sha256_i
-import opened bit_vector_lemmas_i
 import opened ARM_decls_i
 import opened nlarith_s
 
