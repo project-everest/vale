@@ -9,3 +9,4 @@
 /warnShadowing
 /ironDafny
 /allocated:1
+/timeLimit:30
