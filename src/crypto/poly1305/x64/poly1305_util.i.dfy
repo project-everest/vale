@@ -21,6 +21,7 @@ import opened operations_i
 lemma lemma_BitwiseAdd64()
     ensures  forall x:uint64, y:uint64 :: x + y < 0x1_0000_0000_0000_0000 ==> BitwiseAdd64(x, y) == x + y
     ensures  forall x:uint64, y:uint64 :: x + y >= 0x1_0000_0000_0000_0000 ==> BitwiseAdd64(x, y) == x + y - 0x1_0000_0000_0000_0000
+    ensures  forall x:uint64 :: BitwiseAdd64(x, 0) == x;
 {
     reveal_BitwiseAdd64();
 }

@@ -23,6 +23,7 @@
 
 include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_math.i.dfy"
 include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_util.i.dfy"
+include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_bitvectors.i.dfy"
 include{:verbatim} "../../../../arch/x64/vale.i.dfy"
 include{:verbatim} "../../../../lib/util/operations.i.dfy"
 include "../../../../crypto/poly1305/x64/poly1305_decls.i.vad"
@@ -37,6 +38,7 @@ import opened x64_decls_i
 import opened x64__Poly1305_math_i
 import opened x64__Poly1305_util_i
 import opened x64__Poly1305_decls_i
+import opened x64__Poly1305_bitvectors_i
 import opened operations_i
 #endverbatim
 
@@ -159,17 +161,13 @@ procedure{:refined} poly1305_reduce(
         hd == (n * n) * d3 + n * h1 + h0;
         d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
         rax == 0xffff_ffff_ffff_fffc;
-        forall x:uint64 :: BitwiseAdd64(x, 0) == x;
-        forall x:uint64 :: BitwiseShr64(x, 2) == x / 4;
-        forall x:uint64 :: BitwiseAnd64(x, 3) == x % 4;
-        forall x:uint64 :: BitwiseAnd64(x, 0xffff_ffff_ffff_fffc) == (x / 4) * 4;
-        forall x:uint64, y:uint64 :: BitwiseAnd64(x, y) == BitwiseAnd64(y, x);
     ensures
         hh == (n * n) * h2 + n * h1 + h0;
         hd % p == hh % p;
         h2 < 5;
 {
     lemma_BitwiseAdd64();
+    lemma_poly_bits64();
 
     And64(rax, d3);
     Mov64(h2, d3);
@@ -223,11 +221,6 @@ procedure{:refined}{:bridge} poly1305_iteration(
         s1 == r1 + r1 / 4;
         h2 < 7;
         rax == r1;
-        forall x:uint64 :: BitwiseAdd64(x, 0) == x;
-        forall x:uint64 :: BitwiseShr64(x, 2) == x / 4;
-        forall x:uint64 :: BitwiseAnd64(x, 3) == x % 4;
-        forall x:uint64 :: BitwiseAnd64(x, 0xffff_ffff_ffff_fffc) == (x / 4) * 4;
-        forall x:uint64, y:uint64 :: BitwiseAnd64(x, y) == BitwiseAnd64(y, x);
     ensures
         // hh == (n * n) * h2 + n * h1 + h0;
         // modp(h * r) == modp(hh);
@@ -308,12 +301,6 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         r1_in % 4 == 0;
         h2_in < 5;
         padbit < 2;
-        forall x:uint64 :: BitwiseAdd64(x, 0) == x;
-        forall x:uint64 :: BitwiseShr64(x, 2) == x / 4;
-        forall x:uint64 :: BitwiseShr64(x, 4) == x / 16;
-        forall x:uint64 :: BitwiseAnd64(x, 3) == x % 4;
-        forall x:uint64 :: BitwiseAnd64(x, 0xffff_ffff_ffff_fffc) == (x / 4) * 4;
-        forall x:uint64, y:uint64 :: BitwiseAnd64(x, y) == BitwiseAnd64(y, x);
     ensures
         h2 < 5;
         ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
@@ -322,6 +309,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         modp(h) == poly1305_hash(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), old(inp + len));
 {
     lemma_BitwiseAdd64();
+    lemma_poly_bits64();
 
     ghost var length := len;
 
