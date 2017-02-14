@@ -93,7 +93,14 @@ if env['OPENSSL_PATH'] != None:
   everest_sha256 = cdeclenv.Object('src/Crypto/hashing/EverestSha256.c')
   everest_glue = stdcallenv.Object('src/Crypto/hashing/EverestSHA256Glue.c')
   sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
-  cbc_obj = engineenv.Object('obj/cbc_openssl', cbc_asm[0])
+  if env['TARGET_ARCH']=='x86':
+    cbc_obj = engineenv.Object('obj/cbc_openssl', cbc_asm[0])
+  else:
+    cbc_obj = []
+  if env['TARGET_ARCH']=='x64':
+    libcrypto = '$OPENSSL_PATH/libcrypto-x64.lib'
+  else:
+    libcrypto = '$OPENSSL_PATH/libcrypto.lib'
   aes_obj = engineenv.Object('obj/aes_openssl', sha_asm[0])
   engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
-    source=[everest_sha256, everest_glue, sha256_obj, cbc_obj, aes_obj, '$OPENSSL_PATH/libcrypto.lib'])
+    source=[everest_sha256, everest_glue, sha256_obj, cbc_obj, aes_obj, libcrypto])
