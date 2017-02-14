@@ -194,11 +194,27 @@ procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout oper
     this := this.(heaplets := old(this).heaplets);
 }
 
+procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    requires{:refined false}
+        @src is OConst || @src == OReg(X86Ecx);
+    requires
+        0 <= src < 64;
+    ensures
+        dst == old(BitwiseShl64(dst, src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
 procedure{:refined}{:bridge}{:instruction Ins(Shr64(dst, src))} Shr64(inout operand dst:uint64, operand src:uint64)
     modifies
         efl;
     requires{:refined false}
-        @src is OConst;
+        @src is OConst || @src == OReg(X86Ecx);
     requires
         0 <= src < 64;
     ensures

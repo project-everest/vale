@@ -1,6 +1,7 @@
 include "../../../lib/math/bitvectors64.i.dfy"
 include "../../../lib/math/bitvectors128.i.dfy"
 include "poly1305.s.dfy"
+include "poly1305_common.i.dfy"
 
 module x64__Poly1305_bitvectors_i
 {
@@ -9,6 +10,7 @@ import opened bitvectors64_i
 import opened bitvectors128_s
 import opened bitvectors128_i
 import opened x64__Poly1305_s
+import opened x64__Poly1305_common_i
 
 lemma lemma_shr2_bv(x:bv64)
     ensures  bv64shr(x, 2) == bv64div(x, 4)
@@ -262,10 +264,10 @@ lemma lemma_bytes_and_mod5(x:bv64) ensures bv64and(x, 0x1_0000_0000_00      - 1)
 lemma lemma_bytes_and_mod6(x:bv64) ensures bv64and(x, 0x1_0000_0000_0000    - 1) == bv64mod(x, 0x1_0000_0000_0000   ) { reveal_bv64and(); reveal_bv64mod(); }
 lemma lemma_bytes_and_mod7(x:bv64) ensures bv64and(x, 0x1_0000_0000_0000_00 - 1) == bv64mod(x, 0x1_0000_0000_0000_00) { reveal_bv64and(); reveal_bv64mod(); }
 
-lemma lemma_bytes_and_mod(x:bv64, y:bv64, z:bv64)
-    requires 0 <= y < 8
-    requires 0 <= bv64shl(y, 3) < 64 ==> z == bv64shl(1, bv64shl(y, 3))
-    ensures  0 <= bv64shl(y, 3) < 64
+lemma lemma_bytes_and_mod_bv(x:bv64, y:bv64, z:bv64)
+    requires y < 8
+    ensures  bv64shl(y, 3) < 64
+    requires bv64shl(y, 3) < 64 ==> z == bv64shl(1, bv64shl(y, 3))
     ensures  z != 0
     ensures  bv64and(x, bv64sub(z, 1)) == bv64mod(x, z)
 {
@@ -281,27 +283,46 @@ lemma lemma_bytes_and_mod(x:bv64, y:bv64, z:bv64)
     lemma_bytes_and_mod7(x);
 }
 
-lemma{:fuel power2, 10} lemma_bytes_power2()
-    ensures power2(0) == 0x1
-    ensures power2(8) == 0x1_00
-    ensures power2(16) == 0x1_0000
-    ensures power2(24) == 0x1_0000_00
-    ensures power2(32) == 0x1_0000_0000
-    ensures power2(40) == 0x1_0000_0000_00
-    ensures power2(48) == 0x1_0000_0000_0000
-    ensures power2(56) == 0x1_0000_0000_0000_00
+lemma lemma_bytes_and_mod(x:uint64, y:uint64)
+    requires y < 8
+    ensures  BitwiseShl64(y, 3) < 64
+    ensures  var z := BitwiseShl64(1, BitwiseShl64(y, 3)); z != 0 && BitwiseAnd64(x, z - 1) == x % z
 {
+    lemma_bv64_helpers();
+    lemma_bv64le(8, y);
+    lemma_bv64le(64, BitwiseShl64(y, 3));
+    assert B64(64) == 64 by { reveal_B64(); }
+    var z := if BitwiseShl64(y, 3) < 64 then BitwiseShl64(1, BitwiseShl64(y, 3)) else 0;
+    lemma_bytes_and_mod_bv(B64(x), B64(y), B64(z));
+    assert u64sub(z, 1) == z - 1 by { reveal_mod2_64(); }
+    assert u64mod(x, z) == x % z;
 }
 
-lemma lemma_bytes_shift_power2(y:bv64)
-    requires 0 <= y < 8
-    ensures  0 <= bv64shl(y, 3) < 64
+lemma lemma_bytes_shift_power2_bv(y:bv64)
+    requires y < 8
+    ensures  bv64shl(y, 3) < 64
+    ensures  bv64mul(y, 8) == bv64shl(y, 3);
     ensures  power2(U64(bv64shl(y, 3))) == U64(bv64shl(1, bv64shl(y, 3)))
 {
     lemma_bytes_shift_constants();
     lemma_bytes_power2();
     reveal_U64();
+    reveal_bv64mul();
 }
 
+lemma lemma_bytes_shift_power2(y:uint64)
+    requires y < 8
+    ensures  BitwiseShl64(y, 3) < 64
+    ensures  y * 8 == BitwiseShl64(y, 3);
+    ensures  power2(BitwiseShl64(y, 3)) == BitwiseShl64(1, BitwiseShl64(y, 3))
+{
+    lemma_bv64_helpers();
+    lemma_bv64le(8, y);
+    lemma_bytes_shift_power2_bv(B64(y));
+    lemma_bv64le(64, BitwiseShl64(y, 3));
+    assert B64(64) == 64 by { reveal_B64(); }
+    assert u64mul(y, 8) == BitwiseShl64(y, 3);
+    assert u64mul(y, 8) == y * 8 by { reveal_mod2_64(); }
+}
 
 } // end module

@@ -308,6 +308,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         h0 == mem[ctx_id].mem64[ctx + 0].v;
         h1 == mem[ctx_id].mem64[ctx + 8].v;
         h2 == mem[ctx_id].mem64[ctx + 16].v;
+        r0 == mem[ctx_id].mem64[ctx + 24].v;
+        r1 == mem[ctx_id].mem64[ctx + 32].v;
+        s1 == r1 + r1 / 4;
         ctx == old(ctx); // REVIEW: framing should add this automatically
         inp == old(inp + len);
         forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[ctx_id].mem64[i] == old(mem)[ctx_id].mem64[i];
@@ -395,6 +398,91 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     Store64(ctx, h0, 0, Public, ctx_id);
     Store64(ctx, h1, 8, Public, ctx_id);
     Store64(ctx, h2, 16, Public, ctx_id);
+}
+
+// last 1..15 bytes, in case len is not a multiple of 16
+procedure{:refined}{:bridge} poly1305_last_block(
+    inout operand h0:uint64,
+    inout operand h1:uint64,
+    inout operand h2:uint64,
+          operand r0:uint64,
+          operand s1:uint64,
+          operand nExtra:uint64,
+    ghost hBlocks:int,
+    ghost r1:uint64,
+    ghost r:int,
+    ghost inpLast:uint128,
+    ghost n:int,
+    ghost p:int)
+    modifies
+        rax; rcx; rdx; r8; r9; r10;
+        efl;
+    requires{:refined false}
+        @h0 == OReg(X86R14);
+        @h1 == OReg(X86Ebx);
+        @h2 == OReg(X86Ebp);
+        @r0 == OReg(X86R11);
+        @s1 == OReg(X86R13);
+        @nExtra == OReg(X86R15);
+    requires
+        n == 0x1_0000_0000_0000_0000;
+        p == n * n * 4 - 5;
+        h2 < 5;
+        hBlocks == lowerUpper192(lowerUpper128(h0, h1), h2);
+        r == lowerUpper128(r0, r1);
+        rax == r1;
+        r0 < n / 16;
+        r1 < n / 16;
+        r1 % 4 == 0;
+        s1 == r1 + r1 / 4;
+        inpLast == lowerUpper128(r8, r9);
+        1 <= nExtra < 16;
+        nExtra < 8; // TODO: >= 8 case
+    ensures
+        h2 < 5;
+        let padLast := power2(nExtra * 8);
+        let hLast := lowerUpper192(lowerUpper128(h0, h1), h2);
+        modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r);
+{
+    lemma_BitwiseAdd64();
+    lemma_bytes_shift_power2(nExtra);
+
+    ghost var padLast := power2(nExtra * 8);
+    Mov64(rcx, nExtra);
+    Shl64(rcx, 3);
+    Mov64(rdx, 1);
+    Shl64(rdx, rcx);
+    assert rdx == padLast;
+
+    // inpLast := (inpLast % padLast)
+    lemma_bytes_and_mod(r8, nExtra);
+    lemma_mod_power2_lo(r8, r9, nExtra, power2(8 * nExtra));
+    Mov64(rcx, rdx);
+    Sub64(rcx, 1);
+    And64(r8, rcx);
+    Mov64(r9, 0);
+    assert r8 == old(r8) % padLast;
+    assert lowerUpper128(r8, r9) == inpLast % padLast;
+
+    // h += (inpLast % padLast)
+    Add64Wrap(h0, r8);
+    Adc64Wrap(h1, r9);
+    Adc64Wrap(h2, 0);
+
+    Add64Wrap(h0, rdx);
+    Adc64Wrap(h1, 0);
+    Adc64Wrap(h2, 0);
+
+    ghost var h := hBlocks + (inpLast % padLast) + padLast;
+    assert h == h2 * (n * n) + h1 * n + h0 by { reveal lowerUpper192; reveal lowerUpper128; }
+    assert r == r1 * n + r0 by { reveal lowerUpper128; }
+
+    poly1305_iteration(r8, r9, r10, r0, s1, h0, h1, h2, r1, r, h, n, p);
+    exists hLast :: (hLast == h2 * (n * n) + h1 * n + h0 && modp(h * r) == modp(hLast));
+
+    assert hLast == lowerUpper192(lowerUpper128(h0, h1), h2) by { reveal lowerUpper192; reveal lowerUpper128; }
+    lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
+    assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal modp; }
 }
 
 // h := (h % p) % 2^128;
@@ -485,6 +573,9 @@ procedure{:refined}{:bridge} poly1305_add_key_s(
     }
 }
 
+// Note that this reads 16-byte chunks directly from the input buffer,
+// so (len + 15) / 16 * 16 bytes must be readable, even though only len bytes
+// affect the result.
 procedure{:timeLimitMultiplier 2} poly1305(
           operand ctx:uint64,
     inout operand inp:uint64,
@@ -514,13 +605,13 @@ procedure{:timeLimitMultiplier 2} poly1305(
         @h0 == OReg(X86R14);
         @h1 == OReg(X86Ebx);
         @h2 == OReg(X86Ebp);
-        len % 16 == 0; // TODO: general case
+        len % 16 < 8; // TODO: >= 8 case
         n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
         inp + len < 0x1_0000_0000_0000_0000;
         ctx_id != inp_id;
         ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, inp, 64, Public, len);
+        ValidSrcAddrs(mem, inp_id, inp, 64, Public, (len + 15) / 16 * 16);
         let key_r0 := mem[ctx_id].mem64[ctx + 24].v;
         let key_r1 := mem[ctx_id].mem64[ctx + 32].v;
         let key_s0 := mem[ctx_id].mem64[ctx + 40].v;
@@ -528,10 +619,11 @@ procedure{:timeLimitMultiplier 2} poly1305(
         key_r == lowerUpper128(key_r0, key_r1);
         key_s == lowerUpper128(key_s0, key_s1);
     ensures
-        mem?[ctx_id];
+        ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
+        ValidSrcAddrs(mem, inp_id, old(inp), 64, Public, old(len + 15) / 16 * 16);
         mem == old(mem)[ctx_id := mem[ctx_id]];
         h == lowerUpper128(h0, h1);
-        let inp_mem := heapletTo128(mem[inp_id].mem64, old(inp), old(inp + len));
+        let inp_mem := heapletTo128(mem[inp_id].mem64, old(inp), old(len));
         forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 16 == 0 ==> inp_mem?[j];
         h == poly1305_hash(key_r, key_s, inp_mem, old(inp), old(len));
 {
@@ -585,11 +677,23 @@ procedure{:timeLimitMultiplier 2} poly1305(
         assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
     }
 
-    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem[inp_id].mem64, old(inp), old(inp + len), old(inp + len));
-    lemma_add_mod128(modp(h), key_s);
-
+    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem[inp_id].mem64, old(inp), old(inp + len / 16 * 16), old(len));
     assert h == lowerUpper192(lowerUpper128(h0, h1), h2)
         by { reveal lowerUpper192; reveal lowerUpper128; }
+
+    Load64(r15, ctx, 56, Public, ctx_id); // assert r15 == old(len) % 16;
+    if (r15 != 0)
+    {
+        Load64(rax, ctx, 32, Public, ctx_id);
+        Load64(r8, inp, 0, Public, inp_id);
+        Load64(r9, inp, 8, Public, inp_id);
+        assert lowerUpper128(r8, r9) == heapletTo128(mem[inp_id].mem64, old(inp), old(len))[inp]
+            by { reveal heapletTo128; reveal lowerUpper128; }
+        poly1305_last_block(h0, h1, h2, r0, r13, r15, h, r1, r, lowerUpper128(r8, r9), n, p);
+        h := lowerUpper192(lowerUpper128(h0, h1), h2);
+    }
+
+    lemma_add_mod128(modp(h), key_s);
     poly1305_reduce_last(h0, h1, h2, h);
     h := lowerUpper128(h0, h1);
 
@@ -598,7 +702,7 @@ procedure{:timeLimitMultiplier 2} poly1305(
     poly1305_add_key_s(h0, h1, rax, rdx, h, key_s);
     h := lowerUpper128(h0, h1);
 
-    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem[inp_id].mem64, old(inp), old(inp + len)), old(inp), old(len))
+    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem[inp_id].mem64, old(inp), old(len)), old(inp), old(len))
         by { reveal poly1305_hash; }
 }
 
