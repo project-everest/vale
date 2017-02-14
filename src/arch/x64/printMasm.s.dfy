@@ -175,6 +175,7 @@ method printIns(ins:ins)
         case Mul64(src) => print("not implemented\n");
         case IMul64(dst, src) => print("not implemented\n");
         case And64(dst, src) => print("not implemented\n");
+        case Shl64(dst, src) => print("not implemented\n");
         case Shr64(dst, src) => print("not implemented\n");
         case Sub32(dst, src) => print ("  sub "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case Mul32(src)      => print ("  mul "); printOprnd(src); print("\n");

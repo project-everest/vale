@@ -190,6 +190,7 @@ method printIns(ins:ins)
         case Mul64(src) => print("not implemented\n");
         case IMul64(dst, src) => print("not implemented\n");
         case And64(dst, src) => print("not implemented\n");
+        case Shl64(dst, src) => print("not implemented\n");
         case Shr64(dst, src) => print("not implemented\n");
         case Mov32(dst, src)    => printName2("  mov", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Add32(dst, src)    => printName2("  add", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
