@@ -251,4 +251,21 @@ lemma lemma_mod_power2_lo(x0:uint64, x1:uint64, y:int, z:int)
     lemma_bytes_power2();
 }
 
+lemma lemma_mod_hi(x0:uint64, x1:uint64, z:uint64)
+    requires z != 0
+    ensures  lowerUpper128(0, z) != 0
+    ensures  lowerUpper128(x0, x1) % lowerUpper128(0, z) == lowerUpper128(x0, x1 % z)
+{
+    assert lowerUpper128(0, z) != 0 by { reveal_lowerUpper128(); }
+    var n := 0x1_0000_0000_0000_0000;
+    calc
+    {
+        lowerUpper128(x0, x1) % lowerUpper128(0, z); { reveal_lowerUpper128(); }
+        (x1 * n + x0) % (z * n);                     { lemma_mod_breakdown(x1 * n + x0, n, z); }
+        n * (((x1 * n + x0) / n) % z) + (x1 * n + x0) % n;
+        n * (x1 % z) + x0;                           { reveal_lowerUpper128(); }
+        lowerUpper128(x0, x1 % z);
+    }
+}
+
 }
