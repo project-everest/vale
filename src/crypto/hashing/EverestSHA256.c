@@ -6,7 +6,7 @@
 // allocating and freeing heap on every inner loop in the "speed" test.
 #define USE_OPENSSL 0
 
-#ifndef _MSV_VER
+#ifndef _MSC_VER
 #define __int32 int
 #define __int8  char
 #endif

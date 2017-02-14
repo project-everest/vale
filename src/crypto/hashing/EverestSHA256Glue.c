@@ -5,7 +5,7 @@
 // But its functions are __cdecl so OpenSSL can call them.
 // In this file, you can reference OpenSSL types, but not call OpenSSL functions
 
-#ifndef _MSV_VER
+#ifndef _MSC_VER
 #define __int32 int
 #define __int8  char
 #endif
