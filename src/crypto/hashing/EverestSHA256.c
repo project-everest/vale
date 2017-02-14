@@ -6,6 +6,11 @@
 // allocating and freeing heap on every inner loop in the "speed" test.
 #define USE_OPENSSL 0
 
+#ifndef _MSV_VER
+#define __int32 int
+#define __int8  char
+#endif
+
 #define _WINDLL 1
 #pragma warning(disable:4090) // from openssl lhash.h
 #include <openssl/engine.h>
@@ -20,12 +25,19 @@ static const char *engine_Everest_name = "Everest engine (Everest crypto)";
 IMPLEMENT_DYNAMIC_CHECK_FN();
 IMPLEMENT_DYNAMIC_BIND_FN(bind_helper);
 
+// Vale AES CBC 128 is currently supported only on x86
+#if USE_OPENSSL || _M_IX86 || __i386__
+#define INCLUDE_AES_CBC_128 1
+#else
+#define INCLUDE_AES_CBC_128 0
+#endif
+
 int Everest_init(ENGINE *e) {
     return 1;
 }
 
 #if USE_OPENSSL
-int __cdecl OpenSSL_SHA256_Init(void *evpctx)
+int __cdecl OpenSSL_SHA256_Init(EVP_MD_CTX *evpctx)
 {
     SHA256_CTX *ctx = (SHA256_CTX *)EVP_MD_CTX_md_data(evpctx);
 
@@ -49,11 +61,6 @@ typedef struct {
         double align;
         AES_KEY ks;
     } ks;
-    //block128_f block;
-    //union {
-    //    cbc128_f cbc;
-    //    ctr128_f ctr;
-    //} stream;
 } EVP_AES_KEY;
 
 int __cdecl OpenSSL_AES128_InitKey(EVP_CIPHER_CTX *evpctx, const unsigned char *key, const unsigned char *iv, int enc)
@@ -100,6 +107,7 @@ extern int Everest_AES128_Cleanup(EVP_CIPHER_CTX *ctx);
 extern void __stdcall aes_main_i_KeyExpansionStdcall(const void * key_ptr, void *expanded_key_ptr);
 extern void __stdcall CBCEncryptStdcall(const void* input_ptr, void* output_ptr, const void* expanded_key_ptr, const void* input_end_ptr, const void* IV_ptr, unsigned __int32 scratch1);
 
+#if INCLUDE_AES_CBC_128
 typedef struct {
     unsigned __int8 iv[16];
     unsigned __int8 expanded_key[176];
@@ -133,7 +141,7 @@ int Everest_AES128_Cleanup(EVP_CIPHER_CTX *evpctx)
     OPENSSL_cleanse(ctx->expanded_key, sizeof(ctx->expanded_key));
     return 1;
 }
-
+#endif // INCLUDE_AES_CBC_128
 #endif
 
 static EVP_MD *sha256_md = NULL;
@@ -167,6 +175,7 @@ static int Everest_digest_nids(const int **nids)
     return 1;
 }
 
+#if INCLUDE_AES_CBC_128
 static EVP_CIPHER *aes128_cbc_md = NULL;
 static int Everest_ciphers_nids(const int **nids)
 {
@@ -196,6 +205,7 @@ static int Everest_ciphers_nids(const int **nids)
     *nids = cipher_nids;
     return 1;
 }
+#endif // INCLUDE_AES_CBC_128
 
 
 int Everest_digest(ENGINE *e, const EVP_MD **digest, const int **nids, int nid)
@@ -210,6 +220,7 @@ int Everest_digest(ENGINE *e, const EVP_MD **digest, const int **nids, int nid)
     }
 }
 
+#if INCLUDE_AES_CBC_128
 int Everest_ciphers(ENGINE *e, const EVP_CIPHER **cipher, const int **nids, int nid)
 {
     if (cipher == NULL) {
@@ -221,6 +232,7 @@ int Everest_ciphers(ENGINE *e, const EVP_CIPHER **cipher, const int **nids, int 
         return 0;
     }
 }
+#endif // INCLUDE_AES_CBC_128
 
 // See https://wiki.openssl.org/index.php/Creating_an_OpenSSL_Engine_to_use_indigenous_ECDH_ECDSA_and_HASH_Algorithms
 
@@ -229,8 +241,10 @@ int bind_helper(ENGINE * e, const char *id)
     if (!ENGINE_set_id(e, engine_Everest_id) ||
         !ENGINE_set_name(e, engine_Everest_name) ||
         !ENGINE_set_init_function(e,Everest_init) ||
-        !ENGINE_set_digests(e, Everest_digest) ||
-        !ENGINE_set_ciphers(e, Everest_ciphers)
+#if INCLUDE_AES_CBC_128
+        !ENGINE_set_ciphers(e, Everest_ciphers) ||
+#endif // INCLUDE_AES_CBC_128
+        !ENGINE_set_digests(e, Everest_digest)
     )
         return 0;
 
