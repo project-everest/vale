@@ -123,6 +123,19 @@ procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64(inout oper
     this := this.(heaplets := old(this).heaplets);
 }
 
+procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(BitwiseSub64(dst, src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    reveal BitwiseSub64;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
 procedure{:refined}{:bridge}{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout operand dst:uint64, mem_operand src:uint64)
     modifies
         efl;
@@ -169,7 +182,7 @@ procedure{:refined}{:instruction Ins(Mul64(src))} Mul64Wrap(operand src:uint64)
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:instruction Ins(And64(dst, src))} And64(inout operand dst:uint64, operand src:uint64)
+procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures

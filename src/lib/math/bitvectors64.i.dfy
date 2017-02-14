@@ -190,6 +190,13 @@ lemma lemma_bv64_helpers()
     ensures  B64(4) == 4
     ensures  B64(8) == 8
     ensures  B64(16) == 16
+    ensures  U64(0) == 0
+    ensures  U64(1) == 1
+    ensures  U64(2) == 2
+    ensures  U64(3) == 3
+    ensures  U64(4) == 4
+    ensures  U64(8) == 8
+    ensures  U64(16) == 16
 {
     lemma_B64_forall();
     lemma_bv_add64_forall();
@@ -206,6 +213,13 @@ lemma lemma_bv64_helpers()
     assert B64(4) == 4 by { reveal_B64(); }
     assert B64(8) == 8 by { reveal_B64(); }
     assert B64(16) == 16 by { reveal_B64(); }
+    assert U64(0) == 0 by { reveal_U64(); }
+    assert U64(1) == 1 by { reveal_U64(); }
+    assert U64(2) == 2 by { reveal_U64(); }
+    assert U64(3) == 3 by { reveal_U64(); }
+    assert U64(4) == 4 by { reveal_U64(); }
+    assert U64(8) == 8 by { reveal_U64(); }
+    assert U64(16) == 16 by { reveal_U64(); }
 }
 
 } // end module
