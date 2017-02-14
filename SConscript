@@ -4,6 +4,7 @@
 
 # Python imports
 import os, os.path
+import sys
 
 # Imported identifiers defined in the SConstruct file
 Import('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarith')
@@ -52,14 +53,16 @@ Export('verify_options')
 #
 # build sha256-exe
 #
-sha_asm = env.ExtractValeCode(
+# TODO: Please fix calling conventions on Linux 64-bit and reenable Linux build.
+if sys.platform == "win32" :
+ sha_asm = env.ExtractValeCode(
   ['src/crypto/hashing/$SHA_ARCH_DIR/sha256.vad'],           # Vale source
   'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
   'sha256'                                                   # Base name for the ASM files and EXE
   )
-sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
-sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
-env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
+ sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
+ sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
+ env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
 
 #
 # build cbc-exe
@@ -82,12 +85,19 @@ aes_asm = env.ExtractValeCode(
   )
 env.BuildTest(['src/crypto/aes/testaes.c', aes_asm[0]], 'src/crypto/aes', 'testaes')
 
+if 'KREMLIN_HOME' in os.environ:
+  kremlin_path = os.environ['KREMLIN_HOME']
+else:
+  kremlin_path = '#tools/Kremlin'
+
+kremlib_path = kremlin_path + '/kremlib'
+
 #
 # Build the OpenSSL engine
 #
 if env['OPENSSL_PATH'] != None:
   engineenv = env.Clone()
-  engineenv.Append(CPPPATH=['#tools/Kremlin/Kremlib', '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
+  engineenv.Append(CPPPATH=[kremlib_path, '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
   cdeclenv = engineenv.Clone(CCFLAGS='/Ox /Zi /Gd /LD') # compile __cdecl so it can call OpenSSL code
   stdcallenv=engineenv.Clone(CCFLAGS='/Ox /Zi /Gz /LD') # compile __stdcall so it can call the Vale crypto code
   everest_sha256 = cdeclenv.Object('src/Crypto/hashing/EverestSha256.c')

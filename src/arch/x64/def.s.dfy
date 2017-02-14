@@ -2,7 +2,7 @@
 
 include "../../lib/util/operations.s.dfy"
 include "../../lib/util/words_and_bytes.s.dfy"
-include "../../crypto/AES/aes.s.dfy"
+include "../../crypto/aes/aes.s.dfy"
 
 module x64_def_s {
 

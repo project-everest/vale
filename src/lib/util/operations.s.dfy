@@ -215,7 +215,26 @@ lemma {:axiom} lemma_BitShiftsSum(x: bv32, a: nat, b: nat)
 
 function {:opaque} BitwiseMul64(x:uint64, y:uint64):uint64 { (x * y) % 0x1_0000_0000_0000_0000 }
 function {:opaque} BitwiseMul64hi(x:uint64, y:uint64):uint64 { ((x * y) / 0x1_0000_0000_0000_0000) % 0x1_0000_0000_0000_0000 }
-function {:axiom} BitwiseAnd64(x:uint64, y:uint64):uint64
-function {:axiom} BitwiseShr64(x:uint64, y:uint64):uint64
+
+function{:opaque} BitAnd64(x:bv64, y:bv64):bv64 { x & y }
+function{:opaque} BitwiseAnd64_opaque(x:uint64, y:uint64):uint64 { BitsToWord64(BitAnd64(WordToBits64(x), WordToBits64(y))) }
+function BitwiseAnd64(x:uint64, y:uint64):uint64 { BitwiseAnd64_opaque(x, y) }
+
+lemma{:axiom} lemma_bitwise_shifts64(x:uint64)
+    requires x < 64
+    ensures  WordToBits64(x) < 64
+
+function{:opaque} BitShr64(x:bv64, y:bv64):bv64 requires y < 64 { x >> y }
+function{:opaque} BitwiseShr64_opaque(x:uint64, y:uint64):uint64
+    requires y < 64
+{
+    lemma_bitwise_shifts64(y);
+    BitsToWord64(BitShr64(WordToBits64(x), WordToBits64(y)))
+}
+function BitwiseShr64(x:uint64, y:uint64):uint64
+    requires y < 64
+{
+    BitwiseShr64_opaque(x, y)
+}
 
 } // end module operations_s

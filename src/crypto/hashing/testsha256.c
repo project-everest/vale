@@ -1,5 +1,6 @@
 #include <math.h>
 #include <sha256_main_i.h>
+#include <stdint.h> // for uint64_t
 
 uint64_t GetRDTSC() {
   //VS on x64 doesn't support inline assembly
@@ -82,10 +83,11 @@ sha256_main_i_SHA256_Complete(bytes, 0, 3, digest);
   printf("\n");
 }
 
-void main()
+int main(void)
 {
   demo();
   //speed_test(100000, 8192);
   //speed_test(10000, 10*1024);
+  return 0;
 }
 

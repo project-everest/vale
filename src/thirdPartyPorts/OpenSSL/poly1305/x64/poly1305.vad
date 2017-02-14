@@ -23,6 +23,7 @@
 
 include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_math.i.dfy"
 include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_util.i.dfy"
+include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_bitvectors.i.dfy"
 include{:verbatim} "../../../../arch/x64/vale.i.dfy"
 include{:verbatim} "../../../../lib/util/operations.i.dfy"
 include "../../../../crypto/poly1305/x64/poly1305_decls.i.vad"
@@ -37,6 +38,7 @@ import opened x64_decls_i
 import opened x64__Poly1305_math_i
 import opened x64__Poly1305_util_i
 import opened x64__Poly1305_decls_i
+import opened x64__Poly1305_bitvectors_i
 import opened operations_i
 #endverbatim
 
@@ -159,17 +161,13 @@ procedure{:refined} poly1305_reduce(
         hd == (n * n) * d3 + n * h1 + h0;
         d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
         rax == 0xffff_ffff_ffff_fffc;
-        forall x:uint64 :: BitwiseAdd64(x, 0) == x;
-        forall x:uint64 :: BitwiseShr64(x, 2) == x / 4;
-        forall x:uint64 :: BitwiseAnd64(x, 3) == x % 4;
-        forall x:uint64 :: BitwiseAnd64(x, 0xffff_ffff_ffff_fffc) == (x / 4) * 4;
-        forall x:uint64, y:uint64 :: BitwiseAnd64(x, y) == BitwiseAnd64(y, x);
     ensures
         hh == (n * n) * h2 + n * h1 + h0;
         hd % p == hh % p;
         h2 < 5;
 {
     lemma_BitwiseAdd64();
+    lemma_poly_bits64();
 
     And64(rax, d3);
     Mov64(h2, d3);
@@ -223,11 +221,6 @@ procedure{:refined}{:bridge} poly1305_iteration(
         s1 == r1 + r1 / 4;
         h2 < 7;
         rax == r1;
-        forall x:uint64 :: BitwiseAdd64(x, 0) == x;
-        forall x:uint64 :: BitwiseShr64(x, 2) == x / 4;
-        forall x:uint64 :: BitwiseAnd64(x, 3) == x % 4;
-        forall x:uint64 :: BitwiseAnd64(x, 0xffff_ffff_ffff_fffc) == (x / 4) * 4;
-        forall x:uint64, y:uint64 :: BitwiseAnd64(x, y) == BitwiseAnd64(y, x);
     ensures
         // hh == (n * n) * h2 + n * h1 + h0;
         // modp(h * r) == modp(hh);
@@ -291,7 +284,6 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
         len % 16 == 0; // REVIEW: may be stronger than necessary
-        len != 0; //  REVIEW: may be stronger than necessary
         inp + len < 0x1_0000_0000_0000_0000;
         ctx_id != inp_id;
         ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
@@ -308,25 +300,30 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         r1_in % 4 == 0;
         h2_in < 5;
         padbit < 2;
-        forall x:uint64 :: BitwiseAdd64(x, 0) == x;
-        forall x:uint64 :: BitwiseShr64(x, 2) == x / 4;
-        forall x:uint64 :: BitwiseShr64(x, 4) == x / 16;
-        forall x:uint64 :: BitwiseAnd64(x, 3) == x % 4;
-        forall x:uint64 :: BitwiseAnd64(x, 0xffff_ffff_ffff_fffc) == (x / 4) * 4;
-        forall x:uint64, y:uint64 :: BitwiseAnd64(x, y) == BitwiseAnd64(y, x);
     ensures
         h2 < 5;
         ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
         ValidSrcAddrs(mem, inp_id, old(inp), 64, Public, old(len));
+        mem == old(mem)[ctx_id := mem[ctx_id]];
+        h0 == mem[ctx_id].mem64[ctx + 0].v;
+        h1 == mem[ctx_id].mem64[ctx + 8].v;
+        h2 == mem[ctx_id].mem64[ctx + 16].v;
+        ctx == old(ctx); // REVIEW: framing should add this automatically
+        inp == old(inp + len);
+        forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[ctx_id].mem64[i] == old(mem)[ctx_id].mem64[i];
+        let r0_in := mem[ctx_id].mem64[ctx + 24].v;
+        let r1_in := mem[ctx_id].mem64[ctx + 32].v;
         h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
-        modp(h) == poly1305_hash(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), old(inp + len));
+        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), old(inp + len));
 {
     lemma_BitwiseAdd64();
+    lemma_poly_bits64();
 
     ghost var length := len;
 
     Shr64(len, 4);
-    assert len != 0;
+    // Slight difference: the original code has a special case for len == 0 here.
+    // We can let len == 0 pass through because of the slight difference in the loop condition (see below)
     Mov64(r15, len); // reassign len
 
     Load64(r0, ctx, 24, Public, ctx_id); // load r
@@ -342,13 +339,13 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     Add64(s1, r1); // s1 = r1 + (r1 >> 2)
 
     h := h_in;
-    assert modp(h) == poly1305_hash(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
+    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
     {
         reveal modp;
-        reveal poly1305_hash;
+        reveal poly1305_heap_blocks;
     }
 
-    while (r15 != 0)
+    while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
             n == 0x1_0000_0000_0000_0000;
             r == r1 * n + r0;
@@ -363,7 +360,10 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
             length == old(len);
             ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
             ValidSrcAddrs(mem, inp_id, old(inp), 64, Public, length);
-            modp(h) == poly1305_hash(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp);
+            ctx == old(ctx); // REVIEW: framing should add this automatically
+            forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[ctx_id].mem64[i] == old(mem)[ctx_id].mem64[i];
+            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp);
+            mem == old(mem)[ctx_id := mem[ctx_id]];
         decreases
             r15;
     {
@@ -384,9 +384,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         exists hh :: hh == (n * n) * h2 + n * h1 + h0 && modp(h * r) == modp(hh);
         h := hh;
 
-        assert modp(h) == poly1305_hash(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
+        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
         {
-            reveal poly1305_hash;
+            reveal poly1305_heap_blocks;
             reveal modp;
             lemma_poly_demod(p, hp, hq - hp, r);
         }
@@ -395,6 +395,211 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     Store64(ctx, h0, 0, Public, ctx_id);
     Store64(ctx, h1, 8, Public, ctx_id);
     Store64(ctx, h2, 16, Public, ctx_id);
+}
+
+// h := (h % p) % 2^128;
+procedure{:refined}{:bridge} poly1305_reduce_last(
+    inout operand h0:uint64,
+    inout operand h1:uint64,
+    inout operand h2:uint64,
+    ghost h:int)
+    modifies
+        r8; r9; r10; rax;
+        efl;
+    requires{:refined false}
+        @h0 == OReg(X86R14);
+        @h1 == OReg(X86Ebx);
+        @h2 == OReg(X86Ebp);
+    requires
+        h2 < 5;
+        h == lowerUpper192(lowerUpper128(h0, h1), h2);
+    ensures
+        lowerUpper128(h0, h1) == mod2_128(modp(h));
+{
+    lemma_BitwiseAdd64();
+    lemma_BitwiseSub64();
+    lemma_poly_bits64();
+
+    Mov64(r8, h0);
+    Mov64(r9, h1);
+    Mov64(r10, h2);
+    Add64Wrap(r8, 5);
+    Adc64Wrap(r9, 0);
+    Adc64Wrap(r10, 0);
+
+    assert h + 5 == lowerUpper192(lowerUpper128(r8, r9), r10)
+        by { reveal lowerUpper128; reveal lowerUpper192; }
+    lemma_reduce128(h, old(h2), old(h1), old(h0), h + 5, r10, r9, r8);
+
+    Shr64(r10, 2);
+
+    Mov64(rax, r10);
+    Sub64Wrap(rax, 1); // mask of ones if h < p, zero otherwise
+    assert rax == (if r10 == 0 then 0xffff_ffff_ffff_ffff else 0);
+    And64(h0, rax);
+    And64(h1, rax);
+
+    Mov64(rax, 0);
+    Sub64Wrap(rax, r10); // mask of ones if p <= h < 2 * p, zero otherwise
+    assert rax == (if r10 == 1 then 0xffff_ffff_ffff_ffff else 0);
+    And64(r8, rax);
+    And64(r9, rax);
+
+    // Either h1 == h0 == 0 or r9 == r8 == 0; add to select the nonzero one:
+    Add64(h0, r8);
+    Add64(h1, r9);
+}
+
+// h := (h + key_s) % 2^128
+procedure{:refined}{:bridge} poly1305_add_key_s(
+    inout operand h0:uint64,
+    inout operand h1:uint64,
+          operand key_s0:uint64,
+          operand key_s1:uint64,
+    ghost h_in:int,
+    ghost key_s:uint128)
+    modifies
+        efl;
+    requires{:refined false}
+        @h0 == OReg(X86R14);
+        @h1 == OReg(X86Ebx);
+        @key_s0 == OReg(X86Eax);
+        @key_s1 == OReg(X86Edx);
+    requires
+        h_in == lowerUpper128(h0, h1);
+        key_s == lowerUpper128(key_s0, key_s1);
+    ensures
+        lowerUpper128(h0, h1) == mod2_128(h_in + key_s);
+{
+    lemma_BitwiseAdd64();
+
+    Add64Wrap(h0, key_s0);
+    Adc64Wrap(h1, key_s1);
+
+    ghost var c := if Cf(efl) then 0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000 else 0;
+    calc
+    {
+        mod2_128(h_in + key_s);              { reveal lowerUpper128; }
+        mod2_128(c + lowerUpper128(h0, h1)); { reveal mod2_128; }
+        lowerUpper128(h0, h1);
+    }
+}
+
+procedure{:timeLimitMultiplier 2} poly1305(
+          operand ctx:uint64,
+    inout operand inp:uint64,
+    inout operand len:uint64,
+    inout operand r0:uint64,
+    inout operand r1:uint64,
+    inout operand h0:uint64,
+    inout operand h1:uint64,
+    inout operand h2:uint64,
+    ghost key_r:uint128,
+    ghost key_s:uint128,
+    ghost n:int,
+    ghost p:int,
+    ghost ctx_id:heaplet_id,
+    ghost inp_id:heaplet_id)
+    returns(ghost h:int)
+    modifies
+        rax; rcx; rdx; r8; r9; r10; r13; r15;
+        efl;
+        mem;
+    requires
+        @ctx == OReg(X86Edi);
+        @inp == OReg(X86Esi);
+        @len == OReg(X86Edx);
+        @r0 == OReg(X86R11);
+        @r1 == OReg(X86R12);
+        @h0 == OReg(X86R14);
+        @h1 == OReg(X86Ebx);
+        @h2 == OReg(X86Ebp);
+        len % 16 == 0; // TODO: general case
+        n == 0x1_0000_0000_0000_0000;
+        p == n * n * 4 - 5;
+        inp + len < 0x1_0000_0000_0000_0000;
+        ctx_id != inp_id;
+        ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
+        ValidSrcAddrs(mem, inp_id, inp, 64, Public, len);
+        let key_r0 := mem[ctx_id].mem64[ctx + 24].v;
+        let key_r1 := mem[ctx_id].mem64[ctx + 32].v;
+        let key_s0 := mem[ctx_id].mem64[ctx + 40].v;
+        let key_s1 := mem[ctx_id].mem64[ctx + 48].v;
+        key_r == lowerUpper128(key_r0, key_r1);
+        key_s == lowerUpper128(key_s0, key_s1);
+    ensures
+        mem?[ctx_id];
+        mem == old(mem)[ctx_id := mem[ctx_id]];
+        h == lowerUpper128(h0, h1);
+        let inp_mem := heapletTo128(mem[inp_id].mem64, old(inp), old(inp + len));
+        forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 16 == 0 ==> inp_mem?[j];
+        h == poly1305_hash(key_r, key_s, inp_mem, old(inp), old(len));
+{
+    // context:
+    //   0, 8, 16: will hold h
+    //   24, 32: key_r
+    //   40, 48: key_s
+    //   56: will hold len % 16
+    //   64: will hold len / 16 * 16
+    ghost var key_r0 := mem[ctx_id].mem64[ctx + 24].v;
+    ghost var key_r1 := mem[ctx_id].mem64[ctx + 32].v;
+    ghost var len_in := len;
+    lemma_poly_bits64();
+    lemma_BitwiseAdd64();
+
+    Mov64(rax, 0);
+    Store64(ctx, rax,  0, Public, ctx_id);
+    Store64(ctx, rax,  8, Public, ctx_id);
+    Store64(ctx, rax, 16, Public, ctx_id);
+
+    Load64(r0, ctx, 24, Public, ctx_id);
+    Load64(r1, ctx, 32, Public, ctx_id);
+    And64(r0, 0x0fff_fffc_0fff_ffff);
+    And64(r1, 0x0fff_fffc_0fff_fffc);
+    Store64(ctx, r0, 24, Public, ctx_id);
+    Store64(ctx, r1, 32, Public, ctx_id);
+
+    ghost var r:uint128 := lowerUpper128(r0, r1);
+    assert r == r0 + n * r1 by { reveal lowerUpper128; }
+    assert r == and128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff) by
+    {
+        reveal lowerUpper128;
+        lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
+            0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
+    }
+
+    Mov64(rax, len);
+    And64(rax, 15);
+    Sub64(len, rax);
+    // assert rax == len_in % 16;
+    // assert len == len_in / 16 * 16;
+    Store64(ctx, rax, 56, Public, ctx_id);
+    Store64(ctx, len, 64, Public, ctx_id);
+
+    Mov64(rcx, 1);
+    h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2,
+        r, 0, n, p, ctx_id, inp_id);
+    assert modp(0) == 0 by
+    {
+        reveal modp;
+        assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
+    }
+
+    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem[inp_id].mem64, old(inp), old(inp + len), old(inp + len));
+    lemma_add_mod128(modp(h), key_s);
+
+    assert h == lowerUpper192(lowerUpper128(h0, h1), h2)
+        by { reveal lowerUpper192; reveal lowerUpper128; }
+    poly1305_reduce_last(h0, h1, h2, h);
+    h := lowerUpper128(h0, h1);
+
+    Load64(rax, ctx, 40, Public, ctx_id);
+    Load64(rdx, ctx, 48, Public, ctx_id);
+    poly1305_add_key_s(h0, h1, rax, rdx, h, key_s);
+    h := lowerUpper128(h0, h1);
+
+    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem[inp_id].mem64, old(inp), old(inp + len)), old(inp), old(len))
+        by { reveal poly1305_hash; }
 }
 
 #verbatim

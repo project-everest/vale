@@ -5,6 +5,9 @@
 // But its functions are __cdecl so OpenSSL can call them.
 // In this file, you can reference OpenSSL types, but not call OpenSSL functions
 
+// gcc does not support the __cdecl notation
+#include "gcc_compat.h"
+
 #define _WINDLL 1
 #pragma warning(disable:4090) // from openssl lhash.h
 #define EVP_MD_CTX_md_data EVP_MD_CTX_md_data_cdecl

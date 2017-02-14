@@ -1,6 +1,12 @@
 // Everest OpenSSL crypto engine for SHA256
 // Allows OpenSSL to call the Everest SHA256 code
 
+// gcc does not support the __cdecl notation
+#include "gcc_compat.h"
+
+// For uint?_t
+#include <stdint.h>
+
 // Set this to 1 to build the everest engine DLL, but calling back to OpenSSL's
 // SHA256 code.  This helps isolate performance overhead due to EVP_Digest()
 // allocating and freeing heap on every inner loop in the "speed" test.
@@ -98,11 +104,11 @@ extern int Everest_AES128_Cleanup(EVP_CIPHER_CTX *ctx);
 
 // These are the Vale entrypoints
 extern void __stdcall aes_main_i_KeyExpansionStdcall(const void * key_ptr, void *expanded_key_ptr);
-extern void __stdcall CBCEncryptStdcall(const void* input_ptr, void* output_ptr, const void* expanded_key_ptr, const void* input_end_ptr, const void* IV_ptr, unsigned __int32 scratch1);
+extern void __stdcall CBCEncryptStdcall(const void* input_ptr, void* output_ptr, const void* expanded_key_ptr, const void* input_end_ptr, const void* IV_ptr, uint32_t scratch1);
 
 typedef struct {
-    unsigned __int8 iv[16];
-    unsigned __int8 expanded_key[176];
+    uint8_t iv[16];
+    uint8_t expanded_key[176];
 } EVEREST_AES128_CONTEXT;
 
 int __cdecl Everest_AES128_InitKey(EVP_CIPHER_CTX *evpctx, const unsigned char *key, const unsigned char *iv, int enc)
