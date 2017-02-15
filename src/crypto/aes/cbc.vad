@@ -296,7 +296,7 @@ procedure {:refined} {:timeLimitMultiplier 6} CBCEncryptImpl(
 // 2 = key_ptr with expanded key
 // 3 = input_end_ptr
 // Expects IV to be in xmm0
-procedure {:refined} CBCJustEncryptImpl(
+procedure {:refined}{:timeLimitMultiplier 2} CBCJustEncryptImpl(
     ghost key:seq(uint32), 
     ghost w:seq(uint32),
     ghost input_id:heaplet_id,
@@ -391,7 +391,7 @@ procedure {:refined} CBCJustEncryptImpl(
 // 2 = key_ptr with expanded key
 // 3 = input_end_ptr
 // 4 = IV ptr
-procedure {:refined} CBCEncryptStdcall(
+procedure {:refined}{:timeLimitMultiplier 2} CBCEncryptStdcall(
     ghost key:seq(uint32), 
     ghost w:seq(uint32),
     ghost input_id:heaplet_id,

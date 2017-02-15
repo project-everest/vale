@@ -15,16 +15,16 @@ module MyModule {
     function method MyFunction(x:int): int { x + x }
     type ParamType<G> = seq<G>
 }
-predicate va_is_src_register_MyModule__MyType(x:va_register) { true }
-predicate va_is_dst_register_MyModule__MyType(x:va_register) { true }
+predicate va_is_src_register_MyModule__MyType(x:va_register, s:va_state) { true }
+predicate va_is_dst_register_MyModule__MyType(x:va_register, s:va_state) { true }
 function va_eval_register_MyModule__MyType(s:va_state, o:va_register):int { eval_reg(o, s) }
 
 datatype MyRecord = MakeRecord(a:int, b:bool)
-predicate va_is_src_operand_MyRecord(dt:va_operand)
+predicate va_is_src_operand_MyRecord(dt:va_operand, s:va_state)
 function va_eval_operand_MyRecord(s:state, o:va_operand):MyRecord
 #endverbatim
 
-procedure{:instruction Ins(InsIncr(x))} Increment(inout register x:int)
+procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout register x:int)
     ensures
         x == old(x) + 1;
 {

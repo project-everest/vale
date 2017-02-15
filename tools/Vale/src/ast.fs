@@ -39,7 +39,7 @@ type op =
 | Cond
 | FieldOp of id
 | FieldUpdate of id
-//| CodeLemmaOp // one expression for code, a different expression for lemmas
+| CodeLemmaOp // one expression for code, a different expression for lemmas
 | RefineOp // one expression for abstract, one expression for abstract with optional oldness, one expression for refined
 | StateOp of id * string * typ // example: (eax, "reg", int) for va_get_reg(EAX, ...exps..., state):int
 | OperandArg of id * string * typ

@@ -2,7 +2,7 @@
 
 include "../../lib/util/operations.s.dfy"
 include "../../lib/util/words_and_bytes.s.dfy"
-include "../../crypto/AES/aes.s.dfy"
+include "../../crypto/aes/aes.s.dfy"
 
 module x64_def_s {
 
@@ -15,7 +15,7 @@ datatype x86reg =
 | X86R8 | X86R9 | X86R10 | X86R11 | X86R12 | X86R13 | X86R14 | X86R15
 | X86Xmm(xmm:int)
 datatype maddr = MConst(n:int) | MReg(reg:x86reg, offset:int) | MIndex(base:x86reg, scale:int, index:x86reg, index_offset:int)
-datatype operand = OConst(n:uint32) | OReg(r:x86reg) | OStack(s:int) | OHeap(addr:maddr, taint:taint)
+datatype operand = OConst(n:uint64) | OReg(r:x86reg) | OStack(s:int) | OHeap(addr:maddr, taint:taint)
 datatype ocmp = OEq | ONe | OLe | OGe | OLt | OGt
 datatype obool = OCmp(cmp:ocmp, o1:operand, o2:operand)
 
@@ -25,18 +25,26 @@ datatype ins =
 | Mov64(dstMov64:operand, srcMov64:operand)
 | Add32(dstAdd:operand, srcAdd:operand)
 | Add64(dstAdd64:operand, srcAdd64:operand)
+| AddLea64(dstAddLea64:operand, src1AddLea64:operand, src2AddLea64:operand)
 | Sub32(dstSub:operand, srcSub:operand)
+| Sub64(dstSub64:operand, srcSub64:operand)
 | Mul32(srcMul:operand)
+| Mul64(srcMul64:operand)
+| IMul64(dstIMul64:operand, srcIMul64:operand)
 | AddCarry(dstAddCarry:operand, srcAddCarry:operand)
+| AddCarry64(dstAddCarry64:operand, srcAddCarry64:operand)
 | BSwap32(dstBSwap:operand)
 | Xor32(dstXor:operand, srcXor:operand)
 | And32(dstAnd:operand, srcAnd:operand)
+| And64(dstAnd64:operand, srcAnd64:operand)
 | Not32(dstNot:operand)
 | GetCf(dstCf:operand) // corresponds to SETC instruction
 | Rol32(dstRolConst:operand, amountRolConst:operand)
 | Ror32(dstRorConst:operand, amountRorConst:operand)
 | Shl32(dstShlConst:operand, amountShlConst:operand)
+| Shl64(dstShlConst64:operand, amountShlConst64:operand)
 | Shr32(dstShrConst:operand, amountShrConst:operand)
+| Shr64(dstShrConst64:operand, amountShrConst64:operand)
 | AESNI_enc(dstEnc:operand, srcEnc:operand)
 | AESNI_enc_last(dstEncLast:operand, srcEncLast:operand)
 | AESNI_dec(dstDec:operand, srcDec:operand)
@@ -127,7 +135,7 @@ predicate ValidXmm(xmms:map<int,Quadword>, r:x86reg)
 predicate ValidOperand(s:state, size:int, o:operand)
 {
     match o
-        case OConst(n) => true
+        case OConst(n) => (size == 32 ==> IsUInt32(o.n))
         case OReg(r) =>
             if size == 32 || size == 64 then
                 !r.X86Xmm? && ValidRegister(s.regs, r)
@@ -149,6 +157,8 @@ predicate ValidOperand(s:state, size:int, o:operand)
         case OHeap(addr, _) => 
             if size == 32 then
                 ValidHeapAddr(s, addr)
+            else if size == 64 then
+                Valid64BitHeapOperand(s, o)
             else if size == 128 then
                 Valid128BitHeapOperand(s, o)
             else false
@@ -188,6 +198,15 @@ predicate ValidShiftAmountOperand(s:state, o:operand)
 {
        (   o.OConst?
         && 0 <= o.n < 32)
+    || (   o == OReg(X86Ecx)
+        && o.r in s.regs
+        && IsUInt32(s.regs[o.r]))
+}
+
+predicate ValidShiftAmountOperand64(s:state, o:operand)
+{
+       (   o.OConst?
+        && 0 <= o.n < 64)
     || (   o == OReg(X86Ecx)
         && o.r in s.regs
         && IsUInt32(s.regs[o.r]))
@@ -260,6 +279,16 @@ predicate Valid128BitStackOperand(s:state, o:operand)
     && o.s+3 in s.stack[0]
 }
 
+predicate Valid64BitHeapOperand(s:state, o:operand)
+    requires o.OHeap?;
+{
+    ValidMemAddr(o.addr)
+  && var m0 := EvalMemAddr(s.regs, o.addr);
+     var m1 := m0 + 4;
+        ValidResolvedAddr(s.heap, m0)
+     && ValidResolvedAddr(s.heap, m1)
+}
+
 predicate Valid128BitHeapOperand(s:state, o:operand)
     requires o.OHeap?;
 {
@@ -288,13 +317,12 @@ function eval_op32(s:state, o:operand) : uint32
             case OHeap(addr, taint) => GetValueAtHeapAddress(s, addr)
 }
 
-function{:axiom} lower64(i:uint64):uint32
-function{:axiom} upper64(i:uint64):uint32
-function{:axiom} lowerUpper64(l:uint32, u:uint32):uint64
-lemma{:axiom} lemma_lowerUpper64(i:uint64) ensures lowerUpper64(lower64(i), upper64(i)) == i
+function{:opaque} lower64(i:uint64):uint32 { i % 0x1_0000_0000 }
+function{:opaque} upper64(i:uint64):uint32 { i / 0x1_0000_0000 }
+function{:opaque} lowerUpper64(l:uint32, u:uint32):uint64 { l + 0x1_0000_0000 * u }
 
 function eval_op64(s:state, o:operand) : uint64
-    requires !(o.OReg? && o.r.X86Xmm?) && !o.OHeap?;
+    requires !(o.OReg? && o.r.X86Xmm?)
 {
     if !ValidSourceOperand(s, 64, o) then
         42
@@ -303,6 +331,9 @@ function eval_op64(s:state, o:operand) : uint64
             case OConst(n) => n
             case OReg(r) => s.regs[r]
             case OStack(slot) => lowerUpper64(s.stack[0][slot], s.stack[0][slot + 1])
+            case OHeap(addr, taint) =>
+                var resolved_addr := EvalMemAddr(s.regs, addr);
+                lowerUpper64(GetValueAtResolvedAddress(s.heap, resolved_addr), GetValueAtResolvedAddress(s.heap, resolved_addr + 4))
 }
 
 function UpdateHeap32(h:heap, addr:int, v:uint32, t:taint) : heap
@@ -312,6 +343,11 @@ function UpdateHeap32(h:heap, addr:int, v:uint32, t:taint) : heap
      [addr + 1 := HeapEntry(big_endian_bytes[2], t)]
      [addr + 2 := HeapEntry(big_endian_bytes[1], t)]
      [addr + 3 := HeapEntry(big_endian_bytes[0], t)]
+}
+
+function UpdateHeap64(h:heap, resolved_addr:int, v:uint64, t:taint) : heap
+{
+    UpdateHeap32(UpdateHeap32(h, resolved_addr, lower64(v), t), resolved_addr + 4, upper64(v), t)
 }
 
 predicate evalUpdateAndMaintainFlags(s:state, o:operand, v:uint32, r:state, obs:seq<observation>)
@@ -331,7 +367,7 @@ predicate evalUpdateAndMaintainFlags64(s:state, o:operand, v:uint64, r:state, ob
     match o
         case OReg(reg)    => r == s.(regs := s.regs[reg := v], trace := s.trace + obs)
         case OStack(slot) => r == s.(stack := [s.stack[0][slot := lower64(v)][slot + 1 := upper64(v)]] + s.stack[1..], trace := s.trace + obs)
-        case OHeap(addr, taint)  => r == s.(ok := false) // not yet supported
+        case OHeap(addr, taint)  => r == s.(heap := UpdateHeap64(s.heap, EvalMemAddr(s.regs, addr), v, taint))
 }
 
 predicate evalUpdateAndHavocFlags(s:state, o:operand, v:uint32, r:state, obs:seq<observation>)
@@ -361,7 +397,7 @@ predicate evalUpdateXmmsAndHavocFlags(s:state, o:operand, v:Quadword, r:state, o
 predicate Valid128BitOperand(s:state, o:operand)
 {
     match o
-        case OConst(c) => true
+        case OConst(c) => IsUInt32(c)
         case OReg(r) => r.X86Xmm? && r.xmm in s.xmms
         case OStack(arg) => Valid128BitStackOperand(s, o)
         case OHeap(addr, taint) => Valid128BitHeapOperand(s, o)
@@ -420,7 +456,7 @@ predicate evalUpdate128AndHavocFlags(s:state, o:operand, v:Quadword, r:state, ob
                                      trace := s.trace + obs)
 }
 
-function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
+function evalCmp(c:ocmp, i1:uint64, i2:uint64):bool
 {
     match c
         case OEq => i1 == i2
@@ -432,10 +468,10 @@ function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
 }
 
 function evalOBool(s:state, o:obool):bool
-    requires ValidSourceOperand(s, 32, o.o1);
-    requires ValidSourceOperand(s, 32, o.o2);
+    requires ValidSourceOperand(s, 64, o.o1);
+    requires ValidSourceOperand(s, 64, o.o2);
 {
-    evalCmp(o.cmp, eval_op32(s, o.o1), eval_op32(s, o.o2))
+    evalCmp(o.cmp, eval_op64(s, o.o1), eval_op64(s, o.o2))
 }
 
 function clear_low_byte(n:uint32) : uint32
@@ -481,18 +517,26 @@ predicate ValidInstruction(s:state, ins:ins)
         case Mov64(dstMov, srcMov) => Valid64BitDestinationOperand(s, dstMov) && Valid64BitSourceOperand(s, srcMov)
         case Add32(dstAdd, srcAdd) => Valid32BitDestinationOperand(s, dstAdd) && Valid32BitSourceOperand(s, srcAdd) && Valid32BitSourceOperand(s, dstAdd)
         case Add64(dstAdd, srcAdd) => Valid64BitDestinationOperand(s, dstAdd) && Valid64BitSourceOperand(s, srcAdd) && Valid64BitSourceOperand(s, dstAdd)
+        case AddLea64(dstAdd, srcAdd1, srcAdd2) => Valid64BitDestinationOperand(s, dstAdd) && Valid64BitSourceOperand(s, srcAdd1) && Valid64BitSourceOperand(s, srcAdd2) && Valid64BitSourceOperand(s, dstAdd)
         case Sub32(dstSub, srcSub) => Valid32BitDestinationOperand(s, dstSub) && Valid32BitSourceOperand(s, srcSub) && Valid32BitSourceOperand(s, dstSub)
+        case Sub64(dstSub, srcSub) => Valid64BitDestinationOperand(s, dstSub) && Valid64BitSourceOperand(s, srcSub) && Valid64BitSourceOperand(s, dstSub)
         case Mul32(srcMul) => Valid32BitSourceOperand(s, srcMul) && Valid32BitSourceOperand(s, OReg(X86Eax)) && Valid32BitDestinationOperand(s, OReg(X86Eax)) && Valid32BitDestinationOperand(s, OReg(X86Edx))
+        case Mul64(srcMul) => Valid64BitSourceOperand(s, srcMul) && Valid64BitSourceOperand(s, OReg(X86Eax)) && Valid64BitDestinationOperand(s, OReg(X86Eax)) && Valid64BitDestinationOperand(s, OReg(X86Edx))
+        case IMul64(dst, src) => Valid64BitDestinationOperand(s, dst) && Valid64BitSourceOperand(s, src) && Valid64BitSourceOperand(s, dst)
         case AddCarry(dstAddCarry, srcAddCarry) => Valid32BitDestinationOperand(s, dstAddCarry) && Valid32BitSourceOperand(s, srcAddCarry) && Valid32BitSourceOperand(s, dstAddCarry)
+        case AddCarry64(dstAddCarry, srcAddCarry) => Valid64BitDestinationOperand(s, dstAddCarry) && Valid64BitSourceOperand(s, srcAddCarry) && Valid64BitSourceOperand(s, dstAddCarry)
         case BSwap32(dstBSwap) => Valid32BitDestinationOperand(s, dstBSwap) && dstBSwap.OReg?
         case Xor32(dstXor, srcXor) => Valid32BitDestinationOperand(s, dstXor) && Valid32BitSourceOperand(s, srcXor) && Valid32BitSourceOperand(s, dstXor)
         case And32(dstAnd, srcAnd) => Valid32BitDestinationOperand(s, dstAnd) && Valid32BitSourceOperand(s, srcAnd) && Valid32BitSourceOperand(s, dstAnd)
+        case And64(dstAnd, srcAnd) => Valid64BitDestinationOperand(s, dstAnd) && Valid64BitSourceOperand(s, srcAnd) && Valid64BitSourceOperand(s, dstAnd)
         case Not32(dstNot) => Valid32BitDestinationOperand(s, dstNot) && Valid32BitSourceOperand(s, dstNot)
         case GetCf(dstCf) => Valid32BitDestinationOperand(s, dstCf) && Valid32BitSourceOperand(s, dstCf)
         case Rol32(dstRolConst, amountRol) => Valid32BitDestinationOperand(s, dstRolConst) && ValidShiftAmountOperand(s, amountRol) && Valid32BitSourceOperand(s, dstRolConst)
         case Ror32(dstRorConst, amountRor) => Valid32BitDestinationOperand(s, dstRorConst) && ValidShiftAmountOperand(s, amountRor) && Valid32BitSourceOperand(s, dstRorConst)
         case Shl32(dstShlConst, amountShl) => Valid32BitDestinationOperand(s, dstShlConst) && ValidShiftAmountOperand(s, amountShl) && Valid32BitSourceOperand(s, dstShlConst)
+        case Shl64(dstShrConst, amountShr) => Valid64BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand64(s, amountShr) && Valid64BitSourceOperand(s, dstShrConst)
         case Shr32(dstShrConst, amountShr) => Valid32BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand(s, amountShr) && Valid32BitSourceOperand(s, dstShrConst)
+        case Shr64(dstShrConst, amountShr) => Valid64BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand64(s, amountShr) && Valid64BitSourceOperand(s, dstShrConst)
         case AESNI_enc(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
         case AESNI_enc_last(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
         case AESNI_dec(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
@@ -507,6 +551,9 @@ predicate ValidInstruction(s:state, ins:ins)
 
 lemma {:axiom} lemma_division_in_bounds(a:uint32, b:uint32)
     ensures 0 <= (a * b) / 0x1_0000_0000 < 0x1_0000_0000;
+
+lemma {:axiom} lemma_division_in_bounds64(a:uint64, b:uint64)
+    ensures 0 <= (a * b) / 0x1_0000_0000_0000_0000 < 0x1_0000_0000_0000_0000;
 
 function operandObs(s:state, size:int, o:operand) : seq<observation>
     requires ValidOperand(s, size, o)
@@ -531,18 +578,26 @@ function insObs(s:state, ins:ins):seq<observation>
         case Mov64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
         case Add32(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
         case Add64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
+        case AddLea64(dst, src1, src2) => operandObs(s, 64, dst) + operandObs(s, 64, src1) + operandObs(s, 64, src2)
         case Sub32(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
-        case Mul32(src) => operandObs(s, 32, src)
+        case Sub64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
+        case Mul32(src) => operandObs(s, 32, src) // TODO: eax, edx
+        case Mul64(src) => operandObs(s, 64, src)
+        case IMul64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
         case AddCarry(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
+        case AddCarry64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
         case BSwap32(dst) => operandObs(s, 32, dst)
         case Xor32(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
         case And32(dst, src) => operandObs(s, 32, dst) + operandObs(s, 32, src)
+        case And64(dst, src) => operandObs(s, 64, dst) + operandObs(s, 64, src)
         case Not32(dst) => operandObs(s, 32, dst)
         case GetCf(dst) => operandObs(s, 32, dst)
         case Rol32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
         case Ror32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
         case Shl32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
+        case Shl64(dst, amount) => operandObs(s, 64, dst) + operandObs(s, 64, amount)
         case Shr32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
+        case Shr64(dst, amount) => operandObs(s, 64, dst) + operandObs(s, 64, amount)
         case AESNI_enc(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
         case AESNI_enc_last(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
         case AESNI_dec(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
@@ -566,21 +621,36 @@ predicate evalIns(ins:ins, s:state, r:state)
             case Mov32(dst, src) => evalUpdateAndMaintainFlags(s, dst, eval_op32(s, src), r, obs) // mov doesn't change flags
             case Mov64(dst, src) => evalUpdateAndMaintainFlags64(s, dst, eval_op64(s, src), r, obs) // mov doesn't change flags
             case Add32(dst, src) => evalUpdateAndHavocFlags(s, dst, (eval_op32(s, dst) + eval_op32(s, src)) % 0x1_0000_0000, r, obs)
-            case Add64(dst, src) => evalUpdateAndHavocFlags64(s, dst, (eval_op64(s, dst) + eval_op64(s, src)) % 0x1_0000_0000_0000_0000, r, obs)
+            case Add64(dst, src) => var sum := eval_op64(s, dst) + eval_op64(s, src);
+                                    evalUpdateAndHavocFlags64(s, dst, sum % 0x1_0000_0000_0000_0000, r, obs)
+                                    && Cf(r.flags) == (sum >= 0x1_0000_0000_0000_0000)
+            case AddLea64(dst, src1, src2) => evalUpdateAndMaintainFlags64(s, dst, (eval_op64(s, src1) + eval_op64(s, src2)) % 0x1_0000_0000_0000_0000, r, obs)
             case Sub32(dst, src) => evalUpdateAndHavocFlags(s, dst, (eval_op32(s, dst) - eval_op32(s, src)) % 0x1_0000_0000, r, obs)
+            case Sub64(dst, src) => evalUpdateAndHavocFlags64(s, dst, (eval_op64(s, dst) - eval_op64(s, src)) % 0x1_0000_0000_0000_0000, r, obs)
             case Mul32(src)      => var product := s.regs[X86Eax] * eval_op32(s, src);
                                     lemma_division_in_bounds(s.regs[X86Eax], eval_op32(s, src));  // Annoying
                                     var hi := (product / 0x1_0000_0000);
                                     var lo := (product % 0x1_0000_0000);
                                     r == s.(regs := s.regs[X86Edx := hi][X86Eax := lo], flags := r.flags)
+            case Mul64(src)      => var product := s.regs[X86Eax] * eval_op64(s, src);
+                                    lemma_division_in_bounds64(s.regs[X86Eax], eval_op64(s, src));  // Annoying
+                                    var hi := (product / 0x1_0000_0000_0000_0000);
+                                    var lo := (product % 0x1_0000_0000_0000_0000);
+                                    r == s.(regs := s.regs[X86Edx := hi][X86Eax := lo], flags := r.flags)
+            case IMul64(dst, src) => evalUpdateAndHavocFlags64(s, dst, (eval_op64(s, dst) * eval_op64(s, src)) % 0x1_0000_0000_0000_0000, r, obs)
             // Add with carry (ADC) instruction
             case AddCarry(dst, src) => var old_carry := if Cf(s.flags) then 1 else 0;
                                        var sum := eval_op32(s, dst) + eval_op32(s, src) + old_carry;
                                        evalUpdateAndHavocFlags(s, dst, sum % 0x1_0000_0000, r, obs)
                                     && Cf(r.flags) == (sum >= 0x1_0000_0000)
+            case AddCarry64(dst, src) => var old_carry := if Cf(s.flags) then 1 else 0;
+                                       var sum := eval_op64(s, dst) + eval_op64(s, src) + old_carry;
+                                       evalUpdateAndHavocFlags64(s, dst, sum % 0x1_0000_0000_0000_0000, r, obs)
+                                    && Cf(r.flags) == (sum >= 0x1_0000_0000_0000_0000)
             case BSwap32(dst)    => evalUpdateAndMaintainFlags(s, dst, bswap32(eval_op32(s, dst)), r, obs)
             case Xor32(dst, src) => evalUpdateAndHavocFlags(s, dst, xor32(eval_op32(s, dst), eval_op32(s, src)), r, obs)
             case And32(dst, src) => evalUpdateAndHavocFlags(s, dst, and32(eval_op32(s, dst), eval_op32(s, src)), r, obs)
+            case And64(dst, src) => evalUpdateAndHavocFlags64(s, dst, BitwiseAnd64(eval_op64(s, dst), eval_op64(s, src)), r, obs)
             case Not32(dst)      => evalUpdateAndHavocFlags(s, dst, not32(eval_op32(s, dst)), r, obs)
             // Sticks the carry flag (CF) in a register (see SETC instruction)
             case GetCf(dst)      => // Instruction only writes the first uint8
@@ -596,10 +666,16 @@ predicate evalIns(ins:ins, s:state, r:state)
             case Shl32(dst, amount)  =>
                 var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
                 if 0 <= n < 32 then evalUpdateAndHavocFlags(s, dst, shl32(eval_op32(s, dst), n), r, obs) else !r.ok
+            case Shl64(dst, amount) =>
+                var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
+                if 0 <= n < 64 then evalUpdateAndHavocFlags64(s, dst, BitwiseShl64(eval_op64(s, dst), n), r, obs) else !r.ok
 
             case Shr32(dst, amount) =>
                 var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
                 if 0 <= n < 32 then evalUpdateAndHavocFlags(s, dst, shr32(eval_op32(s, dst), n), r, obs) else !r.ok
+            case Shr64(dst, amount) =>
+                var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
+                if 0 <= n < 64 then evalUpdateAndHavocFlags64(s, dst, BitwiseShr64(eval_op64(s, dst), n), r, obs) else !r.ok
             case AESNI_enc(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(MixColumns(SubBytes(ShiftRows(s.xmms[dst.r.xmm]))), s.xmms[src.r.xmm]), r, obs)
             case AESNI_enc_last(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(SubBytes(ShiftRows(s.xmms[dst.r.xmm])), s.xmms[src.r.xmm]), r, obs)
             case AESNI_dec(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(InvMixColumns(InvSubBytes(InvShiftRows(s.xmms[dst.r.xmm]))), s.xmms[src.r.xmm]), r, obs)
@@ -639,9 +715,9 @@ predicate branchRelation(s:state, s':state, cond:bool)
 }
 
 predicate evalIfElse(cond:obool, ifT:code, ifF:code, s:state, r:state)
-    decreases if ValidSourceOperand(s, 32, cond.o1) && ValidSourceOperand(s, 32, cond.o2) && evalOBool(s, cond) then ifT else ifF;
+    decreases if ValidSourceOperand(s, 64, cond.o1) && ValidSourceOperand(s, 64, cond.o2) && evalOBool(s, cond) then ifT else ifF;
 {
-    if s.ok && ValidSourceOperand(s, 32, cond.o1) && ValidSourceOperand(s, 32, cond.o2) then
+    if s.ok && ValidSourceOperand(s, 64, cond.o1) && ValidSourceOperand(s, 64, cond.o2) then
         exists s' ::
            branchRelation(s, s', evalOBool(s, cond))
         && (if evalOBool(s, cond) then evalCode(ifT, s', r) else evalCode(ifF, s', r))
@@ -652,7 +728,7 @@ predicate evalIfElse(cond:obool, ifT:code, ifF:code, s:state, r:state)
 predicate evalWhile(b:obool, c:code, n:nat, s:state, r:state)
   decreases c, n
 {
-    if s.ok && ValidSourceOperand(s, 32, b.o1) && ValidSourceOperand(s, 32, b.o2) then
+    if s.ok && ValidSourceOperand(s, 64, b.o1) && ValidSourceOperand(s, 64, b.o2) then
         if n == 0 then
             !evalOBool(s, b) && branchRelation(s, r, false)
         else

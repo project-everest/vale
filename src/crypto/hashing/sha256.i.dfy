@@ -95,6 +95,15 @@ predicate PartialSHA256TraceIsCorrect(z:SHA256Trace)
     && (forall i {:trigger |z.M[i]|}:: 0 <= i < |z.M| ==> |z.M[i]| == 16)
 }
 
+predicate IsSHA256TraceReadyForStep(z:SHA256Trace, nextStep:int)
+    requires 0 <= nextStep <= 64;
+{
+       PartialSHA256TraceIsCorrect(z)
+    && |z.W| == |z.H| == |z.atoh| 
+    && (forall blk {:trigger |z.atoh[blk]|}:: 0 <= blk < |z.H|-1 ==> |z.atoh[blk]| == 65)
+    && |z.atoh[|z.H|-1]| == nextStep+1
+}
+
 predicate IsSHA256ReadyForStep(z:SHA256Trace, s:SHA256_state, nextStep:int)
     requires 0 <= nextStep <= 64;
 {

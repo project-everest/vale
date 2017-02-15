@@ -14,7 +14,7 @@ predicate{:opaque} OpaqueTruth(x:int)
 }
 #endverbatim
 
-procedure{:instruction Ins(InsIncr(x))} Increment(inout register x:int)
+procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout register x:int)
     ensures
         x == old(x) + 1;
 {
