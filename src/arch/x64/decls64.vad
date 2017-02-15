@@ -1,15 +1,15 @@
-include{:verbatim} "../../../arch/x64/vale.i.dfy"
-include{:verbatim} "../../../lib/util/operations.i.dfy"
-include{:verbatim} "poly1305_util.i.dfy"
-include "../../../arch/x64/decls.vad"
+include{:verbatim} "vale.i.dfy"
+include{:verbatim} "vale64.i.dfy"
+include{:verbatim} "../../lib/util/operations.i.dfy"
+include "decls.vad"
 
 #verbatim
-module x64__Poly1305_decls_i
+module x64_decls64_i
 {
 import opened x64_def_s
 import opened x64_vale_i
+import opened x64_vale64_i
 import opened x64_decls_i
-import opened x64__Poly1305_util_i
 import opened operations_i
 #endverbatim
 
