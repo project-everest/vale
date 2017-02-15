@@ -127,7 +127,7 @@ VALE_BIN = DAFNY_BIN + [
 DafnyInterface_dir = Dir('DafnyInterface/Source/DafnyInterface')
 DafnyInterface_src = [DafnyInterface_dir.File(f)
                       for f in ['DafnyDriver.cs', 'Properties/AssemblyInfo.cs']]
-DafnyInterface_refs = [env.Dir(env['DAFNY_PATH']).File(f) for f in [
+DafnyInterface_refs = [Dir(env['DAFNY_PATH']).File(f) for f in [
     'BoogieAbsInt.dll',
     'BoogieConcurrency.dll',
     'BoogieCore.dll',
@@ -151,7 +151,7 @@ DafnyInterface_dll = env.Command(
     + ' '.join(['-r:'+r.path for r in DafnyInterface_refs]))
 Depends(DafnyInterface_dll, DafnyInterface_refs)
 
-DAFNY_REFS = [os.path.join(env['DAFNY_PATH'], f) for f in DAFNY_BIN] + [
+DAFNY_REFS = [Dir(env['DAFNY_PATH']).File(f).path for f in DAFNY_BIN] + [
   DafnyInterface_dll,
   '../Dafny/Newtonsoft.Json.dll',
   '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'

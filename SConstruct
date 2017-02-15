@@ -80,7 +80,7 @@ AddOption('--OPENSSL',
   action='append',
   help='Specify the path to the root of an OpenSSL source tree')
 
-env['DAFNY_PATH'] = GetOption('dafny_path')
+env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).path
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
 env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
