@@ -6,6 +6,7 @@
 import os, os.path
 import sys
 import collections
+import platform
 # Scons imports
 import SCons.Util
 
@@ -168,7 +169,9 @@ for s in VALE_BIN:
   b = env.CopyAs(BIN+'/'+s, env['DAFNY_PATH']+'/'+s)
   Depends(vale_tool, b)
   dependencies.append(b)
-if sys.platform == 'win32':
+if sys.platform == 'win32' or (
+    sys.platform.startswith('linux') and platform.release().find('Microsoft') != -1):
+  # we can use our win32 z3 on WSL here
   b = env.CopyAs(BIN+'/z3.exe', env['DAFNY_PATH']+'/z3.exe')
   Depends(vale_tool, b)
   dependencies.append(b)
