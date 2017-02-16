@@ -33,6 +33,7 @@ env = Environment(**envDict)
 if sys.platform == 'win32':
   env.Replace(CCPDBFLAGS='/Zi /Fd${TARGET.base}.pdb')
   env.Append(CCFLAGS=['/Ox', '/Gz'])
+  env.Append(LINKFLAGS=['/DEBUG'])
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
