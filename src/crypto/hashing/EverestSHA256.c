@@ -37,6 +37,14 @@ int Everest_init(ENGINE *e) {
 }
 
 #if USE_OPENSSL
+
+typedef int (*openssl_do_cipher) (EVP_CIPHER_CTX *ctx,
+                          unsigned char *out,
+                          const unsigned char *in,
+                          size_t inl);
+                          
+openssl_do_cipher openssl_aes_128_cbc_do_cipher;                          
+
 int __cdecl OpenSSL_SHA256_Init(EVP_MD_CTX *evpctx)
 {
     SHA256_CTX *ctx = (SHA256_CTX *)EVP_MD_CTX_md_data(evpctx);
@@ -76,11 +84,7 @@ int __cdecl OpenSSL_AES128_InitKey(EVP_CIPHER_CTX *evpctx, const unsigned char *
 
 int __cdecl OpenSSL_AES128_Cipher(EVP_CIPHER_CTX *evpctx, unsigned char *out, const unsigned char *in, size_t inl)
 {
-    // Note:  This calls the non-engine version of AES, which does not use AESNI.
-
-    EVP_AES_KEY *ctx = (EVP_AES_KEY*)EVP_CIPHER_CTX_get_cipher_data(evpctx);
-    AES_cbc_encrypt(in, out, inl, &ctx->ks.ks, EVP_CIPHER_CTX_iv_noconst(evpctx), EVP_CIPHER_CTX_encrypting(evpctx));
-    return 1;
+    return openssl_aes_128_cbc_do_cipher(evpctx, out, in, inl);
 }
 
 int __cdecl OpenSSL_AES128_Cleanup(EVP_CIPHER_CTX *evpctx)
@@ -183,6 +187,13 @@ static int Everest_ciphers_nids(const int **nids)
     static int init = 0;
 
     if (!init) {
+#if USE_OPENSSL
+        // Capture the original cipher function pointer before patching ours in
+        const EVP_CIPHER *originalcipher = EVP_aes_128_cbc();
+        openssl_aes_128_cbc_do_cipher = EVP_CIPHER_meth_get_do_cipher(originalcipher);
+        printf("openssl_aes_128_cbc_do_cipher=%p\n", openssl_aes_128_cbc_do_cipher);
+#endif        
+        
         //
         // Initialize AES 128 CBC
         //
