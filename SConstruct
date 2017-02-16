@@ -470,7 +470,8 @@ def verify_vale_files(env, files):
       target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
       target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
       dfy = compile_vale(env, f)
-      options.env.Dafny(target, dfy)
+      if verify == True:
+        options.env.Dafny(target, dfy)
 
 def recursive_glob(env, pattern, strings=False):
   matches = []
