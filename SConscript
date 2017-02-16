@@ -124,5 +124,5 @@ if env['OPENSSL_PATH'] != None:
     sha256asm_obj = engineenv.Object('obj/sha256asm_openssl', sha_asm[0])
     poly1305_obj = engineenv.Object('obj/poly1305_openssl', poly1305_asm[0])
     engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
-      source=[everest_sha256, everest_glue, sha256_obj, sha256asm_obj, poly1305_obj, '$OPENSSL_PATH/libcrypto-x64.lib'])
+      source=[everest_sha256, everest_glue, sha256_obj, sha256asm_obj, poly1305_obj, '$OPENSSL_PATH/libcrypto.lib'])
 

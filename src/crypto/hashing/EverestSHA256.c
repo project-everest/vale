@@ -184,7 +184,7 @@ static EVP_MD *sha256_md = NULL;
 static EVP_MD *poly1305_md = NULL;
 static int Everest_digest_nids(const int **nids)
 {
-    static int digest_nids[2];
+    static int digest_nids[16];
     static int init = 0;
     int count = 0;
 
@@ -207,7 +207,7 @@ static int Everest_digest_nids(const int **nids)
         //
         // Initialize Poly1305
         //
-        md = EVP_MD_meth_new(NID_chacha20_poly1305, NID_sha256WithRSAEncryption); // somewhat arbitrary choices
+        md = EVP_MD_meth_new(NID_md4, NID_sha256WithRSAEncryption); // arbitrary choices; poly1305 isn't one of the nids
         EVP_MD_meth_set_init(md, Everest_Poly1305_Init);
         EVP_MD_meth_set_update(md, Everest_Poly1305_Update);
         EVP_MD_meth_set_final(md, Everest_Poly1305_Final);
@@ -226,13 +226,13 @@ static int Everest_digest_nids(const int **nids)
         init = 1;
     }
     *nids = digest_nids;
-    return 1;
+    return count;
 }
 
 static EVP_CIPHER *aes128_cbc_md = NULL;
 static int Everest_ciphers_nids(const int **nids)
 {
-    static int cipher_nids[3];
+    static int cipher_nids[16];
     static int init = 0;
     int count = 0;
 
@@ -259,10 +259,10 @@ static int Everest_ciphers_nids(const int **nids)
         init = 1;
     }
     *nids = cipher_nids;
-    return 1;
+    return count;
 }
 
-
+static int xxx;
 int Everest_digest(ENGINE *e, const EVP_MD **digest, const int **nids, int nid)
 {
     if (digest == NULL) {
@@ -271,7 +271,7 @@ int Everest_digest(ENGINE *e, const EVP_MD **digest, const int **nids, int nid)
         *digest = sha256_md;
         return 1;
 #ifdef _M_X64
-    } else if (nid == NID_chacha20_poly1305) {
+    } else if (nid == NID_md4) {
         *digest = poly1305_md;
         return 1;
 #endif // !_M_X64
