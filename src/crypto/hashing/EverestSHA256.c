@@ -101,7 +101,13 @@ extern int Everest_SHA256_Final(EVP_MD_CTX *evpctx, unsigned char *md);
 extern int Everest_AES128_InitKey(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
 extern int Everest_AES128_Cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 extern int Everest_AES128_Cleanup(EVP_CIPHER_CTX *ctx);
+#ifdef _M_X64
+extern int Everest_Poly1305_Init(EVP_MD_CTX *evpctx);
+extern int Everest_Poly1305_Update(EVP_MD_CTX *evpctx, const void *data, size_t count);
+extern int Everest_Poly1305_Final(EVP_MD_CTX *evpctx, unsigned char *md);
+#endif // _M_X64
 
+#ifndef _M_X64
 // These are the Vale entrypoints
 extern void __stdcall aes_main_i_KeyExpansionStdcall(const void * key_ptr, void *expanded_key_ptr);
 extern void __stdcall CBCEncryptStdcall(const void* input_ptr, void* output_ptr, const void* expanded_key_ptr, const void* input_end_ptr, const void* IV_ptr, uint32_t scratch1);
@@ -139,14 +145,17 @@ int Everest_AES128_Cleanup(EVP_CIPHER_CTX *evpctx)
     OPENSSL_cleanse(ctx->expanded_key, sizeof(ctx->expanded_key));
     return 1;
 }
+#endif // !_M_X64
 
 #endif
 
 static EVP_MD *sha256_md = NULL;
+static EVP_MD *poly1305_md = NULL;
 static int Everest_digest_nids(const int **nids)
 {
     static int digest_nids[2];
     static int init = 0;
+    int count = 0;
 
     if (!init) {
         //
@@ -161,12 +170,28 @@ static int Everest_digest_nids(const int **nids)
         EVP_MD_meth_set_result_size(md, 256/8);
         EVP_MD_meth_set_flags(md, EVP_MD_FLAG_DIGALGID_ABSENT);
         sha256_md = md;
-        digest_nids[0] = EVP_MD_type(md);
+        digest_nids[count++] = EVP_MD_type(md);
+
+#ifdef _M_X64
+        //
+        // Initialize Poly1305
+        //
+        md = EVP_MD_meth_new(NID_chacha20_poly1305, NID_sha256WithRSAEncryption); // somewhat arbitrary choices
+        EVP_MD_meth_set_init(md, Everest_Poly1305_Init);
+        EVP_MD_meth_set_update(md, Everest_Poly1305_Update);
+        EVP_MD_meth_set_final(md, Everest_Poly1305_Final);
+        EVP_MD_meth_set_app_datasize(md, 4096); // more than needed
+        EVP_MD_meth_set_input_blocksize(md, 1);
+        EVP_MD_meth_set_result_size(md, 16);
+        EVP_MD_meth_set_flags(md, EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_ONESHOT);
+        poly1305_md = md;
+        digest_nids[count++] = EVP_MD_type(md);
+#endif // _M_X64
 
         //
         // NULL-terminate the lst
         //
-        digest_nids[1] = 0;
+        digest_nids[count] = 0;
         init = 1;
     }
     *nids = digest_nids;
@@ -178,8 +203,10 @@ static int Everest_ciphers_nids(const int **nids)
 {
     static int cipher_nids[3];
     static int init = 0;
+    int count = 0;
 
     if (!init) {
+#ifndef _M_X64
         //
         // Initialize AES 128 CBC
         //
@@ -191,12 +218,13 @@ static int Everest_ciphers_nids(const int **nids)
         EVP_CIPHER_meth_set_cleanup(cipher, Everest_AES128_Cleanup);
         EVP_CIPHER_meth_set_impl_ctx_size(cipher, 4096); // much more than Everest SHA128 requires
         aes128_cbc_md = cipher;
-        cipher_nids[0] = EVP_CIPHER_type(cipher);
+        cipher_nids[count++] = EVP_CIPHER_type(cipher);
+#endif // !_M_X64
 
         //
         // NULL-terminate the lst
         //
-        cipher_nids[1] = 0;
+        cipher_nids[count] = 0;
         init = 1;
     }
     *nids = cipher_nids;
@@ -211,6 +239,11 @@ int Everest_digest(ENGINE *e, const EVP_MD **digest, const int **nids, int nid)
     } else if (nid == NID_sha256) {
         *digest = sha256_md;
         return 1;
+#ifdef _M_X64
+    } else if (nid == NID_chacha20_poly1305) {
+        *digest = poly1305_md;
+        return 1;
+#endif // !_M_X64
     } else {
         return 0;
     }
@@ -220,9 +253,11 @@ int Everest_ciphers(ENGINE *e, const EVP_CIPHER **cipher, const int **nids, int 
 {
     if (cipher == NULL) {
         return Everest_ciphers_nids(nids);
+#ifndef _M_X64
     } else if (nid == NID_aes_128_cbc) {
         *cipher = aes128_cbc_md;
         return 1;
+#endif // !_M_X64
     } else {
         return 0;
     }

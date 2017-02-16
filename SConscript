@@ -113,8 +113,16 @@ if env['OPENSSL_PATH'] != None:
   stdcallenv=engineenv.Clone(CCFLAGS='/Ox /Zi /Gz /LD') # compile __stdcall so it can call the Vale crypto code
   everest_sha256 = cdeclenv.Object('src/Crypto/hashing/EverestSha256.c')
   everest_glue = stdcallenv.Object('src/Crypto/hashing/EverestSHA256Glue.c')
-  sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
-  cbc_obj = engineenv.Object('obj/cbc_openssl', cbc_asm[0])
-  aes_obj = engineenv.Object('obj/aes_openssl', sha_asm[0])
-  engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
-    source=[everest_sha256, everest_glue, sha256_obj, cbc_obj, aes_obj, '$OPENSSL_PATH/libcrypto.lib'])
+  if env['TARGET_ARCH']=='x86':
+    sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
+    cbc_obj = engineenv.Object('obj/cbc_openssl', cbc_asm[0])
+    aes_obj = engineenv.Object('obj/aes_openssl', sha_asm[0])
+    engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
+      source=[everest_sha256, everest_glue, sha256_obj, cbc_obj, aes_obj, '$OPENSSL_PATH/libcrypto.lib'])
+  if env['TARGET_ARCH']=='amd64' and sys.platform == "win32":
+    sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
+    sha256asm_obj = engineenv.Object('obj/sha256asm_openssl', sha_asm[0])
+    poly1305_obj = engineenv.Object('obj/poly1305_openssl', poly1305_asm[0])
+    engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
+      source=[everest_sha256, everest_glue, sha256_obj, sha256asm_obj, poly1305_obj, '$OPENSSL_PATH/libcrypto-x64.lib'])
+
