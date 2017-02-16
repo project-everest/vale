@@ -42,8 +42,9 @@ typedef int (*openssl_do_cipher) (EVP_CIPHER_CTX *ctx,
                           unsigned char *out,
                           const unsigned char *in,
                           size_t inl);
-                          
-openssl_do_cipher openssl_aes_128_cbc_do_cipher;                          
+openssl_do_cipher openssl_aes_128_cbc_do_cipher;
+
+EVP_CIPHER* evp_chacha20_poly1305;
 
 int __cdecl OpenSSL_SHA256_Init(EVP_MD_CTX *evpctx)
 {
@@ -100,23 +101,22 @@ const unsigned char openssl_poly1305_key[] =
 
 int __cdecl OpenSSL_Poly1305_Init(void *evpctx)
 {
-    POLY1305 *ctx = (POLY1305 *)EVP_MD_CTX_md_data(evpctx);
-    Poly1305_Init(ctx, openssl_poly1305_key);
-    return 1;
+    EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *)EVP_MD_CTX_md_data(evpctx);
+    return EVP_CipherInit(ctx, evp_chacha20_poly1305, openssl_poly1305_key, openssl_poly1305_key, 1);
 }
 
 int __cdecl OpenSSL_Poly1305_Update(EVP_MD_CTX *evpctx, const void *data, size_t count)
 {
-    POLY1305 *ctx = (POLY1305 *)EVP_MD_CTX_md_data(evpctx);
-    Poly1305_Update(ctx, data, count);
-    return 1;
+    int outl = 0;
+    EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *)EVP_MD_CTX_md_data(evpctx);
+    return EVP_CipherUpdate(ctx, NULL, &outl, data, count);
 }
 
 int  __cdecl OpenSSL_Poly1305_Final(EVP_MD_CTX *evpctx, unsigned char *md)
 {
-    POLY1305 *ctx = (POLY1305 *)EVP_MD_CTX_md_data(evpctx);
-    Poly1305_Final(ctx, md);
-    return 1;
+    int outl = 0;
+    EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *)EVP_MD_CTX_md_data(evpctx);
+    return EVP_CipherFinal(ctx, md, &outl);
 }
 
 #define Everest_SHA256_Init     OpenSSL_SHA256_Init
@@ -242,8 +242,10 @@ static int Everest_ciphers_nids(const int **nids)
     if (!init) {
 #if USE_OPENSSL        
         // Capture the original cipher function pointer before patching ours in
-        const EVP_CIPHER *originalcipher = EVP_aes_128_cbc();
-        openssl_aes_128_cbc_do_cipher = EVP_CIPHER_meth_get_do_cipher(originalcipher);
+        const EVP_CIPHER *original_aes_128_cbc = EVP_aes_128_cbc();
+        openssl_aes_128_cbc_do_cipher = EVP_CIPHER_meth_get_do_cipher(original_aes_128_cbc);
+        
+        evp_chacha20_poly1305 = EVP_chacha20_poly1305();        
 #endif        
         
 #ifndef _M_X64
