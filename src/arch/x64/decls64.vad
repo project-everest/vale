@@ -1,15 +1,15 @@
-include{:verbatim} "../../../arch/x64/vale.i.dfy"
-include{:verbatim} "../../../lib/util/operations.i.dfy"
-include{:verbatim} "poly1305_util.i.dfy"
-include "../../../arch/x64/decls.vad"
+include{:verbatim} "vale.i.dfy"
+include{:verbatim} "vale64.i.dfy"
+include{:verbatim} "../../lib/util/operations.i.dfy"
+include "decls.vad"
 
 #verbatim
-module x64__Poly1305_decls_i
+module x64_decls64_i
 {
 import opened x64_def_s
 import opened x64_vale_i
+import opened x64_vale64_i
 import opened x64_decls_i
-import opened x64__Poly1305_util_i
 import opened operations_i
 #endverbatim
 
@@ -194,11 +194,27 @@ procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout oper
     this := this.(heaplets := old(this).heaplets);
 }
 
+procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    requires{:refined false}
+        @src is OConst || @src == OReg(X86Ecx);
+    requires
+        0 <= src < 64;
+    ensures
+        dst == old(BitwiseShl64(dst, src));
+{
+    reveal evalCodeOpaque;
+    reveal x86_ValidState;
+    this := MaybeUpdateOk(old(this), this);
+    this := this.(heaplets := old(this).heaplets);
+}
+
 procedure{:refined}{:bridge}{:instruction Ins(Shr64(dst, src))} Shr64(inout operand dst:uint64, operand src:uint64)
     modifies
         efl;
     requires{:refined false}
-        @src is OConst;
+        @src is OConst || @src == OReg(X86Ecx);
     requires
         0 <= src < 64;
     ensures

@@ -224,6 +224,19 @@ lemma{:axiom} lemma_bitwise_shifts64(x:uint64)
     requires x < 64
     ensures  WordToBits64(x) < 64
 
+function{:opaque} BitShl64(x:bv64, y:bv64):bv64 requires y < 64 { x << y }
+function{:opaque} BitwiseShl64_opaque(x:uint64, y:uint64):uint64
+    requires y < 64
+{
+    lemma_bitwise_shifts64(y);
+    BitsToWord64(BitShl64(WordToBits64(x), WordToBits64(y)))
+}
+function BitwiseShl64(x:uint64, y:uint64):uint64
+    requires y < 64
+{
+    BitwiseShl64_opaque(x, y)
+}
+
 function{:opaque} BitShr64(x:bv64, y:bv64):bv64 requires y < 64 { x >> y }
 function{:opaque} BitwiseShr64_opaque(x:uint64, y:uint64):uint64
     requires y < 64

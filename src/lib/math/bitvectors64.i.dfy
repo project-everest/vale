@@ -17,6 +17,7 @@ function u64div(x:uint64, y:uint64):uint64 requires y != 0 { lemma_div_nonincrea
 function u64mod(x:uint64, y:uint64):uint64 requires y != 0 { x % y }
 
 // HACK: work around some Dafny/Z3 triggering issues:
+predicate T_BitwiseShl64(x:uint64, y:uint64) { true }
 predicate T_BitwiseShr64(x:uint64, y:uint64) { true }
 predicate T_u64div(x:uint64, y:uint64) { true }
 predicate T_u64mod(x:uint64, y:uint64) { true }
@@ -64,6 +65,48 @@ lemma lemma_BitwiseAnd64_forall()
         ensures BitwiseAnd64(x, y) == U64(bv64and(B64(x), B64(y)))
     {
         lemma_BitwiseAnd64(x, y);
+    }
+}
+
+lemma lemma_BitwiseShl64_helper(x:bv64, y:bv64)
+    requires y < 64
+    ensures  BitShl64(x, y) == bv64shl(x, y)
+{
+    reveal_BitShl64();
+    reveal_bv64shl();
+}
+
+lemma lemma_BitwiseShl64(x:uint64, y:uint64)
+    requires y < 64
+    ensures  B64(y) < 64
+    ensures  BitwiseShl64(x, y) == U64(bv64shl(B64(x), B64(y)))
+{
+    lemma_bv64le(64, y);
+    assert B64(64) == 64 by { reveal_B64(); }
+    assert WordToBits64(y) == B64(y) by { lemma_WordToBits64(y); }
+    calc
+    {
+        BitwiseShl64(x, y);                                       { reveal_BitwiseShl64_opaque(); }
+        BitsToWord64(BitShl64(WordToBits64(x), WordToBits64(y))); { lemma_WordToBits64_forall(); }
+        BitsToWord64(BitShl64(B64(x), B64(y)));                   { lemma_BitsToWord64(BitShl64(B64(x), B64(y))); }
+        U64(BitShl64(B64(x), B64(y)));                            { lemma_BitwiseShl64_helper(B64(x), B64(y)); }
+        U64(bv64shl(B64(x), B64(y)));
+    }
+}
+
+lemma lemma_BitwiseShl64_forall()
+    ensures  forall x:uint64, y:uint64 {:trigger BitwiseShl64(x, y)}{:trigger T_BitwiseShl64(x, y)} ::
+        y < 64 ==> B64(y) < 64 && BitwiseShl64(x, y) == U64(bv64shl(B64(x), B64(y)))
+{
+    forall y:uint64 {:trigger y < 64} | y < 64
+        ensures  B64(y) < 64
+    {
+        lemma_BitwiseShl64(0, y);
+    }
+    forall x:uint64, y:uint64 | y < 64
+        ensures  B64(y) < 64 && BitwiseShl64(x, y) == U64(bv64shl(B64(x), B64(y)))
+    {
+        lemma_BitwiseShl64(x, y);
     }
 }
 
@@ -181,6 +224,8 @@ lemma lemma_bv64_helpers()
         y != 0 ==> B64(y) != 0 && u64mod(x, y) == U64(bv64mod(B64(x), B64(y)))
     ensures forall x:uint64, y:uint64 {:trigger BitwiseAnd64(x, y)} ::
         BitwiseAnd64(x, y) == U64(bv64and(B64(x), B64(y)))
+    ensures forall x:uint64, y:uint64 {:trigger BitwiseShl64(x, y)} :: T_BitwiseShl64(x, y) ==>
+        y < 64 ==> B64(y) < 64 && BitwiseShl64(x, y) == U64(bv64shl(B64(x), B64(y)))
     ensures forall x:uint64, y:uint64 {:trigger BitwiseShr64(x, y)} :: T_BitwiseShr64(x, y) ==>
         y < 64 ==> B64(y) < 64 && BitwiseShr64(x, y) == U64(bv64shr(B64(x), B64(y)))
     ensures  B64(0) == 0
@@ -205,6 +250,7 @@ lemma lemma_bv64_helpers()
     lemma_bv_div64_forall();
     lemma_bv_mod64_forall();
     lemma_BitwiseAnd64_forall();
+    lemma_BitwiseShl64_forall();
     lemma_BitwiseShr64_forall();
     assert B64(0) == 0 by { reveal_B64(); }
     assert B64(1) == 1 by { reveal_B64(); }

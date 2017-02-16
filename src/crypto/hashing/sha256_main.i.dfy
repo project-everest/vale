@@ -754,6 +754,8 @@ method {:timeLimitMultiplier 6} SHA256_Update(ctx:SHA256Context, bytes:array<byt
         return;
     }
 
+    assert{:split_here} true;
+
     var remaining_room:ulong := (64 - ctx.num_unprocessed_bytes) as ulong;
     if len < remaining_room {
         DafnyMemcpy(ctx.unprocessed_bytes, ctx.num_unprocessed_bytes as ulong, bytes, offset, len);
@@ -771,6 +773,8 @@ method {:timeLimitMultiplier 6} SHA256_Update(ctx:SHA256Context, bytes:array<byt
     if len == remaining_room {
         return;
     }
+
+    assert{:split_here} true;
 
     var new_offset:ulong := offset + remaining_room;
     var new_len:ulong := len - remaining_room;

@@ -1,4 +1,5 @@
 include "poly1305.s.dfy"
+include "poly1305_common.i.dfy"
 include "../../../lib/math/mul_auto.i.dfy"
 include "../../../lib/math/mod_auto.i.dfy"
 include "../../../lib/math/div_auto.i.dfy"
@@ -6,11 +7,13 @@ include "../../../lib/math/mul.i.dfy"
 include "../../../lib/math/div.i.dfy"
 include "../../../lib/math/bitvectors128.i.dfy"
 include "../../../arch/x64/vale.i.dfy"
+include "../../../arch/x64/vale64.i.dfy"
 include "../../../lib/util/operations.i.dfy"
 
 module x64__Poly1305_util_i
 {
 import opened x64__Poly1305_s
+import opened x64__Poly1305_common_i
 import opened Math__mul_auto_i
 import opened Math__mod_auto_i
 import opened Math__div_auto_i
@@ -20,16 +23,12 @@ import opened Math__div_i
 import opened bitvectors128_i
 import opened x64_def_s
 import opened x64_vale_i
+import opened x64_vale64_i
 import opened operations_i
 
 function{:opaque} lowerUpper192(l:uint128, h:uint64):int
 {
     0x1_00000000_00000000_00000000_00000000 * h + l
-}
-
-function{:opaque} BitwiseSub64(x:uint64, y:uint64):uint64
-{
-    (x - y) % 0x1_0000_0000_0000_0000
 }
 
 lemma lemma_BitwiseAdd64()
@@ -62,44 +61,6 @@ lemma lemma_BitwiseMul64()
     }
 }
 
-type va_cmp = operand
-function method va_const_cmp(x:uint64):va_cmp { OConst(x) }
-function method va_coerce_operand_to_cmp(o:opr):opr { o }
-
-type va_mem_operand = operand
-
-predicate va_is_src_mem_operand_uint64(o:opr, s:va_state)
-{
-    o.OConst? || (o.OReg? && !o.r.X86Xmm?) || (o.OHeap? && Valid64BitSourceOperand(to_state(s), o))
-}
-
-function va_eval_mem_operand_uint64(s:va_state, o:opr):uint64
-    requires va_is_src_mem_operand_uint64(o, s)
-{
-    eval_op64(to_state(s), o)
-}
-
-function method va_op_mem_operand_reg64(r:x86reg):opr { OReg(r) }
-function method va_coerce_operand_to_mem_operand(o:opr):opr { o }
-function method va_const_mem_operand(x:uint64):opr { OConst(x) }
-
-function method va_opr_code_Mem(base:va_operand, offset:int, taint:taint):va_mem_operand
-{
-    MakeHeapOp(base, offset, taint)
-}
-
-function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
-    requires x86_ValidState(s)
-    requires base.OReg?
-    requires ValidMemAddr(MReg(base.r, offset))
-    requires ValidSrcAddr(s.heaplets, id, va_get_reg64(base.r, s) + offset, 64, taint)
-    ensures  Valid64BitSourceOperand(to_state(s), OHeap(MReg(base.r, offset), taint))
-    ensures  eval_op64(to_state(s), OHeap(MReg(base.r, offset), taint)) == s.heaplets[id].mem64[va_get_reg64(base.r, s) + offset].v
-{
-    reveal_x86_ValidState();
-    va_opr_code_Mem(base, offset, taint)
-}
-
 // only the case for exact multiples of 16:
 function{:opaque} poly1305_heap_blocks(h:int, pad:int, r:int, m:map<int, Heaplet64Entry>, i:int, k:int):int
     requires i <= k
@@ -114,21 +75,19 @@ function{:opaque} poly1305_heap_blocks(h:int, pad:int, r:int, m:map<int, Heaplet
         modp((hh + pad + 0x1_0000_0000_0000_0000 * m[kk + 8].v + m[kk].v) * r)
 }
 
-function{:opaque} heapletTo128(m:map<int, Heaplet64Entry>, i:int, k:int):map<int, uint128>
-    requires i <= k
-    requires forall j :: i <= j < k && (j - i) % 16 == 0 ==> j in m && j + 8 in m
+function{:opaque} heapletTo128(m:map<int, Heaplet64Entry>, i:int, len:nat):map<int, uint128>
+    requires forall j :: i <= j < i + (len + 15) / 16 * 16 && (j - i) % 8 == 0 ==> j in m
 {
-    map j:int | i <= j < k && (j - i) % 16 == 0 ::
+    map j:int | i <= j < i + len && (j - i) % 16 == 0 ::
         [m[j].v + 0x1_0000_0000_0000_0000 * m[j + 8].v][0] // HACK: [...][0] works around Dafny resolver issue
 }
 
-lemma lemma_poly1305_heap_hash_blocks(h:int, pad:int, r:int, m:map<int, Heaplet64Entry>, i:int, k:int, k2:int)
-    requires i <= k <= k2
+lemma lemma_poly1305_heap_hash_blocks(h:int, pad:int, r:int, m:map<int, Heaplet64Entry>, i:int, k:int, len:nat)
+    requires i <= k <= i + len
     requires (k - i) % 16 == 0
-    requires (k2 - i) % 16 == 0
-    requires forall j :: i <= j < k2 && (j - i) % 8 == 0 ==> j in m
-    ensures  forall j :: i <= j < k2 && (j - i) % 16 == 0 ==> j in heapletTo128(m, i, k2)
-    ensures  poly1305_heap_blocks(h, pad, r, m, i, k) == poly1305_hash_blocks(h, pad, r, heapletTo128(m, i, k2), i, k)
+    requires forall j :: i <= j < i + (len + 15) / 16 * 16 && (j - i) % 8 == 0 ==> j in m
+    ensures  forall j :: i <= j < i + len && (j - i) % 16 == 0 ==> j in heapletTo128(m, i, len)
+    ensures  poly1305_heap_blocks(h, pad, r, m, i, k) == poly1305_hash_blocks(h, pad, r, heapletTo128(m, i, len), i, k)
     decreases k - i
 {
     reveal_poly1305_heap_blocks();
@@ -136,15 +95,15 @@ lemma lemma_poly1305_heap_hash_blocks(h:int, pad:int, r:int, m:map<int, Heaplet6
     reveal_heapletTo128();
     if (i != k)
     {
-        lemma_poly1305_heap_hash_blocks(h, pad, r, m, i, k - 16, k2);
+        lemma_poly1305_heap_hash_blocks(h, pad, r, m, i, k - 16, len);
     }
 }
 
 function{:opaque} poly1305_heap(key_r:uint128, key_s:uint128, m:map<int, Heaplet64Entry>, start:int, len:nat):int
-    requires forall j :: start <= j < start + len && (j - start) % 16 == 0 ==> j in m && j + 8 in m
+    requires forall j :: start <= j < start + (len + 15) / 16 * 16 && (j - start) % 8 == 0 ==> j in m
 {
     reveal_heapletTo128();
-    poly1305_hash(key_r, key_s, heapletTo128(m, start, start + len), start, len)
+    poly1305_hash(key_r, key_s, heapletTo128(m, start, len), start, len)
 }
 
 lemma{:fuel power2, 16} lemma_power2_add64(n:nat)
@@ -154,7 +113,6 @@ lemma{:fuel power2, 16} lemma_power2_add64(n:nat)
     assert power2(32 + n) == 0x1_0000_0000 * power2(n);
     assert power2(48 + n) == 0x1_0000_0000_0000 * power2(n);
 }
-
 
 lemma lemma_uint128_64_mod(x1:uint64, x0:uint64, y1:uint64)
     requires y1 != 0
@@ -189,9 +147,18 @@ lemma lemma_reduce128(h:int, h2:uint64, h1:uint64, h0:uint64, g:int, g2:uint64, 
         calc
         {
             mod2_128(modp(h));
-            { reveal_modp(); assert modp(h) == h % 0x3_ffffffff_ffffffff_ffffffff_fffffffb; }
+            {
+                reveal_modp();
+                assert modp(h) == h % 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
+                assert h - 0x3_ffffffff_ffffffff_ffffffff_fffffffb == h % 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
+            }
             mod2_128(h - 0x3_ffffffff_ffffffff_ffffffff_fffffffb);
-            { reveal_lowerUpper128(); reveal_lowerUpper192(); reveal_mod2_128(); }
+            mod2_128(g - 0x4_00000000_00000000_00000000_00000000);
+            { reveal_mod2_128(); }
+            mod2_128(g);
+            {
+                reveal_lowerUpper128(); reveal_lowerUpper192(); reveal_mod2_128();
+            }
             lowerUpper128(g0, g1);
         }
     }
@@ -201,6 +168,63 @@ lemma lemma_add_mod128(x:int, y:int)
     ensures  mod2_128(mod2_128(x) + y) == mod2_128(x + y)
 {
     reveal_mod2_128();
+}
+
+lemma{:fuel power2, 10} lemma_bytes_power2()
+    ensures power2(0)  == 0x1
+    ensures power2(8)  == 0x1_00
+    ensures power2(16) == 0x1_0000
+    ensures power2(24) == 0x1_0000_00
+    ensures power2(32) == 0x1_0000_0000
+    ensures power2(40) == 0x1_0000_0000_00
+    ensures power2(48) == 0x1_0000_0000_0000
+    ensures power2(56) == 0x1_0000_0000_0000_00
+{
+}
+
+//lemma L0(x0:uint64, x1:uint64) ensures var z := 1; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0)
+
+lemma lemma_mod_power2_lo0(x0:uint64, x1:uint64) ensures var z := 0x1                   ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo1(x0:uint64, x1:uint64) ensures var z := 0x1_00                ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo2(x0:uint64, x1:uint64) ensures var z := 0x1_0000              ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo3(x0:uint64, x1:uint64) ensures var z := 0x1_0000_00           ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo4(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000         ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo5(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000_00      ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo6(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000_0000    ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_power2_lo7(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000_0000_00 ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+
+lemma lemma_mod_power2_lo(x0:uint64, x1:uint64, y:int, z:int)
+    requires 0 <= y < 8
+    requires z == power2(y * 8)
+    ensures  0 <= x0 % z < 0x1_0000_0000_0000_0000
+    ensures  lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0)
+{
+    lemma_mod_power2_lo0(x0, x1);
+    lemma_mod_power2_lo1(x0, x1);
+    lemma_mod_power2_lo2(x0, x1);
+    lemma_mod_power2_lo3(x0, x1);
+    lemma_mod_power2_lo4(x0, x1);
+    lemma_mod_power2_lo5(x0, x1);
+    lemma_mod_power2_lo6(x0, x1);
+    lemma_mod_power2_lo7(x0, x1);
+    lemma_bytes_power2();
+}
+
+lemma lemma_mod_hi(x0:uint64, x1:uint64, z:uint64)
+    requires z != 0
+    ensures  lowerUpper128(0, z) != 0
+    ensures  lowerUpper128(x0, x1) % lowerUpper128(0, z) == lowerUpper128(x0, x1 % z)
+{
+    assert lowerUpper128(0, z) != 0 by { reveal_lowerUpper128(); }
+    var n := 0x1_0000_0000_0000_0000;
+    calc
+    {
+        lowerUpper128(x0, x1) % lowerUpper128(0, z); { reveal_lowerUpper128(); }
+        (x1 * n + x0) % (z * n);                     { lemma_mod_breakdown(x1 * n + x0, n, z); }
+        n * (((x1 * n + x0) / n) % z) + (x1 * n + x0) % n;
+        n * (x1 % z) + x0;                           { reveal_lowerUpper128(); }
+        lowerUpper128(x0, x1 % z);
+    }
 }
 
 }
