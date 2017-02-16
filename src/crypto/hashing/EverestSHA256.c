@@ -18,6 +18,7 @@
 #include <openssl/aes.h>
 static const char *engine_Everest_id = "Everest";
 #if USE_OPENSSL
+#include <../crypto/include/internal/poly1305.h>
 static const char *engine_Everest_name = "Everest engine (OPENSSL crypto)";
 #else
 static const char *engine_Everest_name = "Everest engine (Everest crypto)";
@@ -87,12 +88,42 @@ int __cdecl OpenSSL_AES128_Cleanup(EVP_CIPHER_CTX *evpctx)
     return 1;
 }
 
+const unsigned char openssl_poly1305_key[] =
+{
+  0x85, 0xd6, 0xbe, 0x78, 0x57, 0x55, 0x6d, 0x33, 0x7f, 0x44, 0x52, 0xfe, 0x42, 0xd5, 0x06, 0xa8,
+  0x01, 0x03, 0x80, 0x8a, 0xfb, 0x0d, 0xb2, 0xfd, 0x4a, 0xbf, 0xf6, 0xaf, 0x41, 0x49, 0xf5, 0x1b
+};
+
+int __cdecl OpenSSL_Poly1305_Init(void *evpctx)
+{
+    POLY1305 *ctx = (POLY1305 *)EVP_MD_CTX_md_data(evpctx);
+    Poly1305_Init(ctx, openssl_poly1305_key);
+    return 1;
+}
+
+int __cdecl OpenSSL_Poly1305_Update(EVP_MD_CTX *evpctx, const void *data, size_t count)
+{
+    POLY1305 *ctx = (POLY1305 *)EVP_MD_CTX_md_data(evpctx);
+    Poly1305_Update(ctx, data, count);
+    return 1;
+}
+
+int  __cdecl OpenSSL_Poly1305_Final(EVP_MD_CTX *evpctx, unsigned char *md)
+{
+    POLY1305 *ctx = (POLY1305 *)EVP_MD_CTX_md_data(evpctx);
+    Poly1305_Final(ctx, md);
+    return 1;
+}
+
 #define Everest_SHA256_Init     OpenSSL_SHA256_Init
 #define Everest_SHA256_Update   OpenSSL_SHA256_Update
 #define Everest_SHA256_Final    OpenSSL_SHA256_Final
 #define Everest_AES128_InitKey  OpenSSL_AES128_InitKey
 #define Everest_AES128_Cipher   OpenSSL_AES128_Cipher
 #define Everest_AES128_Cleanup  OpenSSL_AES128_Cleanup
+#define Everest_Poly1305_Init   OpenSSL_Poly1305_Init
+#define Everest_Poly1305_Update OpenSSL_Poly1305_Update
+#define Everest_Poly1305_Final  OpenSSL_Poly1305_Final
 #else
 // These are __cdecl calling convention, but implemented in a separate file.
 extern int Everest_SHA256_Init(EVP_MD_CTX *evpctx);

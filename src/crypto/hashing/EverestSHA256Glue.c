@@ -95,7 +95,8 @@ int __cdecl  Everest_Poly1305_Update(EVP_MD_CTX *evpctx, const void *data, size_
 
 int  __cdecl Everest_Poly1305_Final(EVP_MD_CTX *evpctx, unsigned char *md)
 {
-    // nothing to do
+    struct poly1305_ctxt *ctx = ((struct poly1305_ctxt *)EVP_MD_CTX_md_data(evpctx));
+    memcpy(md, &(ctx->h0), 16);
     return 1;
 }
 #endif // _M_X64
