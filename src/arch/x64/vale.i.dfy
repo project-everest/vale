@@ -803,6 +803,7 @@ lemma va_lemma_ifElse(ifb:obool, ct:code, cf:code, s:va_state, r:va_state) retur
                  && x86_ValidState(s')
                  && cond == evalOBool(to_state(s), ifb)
                  && x86_branchRelation(s, s', cond)
+                 && (s.heaplets == s'.heaplets)
                  && (if cond then eval_code(ct, s', r) else eval_code(cf, s', r))
              else
                 true

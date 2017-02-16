@@ -6,6 +6,7 @@ import traceback
 import pdb
 import SCons.Util
 import atexit
+import platform
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -17,7 +18,7 @@ target_arch='x86'
 target_x='86'
 sha_arch_dir=''
 aes_arch_dir=''
-if sys.platform == 'win32' and os.getenv('PLATFORM')=='X64':
+if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machine() == 'x86_64' :
   target_arch='amd64'
   target_x='64'
   sha_arch_dir='sha-x64'
@@ -99,8 +100,17 @@ if cache_dir != None:
   CacheDir(cache_dir)
 
 env['DAFNY'] = File(os.path.join(env['DAFNY_PATH'], 'Dafny.exe'))
-env['KREMLIN'] = File('#tools/Kremlin/Kremlin.native')
+
+if 'KREMLIN_HOME' in os.environ:
+  kremlin_path = os.environ['KREMLIN_HOME']
+  env['KREMLIN'] = File(kremlin_path + '/_build/src/Kremlin.native')
+else:
+  kremlin_path = '#tools/Kremlin'
+  env['KREMLIN'] = File(kremlin_path + '/Kremlin.native')
+
 env['VALE'] = File('bin/vale.exe')
+
+kremlib_path = kremlin_path + '/kremlib'
 
 # Useful Dafny command lines
 dafny_default_args =   '/ironDafny /allocated:1 /compile:0 /timeLimit:30 /trace'
@@ -401,7 +411,7 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
 # returns the exe target and the stdout after executing the exe test target
 def build_test(env, inputs, include_dir, output_base_name):
   testenv = env.Clone()
-  testenv.Append(CPPPATH=['tools/Kremlin/kremlib', 'src/lib/util', include_dir])
+  testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
   inputs_obj = []
   for inp in inputs:
     inps = str(inp)
@@ -412,7 +422,7 @@ def build_test(env, inputs, include_dir, output_base_name):
   testoutput = 'obj/'+output_base_name+'.txt'
   env.Command(target=testoutput,
               source=exe,
-              action = [exe, 'type NUL > ' + testoutput])
+              action = [exe, 'echo ABC > ' + testoutput])
   a = env.Alias('runtest', '', exe)
   #AlwaysBuild(a)
   return a

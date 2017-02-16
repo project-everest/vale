@@ -108,7 +108,7 @@ method printOprnd64(o:operand)
 {
     match o
         case OConst(n) =>
-            if 0 <= n as int < 0x1_0000_0000 { print(n); }
+            if 0 <= n as int < 0x1_0000_0000_0000_0000 { print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
         case OStack(i) => print(4+4*i); print("(%rsp)"); 
@@ -125,6 +125,18 @@ method printSmallOprnd(o:operand)
       }
     } else if o.OReg? { printSmallReg(o.r); }
     else { print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); }
+}
+
+method printShiftOprnd(o:operand, size:int)
+{
+    if o.OConst? {
+      if 0 <= o.n as int < size {
+        print("$"); print(o.n);
+      } else {
+        print(o.n, " is too large for a shift operand");
+      }
+    } else if o == OReg(X86Ecx) { print("%cl"); }
+    else { print(" !!!INVALID shift operand!!!  Expected cl."); }
 }
 
 function method cmpNot(c:ocmp):ocmp
@@ -168,6 +180,15 @@ method printName2(name:string, o1:operand, o2:operand)
     print(" ");
 }
 
+method printName64_1(name:string, o1:operand)
+{
+    print(name);
+    if o1.OStack? || o1.OHeap? {
+        print("q");
+    }
+    print(" ");
+}
+
 method printName64(name:string, o1:operand, o2:operand)
 {
     print(name);
@@ -184,13 +205,13 @@ method printIns(ins:ins)
         case Rand(o)            => printName1("  rdrand", o);     printOprnd(o); print("\n");
         case Mov64(dst, src) =>    printName64("  mov", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case Add64(dst, src) =>    printName64("  add", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
-        case AddLea64(dst, src1, src2) => print("not implemented\n");
-        case Sub64(dst, src) => print("not implemented\n");
-        case AddCarry64(dst, src) => print("not implemented\n");
-        case Mul64(src) => print("not implemented\n");
-        case IMul64(dst, src) => print("not implemented\n");
-        case And64(dst, src) => print("not implemented\n");
-        case Shr64(dst, src) => print("not implemented\n");
+        case Sub64(dst, src)    => printName64("  sub", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case AddCarry64(dst, src) => printName64("  adc", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case Mul64(src)         => printName64_1("  sub", src); printOprnd64(src); print("\n");
+        case IMul64(dst, src)   => printName64("  imul", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case And64(dst, src)    => printName64("  and", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case Shl64(dst, src)    => printName64("  shl", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case Shr64(dst, src)    => printName64("  shr", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case Mov32(dst, src)    => printName2("  mov", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Add32(dst, src)    => printName2("  add", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Sub32(dst, src)    => printName2("  sub", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
@@ -201,6 +222,22 @@ method printIns(ins:ins)
         case And32(dst, src)    => printName2("  and", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Not32(dst)         => printName1("  not", dst);      printOprnd(dst); print("\n");
         case GetCf(dst)         => printName1("  setc", dst);     printSmallOprnd(dst); print("\n");
+
+        case AddLea64(dst, src1, src2) =>
+            printName64("  lea", dst, src1);
+            if (src1.OReg? && src2.OConst?) { printMAddr(MReg(src1.r, src2.n)); }
+            else if (src1.OReg? && src2.OReg?) {
+                //TODO: printMAddr(MIndex(src1.r, 1, src2.r, 0));
+                print("(");
+                printOprnd(src1);
+                print(", ");
+                printOprnd(src2);
+                print(")");
+            }
+            else { print("!!!INVALID lea operands!!!"); }
+            print(", ");
+            printOprnd(dst);
+            print("\n");
 
         case Rol32(dst, amount)  =>
             printName1("  rol", dst);
@@ -226,29 +263,8 @@ method printIns(ins:ins)
             printOprnd(dst);
             print("\n");
 
-        case Shl32(dst, amount)  =>
-            printName1("  shl", dst);
-            if amount.OConst? {
-                printOprnd(amount);
-            }
-            else {
-                printSmallOprnd(amount);
-            }
-            print ", ";
-            printOprnd(dst);
-            print("\n");
-
-        case Shr32(dst, amount) =>
-            printName1("  shr", dst);
-            if amount.OConst? {
-                printSmallOprnd(amount);
-            }
-            else {
-                print "cl";
-            }
-            print ", ";
-            printOprnd(dst);
-            print("\n");
+        case Shl32(dst, src)    => printName1("  shl", dst); printShiftOprnd(src, 32); print ", "; printOprnd(dst); print("\n");
+        case Shr32(dst, src)    => printName1("  shr", dst); printShiftOprnd(src, 32); print ", "; printOprnd(dst); print("\n");
 
         case AESNI_enc(dst, src)      => print ("  aesenc ");     printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case AESNI_enc_last(dst, src) => print ("  aesenclast "); printOprnd(src); print(", "); printOprnd(dst); print("\n");

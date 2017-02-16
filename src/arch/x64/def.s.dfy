@@ -42,6 +42,7 @@ datatype ins =
 | Rol32(dstRolConst:operand, amountRolConst:operand)
 | Ror32(dstRorConst:operand, amountRorConst:operand)
 | Shl32(dstShlConst:operand, amountShlConst:operand)
+| Shl64(dstShlConst64:operand, amountShlConst64:operand)
 | Shr32(dstShrConst:operand, amountShrConst:operand)
 | Shr64(dstShrConst64:operand, amountShrConst64:operand)
 | AESNI_enc(dstEnc:operand, srcEnc:operand)
@@ -533,6 +534,7 @@ predicate ValidInstruction(s:state, ins:ins)
         case Rol32(dstRolConst, amountRol) => Valid32BitDestinationOperand(s, dstRolConst) && ValidShiftAmountOperand(s, amountRol) && Valid32BitSourceOperand(s, dstRolConst)
         case Ror32(dstRorConst, amountRor) => Valid32BitDestinationOperand(s, dstRorConst) && ValidShiftAmountOperand(s, amountRor) && Valid32BitSourceOperand(s, dstRorConst)
         case Shl32(dstShlConst, amountShl) => Valid32BitDestinationOperand(s, dstShlConst) && ValidShiftAmountOperand(s, amountShl) && Valid32BitSourceOperand(s, dstShlConst)
+        case Shl64(dstShrConst, amountShr) => Valid64BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand64(s, amountShr) && Valid64BitSourceOperand(s, dstShrConst)
         case Shr32(dstShrConst, amountShr) => Valid32BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand(s, amountShr) && Valid32BitSourceOperand(s, dstShrConst)
         case Shr64(dstShrConst, amountShr) => Valid64BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand64(s, amountShr) && Valid64BitSourceOperand(s, dstShrConst)
         case AESNI_enc(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
@@ -593,6 +595,7 @@ function insObs(s:state, ins:ins):seq<observation>
         case Rol32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
         case Ror32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
         case Shl32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
+        case Shl64(dst, amount) => operandObs(s, 64, dst) + operandObs(s, 64, amount)
         case Shr32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
         case Shr64(dst, amount) => operandObs(s, 64, dst) + operandObs(s, 64, amount)
         case AESNI_enc(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
@@ -663,6 +666,9 @@ predicate evalIns(ins:ins, s:state, r:state)
             case Shl32(dst, amount)  =>
                 var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
                 if 0 <= n < 32 then evalUpdateAndHavocFlags(s, dst, shl32(eval_op32(s, dst), n), r, obs) else !r.ok
+            case Shl64(dst, amount) =>
+                var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
+                if 0 <= n < 64 then evalUpdateAndHavocFlags64(s, dst, BitwiseShl64(eval_op64(s, dst), n), r, obs) else !r.ok
 
             case Shr32(dst, amount) =>
                 var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
