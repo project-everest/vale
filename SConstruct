@@ -86,6 +86,11 @@ AddOption('--CACHEDIR',
   default=None,
   action='store',
   help='Specify the SCSons Shared Cache Directory')
+AddOption('--NOVERIFY',
+  dest='noverify',
+  default=False,
+  action='store_true',
+  help='Verify and compile, or compile only')
 
 env['DAFNY_PATH'] = GetOption('dafny_path')
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
@@ -93,6 +98,12 @@ env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
 env.Append(CCFLAGS=GetOption('c_user_args'))
 env['OPENSSL_PATH'] = GetOption('openssl_path')
+
+# --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
+# the other build flavors do not redundently re-verify the same results.
+verify=(GetOption('noverify') == False)
+if not verify:
+  print('***\n*** WARNING:  NOT VERIFYING ANY CODE\n***')
 
 cache_dir=GetOption('cache_dir')
 if cache_dir != None:
@@ -197,9 +208,10 @@ def vale_file_scan(node, env, path):
       v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
       f = os.path.join(dirname, i)
       v_dfy_includes.append(f)
-      env.Dafny(v, f)
+      if verify:
+        env.Dafny(v, f)
     for i in vad_includes:
-      v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
       f = os.path.join(dirname, i)
       v_vad_includes.append(f)
 
@@ -269,7 +281,7 @@ def dafny_file_scan(node, env, path):
       options = get_build_options(srcpath)
       f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
       v_includes.append(f)
-      if options != None:
+      if options != None and verify == True:
         options.env.Dafny(f, srcpath)
     return env.File(v_includes)
 
@@ -444,7 +456,7 @@ class BuildOptions:
 def verify_dafny_files(env, files):
   for f in files:
     options = get_build_options(f)
-    if options != None:
+    if options != None and verify == True:
       target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
       target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
       options.env.Dafny(target, f)
