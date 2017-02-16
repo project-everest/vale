@@ -678,7 +678,17 @@ procedure{:timeLimitMultiplier 3} poly1305(
         let inp_mem := heapletTo128(mem[inp_id].mem64, inp_in, len_in);
         forall j :: inp_in <= j < inp_in + len_in && (j - inp_in) % 16 == 0 ==> inp_mem?[j];
         h == poly1305_hash(key_r, key_s, inp_mem, inp_in, len_in);
+        h1 == old(h1);
+        h2 == old(h2);
+        ctx == old(ctx);
+        inp == old(inp);
+        r1 == old(r1);
+        r13 == old(r13);
+        h0 == old(h0);
+        r15 == old(r15);
 {
+    Mov64(rax, ctx);
+    Mov64(r9, inp);
     InlineIfMov64(win, ctx, rcx, ctx_in);
     InlineIfMov64(win, inp, rdx, inp_in);
     InlineIfMov64(win, len, r8,  len_in);
@@ -692,6 +702,16 @@ procedure{:timeLimitMultiplier 3} poly1305(
     //   40, 48: key_s
     //   56: will hold len % 16
     //   64: will hold len / 16 * 16
+    //   72, 80, 88, 96, 104, 112, 120, 128: callee-save registers
+    Store64(ctx, h1,  72, Public, ctx_id);
+    Store64(ctx, h2,  80, Public, ctx_id);
+    Store64(ctx, rax, 88, Public, ctx_id);
+    Store64(ctx, r9,  96, Public, ctx_id);
+    Store64(ctx, r1,  104, Public, ctx_id);
+    Store64(ctx, r13, 112, Public, ctx_id);
+    Store64(ctx, h0,  120, Public, ctx_id);
+    Store64(ctx, r15, 128, Public, ctx_id);
+
     ghost var key_r0 := mem[ctx_id].mem64[ctx + 24].v;
     ghost var key_r1 := mem[ctx_id].mem64[ctx + 32].v;
     lemma_poly_bits64();
@@ -767,6 +787,16 @@ procedure{:timeLimitMultiplier 3} poly1305(
 
     Store64(ctx, h0,  0, Public, ctx_id);
     Store64(ctx, h1,  8, Public, ctx_id);
+
+    Load64(h1,  ctx, 72, Public, ctx_id);
+    Load64(h2,  ctx, 80, Public, ctx_id);
+    Load64(rax, ctx, 88, Public, ctx_id);
+    Load64(inp, ctx, 96, Public, ctx_id);
+    Load64(r1,  ctx, 104, Public, ctx_id);
+    Load64(r13, ctx, 112, Public, ctx_id);
+    Load64(h0,  ctx, 120, Public, ctx_id);
+    Load64(r15, ctx, 128, Public, ctx_id);
+    Mov64(ctx, rax);
 }
 
 #verbatim
