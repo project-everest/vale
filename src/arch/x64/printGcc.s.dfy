@@ -210,8 +210,8 @@ method printIns(ins:ins)
         case Mul64(src)         => printName64_1("  mul", src); printOprnd64(src); print("\n");
         case IMul64(dst, src)   => printName64("  imul", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case And64(dst, src)    => printName64("  and", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
-        case Shl64(dst, src)    => printName64("  shl", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
-        case Shr64(dst, src)    => printName64("  shr", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
+        case Shl64(dst, src)    => printName64("  shl", dst, src); printShiftOprnd(src, 64); print(", "); printOprnd64(dst); print("\n");
+        case Shr64(dst, src)    => printName64("  shr", dst, src); printShiftOprnd(src, 64); print(", "); printOprnd64(dst); print("\n");
         case Mov32(dst, src)    => printName2("  mov", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Add32(dst, src)    => printName2("  add", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Sub32(dst, src)    => printName2("  sub", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
@@ -300,7 +300,7 @@ method printCode(c:code, n:int) returns(n':int)
         {
             var n1 := n;
             var n2 := n + 1;
-            print("  cmp "); printOprnd(ifb.o1); print(", "); printOprnd(ifb.o2); print("\n");
+            print("  cmp "); printOprnd(ifb.o2); print(", "); printOprnd(ifb.o1); print("\n");
             printJcc(cmpNot(ifb.cmp)); print("L"); print(n1); print("\n");
             n' := printCode(ift, n + 2);
             print("  jmp L"); print(n2); print("\n");
@@ -316,7 +316,7 @@ method printCode(c:code, n:int) returns(n':int)
             print(".align 16\nL"); print(n1); print(":\n");
             n' := printCode(loop, n + 2);
             print(".align 16\nL"); print(n2); print(":\n");
-            print("  cmp "); printOprnd(b.o1); print(", "); printOprnd(b.o2); print("\n");
+            print("  cmp "); printOprnd(b.o2); print(", "); printOprnd(b.o1); print("\n");
             printJcc(b.cmp); print("L"); print(n1); print("\n");
         }
 }
