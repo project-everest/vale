@@ -108,7 +108,7 @@ method printOprnd64(o:operand)
 {
     match o
         case OConst(n) =>
-            if 0 <= n as int < 0x1_0000_0000_0000_0000 { print(n); }
+            if 0 <= n as int < 0x1_0000_0000_0000_0000 { print("$"); print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
         case OStack(i) => print(4+4*i); print("(%rsp)"); 
@@ -207,7 +207,7 @@ method printIns(ins:ins)
         case Add64(dst, src) =>    printName64("  add", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case Sub64(dst, src)    => printName64("  sub", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case AddCarry64(dst, src) => printName64("  adc", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
-        case Mul64(src)         => printName64_1("  sub", src); printOprnd64(src); print("\n");
+        case Mul64(src)         => printName64_1("  mul", src); printOprnd64(src); print("\n");
         case IMul64(dst, src)   => printName64("  imul", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case And64(dst, src)    => printName64("  and", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
         case Shl64(dst, src)    => printName64("  shl", dst, src); printOprnd64(src); print(", "); printOprnd64(dst); print("\n");
