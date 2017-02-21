@@ -101,7 +101,7 @@ method printOprnd(o:operand)
             if 0 <= n as int < 0x1_0000_0000 { print("$"); print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
-        case OStack(i) => print(4+4*i); print("(%rsp)"); 
+        case OStack(i) => print(8+4*i); print("(%rsp)"); 
         case OHeap(addr, taint) => printMAddr(addr);
 }
 method printOprnd64(o:operand)
@@ -111,7 +111,7 @@ method printOprnd64(o:operand)
             if 0 <= n as int < 0x1_0000_0000_0000_0000 { print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
-        case OStack(i) => print(4+4*i); print("(%rsp)"); 
+        case OStack(i) => print(8+4*i); print("(%rsp)"); 
         case OHeap(addr, taint) => printMAddr(addr);
 }
 

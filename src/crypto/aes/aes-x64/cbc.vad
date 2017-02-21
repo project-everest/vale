@@ -381,7 +381,7 @@ procedure {:refined} CBCJustEncryptImpl(
 // rdx = output_ptr
 // r8 = key_ptr with expanded key
 // r9 = input_end_ptr
-// stack (rsp+32) = IV ptr
+// stack (rsp+(10*4)) = IV ptr.  Note that stack[0][0] is rsp+8 already.
 procedure {:refined} CBCEncryptStdcall(
     ghost key:seq(uint32), 
     ghost w:seq(uint32),
@@ -401,7 +401,7 @@ procedure {:refined} CBCEncryptStdcall(
         SeqLength(input) > 0;
         (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;   // Easy to prove, but necessary precondition to Cipher
         (Nb() * (Nr(alg) + 1)) % 4 == 0;   // Easy to prove, but necessary precondition to Cipher
-        HasStackSlots(stack, 2); // Two 32-bit stack slots, for one 64-bit IV pointer
+        HasStackSlots(stack, 10); // Two 32-bit stack slots, for one 64-bit IV pointer, starting at offset (10*4) from rsp
 
         r8 % 16 == 0;
 
@@ -416,8 +416,8 @@ procedure {:refined} CBCEncryptStdcall(
         input_id != key_id && key_id != output_id && input_id != output_id && IV_id != output_id;
 
         // IV is readable
-        ValidSrcAddrs(mem, IV_id, lowerUpper64(stack[0][0], stack[0][0 + 1]), 128, Public, 16);
-        IV == mem[IV_id].quads[lowerUpper64(stack[0][0], stack[0][0 + 1])].v;
+        ValidSrcAddrs(mem, IV_id, lowerUpper64(stack[0][8], stack[0][8 + 1]), 128, Public, 16);
+        IV == mem[IV_id].quads[lowerUpper64(stack[0][8], stack[0][8 + 1])].v;
 
         ValidDstAddrs(mem, output_id, rdx, 128, SeqLength(input)*16);
         InputMatchesMemory(input, mem[input_id], rcx);
@@ -442,7 +442,7 @@ procedure {:refined} CBCEncryptStdcall(
         CBCOutputFinal(key, input, IV, alg, mem, output_id, old(rdx), output);
 {
     // Load the IV
-    LoadStack64(rax, 0);  // rax := IV_ptr
+    LoadStack64(rax, 8);  // rax := IV_ptr
     Load128(xmm0, rax, 0, Public, IV_id);
     assert xmm0 == IV;
 
