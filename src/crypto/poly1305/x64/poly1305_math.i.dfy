@@ -102,4 +102,16 @@ lemma lemma_poly_demod(p:int, h:int, x:int, r:int)
     }
 }
 
+lemma lemma_mod_factors(x0:int, x1:int, y:int, z:int)
+    requires z > 0
+    ensures  (x0 + (y * z) * x1) % z == (x0 % z)
+{
+    calc
+    {
+        (x0 + (y * z) * x1) % z;  { lemma_normalize(); }
+        (x0 + (y * x1) * z) % z;  { lemma_mod_multiples_vanish(y * x1, x0, z); }
+        (x0 % z);
+    }
+}
+
 }

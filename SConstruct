@@ -206,10 +206,10 @@ def vale_file_scan(node, env, path):
     v_dfy_includes = []
     v_vad_includes = []
     for i in dfy_includes:
-      v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
       f = os.path.join(dirname, i)
       v_dfy_includes.append(f)
       if verify:
+        v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
         env.Dafny(v, f)
     for i in vad_includes:
       #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
@@ -280,9 +280,9 @@ def dafny_file_scan(node, env, path):
       srcpath = os.path.join(dirname, i)
       # TODO : this should convert the .gen.dfy filename back to a src\...\.vad filename, and look up its options
       options = get_build_options(srcpath)
-      f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
-      v_includes.append(f)
       if options != None and verify == True:
+        f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+        v_includes.append(f)
         options.env.Dafny(f, srcpath)
     return env.File(v_includes)
 
@@ -468,12 +468,12 @@ def verify_vale_files(env, files):
   for f in files:
     options = get_build_options(f)
     if options != None:
-      target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
-      target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
       dfy = compile_vale(env, f)
       if verify == True:
         dfy_str = str(dfy[0]).replace('\\', '/')  # switch from Windows to Unix path ahead of calling get_build_options()
         dafny_gen_options = get_build_options(dfy_str)
+        target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
+        target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
         dafny_gen_options.env.Dafny(target, dfy)
 
 def recursive_glob(env, pattern, strings=False):
