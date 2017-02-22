@@ -472,7 +472,9 @@ def verify_vale_files(env, files):
       target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
       dfy = compile_vale(env, f)
       if verify == True:
-        options.env.Dafny(target, dfy)
+        dfy_str = str(dfy[0]).replace('\\', '/')  # switch from Windows to Unix path ahead of calling get_build_options()
+        dafny_gen_options = get_build_options(dfy_str)
+        dafny_gen_options.env.Dafny(target, dfy)
 
 def recursive_glob(env, pattern, strings=False):
   matches = []
