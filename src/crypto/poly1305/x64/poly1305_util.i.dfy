@@ -1,5 +1,6 @@
 include "poly1305.s.dfy"
 include "poly1305_common.i.dfy"
+include "poly1305_math.i.dfy"
 include "../../../lib/math/mul_auto.i.dfy"
 include "../../../lib/math/mod_auto.i.dfy"
 include "../../../lib/math/div_auto.i.dfy"
@@ -14,6 +15,7 @@ module x64__Poly1305_util_i
 {
 import opened x64__Poly1305_s
 import opened x64__Poly1305_common_i
+import opened x64__Poly1305_math_i
 import opened Math__mul_auto_i
 import opened Math__mod_auto_i
 import opened Math__div_auto_i
@@ -182,16 +184,19 @@ lemma{:fuel power2, 10} lemma_bytes_power2()
 {
 }
 
-//lemma L0(x0:uint64, x1:uint64) ensures var z := 1; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0)
-
-lemma lemma_mod_power2_lo0(x0:uint64, x1:uint64) ensures var z := 0x1                   ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo1(x0:uint64, x1:uint64) ensures var z := 0x1_00                ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo2(x0:uint64, x1:uint64) ensures var z := 0x1_0000              ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo3(x0:uint64, x1:uint64) ensures var z := 0x1_0000_00           ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo4(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000         ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo5(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000_00      ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo6(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000_0000    ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
-lemma lemma_mod_power2_lo7(x0:uint64, x1:uint64) ensures var z := 0x1_0000_0000_0000_00 ; lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0) { reveal_lowerUpper128(); }
+lemma lemma_mod_factor_lo(x0:uint64, x1:uint64, y:int, z:int)
+    requires 0 < z < 0x1_0000_0000_0000_0000
+    requires y * z == 0x1_0000_0000_0000_0000
+    ensures  lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0)
+{
+    calc
+    {
+        lowerUpper128(x0, x1) % z;                { reveal_lowerUpper128(); }
+        (x0 + 0x1_0000_0000_0000_0000 * x1) % z;  { lemma_mod_factors(x0, x1, y, z); }
+        x0 % z;                                   { reveal_lowerUpper128(); }
+        lowerUpper128(x0 % z, 0);
+    }
+}
 
 lemma lemma_mod_power2_lo(x0:uint64, x1:uint64, y:int, z:int)
     requires 0 <= y < 8
@@ -199,14 +204,14 @@ lemma lemma_mod_power2_lo(x0:uint64, x1:uint64, y:int, z:int)
     ensures  0 <= x0 % z < 0x1_0000_0000_0000_0000
     ensures  lowerUpper128(x0, x1) % z == lowerUpper128(x0 % z, 0)
 {
-    lemma_mod_power2_lo0(x0, x1);
-    lemma_mod_power2_lo1(x0, x1);
-    lemma_mod_power2_lo2(x0, x1);
-    lemma_mod_power2_lo3(x0, x1);
-    lemma_mod_power2_lo4(x0, x1);
-    lemma_mod_power2_lo5(x0, x1);
-    lemma_mod_power2_lo6(x0, x1);
-    lemma_mod_power2_lo7(x0, x1);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000_0000_0000_0000,  0x1);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000_0000_0000_00, 0x1_00);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000_0000_0000,  0x1_0000);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000_0000_00, 0x1_0000_00);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000_0000,  0x1_0000_0000);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000_00, 0x1_0000_0000_00);
+    lemma_mod_factor_lo(x0, x1, 0x1_0000,  0x1_0000_0000_0000);
+    lemma_mod_factor_lo(x0, x1, 0x1_00, 0x1_0000_0000_0000_00);
     lemma_bytes_power2();
 }
 
