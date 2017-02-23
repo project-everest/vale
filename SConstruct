@@ -472,7 +472,7 @@ def verify_vale_files(env, files):
       if verify == True:
         dfy_str = str(dfy[0]).replace('\\', '/')  # switch from Windows to Unix path ahead of calling get_build_options()
         dafny_gen_options = get_build_options(dfy_str)
-        target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
+        target = os.path.splitext(f.replace('src', 'obj'))[0] + '.gen.vdfy'
         target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
         dafny_gen_options.env.Dafny(target, dfy)
 
