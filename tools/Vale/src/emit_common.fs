@@ -1059,7 +1059,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
         let e = makeSpecForall c.esc_proc.pname (Some c.esc_call_id) c.esc_foralls (EApply (spec_of_call c, args)) in
         [(c.esc_loc, Requires (add_antecedents guards e))]
     | AciIfElse (guards, i) ->
-        let build_ite (e,i,x,y) = EOp (Bop BEq, [EVar i; EOp (Cond, [e; EVar x; EVar y])]) in
+        let build_ite (e, i, x, y) = EOp (Bop BEq, [EVar i; EOp (Cond, [e; EVar x; EVar y])]) in
         List.map (fun q -> (loc, Requires (add_antecedents guards (build_ite q)))) i.esi_replacements
     in
   let opaqueReqs = List.collect req_of_call calls in
@@ -1069,8 +1069,8 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
   //   reveal_va_spec_Q();
   let reveal_of_spec x = SAssign ([], EOp(Uop UReveal, [EVar x])) in
   let specs =
-    let spcs = List.collect (fun aci -> match aci with AciCall(_,c) -> [spec_of_call c] | _ -> []) calls in
-    Set.toList (Set.ofList ((Reserved ("spec_" + (string_of_id p.pname))) :: spcs)) in
+    let spcs = List.collect (fun aci -> match aci with AciCall(_, c) -> [spec_of_call c] | _ -> []) calls in
+    Set.toList (Set.ofList ((Reserved ("spec_" + (string_of_id p.pname)))::spcs)) in
   let reveals = List.map reveal_of_spec specs in
 
   let specArgs = area_fun_params EmitEns (drop_ghosts p.prets) p.pargs in
@@ -1113,7 +1113,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
     | (id,t,vstorag,_,attrs) -> SVar (id, Some t, vstorag, attrs, None)
   let ghost_returns_var_decls = List.map formal_to_var (List.filter is_ghost_formal p.prets) in
   let trEx = makeSpecTriggerExists p.pname (List.map (fun (x, _) -> EVar x) (List.collect ghostFormal p.prets)) in
-  let forallBody = ghost_returns_var_decls @ stmts_abstract true (stmts_of_estmts false true estmts) @ [SAssert (NotInv, trEx)] in
+  let forallBody = ghost_returns_var_decls @ (stmts_abstract true (stmts_of_estmts false true estmts)) @ [SAssert (NotInv, trEx)] in
   let forallStmt =
     match ensForalls with
     | [] -> SIfElse (SmGhost, benv.eReq true, forallBody, [])

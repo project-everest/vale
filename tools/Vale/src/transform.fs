@@ -624,6 +624,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
             assert inMem(va_tmp_ptr + va_tmp_offset, va_x99_mem);
           }
           *)
+          let es = List.map (map_exp (fun e -> match e with EOp (Uop UConst, [e]) -> Replace e | _ -> Unchanged)) es in
           let xs = List.map (fun (x, _, _, _, _) -> x) pCall.pargs in
           let rename x = Reserved ("tmp_" + string_of_id x) in
           let xSubst = Map.ofList (List.map (fun x -> (x, EVar (rename x))) xs) in
