@@ -102,9 +102,12 @@ env['OPENSSL_PATH'] = GetOption('openssl_path')
 
 # --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
 # the other build flavors do not redundently re-verify the same results.
+env['DAFNY_NO_VERIFY'] = ''
 verify=(GetOption('noverify') == False)
 if not verify:
   print('***\n*** WARNING:  NOT VERIFYING ANY CODE\n***')
+  env['DAFNY_NO_VERIFY'] = '/noVerify'
+  
 
 cache_dir=GetOption('cache_dir')
 if cache_dir != None:
@@ -208,9 +211,8 @@ def vale_file_scan(node, env, path):
     for i in dfy_includes:
       f = os.path.join(dirname, i)
       v_dfy_includes.append(f)
-      if verify:
-        v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
-        env.Dafny(v, f)
+      v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
+      env.Dafny(v, f)
     for i in vad_includes:
       #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
       f = os.path.join(dirname, i)
@@ -280,7 +282,7 @@ def dafny_file_scan(node, env, path):
       srcpath = os.path.join(dirname, i)
       # TODO : this should convert the .gen.dfy filename back to a src\...\.vad filename, and look up its options
       options = get_build_options(srcpath)
-      if options != None and verify == True:
+      if options != None:
         f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
         v_includes.append(f)
         options.env.Dafny(f, srcpath)
@@ -305,7 +307,7 @@ env.Append(SCANNERS = dafny_scan)
 #  File representing the verification result
 def verify_dafny(env, targetfile, sourcefile):
   temptargetfile = os.path.splitext(targetfile)[0] + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_USER_ARGS >$TARGET")
+  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_NO_VERIFY $DAFNY_USER_ARGS >$TARGET")
   return env.CopyAs(source=temptarget, target=targetfile)
   
 # Add env.Dafny(), to verify a .dfy file into a .vdfy
