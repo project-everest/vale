@@ -473,8 +473,6 @@ procedure {:refined} CBCEncryptStdcall(
         Mov64(rdx, rsi);
         Mov64(rcx, rdi);
     }
-    assert(ValidSrcAddrs(mem, input_id, input_ptr, 128, Secret, SeqLength(input)*16));
-    assert(ValidSrcAddrs(mem, input_id, rcx, 128, Secret, SeqLength(input)*16));
     assert xmm0 == IV;
 
     output := CBCJustEncryptImpl(key, w, input_id, input, key_id, alg, output_id);
