@@ -55,7 +55,7 @@ method {:main} Main(ghost env:HostEnvironment)
         0, 8,
         asm_choice, platform_choice);
     printProcPlatform("CBCEncryptStdcall",
-        va_code_CBCEncryptStdcall(),
+        va_code_CBCEncryptStdcall(win),
         0, 24,
         asm_choice, platform_choice);
     printFooter(asm_choice);

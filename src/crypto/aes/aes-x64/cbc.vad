@@ -376,13 +376,14 @@ procedure {:refined} CBCJustEncryptImpl(
 
 
 // Calling convention:
-// Registers initially contain:
-// rcx = input_ptr
-// rdx = output_ptr
-// r8 = key_ptr with expanded key
-// r9 = input_end_ptr
-// stack (rsp+(10*4)) = IV ptr.  Note that stack[0][0] is rsp+8 already.
+// Registers initially contain: (Windows/Linux)
+// rcx/rdi = input_ptr
+// rdx/rsi = output_ptr
+// r8 /rdx = key_ptr with expanded key
+// r9 /rcx = input_end_ptr
+// stack (rsp+(10*4))/r8 = IV ptr.  Note that stack[0][0] is rsp+8 already.
 procedure {:refined} CBCEncryptStdcall(
+    inline win:bool,
     ghost key:seq(uint32), 
     ghost w:seq(uint32),
     ghost input_id:heaplet_id,
@@ -401,49 +402,79 @@ procedure {:refined} CBCEncryptStdcall(
         SeqLength(input) > 0;
         (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;   // Easy to prove, but necessary precondition to Cipher
         (Nb() * (Nr(alg) + 1)) % 4 == 0;   // Easy to prove, but necessary precondition to Cipher
-        HasStackSlots(stack, 10); // Two 32-bit stack slots, for one 64-bit IV pointer, starting at offset (10*4) from rsp
+        if win then HasStackSlots(stack, 10) else true; // Two 32-bit stack slots, for one 64-bit IV pointer, starting at offset (10*4) from rsp
 
-        r8 % 16 == 0;
+        let input_ptr     := if win then old(rcx) else old(rdi);
+        let output_ptr    := if win then old(rdx) else old(rsi);
+        let key_ptr       := if win then old(r8)  else old(rdx);
+        let input_end_ptr := if win then old(r9)  else old(rcx);
+        key_ptr % 16 == 0;
 
-        ValidSrcAddrs(mem, key_id, r8, 128, Secret, 11*16);  // Key is readable
+        ValidSrcAddrs(mem, key_id, key_ptr, 128, Secret, 11*16);  // Key is readable
         SeqLength(w) == 44;
-        (forall j :: 0 <= j <= 10 ==> mem[key_id].quads[r8 + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]));
+        (forall j :: 0 <= j <= 10 ==> mem[key_id].quads[key_ptr + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]));
         KeyExpansionPredicate(key, AES_128, w);
 
         // Input is readable
-        ValidSrcAddrs(mem, input_id, old(rcx), 128, Secret, SeqLength(input)*16);
+        ValidSrcAddrs(mem, input_id, input_ptr, 128, Secret, SeqLength(input)*16);
     requires
         input_id != key_id && key_id != output_id && input_id != output_id && IV_id != output_id;
 
+        let input_ptr     := if win then rcx else rdi;
+        let output_ptr    := if win then rdx else rsi;
+        let key_ptr       := if win then r8  else rdx;
+        let input_end_ptr := if win then r9  else rcx;
+        
         // IV is readable
-        ValidSrcAddrs(mem, IV_id, lowerUpper64(stack[0][8], stack[0][8 + 1]), 128, Public, 16);
-        IV == mem[IV_id].quads[lowerUpper64(stack[0][8], stack[0][8 + 1])].v;
+        let iv_ptr        := if win then lowerUpper64(stack[0][8], stack[0][8 + 1]) else r8;
+        ValidSrcAddrs(mem, IV_id, iv_ptr, 128, Public, 16);
+        IV == mem[IV_id].quads[iv_ptr].v;
 
-        ValidDstAddrs(mem, output_id, rdx, 128, SeqLength(input)*16);
-        InputMatchesMemory(input, mem[input_id], rcx);
+        ValidDstAddrs(mem, output_id, output_ptr, 128, SeqLength(input)*16);
+        InputMatchesMemory(input, mem[input_id], input_ptr);
 
-        rcx + SeqLength(input)*16 < 0x1_0000_0000_0000_0000;
-        rdx + SeqLength(input)*16 < 0x1_0000_0000_0000_0000;
-        r9 >= rcx;   // end >= start
-        r9 == rcx + SeqLength(input)*16;
-        r9 < 0x1_0000_0000_0000_0000;
-    reads
-        r8; r9;
+        input_ptr + SeqLength(input)*16 < 0x1_0000_0000_0000_0000;
+        output_ptr + SeqLength(input)*16 < 0x1_0000_0000_0000_0000;
+        input_end_ptr >= input_ptr;   // end >= start
+        input_end_ptr == input_ptr + SeqLength(input)*16;
+        input_end_ptr < 0x1_0000_0000_0000_0000;
+    reads        
+        rsi; rdi;
     modifies
-        rax; rcx; rdx; mem; xmm0; xmm1; xmm2; xmm3; efl; stack; 
+        rax; rcx; rdx; r8; r9; mem; xmm0; xmm1; xmm2; xmm3; efl; stack; 
     ensures
+        let output_ptr    := if win then old(rdx) else old(rsi);
 
         // Output is now readable
-        ValidSrcAddrs(mem, output_id, old(rdx), 128, Secret, SeqLength(input)*16);
+        ValidSrcAddrs(mem, output_id, output_ptr, 128, Secret, SeqLength(input)*16);
 
         // Framing
         mem == old(mem)[output_id := mem[output_id]];
 
-        CBCOutputFinal(key, input, IV, alg, mem, output_id, old(rdx), output);
+        CBCOutputFinal(key, input, IV, alg, mem, output_id, output_ptr, output);
 {
+    ghost var input_ptr     := if win then rcx else rdi;
+    ghost var output_ptr    := if win then rdx else rsi;
+    ghost var key_ptr       := if win then r8  else rdx;
+    ghost var input_end_ptr := if win then r9  else rcx;
+        
+        
     // Load the IV
-    LoadStack64(rax, 8);  // rax := IV_ptr
-    Load128(xmm0, rax, 0, Public, IV_id);
+    inline if (win) 
+    {
+        LoadStack64(rax, 8);  // rax := IV_ptr
+        Load128(xmm0, rax, 0, Public, IV_id);
+    }
+    else
+    {
+        Load128(xmm0, r8, 0, Public, IV_id);
+        Mov64(r9, rcx);
+        Mov64(r8, rdx);
+        Mov64(rdx, rsi);
+        Mov64(rcx, rdi);
+    }
+    assert(ValidSrcAddrs(mem, input_id, input_ptr, 128, Secret, SeqLength(input)*16));
+    assert(ValidSrcAddrs(mem, input_id, rcx, 128, Secret, SeqLength(input)*16));
     assert xmm0 == IV;
 
     output := CBCJustEncryptImpl(key, w, input_id, input, key_id, alg, output_id);
