@@ -633,6 +633,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
           let f e =
 //            let f2 e x ex = EBind (BindLet, [ex], [(rename x, None)], [], e) in
 //            List.fold2 f2 (subst_reserved_exp xSubst e) xs es
+            let e = map_exp (fun e -> match e with EOp (Uop UOld, [e]) -> Replace e | _ -> Unchanged) e in
             subst_reserved_exp xSubst e
             in
           let reqAsserts = (List.collect (reqAssert f) pCall.pspecs) in
