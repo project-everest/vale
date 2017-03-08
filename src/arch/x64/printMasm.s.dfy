@@ -100,7 +100,7 @@ method printGenericOprnd(o:operand, ptr_type:string)
             if 0 <= n as int < 0x1_0000_0000 { print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
-        case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(4+4*i); print("]");
+        case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(8+4*i); print("]");
         case OHeap(addr, taint) => printMAddr(addr, ptr_type);
 }
 method printGenericOprnd64(o:operand, ptr_type:string)
@@ -110,7 +110,7 @@ method printGenericOprnd64(o:operand, ptr_type:string)
             if 0 <= n as int < 0x1_0000_0000_0000_0000 { print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
-        case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(4+4*i); print("]");
+        case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(8+4*i); print("]");
         case OHeap(addr, taint) => printMAddr(addr, ptr_type);
 }
 method printOprnd(o:operand)
@@ -194,6 +194,7 @@ method printIns(ins:ins)
         case AddCarry(dst, src) => print ("  add "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case BSwap32(dst)    => print ("  bswap "); printOprnd(dst); print("\n");
         case Xor32(dst, src) => print ("  xor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
+        case Xor64(dst, src) => print ("  xor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case And32(dst, src) => print ("  and "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case Not32(dst)      => print ("  not "); printOprnd(dst); print("\n");
         case GetCf(dst)      => print ("  setc "); printSmallOprnd(dst); print("\n");

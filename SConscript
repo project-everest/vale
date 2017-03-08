@@ -53,37 +53,40 @@ Export('verify_options')
 #
 # build sha256-exe
 #
-# TODO: Please fix calling conventions on Linux 64-bit and reenable Linux build.
-if sys.platform == "win32" :
- sha_asm = env.ExtractValeCode(
+sha_asm = env.ExtractValeCode(
   ['src/crypto/hashing/$SHA_ARCH_DIR/sha256.vad'],           # Vale source
   'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
   'sha256'                                                   # Base name for the ASM files and EXE
   )
- sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
- sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
- env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
+sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
+sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
+env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
 
 #
 # build cbc-exe
 #
-if env['TARGET_ARCH']=='x86':   # x86-only
+if env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
   cbc_asm = env.ExtractValeCode(
     ['src/crypto/aes/$AES_ARCH_DIR/aes.vad', 'src/crypto/aes/$AES_ARCH_DIR/cbc.vad'], # Vale source
     'src/crypto/aes/$AES_ARCH_DIR/cbc_main.i.dfy',              # Dafny main
     'cbc'                                                       # Base name for the ASM files and EXE
     )
   env.BuildTest(['src/crypto/aes/testcbc.c', cbc_asm[0]], '', 'testcbc')
+else:
+  print('Not building AES-CBC for this target architecture')  
 
 #
 # build aes-exe
 #
-aes_asm = env.ExtractValeCode(
-  ['src/crypto/aes/$AES_ARCH_DIR/aes.vad'],        # Vale source
-  'src/crypto/aes/$AES_ARCH_DIR/aes_main.i.dfy',   # Dafny main
-  'aes'                                            # Base name for the ASM files and EXE
-  )
-env.BuildTest(['src/crypto/aes/testaes.c', aes_asm[0]], 'src/crypto/aes', 'testaes')
+if env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
+  aes_asm = env.ExtractValeCode(
+    ['src/crypto/aes/$AES_ARCH_DIR/aes.vad'],        # Vale source
+    'src/crypto/aes/$AES_ARCH_DIR/aes_main.i.dfy',   # Dafny main
+    'aes'                                            # Base name for the ASM files and EXE
+    )
+  env.BuildTest(['src/crypto/aes/testaes.c', aes_asm[0]], 'src/crypto/aes', 'testaes')
+else:
+  print('Not building AES for this target architecture')
 
 #
 # build poly1305
@@ -95,6 +98,8 @@ if env['TARGET_ARCH']=='amd64' and sys.platform == "win32":     # x64-only; not 
     'poly1305'                                                  # Base name for the ASM files and EXE
     )
   env.BuildTest(['src/crypto/poly1305/testpoly1305.c', poly1305_asm[0]], 'src/crypto/poly1305', 'testpoly1305')
+else:
+  print('Not building Poly1305 for this target architecture')
 
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
@@ -113,8 +118,16 @@ if env['OPENSSL_PATH'] != None:
   stdcallenv=engineenv.Clone(CCFLAGS='/Ox /Zi /Gz /LD') # compile __stdcall so it can call the Vale crypto code
   everest_sha256 = cdeclenv.Object('src/Crypto/hashing/EverestSha256.c')
   everest_glue = stdcallenv.Object('src/Crypto/hashing/EverestSHA256Glue.c')
-  sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
-  cbc_obj = engineenv.Object('obj/cbc_openssl', cbc_asm[0])
-  aes_obj = engineenv.Object('obj/aes_openssl', sha_asm[0])
-  engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
-    source=[everest_sha256, everest_glue, sha256_obj, cbc_obj, aes_obj, '$OPENSSL_PATH/libcrypto.lib'])
+  if env['TARGET_ARCH']=='x86':
+    sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
+    cbc_obj = engineenv.Object('obj/cbc_openssl', cbc_asm[0])
+    aes_obj = engineenv.Object('obj/aes_openssl', sha_asm[0])
+    engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
+      source=[everest_sha256, everest_glue, sha256_obj, cbc_obj, aes_obj, '$OPENSSL_PATH/libcrypto.lib'])
+  if env['TARGET_ARCH']=='amd64' and sys.platform == "win32":
+    sha256_obj = engineenv.Object('obj/sha256_openssl', sha_c_h[0][0])
+    sha256asm_obj = engineenv.Object('obj/sha256asm_openssl', sha_asm[0])
+    poly1305_obj = engineenv.Object('obj/poly1305_openssl', poly1305_asm[0])
+    engine = engineenv.SharedLibrary(target='obj/EverestSha256.dll',
+      source=[everest_sha256, everest_glue, sha256_obj, sha256asm_obj, poly1305_obj, '$OPENSSL_PATH/libcrypto.lib'])
+

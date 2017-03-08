@@ -1,10 +1,10 @@
-include "../../../../obj/crypto/hashing/sha-x64/sha256.gen.dfy"
+include "../../../../obj/crypto/aes/aes-x64/cbc.gen.dfy"
 include "../../../arch/x64/print.s.dfy"
 include "../../../lib/util/Io.s.dfy"
 
-module x64_SHA256ValeMain {
+module CBCMain {
 
-import opened x64_sha256_vale
+import opened CBC
 import opened x64_print_s
 import opened Io_s
 
@@ -22,7 +22,7 @@ method {:main} Main(ghost env:HostEnvironment)
     var platform_choice_name := HostConstants.GetCommandLineArg(2, env);
     var asm_choice;
     var platform_choice;
-    
+
     if platform_choice_name[..] == "Win" {
         platform_choice := Win;
     } else if platform_choice_name[..] == "Linux" {
@@ -33,7 +33,7 @@ method {:main} Main(ghost env:HostEnvironment)
         print("Please choose a correct assembler option: Win or Linux or MacOS\n");
         return;
     }
-    
+
     if asm_choice_name[..] == "GCC" {
         asm_choice := GCC;
     } else if asm_choice_name[..] == "MASM" {
@@ -43,19 +43,20 @@ method {:main} Main(ghost env:HostEnvironment)
         return;
     }
 
-//    var ts_SHA256_Compute64StepsH:taintState := TaintState(map[0 := Public, 1 := Public], map[], map[], Secret);
-//    var ts_SHA256_ComputeInitialWs := TaintState(map[0 := Public, 1 := Public, 2 := Public], map[], map[], Secret);
-
     printHeader(asm_choice);
     var win := (platform_choice == Win);
-    
-    printProcPlatform("sha256_main_i_SHA256_Compute64Steps", 
-        va_code_SHA256_Compute64StepsH(Secret, Secret, win), 
-        0, 112, 
+
+    printProcPlatform("aes_main_i_KeyExpansionStdcall",
+        va_code_KeyExpansionStdcall(Secret, win),
+        0, 8,
         asm_choice, platform_choice);
-    printProcPlatform("sha256_main_i_SHA256_ComputeInitialWs", 
-        va_code_SHA256_ComputeInitialWs(Secret, win), 
-        0, 0, 
+    printProcPlatform("aes_main_i_KeyExpansionAndInversionStdcall",
+        va_code_KeyExpansionAndInversionStdcall(Secret, win),
+        0, 8,
+        asm_choice, platform_choice);
+    printProcPlatform("CBCEncryptStdcall",
+        va_code_CBCEncryptStdcall(win),
+        0, 24,
         asm_choice, platform_choice);
     printFooter(asm_choice);
 }

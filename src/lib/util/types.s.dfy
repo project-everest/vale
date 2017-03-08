@@ -60,4 +60,10 @@ lemma {:axiom} lemma_WordToBitsToWord(w:uint32)
 function method {:opaque} BitsToWord64(b:bv64) : uint64 { b as uint64 }
 function method {:opaque} WordToBits64(w:uint64) : bv64 { w as bv64 }
 
+lemma {:axiom} lemma_BitsToWordToBits64(b:bv64)
+    ensures WordToBits64(BitsToWord64(b)) == b;
+
+lemma {:axiom} lemma_WordToBitsToWord64(w:uint64)
+    ensures BitsToWord64(WordToBits64(w)) == w;
+
 } // end module types_s
