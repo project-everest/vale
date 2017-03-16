@@ -3,6 +3,7 @@
 *.fsy eol=lf
 *.dfy eol=lf
 *.vad eol=lf
+*.vaf eol=lf
 *.cs eol=lf
 *.html eol=lf
 *.bat eol=lf
