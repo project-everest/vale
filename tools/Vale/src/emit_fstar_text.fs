@@ -129,7 +129,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssign ([lhs], e) ->
       ps.PrintLine ("let " + (string_of_lhs_formal lhs) + " = " + (string_of_exp e) + " in")
   | SAssign ((_::_::_) as lhss, e) ->
-      ps.PrintLine ("let (| " + (String.concat ", " (List.map string_of_lhs_formal lhss)) + " |) = " + (string_of_exp e) + " in")
+      ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_lhs_formal lhss)) + ") = " + (string_of_exp e) + " in")
   | SBlock ss -> notImplemented "block"
   | SIfElse (_, e, ss1, ss2) -> notImplemented "if-else"
   | SWhile (e, invs, (_, ed), ss) -> notImplemented "while"
@@ -194,21 +194,21 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let (rs, es) = (exp_of_conjuncts rs, exp_of_conjuncts es) in
   ps.PrintLine ("");
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
-  ps.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
+  ps.PrintLine ("irreducible val " + (sid p.pname) + " : " + (val_string_of_formals args));
   ps.Indent ();
-  (match p.prets with [] -> () | _ -> notImplemented "procedure return values");
+  //(match p.prets with [] -> () | _ -> notImplemented "procedure return values");
   //ps.PrintLine ("{" + (string_of_exp rs) + "}")
-  //let st = String.concat " * " (List.map string_of_pformal p.prets) in
+  let st = String.concat " * " (List.map string_of_pformal p.prets) in
   //ps.PrintLine ("-> GTot (" + (sid (Reserved "out")) + ":(" + st + "){" + (string_of_exp es) + "})");
-  ps.PrintLine ("-> Lemma");
+  ps.PrintLine ("-> Ghost (" + st + ")");
   ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
-  ps.PrintLine ("(ensures  " + (string_of_exp es) + ")");
-  (match p.prets with [] -> () | rs -> ps.PrintLine ("returns (" + (string_of_pformals rs) + ")"));
+  let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
+  ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
   ps.Unindent ();
   ( match p.pbody with
     | None -> ()
     | Some ss ->
-        ps.PrintLine ("let " + (sid p.pname) + " " + (let_string_of_formals args) + " =");
+        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + (let_string_of_formals args) + " =");
         ps.Indent ();
         emit_stmts ps ss;
         let eRet = EApply (Id "tuple", List.map (fun (x, _, _, _, _) -> EVar x) p.prets) in
