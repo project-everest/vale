@@ -46,7 +46,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
 %token <loc * (bool * string)> COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
-%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL SPLIT GHOST INLINE
+%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
 %token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS REQUIRES ENSURES READS MODIFIES
@@ -272,11 +272,18 @@ Stmt
       stmtAt $1 (SForall ($2, $3, $5, $7, $9))
     }
   | EXISTS Formals Triggers COLONCOLON Exp SEMI { stmtAt $1 (SExists ($2, $3, $5)) }
-  | INVARIANT Exp SEMI { stmtAt $1 (SAssert (IsInv, $2)) }
+  | INVARIANT Exp SEMI { stmtAt $1 (SAssert ({assert_attrs_default with is_inv = true}, $2)) }
   | ASSUME Exp SEMI { stmtAt $1 (SAssume $2) }
-  | ASSERT Exp SEMI { stmtAt $1 (SAssert (NotInv, $2)) }
+  | ASSERT Exp SEMI { stmtAt $1 (SAssert (assert_attrs_default, $2)) }
   | ASSERT Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], EBool true, $2, $5)) }
-  | ASSERT LBRACE SPLIT RBRACE LITBOOL SEMI { stmtAt $1 (if snd $5 then SSplit else parse_err "Must use: assert {:split_here} true;" ) }
+  | ASSERT LBRACECOLON AnyId RBRACE LITBOOL SEMI
+    {
+      stmtAt $1 (if $3 = Id "split_here" && snd $5 then SAssert ({assert_attrs_default with is_split = true}, EBool true) else parse_err "Must use: assert {:split_here} true;" )
+    }
+  | ASSERT LBRACECOLON AnyId RBRACE LBRACECOLON AnyId RBRACE LITBOOL SEMI
+    {
+      stmtAt $1 (if $3 = Id "split_here" && $6 = Id "refined" && snd $8 then SAssert ({assert_attrs_default with is_split = true; is_refined = true}, EBool true) else parse_err "Must use: assert {:split_here}{:refined} true;" )
+    }
   | CALC LBRACE CalcContents0 RBRACE { stmtAt $1 (SCalc (None, $3)) }
   | CALC CalcOp LBRACE CalcContents0 RBRACE { stmtAt $1 (SCalc ($2, $4)) }
   | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp(Uop UReveal, [EVar $2]))) }

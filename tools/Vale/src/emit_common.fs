@@ -683,7 +683,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
           | (true, _::_) ->
               let callId = gen_lemma_sym () in
               let trigger = makeSpecTrigger p.pname (EInt (bigint callId)) esGhost in
-              (callId, [SAssert (NotInv, trigger)])
+              (callId, [SAssert (assert_attrs_default, trigger)])
           | _ -> (0, [])
           in
         let drop_ghost_args (f:pformal) (l:lhs) =
@@ -742,11 +742,12 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
   | SGoto _ -> err "unsupported feature: 'goto' (unstructured code)"
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
   | SAssume e -> (Ghost, false, [EsGhost [SAssume (sub_src e)]])
-  | SAssert (b, e) -> (Ghost, false, [EsGhost [SAssert (b, sub_src e)]])
+  | SAssert (attrs, e) ->
+      if attrs.is_refined then (Ghost, false, [EsStmts [SAssert (attrs, sub_src e)]])
+      else (Ghost, false, [EsGhost [SAssert (attrs, sub_src e)]])
   | SCalc (oop, contents) ->
       let ccs = List.map (build_lemma_calcContents env benv src res loc sub_src) contents in
       (Ghost, false, [EsGhost [SCalc (oop, ccs)]])
-  | SSplit -> (Ghost, false, [EsGhost [SSplit]])
   | SVar (_, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
   | SVar (x, t, g, a, eOpt) -> (Ghost, false, [EsGhost [SVar (x, t, g, a, mapOpt sub_src eOpt)]])
   | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
@@ -861,7 +862,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
                     let esPost = (List.map (fun (x, _) -> EVar x) foralls) @ (List.map (fun x -> EVar (prev_id x)) ghosts) in
                     let ePost = makeSpecTrigger xf (EVar (Reserved "id")) esPost in
                     let eForall = makeSpecForalls [(xf, ghostExps)] None foralls ePost in
-                    let wPost = match ghosts with [] -> [] | _ -> [SAssert (NotInv, eForall)] in
+                    let wPost = match ghosts with [] -> [] | _ -> [SAssert (assert_attrs_default, eForall)] in
                     // work around Dafny issue, also generate better diagnostics:
                     // forall id, g {:trigger va_trigger_Q(id, g)}{:trigger va_trigger_P(id, g, i)}
                     //  | va_trigger_Q(id, g) && va_trigger_P(id, g, i) ==> va_get_ok(src) && invs(src)
@@ -870,7 +871,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
                     let sForall =
                       match invInvs with
                       | (_, EBind (Forall, [], xs, triggers, EOp (Bop BImply, [lhs; rhs]))) ->
-                        let sAssert = SAssert (NotInv, rhs) in
+                        let sAssert = SAssert (assert_attrs_default, rhs) in
                         [SForall (xs, triggers, lhs, rhs, [sAssert])]
                       | _ -> []
                       in
@@ -1113,7 +1114,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
     | (id,t,vstorag,_,attrs) -> SVar (id, Some t, vstorag, attrs, None)
   let ghost_returns_var_decls = List.map formal_to_var (List.filter is_ghost_formal p.prets) in
   let trEx = makeSpecTriggerExists p.pname (List.map (fun (x, _) -> EVar x) (List.collect ghostFormal p.prets)) in
-  let forallBody = ghost_returns_var_decls @ (stmts_abstract true (stmts_of_estmts false true estmts)) @ [SAssert (NotInv, trEx)] in
+  let forallBody = ghost_returns_var_decls @ (stmts_abstract true (stmts_of_estmts false true estmts)) @ [SAssert (assert_attrs_default, trEx)] in
   let forallStmt =
     match ensForalls with
     | [] -> SIfElse (SmGhost, benv.eReq true, forallBody, [])
@@ -1298,7 +1299,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let ghostArgs = ghostFormal
         let sRefined = SAssign (rets, EApply (Reserved ("refined_" + (string_of_id p.pname)), args)) in
         let ghostArgs = List.map (fun (x, _) -> EVar x) (List.collect ghostFormal p.pargs) in
-        let sTrigger = SAssert (NotInv, makeSpecTrigger p.pname (EInt (bigint.Zero)) ghostArgs) in
+        let sTrigger = SAssert (assert_attrs_default, makeSpecTrigger p.pname (EInt (bigint.Zero)) ghostArgs) in
         [reveal_spec; sRefined] @ (match ghostArgs with [] -> [] | _::_ -> [sTrigger])
       else if benv.is_instruction then
         // Body of instruction lemma
@@ -1528,7 +1529,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
               | EOp (Uop (UCustomAssign s), [e]) -> Unchanged
               | _ -> modGhost
             )
-          | SAssume _ | SAssert _ | SCalc _ | SSplit | SVar _ -> modGhost
+          | SAssume _ | SAssert _ | SCalc _ | SVar _ -> modGhost
           | SIfElse (SmGhost, _, _, _) -> modGhost
           | SForall _ | SExists _ -> modGhost
           in

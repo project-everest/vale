@@ -120,7 +120,6 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
   | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";")
   | SCalc _ -> err "unsupported feature: 'calc' for F*"
-  | SSplit -> notImplemented "split"
   | SVar (x, tOpt, g, a, eOpt) ->
       let sf = string_of_formal (x, tOpt) in
       let rhs = match eOpt with Some e -> " = " + (string_of_exp e) | None -> err "right-hand side required in variable declaration" in

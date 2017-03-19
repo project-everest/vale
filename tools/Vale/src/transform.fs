@@ -117,9 +117,8 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SGoto x -> (env, [s])
     | SReturn -> (env, [s])
     | SAssume e -> (env, [SAssume (fee e)])
-    | SAssert (inv, e) -> (env, [SAssert (inv, fee e)])
+    | SAssert (attrs, e) -> (env, [SAssert (attrs, fee e)])
     | SCalc (oop, contents) -> (env, [SCalc (oop, List.map (env_map_calc_contents fe fs env) contents)])
-    | SSplit -> (env, [s])
     | SVar (x, t, g, a, eOpt) ->
       (
         let info =
@@ -256,7 +255,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
         let old_state = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar (Reserved "this")]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar (Reserved "this")]) in
 //        let old_x = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar x]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar x]) in
         let eq = EApply (Reserved "eq_ops", [old_state; EVar (Reserved "this"); (EOp (Uop UToOperand, [EVar x]))]) in
-        [(if !assumeUpdates = 1 then SAssume eq else SAssert (NotInv, eq))]
+        [(if !assumeUpdates = 1 then SAssume eq else SAssert (assert_attrs_default, eq))]
     in
   let f (env:env, i:int, prev:Map<id, int>, sss:stmt list list) (s:stmt) =
     let rec r s =
@@ -264,7 +263,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
       | SLoc (loc, s) ->
           let (i, prev, ss) = r s in
           (i, prev, List.map (fun s -> SLoc (loc, s)) ss)
-      | (SLabel _ | SGoto _ | SReturn | SSplit) -> (i, prev, [s])
+      | (SLabel _ | SGoto _ | SReturn) -> (i, prev, [s])
       | SVar (x, t, (XGhost | XInline | XOperand | XPhysical | XState _), a, eOpt) ->
           (i, prev, [s])
       | SVar (x, t, XAlias _, a, eOpt) ->
@@ -602,7 +601,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     let reqAssert (f:exp -> exp) (loc, spec) =
       match spec with
       | Requires (EOp (Uop UUnrefinedSpec, _)) -> []
-      | Requires e -> [SLoc (loc, SAssert (NotInv, f e))]
+      | Requires e -> [SLoc (loc, SAssert (assert_attrs_default, f e))]
       | _ -> []
       in
     let rec assign e =
@@ -637,7 +636,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
             subst_reserved_exp xSubst e
             in
           let reqAsserts = (List.collect (reqAssert f) pCall.pspecs) in
-          let reqMarker = SLoc (loc, SAssert (NotInv, EBool true)) in
+          let reqMarker = SLoc (loc, SAssert (assert_attrs_default, EBool true)) in
           Replace ([hideResults (xDecls @ (reqMarker::reqAsserts)); s])
         else Unchanged
       | _ -> Unchanged
@@ -659,7 +658,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     *)
     match s with
     | Ensures (EOp (Uop UUnrefinedSpec, _)) -> []
-    | Ensures e -> [hideResults [SLoc (loc, SAssert (NotInv, e))]]
+    | Ensures e -> [hideResults [SLoc (loc, SAssert (assert_attrs_default, e))]]
     | _ -> []
     in
   let ensStmts = List.collect ensStmt p.pspecs in

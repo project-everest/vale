@@ -434,22 +434,15 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let s = new AssumeStmt(start_tok, end_tok, exp, null) :> Statement in
         stmts.Add(s)
         stmts
-    | SAssert (_, e) -> // Assume no attributes
+    | SAssert (attrs, e) -> // Assume no attributes
         let start_tok = create_token loc "assert" in
         let end_tok = create_token loc ";" in
         let exp = create_expression built_ins loc e in
-        let s = new AssertStmt(start_tok, end_tok, exp, null, null) :> Statement in
-        stmts.Add(s)
-        stmts
-    | SCalc _ -> err "unsupported feature: 'calc' not yet implemented for Dafny direct"
-    | SSplit ->
-        let start_tok = create_token loc "assert" in
-        let end_tok = create_token loc ";" in
-        let exp = create_expression built_ins loc (EBool true) in
-        let attrs = create_attr built_ins loc ("split_here",[]) null in
+        let attrs = if attrs.is_split then create_attr built_ins loc ("split_here",[]) null else null in
         let s = new AssertStmt(start_tok, end_tok, exp, null, attrs) :> Statement in
         stmts.Add(s)
         stmts
+    | SCalc _ -> err "unsupported feature: 'calc' not yet implemented for Dafny direct"
     | SVar (x, tOpt, g, a, eOpt) ->
         let is_ghost:bool = var_storage_to_bool g in
         let start_tok =

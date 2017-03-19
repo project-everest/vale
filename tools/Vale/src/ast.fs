@@ -78,7 +78,7 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type is_invariant = IsInv | NotInv
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool}
 type lhs = id * (typ option * ghost) option
 type stmt =
 | SLoc of loc * stmt
@@ -86,9 +86,8 @@ type stmt =
 | SGoto of id
 | SReturn
 | SAssume of exp
-| SAssert of is_invariant * exp
+| SAssert of assert_attrs * exp
 | SCalc of bop option * calcContents list
-| SSplit
 | SVar of id * typ option * var_storage * attrs * exp option
 | SAssign of lhs list * exp
 | SBlock of stmt list

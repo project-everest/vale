@@ -53,6 +53,8 @@ let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
 let and_of_list = binary_op_of_list BAnd (EBool true)
 let or_of_list = binary_op_of_list BOr (EBool false)
 
+let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false}
+
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
 
 let map_apply_modify (m:'a map_modify) (g:unit -> 'a):'a =
@@ -142,9 +144,8 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SGoto x -> [s]
     | SReturn -> [s]
     | SAssume e -> [SAssume (fe e)]
-    | SAssert (inv, e) -> [SAssert (inv, fe e)]
+    | SAssert (attrs, e) -> [SAssert (attrs, fe e)]
     | SCalc (oop, contents) -> [SCalc (oop, List.map (map_calc_contents fe fs) contents)]
-    | SSplit -> [s]
     | SVar (x, t, g, a, eOpt) -> [SVar (x, t, g, map_attrs fe a, mapOpt fe eOpt)]
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
     | SBlock b -> [SBlock (map_stmts fe fs b)]
@@ -173,7 +174,7 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
   let children:'a list =
     match s with
     | SLoc (loc, s) -> try [r s] with err -> raise (LocErr (loc, err))
-    | SLabel _ | SGoto _ | SReturn | SSplit -> []
+    | SLabel _ | SGoto _ | SReturn -> []
     | SAssume e | SAssert (_, e) | SAssign (_, e) -> [re e]
     | SCalc (oop, contents) -> List.collect (gather_calc_contents fs fe) contents
     | SVar (x, t, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))

@@ -181,7 +181,6 @@ and token = parse
 | "for" { FOR (curLoc lexbuf) }
 | "return" { RETURN (curLoc lexbuf) }
 | "reveal" { REVEAL (curLoc lexbuf) }
-| ":split_here" { SPLIT (curLoc lexbuf) }
 | "static" { STATIC (curLoc lexbuf) }
 | "module" { MODULE (curLoc lexbuf) }
 | "interface" { INTERFACE (curLoc lexbuf) }

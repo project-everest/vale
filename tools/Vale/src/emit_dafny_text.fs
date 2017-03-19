@@ -113,7 +113,9 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SGoto _ -> err "unsupported feature: 'goto' (unstructured code)"
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
-  | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";" + "  // " + (string_of_loc !ps.cur_loc))
+  | SAssert (attrs, e) ->
+      let sSplit = if attrs.is_split then "{:split_here}" else "" in
+      ps.PrintLine ("assert" + sSplit + " " + (string_of_exp e) + ";" + "  // " + (string_of_loc !ps.cur_loc))
   | SCalc (oop, contents) ->
       ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
       ps.Indent();
@@ -126,7 +128,6 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ) contents;
       ps.Unindent();
       ps.PrintLine("}")
-  | SSplit -> ps.PrintLine ("assert{:split_here} true;")
   | SVar (x, tOpt, g, a, eOpt) ->
       let st = match tOpt with None -> "" | Some t -> ":" + (string_of_typ t) in
       let rhs = match eOpt with None -> "" | Some e -> " := " + (string_of_exp e) in
