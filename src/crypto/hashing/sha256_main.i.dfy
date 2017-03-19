@@ -561,7 +561,7 @@ method {:timeLimitMultiplier 8} SHA256_DigestOneBlock(ctx:SHA256Context, W:array
     ctx.z := z';
 }
 
-method {:timeLimitMultiplier 4} SHA256_BlockDataOrder(ctx:SHA256Context, ptr:array<byte>, offset:ulong, len:ulong)
+method {:timeLimitMultiplier 4}{:induction 3} SHA256_BlockDataOrder(ctx:SHA256Context, ptr:array<byte>, offset:ulong, len:ulong)
     requires allocated(ctx);
     requires ctx != null;
     requires ctx.Valid();

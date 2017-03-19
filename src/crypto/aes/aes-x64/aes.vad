@@ -53,18 +53,6 @@ procedure {:refined} KeyExpansionRound(
         forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
         KeyExpansionPredicatePartial(key, AES_128, w_out, 4+(round+1)*4);
 {
-    assert mem[dst_id].quads[rdx + 16* 0].v == Quadword(w_in[0],  w_in[1],  w_in[2],  w_in[3]);
-    assert mem[dst_id].quads[rdx + 16* 1].v == Quadword(w_in[4],  w_in[5],  w_in[6],  w_in[7]);
-    assert mem[dst_id].quads[rdx + 16* 2].v == Quadword(w_in[8],  w_in[9],  w_in[10], w_in[11]);
-    assert mem[dst_id].quads[rdx + 16* 3].v == Quadword(w_in[12], w_in[13], w_in[14], w_in[15]);
-    assert mem[dst_id].quads[rdx + 16* 4].v == Quadword(w_in[16], w_in[17], w_in[18], w_in[19]);
-    assert mem[dst_id].quads[rdx + 16* 5].v == Quadword(w_in[20], w_in[21], w_in[22], w_in[23]);
-    assert mem[dst_id].quads[rdx + 16* 6].v == Quadword(w_in[24], w_in[25], w_in[26], w_in[27]);
-    assert mem[dst_id].quads[rdx + 16* 7].v == Quadword(w_in[28], w_in[29], w_in[30], w_in[31]);
-    assert mem[dst_id].quads[rdx + 16* 8].v == Quadword(w_in[32], w_in[33], w_in[34], w_in[35]);
-    assert mem[dst_id].quads[rdx + 16* 9].v == Quadword(w_in[36], w_in[37], w_in[38], w_in[39]);
-    assert mem[dst_id].quads[rdx + 16*10].v == Quadword(w_in[40], w_in[41], w_in[42], w_in[43]);
-
     ghost var xmm1_v0 := xmm1;
 
     AESNI_keygen_assist(xmm2, xmm1, rcon);
@@ -101,48 +89,11 @@ procedure {:refined} KeyExpansionRound(
                  [new_round*4 + 1 := xmm1.mid_lo]
                  [new_round*4 + 2 := xmm1.mid_hi]
                  [new_round*4 + 3 := xmm1.hi];
-    assert SeqLength(w_out) == 44;  // OBSERVE: Need to trigger the exists that Vale generates
 
     forall j :| 0 <= j <= 10 :: mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3])
     {
         assert j == new_round ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
         assert j != new_round ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
-        ghost if (j == 0) {
-            assert mem[dst_id].quads[rdx + 16* 0].v == Quadword(w_out[4* 0+0],  w_out[4* 0+1],  w_out[4* 0+2],  w_out[4* 0+3]);
-        }
-        else if (j == 1) {
-            assert mem[dst_id].quads[rdx + 16* 1].v == Quadword(w_out[4* 1+0],  w_out[4* 1+1],  w_out[4* 1+2],  w_out[4* 1+3]);
-        }
-        else if (j == 2) {
-            assert mem[dst_id].quads[rdx + 16* 2].v == Quadword(w_out[4* 2+0],  w_out[4* 2+1],  w_out[4* 2+2],  w_out[4* 2+3]);
-        }
-        else if (j == 3) {
-            assert mem[dst_id].quads[rdx + 16* 3].v == Quadword(w_out[4* 3+0],  w_out[4* 3+1],  w_out[4* 3+2],  w_out[4* 3+3]);
-        }
-        else if (j == 4) {
-            assert mem[dst_id].quads[rdx + 16* 4].v == Quadword(w_out[4* 4+0],  w_out[4* 4+1],  w_out[4* 4+2],  w_out[4* 4+3]);
-        }
-        else if (j == 5) {
-            assert mem[dst_id].quads[rdx + 16* 5].v == Quadword(w_out[4* 5+0],  w_out[4* 5+1],  w_out[4* 5+2],  w_out[4* 5+3]);
-        }
-        else if (j == 6) {
-            assert mem[dst_id].quads[rdx + 16* 6].v == Quadword(w_out[4* 6+0],  w_out[4* 6+1],  w_out[4* 6+2],  w_out[4* 6+3]);
-        }
-        else if (j == 7) {
-            assert mem[dst_id].quads[rdx + 16* 7].v == Quadword(w_out[4* 7+0],  w_out[4* 7+1],  w_out[4* 7+2],  w_out[4* 7+3]);
-        }
-        else if (j == 8) {
-            assert mem[dst_id].quads[rdx + 16* 8].v == Quadword(w_out[4* 8+0],  w_out[4* 8+1],  w_out[4* 8+2],  w_out[4* 8+3]);
-        }
-        else if (j == 9) {
-            assert mem[dst_id].quads[rdx + 16* 9].v == Quadword(w_out[4* 9+0],  w_out[4* 9+1],  w_out[4* 9+2],  w_out[4* 9+3]);
-        }
-        else if (j == 10) {
-            assert mem[dst_id].quads[rdx + 16*10].v == Quadword(w_out[4*10+0],  w_out[4*10+1],  w_out[4*10+2],  w_out[4*10+3]);
-        }
-        else {
-            assert false;
-        }
     }
 
     ghost var alg := AES_128();

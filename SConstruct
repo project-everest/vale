@@ -128,7 +128,7 @@ env['VALE'] = File('bin/vale.exe')
 kremlib_path = kremlin_path + '/kremlib'
 
 # Useful Dafny command lines
-dafny_default_args =   '/ironDafny /allocated:1 /compile:0 /timeLimit:30 /trace'
+dafny_default_args =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /trace'
 dafny_default_args_nonlarith = dafny_default_args + ' /noNLarith'
 
 ####################################################################
