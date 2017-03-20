@@ -133,7 +133,11 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SGoto x -> ps.PrintLine ("goto " + sid x + ";")
   | SReturn -> ps.PrintLine ("return;")
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
-  | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";")
+  | SAssert (attrs, e) ->
+      let sAssert = if attrs.is_inv then "invariant" else "assert" in
+      let sSplit = if attrs.is_split then "{:split_here}" else "" in
+      let sRefined = if attrs.is_refined then "{:refined}" else "" in
+      ps.PrintLine (sAssert + sSplit + sRefined + " " + (string_of_exp e) + ";")
   | SCalc (oop, contents) ->
       ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
       ps.Indent();
@@ -146,7 +150,6 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ) contents;
       ps.Unindent();
       ps.PrintLine("}")
-  | SSplit -> ps.PrintLine ("assert{:split_here} true;")
   | SVar (x, tOpt, g, a, eOpt) ->
       let st = match tOpt with None -> "" | Some t -> ":" + (string_of_typ t) in
       let rhs = match eOpt with None -> "" | Some e -> " := " + (string_of_exp e) in
