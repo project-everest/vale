@@ -517,9 +517,14 @@ and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
 //   ecx < 10
 // into
 //   va_cmp_lt(var_ecx(), va_const_operand(10))
+// Turn
+//   f(ecx, 10, ...)
+// into
+//   va_cmp_f(var_ecx(), va_const_operand(10), ...)
 let rewrite_cond_exp (env:env) (e:exp):exp =
   let r = rewrite_vars_arg NotGhost (Some "cmp") In env in
   match skip_loc e with
+  | (EApply (Id xf, es)) -> vaApp ("cmp_" + xf) (List.map r es)
   | (EOp (op, es)) ->
     (
       match (op, es) with
@@ -529,9 +534,9 @@ let rewrite_cond_exp (env:env) (e:exp):exp =
       | (Bop BGe, [e1; e2]) -> vaApp "cmp_ge" [r e1; r e2]
       | (Bop BLt, [e1; e2]) -> vaApp "cmp_lt" [r e1; r e2]
       | (Bop BGt, [e1; e2]) -> vaApp "cmp_gt" [r e1; r e2]
-      | _ -> err ("conditional expression must be a comparison operation")
+      | _ -> err ("conditional expression must be a comparison operation or function call")
     )
-  | _ -> err ("conditional expression must be a comparison operation")
+  | _ -> err ("conditional expression must be a comparison operation or function call")
 
 let rec rewrite_vars_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
   match (lhss, e) with
