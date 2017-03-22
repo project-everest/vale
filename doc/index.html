@@ -838,12 +838,10 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
               <li>update_f(..., sM:state, sK:state):state</li>
             </ul>
           </li>
-          <li>cmp_eq(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_ne(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_le(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_ge(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_lt(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_gt(o1:cmp, o2:cmp):cmp</li>
+          <li>cmp_x(o1:cmp, o2:cmp):cmp for each comparison function x,
+            where x is either a user-defined function name (for conditional expressions x(o1, ..., on))
+            or one of "eq", "ne", "le", "ge", "lt", or "gt" (for conditional expressions o1 == o2, o1 != o2, etc.)
+          </li>
           <li>get_block(c:code):codes</li>
           <li>get_ifCond(c:code):cmp</li>
           <li>get_ifTrue(c:code):code</li>

@@ -139,7 +139,7 @@ procedure Ifs(inline i:int, ghost g:int)
     {
         Imm(ebx, 1);
     }
-    else if (eax <= 10)
+    else if (le(eax, 10)) // same as "eax <= 10"
     {
         Imm(ebx, 2);
     }
