@@ -974,7 +974,7 @@ let build_lemma_spec (env:env) (src:id) (res:exp) (loc:loc, s:spec):((loc * spec
 
 let filter_proc_attr (x, es) =
   match x with
-  | Id "timeLimit" | Id "timeLimitMultiplier" -> true
+  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic") -> true
   | _ -> false
   in
 

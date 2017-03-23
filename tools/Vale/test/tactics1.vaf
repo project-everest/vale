@@ -8,6 +8,7 @@ var{:state mem()} mem:int;
 
 #verbatim
 module Tactics1
+open FStar.Tactics
 
 (*
 module Map=FStar.Map
@@ -71,35 +72,35 @@ assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
 
 
 
-procedure Imm(out register x:int, inline y:int)
+procedure{:tactic smt} Imm(out register x:int, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure Increment(inout register x:int)
+procedure{:tactic smt} Increment(inout register x:int)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure Add(inout register x:int, register y:int)
+procedure{:tactic smt} Add(inout register x:int, register y:int)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure AddReg(inout register x:int, register y:int)
+procedure{:tactic smt} AddReg(inout register x:int, register y:int)
     ensures
         x == old(x + y);
 {
     Add(x, y); // coerces y from register to operand
 }
 
-procedure p()
+procedure{:tactic smt} p()
     modifies
         eax;
     requires
@@ -115,7 +116,7 @@ procedure p()
 let double (x:int):int = x + x
 #endverbatim
 
-procedure Calls()
+procedure{:tactic smt} Calls()
     modifies
         eax; ebx;
     ensures
@@ -128,7 +129,7 @@ procedure Calls()
     Add(eax, ebx);
 }
 
-procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+procedure{:tactic smt} Ghosts(ghost g1:int) returns(ghost g2:int)
     ensures
         g2 == g1 + 1;
 {
