@@ -22,7 +22,7 @@ type ins =
 
 (*
  * while construct has a loop invariant
- * currently it is a mem_opr, but we can introduce an expression language to enrich it
+ * currently it is a mem_opr, but we could introduce an expression language to enrich it
  *)
 type code =
   | Ins   : ins:ins -> code
@@ -32,8 +32,10 @@ type code =
 
 type codes = list code
 
+(* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
 type map (key:eqtype) (value:Type) = Map.t key value
 
+(* state type, noeq qualifier means that this type does not have decidable equality (because of the maps) *)
 noeq type state = {
   ok  :bool;
   regs:map reg int;
@@ -44,9 +46,14 @@ assume val empty_reg:int
 
 open FStar.Map
 
+(* syntax for map accesses, m.[key] and m.[key] <- value *)
 let op_String_Access     = sel
 let op_String_Assignment = upd
 
+(*
+ * writing all the functions as Tot functions
+ *)
+ 
 let eval_reg (r:reg) (s:state) :int =
   if s.regs `contains` r then s.regs.[r] else empty_reg
 
@@ -107,6 +114,11 @@ let decr (c:code) (s:state) :nat =
     if n >= 0 then n else 0
   | _             -> 0
 
+(*
+ * these functions return an option state
+ * None case arises when the while loop invariant fails to hold
+ *)
+
 val eval_code_fn:  c:code           -> s:state -> Tot (option state) (decreases %[c; decr c s; 1])
 val eval_codes_fn: l:codes          -> s:state -> Tot (option state) (decreases %[l])
 val eval_while_fn: c:code{While? c} -> s:state -> Tot (option state) (decreases %[c; decr c s; 0])
@@ -131,18 +143,18 @@ and eval_while_fn c s_0 = (* trying to mimic the eval_while predicate using a fu
   let b = eval_ocmp s_0 cond in
 
   if n_0 <= 0 then
-    if b then None else Some s_0
-  else
-    if not b then None
+    if b then None else Some s_0  //if loop invariant is <= 0, the guard must be false
+  else  //loop invariant > 0
+    if not b then None  //guard must evaluate to true
     else
       let s_opt = eval_code_fn body s_0 in
       if None? s_opt then None
       else
         let s_1 = Some?.v s_opt in
-	if not s_1.ok then Some s_1
+	if not s_1.ok then Some s_1  //this is from the reference semantics, if ok flag is unset, return
 	else
 	  let n_1 = eval_mem_opr inv s_1 in
-	  if n_1 >= n_0 then None
+	  if n_1 >= n_0 then None  //loop invariant must decrease
 	  else eval_while_fn c s_1
 
 (* now define the predicates as in the reference semantics *)
