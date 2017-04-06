@@ -32,12 +32,13 @@ envDict = {'TARGET_ARCH':target_arch,
 env = Environment(**envDict)
 if sys.platform == 'win32':
   env.Replace(CCPDBFLAGS='/Zi /Fd${TARGET.base}.pdb')
-  env.Append(CCFLAGS=['/Ox', '/Gz'])
+  # Use kremlib.h without primitive support for uint128_t.
+  env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
-  env.Append(CCFLAGS=['-O3', '-flto', '-g'])
+  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DNOUINT128'])
   env['MONO'] = 'mono'
 
 # Convert NUMBER_OF_PROCESSORS into '-j n'.
@@ -342,7 +343,7 @@ def kremlin_emitter(target, source, env):
 # Add env.Kremlin(), to extract .c/.h from .json.  The builder returns
 # two targets, the .c file first, followed by the .h file.
 def add_kremlin(env):
-  env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\"'
+  env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc'
   kremlin = Builder(action='cd ${TARGET.dir} && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
                            suffix = '.c',
                            src_suffix = '.json',
