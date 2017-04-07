@@ -38,7 +38,7 @@ if sys.platform == 'win32':
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
-  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DNOUINT128'])
+  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128'])
   env['MONO'] = 'mono'
 
 # Convert NUMBER_OF_PROCESSORS into '-j n'.
