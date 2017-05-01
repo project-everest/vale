@@ -1,0 +1,94 @@
+#verbatim
+open Vale
+open Semantics
+#endverbatim
+
+var{:state ok()} ok:bool;
+var{:state reg(Rax)} rax:int;
+var{:state reg(RbX)} rbx:int;
+var{:state flags()} efl:int;
+var{:state mem()} mem:int;
+
+procedure{:instruction ins (Add64 dst src)} Add64Wrap(inout operand dst:uint64, mem_operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst + src);
+        //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
+{
+//    reveal evalCodeOpaque;
+//    reveal x86_ValidState;
+//    reveal BitwiseAdd64;
+//    this := this.(heaplets := old(this).heaplets);
+//    this := MaybeUpdateOk(old(this), this);
+//    ghost if (!this.ok)
+//    {
+//        this := this.(regs := this.regs[@dst.r := 0]);
+//    }
+}
+
+/*
+procedure Imm(out register x:int, inline y:int)
+    ensures
+        x == y;
+{
+    assume false;
+}
+
+procedure Increment(inout register x:int)
+    ensures
+        x == old(x) + 1;
+{
+    assume false;
+}
+
+procedure Add(inout register x:int, register y:int)
+    ensures
+        x == old(x + y);
+{
+    assume false;
+}
+
+procedure AddReg(inout register x:int, register y:int)
+    ensures
+        x == old(x + y);
+{
+    Add(x, y); // coerces y from register to operand
+}
+
+procedure p()
+    modifies
+        eax;
+    requires
+        eax >= 0;
+    ensures
+        eax >= 2;
+{
+    Increment(eax);
+    Increment(eax);
+}
+
+#verbatim
+let double (x:int):int = x + x
+#endverbatim
+
+procedure Calls()
+    modifies
+        eax; ebx;
+    ensures
+        eax == old(eax) + 3;
+{
+    Increment(eax);
+    Imm(ebx, double(1));
+    assert ebx == 2;
+    Add(eax, ebx);
+}
+
+procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+    ensures
+        g2 == g1 + 1;
+{
+    g2 := g1 + 1;
+}
+
+*/
