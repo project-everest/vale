@@ -19,16 +19,21 @@ procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint
         dst == old(add_mod(dst, src));
         //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
 {
-//    reveal evalCodeOpaque;
-//    reveal x86_ValidState;
-//    reveal BitwiseAdd64;
-//    this := this.(heaplets := old(this).heaplets);
-//    this := MaybeUpdateOk(old(this), this);
-//    ghost if (!this.ok)
-//    {
-//        this := this.(regs := this.regs[@dst.r := 0]);
-//    }
 }
+
+
+procedure p()
+    modifies
+        rax; efl;
+    requires
+        0 <= v(rax) && v(rax) < 10;
+    ensures
+        v(rax) == v(old(rax)) + 4;
+{
+    Add64Wrap(rax, 2);
+    Add64Wrap(rax, 2);
+}
+
 
 /*
 procedure Imm(out register x:int, inline y:int)

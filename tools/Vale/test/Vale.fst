@@ -25,11 +25,12 @@ type va_register = reg
 
 (* Constructors *)
 let va_op_operand_reg (r:reg) :va_operand = OReg r
-let va_const_operand (n:uint64) = OConst n
+let va_const_operand (n:int{ 0 <= n && n < uint64_max }) = OConst (uint_to_t n)
 let va_op_cmp_reg (r:reg) :va_cmp = OReg r
 let va_const_cmp (n:uint64) :va_cmp = OConst n
 let va_coerce_register_to_operand (r:va_register) :va_operand = OReg r
 let va_op_register (r:reg) :va_register = r
+let va_op_dst_operand_reg (r:reg{ not (Rsp? r) }) : va_dst_operand = OReg r
 
 (* Predicates *)
 let va_is_src_operand_uint64 (o:operand) (s:va_state) = true
