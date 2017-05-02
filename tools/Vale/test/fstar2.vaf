@@ -3,6 +3,7 @@ module FStar2
 
 open Vale
 open Semantics
+open FStar.UInt64
 #endverbatim
 
 var{:state ok()} ok:bool;
@@ -11,11 +12,11 @@ var{:state reg(RbX)} rbx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures
-        dst == old(dst + src);
+        dst == old(add_mod(dst, src));
         //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
 {
 //    reveal evalCodeOpaque;

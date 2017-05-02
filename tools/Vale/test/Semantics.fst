@@ -38,7 +38,10 @@ type operand =
   | OReg  : r:reg -> operand
   | OMem  : m:maddr -> operand
 
-type dst_op = o:operand { not(OConst? o || (OReg? o && Rsp? (OReg?.r o) )) }
+let valid_dst (o:operand) : bool =
+  not(OConst? o || (OReg? o && Rsp? (OReg?.r o) ))
+
+type dst_op = o:operand { valid_dst o }
 
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
