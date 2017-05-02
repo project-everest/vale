@@ -48,7 +48,7 @@ let va_update_ok (sM:va_state) (sK:va_state) :va_state  = { sK with ok = sM.ok }
 let va_update_flags  (sM:va_state) (sK:va_state) :va_state  = { sK with flags = sM.flags }
 let va_update_reg (r:reg) (sM:va_state) (sK:va_state) :va_state = { sK with regs = sK.regs.[r] <- va_get_reg r sM }
 let va_update_mem (sM:va_state) (sK:va_state) :va_state = { sK with mem = sM.mem }
-let va_opdate_operand (o:operand{OReg? o}) (sM:va_state) (sK:va_state) :va_state =
+let va_update_operand (o:operand{OReg? o}) (sM:va_state) (sK:va_state) :va_state =
   va_update_reg (OReg?.r o) sM sK 
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) :va_state = va_update_reg r sM sK
 
@@ -135,10 +135,12 @@ let va_lemma_whileTrue (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_sta
 				  Some(s_1) == eval_code c s_0' /\
 				  (if s_1.ok then Some(sN) == eval_while c s_1 else s_1 == sN)))
 (* REVIEW: Why does the first let below produce a type error? *)				  
+(*
   = let foo = s_0 in
     let s1 = Some?.v (eval_code c s_0) in
     assert foo == s_0
     foo, s1
+    *)
   = s_0, Some?.v (eval_code c s_0)
 (*
 let va_lemma_whileFalse (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
