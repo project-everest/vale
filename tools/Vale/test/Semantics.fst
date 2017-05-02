@@ -1,9 +1,8 @@
 module Semantics
 
 open FStar.BaseTypes
-open FStar.UInt64
-(* REVIEW: Why can't I open this? 
-open FStar.Int.Cast *)
+open FStar.UInt64 
+open FStar.Int.Cast
 open FStar.Map
 open FStar.Mul
 
@@ -101,7 +100,6 @@ let op_String_Assignment = upd
  * writing all the functions as Tot functions
  *)
 
-(* REVIEW: Is it preferred for r:reg to proceed s:state?  Does it come down to which one (if any) we're more likely to want to curry? *)
 let eval_reg (r:reg) (s:state) :uint64 =
   if s.regs `contains` r then s.regs.[r] else invalid
 
@@ -117,14 +115,13 @@ let valid_resolved_addr (ptr:int) (m:mem) :bool =
 let eval_mem (ptr:int) (s:state) :uint64 =
   if s.mem `contains` ptr then s.mem.[ptr] else invalid
 
+(* REVIEW: Use FStar.Integers? *)
 let eval_maddr (m:maddr) (s:state) :int =
   match m with
   | MConst n -> n
   | MReg reg offset -> (FStar.UInt64.v (eval_reg reg s)) + offset
-  | MIndex _ _ _ _ -> 42
-  (* TODO: Should be the following, but it doesn't type check for some reason
-  | MIndex base scale index offset -> (FStar.UInt64.v (eval_reg base s)) + (scale * (FStar.UInt64.v (eval_reg index s))) + offset
-  *)
+  | MIndex base scale index offset -> (v (eval_reg base s)) + (scale * (v (eval_reg index s))) + offset
+
 
 let eval_operand (o:operand) (s:state) :uint64 =
   match o with
@@ -132,11 +129,10 @@ let eval_operand (o:operand) (s:state) :uint64 =
   | OReg r   -> eval_reg r s
   | OMem m   -> eval_mem (eval_maddr m s) s
 
-(* REVIEW: Is it strange to have a dangling v before each term? 
-   REVIEW: Do the boolean operators below mean what I think they mean? *)
+(* REVIEW: Is it strange to have a dangling v before each term? *)
 let eval_ocmp (s:state) (c:ocmp) :bool =
   match c with
-  | OEq o1 o2 -> v (eval_operand o1 s) =  v (eval_operand o2 s)
+  | OEq o1 o2 -> v (eval_operand o1 s) = v (eval_operand o2 s)
   | ONe o1 o2 -> v (eval_operand o1 s) <> v (eval_operand o2 s)
   | OLe o1 o2 -> v (eval_operand o1 s) <= v (eval_operand o2 s)
   | OGe o1 o2 -> v (eval_operand o1 s) >= v (eval_operand o2 s)
@@ -157,23 +153,26 @@ let update_operand_and_flags (o:dst_op) (s:state) (ins:ins) (v:uint64) :state =
 
 (* REVIEW: Is there a cleaner way to write this? *)
 let cf (flags:uint64) :bool =
-  (v (logand flags (uint_to_t 1))) > 0
+  v (logand flags 1uL) > 0
 
-(* REVIEW: Is there a way to write a numeric literal without a cast *)
 let update_cf (flags:uint64) (cf:bool) :uint64 =
-  if cf then logor flags (uint_to_t 1)
+  if cf then logor flags 1uL
   else flags
 
-(* REVIEW: How can I tell I got the constant on the next two lines correct? *)
 let uint32_max = 0x100000000
 let uint64_max = 0x10000000000000000
+let _ = assert_norm (pow2 32 = uint32_max)    (* Sanity check our constant *)
+let _ = assert_norm (pow2 64 = uint64_max)    (* Sanity check our constant *)
 
-(* REVIEW: What's the best way to handle "valid shift amount" for shift instructions?  It depends on ins and state *)
+(* REVIEW: What's the best way to handle "valid shift amount" for shift instructions?  It depends on ins and state.
+           Approach below makes the machine go bad if you use an invalid amount
+ *)
 let valid_shift_operand (o:operand) (s:state) :bool =
   (OConst? o && 0 <= v (OConst?.n o) && v (OConst?.n o) < 32) 
   || 
   ((OReg? o) && (Rcx? (OReg?.r o)) && v (eval_operand o s) < uint32_max)
 
+#reset-options "--z3rlimit 100"
 let eval_ins (ins:ins) (s:state) :state =
   if not s.ok then s
   else
@@ -192,14 +191,14 @@ let eval_ins (ins:ins) (s:state) :state =
 		  { update_reg Rax (update_reg Rdx s hi) lo with flags = havoc s ins }
     | IMul64 dst src -> update_operand_and_flags dst s ins (eval_operand dst s *%^ eval_operand src s)	  
     | Xor64 dst src -> update_operand_and_flags dst s ins (eval_operand dst s ^^ eval_operand src s)	  
-    | Shr64 dst amt -> if valid_shift_operand amt s then
-			 s
-			 (* REVIEW: Why doesn't the following work?
-			 update_operand_and_flags dst s ins (shift_right (eval_operand dst s) (UInt32.uint_to_t (v (eval_operand amt s)))) *)
-		        (* update_operand_and_flags dst s ins (shift_right (eval_operand dst s) (uint64_to_uint32 (eval_operand amt s))) *)	  
+    | Shr64 dst amt -> if valid_shift_operand amt s then			
+		        update_operand_and_flags dst s ins (shift_right (eval_operand dst s) (uint64_to_uint32 (eval_operand amt s)))
 		      else
 			{ s with ok = false }
-    | Shl64 dst amt -> s  (* TODO: Follow the format of Shr64, once it works *)
+    | Shl64 dst amt -> if valid_shift_operand amt s then			
+		        update_operand_and_flags dst s ins (shift_left (eval_operand dst s) (uint64_to_uint32 (eval_operand amt s)))
+		      else
+			{ s with ok = false }
 
 
 (*
