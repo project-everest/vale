@@ -11,7 +11,7 @@ var{:state reg(RbX)} rbx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-procedure{:instruction ins(Add64(dst,src))} Add64Wrap(inout operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures
