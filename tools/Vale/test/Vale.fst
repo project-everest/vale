@@ -140,18 +140,12 @@ let va_lemma_whileTrue (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_sta
 	(ensures  (fun (s_0', s_1) -> s_0' == s_0         /\
 	                          eval_ocmp s_0 b      /\
 				  Some(s_1) == eval_code c s_0' /\
-				  (if s_1.ok then Some(sN) == eval_while c s_1 else s_1 == sN)))
-  = let foo = s_0 in
-    let s1 = Some?.v (eval_code c s_0) in
-    assert (foo == s_0);
-    foo, s1
- (*
+				  (if s_1.ok then Some(sN) == eval_while (While b c inv) s_1 else s_1 == sN)))
   = s_0, Some?.v (eval_code c s_0)
-  *)
-(*
+
 let va_lemma_whileFalse (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
   :Pure va_state (requires (v (eval_operand inv s_0) == 0 /\
                             Some(sN) == eval_while (While b c inv) s_0))
 		 (ensures  (fun s_1 -> s_0 == s_1 /\ s_1 == sN /\ not (eval_ocmp s_0 b)))
   = s_0
-*)
+
