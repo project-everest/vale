@@ -344,7 +344,7 @@ def kremlin_emitter(target, source, env):
 # two targets, the .c file first, followed by the .h file.
 def add_kremlin(env):
   env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc'
-  kremlin = Builder(action='cd ${TARGET.dir} && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
+  kremlin = Builder(action='cd ${TARGET.dir} && echo %PATH% && where libgmp-10.dll && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
                            suffix = '.c',
                            src_suffix = '.json',
                            emitter = kremlin_emitter)
