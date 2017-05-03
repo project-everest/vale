@@ -81,7 +81,12 @@ let va_get_whileCond (c:code{While? c}) :ocmp = While?.whileCond c
 let va_get_whileBody (c:code{While? c}) :code = While?.whileBody c
 
 
-let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 = s_0 == s_1
+let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 = 
+  s_0.ok == s_1.ok /\
+  Map.equal s_0.regs s_1.regs /\
+  s_0.flags == s_1.flags /\
+  Map.equal s_0.mem s_1.mem
+  
 
 let va_require (block:va_codes) (c:va_code) (s_0:va_state) (s_1:va_state) :Type0 =
   Cons? block                         /\
