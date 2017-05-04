@@ -2,7 +2,6 @@ module Vale
 
 open Semantics
 open FStar.BaseTypes
-open FStar.UInt64
 open FStar.Map
 
 (***** Vale Interface *****)
@@ -25,9 +24,9 @@ type va_register = reg
 
 (* Constructors *)
 let va_op_operand_reg (r:reg) :va_operand = OReg r
-let va_const_operand (n:int{ 0 <= n && n < uint64_max }) = OConst (uint_to_t n)
+let va_const_operand (n:nat64) = OConst n
 let va_op_cmp_reg (r:reg) :va_cmp = OReg r
-let va_const_cmp (n:uint64) :va_cmp = OConst n
+let va_const_cmp (n:nat64) :va_cmp = OConst n
 let va_coerce_register_to_operand (r:va_register) :va_operand = OReg r
 let va_op_register (r:reg) :va_register = r
 let va_op_dst_operand_reg (r:reg{ not (Rsp? r) }) : va_dst_operand = OReg r
@@ -41,8 +40,8 @@ let va_is_dst_register (r:reg) (s:va_state) :bool = true
 
 (* Getters *)
 let va_get_ok (s:va_state) :bool = s.ok
-let va_get_flags (s:va_state) :uint64 = s.flags
-let va_get_reg (r:reg) (s:va_state) :uint64 = eval_reg r s
+let va_get_flags (s:va_state) :nat64 = s.flags
+let va_get_reg (r:reg) (s:va_state) :nat64 = eval_reg r s
 let va_get_mem (s:va_state) :mem = s.mem
 
 (* Setters *)
@@ -60,10 +59,10 @@ let va_update_dst_operand (o:dst_op) (sM:va_state) (sK:va_state) :va_state =
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) :va_state = va_update_reg r sM sK
 
 (* Evaluation *)
-let va_eval_operand_uint64 (s:va_state) (o:va_operand) :uint64 = eval_operand o s
-let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :uint64 = eval_operand o s
-let va_eval_cmp_uint64 (s:va_state) (r:va_cmp) :uint64 = eval_operand r s
-let va_eval_register_uint64 (s:va_state) (r:va_register) :uint64 = eval_reg r s
+let va_eval_operand_uint64 (s:va_state) (o:va_operand) :nat64 = eval_operand o s
+let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :nat64 = eval_operand o s
+let va_eval_cmp_uint64 (s:va_state) (r:va_cmp) :nat64 = eval_operand r s
+let va_eval_register_uint64 (s:va_state) (r:va_register) :nat64 = eval_reg r s
 
 
 (* Dealing with code *)
@@ -128,7 +127,7 @@ let va_lemma_ifElse (ifb:ocmp) (ct:code) (cf:code) (s_0:va_state) (sN:va_state)
   = eval_ocmp s_0 ifb, s_0
 
 let va_whileInv (b:ocmp) (c:code{While? c}) (inv:operand) (s_0:va_state) (sN:va_state) =
-  v (eval_operand inv s_0) >= 0           /\
+  eval_operand inv s_0 >= 0           /\
   (forall (r:reg). s_0.regs `contains` r) /\
   Some(sN) == eval_while c s_0
 
@@ -140,7 +139,7 @@ let va_lemma_while (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
 
 let va_lemma_whileTrue (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
   :Pure (va_state * va_state)
-        (requires (v (eval_operand inv s_0) > 0 /\
+        (requires (eval_operand inv s_0 > 0 /\
 	           Some(sN) == eval_while (While b c inv) s_0))
 	(ensures  (fun (s_0', s_1) -> s_0' == s_0         /\
 	                          eval_ocmp s_0 b      /\
@@ -149,7 +148,7 @@ let va_lemma_whileTrue (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_sta
   = s_0, Some?.v (eval_code c s_0)
 
 let va_lemma_whileFalse (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
-  :Pure va_state (requires (v (eval_operand inv s_0) == 0 /\
+  :Pure va_state (requires (eval_operand inv s_0 == 0 /\
                             Some(sN) == eval_while (While b c inv) s_0))
 		 (ensures  (fun s_1 -> s_0 == s_1 /\ s_1 == sN /\ not (eval_ocmp s_0 b)))
   = s_0

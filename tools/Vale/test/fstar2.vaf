@@ -16,7 +16,7 @@ procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint
     modifies
         efl;
     ensures
-        dst == old(add_mod(dst, src));
+        dst == old(dst + src) % nat64_max;
         //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
 {
 }
@@ -26,9 +26,9 @@ procedure p()
     modifies
         rax; efl;
     requires
-        0 <= v(rax) && v(rax) < 10;
+        0 <= rax && rax < 10;
     ensures
-        v(rax) == v(old(rax)) + 4;
+        rax == old(rax) + 4;
 {
     Add64Wrap(rax, 2);
     Add64Wrap(rax, 2);
