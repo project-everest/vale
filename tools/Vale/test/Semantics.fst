@@ -195,11 +195,12 @@ let bind (m : st) (f: state -> st) : st =
   | None -> None
   | Some x -> f x s
 
-
 let get (): st =
   fun s -> Some s
+  
 let set (s: state): st =
   fun _ -> Some s
+  
 let fail (): st =
   fun s -> None
   
@@ -214,18 +215,16 @@ let update_operand (dst:dst_op) (v:nat64): st =
   s <-- get ();
   set (update_operand' dst v s)
 
-let example (m :st)  (dst:dst_op) (src:operand): st =
-  check m (valid_operand dst);;
-  check m (valid_operand src);;
+let example (dst:dst_op) (src:operand): st =
+  check (valid_operand dst);;
+  check (valid_operand src);;
   update_operand dst 2
 
 let test (dst:dst_op) (src:operand) (s:state) :state =
-  let maybe_s = (example (return s) dst src) s in
+  let maybe_s = (example dst src) s in
     match maybe_s with
     | None -> { s with ok = false }
     | Some s_new -> s_new
-
-(*
 
 open FStar.Mul
 
@@ -234,17 +233,17 @@ let eval_ins (ins:ins) (s:state) :state =
   if not s.ok then s
   else
     let maybe_s = 
-      match ins with 
-      | Mov64 dst src -> check (valid_operand dst);;
-			check (valid_operand src);;
-			return update_operand dst (eval_operand src s)
-      | _ -> return s
-      ;s
+      (match ins with 
+       | Mov64 dst src -> check (valid_operand dst);;
+			 check (valid_operand src);;
+			 update_operand dst (eval_operand src s)
+       (* TODO: Fill in the rest of the instructions here *)
+       | _ -> return s
+      ) s
     in
       match maybe_s with
-	None -> { s with ok = false }
-	Some s_new -> s_new
-*)
+      | None -> { s with ok = false }
+      | Some s_new -> s_new
 (*
     match ins with 
     | Mov64 dst src -> if valid_operand dst s && valid_operand src s then      
