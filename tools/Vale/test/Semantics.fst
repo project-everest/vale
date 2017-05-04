@@ -2,7 +2,6 @@ module Semantics
 
 open FStar.BaseTypes
 open FStar.Map
-open FStar.Mul
 
 (* Define some transparently refined int types, 
    since we only use them in specs, not in emitted code *)
@@ -119,10 +118,11 @@ let eval_mem (ptr:int) (s:state) :nat64 =
   s.mem.[ptr]
 
 let eval_maddr (m:maddr) (s:state) :int =
-  match m with
-  | MConst n -> n
-  | MReg reg offset -> (eval_reg reg s) + offset
-  | MIndex base scale index offset -> eval_reg base s + scale * eval_reg index s + offset
+  let open FStar.Mul in
+    match m with
+    | MConst n -> n
+    | MReg reg offset -> (eval_reg reg s) + offset
+    | MIndex base scale index offset -> eval_reg base s + scale * eval_reg index s + offset
 
 let eval_operand (o:operand) (s:state) :nat64 =
   match o with
@@ -140,17 +140,17 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
   | OLt o1 o2 -> eval_operand o1 s < eval_operand o2 s
   | OGt o1 o2 -> eval_operand o1 s > eval_operand o2 s
 
-let update_reg (r:reg) (s:state) (v:nat64) :state = { s with regs = s.regs.[r] <- v }
+let update_reg (r:reg) (v:nat64) (s:state) :state = { s with regs = s.regs.[r] <- v }
 
-let update_mem (ptr:int) (s:state) (v:nat64) :state = { s with mem = s.mem.[ptr] <- v }
+let update_mem (ptr:int) (v:nat64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
 
-let update_operand (o:dst_op) (s:state) (v:nat64) :state =
+let update_operand' (o:dst_op) (v:nat64) (s:state) :state =
   match o with
-  | OReg r   -> update_reg r s v
-  | OMem m   -> update_mem (eval_maddr m s) s v
+  | OReg r   -> update_reg r v s
+  | OMem m   -> update_mem (eval_maddr m s) v s
 
-let update_operand_and_flags (o:dst_op) (s:state) (ins:ins) (v:nat64) :state =
-  { (update_operand o s v) with flags = havoc s ins }
+let update_operand_and_flags' (o:dst_op) (ins:ins) (v:nat64) (s:state) :state =
+  { (update_operand' o v s) with flags = havoc s ins }
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
 let cf (flags:nat64) :bool =
@@ -171,17 +171,91 @@ let update_cf (flags:nat64) (new_cf:bool) :nat64 =
 (* REVIEW: What's the best way to handle "valid shift amount" for shift instructions?  It depends on ins and state.
            Approach below makes the machine go bad if you use an invalid amount
  *)
+
+let valid_maddr (m:maddr) (s:state) :bool =
+  s.mem `contains` (eval_maddr m s)
+
+let valid_operand (o:operand) (s:state) :bool =
+  not (OMem? o) || (OMem? o && valid_maddr (OMem?.m o) s)
+
 let valid_shift_operand (o:operand) (s:state) :bool =
   (OConst? o && 0 <= OConst?.n o && OConst?.n o < 32) 
   || 
   ((OReg? o) && (Rcx? (OReg?.r o)) && eval_operand o s < nat32_max)
 
+
+let st t = state -> option (t * state)
+
+let return (x : 'a) : st 'a =
+  fun s -> Some (x, s)
+
+let bind (m : st 'a) (f: 'a -> st 'b) : st 'b =
+  fun s ->
+  match m s with
+  | None -> None
+  | Some (x, s) -> f x s
+
+
+let get (): st state =
+  fun s -> Some (s, s)
+let set (s: state): st unit =
+  fun _ -> Some ((), s)
+let fail #a (): st a =
+  fun s -> None
+  
+
+let check (m :st state) (valid: state -> bool) : st unit =
+  s <-- m;
+  if valid s then
+    return ()
+  else 
+    fail ()
+
+let update_operand (dst:dst_op) (v:nat64): st unit =
+  s <-- get ();
+  set (update_operand' dst v s)
+
+let example (m :st state)  (dst:dst_op) (src:operand): st unit =
+  check m (valid_operand dst);;
+  check m (valid_operand src);;
+  update_operand dst 2
+
+let test (dst:dst_op) (src:operand) (s:state) :state =
+  let maybe_pair = (example (return s) dst src) s in
+    match maybe_pair with
+    | None -> { s with ok = false }
+    | Some (_, s_new) -> s_new
+
+(*
+valid_operand dst s;;
+valid_operand src s;;
+return update_operand dst s (eval_operand src s)
+
+open FStar.Mul
+
+
 #reset-options "--z3rlimit 100"
 let eval_ins (ins:ins) (s:state) :state =
   if not s.ok then s
   else
+    let maybe_s = 
+      match ins with 
+      | Mov64 dst src -> check (valid_operand dst);;
+			check (valid_operand src);;
+			return update_operand dst (eval_operand src s)
+      | _ -> return s
+      ;s
+    in
+      match maybe_s with
+	None -> { s with ok = false }
+	Some s_new -> s_new
+*)
+(*
     match ins with 
-    | Mov64 dst src -> update_operand dst s (eval_operand src s)
+    | Mov64 dst src -> if valid_operand dst s && valid_operand src s then      
+			 update_operand dst s (eval_operand src s)
+		      else
+			 { s with ok = false }
     | Add64 dst src -> update_operand_and_flags dst s ins ((eval_operand dst s + eval_operand src s) % nat64_max)
     | AddLea64 dst src1 src2 -> update_operand_and_flags dst s ins ((eval_operand src1 s + eval_operand src2 s) % nat64_max)
     | AddCarry64 dst src -> let old_carry = if cf(s.flags) then 1 else 0 in
@@ -194,16 +268,16 @@ let eval_ins (ins:ins) (s:state) :state =
 		  let lo = product % nat64_max in
 		  { update_reg Rax (update_reg Rdx s hi) lo with flags = havoc s ins }
     | IMul64 dst src -> update_operand_and_flags dst s ins ((eval_operand dst s * eval_operand src s) % nat64_max)	  
-    | Xor64 dst src -> update_operand_and_flags dst s ins (FStar.Int.logxor #64 (eval_operand dst s) (eval_operand src s))	  
+    | Xor64 dst src -> update_operand_and_flags dst s ins (FStar.UInt.logxor #64 (eval_operand dst s) (eval_operand src s))	  
     | Shr64 dst amt -> if valid_shift_operand amt s then			
-		        update_operand_and_flags dst s ins (FStar.Int.shift_right #64 (eval_operand dst s) (eval_operand amt s))
+		        update_operand_and_flags dst s ins (FStar.UInt.shift_right #64 (eval_operand dst s) (eval_operand amt s))
 		      else
 			{ s with ok = false }
     | Shl64 dst amt -> if valid_shift_operand amt s then			
-		        update_operand_and_flags dst s ins (FStar.Int.shift_left #64 (eval_operand dst s) (eval_operand amt s))
+		        update_operand_and_flags dst s ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
 		      else
 			{ s with ok = false }
-
+*)
 
 (*
  * the decreases clause

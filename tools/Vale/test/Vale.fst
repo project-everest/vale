@@ -44,7 +44,7 @@ let va_get_flags (s:va_state) :nat64 = s.flags
 let va_get_reg (r:reg) (s:va_state) :nat64 = eval_reg r s
 let va_get_mem (s:va_state) :mem = s.mem
 
-(* Setters *)
+(* Framing: va_update_foo means the two states are the same except for foo *)
 let va_update_ok (sM:va_state) (sK:va_state) :va_state  = { sK with ok = sM.ok }
 let va_update_flags  (sM:va_state) (sK:va_state) :va_state  = { sK with flags = sM.flags }
 let va_update_reg (r:reg) (sM:va_state) (sK:va_state) :va_state = { sK with regs = sK.regs.[r] <- va_get_reg r sM }
