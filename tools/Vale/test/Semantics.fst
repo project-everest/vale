@@ -140,13 +140,13 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
   | OLt o1 o2 -> eval_operand o1 s < eval_operand o2 s
   | OGt o1 o2 -> eval_operand o1 s > eval_operand o2 s
 
-let update_reg (r:reg) (v:nat64) (s:state) :state = { s with regs = s.regs.[r] <- v }
+let update_reg' (r:reg) (v:nat64) (s:state) :state = { s with regs = s.regs.[r] <- v }
 
 let update_mem (ptr:int) (v:nat64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
 
 let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) :state =
   match o with
-  | OReg r   -> update_reg r v s
+  | OReg r   -> update_reg' r v s
   | OMem m   -> update_mem (eval_maddr m s) v s
 
 let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) :state =
@@ -223,11 +223,20 @@ let update_operand_preserve_flags (dst:dst_op) (v:nat64): st =
  check (valid_operand dst);;  
   s <-- get ();
   set (update_operand_preserve_flags' dst v s)
- 
+
+(* Default version havocs flags *)
 let update_operand (dst:dst_op) (ins:ins) (v:nat64): st =
  check (valid_operand dst);;
   s <-- get ();
   set (update_operand' dst ins v s)
+
+let update_reg (r:reg) (v:nat64) : st =
+  s <-- get();
+  set (update_reg' r v s)
+
+let update_flags (new_flags:nat64) : st =
+  s <-- get();
+  set ( { s with flags = new_flags } )
 
 let example (dst:dst_op) (src:operand): st =
   check (valid_operand dst);;
@@ -248,10 +257,56 @@ let eval_ins (ins:ins) (s:state) :state =
   else
     let maybe_s = 
       (match ins with 
-       | Mov64 dst src -> check (valid_operand src);;
-			 update_operand_preserve_flags dst (eval_operand src s)
-       (* TODO: Fill in the rest of the instructions here *)
-       | _ -> return s
+       | Mov64 dst src -> 
+	 check (valid_operand src);;
+	 update_operand_preserve_flags dst (eval_operand src s)
+
+       | Add64 dst src -> 
+	 check (valid_operand src);;
+	 update_operand dst ins ((eval_operand dst s + eval_operand src s) % nat64_max)
+			 
+       | AddLea64 dst src1 src2 -> 
+	 check (valid_operand src1);;
+	 check (valid_operand src2);;
+	 update_operand dst ins ((eval_operand src1 s + eval_operand src2 s) % nat64_max)
+	 
+       | AddCarry64 dst src -> 
+	 let old_carry = if cf(s.flags) then 1 else 0 in
+	 let sum = eval_operand dst s + eval_operand src s + old_carry in			 		      
+	 let new_carry = sum > nat64_max in
+	 check (valid_operand src);;
+	 update_operand_preserve_flags dst (sum % nat64_max);;
+	 update_flags (update_cf s.flags new_carry)
+
+       | Sub64 dst src -> 
+	 check (valid_operand src);;
+	 update_operand dst ins ((eval_operand dst s - eval_operand src s) % nat64_max)
+	 
+       | Mul64 src -> 
+	 let product = eval_reg Rax s * eval_operand src s in
+	 let hi = product / nat64_max in
+	 let lo = product % nat64_max in
+	 check (valid_operand src);;
+	 update_reg Rax lo;;
+	 update_reg Rdx hi;;
+	 update_flags (havoc s ins)
+	   
+       | IMul64 dst src -> 
+	 check (valid_operand src);;
+	 update_operand dst ins ((eval_operand dst s * eval_operand src s) % nat64_max)	  
+	 
+       | Xor64 dst src -> 
+	 check (valid_operand src);;
+	 update_operand dst ins (FStar.UInt.logxor #64 (eval_operand dst s) (eval_operand src s))	  
+	 
+       | Shr64 dst amt -> 
+	 check (valid_shift_operand amt);;
+	 update_operand dst ins (FStar.UInt.shift_right #64 (eval_operand dst s) (eval_operand amt s))
+
+       | Shl64 dst amt ->
+	 check (valid_shift_operand amt);;
+	 update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
+
       ) s
     in
       match maybe_s with
