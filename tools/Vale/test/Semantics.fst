@@ -113,7 +113,6 @@ let valid_resolved_addr (ptr:int) (m:mem) :bool =
   m `contains` ptr + 3 
 *)
 
-(* REVIEW: Is returning invalid the right thing to do here?  Seems like we want !state.ok if this happens *)
 let eval_mem (ptr:int) (s:state) :nat64 =
   s.mem.[ptr]
 
@@ -130,7 +129,6 @@ let eval_operand (o:operand) (s:state) :nat64 =
   | OReg r   -> eval_reg r s
   | OMem m   -> eval_mem (eval_maddr m s) s
 
-(* REVIEW: Is it strange to have a dangling v before each term? *)
 let eval_ocmp (s:state) (c:ocmp) :bool =
   match c with
   | OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
@@ -167,10 +165,6 @@ let update_cf (flags:nat64) (new_cf:bool) :nat64 =
       flags - 1
     else
       flags
-
-(* REVIEW: What's the best way to handle "valid shift amount" for shift instructions?  It depends on ins and state.
-           Approach below makes the machine go bad if you use an invalid amount
- *)
 
 let valid_maddr (m:maddr) (s:state) :bool =
   s.mem `contains` (eval_maddr m s)
@@ -251,7 +245,7 @@ let test (dst:dst_op) (src:operand) (s:state) :state =
 
 open FStar.Mul
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 200"
 let eval_ins (ins:ins) (s:state) :state =
   if not s.ok then s
   else

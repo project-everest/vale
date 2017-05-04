@@ -32,7 +32,7 @@ let va_op_register (r:reg) :va_register = r
 let va_op_dst_operand_reg (r:reg{ not (Rsp? r) }) : va_dst_operand = OReg r
 
 (* Predicates *)
-let va_is_src_operand_uint64 (o:operand) (s:va_state) = true
+let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
 let va_is_dst_operand_uint64 (o:operand) (s:va_state) = valid_dst o
 let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = true
 let va_is_src_register_int (r:reg) (s:va_state) :bool = true
