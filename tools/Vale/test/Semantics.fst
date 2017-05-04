@@ -211,11 +211,21 @@ let check (valid: state -> bool) : st =
   else 
     fail()
 
+(*
+let check_eval_operand (valid: operand -> state -> bool) (o:operand) : nat64 * st =
+ check (valid o);;
+ s <-- get();
+ (2, return s)
+
+ (eval_operand o s, return s)
+*)
 let update_operand_preserve_flags (dst:dst_op) (v:nat64): st =
+ check (valid_operand dst);;  
   s <-- get ();
   set (update_operand_preserve_flags' dst v s)
-
+ 
 let update_operand (dst:dst_op) (ins:ins) (v:nat64): st =
+ check (valid_operand dst);;
   s <-- get ();
   set (update_operand' dst ins v s)
 
@@ -238,8 +248,7 @@ let eval_ins (ins:ins) (s:state) :state =
   else
     let maybe_s = 
       (match ins with 
-       | Mov64 dst src -> check (valid_operand dst);;
-			 check (valid_operand src);;
+       | Mov64 dst src -> check (valid_operand src);;
 			 update_operand_preserve_flags dst (eval_operand src s)
        (* TODO: Fill in the rest of the instructions here *)
        | _ -> return s
