@@ -184,55 +184,50 @@ let valid_shift_operand (o:operand) (s:state) :bool =
   ((OReg? o) && (Rcx? (OReg?.r o)) && eval_operand o s < nat32_max)
 
 
-let st t = state -> option (t * state)
+let st = state -> option state
 
-let return (x : 'a) : st 'a =
-  fun s -> Some (x, s)
+let return (x : state) : st =
+  fun s -> Some x
 
-let bind (m : st 'a) (f: 'a -> st 'b) : st 'b =
+let bind (m : st) (f: state -> st) : st =
   fun s ->
   match m s with
   | None -> None
-  | Some (x, s) -> f x s
+  | Some x -> f x s
 
 
-let get (): st state =
-  fun s -> Some (s, s)
-let set (s: state): st unit =
-  fun _ -> Some ((), s)
-let fail #a (): st a =
+let get (): st =
+  fun s -> Some s
+let set (s: state): st =
+  fun _ -> Some s
+let fail (): st =
   fun s -> None
   
-
-let check (m :st state) (valid: state -> bool) : st unit =
-  s <-- m;
+let check (valid: state -> bool) : st =
+  s <-- get();
   if valid s then
-    return ()
+    return s
   else 
-    fail ()
+    fail()
 
-let update_operand (dst:dst_op) (v:nat64): st unit =
+let update_operand (dst:dst_op) (v:nat64): st =
   s <-- get ();
   set (update_operand' dst v s)
 
-let example (m :st state)  (dst:dst_op) (src:operand): st unit =
+let example (m :st)  (dst:dst_op) (src:operand): st =
   check m (valid_operand dst);;
   check m (valid_operand src);;
   update_operand dst 2
 
 let test (dst:dst_op) (src:operand) (s:state) :state =
-  let maybe_pair = (example (return s) dst src) s in
-    match maybe_pair with
+  let maybe_s = (example (return s) dst src) s in
+    match maybe_s with
     | None -> { s with ok = false }
-    | Some (_, s_new) -> s_new
+    | Some s_new -> s_new
 
 (*
-valid_operand dst s;;
-valid_operand src s;;
-return update_operand dst s (eval_operand src s)
 
 open FStar.Mul
-
 
 #reset-options "--z3rlimit 100"
 let eval_ins (ins:ins) (s:state) :state =
