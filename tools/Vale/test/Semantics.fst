@@ -144,13 +144,13 @@ let update_reg (r:reg) (v:nat64) (s:state) :state = { s with regs = s.regs.[r] <
 
 let update_mem (ptr:int) (v:nat64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
 
-let update_operand' (o:dst_op) (v:nat64) (s:state) :state =
+let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) :state =
   match o with
   | OReg r   -> update_reg r v s
   | OMem m   -> update_mem (eval_maddr m s) v s
 
-let update_operand_and_flags' (o:dst_op) (ins:ins) (v:nat64) (s:state) :state =
-  { (update_operand' o v s) with flags = havoc s ins }
+let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) :state =
+  { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
 let cf (flags:nat64) :bool =
@@ -211,14 +211,18 @@ let check (valid: state -> bool) : st =
   else 
     fail()
 
-let update_operand (dst:dst_op) (v:nat64): st =
+let update_operand_preserve_flags (dst:dst_op) (v:nat64): st =
   s <-- get ();
-  set (update_operand' dst v s)
+  set (update_operand_preserve_flags' dst v s)
+
+let update_operand (dst:dst_op) (ins:ins) (v:nat64): st =
+  s <-- get ();
+  set (update_operand' dst ins v s)
 
 let example (dst:dst_op) (src:operand): st =
   check (valid_operand dst);;
   check (valid_operand src);;
-  update_operand dst 2
+  update_operand_preserve_flags dst 2
 
 let test (dst:dst_op) (src:operand) (s:state) :state =
   let maybe_s = (example dst src) s in
@@ -236,7 +240,7 @@ let eval_ins (ins:ins) (s:state) :state =
       (match ins with 
        | Mov64 dst src -> check (valid_operand dst);;
 			 check (valid_operand src);;
-			 update_operand dst (eval_operand src s)
+			 update_operand_preserve_flags dst (eval_operand src s)
        (* TODO: Fill in the rest of the instructions here *)
        | _ -> return s
       ) s
