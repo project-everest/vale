@@ -343,6 +343,11 @@ def kremlin_emitter(target, source, env):
 # Add env.Kremlin(), to extract .c/.h from .json.  The builder returns
 # two targets, the .c file first, followed by the .h file.
 def add_kremlin(env):
+  # In order to succeed, the Kremlin builder needs an extra directory in the
+  # PATH on Windows so that the DLL can be properly found.
+  gmp_dll = FindFile('libgmp-10.dll', os.environ['PATH'].split(';'))
+  if gmp_dll != None:
+    env.PrependENVPath('PATH', os.path.dirname(str(gmp_dll)))
   env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc'
   kremlin = Builder(action='cd ${TARGET.dir} && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
                            suffix = '.c',
