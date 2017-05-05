@@ -4,6 +4,9 @@ module FStar2
 open Vale
 open Semantics
 open FStar.UInt64
+
+#reset-options "--z3rlimit 20"
+
 #endverbatim
 
 var{:state ok()} ok:bool;
