@@ -180,10 +180,10 @@ let valid_shift_operand (o:operand) (s:state) :bool =
 
 let st = state -> option state
 
-let return (x : state) : st =
+unfold let return (x : state) : st =
   fun s -> Some x
 
-let bind (m : st) (f: state -> st) : st =
+unfold let bind (m : st) (f: state -> st) : st =
   fun s ->
   match m s with
   | None -> None
