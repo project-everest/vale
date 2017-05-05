@@ -269,7 +269,7 @@ let eval_ins (ins:ins) (s:state) :state =
 	 let sum = eval_operand dst s + eval_operand src s + old_carry in			 		      
 	 let new_carry = sum > nat64_max in
 	 check (valid_operand src);;
-	 update_operand_preserve_flags dst (sum % nat64_max);;
+	 update_operand dst ins (sum % nat64_max);;
 	 update_flags (update_cf s.flags new_carry)
 
        | Sub64 dst src -> 
