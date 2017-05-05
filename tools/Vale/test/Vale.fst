@@ -19,6 +19,7 @@ type va_code = code
 type va_state = state
 type va_operand = operand
 type va_dst_operand = dst_op
+type va_shift_amt = operand
 type va_cmp = operand
 type va_register = reg
 
@@ -37,6 +38,7 @@ let va_is_dst_operand_uint64 (o:operand) (s:va_state) = valid_dst o
 let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = valid_operand o s
 let va_is_src_register_int (r:reg) (s:va_state) :bool = true
 let va_is_dst_register (r:reg) (s:va_state) :bool = true
+let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_shift_operand o s
 
 (* Getters *)
 let va_get_ok (s:va_state) :bool = s.ok
@@ -61,6 +63,7 @@ let va_update_register (r:reg) (sM:va_state) (sK:va_state) :va_state = va_update
 (* Evaluation *)
 let va_eval_operand_uint64 (s:va_state) (o:va_operand) :nat64 = eval_operand o s
 let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :nat64 = eval_operand o s
+let va_eval_shift_amt_uint64 (s:va_state) (o:va_shift_amt) : nat64 = eval_operand o s
 let va_eval_cmp_uint64 (s:va_state) (r:va_cmp) :nat64 = eval_operand r s
 let va_eval_register_uint64 (s:va_state) (r:va_register) :nat64 = eval_reg r s
 
