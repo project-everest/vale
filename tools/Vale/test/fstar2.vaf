@@ -25,6 +25,7 @@ var{:state reg(Rdx)} rdx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
+/*
 procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
@@ -33,8 +34,8 @@ procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint
         //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
 {
 }
+*/
 
-/*
 procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst_operand dst:uint64, operand src1:uint64, operand src2:uint64)
     requires
         src1 + src2 < nat64_max;
@@ -43,6 +44,7 @@ procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst_operand 
 {
 }
 
+/*
 procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;

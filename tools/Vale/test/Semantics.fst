@@ -262,7 +262,7 @@ let eval_ins (ins:ins) (s:state) :state =
        | AddLea64 dst src1 src2 -> 
 	 check (valid_operand src1);;
 	 check (valid_operand src2);;
-	 update_operand dst ins ((eval_operand src1 s + eval_operand src2 s) % nat64_max)
+	 update_operand_preserve_flags dst ((eval_operand src1 s + eval_operand src2 s) % nat64_max)
 	 
        | AddCarry64 dst src -> 
 	 let old_carry = if cf(s.flags) then 1 else 0 in
