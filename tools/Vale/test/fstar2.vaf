@@ -5,13 +5,7 @@ open Vale
 open Semantics
 open FStar.UInt
 
-#reset-options "--z3rlimit 20"
-
-(* 
- * Can't open FStar.Mul, since Vale emits lemmas that use '*' to  create tuples 
- * Should come up with a different symbol though, since ** looks like Python's exponentiation
-let (**) = Prims.op_Multiply
- *)
+#reset-options "--z3rlimit 200"
 
 #endverbatim
 
@@ -49,7 +43,6 @@ procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst_operand ds
 {
 }
 
-/*
 procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst_operand dst:uint64, operand src:uint64)
     requires
         0 <= dst - src;
@@ -68,14 +61,6 @@ procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst_operand dst:uin
 {
 }
 
-procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst_operand dst:uint64, operand src:uint64)
-    modifies
-        efl;
-    ensures
-        dst == old(dst * src) % nat64_max;
-{
-}
-
 procedure{:instruction Ins(Mul64(src))} Mul64Wrap(operand src:uint64)
     modifies
         efl;
@@ -87,10 +72,24 @@ procedure{:instruction Ins(Mul64(src))} Mul64Wrap(operand src:uint64)
 {
 }
 
+procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst * src) % nat64_max;
+{
+}
+
 #verbatim
 
 let logxor64 (x:nat64) (y:nat64) :nat64 =
   logxor #64 x y
+
+let shift_left64 (x:nat64) (amt:nat64) :nat64 =
+  shift_left #64 x amt
+
+let shift_right64 (x:nat64) (amt:nat64) :nat64 =
+  shift_right #64 x amt
 
 #endverbatim
 
@@ -98,7 +97,7 @@ procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst_operand dst:uint64,
     modifies 
         efl;
     ensures
-        dst == old(logxor64 dst src)
+        dst == old(logxor64(dst,src));
 {
 }
 
@@ -109,17 +108,15 @@ procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst_operand dst:uint64,
 //    requires
 //        0 <= src < 64;
     ensures
-        dst == old(shift_left(dst, amt));
+        dst == old(shift_left64(dst, amt));
 {
 }
 
 procedure{:instruction Ins(Shr64(dst, amt))} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
     modifies
         efl;
-//    requires
-//        0 <= src < 64;
     ensures
-        dst == old(shift_right(dst, amt));
+        dst == old(shift_right64(dst, amt));
 {
 }
 
@@ -136,7 +133,6 @@ procedure p()
     Add64Wrap(rax, 2);
     Add64Wrap(rax, 2);
 }
-*)
 
 /*
 procedure Imm(out register x:int, inline y:int)
