@@ -34,7 +34,6 @@ procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint
         //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
 {
 }
-*/
 
 procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst_operand dst:uint64, operand src1:uint64, operand src2:uint64)
     requires
@@ -43,8 +42,8 @@ procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst_operand 
         dst == old(src1) + old(src2);
 {
 }
+*/
 
-/*
 procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
@@ -54,6 +53,7 @@ procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst_operand ds
 {
 }
 
+/*
 procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst_operand dst:uint64, operand src:uint64)
     requires
         0 <= dst - src;
