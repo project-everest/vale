@@ -154,7 +154,7 @@ let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) :state =
 let cf (flags:nat64) :bool =
   flags % 2 = 1
 
-let update_cf (flags:nat64) (new_cf:bool) :nat64 =
+let update_cf (flags:nat64) (new_cf:bool) : (new_flags:nat64{cf new_flags == new_cf}) =
   if new_cf then
     if not (cf flags) then
       flags + 1
@@ -187,7 +187,7 @@ unfold let bind (m : st) (f: state -> st) : st =
   fun s ->
   match m s with
   | None -> None
-  | Some x -> f x s
+  | Some x -> f x x
 
 let get (): st =
   fun s -> Some s
@@ -266,8 +266,8 @@ let eval_ins (ins:ins) (s:state) :state =
 	 
        | AddCarry64 dst src -> 
 	 let old_carry = if cf(s.flags) then 1 else 0 in
-	 let sum = eval_operand dst s + eval_operand src s + old_carry in			 		      
-	 let new_carry = sum > nat64_max in
+	 let sum = eval_operand dst s + eval_operand src s + old_carry in
+	 let new_carry = sum >= nat64_max in
 	 check (valid_operand src);;
 	 update_operand dst ins (sum % nat64_max);;
 	 update_flags (update_cf s.flags new_carry)

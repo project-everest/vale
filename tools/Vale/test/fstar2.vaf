@@ -5,9 +5,7 @@ open Vale
 open Semantics
 open FStar.UInt
 
-(*
 #reset-options "--z3rlimit 20"
-*)
 
 (* 
  * Can't open FStar.Mul, since Vale emits lemmas that use '*' to  create tuples 
@@ -25,7 +23,6 @@ var{:state reg(Rdx)} rdx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-/*
 procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
@@ -42,7 +39,6 @@ procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst_operand 
         dst == old(src1) + old(src2);
 {
 }
-*/
 
 procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
