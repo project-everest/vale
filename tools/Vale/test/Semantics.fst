@@ -178,32 +178,32 @@ let valid_shift_operand (o:operand) (s:state) :bool =
   ((OReg? o) && (Rcx? (OReg?.r o)) && eval_operand o s < nat32_max)
 
 
-let st = state -> option state
+let st (a:Type) = state -> option (a * state)
 
-unfold let return (x : state) : st =
-  fun s -> Some x
+unfold let return (#a:Type) (x:a) :st a =
+  fun s -> Some (x, s)
 
-unfold let bind (m : st) (f: state -> st) : st =
+unfold let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :st b =
   fun s ->
-  match m s with
-  | None -> None
-  | Some x -> f x x
+    match m s with
+    | None        -> None
+    | Some (x, s) -> f x s
 
-let get (): st =
-  fun s -> Some s
+let get () :st state =
+  fun s -> Some (s, s)
   
-let set (s: state): st =
-  fun _ -> Some s
+let set (s:state) :st unit =
+  fun _ -> Some ((), s)
   
-let fail (): st =
+let fail () :st unit =
   fun s -> None
   
-let check (valid: state -> bool) : st =
+let check (valid: state -> bool) :st unit =
   s <-- get();
   if valid s then
-    return s
+    return ()
   else 
-    fail()
+    fail ()
 
 (*
 let check_eval_operand (valid: operand -> state -> bool) (o:operand) : nat64 * st =
@@ -213,26 +213,27 @@ let check_eval_operand (valid: operand -> state -> bool) (o:operand) : nat64 * s
 
  (eval_operand o s, return s)
 *)
-let update_operand_preserve_flags (dst:dst_op) (v:nat64): st =
+
+let update_operand_preserve_flags (dst:dst_op) (v:nat64) :st unit =
  check (valid_operand dst);;  
   s <-- get ();
   set (update_operand_preserve_flags' dst v s)
 
 (* Default version havocs flags *)
-let update_operand (dst:dst_op) (ins:ins) (v:nat64): st =
+let update_operand (dst:dst_op) (ins:ins) (v:nat64) :st unit =
  check (valid_operand dst);;
   s <-- get ();
   set (update_operand' dst ins v s)
 
-let update_reg (r:reg) (v:nat64) : st =
+let update_reg (r:reg) (v:nat64) :st unit =
   s <-- get();
   set (update_reg' r v s)
 
-let update_flags (new_flags:nat64) : st =
+let update_flags (new_flags:nat64) :st unit =
   s <-- get();
   set ( { s with flags = new_flags } )
 
-let example (dst:dst_op) (src:operand): st =
+let example (dst:dst_op) (src:operand) :st unit =
   check (valid_operand dst);;
   check (valid_operand src);;
   update_operand_preserve_flags dst 2
@@ -240,8 +241,8 @@ let example (dst:dst_op) (src:operand): st =
 let test (dst:dst_op) (src:operand) (s:state) :state =
   let maybe_s = (example dst src) s in
     match maybe_s with
-    | None -> { s with ok = false }
-    | Some s_new -> s_new
+    | None             -> { s with ok = false }
+    | Some ((), s_new) -> s_new
 
 open FStar.Mul
 
@@ -304,8 +305,8 @@ let eval_ins (ins:ins) (s:state) :state =
       ) s
     in
       match maybe_s with
-      | None -> { s with ok = false }
-      | Some s_new -> s_new
+      | None             -> { s with ok = false }
+      | Some ((), s_new) -> s_new
 (*
     match ins with 
     | Mov64 dst src -> if valid_operand dst s && valid_operand src s then      
