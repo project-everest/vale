@@ -1,5 +1,5 @@
 #verbatim
-module FStar2
+module Decls
 
 open Vale
 open Semantics
@@ -16,6 +16,12 @@ var{:state reg(Rcx)} rcx:int;
 var{:state reg(Rdx)} rdx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
+
+procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst_operand dst:uint64, operand src:uint64)
+    ensures
+        dst == old(src);
+{
+}
 
 procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies

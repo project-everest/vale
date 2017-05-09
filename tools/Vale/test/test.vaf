@@ -1,16 +1,20 @@
+include "decls.vaf"
+
 #verbatim
 module Test
 
-(* open Vale *)
+open Semantics
+open Vale
 open Decls
 
 #endverbatim
+
 
 procedure p()
     modifies
         rax; efl;
     requires
-        0 <= rax && rax < 10;
+        rax < 10;
     ensures
         rax == old(rax) + 4;
 {
@@ -18,61 +22,23 @@ procedure p()
     Add64Wrap(rax, 2);
 }
 
-/*
-procedure Imm(out register x:int, inline y:int)
-    ensures
-        x == y;
-{
-    assume false;
-}
-
-procedure Increment(inout register x:int)
-    ensures
-        x == old(x) + 1;
-{
-    assume false;
-}
-
-procedure Add(inout register x:int, register y:int)
-    ensures
-        x == old(x + y);
-{
-    assume false;
-}
-
-procedure AddReg(inout register x:int, register y:int)
-    ensures
-        x == old(x + y);
-{
-    Add(x, y); // coerces y from register to operand
-}
-
-procedure p()
-    modifies
-        eax;
-    requires
-        eax >= 0;
-    ensures
-        eax >= 2;
-{
-    Increment(eax);
-    Increment(eax);
-}
-
 #verbatim
 let double (x:int):int = x + x
 #endverbatim
 
 procedure Calls()
+    requires 
+        rax < 7;
     modifies
-        eax; ebx;
+        rax; rbx; efl;
     ensures
-        eax == old(eax) + 3;
+        rax == old(rax) + 7;
 {
-    Increment(eax);
-    Imm(ebx, double(1));
-    assert ebx == 2;
-    Add(eax, ebx);
+    Add64Wrap(rax, 1);
+    Mov64(rbx, const(double(1)));
+    assert rbx == 2;
+    Add64Wrap(rax, rbx);
+    p();
 }
 
 procedure Ghosts(ghost g1:int) returns(ghost g2:int)
@@ -82,4 +48,3 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
     g2 := g1 + 1;
 }
 
-*/
