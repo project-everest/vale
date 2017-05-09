@@ -31,6 +31,8 @@ let va_const_cmp (n:nat64) :va_cmp = OConst n
 let va_coerce_register_to_operand (r:va_register) :va_operand = OReg r
 let va_op_register (r:reg) :va_register = r
 let va_op_dst_operand_reg (r:reg{ not (Rsp? r) }) : va_dst_operand = OReg r
+let va_coerce_operand_to_dst_operand (o:va_operand{ valid_dst o }) : va_dst_operand = o
+let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 
 (* Predicates *)
 let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
