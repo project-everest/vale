@@ -35,17 +35,17 @@ let va_coerce_operand_to_dst_operand (o:va_operand{ valid_dst o }) : va_dst_oper
 let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 
 (* Predicates *)
-let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
+let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand_b o s
 let va_is_dst_operand_uint64 (o:operand) (s:va_state) = valid_dst o
-let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = valid_operand o s
+let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = valid_operand_b o s
 let va_is_src_register_int (r:reg) (s:va_state) :bool = true
 let va_is_dst_register (r:reg) (s:va_state) :bool = true
-let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_shift_operand o s
+let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_shift_operand_b o s
 
 (* Getters *)
 let va_get_ok (s:va_state) :bool = s.ok
 let va_get_flags (s:va_state) :nat64 = s.flags
-let va_get_reg (r:reg) (s:va_state) :nat64 = eval_reg r s
+let va_get_reg (r:reg) (s:va_state) :nat64 = eval.eval_reg r s
 let va_get_mem (s:va_state) :mem = s.mem
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
@@ -63,11 +63,11 @@ let va_update_dst_operand (o:dst_op) (sM:va_state) (sK:va_state) :va_state =
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) :va_state = va_update_reg r sM sK
 
 (* Evaluation *)
-let va_eval_operand_uint64 (s:va_state) (o:va_operand) :nat64 = eval_operand o s
-let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :nat64 = eval_operand o s
-let va_eval_shift_amt_uint64 (s:va_state) (o:va_shift_amt) : nat64 = eval_operand o s
-let va_eval_cmp_uint64 (s:va_state) (r:va_cmp) :nat64 = eval_operand r s
-let va_eval_register_uint64 (s:va_state) (r:va_register) :nat64 = eval_reg r s
+let va_eval_operand_uint64 (s:va_state) (o:va_operand) :nat64 = eval.eval_operand o s
+let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :nat64 = eval.eval_operand o s
+let va_eval_shift_amt_uint64 (s:va_state) (o:va_shift_amt) : nat64 = eval.eval_operand o s
+let va_eval_cmp_uint64 (s:va_state) (r:va_cmp) :nat64 = eval.eval_operand r s
+let va_eval_register_uint64 (s:va_state) (r:va_register) :nat64 = eval.eval_reg r s
 
 
 (* Dealing with code *)
@@ -126,13 +126,13 @@ let va_lemma_empty (s_0:va_state) (sN:va_state)
 let va_lemma_ifElse (ifb:ocmp) (ct:code) (cf:code) (s_0:va_state) (sN:va_state)
   :Pure (bool * va_state)
         (requires (Some(sN) == eval_code (IfElse ifb ct cf) s_0))
-	(ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\
+	(ensures  (fun (cond, sM) -> cond == eval.eval_ocmp ifb s_0 /\
 	                          sM == s_0                 /\
 				  Some(sN) == (if cond then eval_code ct sM else eval_code cf sM)))
-  = eval_ocmp s_0 ifb, s_0
+  = eval.eval_ocmp ifb s_0, s_0
 
 let va_whileInv (b:ocmp) (c:code{While? c}) (inv:operand) (s_0:va_state) (sN:va_state) =
-  eval_operand inv s_0 >= 0           /\
+  eval.eval_operand inv s_0 >= 0           /\
   (forall (r:reg). s_0.regs `contains` r) /\
   Some(sN) == eval_while c s_0
 
@@ -144,17 +144,17 @@ let va_lemma_while (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
 
 let va_lemma_whileTrue (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
   :Pure (va_state * va_state)
-        (requires (eval_operand inv s_0 > 0 /\
+        (requires (eval.eval_operand inv s_0 > 0 /\
 	           Some(sN) == eval_while (While b c inv) s_0))
 	(ensures  (fun (s_0', s_1) -> s_0' == s_0         /\
-	                          eval_ocmp s_0 b      /\
+	                          eval.eval_ocmp b s_0      /\
 				  Some(s_1) == eval_code c s_0' /\
 				  (if s_1.ok then Some(sN) == eval_while (While b c inv) s_1 else s_1 == sN)))
   = s_0, Some?.v (eval_code c s_0)
 
 let va_lemma_whileFalse (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
-  :Pure va_state (requires (eval_operand inv s_0 == 0 /\
+  :Pure va_state (requires (eval.eval_operand inv s_0 == 0 /\
                             Some(sN) == eval_while (While b c inv) s_0))
-		 (ensures  (fun s_1 -> s_0 == s_1 /\ s_1 == sN /\ not (eval_ocmp s_0 b)))
+		 (ensures  (fun s_1 -> s_0 == s_1 /\ s_1 == sN /\ not (eval.eval_ocmp b s_0)))
   = s_0
 
