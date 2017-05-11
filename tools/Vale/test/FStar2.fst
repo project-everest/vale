@@ -154,6 +154,7 @@ irreducible let va_lemma_Mul64Wrap va_b0 va_s0 va_sN src =
   ();
   let (va_old_s:va_state) = va_s0 in
   let (va_sM, (va_cM:va_code), va_bM) = (va_lemma_block va_b0 va_s0 va_sN) in
+  assert (va_sM == eval_ins (Mul64 src) va_s0);
   (va_bM, va_sM)
 
 val va_code_IMul64Wrap : dst:va_dst_operand -> src:va_operand -> Tot va_code

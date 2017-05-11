@@ -188,9 +188,11 @@ unfold let return (#a:Type) (x:a) :st a =
 
 unfold let bind (#a:Type) (#b:Type) (f:st a) (g:a -> st b) :st b =
   fun s ->
-    let (x_opt, s) = f s in
-    if None? x_opt then (None, { s with ok = false})
-    else g (Some?.v x_opt) s
+    if not s.ok then (None, s)
+    else
+      let (x_opt, s) = f s in
+      if None? x_opt || (not s.ok) then (None, { s with ok = false})
+      else g (Some?.v x_opt) s
 
 let get () :st state =
   fun s -> (Some s, s)
