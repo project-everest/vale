@@ -71,6 +71,7 @@ type ins =
   | Mul64      : src:operand -> ins
   | IMul64     : dst:dst_op -> src:operand -> ins
   | Xor64      : dst:dst_op -> src:operand -> ins
+  | And64      : dst:dst_op -> src:operand -> ins
   | Shr64      : dst:dst_op -> amt:operand -> ins
   | Shl64      : dst:dst_op -> amt:operand -> ins
 
@@ -293,6 +294,10 @@ let eval_ins (ins:ins) (s:state) :state =
        | Xor64 dst src -> 
 	 check (valid_operand src);;
 	 update_operand dst ins (FStar.UInt.logxor #64 (eval_operand dst s) (eval_operand src s))	  
+	 
+       | And64 dst src -> 
+	 check (valid_operand src);;
+	 update_operand dst ins (FStar.UInt.logand #64 (eval_operand dst s) (eval_operand src s))
 	 
        | Shr64 dst amt -> 
 	 check (valid_shift_operand amt);;

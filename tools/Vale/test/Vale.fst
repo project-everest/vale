@@ -26,6 +26,7 @@ type va_register = reg
 (* Constructors *)
 let va_op_operand_reg (r:reg) :va_operand = OReg r
 let va_const_operand (n:nat64) = OConst n
+let va_const_shift_amt (n:nat64) :va_shift_amt = OConst n
 let va_op_cmp_reg (r:reg) :va_cmp = OReg r
 let va_const_cmp (n:nat64) :va_cmp = OConst n
 let va_coerce_register_to_operand (r:va_register) :va_operand = OReg r

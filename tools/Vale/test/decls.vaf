@@ -91,6 +91,9 @@ procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst_operand dst:u
 let logxor64 (x:nat64) (y:nat64) :nat64 =
   logxor #64 x y
 
+let logand64 (x:nat64) (y:nat64) :nat64 =
+  logand #64 x y
+
 let shift_left64 (x:nat64) (amt:nat64) :nat64 =
   shift_left #64 x amt
 
@@ -107,6 +110,13 @@ procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst_operand dst:uint64,
 {
 }
 
+procedure{:instruction Ins(And64(dst, src))} And64(inout dst_operand dst:uint64, operand src:uint64)
+    modifies 
+        efl;
+    ensures
+        dst == old(logand64(dst,src));
+{
+}
 
 procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst_operand dst:uint64, shift_amt amt:uint64)
     modifies
