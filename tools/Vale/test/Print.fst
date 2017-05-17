@@ -189,3 +189,57 @@ let print_proc (name:string) (code:code) (label:Z) =
 
 let print_footer (p:printer) =
   print_string (p.footer())
+
+(* Concrete printers for MASM and GCC syntax *)
+let masm : printer =
+  let reg_prefix unit = "" in
+  let maddr (m:maddr) (ptr:string) : string = "TODO" in
+  let const (n:int) = "" in
+  let ins_name (name:string) (ops:list operand) : string = name ^ " " in
+  let op_order (#a:Type) (dst:a) (src:a) = dst, src in
+  let align() = "ALIGN" in
+  let header() = ".code\n" in
+  let footer() = "end\n" in
+  let proc_name (name:string) = "ALIGN 16\n" ^ name ^ " proc\n" in
+  let ret (name:string) = "  ret\n" ^ name ^ " endp\n" in
+  {
+  reg_prefix = reg_prefix;
+  maddr      = maddr;
+  const      = const;
+  ins_name   = ins_name;
+  op_order   = op_order;
+  align      = align;
+  header     = header;
+  footer     = footer;
+  proc_name  = proc_name;
+  ret        = ret;
+  }
+
+let gcc : printer =
+  let reg_prefix unit = "%" in
+  let maddr (m:maddr) (ptr:string) : string = "TODO" in
+  let const (n:int) = "$" in
+  let rec ins_name (name:string) (ops:list operand) : string = 
+    match ops with 
+    | Nil -> name ^ " "
+    | OMem _ :: _ -> name ^ "q "
+    | _ :: tail -> ins_name name tail
+  in
+  let op_order (#a:Type) (dst:a) (src:a) = src, dst in
+  let align() = ".align" in
+  let header() = ".text\n" in
+  let footer() = "\n" in
+  let proc_name (name:string) = ".global " ^ name ^ "\n" in
+  let ret (name:string) = "  ret\n\n" in
+  {
+  reg_prefix = reg_prefix;
+  maddr      = maddr;
+  const      = const;
+  ins_name   = ins_name;
+  op_order   = op_order;
+  align      = align;
+  header     = header;
+  footer     = footer;
+  proc_name  = proc_name;
+  ret        = ret;
+  }
