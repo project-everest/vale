@@ -1,10 +1,16 @@
-REPO_BASE=../../../../../
+REPO_BASE=../../../../..
 ARCH=$(REPO_BASE)/tools/Vale/test
+
+ifeq ($(OS),Windows_NT)
+  RUNTIME =
+else
+  RUNTIME = mono
+endif
 
 INCLUDE=--include $(ARCH) --include $(REPO_BASE)/src/crypto/poly1305/x64/
 Z3_OPTIONS=--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false
-FSTAR_OPTIONS=$(INCLUDE) $(Z3_OPTIONS) --hint_info --lax
-VALE=mono $(REPO_BASE)/bin/vale.exe 
+FSTAR_OPTIONS=$(INCLUDE) $(Z3_OPTIONS) --hint_info --debug yes --max_fuel 0 --max_ifuel 0 --z3rlimit_factor 4
+VALE=$(RUNTIME) $(REPO_BASE)/bin/vale.exe
 
 # For simplified Makefiles, define FSTAR_HOME, then include the file below.
 include $(FSTAR_HOME)/examples/Makefile.include
