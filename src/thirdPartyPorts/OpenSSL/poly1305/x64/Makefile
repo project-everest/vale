@@ -11,6 +11,9 @@ include $(FSTAR_HOME)/examples/Makefile.include
 
 all: ocaml
 
+vale: 
+	cd $(REPO_BASE); scons --NOVERIFY
+
 include $(FSTAR_HOME)/ulib/ml/Makefile.include
 
 $(ARCH)/decls.fst: $(ARCH)/decls.vaf
