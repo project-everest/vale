@@ -55,10 +55,10 @@ let print_maddr (m:maddr) (ptr_type:string) (p:printer) =
   (match m with
      | MConst n -> p.const n 
      | MReg r offset -> p.maddr (print_reg r p) None (string_of_int offset)
-     | MIndex base scale index offset ->  (* TODO: Why is this invalid? *)
-       "!!!invalid!!!" ^ p.maddr (print_reg base p)
-				 (Some (string_of_int scale, print_reg index p))
-				 (string_of_int offset)
+     | MIndex base scale index offset ->
+	      p.maddr (print_reg base p)
+	      (Some (string_of_int scale, print_reg index p))
+	      (string_of_int offset)
    )  
 
 let print_operand (o:operand) (p:printer) =
