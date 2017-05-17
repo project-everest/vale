@@ -7,7 +7,8 @@ open FStar.IO
 
 noeq type printer = {
   reg_prefix : unit -> string;
-  maddr      : maddr -> string -> string;
+  mem_prefix : string -> string;
+  maddr      : string -> option(string * string) -> string -> string;
   const      : int -> string;
   ins_name   : string -> list operand -> string;
   op_order   : #a:Type -> a -> a -> a*a;
@@ -49,6 +50,17 @@ let print_small_reg (r:reg) (p:printer) =
   | _ -> " !!! INVALID small operand !!!  Expected al, bl, cl, or dl."
   )
 
+let print_maddr (m:maddr) (ptr_type:string) (p:printer) = 
+  p.mem_prefix ptr_type ^
+  (match m with
+     | MConst n -> p.const n 
+     | MReg r offset -> p.maddr (print_reg r p) None (string_of_int offset)
+     | MIndex base scale index offset ->  (* TODO: Why is this invalid? *)
+       "!!!invalid!!!" ^ p.maddr (print_reg base p)
+				 (Some (string_of_int scale, print_reg index p))
+				 (string_of_int offset)
+   )  
+
 let print_operand (o:operand) (p:printer) =
   match o with
   | OConst n -> if 0 <= n && n < nat64_max then
@@ -56,7 +68,7 @@ let print_operand (o:operand) (p:printer) =
 	       else
 		 "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg r p
-  | OMem m -> p.maddr m "qword"
+  | OMem m -> print_maddr m "qword" p
 
 let print_small_operand (o:operand) (p:printer) =
   match o with
@@ -106,9 +118,9 @@ let print_ins (ins:ins) (p:printer) =
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
   | AddLea64 dst src1 src2 -> let name = p.ins_name "  lea" [dst; src1; src2] in
 			     if OReg? src1 && OConst? src2 then
-			       name ^ p.maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword"
+			       name ^ print_maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword" p
 			     else if OReg? src1 && OReg? src2 then
-			       name ^ p.maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword"
+			       name ^ print_maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword" p
 			     else
 			       "!!! INVALID AddLea64 operands: " ^ print_any src1 ^ ", " ^ print_any src2 ^ "!!!"			      
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
@@ -173,28 +185,27 @@ let print_proc (name:string) (code:code) (label:int) (p:printer) =
   let ret = p.ret name in
   print_string (proc ^ code_str ^ ret)
 
-(*
-let print_proc (name:string) (code:code) (label:int) =
-  let proc = "ALIGN 16\n" ^ name ^ " proc\n" in
-  let code_str, _ = print_code code label in
-  let ret = "  ret\n" ^ name ^ " endp\n"
-  print_string proc ^ code_str ^ ret
-
-let print_proc (name:string) (code:code) (label:Z) =
-  let proc = ".global " ^ name ^ "\n" in
-  let code_str, _ = print_code code label in
-  let ret = "  ret\n\n" in
-  print_string proc ^ code_str ^ ret
-*)
-
 let print_footer (p:printer) =
   print_string (p.footer())
 
+       
 (* Concrete printers for MASM and GCC syntax *)
 let masm : printer =
   let reg_prefix unit = "" in
-  let maddr (m:maddr) (ptr:string) : string = "TODO" in
-  let const (n:int) = "" in
+  let mem_prefix (ptr_type:string) = ptr_type ^ " ptr " in
+  let maddr (base:string) (adj:option(string * string)) (offset:string) = ""
+  (*
+  (m:maddr) (ptr_type:string) : string = 
+    ptr ^
+    (match m with
+     | MConst n -> " ptr " ^ string_of_int n
+     | MReg r offset -> " ptr [" ^ print_reg r p ^ " + " ^ string_of_int offset ^ "]"
+     | MIndex base scale index offset ->
+       "!!!invalid!!! ptr [" ^ print_reg base p ^ " + " string_of_int scale ^ " * " ^ print_reg index p ^ " + " ^ string_of_int offset ^ "]"
+    )
+    *)
+  in
+  let const (n:int) = string_of_int n in
   let ins_name (name:string) (ops:list operand) : string = name ^ " " in
   let op_order (#a:Type) (dst:a) (src:a) = dst, src in
   let align() = "ALIGN" in
@@ -204,6 +215,7 @@ let masm : printer =
   let ret (name:string) = "  ret\n" ^ name ^ " endp\n" in
   {
   reg_prefix = reg_prefix;
+  mem_prefix = mem_prefix;
   maddr      = maddr;
   const      = const;
   ins_name   = ins_name;
@@ -217,8 +229,17 @@ let masm : printer =
 
 let gcc : printer =
   let reg_prefix unit = "%" in
-  let maddr (m:maddr) (ptr:string) : string = "TODO" in
-  let const (n:int) = "$" in
+  let mem_prefix (ptr_type:string) = "" in
+  let maddr (base:string) (adj:option(string * string)) (offset:string) = ""
+  (*
+    match m with
+    | MConst n -> " $" ^ string_of_int n
+    | MReg r offset -> string_of_int offset ^ " (" ^ print_reg r p ^ ")"
+    | MIndex base scale index offset ->
+      "!!!invalid!!!" ^ string_of_int offset ^ " (" ^ print_reg base p ^ ", " ^ string_of_int scale ^ ", " ^ print_reg index p ^ ")"
+      *)
+  in
+  let const (n:int) = "$" ^ string_of_int n in
   let rec ins_name (name:string) (ops:list operand) : string = 
     match ops with 
     | Nil -> name ^ " "
@@ -233,6 +254,7 @@ let gcc : printer =
   let ret (name:string) = "  ret\n\n" in
   {
   reg_prefix = reg_prefix;
+  mem_prefix = mem_prefix;
   maddr      = maddr;
   const      = const;
   ins_name   = ins_name;
