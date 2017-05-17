@@ -99,7 +99,13 @@ let print_ins (ins:ins) (p:printer) =
   match ins with 
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
-  | AddLea64 dst src1 src2 -> "TODO" (* p.ins_name "  lea" [dst; src1; src2] *)
+  | AddLea64 dst src1 src2 -> let name = p.ins_name "  lea" [dst; src1; src2] in
+			     if OReg? src1 && OConst? src2 then
+			       name ^ p.maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword"
+			     else if OReg? src1 && OReg? src2 then
+			       name ^ p.maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword"
+			     else
+			       "!!! INVALID AddLea64 operands: " ^ print_any src1 ^ ", " ^ print_any src2 ^ "!!!"			      
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
   | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
