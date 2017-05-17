@@ -832,8 +832,7 @@ procedure{:timeLimitMultiplier 2} poly1305(
     Store64(ctx, r15, 128, Public, ctx_id);
 
     h := poly1305_impl(ctx, inp, len, r0, r1, h0, h1, h2, key_r, key_s, n, p, ctx_id, inp_id);
-
-    Store64(ctx, h0,  0, Public, ctx_id);
+Store64(ctx, h0,  0, Public, ctx_id);
     Store64(ctx, h1,  8, Public, ctx_id);
 
     Load64(h1,  ctx, 72, Public, ctx_id);
@@ -848,3 +847,21 @@ procedure{:timeLimitMultiplier 2} poly1305(
 }
 
 */
+
+#verbatim
+
+open Print
+open FStar.IO
+
+let print_poly1305 (p:printer) =
+  let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
+  print_header p;
+  print_proc "poly1305" poly_code 0 p;
+  print_footer p
+
+let main =
+  print_poly1305 masm;
+  print_string "\n\n";
+  print_poly1305 gcc
+
+#endverbatim
