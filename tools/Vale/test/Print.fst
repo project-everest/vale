@@ -193,17 +193,10 @@ let print_footer (p:printer) =
 let masm : printer =
   let reg_prefix unit = "" in
   let mem_prefix (ptr_type:string) = ptr_type ^ " ptr " in
-  let maddr (base:string) (adj:option(string * string)) (offset:string) = ""
-  (*
-  (m:maddr) (ptr_type:string) : string = 
-    ptr ^
-    (match m with
-     | MConst n -> " ptr " ^ string_of_int n
-     | MReg r offset -> " ptr [" ^ print_reg r p ^ " + " ^ string_of_int offset ^ "]"
-     | MIndex base scale index offset ->
-       "!!!invalid!!! ptr [" ^ print_reg base p ^ " + " string_of_int scale ^ " * " ^ print_reg index p ^ " + " ^ string_of_int offset ^ "]"
-    )
-    *)
+  let maddr (base:string) (adj:option(string * string)) (offset:string) = 
+    match adj with
+    | None -> "[" ^ base ^ " + " ^ offset ^ "]"
+    | Some (scale, index) -> "[" ^ base ^ " + " ^ scale ^ " * " ^ index ^ " + " ^ offset ^ "]"
   in
   let const (n:int) = string_of_int n in
   let ins_name (name:string) (ops:list operand) : string = name ^ " " in
@@ -230,14 +223,10 @@ let masm : printer =
 let gcc : printer =
   let reg_prefix unit = "%" in
   let mem_prefix (ptr_type:string) = "" in
-  let maddr (base:string) (adj:option(string * string)) (offset:string) = ""
-  (*
-    match m with
-    | MConst n -> " $" ^ string_of_int n
-    | MReg r offset -> string_of_int offset ^ " (" ^ print_reg r p ^ ")"
-    | MIndex base scale index offset ->
-      "!!!invalid!!!" ^ string_of_int offset ^ " (" ^ print_reg base p ^ ", " ^ string_of_int scale ^ ", " ^ print_reg index p ^ ")"
-      *)
+  let maddr (base:string) (adj:option(string * string)) (offset:string) = 
+    match adj with
+    | None -> offset ^ "(" ^ base ^ ")"
+    | Some (scale, index) -> offset ^ " (" ^ base ^ ", " ^ scale ^ ", " ^ index ^ ")"
   in
   let const (n:int) = "$" ^ string_of_int n in
   let rec ins_name (name:string) (ops:list operand) : string = 
