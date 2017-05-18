@@ -31,10 +31,10 @@ poly1305.fst: poly1305.vaf $(ARCH)/decls.vaf
 poly1305.v: poly1305.fst $(ARCH)/decls.fst
 	fstar $(FSTAR_OPTIONS) poly1305.fst
 
-ocaml: out poly1305.fst
+ocaml: out poly1305.fst $(ARCH)/decls.fst
 	$(MAKE) -C $(ULIB_ML)
 	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst
-	$(OCAMLOPT) out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
+	$(OCAMLOPT) -I $(FSTAR_HOME)/ulib/ml/extracted/ out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
 	./poly1305.exe
 
 out:
