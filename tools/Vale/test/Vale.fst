@@ -92,19 +92,16 @@ let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 =
   s_0.flags == s_1.flags /\
   Map.equal s_0.mem s_1.mem
   
-
 let va_require (block:va_codes) (c:va_code) (s_0:va_state) (s_1:va_state) :Type0 =
   Cons? block                         /\
   Cons?.hd block == c                 /\
-  Some s_1 == eval_code (va_Block block) s_0    /\
-  (forall (r:reg). s_0.regs `contains` r)  //what is this?
+  Some s_1 == eval_code (va_Block block) s_0
 
 let va_ensure (b_0:va_codes) (b_1:va_codes) (s_0:va_state) (s_1:va_state) (sN:va_state) :Type0 =
   Cons? b_0                         /\
   Cons?.tl b_0 == b_1                /\
   Some(s_1) == eval_code (Cons?.hd b_0) s_0     /\
-  Some(sN)  == eval_code (va_Block b_1) s_1     /\
-  (forall (r:reg). s_1.regs `contains` r)
+  Some(sN)  == eval_code (va_Block b_1) s_1
 
 (* the lemmas have out variables, so writing them as pure functions *)
 
