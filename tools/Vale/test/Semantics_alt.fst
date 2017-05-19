@@ -1,20 +1,26 @@
 module Semantics_alt
 
+//let phase_1_ (x:Type) = x
+let phase_1_ (x:Type) = x
+let phase_2_ (x:Type) = x
+
+assume val assert_1_2 : p:Type -> Pure unit (requires (phase_1_ p)) (ensures (fun x -> phase_2_ p))
+
 assume new type map (key:eqtype) (value:Type) : Type0
 
 assume val sel: #key:eqtype -> #value:Type -> map key value -> key -> Tot value
 assume val upd: #key:eqtype -> #value:Type -> map key value -> key -> value -> Tot (map key value)
 assume val contains: #key:eqtype -> #value:Type -> map key value -> key -> Tot bool
 
-assume val lemma_SelUpd1: #key:eqtype -> #value:Type -> m:map key value -> k:key -> v:value ->
+assume val lemma_phase_1_SelUpd1: #key:eqtype -> #value:Type -> m:map key value -> k:key -> v:value ->
                    Lemma (requires True) (ensures (sel (upd m k v) k == v))
 		   [SMTPat (sel (upd m k v) k)]
 
-assume val lemma_SelUpd2: #key:eqtype -> #value:Type -> m:map key value -> k1:key -> k2:key -> v:value ->
+assume val lemma_phase_1_SelUpd2: #key:eqtype -> #value:Type -> m:map key value -> k1:key -> k2:key -> v:value ->
                    Lemma (requires True) (ensures (k2=!=k1 ==> sel (upd m k2 v) k1 == sel m k1))
                    [SMTPat (sel (upd m k2 v) k1)]
 
-assume val lemma_InDomUpd1: #key:eqtype -> #value:Type -> m:map key value -> k1:key -> k2:key -> v:value ->
+assume val lemma_phase_1_InDomUpd1: #key:eqtype -> #value:Type -> m:map key value -> k1:key -> k2:key -> v:value ->
                      Lemma (requires True) (ensures (contains (upd m k1 v) k2 == (k1=k2 || contains m k2)))
                      [SMTPat (contains (upd m k1 v) k2)]
 
@@ -34,8 +40,10 @@ assume val lemma_equal_elim: #key:eqtype -> #value:Type -> m1:map key value -> m
    since we only use them in specs, not in emitted code *)
 let nat32_max = 0x100000000
 let nat64_max = 0x10000000000000000
-let _ = assert_norm (pow2 32 = nat32_max)    (* Sanity check our constant *)
-let _ = assert_norm (pow2 64 = nat64_max)    (* Sanity check our constant *)
+//let nat32_max = 0x10
+//let nat64_max = 0x100
+//let _ = assert_norm (pow2 32 = nat32_max)    (* Sanity check our constant *)
+//let _ = assert_norm (pow2 64 = nat64_max)    (* Sanity check our constant *)
 
 type nat64 = x:int{0 <= x && x < nat64_max}
 
@@ -61,6 +69,8 @@ type reg =
   | R13
   | R14
   | R15
+
+assume HasEq_reg: hasEq reg
 
 type maddr =
   | MConst : n:nat -> maddr

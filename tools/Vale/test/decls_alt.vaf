@@ -8,6 +8,8 @@ open Vale_alt
 
 #reset-options "--z3rlimit 200"
 
+let add_wrap (x:int) (y:int) = if x + y < nat64_max then x + y else x + y - nat64_max
+
 #endverbatim
 
 var{:state ok()} ok:bool;
@@ -27,8 +29,8 @@ procedure Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures
-        dst == old(dst + src) % nat64_max;
-        //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
+        dst == old(add_wrap(dst, src));
+        cf(efl) == old(dst + src >= nat64_max);
     extern;
 
 procedure AddLea64(out dst_operand dst:uint64, operand src1:uint64, operand src2:uint64)
@@ -42,8 +44,8 @@ procedure Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures
-        dst == old(dst + src + (if cf(efl) then 1 else 0)) % nat64_max;
-        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= 0x1_0000_0000_0000_0000;
+        dst == old(add+wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
+        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max;
     extern;
 
 procedure Sub64(inout dst_operand dst:uint64, operand src:uint64)
@@ -68,15 +70,17 @@ procedure Mul64Wrap(operand src:uint64)
         rax;
         rdx;
     ensures
-        rax == old(rax * src) % nat64_max;
-        rdx == old(rax * src) / nat64_max;
+        nat64_max * rdx + rax == old(rax * src);
     extern;
 
 procedure IMul64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+    requires
+        dst * src < nat64_max;
     modifies
         efl;
     ensures
-        dst == old(dst * src) % nat64_max;
+        // dst == old(dst * src) % nat64_max;
+        dst == old(dst * src);
     extern;
 
 #verbatim
@@ -122,8 +126,8 @@ assume val va_code_Mov64 : dst:va_dst_operand -> src:va_operand -> Tot va_code
 assume val va_lemma_Mov64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Mov64 dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_Mov64 dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (va_eval_operand_uint64 va_s0 src) /\ (va_state_eq
@@ -134,12 +138,14 @@ assume val va_code_Add64Wrap : dst:va_dst_operand -> src:va_operand -> Tot va_co
 assume val va_lemma_Add64Wrap : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Add64Wrap dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_Add64Wrap dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
-    (va_eval_dst_operand_uint64 va_sM dst) == ((va_eval_dst_operand_uint64 va_s0 dst) +
-    (va_eval_operand_uint64 va_s0 src)) `op_Modulus` nat64_max /\ (va_state_eq va_sM
+    (va_eval_dst_operand_uint64 va_sM dst) == (add_wrap (va_eval_dst_operand_uint64 va_s0 dst)
+    (va_eval_operand_uint64 va_s0 src)) /\
+    (cf (va_get_flags va_sM)) == (((va_eval_dst_operand_uint64 va_s0 dst)
+    + (va_eval_operand_uint64 va_s0 src)) >= nat64_max) /\ (va_state_eq va_sM
     (va_update_flags va_sM (va_update_ok va_sM (va_update_dst_operand dst va_sM va_s0)))))))
 
 assume val va_code_AddLea64 : dst:va_dst_operand -> src1:va_operand -> src2:va_operand -> Tot va_code
@@ -147,9 +153,9 @@ assume val va_code_AddLea64 : dst:va_dst_operand -> src1:va_operand -> src2:va_o
 assume val va_lemma_AddLea64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src1:va_operand -> src2:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_AddLea64 dst src1 src2) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src1 va_s0) /\
-    (va_is_src_operand_uint64 src2 va_s0) /\ (va_get_ok va_s0) /\ (va_eval_operand_uint64 va_s0
+  (requires (phase_1_ (va_require va_b0 (va_code_AddLea64 dst src1 src2) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src1 va_s0) /\
+    phase_1_ (va_is_src_operand_uint64 src2 va_s0) /\ (va_get_ok va_s0) /\ (va_eval_operand_uint64 va_s0
     src1) + (va_eval_operand_uint64 va_s0 src2) < nat64_max))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (va_eval_operand_uint64 va_s0 src1) +
@@ -161,15 +167,15 @@ assume val va_code_Adc64Wrap : dst:va_dst_operand -> src:va_operand -> Tot va_co
 assume val va_lemma_Adc64Wrap : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Adc64Wrap dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_Adc64Wrap dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
-    (va_eval_dst_operand_uint64 va_sM dst) == (((va_eval_dst_operand_uint64 va_s0 dst) +
-    (va_eval_operand_uint64 va_s0 src)) + (if (cf (va_get_flags va_s0)) then 1 else 0))
-    `op_Modulus` nat64_max /\ (cf (va_get_flags va_sM)) == (((va_eval_dst_operand_uint64 va_s0 dst)
+    (va_eval_dst_operand_uint64 va_sM dst) == (add_wrap (add_wrap (va_eval_dst_operand_uint64 va_s0 dst)
+    (va_eval_operand_uint64 va_s0 src)) (if (cf (va_get_flags va_s0)) then 1 else 0))
+    /\ (cf (va_get_flags va_sM)) == (((va_eval_dst_operand_uint64 va_s0 dst)
     + (va_eval_operand_uint64 va_s0 src)) + (if (cf (va_get_flags va_s0)) then 1 else 0) >=
-    18446744073709551616) /\ (va_state_eq va_sM (va_update_flags va_sM (va_update_ok va_sM
+    nat64_max) /\ (va_state_eq va_sM (va_update_flags va_sM (va_update_ok va_sM
     (va_update_dst_operand dst va_sM va_s0)))))))
 
 assume val va_code_Sub64 : dst:va_dst_operand -> src:va_operand -> Tot va_code
@@ -177,8 +183,8 @@ assume val va_code_Sub64 : dst:va_dst_operand -> src:va_operand -> Tot va_code
 assume val va_lemma_Sub64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Sub64 dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_Sub64 dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0) /\ 0 <= (va_eval_dst_operand_uint64 va_s0 dst) - (va_eval_operand_uint64 va_s0 src)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (va_eval_dst_operand_uint64 va_s0 dst) -
@@ -190,8 +196,8 @@ assume val va_code_Sub64Wrap : dst:va_dst_operand -> src:va_operand -> Tot va_co
 assume val va_lemma_Sub64Wrap : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Sub64Wrap dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_Sub64Wrap dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == ((va_eval_dst_operand_uint64 va_s0 dst) -
@@ -203,12 +209,12 @@ assume val va_code_Mul64Wrap : src:va_operand -> Tot va_code
 assume val va_lemma_Mul64Wrap : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Mul64Wrap src) va_s0 va_sN) /\ (va_is_src_operand_uint64
+  (requires (phase_1_ (va_require va_b0 (va_code_Mul64Wrap src) va_s0 va_sN) /\ phase_1_ (va_is_src_operand_uint64
     src va_s0) /\ (va_get_ok va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
-    (va_get_reg Rax va_sM) == ((va_get_reg Rax va_s0) `op_Multiply` (va_eval_operand_uint64 va_s0
-    src)) `op_Modulus` nat64_max /\ (va_get_reg Rdx va_sM) == ((va_get_reg Rax va_s0) `op_Multiply`
-    (va_eval_operand_uint64 va_s0 src)) `op_Division` nat64_max /\ (va_state_eq va_sM
+    (va_get_reg Rax va_sM) + (nat64_max `op_Multiply` (va_get_reg Rdx va_sM)) ==
+      ((va_get_reg Rax va_s0) `op_Multiply` (va_eval_operand_uint64 va_s0 src)) /\
+    (va_state_eq va_sM
     (va_update_reg Rdx va_sM (va_update_reg Rax va_sM (va_update_flags va_sM (va_update_ok va_sM
     va_s0))))))))
 
@@ -217,12 +223,13 @@ assume val va_code_IMul64Wrap : dst:va_dst_operand -> src:va_operand -> Tot va_c
 assume val va_lemma_IMul64Wrap : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_IMul64Wrap dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
-    va_s0)))
+  (requires (phase_1_ (va_require va_b0 (va_code_IMul64Wrap dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\
+    ((va_eval_dst_operand_uint64 va_s0 dst) `op_Multiply` (va_eval_operand_uint64 va_s0 src)) < nat64_max /\
+    (va_get_ok va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == ((va_eval_dst_operand_uint64 va_s0 dst) `op_Multiply`
-    (va_eval_operand_uint64 va_s0 src)) `op_Modulus` nat64_max /\ (va_state_eq va_sM
+    (va_eval_operand_uint64 va_s0 src)) /\ (va_state_eq va_sM
     (va_update_flags va_sM (va_update_ok va_sM (va_update_dst_operand dst va_sM va_s0)))))))
 
 assume val va_code_Xor64 : dst:va_dst_operand -> src:va_operand -> Tot va_code
@@ -230,8 +237,8 @@ assume val va_code_Xor64 : dst:va_dst_operand -> src:va_operand -> Tot va_code
 assume val va_lemma_Xor64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Xor64 dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_Xor64 dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (logxor64 (va_eval_dst_operand_uint64 va_s0 dst)
@@ -243,8 +250,8 @@ assume val va_code_And64 : dst:va_dst_operand -> src:va_operand -> Tot va_code
 assume val va_lemma_And64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> src:va_operand
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_And64 dst src) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
+  (requires (phase_1_ (va_require va_b0 (va_code_And64 dst src) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_operand_uint64 src va_s0) /\ (va_get_ok
     va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (logand64 (va_eval_dst_operand_uint64 va_s0 dst)
@@ -256,8 +263,8 @@ assume val va_code_Shl64 : dst:va_dst_operand -> amt:va_shift_amt -> Tot va_code
 assume val va_lemma_Shl64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> amt:va_shift_amt
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Shl64 dst amt) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_shift_amt_uint64 amt va_s0) /\
+  (requires (phase_1_ (va_require va_b0 (va_code_Shl64 dst amt) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_shift_amt_uint64 amt va_s0) /\
     (va_get_ok va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (shift_left64 (va_eval_dst_operand_uint64 va_s0 dst)
@@ -269,8 +276,8 @@ assume val va_code_Shr64 : dst:va_dst_operand -> amt:va_shift_amt -> Tot va_code
 assume val va_lemma_Shr64 : va_b0:va_codes -> va_s0:va_state -> va_sN:va_state ->
   dst:va_dst_operand -> amt:va_shift_amt
   -> Ghost ((va_sM:va_state))
-  (requires ((va_require va_b0 (va_code_Shr64 dst amt) va_s0 va_sN) /\
-    (va_is_dst_dst_operand_uint64 dst va_s0) /\ (va_is_src_shift_amt_uint64 amt va_s0) /\
+  (requires (phase_1_ (va_require va_b0 (va_code_Shr64 dst amt) va_s0 va_sN) /\
+    phase_1_ (va_is_dst_dst_operand_uint64 dst va_s0) /\ phase_1_ (va_is_src_shift_amt_uint64 amt va_s0) /\
     (va_get_ok va_s0)))
   (ensures (fun ((va_sM:va_state)) -> ((va_ensure va_b0 va_s0 va_sM va_sN) /\ (va_get_ok va_sM) /\
     (va_eval_dst_operand_uint64 va_sM dst) == (shift_right64 (va_eval_dst_operand_uint64 va_s0 dst)
