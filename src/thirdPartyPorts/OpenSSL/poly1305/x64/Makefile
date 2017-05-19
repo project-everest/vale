@@ -17,7 +17,7 @@ include $(FSTAR_HOME)/examples/Makefile.include
 all: ocaml
 
 vale: 
-	cd $(REPO_BASE); scons --NOVERIFY
+	cd $(REPO_BASE); scons bin/Vale.exe
 
 include $(FSTAR_HOME)/ulib/ml/Makefile.include
 
