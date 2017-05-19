@@ -235,7 +235,6 @@ let resolve_overload_stmts (env:env) (ss:stmt list):stmt list =
 ///////////////////////////////////////////////////////////////////////////////
 // Propagate variables through state via assumes (if requested)
 
-(*
 // Currently only works for straight-line code (no if/else or while)
 let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:stmt list) (specs:spec list):stmt list =
   if !assumeUpdates = 0 then ss else
@@ -252,10 +251,22 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
     match Map.tryFind x env.ids with
     | None | Some (GhostLocal _) -> []
     | Some (OperandLocal _ | ThreadLocal _ | ProcLocal _ | InlineLocal | StateInfo _) ->
-        let old_state = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar (Reserved "this")]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar (Reserved "this")]) in
+      (
+//        let old_state = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar (Reserved "this")]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar (Reserved "this")]) in
 //        let old_x = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar x]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar x]) in
-        let eq = EApply (Reserved "eq_ops", [old_state; EVar (Reserved "this"); (EOp (Uop UToOperand, [EVar x]))]) in
-        [(if !assumeUpdates = 1 then SAssume eq else SAssert (assert_attrs_default, eq))]
+//        let eq = EApply (Reserved "eq_ops", [old_state; EVar (Reserved "this"); (EOp (Uop UToOperand, [EVar x]))]) in
+        let old_x =
+          match Map.tryFind x prev with
+          | None -> EOp (Uop UOld, [EVar x])
+          | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar x])
+          in
+        let eq = EOp (Bop BEq, [old_x; EVar x]) in
+        match !assumeUpdates with
+        | 1 -> [SAssume eq]
+        | 2 -> [SAssert (assert_attrs_default, eq)]
+        | 3 -> [SAssign ([], EApply (Reserved "assert_hint", [eq]))]
+        | _ -> []
+      )
     in
   let f (env:env, i:int, prev:Map<id, int>, sss:stmt list list) (s:stmt) =
     let rec r s =
@@ -264,7 +275,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
           let (i, prev, ss) = r s in
           (i, prev, List.map (fun s -> SLoc (loc, s)) ss)
       | (SLabel _ | SGoto _ | SReturn) -> (i, prev, [s])
-      | SVar (x, t, (XGhost | XInline | XOperand | XPhysical | XState _), a, eOpt) ->
+      | SVar (x, t, (XGhost | XInline | XOperand _ | XPhysical | XState _), a, eOpt) ->
           (i, prev, [s])
       | SVar (x, t, XAlias _, a, eOpt) ->
           let (i, prev, ss) = setPrev i prev [x] in
@@ -273,17 +284,25 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
         (
           match skip_loc e with
           | EApply (x, es) when Map.containsKey x env.procs ->
-              let xfs = Set.toList (free_vars_stmt s) in
+              let p = (Map.find x env.procs) in
+              let reads = List.collect (fun (loc, s) -> match s with Modifies (_, (EVar x | ELoc (_, EVar x) | EOp (RefineOp, (EVar x)::_))) -> [x] | _ -> []) p.pspecs in
+              let mods = List.collect (fun (loc, s) -> match s with Modifies (true, (EVar x | ELoc (_, EVar x) | EOp (RefineOp, (EVar x)::_))) -> [x] | _ -> []) p.pspecs in
+              let xfs = Set.toList (Set.union (free_vars_stmt s) (Set.ofList reads)) in
               let ssAssume = List.collect (genAssume env prev) xfs in
-              let (mrets, margs) = match_proc_args env (Map.find x env.procs) lhss es in
+              let (mrets, margs) = match_proc_args env p lhss es in
               let xrets = List.map (fun ((_, _, g, _, _), (x, _)) -> (EVar x, Out, g)) mrets in
               let xargs = List.map (fun ((_, _, g, io, _), e) -> (skip_loc e, io, g)) margs in
               let fx e_io_g =
                 match e_io_g with
-                | (EVar x, (Out | InOut), (XOperand | XAlias _ | XInline)) -> [x]
+                | (EVar x, (Out | InOut), (XOperand _ | XAlias _ | XInline)) -> [x]
                 | _ -> []
                 in
               let xsOut = List.collect fx (xrets @ xargs) in
+              let xsOut = xsOut @ mods in
+//              printfn "s = %A" s;
+//              printfn "  p = %A" p;
+//              printfn "  xfs = %A" xfs;
+//              printfn "  xsOut = %A" xsOut;
               let (i, prev, ssSet) = setPrev i prev xsOut in
               (i, prev, ssAssume @ [s] @ ssSet)
           | _ ->
@@ -293,7 +312,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
       | (SAssume _ | SAssert _ | SForall _ | SExists _) ->
           let xfs = Set.toList (free_vars_stmt s) in
           (i, prev, (List.collect (genAssume env prev) xfs) @ [s])
-      | (SIfElse _ | SWhile _) ->
+      | (SIfElse _ | SWhile _ | SBlock _ | SCalc _) ->
           // Not yet supported
           (i, prev, [s])
       in
@@ -306,12 +325,11 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
   let ss = List.concat (List.rev sssRev) in
   let enss = List.collect (fun s -> match s with Ensures e -> [s] | _ -> []) specs in
   let globals = List.collect (fun (x, info) -> match info with ThreadLocal _ -> [x] | _ -> []) (Map.toList env.ids) in
-  let xArgs = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _ (* TODO? InOut | Out *)) -> [x] | _ -> []) args in
-  let xRets = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _) -> [x] | _ -> []) rets in
+  let xArgs = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand _ | XAlias _ | XInline), _ (* TODO? InOut | Out *)) -> [x] | _ -> []) args in
+  let xRets = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand _ | XAlias _ | XInline), _) -> [x] | _ -> []) rets in
   let xfs = Set.toList (Set.unionMany [Set.ofList globals; Set.ofList xArgs; Set.ofList xRets; free_vars_specs enss]) in
   let ensAssume = List.collect (genAssume env prev) xfs in
   ss @ ensAssume
-*)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Rewrite variables
@@ -744,7 +762,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
             let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
             let ss = resolve_overload_stmts envp ss in
-            //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
+            let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
             let ss = rewrite_vars_stmts envp ss in
             Some ss
         in
