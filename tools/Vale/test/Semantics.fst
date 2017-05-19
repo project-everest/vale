@@ -184,30 +184,30 @@ let valid_shift_operand (o:operand) (s:state) :bool =
 
 let st (a:Type) = state -> a * state
 
-unfold 
+unfold
 let return (#a:Type) (x:a) :st a =
   fun s -> x, s
 
-unfold 
+unfold
 let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :st b =
 fun s0 ->
   let x, s1 = m s0 in
   let y, s2 = f x s1 in
   y, {s2 with ok=s0.ok && s1.ok && s2.ok}
 
-unfold 
+unfold
 let get :st state =
   fun s -> s, s
 
-unfold 
+unfold
 let set (s:state) :st unit =
   fun _ -> (), s
 
-unfold 
+unfold
 let fail :st unit =
   fun s -> (), {s with ok=false}
 
-unfold 
+unfold
 let check (valid: state -> bool) : st unit =
   s <-- get;
   if valid s then
@@ -215,7 +215,7 @@ let check (valid: state -> bool) : st unit =
   else
     fail
 
-unfold 
+unfold
 let run (f:st unit) (s:state) : state = snd (f s)
 
 (*
@@ -257,86 +257,34 @@ abstract
 let test (dst:dst_op) (src:operand) (s:state) :state =
   run (example dst src) s
 
-(* (\* Silly that these lemmas are needed *\) *)
-(* let aux (n:nat) (m:nat) (k:nat{n < k && m < k}) : Lemma (FStar.Mul.(n * m < k * k)) = () *)
-(* let lem_prod_nat64 (n:nat64) (m:nat64) : Lemma (FStar.Mul.(n * m < nat64_max * nat64_max)) = aux n m nat64_max *)
+assume val logxor: int -> int -> int
+assume Logxor_uint64:
+  forall (x:int) (y:int).{:pattern (logxor x y)}
+          FStar.UInt.fits x 64 /\
+          FStar.UInt.fits y 64
+          ==> logxor x y = FStar.UInt.logxor #64 x y
 
-(* let eval_ins (ins:ins) (s0:state) : (unit * state) = *)
-(*   let open FStar.Mul in *)
-(*   match ins with *)
-(*   (\* | Mov64 dst src -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand_preserve_flags dst (eval_operand src s0) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
+assume val logand: int -> int -> int
+assume Logand_uint64:
+  forall (x:int) (y:int).{:pattern (logand x y)}
+          FStar.UInt.fits x 64 /\
+          FStar.UInt.fits y 64
+          ==> logand x y = FStar.UInt.logand #64 x y
 
-(*   (\* | Add64 dst src -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins ((eval_operand dst s0 + eval_operand src s0) % nat64_max) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
+assume val shift_right: int -> int -> int
+assume Shift_Right_uint64:
+  forall (x:int) (y:int).{:pattern (shift_right x y)}
+          FStar.UInt.fits x 64 /\
+          y >= 0
+          ==> shift_right x y = FStar.UInt.shift_right #64 x y
 
-(*   (\* | AddLea64 dst src1 src2 -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src1) s0 in *\) *)
-(*   (\*   let _, s2 = check (valid_operand src2) s1 in *\) *)
-(*   (\*   let _, s3 = update_operand_preserve_flags dst ((eval_operand src1 s0 + eval_operand src2 s0) % nat64_max) s2 in *\) *)
-(*   (\*   (), {s3 with ok = s0.ok && s1.ok && s2.ok && s3.ok} *\) *)
-
-(*   (\* | AddCarry64 dst src -> *\) *)
-(*   (\*   let old_carry = if cf(s0.flags) then 1 else 0 in *\) *)
-(*   (\*   let sum = eval_operand dst s0 + eval_operand src s0 + old_carry in *\) *)
-(*   (\*   let new_carry = sum >= nat64_max in *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins (sum % nat64_max) s1 in *\) *)
-(*   (\*   let _, s3 = update_flags (update_cf s0.flags new_carry) s2 in *\) *)
-(*   (\*   (), {s3 with ok = s0.ok && s1.ok && s2.ok && s3.ok} *\) *)
-
-(*   (\* | Sub64 dst src -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins ((eval_operand dst s0 - eval_operand src s0) % nat64_max) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
-
-(*   | Mul64 src -> *)
-(*     let hi = eval_reg Rax s0 */^ eval_operand src s0 in *)
-(* //    lem_prod_nat64 (eval_reg Rax s0) (eval_operand src s0); //would be nice to split this off using an arithmetic tactic *)
-(* //    let hi = product / nat64_max in *)
-(*     (\* let lo = product % nat64_max in *\) *)
-(*     (\* let s1 = {s0 with ok = valid_operand src s0} in *\) *)
-(*     (\* let _, s2 = update_reg Rax lo s1 in *\) *)
-(*     let _, s1 = update_reg Rdx hi s0 in *)
-(*     (\* let _, s2 = update_flags (havoc s0 ins) s2 in *\) *)
-(*     (), {s1 with ok = s0.ok && s1.ok} *)
-
-(*   (\* | IMul64 dst src -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins ((eval_operand dst s0 * eval_operand src s0) % nat64_max) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
-    
-(*   (\* | Xor64 dst src -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins (FStar.UInt.logxor #64 (eval_operand dst s0) (eval_operand src s0)) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
-    
-(*   (\* | And64 dst src -> *\) *)
-(*   (\*   let _, s1 = check (valid_operand src) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins (FStar.UInt.logand #64 (eval_operand dst s0) (eval_operand src s0)) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
-
-(*   (\* | Shr64 dst amt -> *\) *)
-(*   (\*   let _, s1 = check (valid_shift_operand amt) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins (FStar.UInt.shift_right #64 (eval_operand dst s0) (eval_operand amt s0)) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
-
-(*   (\* | Shl64 dst amt -> *\) *)
-(*   (\*   let _, s1 = check (valid_shift_operand amt) s0 in *\) *)
-(*   (\*   let _, s2 = update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s0) (eval_operand amt s0)) s1 in *\) *)
-(*   (\*   (), {s2 with ok = s0.ok && s1.ok && s2.ok} *\) *)
-
-(*   | _ -> (), {s0 with ok=false} *)
-
-let shift_left (a:nat64) (r:nat64) : nat64 = 
-  FStar.UInt64.uint_to_t (v a `FStar.UInt.shift_left` v r)
-
-let shift_right (a:nat64) (r:nat64) : nat64 = 
-  FStar.UInt64.uint_to_t (v a `FStar.UInt.shift_right` v r)
+assume val shift_left: int -> int -> int
+assume Shift_Left_uint64:
+  forall (x:int) (y:int).{:pattern (shift_left x y)}
+          FStar.UInt.fits x 64 /\
+          y >= 0
+          ==> shift_left x y = FStar.UInt.shift_left #64 x y
+let u (i:int{FStar.UInt.fits i 64}) : nat64 = FStar.UInt64.uint_to_t i
 
 let eval_ins (ins:ins) : st unit =
   let open FStar.Mul in
@@ -353,7 +301,7 @@ let eval_ins (ins:ins) : st unit =
   | AddLea64 dst src1 src2 ->
     check (valid_operand src1);;
     check (valid_operand src2);;
-    update_operand_preserve_flags dst (eval_operand src1 s +%^ eval_operand src2 s)
+    update_operand_preserve_flags dst (eval_operand src1 s +?^ eval_operand src2 s)
 
   | AddCarry64 dst src ->
     let old_carry = if cf(s.flags) then 1 else 0 in
@@ -381,19 +329,19 @@ let eval_ins (ins:ins) : st unit =
 
   | Xor64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s `logxor` eval_operand src s)
+    update_operand dst ins (u (v (eval_operand dst s) `logxor` v (eval_operand src s)))
 
   | And64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s `logand` eval_operand src s)
+    update_operand dst ins (u (v (eval_operand dst s) `logand` v (eval_operand src s)))
 
   | Shr64 dst amt ->
     check (valid_shift_operand amt);;
-    update_operand dst ins (eval_operand dst s `shift_right` eval_operand amt s)
+    update_operand dst ins (u (v (eval_operand dst s) `shift_right` v (eval_operand amt s)))
 
   | Shl64 dst amt ->
     check (valid_shift_operand amt);;
-    update_operand dst ins (eval_operand dst s `shift_left` eval_operand amt s)
+    update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
 
   | _ -> fail
 
