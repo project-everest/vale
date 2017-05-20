@@ -1,0 +1,23 @@
+{
+module Lex
+open Ast
+open Parse
+open Microsoft.FSharp.Text.Lexing
+let lexeme (lexbuf:LexBuffer<_>):(string) = System.Text.Encoding.ASCII.GetString lexbuf.Lexeme
+let next_line (lexbuf:LexBuffer<_>) = lexbuf.EndPos <- lexbuf.EndPos.NextLine
+}
+
+rule token = parse
+| "\n\r" { next_line lexbuf; token lexbuf }
+| "\r\n" { next_line lexbuf; token lexbuf }
+| ['\n''\r'] { next_line lexbuf; token lexbuf }
+| [' ']+ { token lexbuf }
+| ";"[^'\n''\r']* { token lexbuf }
+| "(" { LPAREN }
+| ")" { RPAREN }
+| ['a'-'z''A'-'Z''0'-'9''_''!''%''+''-''*''&''^''|''<''>''=''.''#'':''$''?''`''~''@']+ { TOKEN (lexeme lexbuf) }
+| ['"'][' ''a'-'z''A'-'Z''0'-'9''_''!''%''+''-''*''&''^''|''<''>''=''.''#'':''$''?''`''~''@']*['"'] { TOKEN (lexeme lexbuf) }
+| eof { EOF }
+| '\000' { EOF }
+| _ { parse_err ("cannot parse character: \"" + (lexeme lexbuf) + "\"" + "\n(ascii code " + (string (int ((lexeme lexbuf).Chars 0))) + ")") }
+

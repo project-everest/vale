@@ -1,0 +1,24 @@
+%{
+
+open Ast
+
+%}
+
+%start start
+%type <exps> start
+
+%token LPAREN RPAREN
+%token <string> TOKEN
+%token EOF
+
+%%
+
+start: Exps EOF { $1 }
+
+Exp
+  : TOKEN { Token $1 }
+  | LPAREN Exps RPAREN { Exps $2 }
+Exps
+  : { [] }
+  | Exp Exps { $1::$2 }
+
