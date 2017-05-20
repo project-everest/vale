@@ -921,9 +921,8 @@ and build_lemma_ghost_stmt (env:env) (benv:build_env) (src:id) (res:id) (loc:loc
 and build_lemma_ghost_stmts (env:env) (benv:build_env) (src:id) (res:id) (loc:loc) (stmts:stmt list):stmt list =
   List.collect (build_lemma_ghost_stmt env benv src res loc) stmts
 and build_lemma_calcContents (env:env) (benv:build_env) (src:id) (res:id) (loc:loc) (sub_src:exp -> exp) (cc:calcContents):calcContents =
-  match cc with
-  | CalcLine e -> CalcLine (sub_src e)
-  | CalcHint (oop, ss) -> CalcHint (oop, build_lemma_ghost_stmts env benv src res loc ss)
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  {calc_exp = sub_src e; calc_op = oop; calc_hints = List.map (build_lemma_ghost_stmts env benv src res loc) hints}
 and build_lemma_stmts (env:env) (benv:build_env) (block:id) (src:id) (res:id) (loc:loc) (stmts:stmt list):estmt list =
   match stmts with
   | [] ->
