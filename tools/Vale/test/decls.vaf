@@ -14,12 +14,34 @@ var{:state reg(Rax)} rax:int;
 var{:state reg(Rbx)} rbx:int;
 var{:state reg(Rcx)} rcx:int;
 var{:state reg(Rdx)} rdx:int;
+var{:state reg(Rsi)} rsi:int;
+var{:state reg(Rdi)} rdi:int;
+var{:state reg(Rbp)} rbp:int;
+var{:state reg(Rsp)} rsp:int;
+var{:state reg(R8)}  r8:int;
+var{:state reg(R9)}  r9:int;
+var{:state reg(R10)} r10:int;
+var{:state reg(R11)} r11:int;
+var{:state reg(R12)} r12:int;
+var{:state reg(R13)} r13:int;
+var{:state reg(R14)} r14:int;
+var{:state reg(R15)} r15:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
 procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst_operand dst:uint64, operand src:uint64)
     ensures
         dst == old(src);
+{
+}
+
+procedure{:instruction Ins(Add64(dst,src))} Add64(inout dst_operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    requires
+        src + dst < nat64_max;
+    ensures
+        dst == old(dst + src);
 {
 }
 

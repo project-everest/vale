@@ -8,7 +8,8 @@ else
 endif
 
 INCLUDE=--include $(ARCH) --include $(REPO_BASE)/src/crypto/poly1305/x64/
-FSTAR_OPTIONS=$(INCLUDE) --hint_info --debug yes  --z3rlimit_factor 4
+FSTAR_OPTIONS=$(INCLUDE) --hint_info --debug yes  --z3rlimit_factor 4 --z3rlimit 200 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0
+
 VALE=$(RUNTIME) $(REPO_BASE)/bin/vale.exe
 
 # For simplified Makefiles, define FSTAR_HOME, then include the file below.
