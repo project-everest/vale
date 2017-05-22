@@ -70,15 +70,15 @@ let va_Block (block:va_codes) :va_code = Block block
 let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) :va_code = IfElse ifCond ifTrue ifFalse
 let va_While (whileCond:ocmp) (whileBody:va_code) (inv:operand) :va_code = While whileCond whileBody inv
 //let va_cmp_le (a:va_operand) (b:va_operand) :ocmp = OLe a b
-let va_get_block (c:va_code{Block? c}) :va_codes = Block?.block c
+let va_get_block (c:va_code{phase_1_(Block? c)}) :va_codes = Block?.block c
 let va_get_ifCond (c:code{IfElse? c}) :ocmp = IfElse?.ifCond c
 let va_get_ifTrue (c:code{IfElse? c}) :code = IfElse?.ifTrue c
 let va_get_ifFalse (c:code{IfElse? c}) :code = IfElse?.ifFalse c
 let va_get_whileCond (c:code{While? c}) :ocmp = While?.whileCond c
 let va_get_whileBody (c:code{While? c}) :code = While?.whileBody c
 
-let va_block_head (b:va_codes) : Ghost va_code (requires (Cons? b)) (ensures (fun _ -> True)) = Cons?.hd b
-let va_block_tail (b:va_codes) : Ghost va_codes (requires (Cons? b)) (ensures (fun _ -> True)) = Cons?.tl b
+let va_block_head (b:va_codes) : Ghost va_code (requires (phase_1_ (Cons? b))) (ensures (fun _ -> True)) = Cons?.hd b
+let va_block_tail (b:va_codes) : Ghost va_codes (requires (phase_1_ (Cons? b))) (ensures (fun _ -> True)) = Cons?.tl b
 
 let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 = 
   s_0.ok == s_1.ok /\
@@ -97,7 +97,7 @@ let va_ensure (b0:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : GTot Typ
  /\ Some sN == eval_code (va_Block (Cons?.tl b0)) s1
 
 assume val va_lemma_block : c1:va_code -> b1:va_codes -> s0:va_state -> sN:va_state -> Ghost (s1:va_state)
-  (requires (eval_code (va_Block (c1::b1)) s0 == Some sN))
+  (requires (phase_1_ (eval_code (va_Block (c1::b1)) s0 == Some sN)))
   (ensures (fun s1 -> (eval_code c1 s0 == Some s1) /\ (eval_code (va_Block b1) s1 == Some sN)))
 
 assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)

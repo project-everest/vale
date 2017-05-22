@@ -42,6 +42,7 @@ open Poly1305_lemmas_alt
 
 let eq_int (i1:int) (i2:int) = (i1 == i2)
 unfold let va_assert_hint = assert_1_2
+unfold let n = nat64_max
 #endverbatim
 
 procedure poly1305_multiply(
@@ -56,7 +57,7 @@ procedure poly1305_multiply(
     ghost r1:nat64,
     ghost r:int,
     ghost h:int,
-    ghost n:int,
+//    ghost n:int,
     ghost p:int)
     returns(ghost hh:int)
     modifies
@@ -72,7 +73,7 @@ procedure poly1305_multiply(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-        n == nat64_max;
+//        n == nat64_max;
         p == n * n * 4 + (-5);
         r == r1 * n + r0;
         h == h2 * (n * n) + h1 * n + h0;
@@ -94,12 +95,13 @@ procedure poly1305_multiply(
 {
 //    lemma_BitwiseAdd64();
 //    lemma_BitwiseMul64();
-assume r1 * h0 == h0 * r1;
-assume r0 * h0 == h0 * r0;
-assume r0 * h1 == h1 * r0;
-assume r0 * h2 == h2 * r0;
-assume s1 * h1 == h1 * s1;
-assume s1 * h2 == h2 * s1;
+assert r1 * h0 == h0 * r1;
+assert r1 * h0 == h0 * r1;
+assert r0 * h0 == h0 * r0;
+assert r0 * h1 == h1 * r0;
+assert r0 * h2 == h2 * r0;
+assert s1 * h1 == h1 * s1;
+assert s1 * h2 == h2 * s1;
 //    assert p > 0; hh := 0;
     ghost var gd0 := h0 * r0 + h1 * s1;
     ghost var gd1 := h0 * r1 + h1 * r0 + h2 * s1;
@@ -138,13 +140,13 @@ assume s1 * h2 == h2 * s1;
     IMul64Wrap(h2, r0); // h2*r0
     assert phase_2_(h2 == gd2);
 
-assume phase_2_(n * (n * d3 + d2) == n * n * d3 + n * d2);
-assume phase_2_(n * (h1 + d2) == n * h1 + n * d2);
-assume phase_2_(n * (h1 + d2 - nat64_max) == n * h1 + n * d2 - n * nat64_max);
-assume phase_2_(n * n * (d3 + h2) == n * n * d3 + n * n * h2);
-assume phase_2_(n * n * (d3 + h2 + 1) == n * n * d3 + n * n * h2 + n * n);
-assume phase_2_(gd1 * n == n * gd1);
-assume phase_2_(gd2 * (n * n) == (n * n) * gd2);
+//assert phase_2_(n * (n * d3 + d2) == n * n * d3 + n * d2);
+//assert phase_2_(n * (h1 + d2) == n * h1 + n * d2);
+//assert phase_2_(n * (h1 + d2 - nat64_max) == n * h1 + n * d2 - n * nat64_max);
+//assert phase_2_(n * n * (d3 + h2) == n * n * d3 + n * n * h2);
+//assert phase_2_(n * n * (d3 + h2 + 1) == n * n * d3 + n * n * h2 + n * n);
+//assert phase_2_(gd1 * n == n * gd1);
+//assert phase_2_(gd2 * (n * n) == (n * n) * gd2);
 
     Add64Wrap(h1, d2);
     Adc64Wrap(d3, h2);

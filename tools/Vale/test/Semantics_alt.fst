@@ -38,8 +38,8 @@ assume val lemma_equal_elim: #key:eqtype -> #value:Type -> m1:map key value -> m
 
 (* Define some transparently refined int types, 
    since we only use them in specs, not in emitted code *)
-let nat32_max = 0x100000000
-let nat64_max = 0x10000000000000000
+unfold let nat32_max = 0x100000000
+unfold let nat64_max = 0x10000000000000000
 //let nat32_max = 0x10
 //let nat64_max = 0x100
 //let _ = assert_norm (pow2 32 = nat32_max)    (* Sanity check our constant *)

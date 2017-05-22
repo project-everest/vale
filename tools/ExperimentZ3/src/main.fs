@@ -173,6 +173,32 @@ let remove_exps (q:query):query =
   let es = List.filter f es in
   query_from_parsed es
 
+let remove2_exps (q:query):query =
+  let es = query_to_parsed q in
+  let f e =
+    match e with
+    | Assert (_, Some s)
+        when  s.Contains(".Ins")
+           || s.Contains(".va_code_")
+           || s = "equation_Semantics_alt.valid_operand"
+           || s = "equation_Vale_alt.va_ensure"
+           || s = "equation_Vale_alt.va_require"
+           || s = "equation_Vale_alt.va_state_eq"
+           || s = "equation_Vale_alt.va_update_flags"
+           || s = "equation_Vale_alt.va_update_reg"
+           || s = "equation_Vale_alt.va_update_operand"
+           || s = "equation_Vale_alt.va_update_dst_operand"
+//           || s = "equation_Vale_alt.va_eval_dst_operand_uint64"
+//           || s = "equation_Vale_alt.va_eval_dst_operand"
+//           || s = "equation_Vale_alt.va_eval_operand"
+           || s = "equation_Semantics_alt.eval_reg"
+           || s = "typing_Semantics_alt.assert_1_2"
+           -> false
+    | _ -> true
+    in
+  let es = List.filter f es in
+  query_from_parsed es
+
 let phase (n:string) (q:query):query =
   let es = query_to_parsed q in
   let s_phase = "phase_" in
@@ -202,6 +228,73 @@ let phase (n:string) (q:query):query =
     in
   let es = List.collect g es in
   query_from_parsed es
+
+let declare_arith (q:query):query =
+  let es = query_to_parsed q in
+  let makeArith (fn:string, op:string) =
+    let tInt = Token "Int" in
+    let x = Token "x" in
+    let y = Token "y" in
+    let e1 = Exps [Token "declare-fun"; Token fn; Exps [tInt; tInt]; tInt] in
+    let app = Exps [Token fn; x; y] in
+    let body = Exps [Token "="; app; Exps [Token op; x; y]] in
+    let eq = Quant (Forall, [("x", tInt); ("y", tInt)], body, [[app]], None, None) in
+    let e2 = Assert (eq, None) in
+    [e1; e2]
+  let f (e:exp):exp list =
+    match e with
+    | Assert (_, Some "primitive_Prims.op_Addition") ->
+        let es = List.collect makeArith [("MUL", "*"); ("DIV", "div"); ("MOD", "mod")] in
+//        let es = List.collect makeArith [("ADD", "+"); ("SUB", "-"); ("MUL", "*"); ("DIV", "div"); ("MOD", "mod")] in
+        e::es
+    | _ -> [e]
+  let es = List.collect f es in
+  query_from_parsed es
+  
+let simplify_arith (q:query):query =
+  let es = query_to_unparsed q in
+  let box_int (e:exp):exp = Exps [Token "BoxInt"; e] in
+  let box_bool (e:exp):exp = Exps [Token "BoxBool"; e] in
+  let proj_int (e:exp):exp =
+    match e with
+    | Exps [Token "BoxInt"; e] -> e
+    | _ -> Exps [Token "BoxInt_proj_0"; e]
+    in
+  let arith_int s es = box_int (Exps ((Token s)::(List.map proj_int es))) in
+  let arith_bool s es = box_bool (Exps ((Token s)::(List.map proj_int es))) in
+  let rec f (e:exp):exp =
+    let named_keep (s:string) =
+      s.StartsWith("primitive_Prims.") || s.StartsWith("projection_inverse_BoxInt")
+      in
+    let e =
+      match e with
+      | Exps ((Token "define-fun")::_) -> e
+      | Exps es when not (List.exists (fun e -> match e with Token s when named_keep s -> true | _ -> false) es) ->
+          Exps (List.map f es)
+      | _ -> e
+      in
+    match e with
+    | Exps [Token "BoxInt_proj_0"; Exps [Token "BoxInt"; e]] -> e
+    | Exps [Token "BoxInt"; Exps [Token "BoxInt_proj_0"; e]] -> e
+//    | Exps ((Token "Prims.op_Minus")::es) -> arith_int "MINUS" es
+    | Exps ((Token "Prims.op_Addition")::es) -> arith_int "+" es
+    | Exps ((Token "Prims.op_Subtraction")::es) -> arith_int "-" es
+    | Exps ((Token "Prims.op_Multiply")::es) -> arith_int "MUL" es
+    | Exps ((Token "Prims.op_Division")::es) -> arith_int "DIV" es
+    | Exps ((Token "Prims.op_Modulus")::es) -> arith_int "MOD" es
+    | Exps ((Token "Prims.op_LessThanOrEqual")::es) -> arith_bool "<=" es
+    | Exps ((Token "Prims.op_GreaterThan")::es) -> arith_bool ">" es
+    | Exps ((Token "Prims.op_GreaterThanOrEqual")::es) -> arith_bool ">=" es
+    | Exps ((Token "Prims.op_LessThan")::es) -> arith_bool "<" es
+    | Exps [Token "="; Exps [Token "BoxInt"; e1]; Exps [Token "BoxInt"; e2]] -> Exps [Token "="; e1; e2]
+    | Exps [Token "="; Exps [Token "BoxBool"; e1]; Exps [Token "BoxBool"; e2]] -> Exps [Token "="; e1; e2]
+// This should say (Valid (Prims.eq2 ...)); see eq2-interp
+//    | Exps [Token "Prims.eq2"; Token "Prims.int"; Exps [Token "BoxInt"; e1]; Exps [Token "BoxInt"; e2]] ->
+//        box_bool (Exps [Token "="; e1; e2])
+    | _ -> e
+    in
+  let es = List.map f es in
+  query_from_unparsed es
 
 // select nth check-sat, where n=0 is first, n=1 is second, etc.
 let select_exps (n:string) (q:query):query =
@@ -251,6 +344,8 @@ let main (args:string list) =
       | "-sort"::cmds -> sort_exps q; do_cmds q cmds
       | "-select"::n::cmds -> do_cmds (select_exps n q) cmds
       | "-remove"::cmds -> do_cmds (remove_exps q) cmds
+      | "-remove2"::cmds -> do_cmds (remove2_exps q) cmds
+      | "-arith"::cmds -> do_cmds (simplify_arith (declare_arith q)) cmds
       | "-phase"::n::cmds -> do_cmds (phase n q) cmds
       | "-stats"::cmds -> do_cmds (stats q) cmds
       | _ -> parse_err (sprintf "unknown commands: %A" cmds)

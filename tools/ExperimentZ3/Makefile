@@ -12,10 +12,10 @@ $(EXPZ): src\ast.fs src\main.fs src\lex.fsl src\parse.fsy
 	MSBuild.exe .\src\ExperimentZ3.sln
 	editbin /stack:128000000 $(EXPZ)
 
-..\..\obj\Vale\test\decls_alt.fst: ..\Vale\test\decls_alt.vaf
+..\..\obj\Vale\test\decls_alt.fst: $(VALE) ..\Vale\test\decls_alt.vaf
 	$(VALE) -fstarText -conciseLemmas=false -in ..\Vale\test\decls_alt.vaf -out ..\..\obj\Vale\test\decls_alt.fst
 
-..\..\obj\thirdPartyPorts\OpenSSL\poly1305\x64\poly1305_alt.fst: ..\..\src\thirdPartyPorts\OpenSSL\poly1305\x64\poly1305_alt.vaf ..\Vale\test\decls_alt.vaf
+..\..\obj\thirdPartyPorts\OpenSSL\poly1305\x64\poly1305_alt.fst: $(VALE) ..\..\src\thirdPartyPorts\OpenSSL\poly1305\x64\poly1305_alt.vaf ..\Vale\test\decls_alt.vaf
 	$(VALE) -fstarText -assumeUpdates 3 -conciseLemmas=false -in ..\..\src\thirdPartyPorts\OpenSSL\poly1305\x64\poly1305_alt.vaf -out ..\..\obj\thirdPartyPorts\OpenSSL\poly1305\x64\poly1305_alt.fst
 
 decls_alt: ..\Vale\test\Semantics_alt.fst ..\Vale\test\Vale_alt.fst ..\..\obj\Vale\test\decls_alt.fst
@@ -29,12 +29,12 @@ poly1305_mod0: $(EXPZ)
 	$(Z3) $(Z3_ARGS) queries-Poly1305_alt.mod0
 
 poly1305_mod1: $(EXPZ)
-	$(EXPZ) -in .\queries-Poly1305_alt.smt2 -select 2 -remove -stats -print > queries-Poly1305_alt.mod1
+	$(EXPZ) -in .\queries-Poly1305_alt.smt2 -select 2 -remove -arith -stats -print > queries-Poly1305_alt.mod1
 	$(Z3) $(Z3_ARGS) queries-Poly1305_alt.mod1
 
 poly1305_phases: $(EXPZ)
-	$(EXPZ) -in .\queries-Poly1305_alt.smt2 -select 2 -remove -phase 1 -stats -print > queries-Poly1305_alt.phase1
-	$(EXPZ) -in .\queries-Poly1305_alt.smt2 -select 2 -remove -phase 2 -stats -print > queries-Poly1305_alt.phase2
+	$(EXPZ) -in .\queries-Poly1305_alt.smt2 -select 2 -remove          -phase 1 -arith -stats -print > queries-Poly1305_alt.phase1
+	$(EXPZ) -in .\queries-Poly1305_alt.smt2 -select 2 -remove -remove2 -phase 2 -arith -stats -print > queries-Poly1305_alt.phase2
 	$(Z3) $(Z3_ARGS) queries-Poly1305_alt.phase1
 	$(Z3) $(Z3_ARGS) queries-Poly1305_alt.phase2
 
