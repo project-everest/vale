@@ -168,7 +168,10 @@ for s in VALE_BIN:
   b = env.CopyAs(BIN+'/'+s, env['DAFNY_PATH']+'/'+s)
   Depends(vale_tool, b)
   dependencies.append(b)
-if sys.platform == 'win32':
+if sys.platform == 'win32' or (
+    sys.platform.startswith('linux')
+        and os.path.exists('/proc/sys/fs/binfmt_misc/WSLInterop')):
+  # we can use our win32 z3 binary, either natively or via WSL interop
   b = env.CopyAs(BIN+'/z3.exe', env['DAFNY_PATH']+'/z3.exe')
   Depends(vale_tool, b)
   dependencies.append(b)
