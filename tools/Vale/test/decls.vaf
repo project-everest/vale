@@ -1,0 +1,138 @@
+#verbatim
+module Decls
+
+open Vale
+open Semantics
+open FStar.UInt
+
+#reset-options "--z3rlimit 200"
+
+#endverbatim
+
+var{:state ok()} ok:bool;
+var{:state reg(Rax)} rax:int;
+var{:state reg(Rbx)} rbx:int;
+var{:state reg(Rcx)} rcx:int;
+var{:state reg(Rdx)} rdx:int;
+var{:state flags()} efl:int;
+var{:state mem()} mem:int;
+
+procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst_operand dst:uint64, operand src:uint64)
+    ensures
+        dst == old(src);
+{
+}
+
+procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst + src) % nat64_max;
+        //Cf(efl) == old(dst + src >= 0x1_0000_0000_0000_0000);
+{
+}
+
+procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst_operand dst:uint64, operand src1:uint64, operand src2:uint64)
+    requires
+        src1 + src2 < nat64_max;
+    ensures
+        dst == old(src1) + old(src2);
+{
+}
+
+procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst + src + (if cf(efl) then 1 else 0)) % nat64_max;
+        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= 0x1_0000_0000_0000_0000;
+{
+}
+
+procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst_operand dst:uint64, operand src:uint64)
+    requires
+        0 <= dst - src;
+    modifies 
+        efl;
+    ensures
+        dst == old(dst) - old(src);
+{
+}
+
+procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst - src) % nat64_max;
+{
+}
+
+procedure{:instruction Ins(Mul64(src))} Mul64Wrap(operand src:uint64)
+    modifies
+        efl;
+        rax;
+        rdx;
+    ensures
+        rax == old(rax * src) % nat64_max;
+        rdx == old(rax * src) / nat64_max;
+{
+}
+
+procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst * src) % nat64_max;
+{
+}
+
+#verbatim
+
+let logxor64 (x:nat64) (y:nat64) :nat64 =
+  logxor #64 x y
+
+let logand64 (x:nat64) (y:nat64) :nat64 =
+  logand #64 x y
+
+let shift_left64 (x:nat64) (amt:nat64) :nat64 =
+  shift_left #64 x amt
+
+let shift_right64 (x:nat64) (amt:nat64) :nat64 =
+  shift_right #64 x amt
+
+#endverbatim
+
+procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst_operand dst:uint64, operand src:uint64)
+    modifies 
+        efl;
+    ensures
+        dst == old(logxor64(dst,src));
+{
+}
+
+procedure{:instruction Ins(And64(dst, src))} And64(inout dst_operand dst:uint64, operand src:uint64)
+    modifies 
+        efl;
+    ensures
+        dst == old(logand64(dst,src));
+{
+}
+
+procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst_operand dst:uint64, shift_amt amt:uint64)
+    modifies
+        efl;
+//    requires
+//        0 <= src < 64;
+    ensures
+        dst == old(shift_left64(dst, amt));
+{
+}
+
+procedure{:instruction Ins(Shr64(dst, amt))} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
+    modifies
+        efl;
+    ensures
+        dst == old(shift_right64(dst, amt));
+{
+}
+

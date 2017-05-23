@@ -35,17 +35,17 @@ let string_of_bop (op:bop):string =
   | BExply -> notImplemented "<=="
   | BOr -> "\\/"
   | BAnd -> "/\\"
-  | BEq -> "="
-  | BNe -> "<>"
+  | BEq -> "=="
+  | BNe -> "=!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
   | BGe -> ">="
   | BAdd -> "+"
   | BSub -> "-"
-  | BMul -> "*"
-  | BDiv -> "/"
-  | BMod -> "%"
+  | BMul -> "`op_Multiply`"
+  | BDiv -> "`op_Division`"
+  | BMod -> "`op_Modulus`"
   | BOldAt | BIn | BCustom _ -> internalErr "binary operator"
 
 let string_of_ghost (g:ghost) = ""
@@ -168,10 +168,10 @@ let val_string_of_formals (xs:formal list) =
   | [] -> (sid (Reserved "dummy")) + ":unit"
   | _ -> String.concat " -> " (List.map string_of_formal_bare xs)
 
-let let_string_of_formals (xs:formal list) =
+let let_string_of_formals (useTypes:bool) (xs:formal list) =
   match xs with
   | [] -> "()"
-  | _ -> string_of_formals (List.map (fun (x, _) -> (x, None)) xs)
+  | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
@@ -181,7 +181,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ( match f.fbody with
     | None -> ()
     | Some e ->
-        ps.PrintLine ("let " + (sid f.fname) + " " + (let_string_of_formals f.fargs) + " =");
+        ps.PrintLine ("let " + (sid f.fname) + " " + (let_string_of_formals false f.fargs) + " =");
         ps.Indent ();
         ps.PrintLine (string_of_exp e);
         ps.Unindent ()
@@ -192,27 +192,41 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let (rs, es) = collect_specs p.pspecs in
   let (rs, es) = (exp_of_conjuncts rs, exp_of_conjuncts es) in
   ps.PrintLine ("");
+  let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
-  ps.PrintLine ("irreducible val " + (sid p.pname) + " : " + (val_string_of_formals args));
-  ps.Indent ();
-  //(match p.prets with [] -> () | _ -> notImplemented "procedure return values");
-  //ps.PrintLine ("{" + (string_of_exp rs) + "}")
-  let st = String.concat " * " (List.map string_of_pformal p.prets) in
-  //ps.PrintLine ("-> GTot (" + (sid (Reserved "out")) + ":(" + st + "){" + (string_of_exp es) + "})");
-  ps.PrintLine ("-> Ghost (" + st + ")");
-  ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
-  let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
-  ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
-  ps.Unindent ();
+  let printPType s =
+    ps.Indent ();
+    let st = String.concat " * " (List.map string_of_pformal p.prets) in
+    ps.PrintLine (s + "Ghost (" + st + ")");
+    ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
+    let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
+    ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
+    ps.Unindent ();
+    in
+  ( match tactic with
+    | None ->
+        ps.PrintLine ("irreducible val " + (sid p.pname) + " : " + (val_string_of_formals args));
+        printPType "-> "
+    | Some _ -> ()
+  );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
-        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + (let_string_of_formals args) + " =");
+        let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
+        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
+        (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         emit_stmts ps ss;
         let eRet = EApply (Id "tuple", List.map (fun (x, _, _, _, _) -> EVar x) p.prets) in
         ps.PrintLine (string_of_exp_prec 0 eRet)
-        ps.Unindent ()
+        ps.Unindent ();
+        ( match tactic with
+          | None -> ()
+          | Some e ->
+              ps.PrintLine ") <: ("
+              printPType "";
+              ps.PrintLine (") by " + (string_of_exp_prec 99 e))
+        )
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =

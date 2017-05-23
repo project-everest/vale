@@ -1,0 +1,50 @@
+include "decls.vaf"
+
+#verbatim
+module Test
+
+open Semantics
+open Vale
+open Decls
+
+#endverbatim
+
+
+procedure p()
+    modifies
+        rax; efl;
+    requires
+        rax < 10;
+    ensures
+        rax == old(rax) + 4;
+{
+    Add64Wrap(rax, 2);
+    Add64Wrap(rax, 2);
+}
+
+#verbatim
+let double (x:int):int = x + x
+#endverbatim
+
+procedure Calls()
+    requires 
+        rax < 7;
+    modifies
+        rax; rbx; efl;
+    ensures
+        rax == old(rax) + 7;
+{
+    Add64Wrap(rax, 1);
+    Mov64(rbx, const(double(1)));
+    assert rbx == 2;
+    Add64Wrap(rax, rbx);
+    p();
+}
+
+procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+    ensures
+        g2 == g1 + 1;
+{
+    g2 := g1 + 1;
+}
+

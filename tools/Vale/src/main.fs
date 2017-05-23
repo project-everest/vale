@@ -110,6 +110,7 @@ let main (argv) =
         | "-reprintGhostStmts=false" :: l -> reprint_ghost_stmts := false; match_args l
         | "-reprintLoopInvs=false" :: l -> reprint_loop_invs := false; match_args l
         | "-reprintBlankLines=false" :: l -> reprint_blank_lines := false; match_args l
+        | "-conciseLemmas=false" :: l -> concise_lemmas := false; match_args l
         | f :: l ->
           if f.[0] = '-' then
             failwith ("Unrecognized argument: " + f + "\n")

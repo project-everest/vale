@@ -152,9 +152,8 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
 and env_map_stmts (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip (env_map_stmt fe fs) env ss))
 and env_map_calc_contents (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env)  (cc:calcContents) =
-  match cc with
-  | CalcLine e -> CalcLine (fe env e)
-  | CalcHint (oop, ss) -> CalcHint (oop, env_map_stmts fe fs env ss)
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  {calc_exp = fe env e; calc_op = oop; calc_hints = List.map (env_map_stmts fe fs env) hints}
 
 let env_next_stmt (env:env) (s:stmt):env =
   let (env, _) = env_map_stmt (fun _ e -> e) (fun _ _ -> Unchanged) env s in
