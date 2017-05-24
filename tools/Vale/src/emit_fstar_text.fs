@@ -35,17 +35,17 @@ let string_of_bop (op:bop):string =
   | BExply -> notImplemented "<=="
   | BOr -> "\\/"
   | BAnd -> "/\\"
-  | BEq -> "="
-  | BNe -> "<>"
+  | BEq -> "=="
+  | BNe -> "=!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
   | BGe -> ">="
   | BAdd -> "+"
   | BSub -> "-"
-  | BMul -> "*"
-  | BDiv -> "/"
-  | BMod -> "%"
+  | BMul -> "`op_Multiply`"
+  | BDiv -> "`op_Division`"
+  | BMod -> "`op_Modulus`"
   | BOldAt | BIn | BCustom _ -> internalErr "binary operator"
 
 let string_of_ghost (g:ghost) = ""
@@ -88,7 +88,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2]) -> ("{" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "}", 90)
-    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
+    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
     | EApply (x, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
@@ -120,7 +120,6 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
   | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";")
   | SCalc _ -> err "unsupported feature: 'calc' for F*"
-  | SSplit -> notImplemented "split"
   | SVar (x, tOpt, g, a, eOpt) ->
       let sf = string_of_formal (x, tOpt) in
       let rhs = match eOpt with Some e -> " = " + (string_of_exp e) | None -> err "right-hand side required in variable declaration" in
@@ -129,7 +128,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssign ([lhs], e) ->
       ps.PrintLine ("let " + (string_of_lhs_formal lhs) + " = " + (string_of_exp e) + " in")
   | SAssign ((_::_::_) as lhss, e) ->
-      ps.PrintLine ("let (| " + (String.concat ", " (List.map string_of_lhs_formal lhss)) + " |) = " + (string_of_exp e) + " in")
+      ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_lhs_formal lhss)) + ") = " + (string_of_exp e) + " in")
   | SBlock ss -> notImplemented "block"
   | SIfElse (_, e, ss1, ss2) -> notImplemented "if-else"
   | SWhile (e, invs, (_, ed), ss) -> notImplemented "while"
@@ -169,10 +168,10 @@ let val_string_of_formals (xs:formal list) =
   | [] -> (sid (Reserved "dummy")) + ":unit"
   | _ -> String.concat " -> " (List.map string_of_formal_bare xs)
 
-let let_string_of_formals (xs:formal list) =
+let let_string_of_formals (useTypes:bool) (xs:formal list) =
   match xs with
   | [] -> "()"
-  | _ -> string_of_formals (List.map (fun (x, _) -> (x, None)) xs)
+  | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
@@ -182,7 +181,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ( match f.fbody with
     | None -> ()
     | Some e ->
-        ps.PrintLine ("let " + (sid f.fname) + " " + (let_string_of_formals f.fargs) + " =");
+        ps.PrintLine ("let " + (sid f.fname) + " " + (let_string_of_formals false f.fargs) + " =");
         ps.Indent ();
         ps.PrintLine (string_of_exp e);
         ps.Unindent ()
@@ -193,27 +192,41 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let (rs, es) = collect_specs p.pspecs in
   let (rs, es) = (exp_of_conjuncts rs, exp_of_conjuncts es) in
   ps.PrintLine ("");
+  let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
-  ps.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
-  ps.Indent ();
-  (match p.prets with [] -> () | _ -> notImplemented "procedure return values");
-  //ps.PrintLine ("{" + (string_of_exp rs) + "}")
-  //let st = String.concat " * " (List.map string_of_pformal p.prets) in
-  //ps.PrintLine ("-> GTot (" + (sid (Reserved "out")) + ":(" + st + "){" + (string_of_exp es) + "})");
-  ps.PrintLine ("-> Lemma");
-  ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
-  ps.PrintLine ("(ensures  " + (string_of_exp es) + ")");
-  (match p.prets with [] -> () | rs -> ps.PrintLine ("returns (" + (string_of_pformals rs) + ")"));
-  ps.Unindent ();
+  let printPType s =
+    ps.Indent ();
+    let st = String.concat " * " (List.map string_of_pformal p.prets) in
+    ps.PrintLine (s + "Ghost (" + st + ")");
+    ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
+    let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
+    ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
+    ps.Unindent ();
+    in
+  ( match tactic with
+    | None ->
+        ps.PrintLine ("irreducible val " + (sid p.pname) + " : " + (val_string_of_formals args));
+        printPType "-> "
+    | Some _ -> ()
+  );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
-        ps.PrintLine ("let " + (sid p.pname) + " " + (let_string_of_formals args) + " =");
+        let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
+        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
+        (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         emit_stmts ps ss;
         let eRet = EApply (Id "tuple", List.map (fun (x, _, _, _, _) -> EVar x) p.prets) in
         ps.PrintLine (string_of_exp_prec 0 eRet)
-        ps.Unindent ()
+        ps.Unindent ();
+        ( match tactic with
+          | None -> ()
+          | Some e ->
+              ps.PrintLine ") <: ("
+              printPType "";
+              ps.PrintLine (") by " + (string_of_exp_prec 99 e))
+        )
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =

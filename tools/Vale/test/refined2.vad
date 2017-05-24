@@ -20,8 +20,8 @@ datatype reg = EAX | EBX | ECX | EDX | ESI | EDI | EBP
 datatype opr = OReg(r:reg) | OConst(n:uint32)
 type va_operand = opr
 function method va_op_operand_reg(r:reg):va_operand { OReg(r) }
-predicate va_is_src_operand_uint32(o:opr) { true }
-predicate va_is_dst_operand_uint32(o:opr) { o.OReg? }
+predicate va_is_src_operand_uint32(o:opr, s:va_state) { true }
+predicate va_is_dst_operand_uint32(o:opr, s:va_state) { o.OReg? }
 
 type va_bool = bool
 type va_int = int

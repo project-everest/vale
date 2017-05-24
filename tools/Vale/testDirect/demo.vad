@@ -1,0 +1,62 @@
+// ..\..\..\bin\vale.exe -dafnyDirect -in .\demo.vad /trace /compile:3 /dprint:demo.dfy
+
+include "demoX86.vad"
+include{:verbatim} "demoX86.dfy"
+
+#verbatim
+function{:opaque} f(i:int):int { i + 1 }
+#endverbatim
+
+procedure{:instruction Ins(Mov(x, y))} mov(out register x:uint32,
+                                                operand y:uint32)
+    ensures x == old(y);
+{
+}
+
+procedure{:instruction Ins(Add(x, y))} add(inout register x:uint32,
+                                                  operand y:uint32)
+    requires x + y < 0x1_0000_0000;
+    ensures  x == old(x + y);
+{
+}
+
+procedure{:recursive} Demo(inline i:uint32)
+    reads eax;
+    modifies ebx;
+    requires i < 1000;
+    requires ebx < 0x4000_0000 - 2000 * i;
+    ensures ebx >= old(ebx);
+{
+    add(ebx, i);
+    add(ebx, i);
+    inline if (i > 0) { Demo(i - 1); }
+}
+
+procedure TestCalc()
+    ensures f(f(0)) == 2;
+{
+    calc
+    {
+        f(f(0));
+        { reveal f; }
+        f(0) + 1;
+        { reveal f; }
+        2;
+    }
+}
+
+#verbatim
+method PrintDemo(asm:AsmTarget,
+                 platform:PlatformTarget)
+{
+    printHeader(asm);
+    printProc("demo", va_code_Demo(999), 0, 0,
+        "", asm, platform);
+    printFooter(asm);
+}
+
+method Main()
+{
+    PrintDemo(GCC, Linux);
+}
+#endverbatim

@@ -6,6 +6,7 @@ import traceback
 import pdb
 import SCons.Util
 import atexit
+import platform
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -17,7 +18,7 @@ target_arch='x86'
 target_x='86'
 sha_arch_dir=''
 aes_arch_dir=''
-if sys.platform == 'win32' and os.getenv('PLATFORM')=='X64':
+if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machine() == 'x86_64' :
   target_arch='amd64'
   target_x='64'
   sha_arch_dir='sha-x64'
@@ -29,16 +30,15 @@ envDict = {'TARGET_ARCH':target_arch,
            'AES_ARCH_DIR':aes_arch_dir}
 
 env = Environment(**envDict)
-env['DAFNY'] = File('tools/Dafny/Dafny.exe')
-env['KREMLIN'] = File('#tools/Kremlin/Kremlin.native')
-env['VALE'] = File('bin/vale.exe')
 if sys.platform == 'win32':
   env.Replace(CCPDBFLAGS='/Zi /Fd${TARGET.base}.pdb')
-  env.Append(CCFLAGS=['/Ox', '/Gz'])
+  # Use kremlib.h without primitive support for uint128_t.
+  env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
+  env.Append(LINKFLAGS=['/DEBUG'])
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
-  env.Append(CCFLAGS=['-O3', '-flto', '-g'])
+  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128'])
   env['MONO'] = 'mono'
 
 # Convert NUMBER_OF_PROCESSORS into '-j n'.
@@ -46,6 +46,12 @@ else:
 #SetOption('num_jobs', num_cpu) 
 
 # Retrieve tool-specific command overrides passed in by the user
+AddOption('--DAFNYPATH',
+  dest='dafny_path',
+  type='string',
+  default='#tools/Dafny',
+  action='store',
+  help='Specify the path to Dafny tool binaries')
 AddOption('--DARGS',
   dest='dafny_user_args',
   type='string',
@@ -70,13 +76,60 @@ AddOption('--CARGS',
   default=[],
   action='append',
   help='Supply temporary additional arguments to the C compiler')
+AddOption('--OPENSSL',
+  dest='openssl_path',
+  type='string',
+  default=None,
+  action='store',
+  help='Specify the path to the root of an OpenSSL source tree')
+AddOption('--CACHEDIR',
+  dest='cache_dir',
+  type='string',
+  default=None,
+  action='store',
+  help='Specify the SCSons Shared Cache Directory')
+AddOption('--NOVERIFY',
+  dest='noverify',
+  default=False,
+  action='store_true',
+  help='Verify and compile, or compile only')
+
+env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
 env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
 env.Append(CCFLAGS=GetOption('c_user_args'))
+env['OPENSSL_PATH'] = GetOption('openssl_path')
+
+# --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
+# the other build flavors do not redundently re-verify the same results.
+env['DAFNY_NO_VERIFY'] = ''
+verify=(GetOption('noverify') == False)
+if not verify:
+  print('***\n*** WARNING:  NOT VERIFYING ANY CODE\n***')
+  env['DAFNY_NO_VERIFY'] = '/noVerify'
+  
+
+cache_dir=GetOption('cache_dir')
+if cache_dir != None:
+  print('Using Shared Cache Directory %s'%cache_dir)
+  CacheDir(cache_dir)
+
+env['DAFNY'] = Dir(env['DAFNY_PATH']).File('Dafny.exe')
+
+if 'KREMLIN_HOME' in os.environ:
+  kremlin_path = os.environ['KREMLIN_HOME']
+  env['KREMLIN'] = File(kremlin_path + '/_build/src/Kremlin.native')
+else:
+  kremlin_path = '#tools/Kremlin'
+  env['KREMLIN'] = File(kremlin_path + '/Kremlin.native')
+
+env['VALE'] = File('bin/vale.exe')
+
+kremlib_path = kremlin_path + '/kremlib'
 
 # Useful Dafny command lines
-dafny_default_args =   '/ironDafny /allocated:1 /compile:0 /timeLimit:30 /trace'
+dafny_default_args =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /trace'
 dafny_default_args_nonlarith = dafny_default_args + ' /noNLarith'
 
 ####################################################################
@@ -97,12 +150,12 @@ def formatExceptionInfo(maxTBlevel=5):
          
 def docmd(env, cmd):
   try:
-    print('cmd ' + cmd)
+    #print('cmd ' + cmd)
     pipe = SCons.Action._subproc(env, cmd,
                                  stdin = 'devnull',
                                  stderr = 'devnull',
                                  stdout = subprocess.PIPE)  
-    print('back from cmd')
+    #print('back from cmd')
   except:
     e = sys.exc_info()[0]
     print ("Error invoking: %s" % cmd)
@@ -112,10 +165,8 @@ def docmd(env, cmd):
   result = []
   line = pipe.stdout.readline()
   while line:
-    print('Adding line ' + line)
     result.append(line)
     line = pipe.stdout.readline()
-  print('finished docmd')
   return result
 
 def make_cygwin_path(path):
@@ -156,32 +207,24 @@ def vale_file_scan(node, env, path):
     dfy_includes = vale_dfy_include_re.findall(contents)
     vad_includes = vale_vad_include_re.findall(contents)
 
-    print "Processing %s.  Dir = %s.  vad_includes are %s." % (node, dirname, vad_includes)
-
-    v_dfy_includes = map(lambda f : os.path.join(dirname, os.path.splitext(f)[0] + '.vdfy'), dfy_includes)
-    v_vad_includes = map(lambda f : os.path.join(dirname, os.path.splitext(f)[0] + '.vdfy'), vad_includes)
-    print "v_dfy_includes: %s" % v_dfy_includes
-    print "v_vad_includes: %s" % v_vad_includes
-
+    v_dfy_includes = []
+    v_vad_includes = []
     for i in dfy_includes:
-      v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
       f = os.path.join(dirname, i)
-      print("Adding Dafny(%s, %s)" % (v, f))
+      v_dfy_includes.append(f)
+      v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
       env.Dafny(v, f)
     for i in vad_includes:
-      v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
       f = os.path.join(dirname, i)
-      print "Adding Vale(%s, %s)" % (v, f)
-      env.Vale(v, f)
+      v_vad_includes.append(f)
 
     files = env.File(v_dfy_includes + v_vad_includes) 
-    for f in files:
-      print "Returning %s" % f
     return files
 
-#vale_scan = Scanner(function = vale_file_scan,
-#                     skeys = ['.vad'])
-#env.Append(SCANNERS = vale_scan)
+vale_scan = Scanner(function = vale_file_scan,
+                     skeys = ['.vad'])
+env.Append(SCANNERS = vale_scan)
 
 
 ####################################################################
@@ -235,16 +278,14 @@ def dafny_file_scan(node, env, path):
     #  print("Output " + o)
     
     includes = dafny_include_re.findall(contents)
-    #includes = []
     v_includes = []
     for i in includes:
       srcpath = os.path.join(dirname, i)
       # TODO : this should convert the .gen.dfy filename back to a src\...\.vad filename, and look up its options
       options = get_build_options(srcpath)
-      f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
-      v_includes.append(f)
       if options != None:
-        #print("Adding dependency on " + f)
+        f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+        v_includes.append(f)
         options.env.Dafny(f, srcpath)
     return env.File(v_includes)
 
@@ -267,7 +308,7 @@ env.Append(SCANNERS = dafny_scan)
 #  File representing the verification result
 def verify_dafny(env, targetfile, sourcefile):
   temptargetfile = os.path.splitext(targetfile)[0] + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_USER_ARGS >$TARGET")
+  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_NO_VERIFY $DAFNY_USER_ARGS >$TARGET")
   return env.CopyAs(source=temptarget, target=targetfile)
   
 # Add env.Dafny(), to verify a .dfy file into a .vdfy
@@ -302,7 +343,13 @@ def kremlin_emitter(target, source, env):
 # Add env.Kremlin(), to extract .c/.h from .json.  The builder returns
 # two targets, the .c file first, followed by the .h file.
 def add_kremlin(env):
-  env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\"'
+  # In order to succeed, the Kremlin builder needs an extra directory in the
+  # PATH on Windows so that the DLL can be properly found.
+  if sys.platform == 'win32':
+    gmp_dll = FindFile('libgmp-10.dll', os.environ['PATH'].split(';'))
+    if gmp_dll != None:
+      env.PrependENVPath('PATH', os.path.dirname(str(gmp_dll)))
+  env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc'
   kremlin = Builder(action='cd ${TARGET.dir} && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
                            suffix = '.c',
                            src_suffix = '.json',
@@ -336,11 +383,8 @@ def extract_dafny_code(env, kremlin_dfys):
 # Takes a source .vad file as a string
 # Returns a File() representing the resulting .gen.dfy file
 def compile_vale(env, source_vad):
-  decls = env.Vale(source='$ARCH/decls.vad', target='obj/arch/x$X/decls.tmp.dfy')
-  decls_gen_dfy = env.CopyAs(source='obj/arch/x$X/decls.tmp.dfy', target='obj/arch/x$X/decls.gen.dfy')
   target_s = os.path.splitext(source_vad.replace('src', 'obj').replace('tools', 'obj'))[0]+'.gen.dfy'
   target_dfy = env.Vale(source=source_vad, target=target_s)
-  Depends(target_dfy, decls_gen_dfy)
   return target_dfy
   
 # Pseudo-builder that takes Vale code, a main .dfy, and generates a Vale EXE which then emits .asm files
@@ -354,8 +398,6 @@ def compile_vale(env, source_vad):
 #  ones are for other OS platforms, in no particular order.
 def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
   # generate decls.gen.dfy from decls.vad
-  decls = env.Vale(source='$ARCH/decls.vad', target='obj/arch/x$X/decls.tmp.dfy')
-  decls_gen_dfy = env.CopyAs(source='obj/arch/x$X/decls.tmp.dfy', target='obj/arch/x$X/decls.gen.dfy')
   vale_outputs = []
   for s in vads:
     outputs = compile_vale(env, s)
@@ -366,7 +408,6 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
   exe = env.Clone(DAFNY_COMPILER_FLAGS=dafny_default_args_nonlarith + ' /nologo /noVerify /compile:2 '+ionative).DafnyCompile(
     source=vad_main_dfy, target=exe_name)
   Depends(exe, ionative)
-  Depends(exe, decls_gen_dfy)
   Depends(exe, vale_outputs) # todo: this should be implicitly generated by scanning the vad_main_dfy file.  Is it?
   
   masm_win = env.Command(output_target_base+'.asm', exe, '$MONO $SOURCE MASM Win > $TARGET')
@@ -392,7 +433,7 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
 # returns the exe target and the stdout after executing the exe test target
 def build_test(env, inputs, include_dir, output_base_name):
   testenv = env.Clone()
-  testenv.Append(CPPPATH=['tools/Kremlin/kremlib', 'src/lib/util', include_dir])
+  testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
   inputs_obj = []
   for inp in inputs:
     inps = str(inp)
@@ -403,7 +444,7 @@ def build_test(env, inputs, include_dir, output_base_name):
   testoutput = 'obj/'+output_base_name+'.txt'
   env.Command(target=testoutput,
               source=exe,
-              action = [exe, 'type NUL > ' + testoutput])
+              action = [exe, 'echo ABC > ' + testoutput])
   a = env.Alias('runtest', '', exe)
   #AlwaysBuild(a)
   return a
@@ -425,7 +466,7 @@ class BuildOptions:
 def verify_dafny_files(env, files):
   for f in files:
     options = get_build_options(f)
-    if options != None:
+    if options != None and verify == True:
       target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
       target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
       options.env.Dafny(target, f)
@@ -436,19 +477,35 @@ def verify_vale_files(env, files):
   for f in files:
     options = get_build_options(f)
     if options != None:
-      target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
-      target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
       dfy = compile_vale(env, f)
-      options.env.Dafny(target, dfy)
+      if verify == True:
+        dfy_str = str(dfy[0]).replace('\\', '/')  # switch from Windows to Unix path ahead of calling get_build_options()
+        dafny_gen_options = get_build_options(dfy_str)
+        target = os.path.splitext(f.replace('src', 'obj'))[0] + '.gen.vdfy'
+        target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
+        dafny_gen_options.env.Dafny(target, dfy)
+
+def recursive_glob(env, pattern, strings=False):
+  matches = []
+  split = os.path.split(pattern) # [0] is the directory, [1] is the actual pattern
+  platform_directory =  split[0] #os.path.normpath(split[0])
+  for d in os.listdir(platform_directory):
+    if os.path.isdir(os.path.join(platform_directory, d)):
+      newpattern = os.path.join(split[0], d, split[1])
+      matches.append(recursive_glob(env, newpattern, strings))
+  
+  files = env.Glob(pattern, strings=strings)
+  matches.append(files)
+  return Flatten(matches)
 
 # Verify *.dfy and *.vad files in a list of directories.  This enumerates
 # all files in those trees, and creates verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
 def verify_files_in(env, directories):
   for d in directories:
-    files = Glob(d+'/*.dfy', strings=True)
+    files = recursive_glob(env, d+'/*.dfy', strings=True)
     verify_dafny_files(env, files)
-    files = Glob(d+'/*.vad', strings=True)
+    files = recursive_glob(env, d+'/*.vad', strings=True)
     verify_vale_files(env, files)
     
 ####################################################################
@@ -511,7 +568,7 @@ def report_verification_failures():
         for x in bf:
           if x is not None:
             filename = bf_to_filename(x)
-            if filename.endswith('.tmp'):
+            if filename.endswith('.tmp') and os.path.isfile(filename):
               print '##### Verification error.  Printing contents of ' + filename + ' #####'
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()

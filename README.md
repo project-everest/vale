@@ -9,7 +9,7 @@ for formal verification.
 It supports multiple architectures, such as x86, x64, and ARM, and multiple platforms, such as Windows, Mac, and Linux.
 Additional architectures and platforms can be supported with no changes to the Vale tool.
 
-Vale is part of the [Everest project](https://github.com/project-everest/project-everest.github.io).
+Vale is part of the [Everest project](https://project-everest.github.io).
 
 # Installation
 

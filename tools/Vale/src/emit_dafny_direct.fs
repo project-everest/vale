@@ -327,7 +327,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let updates = new ResizeArray<IToken * string * Expression>() in
           updates.Add((id, id.``val``, e2))
           new DatatypeUpdateExpr(tok, e1, updates) :> Expression
-      | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
+      | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
       | EApply (x, es) ->
           let tok = create_token loc (sid x) in
           if (sid x).Equals("int")
@@ -434,20 +434,48 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let s = new AssumeStmt(start_tok, end_tok, exp, null) :> Statement in
         stmts.Add(s)
         stmts
-    | SAssert (_, e) -> // Assume no attributes
+    | SAssert (attrs, e) -> // Assume no attributes
         let start_tok = create_token loc "assert" in
         let end_tok = create_token loc ";" in
         let exp = create_expression built_ins loc e in
-        let s = new AssertStmt(start_tok, end_tok, exp, null, null) :> Statement in
+        let attrs = if attrs.is_split then create_attr built_ins loc ("split_here",[]) null else null in
+        let s = new AssertStmt(start_tok, end_tok, exp, null, attrs) :> Statement in
         stmts.Add(s)
         stmts
-    | SCalc _ -> err "unsupported feature: 'calc' not yet implemented for Dafny direct"
-    | SSplit ->
-        let start_tok = create_token loc "assert" in
-        let end_tok = create_token loc ";" in
-        let exp = create_expression built_ins loc (EBool true) in
-        let attrs = create_attr built_ins loc ("split_here",[]) null in
-        let s = new AssertStmt(start_tok, end_tok, exp, null, attrs) :> Statement in
+    | SCalc (oop, contents) ->
+        let start_tok = create_token loc "calc" in
+        let end_tok = create_token loc "}" in
+        let defOp = CalcStmt.DefaultOp in
+        let makeCalcOp op = CalcStmt.BinaryCalcOp(bop2opcode op) :> CalcStmt.CalcOp in
+        let makeCalcOpOpt op = match oop with None -> defOp | Some op -> makeCalcOp op in
+        let calcOp = makeCalcOpOpt oop in
+        let resOp = ref calcOp in
+        let checkOp nextOp =
+          let maybeOp = (!resOp).ResultOp(nextOp) in
+          if maybeOp = null then err "bad calc op" else
+          resOp := maybeOp
+          in
+        let resOp = calcOp in
+        let lines = new ResizeArray<Expression>() in
+        let hints = new ResizeArray<BlockStmt>() in
+        let stepOps = new ResizeArray<CalcStmt.CalcOp>() in
+        let attrs = null in
+        let len = List.length contents in
+        let addContents {calc_exp = e; calc_op = oop; calc_hints = chs} =
+          let exp = create_expression built_ins loc e in
+          lines.Add(exp)
+          if lines.Count = len then lines.Add(exp) // Dafny expects redundant last expression
+          let subhints = new ResizeArray<Statement>() in
+          let start_tok = create_token loc "{" in
+          let end_tok = create_token loc "}" in
+          List.iter (fun ss -> subhints.Add(create_block_stmt built_ins loc ss)) chs
+          hints.Add(new BlockStmt(start_tok, end_tok, subhints))
+          let stepOp = match oop with None -> calcOp | Some op -> makeCalcOp op in
+          checkOp stepOp
+          stepOps.Add(stepOp)
+          in
+        List.iter addContents contents
+        let s = new CalcStmt(start_tok, end_tok, calcOp, lines, hints, stepOps, resOp, attrs) in
         stmts.Add(s)
         stmts
     | SVar (x, tOpt, g, a, eOpt) ->

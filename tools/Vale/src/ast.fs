@@ -39,7 +39,7 @@ type op =
 | Cond
 | FieldOp of id
 | FieldUpdate of id
-//| CodeLemmaOp // one expression for code, a different expression for lemmas
+| CodeLemmaOp // one expression for code, a different expression for lemmas
 | RefineOp // one expression for abstract, one expression for abstract with optional oldness, one expression for refined
 | StateOp of id * string * typ // example: (eax, "reg", int) for va_get_reg(EAX, ...exps..., state):int
 | OperandArg of id * string * typ
@@ -78,7 +78,7 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type is_invariant = IsInv | NotInv
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool}
 type lhs = id * (typ option * ghost) option
 type stmt =
 | SLoc of loc * stmt
@@ -86,9 +86,8 @@ type stmt =
 | SGoto of id
 | SReturn
 | SAssume of exp
-| SAssert of is_invariant * exp
+| SAssert of assert_attrs * exp
 | SCalc of bop option * calcContents list
-| SSplit
 | SVar of id * typ option * var_storage * attrs * exp option
 | SAssign of lhs list * exp
 | SBlock of stmt list
@@ -96,9 +95,7 @@ type stmt =
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list
 | SExists of formal list * triggers * exp
-and calcContents =
-| CalcLine of exp
-| CalcHint of bop option * stmt list
+and calcContents = {calc_exp:exp; calc_op:bop option; calc_hints:stmt list list}
 
 type spec =
 | Requires of exp

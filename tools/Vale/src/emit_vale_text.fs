@@ -75,7 +75,8 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UToOperand, [e]) -> ("@" + (r 99 e), 90)
     | EOp (Uop UOld, [e]) -> ("old(" + (r 99 e) + ")", 90)
     | EOp (Uop UConst, [e]) -> ("const(" + (r 99 e) + ")", 90)
-    | EOp (Uop (UReveal | UGhostOnly | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator:%A" e)
+    | EOp (Uop UUnrefinedSpec, [e]) -> ("{:refined false} " + (r 99 e), 90)
+    | EOp (Uop (UReveal | UGhostOnly | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator:%A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
     | EOp (Bop BIn, [e1; e2]) ->
         ((r 90 e1) + "?[" + (r 5 e2) + "]", 90)
@@ -90,7 +91,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2]) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
-    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp:%A" e)
+    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp:%A" e)
     | EApply (x, es) -> ((sid x) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" xs ts e
@@ -132,20 +133,21 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SGoto x -> ps.PrintLine ("goto " + sid x + ";")
   | SReturn -> ps.PrintLine ("return;")
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
-  | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";")
+  | SAssert (attrs, e) ->
+      let sAssert = if attrs.is_inv then "invariant" else "assert" in
+      let sSplit = if attrs.is_split then "{:split_here}" else "" in
+      let sRefined = if attrs.is_refined then "{:refined}" else "" in
+      ps.PrintLine (sAssert + sSplit + sRefined + " " + (string_of_exp e) + ";")
   | SCalc (oop, contents) ->
       ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
       ps.Indent();
-      List.iter (fun cc ->
-        match cc with
-        | CalcLine e -> ps.PrintLine ((string_of_exp e) + ";")
-        | CalcHint (oop, ss) ->
-            (match oop with | None -> () | Some op -> ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent());
-            emit_block ps ss
+      List.iter (fun {calc_exp = e; calc_op = oop; calc_hints = hints} ->
+        ps.PrintLine ((string_of_exp e) + ";");
+        (match oop with | None -> () | Some op -> ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent());
+        List.iter (emit_block ps) hints
       ) contents;
       ps.Unindent();
       ps.PrintLine("}")
-  | SSplit -> ps.PrintLine ("assert{:split_here} true;")
   | SVar (x, tOpt, g, a, eOpt) ->
       let st = match tOpt with None -> "" | Some t -> ":" + (string_of_typ t) in
       let rhs = match eOpt with None -> "" | Some e -> " := " + (string_of_exp e) in

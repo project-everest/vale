@@ -194,7 +194,7 @@ DECL ::=
   | <a href="#state">var</a> x : TYPE ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS := extern ;
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
@@ -231,7 +231,7 @@ STMT ::=
   | assume EXP ;
   | assert EXP ;
   | assert EXP by { STMTS }
-  | calc <i>[</i>CALCOP<i>]</i> { CALC ... CALC }
+  | calc <i>[</i>CALC_OP<i>]</i> { CALC ... CALC EXP ; }
   | reveal f ;
   | p ( EXP , ... , EXP) ;
   | ASSIGN ;
@@ -244,10 +244,10 @@ STMT ::=
     <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
     <i>[</i> else { ... } <i>]</i>
 
-CALC ::=
-  | <i>[</i>CALCOP<i>]</i> EXP ;
-  | <i>[</i>CALCOP<i>]</i> { STMTS }
-CALCOP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
+CALC ::= EXP ; <i>[</i>CALC_OP<i>]</i> CALC_HINTS
+CALC_HINTS ::= CALC_HINT ... CALC_HINT
+CALC_HINT ::= { STMTS }
+CALC_OP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
 
 ASSIGNS ::= ASSIGN , ... , ASSIGN
 ASSIGN ::= 
@@ -524,6 +524,7 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     <ul>
       <li>{:verbatim} on include directives, which directs Vale to include a file written directly in the underlying verification language, rather than including another Vale file</li>
       <li>{:instruction EXP} on procedures, indicating a primitive procedure that is implemented with the code value specified by the expression EXP</li>
+      <li>{:operand} on procedures, indicating an operand constructor</li>
       <li>{:state f(EXP, ..., EXP)} on global variable declarations, indicating that the variable x corresponds to a field f(EXP, ..., EXP) of the state type.</li>
       <li>{:refined} and {:bridge} on procedures -- an experimental feature that uses a more complicated, but sometimes more efficient, Dafny encoding for generated lemmas</li>
     </ul>
@@ -678,8 +679,8 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     </code></pre>
 
   <p>
-    Operand parameters may be instantiated with constants, state variables, or operands.
-    Operand return values may be instantiated with state variables or operands.
+    Operand parameters may be instantiated with constants, state variables, operands, or operand constructor applications.
+    Operand return values may be instantiated with state variables, operands, or operand constructor applications.
     Constants passed as operand parameters may either be simple integer literals,
     or more complex expressions inside a "const(...)" expression.
 
@@ -837,12 +838,10 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
               <li>update_f(..., sM:state, sK:state):state</li>
             </ul>
           </li>
-          <li>cmp_eq(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_ne(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_le(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_ge(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_lt(o1:cmp, o2:cmp):cmp</li>
-          <li>cmp_gt(o1:cmp, o2:cmp):cmp</li>
+          <li>cmp_x(o1:cmp, o2:cmp):cmp for each comparison function x,
+            where x is either a user-defined function name (for conditional expressions x(o1, ..., on))
+            or one of "eq", "ne", "le", "ge", "lt", or "gt" (for conditional expressions o1 == o2, o1 != o2, etc.)
+          </li>
           <li>get_block(c:code):codes</li>
           <li>get_ifCond(c:code):cmp</li>
           <li>get_ifTrue(c:code):code</li>

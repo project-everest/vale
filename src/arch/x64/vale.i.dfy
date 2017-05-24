@@ -34,9 +34,11 @@ type imm8 = uint8
 datatype HeapletType = WordHeapletType | ByteHeapletType | QuadwordHeapletType
 datatype ByteHeapletEntry     = ByteHeapletEntry(v:uint8, t:taint)
 datatype WordHeapletEntry     = WordHeapletEntry(v:uint32, t:taint)
+datatype Heaplet64Entry       = Heaplet64Entry(v:uint64, t:taint)
 datatype QuadwordHeapletEntry = QuadwordHeapletEntry(v:Quadword, t:taint)
 datatype Heaplet = ByteHeaplet(bytes:map<int, ByteHeapletEntry>)
                  | WordHeaplet(words:map<int, WordHeapletEntry>) 
+                 | Heaplet64(mem64:map<int, Heaplet64Entry>) 
                  | QuadwordHeaplet(quads:map<int, QuadwordHeapletEntry>)
 
 type heaplet_id = int
@@ -80,37 +82,37 @@ function va_update_memory(sM:va_state, sK:va_state):va_state { sK.(heap := sM.he
 function va_update_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
 function va_update_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
 
-predicate va_is_src_operand_imm8(o:opr) { o.OConst? && 0 <= o.n < 256 }
+predicate va_is_src_operand_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
 
-predicate va_is_src_operand_uint32(o:opr) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
-predicate va_is_dst_operand_uint32(o:opr) { o.OReg? && !o.r.X86Xmm? }
+predicate va_is_src_operand_uint32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm?) }
+predicate va_is_dst_operand_uint32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
 
-predicate va_is_src_operand_uint64(o:opr) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
-predicate va_is_dst_operand_uint64(o:opr) { o.OReg? && !o.r.X86Xmm? }
+predicate va_is_src_operand_uint64(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
+predicate va_is_dst_operand_uint64(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
 
-predicate va_is_src_operand_Quadword(o:opr) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
-predicate va_is_dst_operand_Quadword(o:opr) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
+predicate va_is_src_operand_Quadword(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
+predicate va_is_dst_operand_Quadword(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
 
 function va_eval_operand_imm8(s:va_state, o:opr):uint32
-    requires va_is_src_operand_imm8(o);
+    requires va_is_src_operand_imm8(o, s);
 {
     o.n
 }
 
 function va_eval_operand_uint32(s:va_state, o:opr):uint32
-    requires va_is_src_operand_uint32(o);
+    requires va_is_src_operand_uint32(o, s);
 {
     eval_op32(to_state(s), o)
 }
 
 function va_eval_operand_uint64(s:va_state, o:opr):uint64
-    requires va_is_src_operand_uint64(o);
+    requires va_is_src_operand_uint64(o, s);
 {
     eval_op64(to_state(s), o)
 }
 
 function va_eval_operand_Quadword(s:va_state, o:opr):Quadword
-    requires va_is_src_operand_Quadword(o);
+    requires va_is_src_operand_Quadword(o, s);
     requires o.r.xmm in s.xmms;
 {
     Eval128BitOperand(to_state(s), o)
@@ -173,7 +175,7 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
  && x86_ValidState(s1)
 }
 
-function method va_const_operand(n:uint32):opr { OConst(n) }
+function method va_const_operand(n:uint64):opr { OConst(n) }
 function method va_op_operand_reg32(r:x86reg):opr { OReg(r) }
 function method va_op_operand_reg64(r:x86reg):opr { OReg(r) }
 function method va_op_operand_Quadword(r:int):opr { OReg(X86Xmm(r)) }
@@ -240,6 +242,8 @@ predicate ValidHeapletAddr(h:Heaplet, addr:int)
                             && addr + 2 !in w
                             && addr + 3 !in w
         case ByteHeaplet(b) => addr in b
+        case Heaplet64(s) =>   addr + 0  in s && addr + 1 !in s && addr + 2 !in s && addr + 3 !in s
+                            && addr + 4 !in s && addr + 5 !in s && addr + 6 !in s && addr + 7 !in s
         case QuadwordHeaplet(s) =>  addr in s
                                  && addr + 1 !in s && addr + 2 !in s && addr +  3 !in s
                                  && addr + 4 !in s && addr + 5 !in s && addr +  6 !in s && addr +  7 !in s
@@ -252,6 +256,7 @@ predicate AddrInHeaplet(addr:int, h:Heaplet)
     match h
         case WordHeaplet(w)     => addr in w 
         case ByteHeaplet(b)     => addr in b
+        case Heaplet64(s)       => addr in s 
         case QuadwordHeaplet(s) => addr in s 
 }
 
@@ -263,6 +268,8 @@ predicate ConsistentHeapletAddr(h:Heaplet, H:heap, addr:int)
                             && addr + 2 in H
                             && addr + 3 in H
         case ByteHeaplet(_) => addr in H
+        case Heaplet64(s) =>   addr + 0 in H && addr + 1 in H && addr + 2 in H && addr + 3 in H
+                            && addr + 4 in H && addr + 5 in H && addr + 6 in H && addr + 7 in H
         case QuadwordHeaplet(_) =>  addr      in H && addr +  1 in H && addr +  2 in H && addr +  3 in H
                                  && addr +  4 in H && addr +  5 in H && addr +  6 in H && addr +  7 in H
                                  && addr +  8 in H && addr +  9 in H && addr + 10 in H && addr + 11 in H
@@ -274,6 +281,7 @@ predicate AddrNotInHeaplet(addr:int, h:Heaplet)
     match h
         case WordHeaplet(w)     => addr !in w
         case ByteHeaplet(b)     => addr !in b
+        case Heaplet64(s)       => addr !in s
         case QuadwordHeaplet(s) => addr !in s
 }
 
@@ -287,6 +295,10 @@ predicate ConsistentHeapletValue(h:Heaplet, H:heap, addr:int)
                                                         H[addr+1].v,
                                                         H[addr].v)
         case ByteHeaplet(b) => b[addr].v == H[addr].v
+        case Heaplet64(s) =>
+            s[addr].v == lowerUpper64(
+                BytesToWord(H[addr +  3].v, H[addr +  2].v, H[addr +  1].v, H[addr].v),
+                BytesToWord(H[addr +  7].v, H[addr +  6].v, H[addr +  5].v, H[addr +  4].v))
         case QuadwordHeaplet(s) => s[addr].v == Quadword(
                 BytesToWord(H[addr +  3].v, H[addr +  2].v, H[addr +  1].v, H[addr].v),
                 BytesToWord(H[addr +  7].v, H[addr +  6].v, H[addr +  5].v, H[addr +  4].v),
@@ -304,6 +316,8 @@ predicate ConsistentHeapletTaint(h:Heaplet, H:heap, addr:int)
                                          == H[addr+1].t
                                          == H[addr].t
         case ByteHeaplet(b) => b[addr].t == H[addr].t
+        case Heaplet64(s) => s[addr].t == H[addr     ].t == H[addr +  1].t == H[addr +  2].t == H[addr +  3].t
+                                       == H[addr +  4].t == H[addr +  5].t == H[addr +  6].t == H[addr +  7].t
         case QuadwordHeaplet(s) => s[addr].t == H[addr     ].t == H[addr +  1].t == H[addr +  2].t == H[addr +  3].t
                                              == H[addr +  4].t == H[addr +  5].t == H[addr +  6].t == H[addr +  7].t
                                              == H[addr +  8].t == H[addr +  9].t == H[addr + 10].t == H[addr + 11].t
@@ -324,6 +338,8 @@ predicate AddrExclusive(heaplets:Heaplets, h_id:heaplet_id, h_id':heaplet_id, ad
                             && AddrNotInHeaplet(addr + 2, h')
                             && AddrNotInHeaplet(addr + 3, h')
         case ByteHeaplet(_) => AddrNotInHeaplet(addr, h')
+        case Heaplet64(_) => AddrNotInHeaplet(addr,      h') && AddrNotInHeaplet(addr +  1, h') && AddrNotInHeaplet(addr +  2, h') && AddrNotInHeaplet(addr +  3, h')
+                            && AddrNotInHeaplet(addr +  4, h') && AddrNotInHeaplet(addr +  5, h') && AddrNotInHeaplet(addr +  6, h') && AddrNotInHeaplet(addr +  7, h')
         case QuadwordHeaplet(_) => AddrNotInHeaplet(addr,      h') && AddrNotInHeaplet(addr +  1, h') && AddrNotInHeaplet(addr +  2, h') && AddrNotInHeaplet(addr +  3, h')
                                 && AddrNotInHeaplet(addr +  4, h') && AddrNotInHeaplet(addr +  5, h') && AddrNotInHeaplet(addr +  6, h') && AddrNotInHeaplet(addr +  7, h')
                                 && AddrNotInHeaplet(addr +  8, h') && AddrNotInHeaplet(addr +  9, h') && AddrNotInHeaplet(addr + 10, h') && AddrNotInHeaplet(addr + 11, h')
@@ -375,6 +391,7 @@ predicate ValidDstAddr(h:Heaplets, id:heaplet_id, addr:int, size:int)
  && match h[id]
         case ByteHeaplet(_)     => size ==   8
         case WordHeaplet(_)     => size ==  32
+        case Heaplet64(_)       => size ==  64
         case QuadwordHeaplet(_) => size == 128
 }
 
@@ -385,6 +402,7 @@ predicate ValidSrcAddr(h:Heaplets, id:heaplet_id, addr:int, size:int, taint:tain
  && match h[id]
         case ByteHeaplet(_)     => size ==   8 && h[id].bytes[addr].t == taint
         case WordHeaplet(_)     => size ==  32 && h[id].words[addr].t == taint
+        case Heaplet64(_)       => size ==  64 && h[id].mem64[addr].t == taint
         case QuadwordHeaplet(_) => size == 128 && h[id].quads[addr].t == taint
 }
 
@@ -405,6 +423,12 @@ predicate ValidSrcAddrs(h:Heaplets, id:heaplet_id, addr:int, size:int, taint:tai
                  {:trigger h[id].words[a] } 
                  {:trigger a in h[id].words } 
      :: addr <= a < addr+num_bytes && (a - addr) % 4 == 0 ==> ValidSrcAddr(h, id, a, 32, taint)
+    else if size == 64 then
+        h[id].Heaplet64?
+     && forall a {:trigger ValidSrcAddr(h, id, a, 64, taint) }
+                 {:trigger h[id].mem64[a] }
+                 {:trigger a in h[id].mem64 }
+     :: addr <= a < addr+num_bytes && (a - addr) % 8 == 0 ==> ValidSrcAddr(h, id, a, 64, taint)
     else 
         h[id].QuadwordHeaplet?
      && forall a {:trigger ValidSrcAddr(h, id, a, 128, taint) } 
@@ -430,6 +454,12 @@ predicate ValidDstAddrs(h:Heaplets, id:heaplet_id, addr:int, size:int, num_bytes
                  {:trigger h[id].words[a] } 
                  {:trigger a in h[id].words } 
      :: addr <= a < addr+num_bytes && (a - addr) % 4 == 0 ==> ValidDstAddr(h, id, a, 32)
+    else if size == 64 then
+        h[id].Heaplet64?
+     && forall a {:trigger ValidDstAddr(h, id, a, 64) }
+                 {:trigger h[id].mem64[a] }
+                 {:trigger a in h[id].mem64 }
+     :: addr <= a < addr+num_bytes && (a - addr) % 8 == 0 ==> ValidDstAddr(h, id, a, 64)
     else 
         h[id].QuadwordHeaplet?
      && forall a {:trigger ValidDstAddr(h, id, a, 128) } 
@@ -489,6 +519,13 @@ function UpdateHeaplets(s:State, addr:int, id:heaplet_id, taint:taint, v:uint32)
               ]
 }
 
+function UpdateHeaplets64(s:State, addr:int, id:heaplet_id, taint:taint, v:uint64) : Heaplets
+    requires ValidDstAddr(s.heaplets, id, addr, 64);
+{
+    var old_heaplet := s.heaplets[id];
+    s.heaplets[id := old_heaplet.(mem64 := old_heaplet.mem64[addr := Heaplet64Entry(v, taint)])]
+}
+
 function UpdateHeaplets128(s:State, addr:int, id:heaplet_id, taint:taint, v:Quadword) : Heaplets
     requires ValidDstAddr(s.heaplets, id, addr, 128);
 {
@@ -528,6 +565,48 @@ lemma lemma_HeapletsUpdatedCorrectly32(s:State, r:State, addr:int, id:heaplet_id
               && ConsistentHeapletAddr(r.heaplets[h_id], r.heap, a)
               && ConsistentHeapletValue(r.heaplets[h_id], r.heap, a)
               && ConsistentHeapletTaint(r.heaplets[h_id], r.heap, a);
+    {
+      assert h_id in s.heaplets;
+      assert ValidHeapletAddr(s.heaplets[h_id], a);
+    }
+    assert HeapletsConsistent(r.heaplets, r.heap);
+}
+
+lemma {:timeLimitMultiplier 2} lemma_HeapletsUpdatedCorrectly64(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:uint64)
+    requires x86_ValidState(s);
+    requires ValidDstAddr(s.heaplets, id, addr, 64);
+    requires valid_state(to_state(r));
+    requires r.heap == UpdateHeap64(s.heap, addr, v, taint)
+          && r.heaplets == UpdateHeaplets64(s, addr, id, taint, v);
+    ensures  x86_ValidState(r);
+{
+    reveal_x86_ValidState();
+    reveal_lower64();
+    reveal_upper64();
+    reveal_lowerUpper64();
+    lemma_WordToBytes_BytesToWord_inverses(lower64(v));
+    lemma_WordToBytes_BytesToWord_inverses(upper64(v));
+
+    // Establish HeapletsExclusive
+    forall a, h_id, h_id' | h_id in r.heaplets
+                             && h_id' in r.heaplets 
+                             && h_id != h_id'
+                             && AddrInHeaplet(a, r.heaplets[h_id])
+        ensures ValidHeapletAddr(r.heaplets[h_id], a);
+        ensures AddrExclusive(r.heaplets, h_id, h_id', a);
+    {
+      assert ValidHeapletAddr(s.heaplets[h_id], a);
+    }
+    assert HeapletsExclusive(r.heaplets);
+
+    // Establish HeapletsConsistent
+    forall a, h_id | h_id in r.heaplets
+                     && AddrInHeaplet(a, r.heaplets[h_id])
+        ensures 
+           ValidHeapletAddr(r.heaplets[h_id], a)
+        && ConsistentHeapletAddr(r.heaplets[h_id], r.heap, a)
+        && ConsistentHeapletValue(r.heaplets[h_id], r.heap, a)
+        && ConsistentHeapletTaint(r.heaplets[h_id], r.heap, a);
     {
       assert h_id in s.heaplets;
       assert ValidHeapletAddr(s.heaplets[h_id], a);
@@ -587,7 +666,7 @@ lemma evalWhile_validity(b:obool, c:code, n:nat, s:state, r:state)
     decreases c, 1, n;
     ensures  valid_state(s) && r.ok ==> valid_state(r);
 {
-    if valid_state(s) && r.ok && ValidOperand(s, 32, b.o1) && ValidOperand(s, 32, b.o2) && n > 0 {
+    if valid_state(s) && r.ok && ValidOperand(s, 64, b.o1) && ValidOperand(s, 64, b.o2) && n > 0 {
         var s', r' :| evalOBool(s, b) && branchRelation(s, s', true) && evalCode(c, s', r') && evalWhile(b, c, n - 1, r', r); 
         code_state_validity(c, s', r');
         evalWhile_validity(b, c, n - 1, r', r);
@@ -646,7 +725,7 @@ lemma code_state_validity(c:code, s:state, r:state)
         } else if c.Block? {
             block_state_validity(c.block, s, r);
         } else if c.IfElse? {
-            if ValidOperand(s, 32, c.ifCond.o1) && ValidOperand(s, 32, c.ifCond.o2) {
+            if ValidOperand(s, 64, c.ifCond.o1) && ValidOperand(s, 64, c.ifCond.o2) {
                 var s' :| branchRelation(s, s', evalOBool(s, c.ifCond)) &&
                     if evalOBool(s, c.ifCond) then
                         evalCode(c.ifTrue, s', r)
@@ -716,14 +795,15 @@ lemma va_lemma_block(b:codes, s0:va_state, r:va_state) returns(r1:va_state, c0:c
 lemma va_lemma_ifElse(ifb:obool, ct:code, cf:code, s:va_state, r:va_state) returns(cond:bool, s':va_state)
     requires !ifb.o1.OHeap? && !ifb.o2.OHeap?;
     requires x86_ValidState(s);
-    requires va_is_src_operand_uint32(ifb.o1) && ValidSourceOperand(to_state(s), 32, ifb.o1);
-    requires va_is_src_operand_uint32(ifb.o2) && ValidSourceOperand(to_state(s), 32, ifb.o2);
+    requires va_is_src_operand_uint64(ifb.o1, s) && ValidSourceOperand(to_state(s), 64, ifb.o1);
+    requires va_is_src_operand_uint64(ifb.o2, s) && ValidSourceOperand(to_state(s), 64, ifb.o2);
     requires eval_code(IfElse(ifb, ct, cf), s, r)
     ensures  if s.ok then
                     s'.ok
                  && x86_ValidState(s')
                  && cond == evalOBool(to_state(s), ifb)
                  && x86_branchRelation(s, s', cond)
+                 && (s.heaplets == s'.heaplets)
                  && (if cond then eval_code(ct, s', r) else eval_code(cf, s', r))
              else
                 true
@@ -749,8 +829,8 @@ predicate va_whileInv(b:obool, c:code, n:int, r1:va_state, r2:va_state)
 }
 
 lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':va_state)
-    requires va_is_src_operand_uint32(b.o1);
-    requires va_is_src_operand_uint32(b.o2);
+    requires va_is_src_operand_uint64(b.o1, s);
+    requires va_is_src_operand_uint64(b.o2, s);
     requires x86_ValidState(s);
     requires eval_code(While(b, c), s, r)
     ensures  evalWhileLax(b, c, n, to_state(s), to_state(r))
@@ -771,8 +851,8 @@ lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':
 }
 
 lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns(s':va_state, r':va_state)
-    requires va_is_src_operand_uint32(b.o1) && ValidSourceOperand(to_state(s), 32, b.o1);
-    requires va_is_src_operand_uint32(b.o2) && ValidSourceOperand(to_state(s), 32, b.o2);
+    requires va_is_src_operand_uint64(b.o1, s) && ValidSourceOperand(to_state(s), 64, b.o1);
+    requires va_is_src_operand_uint64(b.o2, s) && ValidSourceOperand(to_state(s), 64, b.o2);
     requires n > 0
     requires evalWhileLax(b, c, n, to_state(s), to_state(r))
     ensures  x86_ValidState(s) ==> x86_ValidState(s');
@@ -781,7 +861,7 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
     ensures  x86_ValidState(s) ==> if s.ok then x86_branchRelation(s, s', true) else s' == s;
     ensures  if s.ok && x86_ValidState(s) then
                     s'.ok
-                 && va_is_src_operand_uint32(b.o1)
+                 && va_is_src_operand_uint64(b.o1, s)
                  && evalOBool(to_state(s), b)
                  && (s.heaplets == s'.heaplets == r'.heaplets)
              else
@@ -811,8 +891,8 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
 }
 
 lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va_state)
-    requires va_is_src_operand_uint32(b.o1) && ValidSourceOperand(to_state(s), 32, b.o1);
-    requires va_is_src_operand_uint32(b.o2) && ValidSourceOperand(to_state(s), 32, b.o2);
+    requires va_is_src_operand_uint64(b.o1, s) && ValidSourceOperand(to_state(s), 64, b.o1);
+    requires va_is_src_operand_uint64(b.o2, s) && ValidSourceOperand(to_state(s), 64, b.o2);
     requires evalWhileLax(b, c, 0, to_state(s), to_state(r))
     ensures  if s.ok then
                 (if x86_ValidState(s) then

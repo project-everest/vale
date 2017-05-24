@@ -32,6 +32,7 @@ type env =
     mods:Map<id, bool>;
     state:exp;
     abstractOld:bool; // if true, x --> va_old_x in abstract lemma
+    checkMods:bool;
   }
 
 let empty_env:env =
@@ -43,6 +44,7 @@ let empty_env:env =
     mods = Map.empty;
     state = EVar (Reserved "s");
     abstractOld = false;
+    checkMods = false;
   }
 
 let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
@@ -115,9 +117,8 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SGoto x -> (env, [s])
     | SReturn -> (env, [s])
     | SAssume e -> (env, [SAssume (fee e)])
-    | SAssert (inv, e) -> (env, [SAssert (inv, fee e)])
+    | SAssert (attrs, e) -> (env, [SAssert (attrs, fee e)])
     | SCalc (oop, contents) -> (env, [SCalc (oop, List.map (env_map_calc_contents fe fs env) contents)])
-    | SSplit -> (env, [s])
     | SVar (x, t, g, a, eOpt) ->
       (
         let info =
@@ -151,9 +152,8 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
 and env_map_stmts (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip (env_map_stmt fe fs) env ss))
 and env_map_calc_contents (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env)  (cc:calcContents) =
-  match cc with
-  | CalcLine e -> CalcLine (fe env e)
-  | CalcHint (oop, ss) -> CalcHint (oop, env_map_stmts fe fs env ss)
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  {calc_exp = fe env e; calc_op = oop; calc_hints = List.map (env_map_stmts fe fs env) hints}
 
 let env_next_stmt (env:env) (s:stmt):env =
   let (env, _) = env_map_stmt (fun _ e -> e) (fun _ _ -> Unchanged) env s in
@@ -254,7 +254,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
         let old_state = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar (Reserved "this")]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar (Reserved "this")]) in
 //        let old_x = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar x]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar x]) in
         let eq = EApply (Reserved "eq_ops", [old_state; EVar (Reserved "this"); (EOp (Uop UToOperand, [EVar x]))]) in
-        [(if !assumeUpdates = 1 then SAssume eq else SAssert (NotInv, eq))]
+        [(if !assumeUpdates = 1 then SAssume eq else SAssert (assert_attrs_default, eq))]
     in
   let f (env:env, i:int, prev:Map<id, int>, sss:stmt list list) (s:stmt) =
     let rec r s =
@@ -262,7 +262,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
       | SLoc (loc, s) ->
           let (i, prev, ss) = r s in
           (i, prev, List.map (fun s -> SLoc (loc, s)) ss)
-      | (SLabel _ | SGoto _ | SReturn | SSplit) -> (i, prev, [s])
+      | (SLabel _ | SGoto _ | SReturn) -> (i, prev, [s])
       | SVar (x, t, (XGhost | XInline | XOperand | XPhysical | XState _), a, eOpt) ->
           (i, prev, [s])
       | SVar (x, t, XAlias _, a, eOpt) ->
@@ -324,10 +324,41 @@ let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
   let abs_x = match (io, env.abstractOld) with (In, _) | (InOut, true) -> (old_id x) | (Out, _) | (InOut, false) -> x in
   EOp (RefineOp, [EVar x; EVar abs_x; e])
 
+let check_state_info (env:env) (x:id):bool = // returns readWrite
+  match (env.checkMods, Map.tryFind x env.mods) with
+  | (true, None) -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
+  | (false, None) -> true
+  | (_, Some readWrite) -> readWrite
+
+let check_state_info_mod (env:env) (x:id) (io:inout):unit =
+  match (env.checkMods, io, check_state_info env x) with
+  | (false, _, _) -> ()
+  | (true, In, _) -> ()
+  | (true, (InOut | Out), true) -> ()
+  | (true, (InOut | Out), false) -> err ("variable " + (err_id x) + "must be declared in procedure's modifies clause")
+
 let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
-  match Map.tryFind x env.mods with
-  | None -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
-  | Some readWrite -> refineOp env (if readWrite then InOut else In) x (stateGet env x)
+  let readWrite = check_state_info env x in
+  refineOp env (if readWrite then InOut else In) x (stateGet env x)
+
+let check_mods (env:env) (p:proc_decl):unit =
+  let check_spec (_, s) =
+    match s with
+    | Modifies (m, e) ->
+      (
+        match skip_loc (exp_abstract false e) with
+        | EVar x ->
+          (
+            match (m, Map.tryFind x env.mods) with
+            | (false, None) -> err ("variable " + (err_id x) + " must be declared in reads clause or modifies clause")
+            | (true, (None | Some false)) -> err ("variable " + (err_id x) + " must be declared in modifies clause")
+            | (_, Some true) | (false, Some false) -> ()
+          )
+        | _ -> ()
+      )
+    | _ -> ()
+    in
+  if env.checkMods then List.iter check_spec p.pspecs
 
 let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env) (e:exp):exp =
   let rec fe (env:env) (e:exp):exp map_modify =
@@ -342,7 +373,13 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
       | None -> ec
       | Some xo -> codeLemma (EOp (RefineOp, [ec; ec; vaApp ("const_" + xo) [e]]))
       in
-    match (g, e) with
+    let operandProc xa io =
+      let xa = string_of_id xa in
+      match io with
+      | In | InOut -> Id (xa + "_in")
+      | Out -> Id (xa + "_out")
+      in
+    match (g, skip_loc e) with
     | (_, EVar x) when Map.containsKey x env.ids ->
       (
         match Map.find x env.ids with
@@ -351,6 +388,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
         | InlineLocal -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
         | OperandLocal (opIo, xo, t) ->
           (
+            if env.checkMods then (match (opIo, io) with (_, In) | ((InOut | Out), _) -> () | (In, (InOut | Out)) -> err ("cannot pass 'in' operand as 'out'/'inout'"));
             match g with
             | Ghost -> Replace (refineOp env opIo x (vaEvalOp xo t env.state e))
             | NotGhost ->
@@ -375,13 +413,47 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           (
             match (g, asOperand) with
             | (Ghost, _) -> Replace (rewrite_state_info env x prefix es)
-            | (NotGhost, Some xo) -> Replace (EOp (StateOp (x, xo + "_" + prefix, t), es))
+            | (NotGhost, Some xo) ->
+                let readWrite = check_state_info_mod env x io in
+                Replace (EOp (StateOp (x, xo + "_" + prefix, t), es))
             | (NotGhost, None) -> err "this expression can only be passed to a ghost parameter or operand parameter"
           )
       )
     | (NotGhost, ELoc _) -> Unchanged
     | (NotGhost, EOp (Uop UConst, [ec])) -> Replace (constOp (rewrite_vars_exp env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
+    | (NotGhost, EApply (xa, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
+      (
+        let xa_in = operandProc xa In in
+        let xa_out = operandProc xa Out in
+        let get_p io =
+          match io with
+          | In | InOut ->
+            if (not (Map.containsKey xa_in env.procs)) then err ("could not find procedure " + (err_id xa_in)) else
+            let p_in = Map.find xa_in env.procs in
+            let p_in = {p_in with prets = []} in
+            check_mods env p_in;
+            p_in
+          | Out ->
+            if (not (Map.containsKey xa_out env.procs)) then err ("could not find procedure " + (err_id xa_out)) else
+            let p_out = Map.find xa_out env.procs in
+            let p_out = {p_out with pargs = List.take (List.length p_out.pargs - 1) p_out.pargs} in
+            check_mods env p_out;
+            p_out
+          in
+        let p =
+          match io with
+          | In -> get_p In
+          | InOut -> let _ = get_p Out in get_p In
+          | Out -> get_p Out
+          in
+        let (lhss, es) = rewrite_vars_args env p [] args in
+        let ecs = List.collect (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> [] | _ -> [e]) es in
+        let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> e | _ -> e) es in
+        let xa_fc = Reserved ("opr_code_" + (string_of_id xa)) in
+        let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
+        Replace (EOp (CodeLemmaOp, [EApply (xa_fc, ecs); EApply (xa_fl, env.state::es)]))
+      )
 (*
     | (NotGhost, EOp (Subscript, [ea; ei])) ->
       (
@@ -401,7 +473,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
       )
 *)
     | (NotGhost, _) ->
-        err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)')"
+        err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)'; if the expression is intended as a non-const operand, try declaring operand procedures)"
         // Replace (codeLemma e)
     | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg NotGhost None io env e)
 // TODO: this is a real error message, it should be uncommented
@@ -409,31 +481,12 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
 //        err ("cannot call a procedure from inside an expression or variable declaration")
     | (Ghost, _) -> Unchanged
     in
-  env_map_exp fe env e
+  try
+    env_map_exp fe env e
+  with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
 and rewrite_vars_exp (env:env) (e:exp):exp =
   rewrite_vars_arg Ghost None In env e
-
-// Turn
-//   ecx < 10
-// into
-//   va_cmp_lt(var_ecx(), va_const_operand(10))
-let rewrite_cond_exp (env:env) (e:exp):exp =
-  let r = rewrite_vars_arg NotGhost (Some "cmp") In env in
-  match skip_loc e with
-  | (EOp (op, es)) ->
-    (
-      match (op, es) with
-      | (Bop BEq, [e1; e2]) -> vaApp "cmp_eq" [r e1; r e2]
-      | (Bop BNe, [e1; e2]) -> vaApp "cmp_ne" [r e1; r e2]
-      | (Bop BLe, [e1; e2]) -> vaApp "cmp_le" [r e1; r e2]
-      | (Bop BGe, [e1; e2]) -> vaApp "cmp_ge" [r e1; r e2]
-      | (Bop BLt, [e1; e2]) -> vaApp "cmp_lt" [r e1; r e2]
-      | (Bop BGt, [e1; e2]) -> vaApp "cmp_gt" [r e1; r e2]
-      | _ -> err ("conditional expression must be a comparison operation")
-    )
-  | _ -> err ("conditional expression must be a comparison operation")
-
-let rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
+and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
   let (mrets, margs) = match_proc_args env p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
@@ -459,6 +512,31 @@ let rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
   let (retsR, retsA) = List.unzip (List.map rewrite_ret mrets) in
   (List.concat retsR, (List.concat retsA) @ args)
 
+// Turn
+//   ecx < 10
+// into
+//   va_cmp_lt(var_ecx(), va_const_operand(10))
+// Turn
+//   f(ecx, 10, ...)
+// into
+//   va_cmp_f(var_ecx(), va_const_operand(10), ...)
+let rewrite_cond_exp (env:env) (e:exp):exp =
+  let r = rewrite_vars_arg NotGhost (Some "cmp") In env in
+  match skip_loc e with
+  | (EApply (Id xf, es)) -> vaApp ("cmp_" + xf) (List.map r es)
+  | (EOp (op, es)) ->
+    (
+      match (op, es) with
+      | (Bop BEq, [e1; e2]) -> vaApp "cmp_eq" [r e1; r e2]
+      | (Bop BNe, [e1; e2]) -> vaApp "cmp_ne" [r e1; r e2]
+      | (Bop BLe, [e1; e2]) -> vaApp "cmp_le" [r e1; r e2]
+      | (Bop BGe, [e1; e2]) -> vaApp "cmp_ge" [r e1; r e2]
+      | (Bop BLt, [e1; e2]) -> vaApp "cmp_lt" [r e1; r e2]
+      | (Bop BGt, [e1; e2]) -> vaApp "cmp_gt" [r e1; r e2]
+      | _ -> err ("conditional expression must be a comparison operation or function call")
+    )
+  | _ -> err ("conditional expression must be a comparison operation or function call")
+
 let rec rewrite_vars_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
   match (lhss, e) with
   | (_, ELoc (loc, e)) ->
@@ -469,6 +547,7 @@ let rec rewrite_vars_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
       match Map.tryFind x env.procs with
       | None -> (lhss, rewrite_vars_exp env e)
       | Some p ->
+          check_mods env p;
           let (lhss, args) = rewrite_vars_args env p lhss es in
           (lhss, EApply(x, args))
     )
@@ -526,7 +605,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     let reqAssert (f:exp -> exp) (loc, spec) =
       match spec with
       | Requires (EOp (Uop UUnrefinedSpec, _)) -> []
-      | Requires e -> [SLoc (loc, SAssert (NotInv, f e))]
+      | Requires e -> [SLoc (loc, SAssert (assert_attrs_default, f e))]
       | _ -> []
       in
     let rec assign e =
@@ -548,6 +627,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
             assert inMem(va_tmp_ptr + va_tmp_offset, va_x99_mem);
           }
           *)
+          let es = List.map (map_exp (fun e -> match e with EOp (Uop UConst, [e]) -> Replace e | _ -> Unchanged)) es in
           let xs = List.map (fun (x, _, _, _, _) -> x) pCall.pargs in
           let rename x = Reserved ("tmp_" + string_of_id x) in
           let xSubst = Map.ofList (List.map (fun x -> (x, EVar (rename x))) xs) in
@@ -556,10 +636,11 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
           let f e =
 //            let f2 e x ex = EBind (BindLet, [ex], [(rename x, None)], [], e) in
 //            List.fold2 f2 (subst_reserved_exp xSubst e) xs es
+            let e = map_exp (fun e -> match e with EOp (Uop UOld, [e]) -> Replace e | _ -> Unchanged) e in
             subst_reserved_exp xSubst e
             in
           let reqAsserts = (List.collect (reqAssert f) pCall.pspecs) in
-          let reqMarker = SLoc (loc, SAssert (NotInv, EBool true)) in
+          let reqMarker = SLoc (loc, SAssert (assert_attrs_default, EBool true)) in
           Replace ([hideResults (xDecls @ (reqMarker::reqAsserts)); s])
         else Unchanged
       | _ -> Unchanged
@@ -581,7 +662,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     *)
     match s with
     | Ensures (EOp (Uop UUnrefinedSpec, _)) -> []
-    | Ensures e -> [hideResults [SLoc (loc, SAssert (NotInv, e))]]
+    | Ensures e -> [hideResults [SLoc (loc, SAssert (assert_attrs_default, e))]]
     | _ -> []
     in
   let ensStmts = List.collect ensStmt p.pspecs in
@@ -638,6 +719,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
       let envpIn = {envpIn with mods = Map.ofList (List.map mod_id mods)} in
       let envpIn = {envpIn with ids = List.fold (addParam false) env.ids p.pargs} in
       let envp = {envpIn with ids = List.fold (addParam true) envpIn.ids p.prets} in
+      let envp = {envpIn with checkMods = isRefined || isFrame} in
       let envpIn = {envpIn with abstractOld = true} in
       let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
       let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in

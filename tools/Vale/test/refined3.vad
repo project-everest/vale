@@ -85,8 +85,8 @@ type opr = reg
 type va_operand = opr
 function method va_op_operand_reg(r:reg):va_operand { r }
 function method va_op_cmp_reg(r:reg):va_operand { r }
-predicate va_is_src_operand_int(o:opr) { true }
-predicate va_is_dst_operand_int(o:opr) { true }
+predicate va_is_src_operand_int(o:opr, s:va_state) { true }
+predicate va_is_dst_operand_int(o:opr, s:va_state) { true }
 
 type va_bool = bool
 type va_int = int

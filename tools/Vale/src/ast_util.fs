@@ -53,6 +53,8 @@ let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
 let and_of_list = binary_op_of_list BAnd (EBool true)
 let or_of_list = binary_op_of_list BOr (EBool false)
 
+let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false}
+
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
 
 let map_apply_modify (m:'a map_modify) (g:unit -> 'a):'a =
@@ -115,7 +117,7 @@ let rec skip_loc_apply (e:exp) (f:exp->'a):'a =
   | ELoc (loc, e) -> try skip_loc_apply e f with err -> raise (LocErr (loc, err))
   | _ -> f e
 
-let rec loc_apply (loc:loc) (e:exp) (f:exp->'a):'a =
+let rec loc_apply (loc:loc) (e:exp) (f:exp -> 'a):'a =
   try
     match e with
     | ELoc (loc, e) -> loc_apply loc e f
@@ -142,9 +144,8 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SGoto x -> [s]
     | SReturn -> [s]
     | SAssume e -> [SAssume (fe e)]
-    | SAssert (inv, e) -> [SAssert (inv, fe e)]
+    | SAssert (attrs, e) -> [SAssert (attrs, fe e)]
     | SCalc (oop, contents) -> [SCalc (oop, List.map (map_calc_contents fe fs) contents)]
-    | SSplit -> [s]
     | SVar (x, t, g, a, eOpt) -> [SVar (x, t, g, map_attrs fe a, mapOpt fe eOpt)]
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
     | SBlock b -> [SBlock (map_stmts fe fs b)]
@@ -162,9 +163,8 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
   )
 and map_stmts (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (ss:stmt list):stmt list = List.collect (map_stmt fe fs) ss
 and map_calc_contents (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (cc:calcContents): calcContents =
-  match cc with
-  | CalcLine e -> CalcLine (fe e)
-  | CalcHint (oop, ss) -> CalcHint (oop, map_stmts fe fs ss)
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  {calc_exp = fe e; calc_op = oop; calc_hints = List.map (map_stmts fe fs) hints}
 
 let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt):'a =
   let re = gather_exp fe in
@@ -173,7 +173,7 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
   let children:'a list =
     match s with
     | SLoc (loc, s) -> try [r s] with err -> raise (LocErr (loc, err))
-    | SLabel _ | SGoto _ | SReturn | SSplit -> []
+    | SLabel _ | SGoto _ | SReturn -> []
     | SAssume e | SAssert (_, e) | SAssign (_, e) -> [re e]
     | SCalc (oop, contents) -> List.collect (gather_calc_contents fs fe) contents
     | SVar (x, t, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))
@@ -186,9 +186,8 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
 and gather_stmts (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (ss:stmt list):'a list =
   List.map (gather_stmt fs fe) ss
 and gather_calc_contents (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (cc:calcContents):'a list =
-  match cc with
-  | CalcLine e -> [(gather_exp fe) e]
-  | CalcHint (oop, ss) -> gather_stmts fs fe ss
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  [gather_exp fe e] @ (List.collect (gather_stmts fs fe) hints)
 
 let rec skip_loc_stmt (s:stmt):stmt =
   match s with

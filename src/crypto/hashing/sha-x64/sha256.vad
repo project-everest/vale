@@ -413,6 +413,8 @@ procedure {:refined}{:bridge} MoveFromHeapToStack(ghost H_id:heaplet_id, inline 
     StoreStack(9 + 6, r8d);
 }
 
+// Calling convention:
+// rcx = heap destination
 procedure {:refined}{:bridge} {:timeLimitMultiplier 2} MoveFromStackToHeap(ghost H_id:heaplet_id, inline taint:taint)
   requires{:refined false} reg32(this, X86R8); reg32(this, X86R11);
   ensures{:refined false}  reg32(this, X86R8); reg32(this, X86R11);
@@ -515,11 +517,20 @@ ensures
 
 // Entry-point for the Dafny-level SHA code
 // Note that we require 16 stack slots at present to provide scratch space for SHA calculations
+// 
+// Calling convention:
+// Registers initially contain: (Windows/Linux)
+// rcx/rdi = H
+// rdx/rsi = W
+// r8 /rdx = 0/scratch
+// r9 /rcx = 0/scratch
+// stack (rsp+(10*4))/r8 = 0/scratch
 procedure SHA256_Compute64StepsH(
     ghost H_id:heaplet_id,      // Hash state
     ghost W_id:heaplet_id,      // Expanded message words
     inline H_taint:taint,
     inline W_taint:taint,
+    inline win:bool,
     ghost z:SHA256Trace,
     ghost current_state:SHA256_state
   ) returns (
@@ -528,39 +539,48 @@ procedure SHA256_Compute64StepsH(
   )
   requires
     // Vale requirements
+    let H := if win then rcx else rdi;
+    let W := if win then rdx else rsi;
     HasStackSlots(stack, 9 + 19);
-    ValidSrcAddrs(mem, H_id, rcx, 32, H_taint, 32);
-    ValidSrcAddrs(mem, W_id, rdx, 32, W_taint, 256);
+    ValidSrcAddrs(mem, H_id, H, 32, H_taint, 32);
+    ValidSrcAddrs(mem, W_id, W, 32, W_taint, 256);
   requires
+    let H := if win then rcx else rdi;
+    let W := if win then rdx else rsi;
     H_id != W_id;
 
     // SHA requirements
 
     // current_state.atoh == atoh_c(H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7]);
-    current_state.atoh == atoh_c(mem[H_id].words[rcx +  0].v,
-                                 mem[H_id].words[rcx +  4].v,
-                                 mem[H_id].words[rcx +  8].v,
-                                 mem[H_id].words[rcx + 12].v,
-                                 mem[H_id].words[rcx + 16].v,
-                                 mem[H_id].words[rcx + 20].v,
-                                 mem[H_id].words[rcx + 24].v,
-                                 mem[H_id].words[rcx + 28].v);
+    current_state.atoh == atoh_c(mem[H_id].words[H +  0].v,
+                                 mem[H_id].words[H +  4].v,
+                                 mem[H_id].words[H +  8].v,
+                                 mem[H_id].words[H + 12].v,
+                                 mem[H_id].words[H + 16].v,
+                                 mem[H_id].words[H + 20].v,
+                                 mem[H_id].words[H + 24].v,
+                                 mem[H_id].words[H + 28].v);
     IsSHA256ReadyForStep(z, current_state, 0); 
     forall i :: 0 <= i < SeqLength(current_state.W)
-            ==> mem[W_id].words[rdx + 4*i].v == current_state.W[i];
+            ==> mem[W_id].words[W + 4*i].v == current_state.W[i];
   reads
+    rsi; rdi;
   modifies 
     stack; mem; eax; r8d; ecx; edx; r10d; r11d; r9d; efl;
     rcx; rdx; r8; r9;
   ensures
+    let H := if win then old(rcx) else old(rdi);
+    let H32 := if win then old(rcx+32) else old(rdi+32);
+    let W := if win then old(rdx) else old(rsi);
+    
     // Vale framing
     HasStackSlots(stack, 9 + 19);
-    ValidSrcAddrs(mem, H_id, old(rcx), 32, H_taint, 32);
-    ValidSrcAddrs(mem, W_id, old(rdx), 32, W_taint, 256);
+    ValidSrcAddrs(mem, H_id, H, 32, H_taint, 32);
+    ValidSrcAddrs(mem, W_id, W, 32, W_taint, 256);
 
     mem == old(mem)[H_id := mem[H_id]]; // Only H's are modified
     forall addr :: mem[H_id].words?[addr] <==> old(mem)[H_id].words?[addr];
-    forall addr :: (addr < old(rcx) || addr >= old(rcx+32)) && mem[H_id].words?[addr]
+    forall addr :: (addr < H || addr >= H32) && mem[H_id].words?[addr]
                 ==> mem[H_id].words[addr] == old(mem[H_id].words[addr]);
 
     forall slot :: HasStackSlot(old(stack), slot) <==> HasStackSlot(stack, slot);
@@ -579,30 +599,29 @@ procedure SHA256_Compute64StepsH(
     IsSHA256ReadyForStep(z', current_state', 64);
     current_state'.W == current_state.W;
     current_state'.H == current_state.H;
-    mem[H_id].words[old(rcx) +  0].v == BitwiseAdd32(current_state'.atoh.a, old(mem[H_id].words[rcx +  0].v));
-    mem[H_id].words[old(rcx) +  4].v == BitwiseAdd32(current_state'.atoh.b, old(mem[H_id].words[rcx +  4].v));
-    mem[H_id].words[old(rcx) +  8].v == BitwiseAdd32(current_state'.atoh.c, old(mem[H_id].words[rcx +  8].v));
-    mem[H_id].words[old(rcx) + 12].v == BitwiseAdd32(current_state'.atoh.d, old(mem[H_id].words[rcx + 12].v));
-    mem[H_id].words[old(rcx) + 16].v == BitwiseAdd32(current_state'.atoh.e, old(mem[H_id].words[rcx + 16].v));
-    mem[H_id].words[old(rcx) + 20].v == BitwiseAdd32(current_state'.atoh.f, old(mem[H_id].words[rcx + 20].v));
-    mem[H_id].words[old(rcx) + 24].v == BitwiseAdd32(current_state'.atoh.g, old(mem[H_id].words[rcx + 24].v));
-    mem[H_id].words[old(rcx) + 28].v == BitwiseAdd32(current_state'.atoh.h, old(mem[H_id].words[rcx + 28].v));
+    mem[H_id].words[H +  0].v == BitwiseAdd32(current_state'.atoh.a, old(mem[H_id].words[H +  0].v));
+    mem[H_id].words[H +  4].v == BitwiseAdd32(current_state'.atoh.b, old(mem[H_id].words[H +  4].v));
+    mem[H_id].words[H +  8].v == BitwiseAdd32(current_state'.atoh.c, old(mem[H_id].words[H +  8].v));
+    mem[H_id].words[H + 12].v == BitwiseAdd32(current_state'.atoh.d, old(mem[H_id].words[H + 12].v));
+    mem[H_id].words[H + 16].v == BitwiseAdd32(current_state'.atoh.e, old(mem[H_id].words[H + 16].v));
+    mem[H_id].words[H + 20].v == BitwiseAdd32(current_state'.atoh.f, old(mem[H_id].words[H + 20].v));
+    mem[H_id].words[H + 24].v == BitwiseAdd32(current_state'.atoh.g, old(mem[H_id].words[H + 24].v));
+    mem[H_id].words[H + 28].v == BitwiseAdd32(current_state'.atoh.h, old(mem[H_id].words[H + 28].v));
     SeqLength(z'.H) == SeqLength(z.H);
     z'.M == z.M;
 {
-    // Save registers
-//    StoreStack(15, r11d); 
-//    StoreStack(16, r8d);
-//    StoreStack(17, r9d);
-//    StoreStack(18, r10d);
-
-    // Load W_ptr into r9, where inner loop expects it
-    Mov64(r9, rdx);
-
-    // Load H_ptr into a register and then use it to load values out of H and into the stack
-//    LoadStack(eax, 9 + 0);
-    StoreStack64(9 + 14, rcx);      // Save a copy for after the inner loop
-
+    inline if (win)
+    {        
+        Mov64(r9, rdx);             // Load W into r9, where inner loop expects it
+        StoreStack64(9 + 14, rcx);  // Save a copy of H for after the inner loop
+    }
+    else
+    {        
+        Mov64(r9, rsi);             // Load W into r9, where inner loop expects it
+        StoreStack64(9 + 14, rdi);  // Save a copy of H for after the inner loop
+        Mov64(rcx, rdi);            // Load H into rcx, where StoreStack64 expects it
+    }
+    
     // HACK: clear upper 32 bits of registers to satisfy precondition:
     Mov32(r8d, 0);
     Mov32(r11d, 0);
@@ -634,7 +653,7 @@ current_state' := new_state;
     lemma_BitwiseAdd32CommutativeAlways();
 
     // Now compute the BitwiseAdds and store the results back in H
-    LoadStack64(rcx, 9 + 14);      // Load H_ptr into a register so we can retrieve the original values
+    LoadStack64(rcx, 9 + 14);      // Load H_ptr into rcx so we can retrieve the original values
 
     MoveFromStackToHeap(H_id, H_taint); 
 
@@ -1034,29 +1053,36 @@ procedure {:refined}{:bridge} CastBytesToWords(inline num_bytes:uint32, inline t
       exists bytes_id, W_id ::
           CastBytesResult(bytes_id, old(mem), mem, old(r10), num_bytes, W_id, taint)
       && (forall id :: old(mem)?[id] && AddrInHeaplet(old(r10), old(mem)[id]) ==> id == bytes_id);
-:= extern;
+  extern;
 
 
 // Entry-point for the Dafny-level SHA code
 // Wrapper around the internal version
 // This handles taking arguments off the stack and casting bytes to words
+// Calling convention:
+// rcx/rdi = bytes_ptr
+// rdx/rsi = offset
+// r8 /rdx = W
 procedure SHA256_ComputeInitialWs(
   ghost bytes_id:heaplet_id,  // Message bytes
   ghost W_id:heaplet_id,      // Expanded message words
-  inline bytes_taint:taint
+  inline bytes_taint:taint,
+  inline win:bool
 )
   requires
     // Vale requirements
     //HasStackSlots(stack, 9 + 7);
-    let bytes_ptr := rcx in
-    let offset    := rdx in
-    let W_ptr     := r8 in 
+    let bytes_ptr := if win then rcx else rdi in
+    let offset    := if win then rdx else rsi in
+    let W_ptr     := if win then r8  else rdx in 
          ValidSrcAddrs(mem, bytes_id, bytes_ptr + offset, 8, bytes_taint, 64)
       && ValidDstAddrs(mem, W_id, W_ptr, 32, 256)
       && W_ptr % 4 == 0
       && bytes_ptr + offset + 64 < 0x1_0000_0000_0000_0000;
   requires
     bytes_id != W_id;
+  reads
+    rdi; rsi;
   modifies
     mem; r8; rcx; rdx; r10; r9; efl;
     eax; r8d; ecx; edx; r11d;
@@ -1073,9 +1099,9 @@ procedure SHA256_ComputeInitialWs(
 //    r10d == old(r10d);
 //    r11d == old(r11d);
 
-    let bytes_ptr := old(rcx) in
-    let offset    := old(rdx) in
-    let W_ptr     := old(r8) in 
+    let bytes_ptr := if win then old(rcx) else old(rdi) in
+    let offset    := if win then old(rdx) else old(rsi) in
+    let W_ptr     := if win then old(r8)  else old(rdx) in 
 
         // Vale heap framing
         ValidSrcAddrs(mem, W_id, W_ptr, 32, bytes_taint, 256)
@@ -1104,10 +1130,19 @@ procedure SHA256_ComputeInitialWs(
 //    StoreStack(9 + 5, r9d);
 //    StoreStack(9 + 6, r10d);
 
-    Mov64(r10, rcx);  // r10 := bytes_ptr
-    //LoadStack(eax, 9 + 1);  // eax := offset
-    Add64(r10, rdx);    // r10 := bytes_ptr + offset
-    Mov64(r9, r8);  // r9 := W_ptr;
+    inline if (win)
+    {
+        Mov64(r10, rcx);  // r10 := bytes_ptr
+        //LoadStack(eax, 9 + 1);  // eax := offset
+        Add64(r10, rdx);    // r10 := bytes_ptr + offset
+        Mov64(r9, r8);  // r9 := W_ptr;
+    }
+    else
+    {
+        Mov64(r10, rdi);  // r10 := bytes_ptr
+        Add64(r10, rsi);  // r10 := bytes_ptr + offset
+        Mov64(r9, rdx);   // r9 := W_ptr;
+    }
 
     ghost var pre_cast_mem := mem;
     assert ValidSrcAddrs(mem, bytes_id, r10, 8, bytes_taint, 64);
@@ -1115,7 +1150,7 @@ procedure SHA256_ComputeInitialWs(
 
     exists b_id, M_id :: CastBytesResult(b_id, pre_cast_mem, mem, r10, 64, M_id, bytes_taint);
 
-    ghost var bytes := old(rcx + rdx);
+    ghost var bytes := if (win) then old(rcx + rdx) else old(rsi + rdi);
     forall i :| 0 <= i < 64 && i % 4 == 0 ::
         mem[M_id].words[bytes + i] == 
         WordHeapletEntry(old(BytesToWord(mem[bytes_id].bytes[bytes + i + 3].v,
@@ -1139,11 +1174,14 @@ procedure SHA256_ComputeInitialWs(
 
     SHA256_ComputeInitialWs_internal(M_id, W_id, bytes_taint);
 
+    ghost var bytes_ptr := if (win) then old(rcx) else old(rdi);
+    ghost var offset := if (win) then old(rdx) else old(rsi);
+    ghost var W_ptr := if (win) then old(r8) else old(rdx);
     forall i :| 0 <= i < 64 && i % 4 == 0 ::
-        mem[W_id].words[old(r8) + i] == 
-        WordHeapletEntry(old(GetBytesToWord(mem, bytes_id, rcx + rdx + i)), bytes_taint)
+        mem[W_id].words[W_ptr + i] == 
+        WordHeapletEntry(old(GetBytesToWord(mem, bytes_id, bytes_ptr + offset + i)), bytes_taint)
     {
-        ghost var addr := old(rcx + rdx) + i;
+        ghost var addr := bytes_ptr + offset + i;
         assert ValidDstAddr(old(mem), bytes_id, addr,     8);   // OBSERVE
         assert ValidDstAddr(old(mem), bytes_id, addr + 1, 8);   // OBSERVE
         assert ValidDstAddr(old(mem), bytes_id, addr + 2, 8);   // OBSERVE
