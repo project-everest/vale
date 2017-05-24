@@ -33,7 +33,7 @@ include "../../../../../tools/Vale/test/decls.vaf"
 #verbatim
 module Poly1305
 
-//#set-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0"
+#reset-options "--z3rlimit_factor 4 --z3rlimit 200 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0"
 
 open Semantics
 open Vale
