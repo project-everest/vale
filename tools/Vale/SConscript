@@ -127,7 +127,7 @@ VALE_BIN = DAFNY_BIN + [
 DafnyInterface_dir = Dir('DafnyInterface/Source/DafnyInterface')
 DafnyInterface_src = [DafnyInterface_dir.File(f)
                       for f in ['DafnyDriver.cs', 'Properties/AssemblyInfo.cs']]
-DafnyInterface_refs = [Dir(env['DAFNY_PATH']).File(f) for f in [
+DafnyInterface_refs = [Dir(env['DAFNY_PATH']).File(f).abspath for f in [
     'BoogieAbsInt.dll',
     'BoogieConcurrency.dll',
     'BoogieCore.dll',
@@ -148,10 +148,10 @@ DafnyInterface_dll = env.Command(
   '#bin/DafnyInterface.dll',
   DafnyInterface_src,
   '$CSC -t:library -out:$TARGET $SOURCES '
-    + ' '.join(['-r:'+r.path for r in DafnyInterface_refs]))
+    + ' '.join(['-r:'+r for r in DafnyInterface_refs]))
 Depends(DafnyInterface_dll, DafnyInterface_refs)
 
-DAFNY_REFS = [Dir(env['DAFNY_PATH']).File(f).path for f in DAFNY_BIN] + [
+DAFNY_REFS = [Dir(env['DAFNY_PATH']).File(f).abspath for f in DAFNY_BIN] + [
   DafnyInterface_dll,
   '../Dafny/Newtonsoft.Json.dll',
   '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'
@@ -165,14 +165,14 @@ vale_tool = build_vale(SRC, DAFNY_REFS)
 # copy the dependencies to the BIN directory, too
 dependencies = vale_tool
 for s in VALE_BIN:
-  b = env.CopyAs(BIN+'/'+s, env['DAFNY_PATH']+'/'+s)
+  b = env.CopyAs(Dir(BIN).File(s), Dir(env['DAFNY_PATH']).File(s))
   Depends(vale_tool, b)
   dependencies.append(b)
 if sys.platform == 'win32' or (
     sys.platform.startswith('linux')
         and os.path.exists('/proc/sys/fs/binfmt_misc/WSLInterop')):
   # we can use our win32 z3 binary, either natively or via WSL interop
-  b = env.CopyAs(BIN+'/z3.exe', env['DAFNY_PATH']+'/z3.exe')
+  b = env.CopyAs(Dir(BIN).File('z3.exe'), Dir(env['DAFNY_PATH']).File('z3.exe'))
   Depends(vale_tool, b)
   dependencies.append(b)
   z3 = File(b[0])
