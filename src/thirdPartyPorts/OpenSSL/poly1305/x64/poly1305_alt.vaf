@@ -111,49 +111,39 @@ assert s1 * h2 == h2 * s1;
     Mov64(d2, rax);
     Mov64(rax, r0);
     Mov64(d3, rdx);
-    assert phase_2_(n * d3 + d2 == old(h0 * r1));
+    //assert phase_2_(n * d3 + d2 == old(h0 * r1));
 
     Mul64Wrap(h0);  // h0*r0
     Mov64(h0, rax); // future h0
     Mov64(rax, r0);
     Mov64(d1, rdx);
-    assert phase_2_(n * d1 + h0 == old(h0 * r0));
+    //assert phase_2_(n * d1 + h0 == old(h0 * r0));
 
     Mul64Wrap(h1);  // h1*r0
     Add64Wrap(d2, rax);
     Mov64(rax, s1);
     Adc64Wrap(d3, rdx);
-    assert phase_2_(n * d3 + d2 == old(h0 * r1 + h1 * r0));
+    //assert phase_2_(n * d3 + d2 == old(h0 * r1 + h1 * r0));
 
     Mul64Wrap(h1);  // h1*s1
     Mov64(h1, h2);  // borrow h1
     Add64Wrap(h0, rax);
     Adc64Wrap(d1, rdx);
-    assert phase_2_(n * d1 + h0 == old(h0 * r0 + h1 * s1));
+    //assert phase_2_(n * d1 + h0 == old(h0 * r0 + h1 * s1));
 
     IMul64Wrap(h1, s1); // h2*s1
     Add64Wrap(d2, h1);
     Mov64(h1, d1);
     Adc64Wrap(d3, 0);
-    assert phase_2_(n * d3 + d2 == old(h0 * r1 + h1 * r0 + h2 * s1));
+    //assert phase_2_(n * d3 + d2 == old(h0 * r1 + h1 * r0 + h2 * s1));
 
     IMul64Wrap(h2, r0); // h2*r0
-    assert phase_2_(h2 == gd2);
-
-//assert phase_2_(n * (n * d3 + d2) == n * n * d3 + n * d2);
-//assert phase_2_(n * (h1 + d2) == n * h1 + n * d2);
-//assert phase_2_(n * (h1 + d2 - nat64_max) == n * h1 + n * d2 - n * nat64_max);
-//assert phase_2_(n * n * (d3 + h2) == n * n * d3 + n * n * h2);
-//assert phase_2_(n * n * (d3 + h2 + 1) == n * n * d3 + n * n * h2 + n * n);
-//assert phase_2_(gd1 * n == n * gd1);
-//assert phase_2_(gd2 * (n * n) == (n * n) * gd2);
-
     Add64Wrap(h1, d2);
     Mov64(rax, 0xffff_ffff_ffff_fffc); // mask value
     Adc64Wrap(d3, h2);
 
     hh := (n * n) * d3 + n * h1 + h0;
-    assert phase_2_(hh == gd2 * (n * n) + gd1 * n + gd0);
+    //assert phase_2_(hh == gd2 * (n * n) + gd1 * n + gd0);
     lemma_poly_multiply(n, p, r, h, r0, r1, old(h0), old(h1), old(h2), s1, gd0, gd1, gd2, hh);
 }
 
