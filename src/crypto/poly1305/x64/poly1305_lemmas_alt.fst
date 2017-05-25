@@ -6,6 +6,9 @@ open FStar.UInt
 open Semantics_alt
 lemma_BitwiseAdd64()
 lemma_BitwiseMul64()
+*)
+
+private unfold let op_Star = op_Multiply
 
 let lemma_poly_multiply (n:int) (p:int{ p > 0 }) (r:int) (h:int) (r0:int) (r1:nat) (h0:int) (h1:int) (h2:int) (s1:int) (d0:int) (d1:int) (d2:int) (hh:int)
   : Lemma (requires 4 * (n * n) == p + 5
@@ -20,6 +23,7 @@ let lemma_poly_multiply (n:int) (p:int{ p > 0 }) (r:int) (h:int) (r0:int) (r1:na
 	  (ensures (h * r) % p == hh % p)
   = admit()
 
+(*
 let lemma_poly_reduce (n:int) (p:int{ p > 0 }) (h:nat) (h2:int) (h10:int) (c:int) (hh:int)
    : Lemma (requires 4 * (n * n) == p + 5
 		     /\ h2 == h / (n * n)

@@ -18,7 +18,7 @@ let rec print_exp (indent:string) (pos:int) (e:exp):int =
   match e with
   | Token s ->
       let pos2 = pos + (String.length s) in
-      if pos > 0 && pos2 > line_len then
+      if (pos > 0 && pos2 > line_len) || s.StartsWith(":") then
         printfn "";
         printf "%s%s" indent s;
         0
@@ -26,11 +26,24 @@ let rec print_exp (indent:string) (pos:int) (e:exp):int =
         printf "%s" s;
         pos2
   | Exps es ->
+      let (pos, indent_children) =
+        let next_line b =
+          printfn "";
+          printf "%s" indent;
+          (0, b)
+          in
+        match es with
+        | (Token "forall")::_ -> next_line false
+        | (Token ("implies" | "and"))::_ -> next_line true
+        | (Token s)::_ when pos + 1 + (String.length s) > line_len -> next_line false
+        | _ -> (pos, false)
+        in
       printf "(";
       let pos = pos + 1 in
       let indent = indent + " " in
       let print_exp_space (space:bool, pos:int) (e:exp):(bool * int) =
         let pos = if space then (printf " "; pos + 1) else pos in
+        let pos = if space && indent_children then line_len + 1 else pos in
         (true, print_exp indent pos e)
         in
       let (_, pos) = List.fold print_exp_space (false, pos) es in
@@ -217,13 +230,28 @@ let phase (n:string) (q:query):query =
     | Not e -> Not (f (not polarity) e)
     | Implies (e1, e2) when polarity -> Implies (e1, f polarity e2)
     | Quant (q, fs, body, pats, qid, weight) when polarity -> Quant (q, fs, f polarity body, pats, qid, weight)
+    | Exps [Token "let"; ls; e] -> Exps [Token "let"; ls; f polarity e]
     | Exps [Token "Valid"; Exps ((Token s)::es)] when phase_mismatch s && polarity -> True
     | _ -> e
+    in
+  let fTop eTop =
+    match eTop with
+    | Not (Quant (Forall, fs1, Implies (i1, Quant (Forall, fs2, Implies (And es2, e2), pats2, qid2, w2)), pats1, qid1, w1)) ->
+        match List.rev es2 with
+        | (Quant (Forall, fs3, Implies (post, Exps [Token "Valid"; Exps [Token "ApplyTT"; x1; x2]]), pats3, qid3, w3))::es2 ->
+            // TODO: should check that ApplyTT only appears in e2, and only with "assert" polarity
+            let post = f true post in
+            let epost = Quant (Forall, fs3, Implies (post, Exps [Token "Valid"; Exps [Token "ApplyTT"; x1; x2]]), pats3, qid3, w3) in
+            let es2 = List.rev (epost::es2) in
+            let eTop = Not (Quant (Forall, fs1, Implies (i1, Quant (Forall, fs2, Implies (And es2, e2), pats2, qid2, w2)), pats1, qid1, w1)) in
+            f false eTop
+        | _ -> f false eTop
+    | _ -> f false eTop
     in
   let g e =
     match e with
     | Assert (e, Some s) when phase_mismatch s -> []
-    | Assert (e, sOpt) -> [Assert (f false e, sOpt)]
+    | Assert (e, sOpt) -> [Assert (fTop e, sOpt)]
     | _ -> [e]
     in
   let es = List.collect g es in

@@ -80,27 +80,27 @@ let va_get_whileBody (c:code{While? c}) :code = While?.whileBody c
 let va_block_head (b:va_codes) : Ghost va_code (requires (phase_1_ (Cons? b))) (ensures (fun _ -> True)) = Cons?.hd b
 let va_block_tail (b:va_codes) : Ghost va_codes (requires (phase_1_ (Cons? b))) (ensures (fun _ -> True)) = Cons?.tl b
 
-let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 = 
-  s_0.ok == s_1.ok /\
-  map_equal s_0.regs s_1.regs /\
-  s_0.flags == s_1.flags /\
-  map_equal s_0.mem s_1.mem
+// used to semantically express effect of syntactic modifies clause:
+unfold let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 = 
+  phase_1_ (tmap_equal s_0.regs s_1.regs) /\
+  phase_1_ (s_0.flags == s_1.flags) /\
+  phase_1_ (map_equal s_0.mem s_1.mem)
 
 let va_require (b0:va_codes) (c:va_code) (s0:va_state) (sN:va_state) : GTot Type =
     Cons? b0
  /\ (Cons?.hd b0) == c
  /\ Some sN == eval_code (va_Block b0) s0
 
-let va_ensure (b0:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : GTot Type =
-    Cons? b0
- /\ Some s1 == eval_code (Cons?.hd b0) s0
- /\ Some sN == eval_code (va_Block (Cons?.tl b0)) s1
+unfold let va_ensure (b0:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : GTot Type =
+    phase_1_ (Cons? b0)
+ /\ phase_1_ (Some s1 == eval_code (Cons?.hd b0) s0)
+ /\ phase_1_ (Some sN == eval_code (va_Block (Cons?.tl b0)) s1)
 
 assume val va_lemma_block : c1:va_code -> b1:va_codes -> s0:va_state -> sN:va_state -> Ghost (s1:va_state)
   (requires (phase_1_ (eval_code (va_Block (c1::b1)) s0 == Some sN)))
   (ensures (fun s1 -> (eval_code c1 s0 == Some s1) /\ (eval_code (va_Block b1) s1 == Some sN)))
 
 assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
-  (requires (eval_code (va_Block []) s0 == Some sN))
+  (requires (phase_1_ (eval_code (va_Block []) s0 == Some sN)))
   (ensures (fun sM -> s0 == sM /\ sM == sN))
 

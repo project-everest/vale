@@ -4,7 +4,35 @@ module Semantics_alt
 let phase_1_ (x:Type) = x
 let phase_2_ (x:Type) = x
 
-assume val assert_1_2 : p:Type -> Pure unit (requires (phase_1_ p)) (ensures (fun x -> phase_2_ p))
+assume val assert_1_2 : p:Type -> Lemma (requires (phase_1_ p)) (ensures (phase_2_ p))
+
+
+assume new type tmap (key:eqtype) (value:Type) : Type0
+
+assume val tsel: #key:eqtype -> #value:Type -> tmap key value -> key -> Tot value
+assume val tupd: #key:eqtype -> #value:Type -> tmap key value -> key -> value -> Tot (tmap key value)
+
+assume val lemma_phase_1_TSelUpd1: #key:eqtype -> #value:Type -> m:tmap key value -> k:key -> v:value ->
+                   Lemma (requires True) (ensures (tsel (tupd m k v) k == v))
+		   [SMTPat (tsel (tupd m k v) k)]
+
+assume val lemma_phase_1_TSelUpd2: #key:eqtype -> #value:Type -> m:tmap key value -> k1:key -> k2:key -> v:value ->
+                   Lemma (requires True) (ensures (k2=!=k1 ==> tsel (tupd m k2 v) k1 == tsel m k1))
+                   [SMTPat (tsel (tupd m k2 v) k1)]
+
+assume new type tmap_equal (#key:eqtype) (#value:Type) (m1:tmap key value) (m2:tmap key value)
+
+assume val lemma_tequal_intro: #key:eqtype -> #value:Type -> m1:tmap key value -> m2:tmap key value ->
+                       Lemma (requires (forall k. tsel m1 k == tsel m2 k))
+                       (ensures (tmap_equal m1 m2))
+                       [SMTPatT (tmap_equal m1 m2)]
+
+assume val lemma_tequal_elim: #key:eqtype -> #value:Type -> m1:tmap key value -> m2:tmap key value ->
+                      Lemma (requires (tmap_equal m1 m2)) (ensures  (m1 == m2))
+                      [SMTPatT (tmap_equal m1 m2)]
+
+
+
 
 assume new type map (key:eqtype) (value:Type) : Type0
 
@@ -36,6 +64,9 @@ assume val lemma_equal_elim: #key:eqtype -> #value:Type -> m1:map key value -> m
                       Lemma (requires (map_equal m1 m2)) (ensures  (m1 == m2))
                       [SMTPatT (map_equal m1 m2)]
 
+
+
+
 (* Define some transparently refined int types, 
    since we only use them in specs, not in emitted code *)
 unfold let nat32_max = 0x100000000
@@ -48,8 +79,8 @@ unfold let nat64_max = 0x10000000000000000
 type nat64 = x:int{0 <= x && x < nat64_max}
 
 (* syntax for map accesses, m.[key] and m.[key] <- value *)
-let op_String_Access     = sel
-let op_String_Assignment = upd
+let op_String_Access     = tsel
+let op_String_Assignment = tupd
 
 (* Define the operators we support *)
 type reg =
@@ -109,7 +140,7 @@ type mem = map int nat64
 (* state type, noeq qualifier means that this type does not have decidable equality (because of the maps) *)
 noeq type state = {
   ok  :bool;
-  regs:map reg nat64;
+  regs:tmap reg nat64;
   flags:nat64;
   mem :mem;
 }
@@ -118,7 +149,7 @@ let eval_reg (r:reg) (s:state) :nat64 =
   s.regs.[r]
 
 let eval_mem (ptr:int) (s:state) :nat64 =
-  s.mem.[ptr]
+  sel s.mem ptr
 
 let eval_maddr (m:maddr) (s:state) :int =
   let open FStar.Mul in

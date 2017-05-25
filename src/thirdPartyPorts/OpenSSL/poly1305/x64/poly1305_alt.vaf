@@ -88,10 +88,10 @@ procedure poly1305_multiply(
         h2 * s1 < 7 * (5 * n / 64);
         rax == r1;
     ensures
-//        hh == (n * n) * d3 + n * h1 + h0;
-//        (h * r) % p == hh % p;
-//        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
-//        rax == 0xffff_ffff_ffff_fffc;
+        phase_2_(hh == (n * n) * d3 + n * h1 + h0);
+        phase_2_((h * r) % p == hh % p);
+        phase_2_(d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000);
+        phase_2_(rax == 0xffff_ffff_ffff_fffc);
 {
 //    lemma_BitwiseAdd64();
 //    lemma_BitwiseMul64();
@@ -149,12 +149,12 @@ assert s1 * h2 == h2 * s1;
 //assert phase_2_(gd2 * (n * n) == (n * n) * gd2);
 
     Add64Wrap(h1, d2);
+    Mov64(rax, 0xffff_ffff_ffff_fffc); // mask value
     Adc64Wrap(d3, h2);
 
     hh := (n * n) * d3 + n * h1 + h0;
     assert phase_2_(hh == gd2 * (n * n) + gd1 * n + gd0);
-assume false;
-//    lemma_poly_multiply(n, p, r, h, r0, r1, old(h0), old(h1), old(h2), s1, gd0, gd1, gd2, hh);
+    lemma_poly_multiply(n, p, r, h, r0, r1, old(h0), old(h1), old(h2), s1, gd0, gd1, gd2, hh);
 }
 
 /*
