@@ -56,26 +56,26 @@ let print_maddr (m:maddr) (ptr_type:string) (p:printer) =
      | MConst n -> p.const n 
      | MReg r offset -> p.maddr (print_reg r p) None (string_of_int offset)
      | MIndex base scale index offset ->
-	      p.maddr (print_reg base p)
-	      (Some (string_of_int scale, print_reg index p))
-	      (string_of_int offset)
+          p.maddr (print_reg base p)
+          (Some (string_of_int scale, print_reg index p))
+          (string_of_int offset)
    )  
 
 let print_operand (o:operand) (p:printer) =
   match o with
   | OConst n -> if 0 <= n && n < nat64_max then
-		  p.const n
-	       else
-		 "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
+          p.const n
+           else
+         "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg r p
   | OMem m -> print_maddr m "qword" p
 
 let print_small_operand (o:operand) (p:printer) =
   match o with
   | OConst n -> if 0 <= n && n < 64 then
-		  p.const n
-	       else
-		 "!!! INVALID constant: " ^ string_of_int n ^ " !!!!"
+          p.const n
+           else
+         "!!! INVALID constant: " ^ string_of_int n ^ " !!!!"
   | OReg r -> print_small_reg r p
   | _ -> "!!! INVALID small operand !!! Expected al, bl, cl, or dl."
 
@@ -84,9 +84,9 @@ assume val print_any: 'a -> string
 let print_shift_operand (o:operand) (p:printer) =
   match o with
   | OConst n -> if 0 <= n && n < 64 then
-		  p.const n
-	       else
-		 "!!! INVALID shift operand: " ^ print_any n ^ " is too large !!!"
+          p.const n
+           else
+         "!!! INVALID shift operand: " ^ print_any n ^ " is too large !!!"
   | OReg Rcx -> print_small_reg (OReg?.r o) p
   | _ -> "!!! INVALID shift operand !!! Expected constant or cl."
 
@@ -117,18 +117,18 @@ let print_ins (ins:ins) (p:printer) =
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
   | AddLea64 dst src1 src2 -> let name = p.ins_name "  lea" [dst; src1; src2] in
-			     if OReg? src1 && OConst? src2 then
-			       name ^ print_maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword" p
-			     else if OReg? src1 && OReg? src2 then
-			       name ^ print_maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword" p
-			     else
-			       "!!! INVALID AddLea64 operands: " ^ print_any src1 ^ ", " ^ print_any src2 ^ "!!!"			      
+                 if OReg? src1 && OConst? src2 then
+                   name ^ print_maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword" p
+                 else if OReg? src1 && OReg? src2 then
+                   name ^ print_maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword" p
+                 else
+                   "!!! INVALID AddLea64 operands: " ^ print_any src1 ^ ", " ^ print_any src2 ^ "!!!"                 
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
   | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
-  | Xor64 dst src -> p.ins_name "  xor" [dst; src] ^ print_ops dst src	 
-  | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src	 
+  | Xor64 dst src -> p.ins_name "  xor" [dst; src] ^ print_ops dst src   
+  | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src   
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
 
