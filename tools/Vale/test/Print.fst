@@ -11,7 +11,7 @@ noeq type printer = {
   maddr      : string -> option(string * string) -> string -> string;
   const      : int -> string;
   ins_name   : string -> list operand -> string;
-  op_order   : #a:Type -> a -> a -> a*a;
+  op_order   : string -> string -> string * string;
   align      : unit -> string;
   header     : unit -> string;
   footer     : unit -> string;
@@ -60,10 +60,12 @@ let print_maddr (m:maddr) (ptr_type:string) (p:printer) =
 	      (Some (string_of_int scale, print_reg index p))
 	      (string_of_int offset)
    )  
+open FStar.UInt64
 
 let print_operand (o:operand) (p:printer) =
   match o with
-  | OConst n -> if 0 <= n && n < nat64_max then
+  | OConst n -> let n = v n in 
+               if 0 <= n && n < nat64_max then
 		  p.const n
 	       else
 		 "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
@@ -72,7 +74,8 @@ let print_operand (o:operand) (p:printer) =
 
 let print_small_operand (o:operand) (p:printer) =
   match o with
-  | OConst n -> if 0 <= n && n < 64 then
+  | OConst n -> let n = v n in
+               if 0 <= n && n < 64 then
 		  p.const n
 	       else
 		 "!!! INVALID constant: " ^ string_of_int n ^ " !!!!"
@@ -83,7 +86,8 @@ assume val print_any: 'a -> string
 
 let print_shift_operand (o:operand) (p:printer) =
   match o with
-  | OConst n -> if 0 <= n && n < 64 then
+  | OConst n -> let n = v n in 
+               if 0 <= n && n < 64 then
 		  p.const n
 	       else
 		 "!!! INVALID shift operand: " ^ print_any n ^ " is too large !!!"
@@ -118,7 +122,7 @@ let print_ins (ins:ins) (p:printer) =
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
   | AddLea64 dst src1 src2 -> let name = p.ins_name "  lea" [dst; src1; src2] in
 			     if OReg? src1 && OConst? src2 then
-			       name ^ print_maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword" p
+			       name ^ print_maddr (MReg (OReg?.r src1) (v (OConst?.n src2))) "qword" p
 			     else if OReg? src1 && OReg? src2 then
 			       name ^ print_maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword" p
 			     else
@@ -200,7 +204,7 @@ let masm : printer =
   in
   let const (n:int) = string_of_int n in
   let ins_name (name:string) (ops:list operand) : string = name ^ " " in
-  let op_order (#a:Type) (dst:a) (src:a) = dst, src in
+  let op_order dst src = dst, src in
   let align() = "ALIGN" in
   let header() = ".code\n" in
   let footer() = "end\n" in
@@ -235,7 +239,7 @@ let gcc : printer =
     | OMem _ :: _ -> name ^ "q "
     | _ :: tail -> ins_name name tail
   in
-  let op_order (#a:Type) (dst:a) (src:a) = src, dst in
+  let op_order dst src = src, dst in
   let align() = ".align" in
   let header() = ".text\n" in
   let footer() = "\n" in

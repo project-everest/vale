@@ -9,13 +9,17 @@ endif
 
 INCLUDE=--include $(ARCH) --include $(REPO_BASE)/src/crypto/poly1305/x64/
 Z3_OPTIONS=--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false
-FSTAR_OPTIONS=$(INCLUDE) $(Z3_OPTIONS) --hint_info --debug yes --max_fuel 0 --max_ifuel 0 --z3rlimit_factor 4
+VALE_ARITH_REPR=--smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped
+FSTAR_OPTIONS=$(INCLUDE) $(Z3_OPTIONS) --hint_info --debug yes --max_fuel 0 --max_ifuel 0 --z3rlimit_factor 4 $(VALE_ARITH_REPR)
 VALE=$(RUNTIME) $(REPO_BASE)/bin/vale.exe
 
 # For simplified Makefiles, define FSTAR_HOME, then include the file below.
 include $(FSTAR_HOME)/examples/Makefile.include
 
-all: ocaml
+all: poly1305.v test
+
+test:
+	make -C $(ARCH) all
 
 vale: 
 	cd $(REPO_BASE); scons --NOVERIFY
@@ -33,7 +37,7 @@ poly1305.v: poly1305.fst $(ARCH)/decls.fst
 
 ocaml: out poly1305.fst
 	$(MAKE) -C $(ULIB_ML)
-	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst
+	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst $(addprefix --extract_module , Semantics Vale Print Poly1305)
 	$(OCAMLOPT) out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
 	./poly1305.exe
 

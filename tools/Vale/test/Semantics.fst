@@ -7,16 +7,22 @@ open FStar.Map
    since we only use them in specs, not in emitted code *)
 let nat32_max = 0x100000000
 let nat64_max = 0x10000000000000000
-let _ = assert_norm (pow2 32 = nat32_max)    (* Sanity check our constant *)
-let _ = assert_norm (pow2 64 = nat64_max)    (* Sanity check our constant *)
-type nat64 = FStar.UInt64.t
+abstract (* Sanity check our constants *)
+let _ = assert_norm (pow2 32 = nat32_max);    
+        assert_norm (pow2 64 = nat64_max)
+        
+type nat64 = n:nat{n < nat64_max}
+type uint64 = FStar.UInt64.t
 
 (* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
-unfold type map (key:eqtype) (value:Type) = Map.t key value
+unfold 
+type map (key:eqtype) (value:Type) = Map.t key value
 
 (* syntax for map accesses, m.[key] and m.[key] <- value *)
-unfold let op_String_Access     = sel
-unfold let op_String_Assignment = upd
+unfold 
+let op_String_Access     = sel
+unfold 
+let op_String_Assignment = upd
 
 (* Define the operators we support *)
 type reg =
@@ -43,7 +49,7 @@ type maddr =
   | MIndex : base:reg -> scale:int -> index:reg -> offset:int -> maddr
 
 type operand =
-  | OConst: n:nat64 -> operand
+  | OConst: n:uint64 -> operand
   | OReg  : r:reg -> operand
   | OMem  : m:maddr -> operand
 
@@ -87,22 +93,22 @@ type code =
 type codes = list code
 
 (* TODO: Eventually this should be a map to bytes.  Simplifying for now *)
-type mem = map int nat64
+type mem = map int uint64
 
 (* state type, noeq qualifier means that this type does not have decidable equality (because of the maps) *)
 noeq type state = {
   ok  :bool;
-  regs:map reg nat64;
-  flags:nat64;
+  regs:map reg uint64;
+  flags:uint64;
   mem :mem;
 }
 
-assume val havoc : state -> ins -> Tot nat64
+assume val havoc : state -> ins -> Tot uint64
 
 (*
  * writing all the functions as Tot functions
  *)
-let eval_reg (r:reg) (s:state) :nat64 =
+let eval_reg (r:reg) (s:state) :uint64 =
   s.regs.[r]
 
 (*
@@ -113,7 +119,7 @@ let valid_resolved_addr (ptr:int) (m:mem) :bool =
   m `contains` ptr + 3
 *)
 
-let eval_mem (ptr:int) (s:state) :nat64 =
+let eval_mem (ptr:int) (s:state) :uint64 =
   s.mem.[ptr]
 
 let eval_maddr (m:maddr) (s:state) :int =
@@ -124,7 +130,7 @@ let eval_maddr (m:maddr) (s:state) :int =
     | MReg reg offset -> v (eval_reg reg s) + offset
     | MIndex base scale index offset -> v (eval_reg base s) + scale * v (eval_reg index s) + offset
 
-let eval_operand (o:operand) (s:state) :nat64 =
+let eval_operand (o:operand) (s:state) :uint64 =
   match o with
   | OConst n -> n
   | OReg r   -> eval_reg r s
@@ -140,25 +146,25 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
   | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
   | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
 
-let update_reg' (r:reg) (v:nat64) (s:state) :state = { s with regs = s.regs.[r] <- v }
+let update_reg' (r:reg) (v:uint64) (s:state) :state = { s with regs = s.regs.[r] <- v }
 
-let update_mem (ptr:int) (v:nat64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
+let update_mem (ptr:int) (v:uint64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
 
-let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) :state =
+let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) :state =
   match o with
   | OReg r   -> update_reg' r v s
   | OMem m   -> update_mem (eval_maddr m s) v s
 
-let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) :state =
+let update_operand' (o:dst_op) (ins:ins) (v:uint64) (s:state) :state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
 open FStar.UInt64
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
-let cf (flags:nat64) :bool =
+let cf (flags:uint64) :bool =
   v flags % 2 = 1
 
-let update_cf (flags:nat64) (new_cf:bool) : (new_flags:nat64{cf new_flags == new_cf}) =
+let update_cf (flags:uint64) (new_cf:bool) : (new_flags:uint64{cf new_flags == new_cf}) =
   if new_cf then
     if not (cf flags) then
       flags +^ 1uL
@@ -219,7 +225,7 @@ unfold
 let run (f:st unit) (s:state) : state = snd (f s)
 
 (*
-let check_eval_operand (valid: operand -> state -> bool) (o:operand) : nat64 * st =
+let check_eval_operand (valid: operand -> state -> bool) (o:operand) : uint64 * st =
  check (valid o);;
  s <-- get();
  (2, return s)
@@ -227,23 +233,23 @@ let check_eval_operand (valid: operand -> state -> bool) (o:operand) : nat64 * s
  (eval_operand o s, return s)
 *)
 unfold
-let update_operand_preserve_flags (dst:dst_op) (v:nat64) :st unit =
+let update_operand_preserve_flags (dst:dst_op) (v:uint64) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand_preserve_flags' dst v s)
 
 (* Default version havocs flags *)
 unfold
-let update_operand (dst:dst_op) (ins:ins) (v:nat64) :st unit =
+let update_operand (dst:dst_op) (ins:ins) (v:uint64) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand' dst ins v s)
 
-let update_reg (r:reg) (v:nat64) :st unit =
+let update_reg (r:reg) (v:uint64) :st unit =
   s <-- get;
   set (update_reg' r v s)
 
-let update_flags (new_flags:nat64) :st unit =
+let update_flags (new_flags:uint64) :st unit =
   s <-- get;
   set ( { s with flags = new_flags } )
 
@@ -257,34 +263,63 @@ abstract
 let test (dst:dst_op) (src:operand) (s:state) :state =
   run (example dst src) s
 
-assume val logxor: int -> int -> int
-assume Logxor_uint64:
-  forall (x:int) (y:int).{:pattern (logxor x y)}
-          FStar.UInt.fits x 64 /\
-          FStar.UInt.fits y 64
-          ==> logxor x y = FStar.UInt.logxor #64 x y
+abstract
+let logxor (x:int) (y:int) : int =
+  if FStar.UInt.fits x 64
+  && FStar.UInt.fits y 64
+  then FStar.UInt.logxor #64 x y
+  else -1
 
-assume val logand: int -> int -> int
-assume Logand_uint64:
-  forall (x:int) (y:int).{:pattern (logand x y)}
-          FStar.UInt.fits x 64 /\
-          FStar.UInt.fits y 64
-          ==> logand x y = FStar.UInt.logand #64 x y
+let logxor_uint64 (x:int) (y:int)
+  : Lemma (ensures (FStar.UInt.fits x 64 /\
+                    FStar.UInt.fits y 64) ==>
+                    logxor x y = FStar.UInt.logxor #64 x y)
+          [SMTPat (logxor x y)]
+  = ()          
 
-assume val shift_right: int -> int -> int
-assume Shift_Right_uint64:
-  forall (x:int) (y:int).{:pattern (shift_right x y)}
-          FStar.UInt.fits x 64 /\
-          y >= 0
-          ==> shift_right x y = FStar.UInt.shift_right #64 x y
+abstract
+let logand (x:int) (y:int) : int =
+  if FStar.UInt.fits x 64
+  && FStar.UInt.fits y 64
+  then FStar.UInt.logand #64 x y
+  else -1
 
-assume val shift_left: int -> int -> int
-assume Shift_Left_uint64:
-  forall (x:int) (y:int).{:pattern (shift_left x y)}
-          FStar.UInt.fits x 64 /\
-          y >= 0
-          ==> shift_left x y = FStar.UInt.shift_left #64 x y
-let u (i:int{FStar.UInt.fits i 64}) : nat64 = FStar.UInt64.uint_to_t i
+let logand_uint64 (x:int) (y:int)
+  : Lemma (ensures (FStar.UInt.fits x 64 /\
+                    FStar.UInt.fits y 64) ==>
+                    logand x y = FStar.UInt.logand #64 x y)
+          [SMTPat (logand x y)]
+  = ()          
+
+abstract
+let shift_right (x:int) (y:int) : int =
+  if FStar.UInt.fits x 64
+  && y >= 0
+  then FStar.UInt.shift_right #64 x y
+  else -1
+
+let shift_right_uint64 (x:int) (y:int)
+  : Lemma (ensures (FStar.UInt.fits x 64 /\
+                    y >= 0) ==>
+                   shift_right x y = FStar.UInt.shift_right #64 x y)
+          [SMTPat (shift_right x y)]
+  = ()          
+
+abstract
+let shift_left (x:int) (y:int) : int =
+  if FStar.UInt.fits x 64
+  && y >= 0
+  then FStar.UInt.shift_left #64 x y
+  else -1
+
+let shift_left_uint64 (x:int) (y:int)
+  : Lemma (ensures (FStar.UInt.fits x 64 /\
+                    y >= 0) ==>
+                   shift_left x y = FStar.UInt.shift_left #64 x y)
+          [SMTPat (shift_left x y)]
+  = ()          
+
+let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
 
 let eval_ins (ins:ins) : st unit =
   let open FStar.Mul in

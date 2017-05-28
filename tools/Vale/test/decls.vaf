@@ -5,8 +5,6 @@ open FStar.UInt
 open Vale
 open Semantics
 
-#reset-options "--z3cliopt smt.arith.nl=false --max_fuel 1 --max_ifuel 0 --hint_info"
-
 let cf (n:int) = n % 2 = 1
 
 #endverbatim
@@ -69,9 +67,6 @@ procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst_operand dst:uin
 {
 }
 
-#verbatim
-#reset-options "--z3cliopt smt.arith.nl=false --max_fuel 1 --max_ifuel 0 --hint_info"
-#endverbatim
 procedure{:instruction Ins(Mul64(src))} Mul64Wrap(operand src:uint64)
     modifies
         efl;
@@ -89,6 +84,13 @@ procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst_operand dst:u
         dst == old(dst * src) % nat64_max;
 {
 }
+
+#verbatim
+let logxor x y = Semantics.logxor x y
+let logand x y = Semantics.logand x y
+let shift_left x y = Semantics.shift_left x y
+let shift_right x y = Semantics.shift_right x y
+#endverbatim
 
 procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst_operand dst:uint64, operand src:uint64)
     modifies 
