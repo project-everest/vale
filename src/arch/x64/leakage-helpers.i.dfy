@@ -437,6 +437,35 @@ predicate assertionsWithoutFlags64(src:operand, dst:operand, ts:taintState, fixe
             fixedTime == false && ts' == ts
 }
 
+predicate assertionsAddLea64(src1:operand, src2:operand, dst:operand, ts:taintState, fixedTime:bool, ts':taintState)
+{
+     var ftSrc1 := specOperandDoesNotUseSecrets(src1, ts);
+     var ftSrc2 := specOperandDoesNotUseSecrets(src2, ts);
+     var ftDst := specOperandDoesNotUseSecrets(dst, ts);
+
+     var src1Taint := specOperandTaint64(src1, ts);
+     var src2Taint := specOperandTaint64(src2, ts);
+     var dstTaint := specOperandTaint64(dst, ts);
+
+     var srcTaint := specMergeTaint(src1Taint, src2Taint);
+     var mergedTaint := specMergeTaint(srcTaint, dstTaint);
+
+    match dst
+        case OStack(st) =>
+            (fixedTime == (ftSrc1 && ftSrc2 && ftDst))
+            && ts' == ts.(flagsTaint := Secret,
+                    stackTaint := ts.stackTaint[dst.s := mergedTaint][dst.s + 1 := mergedTaint])
+        case OHeap(h, t) =>
+            (fixedTime == (ftSrc1 && ftSrc2 && ftDst && !(mergedTaint.Secret? && dst.taint.Public?)))
+            && ts' == ts.(flagsTaint := Secret)
+        case OReg(r) =>
+            (fixedTime == (ftSrc1 && ftSrc2 && ftDst))
+            && ts' == ts.(regTaint := ts.regTaint[dst.r := mergedTaint],
+                    flagsTaint := Secret)
+        case OConst(_) =>
+            fixedTime == false && ts' == ts
+}
+
 predicate assertionsXor32(src:operand, dst:operand, ts:taintState, fixedTime:bool, ts':taintState)
 {
      var ftSrc := specOperandDoesNotUseSecrets(src, ts);
@@ -868,6 +897,43 @@ lemma {:timeLimitMultiplier 3} lemma_Add32Helper1(ins:ins, fixedTime:bool, ts:ta
 
         lemma_ValuesOfPublic32BitOperandAreSame(ts, state1, state2, src);
         lemma_ValuesOfPublic32BitOperandAreSame(ts, state1, state2, dst);
+    }
+}
+
+lemma {:timeLimitMultiplier 3} lemma_AddLea64Helper1(ins:ins, fixedTime:bool, ts:taintState, ts':taintState)
+    requires ins.AddLea64?;
+    requires assertionsAddLea64(ins.src1AddLea64, ins.src2AddLea64, ins.dstAddLea64, ts, fixedTime, ts');
+
+    ensures  fixedTime ==>
+        forall state1, state2, state1', state2' ::
+            (evalIns(ins, state1, state1')
+            && evalIns(ins, state2, state2')
+            && state1.ok && state1'.ok
+            && state2.ok && state2'.ok
+            && constTimeInvariant(ts, state1, state2))
+                ==> (constTimeInvariant(ts', state1', state2')
+                    && state1'.trace == state2'.trace);
+{
+    if fixedTime == false {
+        return;
+    }
+
+    forall state1, state2, state1', state2' |
+        (evalIns(ins, state1, state1')
+        && evalIns(ins, state2, state2')
+        && state1.ok && state1'.ok
+        && state2.ok && state2'.ok
+        && constTimeInvariant(ts, state1, state2))
+    ensures constTimeInvariant(ts', state1', state2');
+    ensures state1'.trace == state2'.trace;
+    {
+        var src1:operand := ins.src1AddLea64;
+        var src2:operand := ins.src2AddLea64;
+        var dst:operand := ins.dstAddLea64;
+
+        lemma_ValuesOfPublic64BitOperandAreSame(ts, state1, state2, src1);
+        lemma_ValuesOfPublic64BitOperandAreSame(ts, state1, state2, src2);
+        lemma_ValuesOfPublic64BitOperandAreSame(ts, state1, state2, dst);
     }
 }
 
@@ -1452,6 +1518,22 @@ lemma lemma_Mov64Helper2(ins:ins, fixedTime:bool, ts:taintState, ts':taintState)
 lemma lemma_Add32Helper2(ins:ins, fixedTime:bool, ts:taintState, ts':taintState)
     requires ins.Add32?;
     requires assertionsWithoutFlags(ins.srcAdd, ins.dstAdd, ts, fixedTime, ts');
+    requires fixedTime ==>
+        forall state1, state2, state1', state2' ::
+            (evalIns(ins, state1, state1')
+            && evalIns(ins, state2, state2')
+            && state1.ok && state1'.ok
+            && state2.ok && state2'.ok
+            && constTimeInvariant(ts, state1, state2))
+                ==> constTimeInvariant(ts', state1', state2');
+
+    ensures specTaintCheckIns(ins, ts, ts', fixedTime)
+{
+}
+
+lemma lemma_AddLea64Helper2(ins:ins, fixedTime:bool, ts:taintState, ts':taintState)
+    requires ins.AddLea64?;
+    requires assertionsAddLea64(ins.src1AddLea64, ins.src2AddLea64, ins.dstAddLea64, ts, fixedTime, ts');
     requires fixedTime ==>
         forall state1, state2, state1', state2' ::
             (evalIns(ins, state1, state1')
