@@ -146,6 +146,10 @@ lemma lemma_BitwiseXorWithItself(x:uint32)
     }
 }
 
+// FIXME: Add proof of lemma.
+lemma lemma_BitwiseXor64WithItself(x:uint64)
+    ensures BitwiseXor64(x, x) == 0;
+
 lemma lemma_BitXorAssociativity(x:bv32, y:bv32, z:bv32)
     ensures BitXor(x, BitXor(y, z)) == BitXor(BitXor(x, y), z);
 {
