@@ -1,6 +1,13 @@
 REPO_BASE=../../../../..
 ARCH=$(REPO_BASE)/tools/Vale/test
 
+# By default, assume the standard Everest layout... can be overridden via the
+# environment.
+FSTAR_HOME?=$(REPO_BASE)/../FStar
+FSTAR=$(FSTAR_HOME)/bin/fstar.exe
+ULIB_ML=$(FSTAR_HOME)/ulib/ml
+include $(ULIB_ML)/Makefile.include
+
 ifeq ($(OS),Windows_NT)
   RUNTIME =
 else
@@ -13,18 +20,13 @@ VALE_ARITH_REPR=--smtencoding.elim_box true --smtencoding.l_arith_repr native --
 FSTAR_OPTIONS=$(INCLUDE) $(Z3_OPTIONS) --hint_info --debug yes --max_fuel 0 --max_ifuel 0 --z3rlimit_factor 4 $(VALE_ARITH_REPR)
 VALE=$(RUNTIME) $(REPO_BASE)/bin/vale.exe
 
-# For simplified Makefiles, define FSTAR_HOME, then include the file below.
-include $(FSTAR_HOME)/examples/Makefile.include
-
 all: poly1305.v test
 
-test:
+test: test-poly1305
 	make -C $(ARCH) all
 
-vale: 
+vale:
 	cd $(REPO_BASE); scons --NOVERIFY
-
-include $(FSTAR_HOME)/ulib/ml/Makefile.include
 
 $(ARCH)/decls.fst: $(ARCH)/decls.vaf
 	$(VALE) -in $(ARCH)/decls.vaf -fstarText -out $(ARCH)/decls.fst
@@ -35,14 +37,22 @@ poly1305.fst: poly1305.vaf $(ARCH)/decls.vaf
 poly1305.v: poly1305.fst $(ARCH)/decls.fst
 	fstar $(FSTAR_OPTIONS) poly1305.fst
 
-ocaml: out poly1305.fst
+$(ULIB_ML)/fstarlib.cmxa:
 	$(MAKE) -C $(ULIB_ML)
-	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst $(addprefix --extract_module , Semantics Vale Print Poly1305)
-	$(OCAMLOPT) out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
-	./poly1305.exe
 
-out:
-	mkdir -p out
+.PHONY: test-poly1305
+test-poly1305: poly1305.exe
+	./$<
+
+MISSING_ML=$(addprefix $(ULIB_ML)/extracted/,FStar_Map.ml)
+MY_ML=$(addprefix out/,FStar_Seq_Base.ml FStar_BitVector.ml FStar_UInt.ml Semantics.ml Vale.ml Decls.ml Print.ml Poly1305.ml)
+
+# Approximation
+$(MY_ML): $(wildcard *.fst)
+	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst
+
+poly1305.exe: $(ULIB_ML)/fstarlib.cmxa $(MISSING_ML) $(MY_ML)
+	$(OCAMLOPT) -I out $^ -o $@
 
 clean:
 	make -C $(ULIB_ML) clean
