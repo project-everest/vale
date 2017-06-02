@@ -1398,7 +1398,7 @@ method {:timeLimitMultiplier 2} checkIfCodeisLeakageFree(code:code, ts:taintStat
     b := fixedTime;
 
     if (b) {
-        b := publicTaintsAreAsExpected(tsExpected, ts');
+        b := publicTaintsAreAsExpected(ts', tsExpected);
 
        if (b == false) {
             return;
