@@ -24,6 +24,7 @@ let concise_lemmas = ref true;
 type print_state =
   {
     print_out:System.IO.TextWriter;
+    print_interface:print_state option;
     cur_loc:loc ref;
     cur_indent:string ref;
   }

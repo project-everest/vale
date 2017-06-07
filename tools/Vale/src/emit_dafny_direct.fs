@@ -633,7 +633,7 @@ let create_dafny_decl (mdl:LiteralModuleDecl) (built_ins:BuiltIns) (loc:loc, d:d
   let default_class:DefaultClassDecl = (dmod.TopLevelDecls.Item 0) :?> DefaultClassDecl in
   try
     match d with
-    | DVerbatim lines ->
+    | DVerbatim (_, lines) ->
         let s = String.concat "" (List.map (fun s -> s + System.Environment.NewLine) lines) in
         let errCount = DafnyDriver.Parse_Verbatim_Block(s, loc.loc_file, loc.loc_line, mdl, built_ins) in
         if errCount > 0 then internalErr (sprintf "%i parse errors detected within verbatim block in %s at (%i,%i)/n" errCount loc.loc_file loc.loc_line loc.loc_col)
