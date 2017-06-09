@@ -1,14 +1,18 @@
+#define FSTAR_HOME in Makefile.inc
+include Makefile.inc
 REPO_BASE=../../../../..
 ARCH=$(REPO_BASE)/tools/Vale/test
 
 ifeq ($(OS),Windows_NT)
   RUNTIME =
+  SCONS = scons.bat
 else
   RUNTIME = mono
+  SCONS = scons
 endif
 
 INCLUDE=--include $(ARCH) --include $(REPO_BASE)/src/crypto/poly1305/x64/
-FSTAR_OPTIONS=$(INCLUDE) --hint_info --debug yes  
+FSTAR_OPTIONS=$(INCLUDE) --hint_info --debug yes --eager_inference --smtencoding.elim_box true
 
 VALE=$(RUNTIME) $(REPO_BASE)/bin/vale.exe
 
@@ -18,12 +22,14 @@ include $(FSTAR_HOME)/examples/Makefile.include
 all: ocaml
 
 vale: 
-	cd $(REPO_BASE); scons bin/Vale.exe
+	cd $(REPO_BASE); $(SCONS) bin/Vale.exe
 
 include $(FSTAR_HOME)/ulib/ml/Makefile.include
 
 $(ARCH)/decls.fst: $(ARCH)/decls.vaf
-	$(VALE) -in $(ARCH)/decls.vaf -fstarText -out $(ARCH)/decls.fst
+	$(VALE) -in $(ARCH)/decls.vaf -fstarText -outi $(ARCH)/decls.fsti -out $(ARCH)/decls.fst
+
+decls: $(ARCH)/decls.fst
 
 poly1305.fst: poly1305.vaf $(ARCH)/decls.vaf
 	$(VALE) -in poly1305.vaf -fstarText -out poly1305.fst
