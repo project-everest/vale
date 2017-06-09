@@ -3,7 +3,6 @@ module Print
 // Trusted code for producing assembly code
 
 open Machine
-open Decls
 open Semantics
 open FStar.IO
 

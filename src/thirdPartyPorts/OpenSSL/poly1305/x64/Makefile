@@ -6,13 +6,15 @@ ARCH=$(REPO_BASE)/tools/Vale/test
 ifeq ($(OS),Windows_NT)
   RUNTIME =
   SCONS = scons.bat
+  FSTAR_EXE = $(FSTAR_HOME)/bin/fstar.exe --smt $(FSTAR_HOME)/bin/z3.exe
 else
   RUNTIME = mono
   SCONS = scons
+  FSTAR_EXE = fstar
 endif
 
 INCLUDE=--include $(ARCH) --include $(REPO_BASE)/src/crypto/poly1305/x64/
-FSTAR_OPTIONS=$(INCLUDE) --hint_info --debug yes --eager_inference --smtencoding.elim_box true
+FSTAR_OPTIONS=$(INCLUDE) --hint_info --debug yes --smtencoding.elim_box true
 
 VALE=$(RUNTIME) $(REPO_BASE)/bin/vale.exe
 
@@ -29,13 +31,26 @@ include $(FSTAR_HOME)/ulib/ml/Makefile.include
 $(ARCH)/decls.fst: $(ARCH)/decls.vaf
 	$(VALE) -in $(ARCH)/decls.vaf -fstarText -outi $(ARCH)/decls.fsti -out $(ARCH)/decls.fst
 
-decls: $(ARCH)/decls.fst
+machine: $(ARCH)/Machine.fst
+	$(FSTAR_EXE) $(FSTAR_OPTIONS) --eager_inference $(ARCH)/Machine.fst
+
+semantics: $(ARCH)/Machine.fst
+	$(FSTAR_EXE) $(FSTAR_OPTIONS) --eager_inference $(ARCH)/Semantics.fst
+
+print: $(ARCH)/Machine.fst
+	$(FSTAR_EXE) $(FSTAR_OPTIONS) $(ARCH)/Print.fst
+
+declsi: $(ARCH)/Machine.fst $(ARCH)/Semantics.fst $(ARCH)/decls.fst
+	$(FSTAR_EXE) $(FSTAR_OPTIONS) --eager_inference $(ARCH)/decls.fsti
+
+decls: $(ARCH)/Machine.fst $(ARCH)/Semantics.fst $(ARCH)/decls.fst
+	$(FSTAR_EXE) $(FSTAR_OPTIONS) --eager_inference $(ARCH)/decls.fst
 
 poly1305.fst: poly1305.vaf $(ARCH)/decls.vaf
 	$(VALE) -in poly1305.vaf -fstarText -out poly1305.fst
 
 poly1305.v: poly1305.fst $(ARCH)/decls.fst
-	fstar $(FSTAR_OPTIONS) poly1305.fst
+	$(FSTAR_EXE) $(FSTAR_OPTIONS) --eager_inference poly1305.fst
 
 ocaml: out poly1305.fst $(ARCH)/decls.fst
 	$(MAKE) -C $(ULIB_ML)

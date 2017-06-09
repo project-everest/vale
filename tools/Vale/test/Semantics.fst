@@ -24,11 +24,7 @@ type ocmp =
   | OLt: o1:operand -> o2:operand -> ocmp
   | OGt: o1:operand -> o2:operand -> ocmp
 
-type code = 
-  | Ins   : ins:ins -> code
-  | Block : block:list code -> code
-  | IfElse: ifCond:ocmp -> ifTrue:code -> ifFalse:code -> code
-  | While : whileCond:ocmp -> whileBody:code -> inv:operand -> code
+type code = precode ins ocmp
 type codes = list code
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
@@ -120,9 +116,9 @@ let example (dst:dst_op) (src:operand) :st unit =
   check (valid_operand src);;
   update_operand_preserve_flags dst 2
 
-abstract
-let test (dst:dst_op) (src:operand) (s:state) :state =
-  run (example dst src) s
+//abstract
+//let test (dst:dst_op) (src:operand) (s:state) :state =
+//  run (example dst src) s
 
 (* Silly that these lemmas are needed *)
 let aux (n:nat) (m:nat) (k:nat{n < k && m < k}) : Lemma (FStar.Mul.(n * m < k * k)) = ()
@@ -147,8 +143,11 @@ let eval_ins (ins:ins) : st unit =
     update_operand_preserve_flags dst (eval_operand src s)
 
   | Add64 dst src ->
+    let sum = eval_operand dst s + eval_operand src s in
+    let new_carry = sum >= nat64_max in
     check (valid_operand src);;
-    update_operand dst ins ((eval_operand dst s + eval_operand src s) % nat64_max)
+    update_operand dst ins (sum % nat64_max);;
+    update_flags (update_cf s.flags new_carry)
 
   | AddLea64 dst src1 src2 ->
     check (valid_operand src1);;
