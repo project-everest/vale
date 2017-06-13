@@ -440,12 +440,17 @@ def build_test(env, inputs, include_dir, output_base_name):
     if inps.startswith('src/'):
       inp = env.CopyAs(source=inp, target=inps.replace('src/', 'obj/', 1))
     inputs_obj.append(inp)
-  exe = testenv.Program(source=inputs_obj, target='obj/'+output_base_name+'.exe')
+  if sys.platform == 'win32':
+    built = testenv.Program(source=inputs_obj, target=['obj/'+output_base_name+'.exe', 'obj/'+output_base_name+'.pdb'])
+    exe = built[0]
+  else:
+    built = testenv.Program(source=inputs_obj, target='obj/'+output_base_name+'.exe')
+    exe = built
   testoutput = 'obj/'+output_base_name+'.txt'
   env.Command(target=testoutput,
               source=exe,
               action = [exe, 'echo ABC > ' + testoutput])
-  a = env.Alias('runtest', '', exe)
+  a = env.Alias('runtest', '', built)
   #AlwaysBuild(a)
   return a
   
