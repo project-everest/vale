@@ -175,8 +175,10 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
+  (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
+  let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
-  ps.PrintLine ("val " + (sid f.fname) + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret));
+  psi.PrintLine ("val " + (sid f.fname) + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret));
   // TODO: opaque
   ( match f.fbody with
     | None -> ()
@@ -192,28 +194,31 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let (rs, es) = collect_specs p.pspecs in
   let (rs, es) = (exp_of_conjuncts rs, exp_of_conjuncts es) in
   ps.PrintLine ("");
+  (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
+  let psi = match ps.print_interface with None -> ps | Some psi -> psi in
+  let irreducible = (match ps.print_interface with None -> "irreducible " | Some psi -> "") in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let printPType s =
-    ps.Indent ();
+    psi.Indent ();
     let st = String.concat " * " (List.map string_of_pformal p.prets) in
-    ps.PrintLine (s + "Ghost (" + st + ")");
-    ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
+    psi.PrintLine (s + "Ghost (" + st + ")");
+    psi.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
-    ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
-    ps.Unindent ();
+    psi.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
+    psi.Unindent ();
     in
-  ( match tactic with
-    | None ->
-        ps.PrintLine ("irreducible val " + (sid p.pname) + " : " + (val_string_of_formals args));
+  ( match (tactic, ps.print_interface) with
+    | (Some _, None) -> ()
+    | _ ->
+        psi.PrintLine (irreducible + "val " + (sid p.pname) + " : " + (val_string_of_formals args));
         printPType "-> "
-    | Some _ -> ()
   );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
+        ps.PrintLine (irreducible + "let " + (sid p.pname) + " " + formals + " =");
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         emit_stmts ps ss;
@@ -232,7 +237,12 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim lines -> List.iter ps.PrintUnbrokenLine lines
+    | DVerbatim (args, lines) ->
+      (
+        match (args, ps.print_interface) with
+        | (["interface"], Some psi) -> List.iter psi.PrintUnbrokenLine lines
+        | _ -> List.iter ps.PrintUnbrokenLine lines
+      )
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

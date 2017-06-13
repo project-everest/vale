@@ -246,8 +246,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim lines ->
-        ps.PrintLine("#verbatim");
+    | DVerbatim (args, lines) ->
+        ps.PrintLine("#verbatim" + (String.concat "" (List.map (fun a -> " " + a) args)));
         List.iter ps.PrintUnbrokenLine lines;
         ps.PrintLine("#endverbatim")
     | DVar (x, t, XState e, attrs) ->

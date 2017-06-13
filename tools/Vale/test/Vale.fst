@@ -110,8 +110,8 @@ let va_lemma_block (b_0:va_codes) (s_0:state) (sN:state)
   :Pure (state * va_code * va_codes)
         (requires (Cons? b_0 /\ Some(sN) == eval_code (Block b_0) s_0))
         (ensures  (fun (s_1, c_1, b_1) -> b_0 == va_CCons c_1 b_1  /\
-	                           Some(s_1) == eval_code c_1 s_0 /\
-				   Some(sN) == eval_code (va_Block b_1) s_1))
+                               Some(s_1) == eval_code c_1 s_0 /\
+                   Some(sN) == eval_code (va_Block b_1) s_1))
   = let c_1::b_1 = b_0 in
     Some?.v (eval_code c_1 s_0), c_1, b_1
 
@@ -125,9 +125,9 @@ abstract
 let va_lemma_ifElse (ifb:ocmp) (ct:code) (cf:code) (s_0:va_state) (sN:va_state)
   :Pure (bool * va_state)
         (requires (Some(sN) == eval_code (IfElse ifb ct cf) s_0))
-	(ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\
-	                          sM == s_0                 /\
-				  Some(sN) == (if cond then eval_code ct sM else eval_code cf sM)))
+    (ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\
+                              sM == s_0                 /\
+                  Some(sN) == (if cond then eval_code ct sM else eval_code cf sM)))
   = eval_ocmp s_0 ifb, s_0
 
 let va_whileInv (b:ocmp) (c:code{While? c}) (inv:operand) (s_0:va_state) (sN:va_state) =
@@ -139,7 +139,7 @@ abstract
 let va_lemma_while (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
   :Pure va_state
         (requires (Some(sN) == eval_code (While b c inv) s_0))
-	(ensures  (fun s_1 -> Some(sN) == eval_while (While b c inv) s_0 /\ s_1 == s_0))
+    (ensures  (fun s_1 -> Some(sN) == eval_while (While b c inv) s_0 /\ s_1 == s_0))
   = s_0
 
 abstract
@@ -157,6 +157,6 @@ abstract
 let va_lemma_whileFalse (b:ocmp) (c:code) (inv:operand) (s_0:va_state) (sN:va_state)
   :Pure va_state (requires (eval_operand inv s_0 == 0uL /\
                             Some(sN) == eval_while (While b c inv) s_0))
-		 (ensures  (fun s_1 -> s_0 == s_1 /\ s_1 == sN /\ not (eval_ocmp s_0 b)))
+         (ensures  (fun s_1 -> s_0 == s_1 /\ s_1 == sN /\ not (eval_ocmp s_0 b)))
   = s_0
 

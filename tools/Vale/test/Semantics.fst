@@ -1,71 +1,7 @@
 module Semantics
 
 open FStar.BaseTypes
-open FStar.Map
-
-(* Define some transparently refined int types,
-   since we only use them in specs, not in emitted code *)
-let nat32_max = 0x100000000
-let nat64_max = 0x10000000000000000
-abstract (* Sanity check our constants *)
-let _ = assert_norm (pow2 32 = nat32_max);    
-        assert_norm (pow2 64 = nat64_max)
-        
-type nat64 = n:nat{n < nat64_max}
-type uint64 = FStar.UInt64.t
-
-(* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
-unfold 
-type map (key:eqtype) (value:Type) = Map.t key value
-
-(* syntax for map accesses, m.[key] and m.[key] <- value *)
-unfold 
-let op_String_Access     = sel
-unfold 
-let op_String_Assignment = upd
-
-(* Define the operators we support *)
-type reg =
-  | Rax
-  | Rbx
-  | Rcx
-  | Rdx
-  | Rsi
-  | Rdi
-  | Rbp
-  | Rsp
-  | R8
-  | R9
-  | R10
-  | R11
-  | R12
-  | R13
-  | R14
-  | R15
-
-type maddr =
-  | MConst : n:nat -> maddr
-  | MReg   : r:reg -> offset:int -> maddr
-  | MIndex : base:reg -> scale:int -> index:reg -> offset:int -> maddr
-
-type operand =
-  | OConst: n:uint64 -> operand
-  | OReg  : r:reg -> operand
-  | OMem  : m:maddr -> operand
-
-let valid_dst (o:operand) : bool =
-  not(OConst? o || (OReg? o && Rsp? (OReg?.r o) ))
-
-type dst_op = o:operand { valid_dst o }
-
-type ocmp =
-  | OEq: o1:operand -> o2:operand -> ocmp
-  | ONe: o1:operand -> o2:operand -> ocmp
-  | OLe: o1:operand -> o2:operand -> ocmp
-  | OGe: o1:operand -> o2:operand -> ocmp
-  | OLt: o1:operand -> o2:operand -> ocmp
-  | OGt: o1:operand -> o2:operand -> ocmp
-
+open Machine
 
 type ins =
   | Mov64      : dst:dst_op -> src:operand -> ins
@@ -80,75 +16,18 @@ type ins =
   | Shr64      : dst:dst_op -> amt:operand -> ins
   | Shl64      : dst:dst_op -> amt:operand -> ins
 
-(*
- * while construct has a loop invariant
- * currently it is a mem_opr, but we could introduce an expression language to enrich it
- *)
-type code =
-  | Ins   : ins:ins -> code
-  | Block : block:list code -> code
-  | IfElse: ifCond:ocmp -> ifTrue:code -> ifFalse:code -> code
-  | While : whileCond:ocmp -> whileBody:code -> inv:operand -> code
-
-type codes = list code
-
-(* TODO: Eventually this should be a map to bytes.  Simplifying for now *)
-type mem = map int uint64
-
-(* state type, noeq qualifier means that this type does not have decidable equality (because of the maps) *)
-noeq type state = {
-  ok  :bool;
-  regs:map reg uint64;
-  flags:uint64;
-  mem :mem;
-}
-
 assume val havoc : state -> ins -> Tot uint64
 
-(*
- * writing all the functions as Tot functions
- *)
-let eval_reg (r:reg) (s:state) :uint64 =
-  s.regs.[r]
+type ocmp =
+  | OEq: o1:operand -> o2:operand -> ocmp
+  | ONe: o1:operand -> o2:operand -> ocmp
+  | OLe: o1:operand -> o2:operand -> ocmp
+  | OGe: o1:operand -> o2:operand -> ocmp
+  | OLt: o1:operand -> o2:operand -> ocmp
+  | OGt: o1:operand -> o2:operand -> ocmp
 
-(*
-let valid_resolved_addr (ptr:int) (m:mem) :bool =
-  m `contains` ptr /\
-  m `contains` ptr + 1 /\
-  m `contains` ptr + 2 /\
-  m `contains` ptr + 3
-*)
-
-let eval_mem (ptr:int) (s:state) :uint64 =
-  s.mem.[ptr]
-
-let eval_maddr (m:maddr) (s:state) :int =
-  let open FStar.UInt64 in
-  let open FStar.Mul in
-    match m with
-    | MConst n -> n
-    | MReg reg offset -> v (eval_reg reg s) + offset
-    | MIndex base scale index offset -> v (eval_reg base s) + scale * v (eval_reg index s) + offset
-
-let eval_operand (o:operand) (s:state) :uint64 =
-  match o with
-  | OConst n -> n
-  | OReg r   -> eval_reg r s
-  | OMem m   -> eval_mem (eval_maddr m s) s
-
-let eval_ocmp (s:state) (c:ocmp) :bool =
-  let open FStar.UInt64 in
-  match c with
-  | OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
-  | ONe o1 o2 -> eval_operand o1 s <> eval_operand o2 s
-  | OLe o1 o2 -> eval_operand o1 s <=^ eval_operand o2 s
-  | OGe o1 o2 -> eval_operand o1 s >=^ eval_operand o2 s
-  | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
-  | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
-
-let update_reg' (r:reg) (v:uint64) (s:state) :state = { s with regs = s.regs.[r] <- v }
-
-let update_mem (ptr:int) (v:uint64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
+type code = precode ins ocmp
+type codes = list code
 
 let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) :state =
   match o with
@@ -176,16 +55,6 @@ let update_cf (flags:uint64) (new_cf:bool) : (new_flags:uint64{cf new_flags == n
     else
       flags
 
-let valid_maddr (m:maddr) (s:state) :bool =
-  s.mem `contains` (eval_maddr m s)
-
-let valid_operand (o:operand) (s:state) :bool =
-  not (OMem? o) || (OMem? o && valid_maddr (OMem?.m o) s)
-
-let valid_shift_operand (o:operand) (s:state) :bool =
-  (OConst? o && 0uL <=^ OConst?.n o && OConst?.n o <^ 32uL)
-  ||
-  ((OReg? o) && (Rcx? (OReg?.r o)) && v (eval_operand o s) < nat32_max)
 
 
 let st (a:Type) = state -> a * state
@@ -232,6 +101,7 @@ let check_eval_operand (valid: operand -> state -> bool) (o:operand) : uint64 * 
 
  (eval_operand o s, return s)
 *)
+
 unfold
 let update_operand_preserve_flags (dst:dst_op) (v:uint64) :st unit =
   check (valid_operand dst);;
@@ -259,16 +129,16 @@ let example (dst:dst_op) (src:operand) :st unit =
   check (valid_operand src);;
   update_operand_preserve_flags dst 2uL
 
-abstract
-let test (dst:dst_op) (src:operand) (s:state) :state =
-  run (example dst src) s
+//abstract
+//let test (dst:dst_op) (src:operand) (s:state) :state =
+//  run (example dst src) s
 
 abstract
-let logxor (x:int) (y:int) : int =
+let logxor (x:int) (y:int) : nat64 =
   if FStar.UInt.fits x 64
   && FStar.UInt.fits y 64
   then FStar.UInt.logxor #64 x y
-  else -1
+  else 0
 
 let logxor_uint64 (x:int) (y:int)
   : Lemma (ensures (FStar.UInt.fits x 64 /\
@@ -278,11 +148,11 @@ let logxor_uint64 (x:int) (y:int)
   = ()          
 
 abstract
-let logand (x:int) (y:int) : int =
+let logand (x:int) (y:int) : nat64 =
   if FStar.UInt.fits x 64
   && FStar.UInt.fits y 64
   then FStar.UInt.logand #64 x y
-  else -1
+  else 0
 
 let logand_uint64 (x:int) (y:int)
   : Lemma (ensures (FStar.UInt.fits x 64 /\
@@ -292,34 +162,69 @@ let logand_uint64 (x:int) (y:int)
   = ()          
 
 abstract
-let shift_right (x:int) (y:int) : int =
+let shift_right (x:int) (y:int) : nat64 =
   if FStar.UInt.fits x 64
   && y >= 0
   then FStar.UInt.shift_right #64 x y
-  else -1
+  else 0
 
 let shift_right_uint64 (x:int) (y:int)
   : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    y >= 0) ==>
-                   shift_right x y = FStar.UInt.shift_right #64 x y)
+                    0 <= y /\
+                    y < 64 ==>
+                    shift_right x y = FStar.UInt.shift_right #64 x y))
           [SMTPat (shift_right x y)]
   = ()          
 
 abstract
-let shift_left (x:int) (y:int) : int =
+let shift_left (x:int) (y:int) : nat64 =
   if FStar.UInt.fits x 64
   && y >= 0
   then FStar.UInt.shift_left #64 x y
-  else -1
+  else 0
 
 let shift_left_uint64 (x:int) (y:int)
   : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    y >= 0) ==>
-                   shift_left x y = FStar.UInt.shift_left #64 x y)
+                    0 <= y /\
+                    y < 64 ==>
+                    shift_left x y = FStar.UInt.shift_left #64 x y))
           [SMTPat (shift_left x y)]
   = ()          
 
 let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
+
+let eval_ocmp (s:state) (c:ocmp) :bool =
+  match c with
+  | OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
+  | ONe o1 o2 -> eval_operand o1 s <> eval_operand o2 s
+  | OLe o1 o2 -> eval_operand o1 s <=^ eval_operand o2 s
+  | OGe o1 o2 -> eval_operand o1 s >=^ eval_operand o2 s
+  | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
+  | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
+
+(* These wrappers of the operators from FStar.UInt are only present
+   because we discovered that using specs of the form (v a + v b) % pow2 64
+   causes Z3 to require some amount of non-linear arithmetic, 
+   which we prefer to avoid *)
+val add_mod64: a:uint64 -> b:uint64 -> Pure uint64
+  (requires True)
+  (ensures (fun c -> (v a + v b) % nat64_max = v c))
+let add_mod64 a b = a +%^ b
+
+val sub_mod64: a:uint64 -> b:uint64 -> Pure uint64
+  (requires True)
+  (ensures (fun c -> (v a - v b) % nat64_max = v c))
+let sub_mod64 a b = a -%^ b
+
+val mul_mod64: a:uint64 -> b:uint64 -> Pure uint64
+  (requires True)
+  (ensures (fun c -> (v a `op_Multiply` v b) % nat64_max = v c))
+let mul_mod64 a b = a *%^ b
+
+val mul_div64: a:uint64 -> b:uint64 -> Pure uint64
+  (requires True)
+  (ensures (fun c -> (v a `op_Multiply` v b) / nat64_max = v c))
+let mul_div64 a b = a */^ b
 
 let eval_ins (ins:ins) : st unit =
   let open FStar.Mul in
@@ -330,13 +235,16 @@ let eval_ins (ins:ins) : st unit =
     update_operand_preserve_flags dst (eval_operand src s)
 
   | Add64 dst src ->
+    let sum = v (eval_operand dst s) + v (eval_operand src s) in
+    let new_carry = sum >= nat64_max in
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s +%^ eval_operand src s)
+    update_operand dst ins (eval_operand dst s `add_mod64` eval_operand src s);;
+    update_flags (update_cf s.flags new_carry)
 
   | AddLea64 dst src1 src2 ->
     check (valid_operand src1);;
     check (valid_operand src2);;
-    update_operand_preserve_flags dst (eval_operand src1 s +?^ eval_operand src2 s) //TODO: use the modulo version
+    update_operand_preserve_flags dst (eval_operand src1 s `add_mod64` eval_operand src2 s)
 
   | AddCarry64 dst src ->
     let old_carry = if cf(s.flags) then 1 else 0 in
@@ -348,11 +256,11 @@ let eval_ins (ins:ins) : st unit =
 
   | Sub64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s -%^ eval_operand src s)
+    update_operand dst ins (eval_operand dst s `sub_mod64` eval_operand src s)
 
   | Mul64 src ->
-    let hi = eval_reg Rax s */^ eval_operand src s in
-    let lo = eval_reg Rax s *%^ eval_operand src s in
+    let hi = eval_reg Rax s `mul_div64` eval_operand src s in
+    let lo = eval_reg Rax s `mul_mod64` eval_operand src s in
     check (valid_operand src);;
     update_reg Rax lo;;
     update_reg Rdx hi;;
@@ -360,7 +268,7 @@ let eval_ins (ins:ins) : st unit =
 
   | IMul64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s *%^ eval_operand src s)
+    update_operand dst ins (eval_operand dst s `mul_mod64` eval_operand src s)
 
   | Xor64 dst src ->
     check (valid_operand src);;
@@ -371,11 +279,9 @@ let eval_ins (ins:ins) : st unit =
     update_operand dst ins (u (v (eval_operand dst s) `logand` v (eval_operand src s)))
 
   | Shr64 dst amt ->
-    check (valid_shift_operand amt);;
     update_operand dst ins (u (v (eval_operand dst s) `shift_right` v (eval_operand amt s)))
 
   | Shl64 dst amt ->
-    check (valid_shift_operand amt);;
     update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
 
   | _ -> fail

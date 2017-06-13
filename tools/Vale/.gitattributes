@@ -7,3 +7,5 @@
 *.cs eol=lf
 *.html eol=lf
 *.bat eol=lf
+*.fst eol=lf
+*.fsti eol=lf

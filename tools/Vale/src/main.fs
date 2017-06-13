@@ -53,6 +53,7 @@ let main (argv) =
     let sourceDir = ref "." in
     let destDir = ref "." in
     let outfile = ref (None:string option) in
+    let outfile_i = ref (None:string option) in
     let dafnyDirect = ref false in
     let emitFStarText = ref false in
     let arg_list = argv |> Array.toList in
@@ -97,6 +98,10 @@ let main (argv) =
           match l with
           | [] -> failwith "Specify output file"
           | f :: l -> outfile := Some f; match_args l
+        | "-outi" :: l ->
+          match l with
+          | [] -> failwith "Specify output interface file"
+          | f :: l -> outfile_i := Some f; match_args l
         | "-debug" :: l ->
           match l with
           | [] -> failwith "Specify debug feature name"
@@ -227,9 +232,29 @@ let main (argv) =
           let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
           (new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter
       in
+    let stream_i =
+      match !outfile_i with
+      | None -> None
+      | Some s ->
+          let s = Path.Combine (!destDir, s) in
+          let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
+          Some ((new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter)
+      in
+    let ps_i =
+      match stream_i with
+      | None -> None
+      | Some s ->
+          Some {
+            print_out = s;
+            print_interface = None;
+            cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
+            cur_indent = ref "";
+          }
+      in
     let ps =
       {
         print_out = stream;
+        print_interface = ps_i;
         cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
         cur_indent = ref "";
       } in
@@ -242,6 +267,7 @@ let main (argv) =
           let rps =
             {
               print_out = rstream;
+              print_interface = None;
               cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
               cur_indent = ref "";
             } in
@@ -259,6 +285,7 @@ let main (argv) =
         Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
         DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
       else Emit_dafny_text.emit_decls ps decls;
+    (match stream_i with None -> () | Some s -> s.Close());
     stream.Close ()
   )
   with err -> print_error None err

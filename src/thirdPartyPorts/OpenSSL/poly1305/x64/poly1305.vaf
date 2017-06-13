@@ -33,9 +33,15 @@ include "../../../../../tools/Vale/test/decls.vaf"
 #verbatim
 module Poly1305
 
-open Semantics
-open Vale
+
+#reset-options "--z3rlimit_factor 4 --z3rlimit 200 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
+
+open Machine
 open Decls
+open Poly1305_spec
+open Poly1305_lemmas
+
+unfold let n = nat64_max
 
 #endverbatim
 procedure poly1305_multiply(
@@ -50,7 +56,7 @@ procedure poly1305_multiply(
     ghost r1:nat64,
     ghost r:int,
     ghost h:int,
-    ghost n:int,
+   // ghost n:int,
     ghost p:int)
     returns(ghost hh:int)
     modifies
@@ -66,28 +72,36 @@ procedure poly1305_multiply(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-        n == 0x1_0000_0000_0000_0000;
-        p == n * n * 4 - 5;
-        r == r1 * n + r0;
-        h == h2 * (n * n) + h1 * n + h0;
-        r1 % 4 == 0;
-        s1 == r1 + r1 / 4;
-        h2 * r0 < 7 * (n / 16);
-        h0 * r1 < n * (n / 16);
-        h1 * r0 < n * (n / 16);
-        h2 * s1 < n * (n / 8);
-        h0 * r0 < n * (n / 16);
-        h1 * s1 < n * (n / 8);
-        h2 * s1 < 7 * (5 * n / 64);
-        rax == r1;
+      // n == 0x1_0000_0000_0000_0000;
+       p == n * n * 4 - 5;
+       r == r1 * n + r0;
+       h == h2 * (n * n) + h1 * n + h0;
+       r1 % 4 == 0;
+       eq_int(s1, r1 + r1 /4);
+       //s1 == r1 + r1 / 4;
+       h2 * r0 < 7 * (n / 16);
+       h0 * r1 < n * (n / 16);
+       h1 * r0 < n * (n / 16);
+       h2 * s1 < n * (n / 8);
+       h0 * r0 < n * (n / 16);
+       h1 * s1 < n * (n / 8);
+       h2 * s1 < 7 * (5 * n / 64);
+       rax == r1;
     ensures
-//        hh == (n * n) * d3 + n * h1 + h0;
-//        (h * r) % p == hh % p;
-//        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
-//        rax == 0xffff_ffff_ffff_fffc;
+       p > 0;
+       hh == (n * n) * d3 + n * h1 + h0;
+       (h * r) % p == hh % p;
+       d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
+       rax == 0xffff_ffff_ffff_fffc;
 {
-//    lemma_BitwiseAdd64();
-//    lemma_BitwiseMul64();
+  // lemma_BitwiseAdd64();
+   //lemma_BitwiseMul64();
+    assert h0 * r1 == r1 * h0;
+    assert r0 * h0 == h0 * r0;
+    assert r0 * h1 == h1 * r0;
+    //assert r0 * h2 == h2 * r0;
+    assert s1 * h1 == h1 * s1;
+    //assert s1 * h2 == h2 * s1;
 
     ghost var gd0 := h0 * r0 + h1 * s1;
     ghost var gd1 := h0 * r1 + h1 * r0 + h2 * s1;
@@ -117,13 +131,13 @@ procedure poly1305_multiply(
     Adc64Wrap(d1, rdx);
     //assert n * d1 + h0 == old(h0 * r0 + h1 * s1);
 
-    IMul64Wrap(h1, s1); // h2*s1
+    IMul64(h1, s1); // h2*s1
     Add64Wrap(d2, h1);
     Mov64(h1, d1);
     Adc64Wrap(d3, 0);
     //assert n * d3 + d2 == old(h0 * r1 + h1 * r0 + h2 * s1);
 
-    IMul64Wrap(h2, r0); // h2*r0
+    IMul64(h2, r0); // h2*r0
     //assert h2 == gd2;
     Add64Wrap(h1, d2);
     Mov64(rax, 0xffff_ffff_ffff_fffc); // mask value
@@ -131,9 +145,9 @@ procedure poly1305_multiply(
 
     hh := (n * n) * d3 + n * h1 + h0;
     //assert hh == gd2 * (n * n) + gd1 * n + gd0;
-//    lemma_poly_multiply(n, p, r, h, r0, r1, old(h0), old(h1), old(h2), s1, gd0, gd1, gd2, hh);
+    lemma_poly_multiply(n, p, r, h, r0, r1, old(h0), old(h1), old(h2), s1, gd0, gd1, gd2, hh);
 }
-
+/*
 procedure poly1305_reduce(
     inout dst_operand d3:uint64,
     inout dst_operand h0:uint64,
@@ -152,11 +166,11 @@ procedure poly1305_reduce(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-        n == 0x1_0000_0000_0000_0000;
-        p == n * n * 4 - 5;
-        hd == (n * n) * d3 + n * h1 + h0;
-        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
-        rax == 0xffff_ffff_ffff_fffc;
+//        n == 0x1_0000_0000_0000_0000;
+//        p == n * n * 4 - 5;
+//        hd == (n * n) * d3 + n * h1 + h0;
+//        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
+//        rax == 0xffff_ffff_ffff_fffc;
     ensures
 //        hh == (n * n) * h2 + n * h1 + h0;
 //        hd % p == hh % p;
@@ -179,7 +193,7 @@ procedure poly1305_reduce(
 //    lemma_poly_reduce(n, p, hd, old(d3), h10, rax, hh);
 }
 
-/*
+
 procedure poly1305_iteration(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,
@@ -208,16 +222,16 @@ procedure poly1305_iteration(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-        n == 0x1_0000_0000_0000_0000;
-        p == n * n * 4 - 5;
-        r == r1 * n + r0;
-        h == h2 * (n * n) + h1 * n + h0;
-        r0 < n / 16;
-        r1 < n / 16;
-        r1 % 4 == 0;
-        s1 == r1 + r1 / 4;
-        h2 < 7;
-        rax == r1;
+//        n == 0x1_0000_0000_0000_0000;
+//        p == n * n * 4 - 5;
+//        r == r1 * n + r0;
+//        h == h2 * (n * n) + h1 * n + h0;
+//        r0 < n / 16;
+//        r1 < n / 16;
+//        r1 % 4 == 0;
+//        s1 == r1 + r1 / 4;
+//        h2 < 7;
+//        rax == r1;
     ensures
 //        // hh == (n * n) * h2 + n * h1 + h0;
 //        // modp(h * r) == modp(hh);
@@ -240,6 +254,7 @@ procedure poly1305_iteration(
 //    assert hh == (n * n) * h2 + n * h1 + h0 && modp(h * r) == modp(hh);
 }
 
+/*
 procedure{:timeLimitMultiplier 2} poly1305_blocks(
           operand ctx:uint64,
     inout dst_operand inp:uint64,
@@ -400,9 +415,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
 
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:timeLimitMultiplier 2} poly1305_last_block(
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
+    inout dst_operand h0:uint64,
+    inout dst_operand h1:uint64,
+    inout dst_operand h2:uint64,
           operand r0:uint64,
           operand s1:uint64,
           operand nExtra:uint64,
@@ -415,13 +430,13 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     modifies
         rax; rcx; rdx; r8; r9; r10;
         efl;
-    requires{:refined false}
-        @h0 == OReg(X86R14);
-        @h1 == OReg(X86Ebx);
-        @h2 == OReg(X86Ebp);
-        @r0 == OReg(X86R11);
-        @s1 == OReg(X86R13);
-        @nExtra == OReg(X86R15);
+    requires
+        @h0 == OReg(R14);
+        @h1 == OReg(Rbx);
+        @h2 == OReg(Rbp);
+        @r0 == OReg(R11);
+        @s1 == OReg(R13);
+        @nExtra == OReg(R15);
     requires
         n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
@@ -514,29 +529,30 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
     assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal modp; }
 }
+*/
 
 // h := (h % p) % 2^128;
-procedure{:refined}{:bridge} poly1305_reduce_last(
-    inout operand h0:uint64,
-    inout operand h1:uint64,
+procedure poly1305_reduce_last(
+    inout dst_operand h0:uint64,
+    inout dst_operand h1:uint64,
     inout operand h2:uint64,
     ghost h:int)
     modifies
         r8; r9; r10; rax;
         efl;
-    requires{:refined false}
-        @h0 == OReg(X86R14);
-        @h1 == OReg(X86Ebx);
-        @h2 == OReg(X86Ebp);
     requires
-        h2 < 5;
-        h == lowerUpper192(lowerUpper128(h0, h1), h2);
+        @h0 == OReg(R14);
+        @h1 == OReg(Rbx);
+        @h2 == OReg(Rbp);
+    requires
+//        h2 < 5;
+//        h == lowerUpper192(lowerUpper128(h0, h1), h2);
     ensures
-        lowerUpper128(h0, h1) == mod2_128(modp(h));
+//        lowerUpper128(h0, h1) == mod2_128(modp(h));
 {
-    lemma_BitwiseAdd64();
-    lemma_BitwiseSub64();
-    lemma_poly_bits64();
+//    lemma_BitwiseAdd64();
+//    lemma_BitwiseSub64();
+//    lemma_poly_bits64();
 
     Mov64(r8, h0);
     Mov64(r9, h1);
@@ -545,73 +561,75 @@ procedure{:refined}{:bridge} poly1305_reduce_last(
     Adc64Wrap(r9, 0);
     Adc64Wrap(r10, 0);
 
-    assert h + 5 == lowerUpper192(lowerUpper128(r8, r9), r10)
-        by { reveal lowerUpper128; reveal lowerUpper192; }
-    lemma_reduce128(h, old(h2), old(h1), old(h0), h + 5, r10, r9, r8);
+//    assert h + 5 == lowerUpper192(lowerUpper128(r8, r9), r10)
+//        by { reveal lowerUpper128; reveal lowerUpper192; }
+//    lemma_reduce128(h, old(h2), old(h1), old(h0), h + 5, r10, r9, r8);
 
     Shr64(r10, 2);
 
     Mov64(rax, r10);
     Sub64Wrap(rax, 1); // mask of ones if h < p, zero otherwise
-    assert rax == (if r10 == 0 then 0xffff_ffff_ffff_ffff else 0);
+//    assert rax == (if r10 == 0 then 0xffff_ffff_ffff_ffff else 0);
     And64(h0, rax);
     And64(h1, rax);
 
     Mov64(rax, 0);
     Sub64Wrap(rax, r10); // mask of ones if p <= h < 2 * p, zero otherwise
-    assert rax == (if r10 == 1 then 0xffff_ffff_ffff_ffff else 0);
+//    assert rax == (if r10 == 1 then 0xffff_ffff_ffff_ffff else 0);
     And64(r8, rax);
     And64(r9, rax);
 
     // Either h1 == h0 == 0 or r9 == r8 == 0; add to select the nonzero one:
+    assume h1 == h0 && h0 == 0 || r9 == r8 && r8 == 0; // TODO: Restore proofs above and remove this
     Add64(h0, r8);
     Add64(h1, r9);
 }
 
 // h := (h + key_s) % 2^128
-procedure{:refined}{:bridge} poly1305_add_key_s(
-    inout operand h0:uint64,
-    inout operand h1:uint64,
+procedure poly1305_add_key_s(
+    inout dst_operand h0:uint64,
+    inout dst_operand h1:uint64,
           operand key_s0:uint64,
           operand key_s1:uint64,
     ghost h_in:int,
-    ghost key_s:uint128)
+    ghost key_s:nat128)
     modifies
         efl;
-    requires{:refined false}
-        @h0 == OReg(X86R14);
-        @h1 == OReg(X86Ebx);
-        @key_s0 == OReg(X86Eax);
-        @key_s1 == OReg(X86Edx);
     requires
-        h_in == lowerUpper128(h0, h1);
-        key_s == lowerUpper128(key_s0, key_s1);
+        @h0 == OReg(R14);
+        @h1 == OReg(Rbx);
+        @key_s0 == OReg(Rax);
+        @key_s1 == OReg(Rdx);
+    requires
+//        h_in == lowerUpper128(h0, h1);
+//        key_s == lowerUpper128(key_s0, key_s1);
     ensures
-        lowerUpper128(h0, h1) == mod2_128(h_in + key_s);
+//        lowerUpper128(h0, h1) == mod2_128(h_in + key_s);
 {
-    lemma_BitwiseAdd64();
+//    lemma_BitwiseAdd64();
 
     Add64Wrap(h0, key_s0);
     Adc64Wrap(h1, key_s1);
 
-    ghost var c := if Cf(efl) then 0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000 else 0;
-    calc
-    {
-        mod2_128(h_in + key_s);              { reveal lowerUpper128; }
-        mod2_128(c + lowerUpper128(h0, h1)); { reveal mod2_128; }
-        lowerUpper128(h0, h1);
-    }
+//    ghost var c := if Cf(efl) then 0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000 else 0;
+//    calc
+//    {
+//        mod2_128(h_in + key_s);              { reveal lowerUpper128; }
+//        mod2_128(c + lowerUpper128(h0, h1)); { reveal mod2_128; }
+//        lowerUpper128(h0, h1);
+//    }
 }
 
+/*
 procedure{:timeLimitMultiplier 2} poly1305_impl(
           operand ctx:uint64,
-    inout operand inp:uint64,
-    inout operand len:uint64,
-    inout operand r0:uint64,
-    inout operand r1:uint64,
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
+    inout dst_operand inp:uint64,
+    inout dst_operand len:uint64,
+    inout dst_operand r0:uint64,
+    inout dst_operand r1:uint64,
+    inout dst_operand h0:uint64,
+    inout dst_operand h1:uint64,
+    inout dst_operand h2:uint64,
     ghost key_r:uint128,
     ghost key_s:uint128,
     ghost n:int,
@@ -624,14 +642,14 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
         efl;
         mem;
     requires
-        @ctx == OReg(X86Edi);
-        @inp == OReg(X86Esi);
-        @len == OReg(X86Edx);
-        @r0 == OReg(X86R11);
-        @r1 == OReg(X86R12);
-        @h0 == OReg(X86R14);
-        @h1 == OReg(X86Ebx);
-        @h2 == OReg(X86Ebp);
+        @ctx == OReg(Rdi);
+        @inp == OReg(Rsi);
+        @len == OReg(Rdx);
+        @r0 == OReg(R11);
+        @r1 == OReg(R12);
+        @h0 == OReg(R14);
+        @h1 == OReg(Rbx);
+        @h2 == OReg(Rbp);
         n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
         inp + len < 0x1_0000_0000_0000_0000;
@@ -738,14 +756,14 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
 // affect the result.
 procedure{:timeLimitMultiplier 2} poly1305(
     inline win:bool,
-    inout operand ctx:uint64,
-    inout operand inp:uint64,
-    inout operand len:uint64,
-    inout operand r0:uint64,
-    inout operand r1:uint64,
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
+    inout dst_operand ctx:uint64,
+    inout dst_operand inp:uint64,
+    inout dst_operand len:uint64,
+    inout dst_operand r0:uint64,
+    inout dst_operand r1:uint64,
+    inout dst_operand h0:uint64,
+    inout dst_operand h1:uint64,
+    inout dst_operand h2:uint64,
     ghost key_r:uint128,
     ghost key_s:uint128,
     ghost n:int,
@@ -761,14 +779,14 @@ procedure{:timeLimitMultiplier 2} poly1305(
         efl;
         mem;
     requires
-        @ctx == OReg(X86Edi);
-        @inp == OReg(X86Esi);
-        @len == OReg(X86Edx);
-        @r0 == OReg(X86R11);
-        @r1 == OReg(X86R12);
-        @h0 == OReg(X86R14);
-        @h1 == OReg(X86Ebx);
-        @h2 == OReg(X86Ebp);
+        @ctx == OReg(Rdi);
+        @inp == OReg(Rsi);
+        @len == OReg(Rdx);
+        @r0 == OReg(R11);
+        @r1 == OReg(R12);
+        @h0 == OReg(R14);
+        @h1 == OReg(Rbx);
+        @h2 == OReg(Rbp);
         ctx_in == (if win then rcx else ctx);
         inp_in == (if win then rdx else inp);
         len_in == (if win then r8 else len);
@@ -847,19 +865,16 @@ Store64(ctx, h0,  0, Public, ctx_id);
 }
 
 */
-
+*/
 #verbatim
 
-open Print
-open FStar.IO
-
-let print_poly1305 (p:printer) =
+let print_poly1305 (p:printer) : FStar.All.ML unit =
   let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
   print_header p;
   print_proc "poly1305" poly_code 0 p;
   print_footer p
 
-let main =
+let main () : FStar.All.ML unit =
   print_poly1305 masm;
   print_string "\n\n";
   print_poly1305 gcc

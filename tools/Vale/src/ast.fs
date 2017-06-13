@@ -134,7 +134,7 @@ type decl =
 | DVar of id * typ * var_storage * attrs
 | DFun of fun_decl
 | DProc of proc_decl
-| DVerbatim of string list
+| DVerbatim of string list * string list
 
 type decls = (loc * decl) list
 
