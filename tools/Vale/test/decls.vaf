@@ -75,6 +75,7 @@ procedure{:instruction Ins(Mul64(src))} Mul64Wrap(operand src:uint64)
     ensures
         rax + nat64_max * rdx == old(rax * src);
 {
+    assume false;
 }
 
 procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst_operand dst:uint64, operand src:uint64)

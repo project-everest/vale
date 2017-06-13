@@ -336,7 +336,7 @@ let eval_ins (ins:ins) : st unit =
   | AddLea64 dst src1 src2 ->
     check (valid_operand src1);;
     check (valid_operand src2);;
-    update_operand_preserve_flags dst (eval_operand src1 s +?^ eval_operand src2 s)
+    update_operand_preserve_flags dst (eval_operand src1 s +?^ eval_operand src2 s) //TODO: use the modulo version
 
   | AddCarry64 dst src ->
     let old_carry = if cf(s.flags) then 1 else 0 in
