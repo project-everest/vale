@@ -1,5 +1,5 @@
 #define FSTAR_HOME in Makefile.inc
-include Makefile.inc
+-include Makefile.inc
 REPO_BASE=../../../../..
 ARCH=$(REPO_BASE)/tools/Vale/test
 
@@ -55,7 +55,7 @@ poly1305.v: poly1305.fst $(ARCH)/decls.fst
 ocaml: out poly1305.fst $(ARCH)/decls.fst
 	$(MAKE) -C $(ULIB_ML)
 	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst
-	$(OCAMLOPT) -I $(FSTAR_HOME)/ulib/ml/extracted/ out/FStar_Map.ml out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
+	$(OCAMLOPT) -I out -I $(FSTAR_HOME)/ulib/ml/extracted/ out/FStar_Map.ml out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
 	./poly1305.exe
 
 out:
