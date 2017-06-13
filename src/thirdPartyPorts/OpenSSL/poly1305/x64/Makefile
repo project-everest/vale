@@ -65,15 +65,15 @@ $(ULIB_ML)/fstarlib.cmxa:
 test-poly1305: poly1305.exe
 	./$<
 
-MISSING_ML=$(addprefix $(ULIB_ML)/extracted/,FStar_Map.ml)
-MY_ML=$(addprefix out/,FStar_Seq_Base.ml FStar_BitVector.ml FStar_UInt.ml Semantics.ml Vale.ml Decls.ml Print.ml Poly1305.ml)
+include $(FSTAR_HOME)/ulib/ml/Makefile.include
 
-# Approximation
-$(MY_ML): $(wildcard *.fst)
-	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst
+ocaml: out poly1305.fst $(ARCH)/decls.fst
+	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst --extract_all
+	$(OCAMLOPT) -I out -I $(FSTAR_HOME)/ulib/ml/extracted/ out/FStar_Map.ml out/Machine.ml out/Semantics.ml out/Print.ml out/Decls.ml out/Poly1305.ml -o poly1305.exe
+	./poly1305.exe
 
-poly1305.exe: $(ULIB_ML)/fstarlib.cmxa $(MISSING_ML) $(MY_ML)
-	$(OCAMLOPT) -I out $^ -o $@
+out:
+	mkdir -p out
 
 clean:
 	make -C $(ULIB_ML) clean
