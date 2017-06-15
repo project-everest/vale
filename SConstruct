@@ -727,6 +727,8 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   # call fstar --dep make
   includes = " ".join(["--include " + x for x in fstar_include_paths])
   fstar = str(env['FSTAR'])
+  lines = []
+  depsBackupFile = 'obj/fstarDepsBackup.d'
   try:
     print('F* dependency analysis: starting')
     cmd = fstar + " --dep make " + includes + " " + " ".join(files)
@@ -735,26 +737,35 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
     print('F* dependency analysis: done')
     fstar_deps_ok = True
     lines = o.splitlines()
-    for line in lines:
-      if 'Warning:' in line:
-        print(line)
-        fstar_deps_ok = False
-      else:
-        # lines are of the form:
-        #   a1.fst a2.fst ... : b1.fst b2.fst ...
-        # we change this to:
-        #   obj\...\a1.vfst obj\...\a2.vfst ... : b1.fst b2.fst ...
-        # we ignore targets that we will not verify (e.g. F* standard libraries)
-        targets, sources = line.split(': ', 1) # ': ', not ':', because of Windows drive letters
-        sources = sources.split()
-        targets = targets.split()
-        targets = [to_obj_dir(re.sub('\.fst$', '.vfst.tmp', re.sub('\.fsti$', '.vfsti.tmp', x))) for x in targets if has_obj_dir(x)]
-        Depends(targets, sources)
   except subprocess.CalledProcessError as e:
     print(e)
     print(e.output)
     print('F* dependency analysis: done, but with errors')
-    return
+    if os.path.isfile(depsBackupFile):
+      print('  loading dependencies from ' + depsBackupFile)
+      with open(depsBackupFile, 'r') as myfile:
+        lines = myfile.read().splitlines()
+  for line in lines:
+    if 'Warning:' in line:
+      print(line)
+      fstar_deps_ok = False
+    else:
+      # lines are of the form:
+      #   a1.fst a2.fst ... : b1.fst b2.fst ...
+      # we change this to:
+      #   obj\...\a1.vfst obj\...\a2.vfst ... : b1.fst b2.fst ...
+      # we ignore targets that we will not verify (e.g. F* standard libraries)
+      targets, sources = line.split(': ', 1) # ': ', not ':', because of Windows drive letters
+      sources = sources.split()
+      targets = targets.split()
+      targets = [to_obj_dir(re.sub('\.fst$', '.vfst.tmp', re.sub('\.fsti$', '.vfsti.tmp', x))) for x in targets if has_obj_dir(x)]
+      Depends(targets, sources)
+  if fstar_deps_ok:
+    # Save results in depsBackupFile
+    # This can be used in case of errors in future invocations of scons
+    with open(depsBackupFile, 'w') as myfile:
+      for line in lines:
+        myfile.write(line + '\n')
 
 ####################################################################
 #
