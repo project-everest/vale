@@ -141,12 +141,10 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SCalc (oop, contents) ->
       ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
       ps.Indent();
-      List.iter (fun cc ->
-        match cc with
-        | CalcLine e -> ps.PrintLine ((string_of_exp e) + ";")
-        | CalcHint (oop, ss) ->
-            (match oop with | None -> () | Some op -> ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent());
-            emit_block ps ss
+      List.iter (fun {calc_exp = e; calc_op = oop; calc_hints = hints} ->
+        ps.PrintLine ((string_of_exp e) + ";");
+        (match oop with | None -> () | Some op -> ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent());
+        List.iter (emit_block ps) hints
       ) contents;
       ps.Unindent();
       ps.PrintLine("}")

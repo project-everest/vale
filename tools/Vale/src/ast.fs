@@ -95,9 +95,7 @@ type stmt =
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list
 | SExists of formal list * triggers * exp
-and calcContents =
-| CalcLine of exp
-| CalcHint of bop option * stmt list
+and calcContents = {calc_exp:exp; calc_op:bop option; calc_hints:stmt list list}
 
 type spec =
 | Requires of exp

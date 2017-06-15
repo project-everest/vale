@@ -144,8 +144,8 @@ AddOption('--NOVERIFY',
   action='store_true',
   help='Verify and compile, or compile only')
 
-env['DAFNY_PATH'] = GetOption('dafny_path')
-env['FSTAR_PATH'] = GetOption('fstar_path')
+env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
+env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
 env['FSTAR_USER_ARGS'] = GetOption('fstar_user_args')
 env['VALE_USER_ARGS'] = GetOption('vale_user_args')
@@ -172,8 +172,8 @@ if cache_dir != None:
   print('Using Shared Cache Directory %s'%cache_dir)
   CacheDir(cache_dir)
 
-env['DAFNY'] = File(os.path.join(env['DAFNY_PATH'], 'Dafny.exe'))
-env['FSTAR'] = File(os.path.join(env['FSTAR_PATH'], 'bin', 'fstar.exe'))
+env['DAFNY'] = Dir(env['DAFNY_PATH']).File('Dafny.exe')
+env['FSTAR'] = Dir(env['FSTAR_PATH']).Dir('bin').File('fstar.exe')
 
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']

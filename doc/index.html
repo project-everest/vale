@@ -231,7 +231,7 @@ STMT ::=
   | assume EXP ;
   | assert EXP ;
   | assert EXP by { STMTS }
-  | calc <i>[</i>CALCOP<i>]</i> { CALC ... CALC }
+  | calc <i>[</i>CALC_OP<i>]</i> { CALC ... CALC EXP ; }
   | reveal f ;
   | p ( EXP , ... , EXP) ;
   | ASSIGN ;
@@ -244,10 +244,10 @@ STMT ::=
     <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
     <i>[</i> else { ... } <i>]</i>
 
-CALC ::=
-  | <i>[</i>CALCOP<i>]</i> EXP ;
-  | <i>[</i>CALCOP<i>]</i> { STMTS }
-CALCOP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
+CALC ::= EXP ; <i>[</i>CALC_OP<i>]</i> CALC_HINTS
+CALC_HINTS ::= CALC_HINT ... CALC_HINT
+CALC_HINT ::= { STMTS }
+CALC_OP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
 
 ASSIGNS ::= ASSIGN , ... , ASSIGN
 ASSIGN ::= 

@@ -163,9 +163,8 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
   )
 and map_stmts (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (ss:stmt list):stmt list = List.collect (map_stmt fe fs) ss
 and map_calc_contents (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (cc:calcContents): calcContents =
-  match cc with
-  | CalcLine e -> CalcLine (fe e)
-  | CalcHint (oop, ss) -> CalcHint (oop, map_stmts fe fs ss)
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  {calc_exp = fe e; calc_op = oop; calc_hints = List.map (map_stmts fe fs) hints}
 
 let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt):'a =
   let re = gather_exp fe in
@@ -187,9 +186,8 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
 and gather_stmts (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (ss:stmt list):'a list =
   List.map (gather_stmt fs fe) ss
 and gather_calc_contents (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (cc:calcContents):'a list =
-  match cc with
-  | CalcLine e -> [(gather_exp fe) e]
-  | CalcHint (oop, ss) -> gather_stmts fs fe ss
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  [gather_exp fe e] @ (List.collect (gather_stmts fs fe) hints)
 
 let rec skip_loc_stmt (s:stmt):stmt =
   match s with
