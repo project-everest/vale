@@ -223,7 +223,7 @@ let mul_mod64 a b = a *%^ b
 
 val mul_div64: a:uint64 -> b:uint64 -> Pure uint64
   (requires True)
-  (ensures (fun c -> (v a `op_Multiply` v b) / nat64_max = v c))
+  (ensures (fun c -> v a `op_Multiply` v b >= 0 /\ (v a `op_Multiply` v b) / nat64_max = v c))
 let mul_div64 a b = a */^ b
 
 let eval_ins (ins:ins) : st unit =

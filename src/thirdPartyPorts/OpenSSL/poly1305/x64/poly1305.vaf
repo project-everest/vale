@@ -30,20 +30,19 @@
 //include "../../../../arch/x64/decls64.vad"
 include "../../../../../tools/Vale/test/decls.vaf"
 
-#verbatim
+#verbatim interface implementation
 module Poly1305
-
-
 #reset-options "--z3rlimit_factor 4 --z3rlimit 200 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
-
 open Machine
 open Decls
 open Poly1305_spec
 open Poly1305_lemmas
-
-unfold let n = nat64_max
-
 #endverbatim
+
+#verbatim interface
+unfold let n = nat64_max
+#endverbatim
+
 procedure poly1305_multiply(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,

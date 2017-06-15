@@ -391,7 +391,9 @@ Decl
       | h::_ when h.Length > 0 && not (h.StartsWith(" ")) -> parse_err "expected space after #verbatim"
       | h::t ->
           let hs = h.Trim().Split(' ') in
-          (fst $1, DVerbatim (Array.toList hs, t))
+          let hs = Array.toList hs in
+          let hs = List.filter (fun x -> x <> "") hs in
+          (fst $1, DVerbatim (hs, t))
     }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId SEMI

@@ -12,7 +12,7 @@ import platform
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
 
 Import("*")
-  
+
 
 target_arch='x86'
 target_x='86'
@@ -45,19 +45,69 @@ else:
 #num_cpu = int(os.environ.get('NUMBER_OF_PROCESSORS', 1)) 
 #SetOption('num_jobs', num_cpu) 
 
+if 'FSTAR_HOME' in os.environ:
+  fstar_default_path = os.environ['FSTAR_HOME']
+else:
+  fstar_default_path = '#tools/FStar'
+
+if sys.platform == 'win32':
+  fstar_default_z3 = 'tools\\Z3\\z3.exe'
+else:
+  fstar_default_z3 = 'tools/Z3/z3'
+if not os.path.isfile(fstar_default_z3):
+  fstar_default_z3 = ''
+
 # Retrieve tool-specific command overrides passed in by the user
+AddOption('--DAFNY',
+  dest='do_dafny',
+  default=True,
+  action='store_true',
+  help='Verify Dafny files')
+AddOption('--NODAFNY',
+  dest='do_dafny',
+  default=True,
+  action='store_false',
+  help='Do not verify Dafny files')
 AddOption('--DAFNYPATH',
   dest='dafny_path',
   type='string',
   default='#tools/Dafny',
   action='store',
   help='Specify the path to Dafny tool binaries')
+AddOption('--FSTAR',
+  dest='do_fstar',
+  default=False,
+  action='store_true',
+  help='Verify F* files')
+AddOption('--NOFSTAR',
+  dest='do_fstar',
+  default=False,
+  action='store_false',
+  help='Do not verify F* files')
+AddOption('--FSTARPATH',
+  dest='fstar_path',
+  type='string',
+  default=fstar_default_path,
+  action='store',
+  help='Specify the path to F* tool')
+AddOption('--FSTARZ3',
+  dest='fstar_z3',
+  type='string',
+  default=fstar_default_z3,
+  action='store',
+  help='Specify the path to z3 or z3.exe for F*')
 AddOption('--DARGS',
   dest='dafny_user_args',
   type='string',
   default=[],
   action='append',
   help='Supply temporary additional arguments to the Dafny compiler')
+AddOption('--FARGS',
+  dest='fstar_user_args',
+  type='string',
+  default=[],
+  action='append',
+  help='Supply temporary additional arguments to the F* compiler')
 AddOption('--VARGS',
   dest='vale_user_args',
   type='string',
@@ -95,20 +145,27 @@ AddOption('--NOVERIFY',
   help='Verify and compile, or compile only')
 
 env['DAFNY_PATH'] = GetOption('dafny_path')
+env['FSTAR_PATH'] = GetOption('fstar_path')
 env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
+env['FSTAR_USER_ARGS'] = GetOption('fstar_user_args')
 env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
 env.Append(CCFLAGS=GetOption('c_user_args'))
 env['OPENSSL_PATH'] = GetOption('openssl_path')
 
+do_dafny = GetOption('do_dafny')
+do_fstar = GetOption('do_fstar')
+
 # --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
 # the other build flavors do not redundently re-verify the same results.
 env['DAFNY_NO_VERIFY'] = ''
+env['FSTAR_NO_VERIFY'] = ''
 verify=(GetOption('noverify') == False)
 if not verify:
   print('***\n*** WARNING:  NOT VERIFYING ANY CODE\n***')
   env['DAFNY_NO_VERIFY'] = '/noVerify'
-  
+  env['FSTAR_NO_VERIFY'] = '--lax'
+
 
 cache_dir=GetOption('cache_dir')
 if cache_dir != None:
@@ -116,6 +173,7 @@ if cache_dir != None:
   CacheDir(cache_dir)
 
 env['DAFNY'] = File(os.path.join(env['DAFNY_PATH'], 'Dafny.exe'))
+env['FSTAR'] = File(os.path.join(env['FSTAR_PATH'], 'bin', 'fstar.exe'))
 
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
@@ -131,6 +189,10 @@ kremlib_path = kremlin_path + '/kremlib'
 # Useful Dafny command lines
 dafny_default_args =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /trace'
 dafny_default_args_nonlarith = dafny_default_args + ' /noNLarith'
+
+fstar_default_args = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
+  + ' --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'\
+  + ' --max_fuel 0 --max_ifuel 1 --initial_ifuel 0 --hint_info'
 
 ####################################################################
 #
@@ -188,44 +250,99 @@ def vale_tool_dependency_Emitter(target, source, env):
   source.append(vale_deps)
   return (target, source)
   
-# add env.Vale(), to invoke Vale to compile a .vad to a .gen.dfy
-def add_vale_builder(env):
-  vale_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -in $SOURCE -out $TARGET $VALE_USER_ARGS",
+# add env.Vale*(), to invoke Vale to compile a .vad to a .gen.dfy or a .vaf to a .fst
+def add_vale_builders(env):
+  vale_dafny_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -in $SOURCE -out $TARGET $VALE_USER_ARGS",
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
-                            emitter=vale_tool_dependency_Emitter)
+                            emitter = vale_tool_dependency_Emitter)
+  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_USER_ARGS",
+                            src_suffix = '.vaf',
+                            emitter = vale_tool_dependency_Emitter)
+  env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})
+  env.Append(BUILDERS = {'ValeFStar' : vale_fstar_builder})
 
-  env.Append(BUILDERS = {'Vale' : vale_builder})
+vale_verbatim_include_re = re.compile(r'^\s*include verbatim\s+"(\S+)"', re.M)
+vale_vale_include_re = re.compile(r'^\s*include\s+"(\S+)"', re.M)
 
-vale_dfy_include_re = re.compile(r'include verbatim\s+"(\S+)"', re.M)
-vale_vad_include_re = re.compile(r'include\s+"(\S+)"', re.M)
+def vale_dafny_file_scan(node, env, path):
+  contents = node.get_text_contents()
+  dirname =  os.path.dirname(str(node))
 
-def vale_file_scan(node, env, path):
-    contents = node.get_text_contents()
-    dirname =  os.path.dirname(str(node))
+  dfy_includes = vale_verbatim_include_re.findall(contents)
+  vad_includes = vale_vale_include_re.findall(contents)
 
-    dfy_includes = vale_dfy_include_re.findall(contents)
-    vad_includes = vale_vad_include_re.findall(contents)
+  v_dfy_includes = []
+  v_vad_includes = []
+  for i in dfy_includes:
+    f = os.path.join(dirname, i)
+    v_dfy_includes.append(f)
+    v = os.path.join(to_obj_dir(dirname), os.path.splitext(i)[0] + '.vdfy')
+    env.Dafny(v, f)
+  for i in vad_includes:
+    #v = to_obj_dir(os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy'))
+    f = os.path.join(dirname, i)
+    v_vad_includes.append(f)
 
-    v_dfy_includes = []
-    v_vad_includes = []
-    for i in dfy_includes:
-      f = os.path.join(dirname, i)
-      v_dfy_includes.append(f)
-      v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
-      env.Dafny(v, f)
-    for i in vad_includes:
-      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
-      f = os.path.join(dirname, i)
-      v_vad_includes.append(f)
+  files = env.File(v_dfy_includes + v_vad_includes) 
+  return files
 
-    files = env.File(v_dfy_includes + v_vad_includes) 
-    return files
+def vale_fstar_file_scan(node, env, path):
+  contents = node.get_text_contents()
+  dirname =  os.path.dirname(str(node))
 
-vale_scan = Scanner(function = vale_file_scan,
+  vaf_includes = vale_vale_include_re.findall(contents)
+
+  v_vaf_includes = []
+  for i in vaf_includes:
+    f = os.path.join(dirname, i)
+    v_vaf_includes.append(f)
+    # if A.vaf includes B.vaf, then manually establish these dependencies:
+    #   A.vfst  depends on B.fsti
+    #   A.vfsti depends on B.fsti
+    # note that A.vfst and A.vfsti may also have other dependencies; we rely on F*'s dependency analysis for these
+    f_fsti = os.path.splitext(to_obj_dir(os.path.normpath(f)))[0] + '.vfsti'
+    node_o = to_obj_dir(str(node))
+    node_o_base = os.path.splitext(node_o)[0]
+    Depends([node_o_base + '.vfst.tmp', node_o_base + '.vfsti.tmp'], f_fsti)
+
+  files = env.File(v_vaf_includes) 
+  return files
+
+vale_dafny_scan = Scanner(function = vale_dafny_file_scan,
                      skeys = ['.vad'])
-env.Append(SCANNERS = vale_scan)
+vale_fstar_scan = Scanner(function = vale_fstar_file_scan,
+                     skeys = ['.vaf'])
+if do_dafny:
+  env.Append(SCANNERS = vale_dafny_scan)
+if do_fstar:
+  env.Append(SCANNERS = vale_fstar_scan)
 
+
+####################################################################
+#
+#   General utilities
+#
+####################################################################
+
+# The obj directory structure is based on the src and tools directory structures:
+#   src/... --> obj/...
+#   tools/... --> obj/...
+def to_obj_dir(path):
+  path = os.path.relpath(path)
+  path = path.replace('\\', '/')
+  if path.startswith('obj/'):
+    return path
+  if path.startswith('src/'):
+    return path.replace('src/', 'obj/', 1)
+  if path.startswith('tools/'):
+    return path.replace('tools/', 'obj/', 1)
+  raise Exception('expected src/... or tools/..., found ' + path)
+
+def has_obj_dir(path):
+  path = os.path.relpath(path)
+  path = path.replace('\\', '/')
+  return path.startswith('obj/') or path.startswith('src/') or path.startswith('tools/')
 
 ####################################################################
 #
@@ -248,8 +365,9 @@ env.Append(SCANNERS = vale_scan)
 ##    )
 ##    return re.sub(pattern, replacer, text)
 ##
-## This picks up on any include statement, even those commented out :(
-dafny_include_re = re.compile(r'include\s+"(\S+)"', re.M)
+## This picks up on any include statement, even those commented out by /* on earlier lines :(
+## (It does work for //, though)
+dafny_include_re = re.compile(r'^\s*include\s+"(\S+)"', re.M)
 
 # helper to look up a Dafny BuildOptions matching a srcpath, from the 
 # verify_options[] list, dealing with POSIX and Windows pathnames, and 
@@ -257,7 +375,7 @@ dafny_include_re = re.compile(r'include\s+"(\S+)"', re.M)
 def get_build_options(srcpath):
   srcpath = os.path.normpath(srcpath)  # normalize the path, which, on Windows, switches to \\ separators
   srcpath = srcpath.replace('\\', '/') # switch to posix path separators
-    
+
   if srcpath in verify_options:
     return verify_options[srcpath]
   else:
@@ -284,7 +402,7 @@ def dafny_file_scan(node, env, path):
       # TODO : this should convert the .gen.dfy filename back to a src\...\.vad filename, and look up its options
       options = get_build_options(srcpath)
       if options != None:
-        f = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+        f = to_obj_dir(os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy'))
         v_includes.append(f)
         options.env.Dafny(f, srcpath)
     return env.File(v_includes)
@@ -292,11 +410,12 @@ def dafny_file_scan(node, env, path):
 # Add env.dafny_scan(), to automatically scan .dfy files for dependencies
 dafny_scan = Scanner(function = dafny_file_scan,
                      skeys = ['.dfy'])
-env.Append(SCANNERS = dafny_scan)
+if do_dafny:
+  env.Append(SCANNERS = dafny_scan)
 
 ####################################################################
 #
-#   Define some Dafny transformation Builders
+#   Define some transformation Builders
 #
 ####################################################################
 
@@ -308,13 +427,22 @@ env.Append(SCANNERS = dafny_scan)
 #  File representing the verification result
 def verify_dafny(env, targetfile, sourcefile):
   temptargetfile = os.path.splitext(targetfile)[0] + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $DAFNY_VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_NO_VERIFY $DAFNY_USER_ARGS >$TARGET")
+  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_NO_VERIFY $DAFNY_USER_ARGS >$TARGET")
   return env.CopyAs(source=temptarget, target=targetfile)
-  
+
 # Add env.Dafny(), to verify a .dfy file into a .vdfy
 def add_dafny_verifier(env):
   env.AddMethod(verify_dafny, "Dafny")
-  
+
+def verify_fstar(env, targetfile, sourcefile):
+  temptargetfile = targetfile + '.tmp'
+  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $FSTAR $VERIFIER_FLAGS $FSTAR_Z3_PATH $SOURCE $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
+  return env.CopyAs(source=temptarget, target=targetfile)
+
+# Add env.FStar(), to verify a .fst or .fsti file into a .vfst or .vfsti
+def add_fstar_verifier(env):
+  env.AddMethod(verify_fstar, "FStar")
+
 # Add env.DafnyCompile(), to compile without verification, a .dfy file into a .exe
 def add_dafny_compiler(env):
   env['DAFNY_COMPILER_FLAGS'] = '/nologo /noVerify /compile:2'
@@ -366,7 +494,7 @@ def extract_dafny_code(env, kremlin_dfys):
   kremlin_outputs = []
   for k in kremlin_dfys:
     # generate .json from .dfy
-    json_file = os.path.splitext(k.replace('src', 'obj'))[0]+'.json' # dest is in obj\ dir and has .json extension instead of .dfy
+    json_file = os.path.splitext(to_obj_dir(k))[0]+'.json' # dest is in obj\ dir and has .json extension instead of .dfy
     json = env.DafnyKremlin(source=k, target=json_file)
     # generate .c from .json
     json_split = os.path.split(json_file) # [0] is the pathname, [1] is the filename
@@ -378,15 +506,25 @@ def extract_dafny_code(env, kremlin_dfys):
     outputs = env.Kremlin(source=json, target=target_file_c)
     kremlin_outputs.append(outputs)
   return kremlin_outputs
-  
-# Compile Vale .vad to Dafny .gen.dfy  
+
+# Compile Vale .vad to Dafny .gen.dfy
 # Takes a source .vad file as a string
 # Returns a File() representing the resulting .gen.dfy file
-def compile_vale(env, source_vad):
-  target_s = os.path.splitext(source_vad.replace('src', 'obj').replace('tools', 'obj'))[0]+'.gen.dfy'
-  target_dfy = env.Vale(source=source_vad, target=target_s)
+def compile_vale_dafny(env, source_vad):
+  target_s = os.path.splitext(to_obj_dir(source_vad))[0]+'.gen.dfy'
+  target_dfy = env.ValeDafny(source=source_vad, target=target_s)
   return target_dfy
-  
+
+# Compile Vale .vaf to FStar .fst/fsti pair
+# Takes a source .vaf file as a string
+# Returns list of File() representing the resulting .fst and .fsti files
+def compile_vale_fstar(env, source_vaf):
+  s = os.path.splitext(to_obj_dir(source_vaf))[0]
+  target_s = s + '.fst'
+  target_si = s + '.fsti'
+  targets = env.ValeFStar(source=source_vaf, target=[target_s, target_si])
+  return targets
+
 # Pseudo-builder that takes Vale code, a main .dfy, and generates a Vale EXE which then emits .asm files
 # Arguments:
 #  vads - a list of vad files to extract
@@ -400,7 +538,7 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
   # generate decls.gen.dfy from decls.vad
   vale_outputs = []
   for s in vads:
-    outputs = compile_vale(env, s)
+    outputs = compile_vale_dafny(env, s)
     vale_outputs.append(File(env.subst(s)))
   output_target_base = 'obj/'+output_base_name
   ionative = os.path.normpath('src/lib/util/IoNative.cs')
@@ -438,7 +576,7 @@ def build_test(env, inputs, include_dir, output_base_name):
   for inp in inputs:
     inps = str(inp)
     if inps.startswith('src/'):
-      inp = env.CopyAs(source=inp, target=inps.replace('src/', 'obj/', 1))
+      inp = env.CopyAs(source=inp, target=to_obj_dir(inps))
     inputs_obj.append(inp)
   exe = testenv.Program(source=inputs_obj, target='obj/'+output_base_name+'.exe')
   testoutput = 'obj/'+output_base_name+'.txt'
@@ -459,7 +597,7 @@ def add_extract_code(env):
 # Dafny command-line options for verification.  
 class BuildOptions:
   def __init__(self, args):
-    self.env = env.Clone(DAFNY_VERIFIER_FLAGS=args)
+    self.env = env.Clone(VERIFIER_FLAGS=args)
 
 # Verify a set of Dafny files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -467,23 +605,46 @@ def verify_dafny_files(env, files):
   for f in files:
     options = get_build_options(f)
     if options != None and verify == True:
-      target = os.path.splitext(f.replace('src', 'obj'))[0] + '.vdfy'
-      target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
+      target = os.path.splitext(to_obj_dir(f))[0] + '.vdfy'
       options.env.Dafny(target, f)
+
+# Verify .fst and/or .fsti files
+def verify_fstar_files(env, files):
+  for f in files:
+    options = get_build_options(f)
+    if options != None and verify:
+      s = os.path.splitext(to_obj_dir(f))
+      target = s[0] + '.v' + s[1].replace('.', '')
+      options.env.FStar(target, f)
 
 # Verify a set of Vale files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
-def verify_vale_files(env, files):
+def verify_vale_dafny_files(env, files):
   for f in files:
     options = get_build_options(f)
     if options != None:
-      dfy = compile_vale(env, f)
+      dfy = compile_vale_dafny(env, f)
       if verify == True:
         dfy_str = str(dfy[0]).replace('\\', '/')  # switch from Windows to Unix path ahead of calling get_build_options()
         dafny_gen_options = get_build_options(dfy_str)
-        target = os.path.splitext(f.replace('src', 'obj'))[0] + '.gen.vdfy'
-        target = target.replace('tools', 'obj')  # remap files from tools\Vale\test to obj\Vale\test
+        target = os.path.splitext(to_obj_dir(f))[0] + '.gen.vdfy'
         dafny_gen_options.env.Dafny(target, dfy)
+
+def verify_vale_fstar_files(env, files):
+  for f in files:
+    options = get_build_options(f)
+    if options != None:
+      fsts = compile_vale_fstar(env, f)
+      if verify == True:
+        fst_str = str(fsts[0]).replace('\\', '/')
+        fsti_str = str(fsts[1]).replace('\\', '/')
+        fstar_gen_options = get_build_options(fst_str)
+        fstari_gen_options = get_build_options(fsti_str)
+        s = os.path.splitext(to_obj_dir(f))[0]
+        target = s + '.vfst'
+        targeti = s + '.vfsti'
+        fstar_gen_options.env.FStar(target, fsts[0])
+        fstari_gen_options.env.FStar(targeti, fsts[1])
 
 def recursive_glob(env, pattern, strings=False):
   matches = []
@@ -498,37 +659,127 @@ def recursive_glob(env, pattern, strings=False):
   matches.append(files)
   return Flatten(matches)
 
-# Verify *.dfy and *.vad files in a list of directories.  This enumerates
+# Verify *.dfy, *.vad, *.fst, *.vaf files in a list of directories.  This enumerates
 # all files in those trees, and creates verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
 def verify_files_in(env, directories):
   for d in directories:
-    files = recursive_glob(env, d+'/*.dfy', strings=True)
-    verify_dafny_files(env, files)
-    files = recursive_glob(env, d+'/*.vad', strings=True)
-    verify_vale_files(env, files)
+    if do_dafny:
+      files = recursive_glob(env, d+'/*.dfy', strings=True)
+      verify_dafny_files(env, files)
+      files = recursive_glob(env, d+'/*.vad', strings=True)
+      verify_vale_dafny_files(env, files)
+    if do_fstar:
+      files = recursive_glob(env, d+'/*.fst', strings=True)
+      verify_fstar_files(env, files)
+      files = recursive_glob(env, d+'/*.fsti', strings=True)
+      verify_fstar_files(env, files)
+      files = recursive_glob(env, d+'/*.vaf', strings=True)
+      verify_vale_fstar_files(env, files)
     
+####################################################################
+#
+#   FStar dependency analysis
+#
+####################################################################
+
+fstar_deps_ok = False
+
+# Use F*'s dependency analysis to determine dependencies for .fst/.fsti files,
+# and predict dependencies for .fst/.fsti files generated from .vaf files.
+# Unfortunately, whenever a .vaf file changes its dependencies, we end up
+# verifying twice: once because the .vaf file changed, and again (in the
+# next invocation of scons) because the dependencies changed.  This also
+# happens for the very first build.
+# We could remove this redundancy if we ran scons in two stages: first,
+# to generate the tools and compile the .vaf files, and second to run
+# F*'s dependency analysis and verify the .fst/.fsti files.
+def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths):
+  import subprocess
+  global fstar_deps_ok
+  import distutils.dir_util
+  # create obj directory
+  distutils.dir_util.mkpath('obj')
+  for d in fstar_include_paths:
+    if d.startswith('obj/'):
+      distutils.dir_util.mkpath(d)
+  # find all .fst, .fsti, and .vaf files in src_directories
+  fst_files = []
+  vaf_files = []
+  for d in src_directories:
+    fst_files.extend(recursive_glob(env, d+'/*.fst', strings=True))
+    fst_files.extend(recursive_glob(env, d+'/*.fsti', strings=True))
+    vaf_files.extend(recursive_glob(env, d+'/*.vaf', strings=True))
+  # use fst_files and vaf_files to choose .fst and .fsti files that need dependency analysis
+  # (including .fst and .fsti in obj directory generated from source .vaf files)
+  files = []
+  for f in fst_files:
+    options = get_build_options(f)
+    if options != None:
+      files.append(f)
+  for f in vaf_files:
+    options = get_build_options(f)
+    if options != None:
+      s = os.path.splitext(to_obj_dir(f))[0]
+      for t in [s + '.fst', s + '.fsti']:
+        if os.path.isfile(t):
+          files.append(t)
+  # call fstar --dep make
+  includes = " ".join(["--include " + x for x in fstar_include_paths])
+  fstar = str(env['FSTAR'])
+  try:
+    print('F* dependency analysis: starting')
+    cmd = fstar + " --dep make " + includes + " " + " ".join(files)
+    print(cmd)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    print('F* dependency analysis: done')
+    fstar_deps_ok = True
+    lines = o.splitlines()
+    for line in lines:
+      if 'Warning:' in line:
+        print(line)
+        fstar_deps_ok = False
+      else:
+        # lines are of the form:
+        #   a1.fst a2.fst ... : b1.fst b2.fst ...
+        # we change this to:
+        #   obj\...\a1.vfst obj\...\a2.vfst ... : b1.fst b2.fst ...
+        # we ignore targets that we will not verify (e.g. F* standard libraries)
+        targets, sources = line.split(': ', 1) # ': ', not ':', because of Windows drive letters
+        sources = sources.split()
+        targets = targets.split()
+        targets = [to_obj_dir(re.sub('\.fst$', '.vfst.tmp', re.sub('\.fsti$', '.vfsti.tmp', x))) for x in targets if has_obj_dir(x)]
+        Depends(targets, sources)
+  except subprocess.CalledProcessError as e:
+    print(e)
+    print(e.output)
+    print('F* dependency analysis: done, but with errors')
+    return
+
 ####################################################################
 #
 #   Put it all together
 #
 ####################################################################
 add_dafny_verifier(env)
+add_fstar_verifier(env)
 add_dafny_compiler(env)
 add_dafny_kremlin(env)
-add_vale_builder(env)
+add_vale_builders(env)
 add_kremlin(env)
 add_extract_code(env)
 env.AddMethod(verify_files_in, "VerifyFilesIn")
-env.AddMethod(verify_vale_files, "VerifyValeFiles")
+env.AddMethod(verify_vale_dafny_files, "VerifyValeDafnyFiles")
 env.AddMethod(verify_dafny_files, "VerifyDafnyFiles")
+env.AddMethod(verify_vale_fstar_files, "VerifyValeFStarFiles")
+env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 
 #
 # Pull in the SConscript files which define actual build targets:
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarith')
+Export('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarith', 'fstar_default_args', 'do_dafny', 'do_fstar')
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')
@@ -538,12 +789,23 @@ if sys.platform == 'win32':
   env['DAFNY_Z3_PATH'] = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
 else:  
   env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
+if fstar_default_z3 == '':
+  env['FSTAR_Z3_PATH'] = ''
+else:
+  env['FSTAR_Z3_PATH'] = '--smt ' + fstar_default_z3
 
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['verify_options', 'verify_paths'])
+Import(['verify_options', 'verify_paths', 'fstar_include_paths'])
 
+env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
+
+# F* dependencies
+if do_fstar:
+  predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
+
+# Verification
 env.VerifyFilesIn(verify_paths)
 
 # extract a string filename out of a build failure
@@ -576,6 +838,8 @@ def report_verification_failures():
                   print line
 
 def display_build_status():
-    report_verification_failures()
+  report_verification_failures()
+  if do_fstar and not fstar_deps_ok:
+    raise Exception('Initial F* dependency analysis failed; you might need to run scons again.')
 
 atexit.register(display_build_status)
