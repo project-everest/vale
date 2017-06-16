@@ -239,8 +239,15 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     match d with
     | DVerbatim (args, lines) ->
       (
+        (match args with
+          | [] | ["interface"] | ["implementation"] | ["interface"; "implementation"] -> ()
+          | _ -> err ("unexpected arguments to #verbatim: " + (String.concat "," (List.map (fun x -> "'" + x + "'") args)))
+        );
         match (args, ps.print_interface) with
         | (["interface"], Some psi) -> List.iter psi.PrintUnbrokenLine lines
+        | (["interface"; "implementation"], Some psi) ->
+            List.iter psi.PrintUnbrokenLine lines;
+            List.iter ps.PrintUnbrokenLine lines
         | _ -> List.iter ps.PrintUnbrokenLine lines
       )
     | DVar _ -> ()

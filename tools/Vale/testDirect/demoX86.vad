@@ -1,0 +1,503 @@
+// ..\..\..\bin\vale.exe -dafnyDirect -in .\demoX86.vad /trace /compile:0
+// ..\..\..\bin\vale.exe -in .\demoX86.vad -out .\demoX86.dfy
+
+var{:state ok()} ok:bool;
+var{:state reg(EAX)} eax:int;
+var{:state reg(EBX)} ebx:int;
+var{:state flags()} efl:int;
+var{:state mem()} mem:int;
+
+#verbatim
+type uint32 = i:int | 0 <= i < 0x1_0000_0000
+
+//////////////////// Sample machine definition ////////////////////////
+
+datatype reg = EAX | EBX
+
+datatype opr = OReg(r:reg) | OConst(n:uint32)
+datatype ocmp = OLe(o1:opr, o2:opr)
+datatype mem_opr = OMem(base:reg, offset:int) | OOpr(o:opr)
+
+datatype ins =
+  Mov(dstMov:reg, srcMov:opr)
+| Add(dstAdd:reg, srcAdd:opr)
+
+datatype code =
+  Ins(ins:ins)
+| Block(block:codes)
+| IfElse(ifCond:ocmp, ifTrue:code, ifFalse:code)
+| While(whileCond:ocmp, whileBody:code)
+datatype codes = CNil() | CCons(hd:code, tl:codes)
+
+datatype state = State(ok:bool, regs:map<reg, uint32>, mem:map<int, uint32>)
+function{:opaque} empty_reg():uint32 { 0 }
+
+function eval_reg(r:reg, s:state):uint32
+{
+    if r in s.regs then s.regs[r] else empty_reg()
+}
+
+function eval_mem(ptr:int, s:state):uint32
+{
+    if ptr in s.mem then s.mem[ptr] else empty_reg()
+}
+
+function update_reg(r:reg, s:state, i:uint32):state
+{
+    s.(regs := s.regs[r := i])
+}
+
+function update_mem(ptr:int, s:state, i:uint32):state
+{
+    s.(mem := s.mem[ptr := i])
+}
+
+function eval_opr(o:opr, s:state):uint32
+{
+    match o
+        case OReg(r) => eval_reg(r, s)
+        case OConst(n) => n
+}
+
+function update_opr(o:opr, s:state, i:uint32):state
+{
+    match o
+        case OReg(r) => update_reg(r, s, i)
+        case OConst(o) => s.(ok := false)
+}
+
+function eval_mem_opr(o:mem_opr, s:state):uint32
+{
+    match o
+        case OMem(base, offset) => eval_mem(eval_reg(base, s) + offset, s)
+        case OOpr(o) => eval_opr(o, s)
+}
+
+function update_mem_opr(o:mem_opr, s:state, i:uint32):state
+{
+    match o
+        case OMem(base, offset) => update_mem(eval_reg(base, s) + offset, s, i)
+        case OOpr(o) => update_opr(o, s, i)
+}
+
+predicate mem_opr_ok(o:mem_opr, s:state)
+{
+    match o
+        case OMem(base, offset) => eval_reg(base, s) + offset in s.mem
+        case OOpr(o) => true
+}
+
+predicate eval_ocmp(s:state, c:ocmp)
+{
+    match c
+        case OLe(o1, o2) => eval_opr(o1, s) <= eval_opr(o2, s)
+}
+
+predicate eval_ins(ins:ins, s0:state, sN:state)
+{
+    if s0.ok then
+        match ins
+            case Mov(dst, src) =>
+                sN == update_reg(dst, s0, eval_opr(src, s0))
+            case Add(dst, src) =>
+                sN == update_reg(dst, s0, (eval_reg(dst, s0)
+                                         + eval_opr(src, s0)) % 0x1_0000_0000)
+    else
+        !sN.ok
+}
+
+predicate eval_block(block:codes, s0:state, sN:state)
+{
+    match block
+        case CNil() => s0 == sN
+        case CCons(h, t) => exists s1 :: eval_code(h, s0, s1) && eval_block(t, s1, sN)
+}
+
+predicate eval_while(b:ocmp, c:code, n:nat, s0:state, sN:state)
+    decreases c, n
+{
+    if n == 0 then !eval_ocmp(s0, b) && s0 == sN
+    else exists s1:state ::
+        eval_ocmp(s0, b) && eval_code(c, s0, s1) && (if s1.ok then eval_while(b, c, n - 1, s1, sN) else s1 == sN)
+}
+
+predicate eval_code(c:code, s0:state, sN:state)
+    decreases c, 0
+{
+    match c
+        case Ins(ins) => eval_ins(ins, s0, sN)
+        case Block(block) => eval_block(block, s0, sN)
+        case IfElse(cond, ifT, ifF) => if eval_ocmp(s0, cond) then eval_code(ifT, s0, sN) else eval_code(ifF, s0, sN)
+        case While(cond, body) => exists n:nat :: eval_while(cond, body, n, s0, sN)
+}
+
+//////////////////// Vale interface ////////////////////////
+
+// types
+type va_bool = bool
+type va_int = int
+type va_codes = codes
+type va_code = code
+
+// state
+type va_state = state
+function va_get_ok(s:va_state):bool { s.ok }
+function va_get_reg(r:reg, s:va_state):uint32 { eval_reg(r, s) }
+function va_get_mem(s:va_state):map<int, int> { s.mem }
+function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state { sK.(regs := sK.regs[r := va_get_reg(r, sM)]) }
+function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
+
+// register
+type va_register = reg
+function method va_op_register_reg(r:reg):va_register { r }
+predicate va_is_src_register_uint32(r:reg, s:va_state) { true }
+predicate va_is_dst_register_uint32(r:reg, s:va_state) { true }
+function va_update_register(r:reg, sM:va_state, sK:va_state):va_state { va_update_reg(r, sM, sK) }
+function va_eval_register_uint32(s:va_state, r:va_register):uint32 { eval_reg(r, s) }
+
+// operand
+type va_operand = opr
+function method va_op_operand_reg(r:reg):va_operand { OReg(r) }
+predicate va_is_src_operand_uint32(o:opr, s:va_state) { true }
+predicate va_is_dst_operand_uint32(o:opr, s:va_state) { o.OReg? }
+function method va_const_operand(x:uint32):va_operand { OConst(x) }
+function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state requires o.OReg? { va_update_reg(o.r, sM, sK) }
+function va_eval_operand_uint32(s:va_state, o:va_operand):uint32 { eval_opr(o, s) }
+
+// mem_operand
+type va_mem_operand = mem_opr
+function method va_op_mem_operand_reg(r:reg):va_mem_operand { OOpr(OReg(r)) }
+function method va_op_mem_operand_operand(o:opr):va_mem_operand { OOpr(o) }
+predicate va_is_src_mem_operand_uint32(o:mem_opr, s:va_state) { mem_opr_ok(o, s) }
+predicate va_is_dst_mem_operand_uint32(o:mem_opr, s:va_state) { mem_opr_ok(o, s) && (o.OOpr? ==> o.o.OReg?) }
+function method va_mem_const_operand(x:uint32):va_mem_operand { OOpr(OConst(x)) }
+function va_update_mem_operand(o:mem_opr, sM:va_state, sK:va_state):va_state requires o.OOpr? ==> o.o.OReg?
+{
+  match o
+    case OMem(base, offset) => sK.(mem := sK.mem[eval_reg(base, sK) + offset := eval_mem_opr(o, sM)])
+    case OOpr(o) => va_update_reg(o.r, sM, sK)
+}
+function va_eval_mem_operand_uint32(s:va_state, o:va_mem_operand):uint32 { eval_mem_opr(o, s) }
+
+// cmp
+type va_cmp = opr
+function method va_op_cmp_reg(r:reg):va_cmp { OReg(r) }
+function method va_const_cmp(x:uint32):va_cmp { OConst(x) }
+function va_eval_cmp_uint32(s:va_state, r:va_cmp):uint32 { eval_opr(r, s) }
+
+// coercions
+function method va_coerce_register_to_operand(r:va_register):va_operand { OReg(r) }
+
+// code
+function method va_CNil():va_codes { CNil() }
+function method va_CCons(hd:va_code, tl:va_codes):va_codes { CCons(hd, tl) }
+function method va_Block(block:va_codes):va_code { Block(block) }
+function method va_IfElse(ifCond:ocmp, ifTrue:va_code, ifFalse:va_code):va_code { IfElse(ifCond, ifTrue, ifFalse) }
+function method va_While(whileCond:ocmp, whileBody:va_code):va_code { While(whileCond, whileBody) }
+function method va_cmp_le(a:va_operand, b:va_operand):ocmp { OLe(a, b) }
+function va_get_block(c:va_code):va_codes requires c.Block? { c.block }
+function va_get_ifCond(c:code):ocmp requires c.IfElse? { c.ifCond }
+function va_get_ifTrue(c:code):code requires c.IfElse? { c.ifTrue }
+function va_get_ifFalse(c:code):code requires c.IfElse? { c.ifFalse }
+function va_get_whileCond(c:code):ocmp requires c.While? { c.whileCond }
+function va_get_whileBody(c:code):code requires c.While? { c.whileBody }
+
+// framing
+
+predicate va_state_eq(s0:va_state, s1:va_state)
+{
+    s0.ok == s1.ok
+ && s0.regs == s1.regs
+ && s0.mem == s1.mem
+}
+
+predicate va_require(block0:va_codes, c:va_code, s0:va_state, sN:va_state)
+{
+    block0.CCons?
+ && block0.hd == c
+ && eval_code(va_Block(block0), s0, sN)
+ && (forall r:reg :: r in s0.regs)
+}
+
+predicate va_ensure(b0:va_codes, b1:va_codes, s0:va_state, s1:va_state, sN:va_state)
+{
+    b0.CCons?
+ && b0.tl == b1
+ && eval_code(b0.hd, s0, s1)
+ && eval_code(va_Block(b1), s1, sN)
+ && (forall r:reg :: r in s1.regs)
+}
+
+// lemmas
+
+lemma va_lemma_block(b0:va_codes, s0:state, sN:state) returns(s1:state, c1:va_code, b1:va_codes)
+    requires b0.CCons?
+    requires eval_code(va_Block(b0), s0, sN)
+    ensures  b0 == va_CCons(c1, b1)
+    ensures  eval_code(c1, s0, s1)
+    ensures  eval_code(va_Block(b1), s1, sN)
+{
+    c1, b1 := b0.hd, b0.tl;
+    s1 :| eval_code(c1, s0, s1) && eval_block(b1, s1, sN);
+}
+
+lemma va_lemma_empty(s0:va_state, sN:va_state) returns(sM:va_state)
+    requires eval_code(va_Block(va_CNil()), s0, sN)
+    ensures  s0 == sM == sN
+{
+    sM := s0;
+}
+
+lemma va_lemma_ifElse(ifb:ocmp, ct:code, cf:code, s0:va_state, sN:va_state) returns(cond:bool, sM:va_state)
+    requires eval_code(IfElse(ifb, ct, cf), s0, sN)
+    ensures  cond == eval_ocmp(s0, ifb)
+    ensures  sM == s0
+    ensures  if cond then eval_code(ct, sM, sN) else eval_code(cf, sM, sN)
+{
+    cond := eval_ocmp(s0, ifb);
+    sM := s0;
+}
+
+predicate va_whileInv(b:ocmp, c:code, n:int, s0:va_state, sN:va_state)
+{
+    n >= 0
+ && (forall r:reg :: r in s0.regs)
+ && eval_while(b, c, n, s0, sN)
+}
+
+lemma va_lemma_while(b:ocmp, c:code, s0:va_state, sN:va_state) returns(n:nat, s1:va_state)
+    requires eval_code(While(b, c), s0, sN)
+    ensures  eval_while(b, c, n, s0, sN)
+    ensures  s1 == s0
+{
+    n :| eval_while(b, c, n, s0, sN);
+    s1 := s0;
+}
+
+lemma va_lemma_whileTrue(b:ocmp, c:code, n:nat, s0:va_state, sN:va_state) returns(s0':va_state, s1:va_state)
+    requires n > 0
+    requires eval_while(b, c, n, s0, sN)
+    ensures  s0' == s0
+    ensures  eval_ocmp(s0, b)
+    ensures  eval_code(c, s0', s1)
+    ensures  if s1.ok then eval_while(b, c, n - 1, s1, sN) else s1 == sN
+{
+    s0' := s0;
+    s1 :| eval_ocmp(s0, b) && eval_code(c, s0, s1) && (if s1.ok then eval_while(b, c, n - 1, s1, sN) else s1 == sN);
+}
+
+lemma va_lemma_whileFalse(b:ocmp, c:code, s0:va_state, sN:va_state) returns(s1:va_state)
+    requires eval_while(b, c, 0, s0, sN)
+    ensures  s1 == s0 == sN
+    ensures  !eval_ocmp(s0, b)
+{
+    s1 := s0;
+}
+
+//////////////////////////////// printing /////////////////////////////////////////
+
+method masm_printReg(r:reg)
+{
+    match r
+        case EAX => print("eax");
+        case EBX => print("ebx");
+}
+
+method gcc_printReg(r:reg)
+{
+    print("%");
+    match r
+        case EAX => print("eax");
+        case EBX => print("ebx");
+}
+
+method masm_printOpr(o:opr)
+{
+    match o
+        case OConst(n) => print(n);
+        case OReg(r) => masm_printReg(r);
+}
+
+method gcc_printOpr(o:opr)
+{
+    match o
+        case OConst(n) => print("$"); print(n);
+        case OReg(r) => gcc_printReg(r);
+}
+
+method masm_printIns(ins:ins)
+{
+    match ins
+        case Mov(dst, src) => print ("  mov "); masm_printReg(dst); print(", "); masm_printOpr(src); print("\n");
+        case Add(dst, src) => print ("  add "); masm_printReg(dst); print(", "); masm_printOpr(src); print("\n");
+}
+
+method gcc_printIns(ins:ins)
+{
+    match ins
+        case Mov(dst, src) => print("  mov "); gcc_printOpr(src); print(", "); gcc_printReg(dst); print("\n");
+        case Add(dst, src) => print("  add "); gcc_printOpr(src); print(", "); gcc_printReg(dst); print("\n");
+}
+
+method masm_printBlock(b:codes, n:int) returns(n':int)
+{
+    n' := n;
+    var i := b;
+    while (i.CCons?)
+        decreases i
+    {
+        n' := masm_printCode(i.hd, n');
+        i := i.tl;
+    }
+}
+
+method gcc_printBlock(b:codes, n:int) returns(n':int)
+{
+    n' := n;
+    var i := b;
+    while (i.CCons?)
+        decreases i
+    {
+        n' := gcc_printCode(i.hd, n');
+        i := i.tl;
+    }
+}
+
+method masm_printCode(c:code, n:int) returns(n':int)
+{
+    match c
+        case Ins(ins) => masm_printIns(ins); n' := n;
+        case Block(block) => n' := masm_printBlock(block, n);
+        case IfElse(ifb, ift, iff) =>
+        {
+            var n1 := n;
+            var n2 := n + 1;
+            print("  cmp "); masm_printOpr(ifb.o1); print(", "); masm_printOpr(ifb.o2); print("\n");
+            print("  ja "); print("L"); print(n1); print("\n");
+            n' := masm_printCode(ift, n + 2);
+            print("  jmp L"); print(n2); print("\n");
+            print("L"); print(n1); print(":\n");
+            n' := masm_printCode(iff, n');
+            print("L"); print(n2); print(":\n");
+        }
+        case While(b, loop) =>
+        {
+            var n1 := n;
+            var n2 := n + 1;
+            print("  jmp L"); print(n2); print("\n");
+            print("ALIGN 16\nL"); print(n1); print(":\n");
+            n' := masm_printCode(loop, n + 2);
+            print("ALIGN 16\nL"); print(n2); print(":\n");
+            print("  cmp "); masm_printOpr(b.o1); print(", "); masm_printOpr(b.o2); print("\n");
+            print("  jbe "); print("L"); print(n1); print("\n");
+        }
+}
+
+method gcc_printCode(c:code, n:int) returns(n':int)
+{
+    match c
+        case Ins(ins) => gcc_printIns(ins); n' := n;
+        case Block(block) => n' := gcc_printBlock(block, n);
+        case IfElse(ifb, ift, iff) =>
+        {
+            var n1 := n;
+            var n2 := n + 1;
+            print("  cmp "); gcc_printOpr(ifb.o2); print(", "); gcc_printOpr(ifb.o1); print("\n");
+            print("  ja "); print("L"); print(n1); print("\n");
+            n' := gcc_printCode(ift, n + 2);
+            print("  jmp L"); print(n2); print("\n");
+            print("L"); print(n1); print(":\n");
+            n' := gcc_printCode(iff, n');
+            print("L"); print(n2); print(":\n");
+        }
+        case While(b, loop) =>
+        {
+            var n1 := n;
+            var n2 := n + 1;
+            print("  jmp L"); print(n2); print("\n");
+            print(".align 16\nL"); print(n1); print(":\n");
+            n' := gcc_printCode(loop, n + 2);
+            print(".align 16\nL"); print(n2); print(":\n");
+            print("  cmp "); gcc_printOpr(b.o2); print(", "); gcc_printOpr(b.o1); print("\n");
+            print("  jbe "); print("L"); print(n1); print("\n");
+        }
+}
+
+method masm_printHeader()
+{
+  print(".686p\n");
+  print(".model flat\n");
+  print(".code\n");
+}
+
+method masm_printProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32)
+{
+  print("ALIGN 16\n");
+  print(proc_name);
+  print(" proc\n");
+  var _ := masm_printCode(code, n);
+  print("  ret ");
+  print(ret_count);
+  print("\n");
+  print(proc_name);
+  print(" endp\n");
+}
+
+method masm_printFooter()
+{
+    print("end\n");
+}
+
+method gcc_printHeader()
+{
+  print(".text\n");
+}
+
+method gcc_printProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32)
+{
+  print(".global "); print(proc_name); print("\n");
+  print(proc_name); print(":\n"); 
+  var _ := gcc_printCode(code, n);
+  print("  ret ");
+  print("\n\n");
+}
+
+method gcc_printFooter()
+{
+    print("\n");
+}
+
+datatype AsmTarget = MASM | GCC
+datatype PlatformTarget = Win | Linux | MacOS
+
+function method procName(proc_name:seq<char>, suffix:seq<char>, asm:AsmTarget, platform:PlatformTarget):seq<char>
+{
+    match platform
+        case Win => "_" + proc_name + (match asm case MASM => suffix case GCC => "")
+        case Linux => proc_name
+        case MacOS => "_" + proc_name
+}
+
+method printHeader(asm:AsmTarget)
+{
+    match asm
+        case MASM => masm_printHeader();
+        case GCC  => gcc_printHeader();
+}
+
+method printProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, suffix:seq<char>, asm:AsmTarget, platform:PlatformTarget)
+{
+    match asm
+        case MASM => masm_printProc(procName(proc_name, suffix, asm, platform), code, n, ret_count);
+        case GCC  => gcc_printProc(procName(proc_name, suffix, asm, platform), code, n, ret_count);
+}
+
+method printFooter(asm:AsmTarget)
+{
+    match asm
+        case MASM => masm_printFooter();
+        case GCC  => gcc_printFooter();
+}
+
+#endverbatim

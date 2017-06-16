@@ -258,35 +258,41 @@ let main (argv) =
         cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
         cur_indent = ref "";
       } in
-    if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
-    let decls = build_decls empty_env decls in
-    (match !reprint_file with
-      | None -> ()
-      | Some filename ->
-          let rstream = (new System.IO.StreamWriter(new System.IO.FileStream(filename, System.IO.FileMode.Create))):>System.IO.TextWriter in
-          let rps =
-            {
-              print_out = rstream;
-              print_interface = None;
-              cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
-              cur_indent = ref "";
-            } in
-          Emit_vale_text.emit_decls rps (List.rev (!reprint_decls_rev));
-          rstream.Close ()
-      );
-    if !emitFStarText then Emit_fstar_text.emit_decls ps decls
-    else
-      if !dafnyDirect then
-        // Initialize Dafny objects
-        let mdl = new LiteralModuleDecl(new DefaultModuleDecl(), null) in
-        let built_ins = new BuiltIns() in
-        let arg_list = List.rev (!cur_file::!dafny_opts_rev) in
-        DafnyOptions.Install(new DafnyOptions(new ConsoleErrorReporter()));
-        Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
-        DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
-      else Emit_dafny_text.emit_decls ps decls;
-    (match stream_i with None -> () | Some s -> s.Close());
-    stream.Close ()
+    let close_streams () =
+      (match stream_i with None -> () | Some s -> s.Close());
+      stream.Close ()
+      in
+    try
+    (
+      if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
+      let decls = build_decls empty_env decls in
+      (match !reprint_file with
+        | None -> ()
+        | Some filename ->
+            let rstream = (new System.IO.StreamWriter(new System.IO.FileStream(filename, System.IO.FileMode.Create))):>System.IO.TextWriter in
+            let rps =
+              {
+                print_out = rstream;
+                print_interface = None;
+                cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
+                cur_indent = ref "";
+              } in
+            Emit_vale_text.emit_decls rps (List.rev (!reprint_decls_rev));
+            rstream.Close ()
+        );
+      if !emitFStarText then Emit_fstar_text.emit_decls ps decls
+      else
+        if !dafnyDirect then
+          // Initialize Dafny objects
+          let mdl = new LiteralModuleDecl(new DefaultModuleDecl(), null) in
+          let built_ins = new BuiltIns() in
+          let arg_list = List.rev (!cur_file::!dafny_opts_rev) in
+          DafnyOptions.Install(new DafnyOptions(new ConsoleErrorReporter()));
+          Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
+          DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
+        else Emit_dafny_text.emit_decls ps decls;
+      close_streams ()
+    ) with err -> close_streams (); raise err
   )
   with err -> print_error None err
 ;;
