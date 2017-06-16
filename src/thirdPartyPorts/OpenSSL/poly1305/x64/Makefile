@@ -6,7 +6,7 @@ ARCH=$(REPO_BASE)/tools/Vale/test
 ifeq ($(OS),Windows_NT)
   RUNTIME =
   SCONS = scons.bat
-  FSTAR_EXE = $(FSTAR_HOME)/bin/fstar.exe --smt $(FSTAR_HOME)/bin/z3.exe
+  FSTAR_EXE = $(FSTAR_HOME)/bin/fstar.exe --smt z3.exe
 else
   RUNTIME = mono
   SCONS = scons
@@ -55,7 +55,7 @@ poly1305.v: poly1305.fst $(ARCH)/decls.fst
 ocaml: out poly1305.fst $(ARCH)/decls.fst
 	$(MAKE) -C $(ULIB_ML)
 	$(FSTAR) $(FSTAR_DEFAULT_ARGS) $(INCLUDE) --lax --odir out --codegen OCaml poly1305.fst
-	$(OCAMLOPT) -I $(FSTAR_HOME)/ulib/ml/extracted/ out/FStar_Map.ml out/Semantics.ml out/Decls.ml out/Vale.ml out/Poly1305.ml -o poly1305.exe
+	$(OCAMLOPT) -I $(FSTAR_HOME)/ulib/ml/extracted/ out/FStar_Map.ml out/Machine.ml out/Semantics.ml out/Decls.ml out/Poly1305.ml -o poly1305.exe
 	./poly1305.exe
 
 out:
