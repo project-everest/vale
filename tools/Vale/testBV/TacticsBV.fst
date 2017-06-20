@@ -1,8 +1,7 @@
 module TacticsBV
 
 open FStar.Tactics
-open FStar.Tactics.Arith
-open FStar.Reflection
+open FStar.Reflection.Syntax (*that uses a copy of the file found in FStar/ulib/FStar.Reflection.Syntax, but I should update that one instead*)
 open FStar.Reflection.Nat64
 open Bv64
 open Decls
@@ -99,7 +98,7 @@ let rec arith_to_bv_tac : unit -> Tac unit = fun () -> (
 	   //  arith_expr_to_bv e
         end
     | _ ->
-        fail ("impossible: " ^ term_to_string g)
+        fail ("impossible: ")
     ) ()
 
 (* As things are right now, we need to be able to parse NatToBv

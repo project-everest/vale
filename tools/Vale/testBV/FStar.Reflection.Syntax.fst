@@ -1,5 +1,4 @@
 module FStar.Reflection.Syntax
-
 open FStar.Order
 
 assume val term : Type0
