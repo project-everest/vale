@@ -21,7 +21,7 @@ assume val nat_to_bv_shl : (#x:Machine.nat64) -> (#y:Machine.nat64) -> (#z:bv64)
 			    Lemma (nat_to_bv (shift_left64 x y) == z)
 
 assume val nat_to_bv_shr : (#x:Machine.nat64) -> (#y:Machine.nat64) -> (#z:bv64) ->
-			    squash (shift_right_vec (nat_to_bv x) y== z) ->
+			    squash (shift_right_vec (nat_to_bv x) y == z) ->
 			    Lemma (nat_to_bv (shift_right64 x y) == z)
 
 (* Congruence lemmas used to push integer to bitvector transformations through arguments of expressions *)
@@ -57,8 +57,6 @@ assume val trans: (#x:bv64) -> (#y:bv64) -> (#z:bv64) -> (#w:bv64) ->
 		  Lemma (x == y)
 
 
-
-
 let rec arith_to_bv_tac : unit -> Tac unit = fun () -> (
 
     let rec arith_expr_to_bv e =
@@ -67,16 +65,14 @@ let rec arith_to_bv_tac : unit -> Tac unit = fun () -> (
       // | Land (Lit _) (Lit _) ->
       // 	apply_lemma (quote nat_to_bv_land) 
 
-      | NatToBv (Shl e1 e2) | Shl e1 e2 ->
+      | NatToBv (Shl e1 _) | Shl e1 _ ->
 	apply_lemma (quote nat_to_bv_shl);;
 	apply_lemma (quote cong_shift_left_vec);;
-	arith_expr_to_bv e1;;
-	arith_expr_to_bv e2	
-      | NatToBv (Shr e1 e2) | Shr e1 e2 ->
+	arith_expr_to_bv e1
+      | NatToBv (Shr e1 _) | Shr e1 _ ->
 	apply_lemma (quote nat_to_bv_shr);;
 	apply_lemma (quote cong_shift_right_vec);;
-	arith_expr_to_bv e1;;
-	arith_expr_to_bv e2
+	arith_expr_to_bv e1
       | NatToBv (Land e1 e2) | (Land e1 e2) ->
 	apply_lemma (quote nat_to_bv_land);;
 	apply_lemma (quote cong_logand_vec);;
