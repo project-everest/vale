@@ -1,4 +1,4 @@
-module Poly1305_lemmas
+module X64.Poly1305.Lemmas_i
 
 open FStar.Tactics
 open FStar.Tactics.Canon

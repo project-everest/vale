@@ -1,7 +1,7 @@
 #verbatim interface
-module Decls
+module X64.ValeDecls
 
-open Machine
+open X64.Machine_s
 open FStar.UInt
 open FStar.Map
 
@@ -152,16 +152,16 @@ val gcc : printer
 #endverbatim
 
 #verbatim
-module Decls
-open Machine
-open Semantics
+module X64.ValeDecls
+open X64.Machine_s
+open X64.Semantics_s
 open FStar.UInt
 open FStar.Map
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
-let ins = Semantics.ins
-type ocmp = Semantics.ocmp
-let cf n = Semantics.cf (Semantics.u n)
+let ins = X64.Semantics_s.ins
+type ocmp = X64.Semantics_s.ocmp
+let cf n = X64.Semantics_s.cf (X64.Semantics_s.u n)
 
 let va_cmp_le (a:va_operand) (b:va_operand) : ocmp = OLe a b
 
@@ -175,24 +175,24 @@ let va_lemma_block (b_0:va_codes) (s_0:va_state) (sN:va_state) =
 let va_lemma_empty (s_0:va_state) (sN:va_state) = s_0
 
 let logxor64 (x:nat64) (y:nat64) :nat64 =
-  Semantics.logxor x y
+  X64.Semantics_s.logxor x y
 
 let logand64 (x:nat64) (y:nat64) :nat64 =
-  Semantics.logand x y
+  X64.Semantics_s.logand x y
 
 let shift_left64 (x:nat64) (amt:nat64) :nat64 =
-  Semantics.shift_left x amt
+  X64.Semantics_s.shift_left x amt
 
 let shift_right64 (x:nat64) (amt:nat64) :nat64 =
-  Semantics.shift_right x amt
+  X64.Semantics_s.shift_right x amt
 
-let printer = Print.printer
+let printer = X64.Print_s.printer
 let print_string = FStar.IO.print_string
-let print_header = Print.print_header
-let print_proc = Print.print_proc
-let print_footer = Print.print_footer
-let masm = Print.masm
-let gcc = Print.gcc
+let print_header = X64.Print_s.print_header
+let print_proc = X64.Print_s.print_proc
+let print_footer = X64.Print_s.print_footer
+let masm = X64.Print_s.masm
+let gcc = X64.Print_s.gcc
 
 #endverbatim
 

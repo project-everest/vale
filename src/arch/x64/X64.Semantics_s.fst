@@ -1,7 +1,7 @@
-module Semantics
+module X64.Semantics_s
 
 open FStar.BaseTypes
-open Machine
+open X64.Machine_s
 
 type ins =
   | Mov64      : dst:dst_op -> src:operand -> ins

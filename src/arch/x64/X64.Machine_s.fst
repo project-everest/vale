@@ -1,4 +1,4 @@
-module Machine
+module X64.Machine_s
 
 open FStar.BaseTypes
 open FStar.Map
