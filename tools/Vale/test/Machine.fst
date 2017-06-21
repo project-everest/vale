@@ -1,7 +1,8 @@
 module Machine
 
 open FStar.BaseTypes
-open FStar.Map
+module M = Map
+open M
 
 (* Define some transparently refined int types,
    since we only use them in specs, not in emitted code *)
@@ -13,8 +14,7 @@ type nat64 = x:nat{x < nat64_max}
 type uint64 = FStar.UInt64.t
 
 (* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
-unfold
-type map (key:eqtype) (value:Type) = Map.t key value
+let map (key:eqtype) (value:Type) = map key value
 
 (* syntax for map accesses, m.[key] and m.[key] <- value *)
 unfold
@@ -108,8 +108,8 @@ let update_reg' (r:reg) (v:uint64) (s:state) :state = { s with regs = s.regs.[r]
 
 let update_mem (ptr:int) (v:uint64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
 
-let valid_maddr (m:maddr) (s:state) :bool =
-  s.mem `contains` (eval_maddr m s)
+(* Nikhil's maps do not have a contain, so just ignoring this for now*)
+let valid_maddr (m:maddr) (s:state) :bool = true
 
 let valid_operand (o:operand) (s:state) :bool =
   not (OMem? o) || (OMem? o && valid_maddr (OMem?.m o) s)
