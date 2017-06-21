@@ -1,8 +1,9 @@
 module Machine
 
 open FStar.BaseTypes
-module M = Map
-open M
+open FStar.Map
+
+module M = TransparentMap
 
 (* Define some transparently refined int types,
    since we only use them in specs, not in emitted code *)
@@ -14,13 +15,16 @@ type nat64 = x:nat{x < nat64_max}
 type uint64 = FStar.UInt64.t
 
 (* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
-let map (key:eqtype) (value:Type) = map key value
+let map (key:eqtype) (value:Type) = FStar.Map.t key value
+let tmap (key:eqtype) (value:Type) = M.map key value
 
 (* syntax for map accesses, m.[key] and m.[key] <- value *)
+(* as we are mostly interested in register maps in this branch, 
+   they get the fancy notation treatment*)
 unfold
-let op_String_Access     = sel
+let op_String_Access     = M.sel
 unfold
-let op_String_Assignment = upd
+let op_String_Assignment = M.upd
 
 (* Define the operators we support *)
 type reg =
@@ -40,6 +44,25 @@ type reg =
   | R13
   | R14
   | R15
+
+let reg_to_int (r : reg) : int =
+  match r with
+  | Rax -> 0
+  | Rbx -> 1
+  | Rcx -> 2
+  | Rdx -> 3
+  | Rsi -> 4
+  | Rdi -> 5
+  | Rbp -> 6
+  | Rsp -> 7
+  | R8 -> 8
+  | R9 -> 9
+  | R10 -> 10
+  | R11 -> 11
+  | R12 -> 12
+  | R13 -> 13
+  | R14 -> 14
+  | R15 -> 15
 
 type maddr =
   | MConst : n:nat -> maddr
@@ -68,7 +91,7 @@ type mem = map int uint64
 (* state type, noeq qualifier means that this type does not have decidable equality (because of the maps) *)
 noeq type state = {
   ok  :bool;
-  regs:map reg uint64;
+  regs: tmap int uint64;
   flags:uint64;
   mem :mem;
 }
@@ -77,7 +100,7 @@ noeq type state = {
  * writing all the functions as Tot functions
  *)
 unfold let eval_reg (r:reg) (s:state) :uint64 =
-  s.regs.[r]
+  s.regs.[reg_to_int r]
 
 (*
 let valid_resolved_addr (ptr:int) (m:mem) :bool =
@@ -88,7 +111,7 @@ let valid_resolved_addr (ptr:int) (m:mem) :bool =
 *)
 
 unfold let eval_mem (ptr:int) (s:state) :uint64 =
-  s.mem.[ptr]
+  sel s.mem ptr
 
 let eval_maddr (m:maddr) (s:state) :int =
   let open FStar.UInt64 in
@@ -104,12 +127,12 @@ let eval_operand (o:operand) (s:state) :uint64 =
   | OReg r   -> eval_reg r s
   | OMem m   -> eval_mem (eval_maddr m s) s
 
-let update_reg' (r:reg) (v:uint64) (s:state) :state = { s with regs = s.regs.[r] <- v }
+let update_reg' (r:reg) (v:uint64) (s:state) :state = { s with regs = s.regs.[reg_to_int r] <- v }
 
-let update_mem (ptr:int) (v:uint64) (s:state) :state = { s with mem = s.mem.[ptr] <- v }
+let update_mem (ptr:int) (v:uint64) (s:state) :state = { s with mem = upd s.mem ptr v }
 
-(* Nikhil's maps do not have a contain, so just ignoring this for now*)
-let valid_maddr (m:maddr) (s:state) :bool = true
+let valid_maddr (m:maddr) (s:state) :bool =
+  s.mem `contains` (eval_maddr m s)
 
 let valid_operand (o:operand) (s:state) :bool =
   not (OMem? o) || (OMem? o && valid_maddr (OMem?.m o) s)

@@ -3,7 +3,7 @@ module Decls
 
 open Machine
 open FStar.UInt
-module M = Map
+module M = TransparentMap
 
 (* Type aliases *)
 type va_bool = bool
@@ -51,7 +51,7 @@ let va_get_mem (s:va_state) :mem = s.mem
 (* Framing: va_update_foo means the two states are the same except for foo *)
 let va_update_ok (sM:va_state) (sK:va_state) :va_state  = { sK with ok = sM.ok }
 let va_update_flags  (sM:va_state) (sK:va_state) :va_state  = { sK with flags = sM.flags }
-let va_update_reg (r:reg) (sM:va_state) (sK:va_state) :va_state = { sK with regs = sK.regs.[r] <- eval_reg r sM }
+let va_update_reg (r:reg) (sM:va_state) (sK:va_state) :va_state = { sK with regs = sK.regs.[reg_to_int r] <- eval_reg r sM }
 let va_update_mem (sM:va_state) (sK:va_state) :va_state = { sK with mem = sM.mem }
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) :va_state =
   match o with
@@ -101,11 +101,9 @@ let va_get_whileBody (c:code{While? c}) :code = While?.whileBody c*)
    instead expose lemmas about it *)
 let va_state_eq (s_0:va_state) (s_1:va_state) :Type0 = 
   s_0.ok == s_1.ok /\
-  s_0.regs == s_1.regs /\
-  // Map.equal s_0.regs s_1.regs /\
+  M.equal s_0.regs s_1.regs /\
   s_0.flags == s_1.flags /\
-  s_0.mem == s_1.mem
-  // Map.equal s_0.mem s_1.mem
+  Map.equal s_0.mem s_1.mem
 
 (*not sure about the decreases part*)
 val va_eval_code : (c:va_code) -> (s:va_state) -> Tot (option va_state)
