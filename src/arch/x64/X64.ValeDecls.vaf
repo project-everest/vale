@@ -15,12 +15,15 @@ let va_codes = list va_code
 
 type va_state = state
 type va_operand = operand
+type va_reg_operand = o:operand{OReg? o}
 type va_dst_operand = dst_op
 type va_shift_amt = operand
 type va_cmp = operand
 type va_register = reg
 
 val cf : (flags:nat64) -> bool
+
+let va_subscript (m:mem) (ptr:int) :nat64 = FStar.UInt64.v m.[ptr]
 
 (* Constructors *)
 let va_op_operand_reg (r:reg) :va_operand = OReg r
@@ -41,12 +44,17 @@ let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = valid_operand
 let va_is_src_register_int (r:reg) (s:va_state) :bool = true
 let va_is_dst_register (r:reg) (s:va_state) :bool = true
 let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = true
+let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
+
+let valid_src_addr (m:mem) (addr:int) : bool = m `contains` addr
 
 (* Getters *)
 let va_get_ok (s:va_state) :bool = s.ok
 let va_get_flags (s:va_state) :nat64 = FStar.UInt64.v s.flags
 let va_get_reg (r:reg) (s:va_state) :nat64 = FStar.UInt64.v (eval_reg r s)
 let va_get_mem (s:va_state) :mem = s.mem
+
+let get_reg (o:va_reg_operand) :reg = OReg?.r o
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
 let va_update_ok (sM:va_state) (sK:va_state) :va_state  = { sK with ok = sM.ok }
@@ -68,6 +76,7 @@ let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :nat64 = FStar.UI
 let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   :nat64 = FStar.UInt64.v (eval_operand o s)
 let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         :nat64 = FStar.UInt64.v (eval_operand r s)
 let va_eval_register_uint64    (s:va_state) (r:va_register)    :nat64 = FStar.UInt64.v (eval_reg r s)
+let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) :nat64 = FStar.UInt64.v (eval_reg (OReg?.r o) s)
 
 (** Constructors for va_codes *)
 let va_CNil () :va_codes = []
@@ -268,6 +277,19 @@ var{:state mem()} mem:int;
 procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst_operand dst:uint64, operand src:uint64)
     ensures
         dst == old(src);
+{
+}
+
+procedure{:instruction Ins(Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load64(
+    out dst_operand dst:uint64,
+        reg_operand src:uint64,
+        inline offset:int)
+    reads
+        mem;
+    requires
+        valid_src_addr(mem, src + offset);
+    ensures
+        dst == mem[old(src) + offset];
 {
 }
 
