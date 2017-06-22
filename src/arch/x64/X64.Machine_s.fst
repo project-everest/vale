@@ -16,15 +16,21 @@ type uint64 = FStar.UInt64.t
 
 (* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
 let map (key:eqtype) (value:Type) = FStar.Map.t key value
+
+// [@"opaque_to_smt"]
 let tmap (key:eqtype) (value:Type) = M.map key value
+// [@"opaque_to_smt"]
+let tsel = M.sel
+// [@"opaque_to_smt"]
+let tupd = M.upd 
 
 (* syntax for map accesses, m.[key] and m.[key] <- value *)
 (* as we are mostly interested in register maps in this branch, 
    they get the fancy notation treatment*)
 unfold
-let op_String_Access     = M.sel
+let op_String_Access     = tsel
 unfold
-let op_String_Assignment = M.upd
+let op_String_Assignment = tupd
 
 (* Define the operators we support *)
 type reg =
@@ -45,6 +51,7 @@ type reg =
   | R14
   | R15
 
+unfold
 let reg_to_int (r : reg) : int =
   match r with
   | Rax -> 0
