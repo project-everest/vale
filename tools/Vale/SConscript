@@ -68,7 +68,7 @@ def build_vale(sources, dafny_refs):
     else:
       senv['FSC']=fsc
   vale_tool = senv.Command(BIN+'/vale.exe', sources,
-    '$FSC -g --platform:x86 --standalone --mlcompatibility -O $SOURCES -o $TARGET $DAFNY_REFS')
+    '$FSC -g --platform:anycpu --standalone --mlcompatibility -O $SOURCES -o $TARGET $DAFNY_REFS')
 
   # add dependencies to vale.exe
   for r in dafny_refs:

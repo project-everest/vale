@@ -22,7 +22,7 @@ const uint8_t out[] = { 0x76, 0x49, 0xab, 0xac, 0x81, 0x19, 0xb2, 0x46, 0xce, 0x
 
 void demo()
 {
-  uint8_t buffer[16];
+  uint8_t buffer[sizeof in];
   uint8_t expanded_key[176];
 
   aes_main_i_KeyExpansionStdcall(key, expanded_key);
