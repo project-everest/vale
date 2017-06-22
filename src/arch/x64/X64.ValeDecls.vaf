@@ -1,7 +1,7 @@
 #verbatim interface
-module Decls
+module X64.ValeDecls
 
-open Machine
+open X64.Machine_s
 open FStar.UInt
 module M = TransparentMap
 
@@ -15,12 +15,15 @@ let va_codes = list va_code
 
 type va_state = state
 type va_operand = operand
+type va_reg_operand = o:operand{OReg? o}
 type va_dst_operand = dst_op
 type va_shift_amt = operand
 type va_cmp = operand
 type va_register = reg
 
 val cf : (flags:nat64) -> bool
+
+let va_subscript (m:mem) (ptr:int) :nat64 = FStar.UInt64.v m.[ptr]
 
 (* Constructors *)
 let va_op_operand_reg (r:reg) :va_operand = OReg r
@@ -41,12 +44,17 @@ let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = valid_operand
 let va_is_src_register_int (r:reg) (s:va_state) :bool = true
 let va_is_dst_register (r:reg) (s:va_state) :bool = true
 let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = true
+let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
+
+let valid_src_addr (m:mem) (addr:int) : bool = m `contains` addr
 
 (* Getters *)
 let va_get_ok (s:va_state) :bool = s.ok
 let va_get_flags (s:va_state) :nat64 = FStar.UInt64.v s.flags
 let va_get_reg (r:reg) (s:va_state) :nat64 = FStar.UInt64.v (eval_reg r s)
 let va_get_mem (s:va_state) :mem = s.mem
+
+let get_reg (o:va_reg_operand) :reg = OReg?.r o
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
 let va_update_ok (sM:va_state) (sK:va_state) :va_state  = { sK with ok = sM.ok }
@@ -68,6 +76,7 @@ let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) :nat64 = FStar.UI
 let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   :nat64 = FStar.UInt64.v (eval_operand o s)
 let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         :nat64 = FStar.UInt64.v (eval_operand r s)
 let va_eval_register_uint64    (s:va_state) (r:va_register)    :nat64 = FStar.UInt64.v (eval_reg r s)
+let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) :nat64 = FStar.UInt64.v (eval_reg (OReg?.r o) s)
 
 (** Constructors for va_codes *)
 let va_CNil () :va_codes = []
@@ -77,25 +86,18 @@ let va_CCons (hd:va_code) (tl:va_codes) :va_codes = hd::tl
 let va_Block (block:va_codes) :va_code = Block block
 let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) :va_code = IfElse ifCond ifTrue ifFalse
 let va_While (whileCond:ocmp) (whileBody:va_code) (inv:operand) :va_code = While whileCond whileBody inv
-val va_cmp_le (a:va_operand) (b:va_operand) :ocmp
+val va_cmp_eq (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_ne (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_le (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_ge (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_lt (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_gt (o1:va_operand) (o2:va_operand) : ocmp
 let va_get_block (c:va_code{Block? c}) :va_codes = Block?.block c
 let va_get_ifCond (c:va_code{IfElse? c}) :ocmp = IfElse?.ifCond c
 let va_get_ifTrue (c:va_code{IfElse? c}) :va_code = IfElse?.ifTrue c
 let va_get_ifFalse (c:va_code{IfElse? c}) :va_code = IfElse?.ifFalse c
 let va_get_whileCond (c:va_code{While? c}) :ocmp = While?.whileCond c
 let va_get_whileBody (c:va_code{While? c}) :va_code = While?.whileBody c
-
-(*val va_Block : (block:va_codes) -> va_code
-
-val va_IfElse : (ifCond:ocmp) -> (ifTrue:va_code) -> (ifFalse:va_code) -> va_code
-val va_While : (whileCond:ocmp) -> (whileBody:va_code) -> (inv:operand) -> va_code
-val va_cmp_le : (a:va_operand) -> (b:va_operand) -> ocmp
-val va_get_block (c:va_code) : va_codes*)
-(*let va_get_ifCond (c:code{IfElse? c}) :ocmp = IfElse?.ifCond c
-let va_get_ifTrue (c:code{IfElse? c}) :code = IfElse?.ifTrue c
-let va_get_ifFalse (c:code{IfElse? c}) :code = IfElse?.ifFalse c
-let va_get_whileCond (c:code{While? c}) :ocmp = While?.whileCond c
-let va_get_whileBody (c:code{While? c}) :code = While?.whileBody c*)
 
 (* ok for now but no need to actually expose the definition.
    instead expose lemmas about it *)
@@ -118,17 +120,56 @@ unfold let va_ensure (b_0:va_codes) (b_1:va_codes) (s_0:va_state) (s_1:va_state)
   Some(s_1) == va_eval_code (Cons?.hd b_0) s_0     /\
   Some(sN)  == va_eval_code (va_Block b_1) s_1    
 
-val va_lemma_block : (b_0:va_codes) -> (s_0:va_state) -> (sN:va_state)
-  -> Pure (va_state * va_code * va_codes)
-        (requires (Cons? b_0 /\ Some(sN) == va_eval_code (va_Block b_0) s_0))
-        (ensures  (fun (s_1, c_1, b_1) -> b_0 == va_CCons c_1 b_1  /\
-                               Some(s_1) == va_eval_code c_1 s_0 /\
-                   Some(sN) == va_eval_code (va_Block b_1) s_1))
+val eval_ocmp : s:va_state -> c:ocmp -> GTot bool
 
+val lemma_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (eval_ocmp s (va_cmp_eq o1 o2)) <==> (va_eval_operand_uint64 s o1 == va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_eq o1 o2))]
 
-val va_lemma_empty : (s_0:va_state) -> (sN:va_state) ->
-  Pure va_state (requires (Some(sN) == va_eval_code (va_Block (va_CNil ())) s_0))
-                 (ensures  (fun sM -> sM == s_0 /\ sM == sN))
+val lemma_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (eval_ocmp s (va_cmp_ne o1 o2)) <==> (va_eval_operand_uint64 s o1 <> va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_ne o1 o2))]
+
+val lemma_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (eval_ocmp s (va_cmp_le o1 o2)) <==> (va_eval_operand_uint64 s o1 <= va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_le o1 o2))]
+
+val lemma_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (eval_ocmp s (va_cmp_ge o1 o2)) <==> (va_eval_operand_uint64 s o1 >= va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_ge o1 o2))]
+
+val lemma_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (eval_ocmp s (va_cmp_lt o1 o2)) <==> (va_eval_operand_uint64 s o1 < va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_lt o1 o2))]
+
+val lemma_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (eval_ocmp s (va_cmp_gt o1 o2)) <==> (va_eval_operand_uint64 s o1 > va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_gt o1 o2))]
+
+val va_lemma_block : (b_0:va_codes) -> (s_0:va_state) -> (sN:va_state) ->
+  Ghost (va_state * va_code * va_codes)
+  (requires (Cons? b_0 /\ Some sN == va_eval_code (va_Block b_0) s_0))
+  (ensures  (fun (s_1, c_1, b_1) ->
+    b_0 == va_CCons c_1 b_1 /\
+    Some s_1 == va_eval_code c_1 s_0 /\
+    Some sN == va_eval_code (va_Block b_1) s_1))
+
+val va_lemma_empty : (s_0:va_state) -> (sN:va_state) -> Ghost va_state
+  (requires (Some sN == va_eval_code (va_Block (va_CNil ())) s_0))
+  (ensures  (fun sM -> sM == s_0 /\ sM == sN))
+
+val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s_0:va_state -> sN:va_state -> Ghost (bool * va_state)
+  (requires (Some sN == va_eval_code (IfElse ifb ct cf) s_0))
+  (ensures  (fun (cond, sM) ->
+    cond == eval_ocmp s_0 ifb /\
+    sM == s_0 /\
+    Some sN == (if cond then va_eval_code ct sM else va_eval_code cf sM)))
 
 (* maybe we want these to be transparent*)
 val logxor64 : (x:nat64) -> (y:nat64) -> nat64
@@ -149,21 +190,35 @@ val gcc : printer
 #endverbatim
 
 #verbatim
-module Decls
-open Machine
-open Semantics
+module X64.ValeDecls
+open X64.Machine_s
+open X64.Semantics_s
 open FStar.UInt
 module M = Map
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
-let ins = Semantics.ins
-type ocmp = Semantics.ocmp
-let cf n = Semantics.cf (Semantics.u n)
+let ins = X64.Semantics_s.ins
+type ocmp = X64.Semantics_s.ocmp
+let cf n = X64.Semantics_s.cf (X64.Semantics_s.u n)
 
-let va_cmp_le (a:va_operand) (b:va_operand) : ocmp = OLe a b
+let va_cmp_eq o1 o2 = OEq o1 o2
+let va_cmp_ne o1 o2 = ONe o1 o2
+let va_cmp_le o1 o2 = OLe o1 o2
+let va_cmp_ge o1 o2 = OGe o1 o2
+let va_cmp_lt o1 o2 = OLt o1 o2
+let va_cmp_gt o1 o2 = OGt o1 o2
 
 (*not sure about the decreases part*)
 let va_eval_code c s = eval_code c s
+
+let eval_ocmp s c = X64.Semantics_s.eval_ocmp s c
+
+let lemma_cmp_eq s o1 o2 = ()
+let lemma_cmp_ne s o1 o2 = ()
+let lemma_cmp_le s o1 o2 = ()
+let lemma_cmp_ge s o1 o2 = ()
+let lemma_cmp_lt s o1 o2 = ()
+let lemma_cmp_gt s o1 o2 = ()
 
 let va_lemma_block (b_0:va_codes) (s_0:va_state) (sN:va_state) =
   let c_1::b_1 = b_0 in
@@ -171,25 +226,28 @@ let va_lemma_block (b_0:va_codes) (s_0:va_state) (sN:va_state) =
 
 let va_lemma_empty (s_0:va_state) (sN:va_state) = s_0
 
+let va_lemma_ifElse (ifb:ocmp) (ct:code) (cf:code) (s_0:va_state) (sN:va_state) =
+  eval_ocmp s_0 ifb, s_0
+
 let logxor64 (x:nat64) (y:nat64) :nat64 =
-  Semantics.logxor x y
+  X64.Semantics_s.logxor x y
 
 let logand64 (x:nat64) (y:nat64) :nat64 =
-  Semantics.logand x y
+  X64.Semantics_s.logand x y
 
 let shift_left64 (x:nat64) (amt:nat64) :nat64 =
-  Semantics.shift_left x amt
+  X64.Semantics_s.shift_left x amt
 
 let shift_right64 (x:nat64) (amt:nat64) :nat64 =
-  Semantics.shift_right x amt
+  X64.Semantics_s.shift_right x amt
 
-let printer = Print.printer
+let printer = X64.Print_s.printer
 let print_string = FStar.IO.print_string
-let print_header = Print.print_header
-let print_proc = Print.print_proc
-let print_footer = Print.print_footer
-let masm = Print.masm
-let gcc = Print.gcc
+let print_header = X64.Print_s.print_header
+let print_proc = X64.Print_s.print_proc
+let print_footer = X64.Print_s.print_footer
+let masm = X64.Print_s.masm
+let gcc = X64.Print_s.gcc
 
 #endverbatim
 
@@ -216,6 +274,19 @@ var{:state mem()} mem:int;
 procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst_operand dst:uint64, operand src:uint64)
     ensures
         dst == old(src);
+{
+}
+
+procedure{:instruction Ins(Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load64(
+    out dst_operand dst:uint64,
+        reg_operand src:uint64,
+        inline offset:int)
+    reads
+        mem;
+    requires
+        valid_src_addr(mem, src + offset);
+    ensures
+        dst == mem[old(src) + offset];
 {
 }
 

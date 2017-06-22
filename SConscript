@@ -25,9 +25,14 @@ Export('verify_paths')
 # Otherwise, the dependency analysis will not be able to find all the
 # dependencies for all the files using just one invocation of FStar.exe --dep.
 #
+# For .vaf files, the generated .fst and .fsti files live under the obj directory,
+# so the include path should contain obj/... for any .vaf files.
+#
 fstar_include_paths = [
   'tools/Vale/test',
   'obj/Vale/test',
+  'src/arch/x64/',
+  'obj/arch/x64/',
   'src/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]
@@ -58,10 +63,7 @@ verify_options = {
   '.fsti': BuildOptions(fstar_default_args),
 
   'tools/Vale/test/vale-debug.vad': None,
-  'tools/Vale/test/fstar1.vaf': None,  # replaced with fstar1ifc.vaf
   'tools/Vale/test/tactics1.vaf': None,
-  'tools/Vale/test/test.vaf': None,
-  'tools/Vale/test/Vale.fst': None,  # file should be deleted
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_nonlarith),

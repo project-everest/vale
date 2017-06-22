@@ -436,7 +436,7 @@ def add_dafny_verifier(env):
 
 def verify_fstar(env, targetfile, sourcefile):
   temptargetfile = targetfile + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $FSTAR $VERIFIER_FLAGS $FSTAR_Z3_PATH $SOURCE $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
+  temptarget = env.Command(temptargetfile, sourcefile, "$FSTAR $VERIFIER_FLAGS $FSTAR_Z3_PATH $SOURCE $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
   return env.CopyAs(source=temptarget, target=targetfile)
 
 # Add env.FStar(), to verify a .fst or .fsti file into a .vfst or .vfsti
@@ -578,12 +578,17 @@ def build_test(env, inputs, include_dir, output_base_name):
     if inps.startswith('src/'):
       inp = env.CopyAs(source=inp, target=to_obj_dir(inps))
     inputs_obj.append(inp)
-  exe = testenv.Program(source=inputs_obj, target='obj/'+output_base_name+'.exe')
+  if sys.platform == 'win32':
+    built = testenv.Program(source=inputs_obj, target=['obj/'+output_base_name+'.exe', 'obj/'+output_base_name+'.pdb'])
+    exe = built[0]
+  else:
+    built = testenv.Program(source=inputs_obj, target='obj/'+output_base_name+'.exe')
+    exe = built
   testoutput = 'obj/'+output_base_name+'.txt'
   env.Command(target=testoutput,
               source=exe,
               action = [exe, 'echo ABC > ' + testoutput])
-  a = env.Alias('runtest', '', exe)
+  a = env.Alias('runtest', '', built)
   #AlwaysBuild(a)
   return a
   
@@ -725,13 +730,16 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
         if os.path.isfile(t):
           files.append(t)
   # call fstar --dep make
-  includes = " ".join(["--include " + x for x in fstar_include_paths])
+  includes = []
+  for include in fstar_include_paths:
+    includes += ["--include", include]
   fstar = str(env['FSTAR'])
   lines = []
   depsBackupFile = 'obj/fstarDepsBackup.d'
   try:
     print('F* dependency analysis: starting')
-    cmd = fstar + " --dep make " + includes + " " + " ".join(files)
+    args = ["--dep", "make"] + includes + files
+    cmd = [fstar] + args
     print(cmd)
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
     print('F* dependency analysis: done')

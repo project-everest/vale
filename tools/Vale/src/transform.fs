@@ -135,6 +135,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SAssign (xs, e) ->
         let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal t) ids) env.ids xs in
         ({env with ids = ids}, [SAssign (xs, fee e)])
+    | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> (env, [SBlock (rs b)])
     | SIfElse (g, e, b1, b2) -> (env, [SIfElse (g, fee e, rs b1, rs b2)])
     | SWhile (e, invs, ed, b) ->

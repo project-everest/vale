@@ -1,9 +1,9 @@
-module Print
+module X64.Print_s
 
 // Trusted code for producing assembly code
 
-open Machine
-open Semantics
+open X64.Machine_s
+open X64.Semantics_s
 open FStar.IO
 
 noeq type printer = {

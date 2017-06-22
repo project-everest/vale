@@ -90,6 +90,7 @@ type stmt =
 | SCalc of bop option * calcContents list
 | SVar of id * typ option * var_storage * attrs * exp option
 | SAssign of lhs list * exp
+| SLetUpdates of formal list * stmt // used to turn imperative updates into functional 'let' assignments
 | SBlock of stmt list
 | SIfElse of stmt_modifier * exp * stmt list * stmt list
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list

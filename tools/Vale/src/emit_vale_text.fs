@@ -159,6 +159,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssign ([], e) -> ps.PrintLine ((string_of_exp e) + ";")
   | SAssign (lhss, e) ->
       ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
+  | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> emit_block ps ss
   | SIfElse (sm, e, ss1, []) ->
       ps.PrintLine ((string_of_stmt_modifier sm) + "if (" + (string_of_exp e) + ")");
