@@ -33,6 +33,7 @@ fstar_include_paths = [
   'obj/Vale/test',
   'src/arch/x64/',
   'obj/arch/x64/',
+  'src/lib/collections/',
   'src/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]

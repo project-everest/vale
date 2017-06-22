@@ -23,7 +23,7 @@ type va_register = reg
 
 val cf : (flags:nat64) -> bool
 
-let va_subscript (m:mem) (ptr:int) :nat64 = FStar.UInt64.v m.[ptr]
+let va_subscript (m:mem) (ptr:int) : nat64 = FStar.UInt64.v (Map.sel m ptr)
 
 (* Constructors *)
 let va_op_operand_reg (r:reg) :va_operand = OReg r
@@ -46,7 +46,7 @@ let va_is_dst_register (r:reg) (s:va_state) :bool = true
 let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = true
 let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
 
-let valid_src_addr (m:mem) (addr:int) : bool = m `contains` addr
+let valid_src_addr (m:mem) (addr:int) : bool = m `Map.contains` addr
 
 (* Getters *)
 let va_get_ok (s:va_state) :bool = s.ok
@@ -194,7 +194,7 @@ module X64.ValeDecls
 open X64.Machine_s
 open X64.Semantics_s
 open FStar.UInt
-module M = Map
+module M = TransparentMap
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
 let ins = X64.Semantics_s.ins
