@@ -762,6 +762,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
       (Ghost, false, [EsGhost [SCalc (oop, ccs)]])
   | SVar (_, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
   | SVar (x, t, g, a, eOpt) -> (Ghost, false, [EsGhost [SVar (x, t, g, a, mapOpt sub_src eOpt)]])
+  | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_src e in
@@ -1515,6 +1516,58 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     in
   fSpecs @ bodyDecls //@ blockLemmaDecls
 
+// convert imperative updates to functional let assignments
+let rec let_updates_stmts (scope:Map<id, typ option>) (ss:stmt list):(Set<id> * stmt list)=
+  let (_, updates, ss_rev) = List.fold let_update_stmt_rev (scope, Set.empty, []) ss in
+  (updates, List.rev ss_rev)
+and let_update_stmt_rev (scope:Map<id, typ option>, updates:Set<id>, ss_rev:stmt list) (s:stmt):(Map<id, typ option> * Set<id> * stmt list) =
+  let (scope, updates, s) = let_update_stmt scope updates s in
+  (scope, updates, s::ss_rev)
+and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<id, typ option> * Set<id> * stmt) =
+  let add_unique x t m =
+    if Map.containsKey x m then err ("variable '" + (err_id x) + "' already in scope") else
+    Map.add x t m
+    in
+  let find_scope x =
+    if Map.containsKey x scope then (x, Map.find x scope)
+    else err ("mutable variable '" + (err_id x) + "' not found")
+    in
+  let make_let updates s =
+    let updates = List.map find_scope (Set.toList updates) in
+    SLetUpdates (updates, s)
+    in
+  match s with
+  | SLoc (loc, s) ->
+      try
+        let (scope, updates, s) = let_update_stmt scope updates s in
+        (scope, updates, SLoc (loc, s))
+      with err -> raise (LocErr (loc, err))
+  | SLabel x -> notImplemented "labels"
+  | SGoto x -> notImplemented "goto"
+  | SReturn -> notImplemented "return"
+  | SAssume _ | SAssert _ | SCalc _ | SForall _ -> (scope, updates, s)
+  | SVar (x, t, g, a, eOpt) -> (add_unique x t scope, updates, s)
+  | SAssign (lhss, e) ->
+      let xs_update = List.collect (fun lhs -> match lhs with (x, None) -> [x] | _ -> []) lhss in
+      let xs_decls = List.collect (fun lhs -> match lhs with (x, Some (t, _)) -> [(x, t)] | _ -> []) lhss in
+      let scope = List.fold (fun scope (x, t) -> add_unique x t scope) scope xs_decls in
+      let updates = Set.union (Set.ofList xs_update) updates in
+      (scope, updates, s)
+  | SLetUpdates _ -> internalErr "SLetUpdates"
+  | SBlock b ->
+      let (u, b) = let_updates_stmts scope b in
+      (scope, Set.union updates u, make_let u (SBlock b))
+  | SIfElse (g, e, b1, b2) ->
+      let (u1, b1) = let_updates_stmts scope b1 in
+      let (u2, b2) = let_updates_stmts scope b2 in
+      (scope, Set.unionMany [updates; u1; u2], make_let (Set.union u1 u2) (SIfElse (g, e, b1, b2)))
+  | SWhile (e, invs, ed, b) ->
+      let (u, b) = let_updates_stmts scope b in
+      (scope, Set.union updates u, make_let u (SWhile (e, invs, ed, b)))
+  | SExists (xs, ts, e) ->
+      let scope = List.fold (fun scope (x, t) -> add_unique x t scope) scope xs in
+      (scope, updates, s)
+
 let reprint_decls_rev = ref ([]:decls)
 
 let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
@@ -1527,7 +1580,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
         let fs (s:stmt):stmt list map_modify =
           let modGhost = if !reprint_ghost_stmts then Unchanged else Replace [] in
           match s with
-          | SLoc _ | SLabel _ | SGoto _ | SReturn | SBlock _ -> Unchanged
+          | SLoc _ | SLabel _ | SGoto _ | SReturn | SLetUpdates _ | SBlock _ -> Unchanged
           | SIfElse ((SmInline | SmPlain), _, _, _) -> Unchanged
           | SWhile _ when !reprint_loop_invs -> Unchanged
           | SWhile (e, _, (l, _), s) -> Replace [SWhile (e, [], (l, []), s)]

@@ -111,9 +111,9 @@ and string_of_args (es:exp list):string = match es with [] -> "()" | _ -> string
 
 let string_of_lhs_formal ((x, tOpt):lhs):string = match tOpt with Some (t, _) -> string_of_formal (x, t) | _ -> sid x
 
-let rec emit_stmt (ps:print_state) (s:stmt):unit =
+let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
   match s with
-  | SLoc (loc, s) -> try emit_stmt ps s with err -> raise (LocErr (loc, err))
+  | SLoc (loc, s) -> try emit_stmt ps eOut s with err -> raise (LocErr (loc, err))
   | SLabel _ -> err "unsupported feature: labels (unstructured code)"
   | SGoto _ -> err "unsupported feature: 'goto' (unstructured code)"
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
@@ -129,27 +129,43 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ("let " + (string_of_lhs_formal lhs) + " = " + (string_of_exp e) + " in")
   | SAssign ((_::_::_) as lhss, e) ->
       ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_lhs_formal lhss)) + ") = " + (string_of_exp e) + " in")
+  | SLetUpdates (outs, s) ->
+      ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_formal outs)) + ") =");
+      ps.PrintLine "(";
+      ps.Indent ();
+      let eOut = EApply (Id "tuple", List.map (fun (x, _) -> EVar x) outs) in
+      emit_stmt ps (Some eOut) s;
+      ps.Unindent ();
+      ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
-  | SIfElse (_, e, ss1, ss2) -> notImplemented "if-else"
+  | SIfElse (_, e, ss1, ss2) ->
+      ps.PrintLine ("if " + (string_of_exp e) + " then");
+      emit_block ps false eOut ss1;
+      ps.PrintLine ("else");
+      emit_block ps false eOut ss2
   | SWhile (e, invs, (_, ed), ss) -> notImplemented "while"
   | SForall ([], [], EBool true, e, ss) ->
       // TODO
       ps.PrintLine "(";
       ps.Indent ();
-      emit_stmts ps ss;
+      emit_stmts ps None ss;
       ps.PrintLine ("assert " + (string_of_exp e) + ";");
       ps.Unindent ();
       ps.PrintLine ");";
       ps.PrintLine ("assume " + (string_of_exp e) + ";");
   | SForall (xs, ts, ex, e, ss) -> notImplemented "forall statements"
   | SExists (xs, ts, e) -> notImplemented "exists statements"
-and emit_stmts (ps:print_state) (stmts:stmt list) = List.iter (emit_stmt ps) stmts
-and emit_block (ps:print_state) (stmts:stmt list) =
+and emit_stmts (ps:print_state) (eOut:exp option) (stmts:stmt list) =
+  List.iter (emit_stmt ps None) stmts;
+  match eOut with
+  | None -> internalErr "emit_stmts"
+  | Some e -> ps.PrintLine (string_of_exp_prec 0 e)
+and emit_block (ps:print_state) (semi:bool) (eOut:exp option) (stmts:stmt list) =
   ps.PrintLine "(";
   ps.Indent ();
-  emit_stmts ps stmts;
+  emit_stmts ps eOut stmts;
   ps.Unindent ();
-  ps.PrintLine ");"
+  ps.PrintLine (if semi then ");" else ")")
 
 let collect_spec (loc:loc, s:spec):(exp list * exp list) =
   try
@@ -221,9 +237,10 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         ps.PrintLine (irreducible + "let " + (sid p.pname) + " " + formals + " =");
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
-        emit_stmts ps ss;
+        let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
+        let (_, ss) = let_updates_stmts mutable_scope ss in
         let eRet = EApply (Id "tuple", List.map (fun (x, _, _, _, _) -> EVar x) p.prets) in
-        ps.PrintLine (string_of_exp_prec 0 eRet)
+        emit_stmts ps (Some eRet) ss;
         ps.Unindent ();
         ( match tactic with
           | None -> ()

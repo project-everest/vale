@@ -64,7 +64,6 @@ verify_options = {
 
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
-  'tools/Vale/test/test.vaf': None,
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_nonlarith),

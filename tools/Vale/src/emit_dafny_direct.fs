@@ -548,6 +548,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
     | SAssign _ ->
         List.iter (fun x -> stmts.AddRange(create_stmt built_ins loc x)) (eliminate_assign_lhss s)
         stmts
+    | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock ss -> notImplemented "block"
     | SIfElse (_, e, ss1, ss2) ->
         let tok = create_token loc "if" in
