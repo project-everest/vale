@@ -740,7 +740,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
     print('F* dependency analysis: starting')
     args = ["--dep", "make"] + includes + files
     cmd = [fstar] + args
-    print(cmd)
+    print(" ".join(cmd))
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
     print('F* dependency analysis: done')
     fstar_deps_ok = True
@@ -767,6 +767,10 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       sources = sources.split()
       targets = targets.split()
       targets = [to_obj_dir(re.sub('\.fst$', '.vfst.tmp', re.sub('\.fsti$', '.vfsti.tmp', x))) for x in targets if has_obj_dir(x)]
+      if not fstar_deps_ok:
+        # If dependency analysis failed, remove non-existent sources so that scons can make progress
+        # Otherwise, scons won't recompile the .vaf files, so the dependencies will never get fixed
+        sources = [x for x in sources if os.path.isfile(x)]
       Depends(targets, sources)
   if fstar_deps_ok:
     # Save results in depsBackupFile
