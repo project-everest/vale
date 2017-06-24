@@ -36,7 +36,7 @@ module X64.Poly1305
 open X64.Machine_s
 open X64.ValeDecls
 open X64.Poly1305.Spec_s
-open X64.Poly1305.Lemmas_i
+open X64.Poly1305.Math_i
 #endverbatim
 
 #verbatim interface
