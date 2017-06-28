@@ -65,17 +65,17 @@ open FStar.UInt64
 
 let print_operand (o:operand) (p:printer) =
   match o with
-  | OConst n -> p.const (v n)
+  | OConst n ->
+      if 0 <= n && n < nat64_max then p.const n
+      else "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg r p
   | OMem m -> print_maddr m "qword" p
 
 let print_small_operand (o:operand) (p:printer) =
   match o with
-  | OConst n -> let n = v n in
-               if n < 64 then
-                  p.const n
-               else
-                 "!!! INVALID constant: " ^ string_of_int n ^ " !!!!"
+  | OConst n ->
+      if n < 64 then p.const n
+      else "!!! INVALID constant: " ^ string_of_int n ^ " !!!!"
   | OReg r -> print_small_reg r p
   | _ -> "!!! INVALID small operand !!! Expected al, bl, cl, or dl."
 
@@ -83,11 +83,9 @@ assume val print_any: 'a -> string
 
 let print_shift_operand (o:operand) (p:printer) =
   match o with
-  | OConst n -> let n = v n in
-               if n < 64 then
-                  p.const n
-               else
-                 "!!! INVALID shift operand: " ^ print_any n ^ " is too large !!!"
+  | OConst n ->
+      if n < 64 then p.const n
+      else "!!! INVALID shift operand: " ^ string_of_int n ^ " is too large !!!"
   | OReg Rcx -> print_small_reg (OReg?.r o) p
   | _ -> "!!! INVALID shift operand !!! Expected constant or cl."
 
@@ -119,7 +117,7 @@ let print_ins (ins:ins) (p:printer) =
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
   | AddLea64 dst src1 src2 -> let name = p.ins_name "  lea" [dst; src1; src2] in
                              if OReg? src1 && OConst? src2 then
-                               name ^ print_maddr (MReg (OReg?.r src1) (v (OConst?.n src2))) "qword" p
+                               name ^ print_maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword" p
                              else if OReg? src1 && OReg? src2 then
                                name ^ print_maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword" p
                              else

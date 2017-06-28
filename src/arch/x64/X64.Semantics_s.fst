@@ -3,6 +3,18 @@ module X64.Semantics_s
 open FStar.BaseTypes
 open X64.Machine_s
 
+let _ = assert_norm (pow2 32 = nat32_max) // Sanity check our constant
+let _ = assert_norm (pow2 64 = nat64_max) // Sanity check our constant
+type uint64 = UInt64.t
+
+let map (key:eqtype) (value:Type) = Map.t key value
+
+// syntax for map accesses, m.[key] and m.[key] <- value
+unfold
+let op_String_Access     = Map.sel
+unfold
+let op_String_Assignment = Map.upd
+
 type ins =
   | Mov64      : dst:dst_op -> src:operand -> ins
   | Add64      : dst:dst_op -> src:operand -> ins
@@ -16,8 +28,6 @@ type ins =
   | Shr64      : dst:dst_op -> amt:operand -> ins
   | Shl64      : dst:dst_op -> amt:operand -> ins
 
-assume val havoc : state -> ins -> Tot uint64
-
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
   | ONe: o1:operand -> o2:operand -> ocmp
@@ -29,18 +39,65 @@ type ocmp =
 type code = precode ins ocmp
 type codes = list code
 
-let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) :state =
-  match o with
-  | OReg r   -> update_reg' r v s
-  | OMem m   -> update_mem (eval_maddr m s) v s
+(* TODO: Eventually this should be a map to bytes.  Simplifying for now *)
+type mem = map int uint64
+assume val mem_make (#v:Type0) (mappings:int -> v) (domain:Set.set int) : m:(map int v){
+  Set.equal (Map.domain m) domain /\
+  (forall (i:int).{:pattern (Map.sel m i)} Map.sel m i == mappings i)}
 
-let update_operand' (o:dst_op) (ins:ins) (v:uint64) (s:state) :state =
+noeq type state = {
+  ok: bool;
+  regs: reg -> uint64;
+  flags: uint64;
+  mem: mem;
+}
+
+let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
+assume val havoc : state -> ins -> uint64
+
+unfold let eval_reg (r:reg) (s:state) : uint64 = s.regs r
+unfold let eval_mem (ptr:int) (s:state) : uint64 = s.mem.[ptr]
+
+let eval_maddr (m:maddr) (s:state) : int =
+  let open FStar.UInt64 in
+  let open FStar.Mul in
+    match m with
+    | MConst n -> n
+    | MReg reg offset -> v (eval_reg reg s) + offset
+    | MIndex base scale index offset -> v (eval_reg base s) + scale * v (eval_reg index s) + offset
+
+let eval_operand (o:operand) (s:state) : uint64 =
+  match o with
+  | OConst n -> u (int_to_nat64 n)
+  | OReg r -> eval_reg r s
+  | OMem m -> eval_mem (eval_maddr m s) s
+
+let update_reg' (r:reg) (v:uint64) (s:state) : state =
+  { s with regs = fun r' -> if r' = r then v else s.regs r' }
+
+let update_mem (ptr:int) (v:uint64) (s:state) : state = { s with mem = s.mem.[ptr] <- v }
+
+let valid_maddr (m:maddr) (s:state) : bool =
+  s.mem `Map.contains` (eval_maddr m s)
+
+let valid_operand (o:operand) (s:state) : bool =
+  match o with
+  | OConst n -> true
+  | OReg r -> true
+  | OMem m -> valid_maddr m s
+
+let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) : state =
+  match o with
+  | OReg r -> update_reg' r v s
+  | OMem m -> update_mem (eval_maddr m s) v s
+
+let update_operand' (o:dst_op) (ins:ins) (v:uint64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
 open FStar.UInt64
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
-let cf (flags:uint64) :bool =
+let cf (flags:uint64) : bool =
   v flags % 2 = 1
 
 let update_cf (flags:uint64) (new_cf:bool) : (new_flags:uint64{cf new_flags == new_cf}) =
@@ -190,8 +247,6 @@ let shift_left_uint64 (x:int) (y:int)
                     shift_left x y = FStar.UInt.shift_left #64 x y))
           [SMTPat (shift_left x y)]
   = ()          
-
-let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
 
 let eval_ocmp (s:state) (c:ocmp) :bool =
   match c with

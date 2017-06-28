@@ -1,6 +1,7 @@
 module StateUpdateTest
 open X64.Machine_s
-open X64.ValeDecls
+open X64.Vale.State_i
+open X64.Vale.Decls
 open FStar.Tactics
 
 val va_code_state_update_test : va_dummy:unit -> Tot va_code
@@ -40,13 +41,13 @@ irreducible let va_lemma_state_update_test va_b0 va_s0 va_sN =
  (* We can destruct va_s0 without tactics *)
   let (Mkstate ok0 regs0 flags0 mem0 :va_state) = va_s0 in
   // and now this works.
+  let s1 = update_reg Rdx (regs0 Rax) (Mkstate ok0 regs0 flags0 mem0) in
   assert_by_tactic (norm[Simpl;Delta;Primops];; dump "before trefl";; trivial;; dump "trivial")
-    (regs0.[reg_to_int Rax] == (regs0.[reg_to_int Rdx] <- regs0.[reg_to_int Rax]).[reg_to_int Rax]);
+    (regs0 Rax == s1.regs Rax);
 
   let (va_b4, va_s4) = (va_lemma_Mov64 va_b2 va_s2 va_sM (va_op_dst_operand_reg Rcx)
     (va_op_operand_reg Rdx)) in
 
-assume false;
   assert ((va_get_reg Rax va_s4) == (va_get_reg Rax va_old_s));
   let va_sM = (va_lemma_empty va_s4 va_sM) in
   (va_bM, va_sM)

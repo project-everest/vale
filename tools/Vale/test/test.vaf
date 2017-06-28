@@ -1,9 +1,9 @@
-include "../../../src/arch/x64/X64.ValeDecls.vaf"
+include "../../../src/arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module Test
 open X64.Machine_s
-open X64.ValeDecls
+open X64.Vale.Decls
 #endverbatim
 
 procedure p()
