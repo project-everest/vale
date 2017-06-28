@@ -12,6 +12,9 @@ let _ = assert_norm (pow2 64 = nat64_max)    (* Sanity check our constant *)
 type nat64 = x:nat{x < nat64_max}
 type uint64 = FStar.UInt64.t
 
+val nat_to_u64: (n:nat64) -> Tot uint64
+let nat_to_u64 n = FStar.UInt64.uint_to_t n 
+
 (* map type from the F* library, it needs the key type to have decidable equality, not an issue here *)
 unfold
 type map (key:eqtype) (value:Type) = Map.t key value
