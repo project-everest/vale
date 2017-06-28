@@ -13,6 +13,7 @@ open X64.Vale.State_i
 val cf : (flags:int) -> bool
 
 unfold let va_subscript = Map.sel
+unfold let va_update = Map.upd
 
 (* Type aliases *)
 unfold let va_bool = bool
@@ -23,7 +24,7 @@ unfold let va_code = precode ins ocmp
 unfold let va_codes = list va_code
 unfold let va_state = state
 unfold let va_operand = operand
-unfold let va_reg_operand = o:operand{OReg? o}
+let va_reg_operand = o:operand{OReg? o}
 unfold let va_dst_operand = dst_op
 unfold let va_shift_amt = operand
 unfold let va_cmp = operand
@@ -37,6 +38,7 @@ unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
 unfold let va_const_cmp (n:int) : va_cmp = OConst n
 unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 unfold let va_op_register (r:reg) : va_register = r
+unfold let va_op_reg_operand_reg (r:reg) : va_reg_operand = OReg r
 unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
 unfold let va_coerce_operand_to_dst_operand (o:va_operand{valid_dst o}) : va_dst_operand = o
 unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
@@ -50,6 +52,7 @@ unfold let va_is_dst_register (r:reg) (s:va_state) = True
 unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = True
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
 unfold let valid_src_addr (m:mem) (addr:int) : bool = m `Map.contains` addr
+unfold let valid_dst_addr (m:mem) (addr:int) : bool = m `Map.contains` addr 
 
 (* Getters *)
 unfold let va_get_ok (s:va_state) : bool = s.ok
@@ -293,6 +296,20 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load
     ensures
         dst == mem[old(src) + offset];
 {
+}
+
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))} Store64(
+        reg_operand dst:uint64,
+        operand src:uint64,
+        inline offset:int)
+    modifies
+        mem;
+    requires
+        valid_dst_addr(mem, dst + offset);
+    ensures
+        mem == old(mem)[old(dst + offset) := src];
+{
+    assert Map.equal(mem, old(mem)[old(dst + offset) := src]);
 }
 
 procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst_operand dst:uint64, operand src:uint64)
