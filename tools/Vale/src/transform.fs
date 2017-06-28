@@ -312,7 +312,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
       | (SAssume _ | SAssert _ | SForall _ | SExists _) ->
           let xfs = Set.toList (free_vars_stmt s) in
           (i, prev, (List.collect (genAssume env prev) xfs) @ [s])
-      | (SIfElse _ | SWhile _ | SBlock _ | SCalc _) ->
+      | (SIfElse _ | SWhile _ | SLetUpdates _ | SBlock _ | SCalc _) ->
           // Not yet supported
           (i, prev, [s])
       in
