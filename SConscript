@@ -31,6 +31,8 @@ Export('verify_paths')
 fstar_include_paths = [
   'tools/Vale/test',
   'obj/Vale/test',
+  'src/test',
+  'obj/test',
   'src/arch/x64/',
   'obj/arch/x64/',
   'src/lib/collections/',
