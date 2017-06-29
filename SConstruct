@@ -50,13 +50,6 @@ if 'FSTAR_HOME' in os.environ:
 else:
   fstar_default_path = '#tools/FStar'
 
-if sys.platform == 'win32':
-  fstar_default_z3 = 'tools\\Z3\\z3.exe'
-else:
-  fstar_default_z3 = 'tools/Z3/z3'
-if not os.path.isfile(fstar_default_z3):
-  fstar_default_z3 = ''
-
 # Retrieve tool-specific command overrides passed in by the user
 AddOption('--DAFNY',
   dest='do_dafny',
@@ -93,7 +86,7 @@ AddOption('--FSTARPATH',
 AddOption('--FSTARZ3',
   dest='fstar_z3',
   type='string',
-  default=fstar_default_z3,
+  default='',
   action='store',
   help='Specify the path to z3 or z3.exe for F*')
 AddOption('--DARGS',
@@ -165,7 +158,6 @@ if not verify:
   print('***\n*** WARNING:  NOT VERIFYING ANY CODE\n***')
   env['DAFNY_NO_VERIFY'] = '/noVerify'
   env['FSTAR_NO_VERIFY'] = '--lax'
-
 
 cache_dir=GetOption('cache_dir')
 if cache_dir != None:
@@ -740,7 +732,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
     print('F* dependency analysis: starting')
     args = ["--dep", "make"] + includes + files
     cmd = [fstar] + args
-    print(cmd)
+    print(" ".join(cmd))
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
     print('F* dependency analysis: done')
     fstar_deps_ok = True
@@ -767,6 +759,10 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       sources = sources.split()
       targets = targets.split()
       targets = [to_obj_dir(re.sub('\.fst$', '.vfst.tmp', re.sub('\.fsti$', '.vfsti.tmp', x))) for x in targets if has_obj_dir(x)]
+      if not fstar_deps_ok:
+        # If dependency analysis failed, remove non-existent sources so that scons can make progress
+        # Otherwise, scons won't recompile the .vaf files, so the dependencies will never get fixed
+        sources = [x for x in sources if os.path.isfile(x)]
       Depends(targets, sources)
   if fstar_deps_ok:
     # Save results in depsBackupFile
@@ -806,12 +802,26 @@ vale_deps = vale_tool_results.dependencies;
 env['Z3'] = vale_tool_results.z3
 if sys.platform == 'win32':
   env['DAFNY_Z3_PATH'] = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
-else:  
-  env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
-if fstar_default_z3 == '':
-  env['FSTAR_Z3_PATH'] = ''
 else:
-  env['FSTAR_Z3_PATH'] = '--smt ' + fstar_default_z3
+  env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
+
+if do_fstar and verify:
+  fstar_z3 = GetOption('fstar_z3')
+  if fstar_z3 == '':
+    fstar_z3 = 'tools\\Z3\\z3.exe' if sys.platform == 'win32' else 'tools/Z3/z3'
+    if not os.path.isfile(fstar_z3):
+      if sys.platform == 'win32':
+        find_z3 = FindFile('z3.exe', os.environ['PATH'].split(';'))
+      else:
+        find_z3 = FindFile('z3', os.environ['PATH'].split(':'))
+      if find_z3 == None:
+        print('Could not find z3 executable.  Either put z3 in your path, or put it in the directory tools/Z3/, or use the --FSTARZ3=<z3-executable> option.')
+        Exit(1)
+      else:
+        fstar_z3 = str(find_z3)
+  env['FSTAR_Z3_PATH'] = '--smt ' + fstar_z3
+else:
+  env['FSTAR_Z3_PATH'] = ''
 
 SConscript('./SConscript')
 
