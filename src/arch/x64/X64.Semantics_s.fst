@@ -27,6 +27,7 @@ type ins =
   | And64      : dst:dst_op -> src:operand -> ins
   | Shr64      : dst:dst_op -> amt:operand -> ins
   | Shl64      : dst:dst_op -> amt:operand -> ins
+  | Jump       : dstaddr:operand -> ins
 
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
@@ -339,6 +340,8 @@ let eval_ins (ins:ins) : st unit =
   | Shl64 dst amt ->
     update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
 
+  | Jump dstaddr ->
+    update_operand_preserve_flags (OReg Rip) (eval_operand dstaddr s)
   | _ -> fail
 
 (*

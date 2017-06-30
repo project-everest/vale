@@ -22,6 +22,7 @@ type reg =
   | R13
   | R14
   | R15
+  | Rip
 
 type maddr =
   | MConst: n:int -> maddr

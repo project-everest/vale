@@ -276,6 +276,7 @@ var{:state reg(R12)} r12:int;
 var{:state reg(R13)} r13:int;
 var{:state reg(R14)} r14:int;
 var{:state reg(R15)} r15:int;
+var{:state reg(Rip)} rip:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
@@ -284,6 +285,17 @@ procedure{:instruction Ins(S.Mov64(dst,src))} Mov64(inout dst_operand dst:uint64
         dst == old(src);
 {
 }
+
+procedure{:instruction Ins(S.Jump(dst))} JumpShort(operand dst:int)
+    requires
+      true;
+    modifies
+      rip;
+    ensures
+      rip == dst;
+{
+}
+
 
 procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load64(
     out dst_operand dst:uint64,
