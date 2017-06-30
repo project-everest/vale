@@ -1,7 +1,7 @@
 include "../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
-module Test.Memcpy
+module Jump
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
