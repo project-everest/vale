@@ -572,7 +572,7 @@ lemma lemma_HeapletsUpdatedCorrectly32(s:State, r:State, addr:int, id:heaplet_id
     assert HeapletsConsistent(r.heaplets, r.heap);
 }
 
-lemma {:timeLimitMultiplier 2} lemma_HeapletsUpdatedCorrectly64(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:uint64)
+lemma {:timeLimitMultiplier 10} lemma_HeapletsUpdatedCorrectly64(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:uint64)
     requires x86_ValidState(s);
     requires ValidDstAddr(s.heaplets, id, addr, 64);
     requires valid_state(to_state(r));
@@ -581,9 +581,6 @@ lemma {:timeLimitMultiplier 2} lemma_HeapletsUpdatedCorrectly64(s:State, r:State
     ensures  x86_ValidState(r);
 {
     reveal_x86_ValidState();
-    reveal_lower64();
-    reveal_upper64();
-    reveal_lowerUpper64();
     lemma_WordToBytes_BytesToWord_inverses(lower64(v));
     lemma_WordToBytes_BytesToWord_inverses(upper64(v));
 
@@ -608,13 +605,16 @@ lemma {:timeLimitMultiplier 2} lemma_HeapletsUpdatedCorrectly64(s:State, r:State
         && ConsistentHeapletValue(r.heaplets[h_id], r.heap, a)
         && ConsistentHeapletTaint(r.heaplets[h_id], r.heap, a);
     {
+      reveal_lower64();
+      reveal_upper64();
+      reveal_lowerUpper64();
       assert h_id in s.heaplets;
       assert ValidHeapletAddr(s.heaplets[h_id], a);
     }
     assert HeapletsConsistent(r.heaplets, r.heap);
 }
 
-lemma {:timeLimitMultiplier 2} lemma_HeapletsUpdatedCorrectly128(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:Quadword)
+lemma {:timeLimitMultiplier 10} lemma_HeapletsUpdatedCorrectly128(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:Quadword)
     requires x86_ValidState(s);
     requires ValidDstAddr(s.heaplets, id, addr, 128);
     requires valid_state(to_state(r));

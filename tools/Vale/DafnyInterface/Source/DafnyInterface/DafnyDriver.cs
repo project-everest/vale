@@ -186,7 +186,7 @@ namespace DafnyInterface
       MemoryStream ms = new MemoryStream(buffer, false);
       string fullFilename = Path.GetFullPath(filename);
       Dafny.Scanner scanner = new Dafny.Scanner(ms, errors, fullFilename, filename, line);
-      Dafny.Parser parser = new Dafny.Parser(scanner, errors, module, builtIns, verifyThisFile);
+      Dafny.Parser parser = new Dafny.Parser(scanner, errors, null, module, builtIns, verifyThisFile);
       parser.Parse();
       return parser.errors.ErrorCount;
     }

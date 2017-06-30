@@ -480,7 +480,7 @@ function UpdateHeaplets128(s:State, addr:int, id:heaplet_id, taint:taint, v:Quad
     s.heaplets[id := old_heaplet.(quads := old_heaplet.quads[addr := QuadwordHeapletEntry(v, taint)])]
 }
 
-lemma lemma_HeapletsUpdatedCorrectly32(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:uint32)
+lemma {:timeLimitMultiplier 10} lemma_HeapletsUpdatedCorrectly32(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:uint32)
     requires x86_ValidState(s);
     requires ValidDstAddr(s.heaplets, id, addr, 32);
     requires valid_state(to_state(r));
@@ -519,7 +519,7 @@ lemma lemma_HeapletsUpdatedCorrectly32(s:State, r:State, addr:int, id:heaplet_id
     assert HeapletsConsistent(r.heaplets, r.heap);
 }
 
-lemma {:timeLimitMultiplier 2} lemma_HeapletsUpdatedCorrectly128(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:Quadword)
+lemma {:timeLimitMultiplier 10} lemma_HeapletsUpdatedCorrectly128(s:State, r:State, addr:int, id:heaplet_id, taint:taint, v:Quadword)
     requires x86_ValidState(s);
     requires ValidDstAddr(s.heaplets, id, addr, 128);
     requires valid_state(to_state(r));

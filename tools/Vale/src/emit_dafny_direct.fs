@@ -183,12 +183,12 @@ let need_rel_chain (exp:exp):bool =
   | EOp (Bop op, [e1; e2]) -> if is_rel_op op then is_rel_expr (skip_loc e1) else false
   | _ -> false
 
-let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:ResizeArray<Expression>) (ops:ResizeArray<BinaryExpr.Opcode>) (prefixLimits:ResizeArray<Expression>) (first_op_tok:IToken ref):Expression =
+let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:ResizeArray<Expression>) (ops:ResizeArray<BinaryExpr.Opcode>) (opLocs:ResizeArray<IToken>) (prefixLimits:ResizeArray<Expression>) (first_op_tok:IToken ref):Expression =
   match x with
   | EOp (Bop op, [e1; e2]) ->
       if is_rel_expr (skip_loc e1)
       then
-        let e = create_chaining_rel built_ins (one_loc_of_exp loc e1) (skip_loc e1) chain ops prefixLimits first_op_tok in
+        let e = create_chaining_rel built_ins (one_loc_of_exp loc e1) (skip_loc e1) chain ops opLocs prefixLimits first_op_tok in
         let left = chain.Item(chain.Count-1) in
         let right = create_expression built_ins loc e2 in
         let tok = create_token loc (string_of_bop op) in
@@ -204,6 +204,7 @@ let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:Resize
         let op = bop2opcode op in
         chain.Add(right)
         ops.Add(op)
+        opLocs.Add(tok)
         prefixLimits.Add(null)
         new BinaryExpr(tok, BinaryExpr.Opcode.And, e, new BinaryExpr(tok, op, left, right)) :> Expression
       else
@@ -215,6 +216,7 @@ let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:Resize
         first_op_tok := tok;
         chain.Add(left)
         chain.Add(right)
+        opLocs.Add(tok)
         ops.Add(op)
         prefixLimits.Add(null)
         new BinaryExpr(tok, op, left, right) :> Expression
@@ -267,10 +269,11 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           then
             let chain = new ResizeArray<Expression>() in
             let ops = new ResizeArray<BinaryExpr.Opcode>() in
+            let opLocs = new ResizeArray<IToken>() in
             let prefix_limits = new ResizeArray<Expression>() in
             let (first_op_tok:IToken ref) = ref null in
-            let e = create_chaining_rel built_ins loc x chain ops prefix_limits first_op_tok in
-            new ChainingExpression(!first_op_tok, chain, ops, prefix_limits, e) :> Expression
+            let e = create_chaining_rel built_ins loc x chain ops opLocs prefix_limits first_op_tok in
+            new ChainingExpression(!first_op_tok, chain, ops, opLocs, prefix_limits) :> Expression
           else
               let tok = create_token loc (string_of_bop op) in
               let opcode = bop2opcode op in
@@ -455,7 +458,6 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
           if maybeOp = null then err "bad calc op" else
           resOp := maybeOp
           in
-        let resOp = calcOp in
         let lines = new ResizeArray<Expression>() in
         let hints = new ResizeArray<BlockStmt>() in
         let stepOps = new ResizeArray<CalcStmt.CalcOp>() in
@@ -475,7 +477,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
           stepOps.Add(stepOp)
           in
         List.iter addContents contents
-        let s = new CalcStmt(start_tok, end_tok, calcOp, lines, hints, stepOps, resOp, attrs) in
+        let s = new CalcStmt(start_tok, end_tok, calcOp, lines, hints, stepOps, attrs) in
         stmts.Add(s)
         stmts
     | SVar (x, tOpt, g, a, eOpt) ->
@@ -625,7 +627,10 @@ let build_fun (built_ins:BuiltIns) (loc:loc) (f:fun_decl):Function =
     in
 
   // Assuming is not static or protected
-  let f = Function(tok, sid f.fname, false, false, not is_function_method, typeArgs, formals, resultType, reqs, reads, ens, new Specification<Expression>(decreases, null), body, attrs, null) in
+  let f =
+    Function(
+      tok, sid f.fname, false, false, not is_function_method, typeArgs, formals, null, resultType,
+      reqs, reads, ens, new Specification<Expression>(decreases, null), body, attrs, null) in
   f.BodyStartTok <- create_token loc "{";
   f.BodyEndTok <- create_token loc "}";
   built_ins.CreateArrowTypeDecl(formals.Count);
