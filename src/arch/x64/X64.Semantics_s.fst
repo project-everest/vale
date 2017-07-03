@@ -354,6 +354,24 @@ let decr (c:code) (s:state) :nat =
     if v n >= 0 then v n else 0
   | _             -> 0
 
+(* load the binary program. Input program is a list of ( memory address, machine encoding) *)
+assume val load_prog (mem:mem) (c:list (int* uint64)) : mem
+assume val next (r:reg) (s:state)  : int = 
+assume val decode (menc:uint64) : code 
+	
+(* TODO: When should this end? *)
+let rec decode_prog  (s:state) =
+    let ptr = eval_reg Rip s in
+    let c = decode (eval_mem ptr s) in
+    let s' = match c with
+              | Ins ins -> (run (eval_ins ) s) 
+              | Block l -> let rec listdecode s'' =  
+                           | [] -> Some s
+                           | c::tl -> let s'' = decode_prog s in
+				      in listdecode s'' tl
+                           in listdecode s l
+              |_ -> None
+    if None? s' then None else decode_prog (Some?.v (update_reg' Rip (next Rip s') s'))
 (*
  * these functions return an option state
  * None case arises when the while loop invariant fails to hold
@@ -376,6 +394,7 @@ and eval_codes l s =
   | c::tl ->
     let s_opt = eval_code c s in
     if None? s_opt then None else eval_codes tl (Some?.v s_opt)
+
 
 and eval_while c s0 = (* trying to mimic the eval_while predicate using a function *)
   let While cond body inv = c in
