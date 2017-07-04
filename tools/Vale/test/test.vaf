@@ -23,8 +23,6 @@ let double (x:int):int = x + x
 #endverbatim
 
 procedure Calls()
-    reads
-      mem;
     requires 
         rax < 7;
     modifies
@@ -35,7 +33,6 @@ procedure Calls()
     Add64Wrap(rax, 1);
     ghost var z := rax;
     Mov64(rbx, const(double(1)));
-    Load64(rbx, rbx, 2);
     assert rbx == 2;
     assert z == rax;
     if (rbx == 2)
