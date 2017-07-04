@@ -31,6 +31,7 @@ let reg_to_int (r:reg) : int =
   | R13 -> 13
   | R14 -> 14
   | R15 -> 15
+  | Rip -> 16
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_mem (ptr:int) (s:state) : nat64 = Map.sel s.mem ptr

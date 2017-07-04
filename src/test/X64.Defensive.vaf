@@ -1,0 +1,77 @@
+include "../arch/x64/X64.Vale.Decls.vaf"
+
+#verbatim interface implementation
+module Test
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls
+open Manifest
+#set-options "--z3rlimit 20"
+
+let is_inside_u_region (addr:uint64) (u:memlayout) = ( addr < get_u_start + get_u_size) /\ ( addr > = get_u_start)  
+#endverbatim
+
+procedure StoreCheck(in register dst:uint64, in register src:uint64, inline offset:uint64,  u:umemlayout)
+      requires
+         true;
+      ensures
+       is_inside_u_region (dst, offset, u);
+       mem[dst + offset] != old(mem)[dst + offset] ==> mem[bitmap_address + ((dst + offset) >> 9)<< 3] & (1 << ((dst + offset) >> 3)) = 1
+{
+       var bitmap_address := get_bitmap_start(u);
+       var u_addr_mask := 0xFFFFFFFFE0000000; 
+       r8 := dst + offset;
+       
+       Mov64(rax, r8);
+       And64(rax, u_addr_mask);
+       Xor64(rax, 0x20000000);
+	
+	Je  L1    //unsupported
+	Int  3     //unsupported
+
+      L1:
+        Mov64(rdx, bitmap_address);
+	Mov64(rcx, r8);
+	Shr64(rcx, 9);
+	Mov64(rax, r8);
+	Shr64(rax, 3);
+	Load64(rcx, rdx, rcx*8); //indexed mode
+	Bt(rcx, rax);  //unsupported
+	Jb     L2;    //unsupported
+	int 3 ;       //unsupported
+     L2:
+         Store64(dst, src, offset);
+}
+
+procedure LoadCheck(out dst_operand dst:uint64, reg_operand src:uint64, inline offset:int)
+  requires
+         true;
+      ensures
+       is_inside_u_region (dst, offset, u);
+       dst = old(mem)[src + offset] ==> mem[bitmap_address + ((src + offset) >> 9)<< 3] & (1 << ((src + offset) >> 3)) = 1
+{
+       var bitmap_address := get_bitmap_start(u);
+       var u_addr_mask := 0xFFFFFFFFE0000000; 
+       r8 := src + offset;
+       
+       Mov64(rax, r8);
+       And64(rax, u_addr_mask);
+       Xor64(rax, 0x20000000);
+	
+	Je  L1    //unsupported
+	Int  3     //unsupported
+
+     L1:
+        Mov64(rdx, bitmap_address);
+	Mov64(rcx, r8);
+	Shr64(rcx, 9);
+	Mov64(rax, r8);
+	Shr64(rax, 3);
+	Load64(rcx, rdx, rcx*8); //indexed mode
+	Bt(rcx, rax);  //unsupported
+	Jb     L2;    //unsupported
+	int 3 ;       //unsupported
+     L2:
+         Load64(dst, src, offset);
+
+}

@@ -8,15 +8,16 @@ open X64.Vale.Decls
 #set-options "--z3rlimit 20"
 #endverbatim
 
-procedure Memcpy(in register rsi:uint64, out register rdi:uint64, ghost len:uint64)
+//Should we strengthen the post condition when source and destination overlap?
+procedure Memcpy(in register rsi:uint64, in register rdi:uint64, ghost len:uint64)
     requires/ensures
-        rsi + 64 <= rdi;
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rsi + i);
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rdi + i);
     ensures
         if (rsi + len < rdi) || (rdi + len < rsi) {
              forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
 	     if (len % 8 != 0) {
+	          // This is required because of memory is 8 byte aligned, always
 	          mem[rsi + len/8] & ((1 << (len % 8)) - 1) = mem[rdi + len/8] & ((1 << (len % 8))-1);               
              }
 	} 
@@ -24,27 +25,26 @@ procedure Memcpy(in register rsi:uint64, out register rdi:uint64, ghost len:uint
     reads
         rsi; rdi;
     modifies
-        rax; rbx; rcx; rdx; rbp;
         mem;
 {
 
 }
 
 
-procedure Memmove(in register rsi:uint64, out register rdi:uint64, ghost len:uint64)
+procedure Memmove(in register rsi:uint64, in register rdi:uint64, ghost len:uint64)
     requires/ensures
-        rsi + 64 <= rdi;
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rsi + i);
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rdi + i);
     ensures
+        // source operand is not changed
+        forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> mem[rsi + i] == old(mem)[rsi + i]; 
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
-	if (len % 8 != 0) {
+         if (len % 8 != 0) {
 	     mem[rsi + len/8] & ((1 << (len % 8)) - 1) = mem[rdi + len/8] & ((1 << (len % 8))-1);               
          }
     reads
         rsi; rdi;
     modifies
-        rax; rbx; rcx; rdx; rbp;
         mem;
 {
 

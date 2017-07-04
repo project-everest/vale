@@ -341,7 +341,9 @@ let eval_ins (ins:ins) : st unit =
     update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
 
   | Jump dstaddr ->
+    check (valid_operand dstaddr);;
     update_operand_preserve_flags (OReg Rip) (eval_operand dstaddr s)
+
   | _ -> fail
 
 (*
@@ -362,7 +364,7 @@ assume val next (r:reg) (s:state)  : Tot uint64
 assume val decode (menc:uint64) : Tot code 
 assume val to_int (u:uint64) : Tot int
 (* returns a machine encoding *)
-assume val fetch (r:reg{Rip? r})->(s:state)->Tot uint64
+assume val fetch (r:reg{Rip? r}) (s:state) : Tot uint64
 type decodemap = map uint64 code
 
 (*

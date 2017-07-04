@@ -286,7 +286,7 @@ procedure{:instruction Ins(S.Mov64(dst,src))} Mov64(inout dst_operand dst:uint64
 {
 }
 
-procedure{:instruction Ins(S.Jump(dst))} JumpShort(operand dst:int)
+procedure{:instruction Ins(S.Jump(dst))} JumpShort(operand dst:uint64)
     requires
       true;
     modifies
