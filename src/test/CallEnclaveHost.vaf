@@ -1,0 +1,21 @@
+
+include "../arch/x64/X64.Vale.Decls.vaf"
+
+#verbatim interface implementation
+module Test.Memcpy
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls
+#set-options "--z3rlimit 20"
+#endverbatim
+
+
+// rax: pointer to function name
+// rbx : pointer to args
+procedure CallEnclaveHost(in register rax:uint64, in register rbx:uint64)
+    requires/ensures
+       true;
+    modifies
+       mem;
+{
+} 
