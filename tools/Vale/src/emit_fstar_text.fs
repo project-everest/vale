@@ -18,14 +18,14 @@ let sid (x:id):string =
 let prec_of_bop (op:bop):(int * int * int) =
   match op with
   | BEquiv -> (10, 11, 11)
-  | BImply -> (12, 13, 12)
+  | BImply -> (12, 13, 13)
   | BExply -> notImplemented "<=="
   | BOr -> (16, 16, 17)
   | BAnd -> (18, 18, 19)
   | BLe | BGe | BLt | BGt | BEq | BNe -> (20, 20, 21)
-  | BAdd -> (30, 31, 30)
-  | BSub -> (35, 35, 36)
-  | BMul | BDiv | BMod -> (40, 41, 40)
+  | BAdd -> (30, 30, 31)
+  | BSub -> (30, 30, 31)
+  | BMul | BDiv | BMod -> (40, 40, 41)
   | BOldAt | BIn | BCustom _ -> internalErr ("binary operator")
 
 let string_of_bop (op:bop):string =
@@ -60,7 +60,7 @@ let rec string_of_typ (t:typ):string =
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
   let (s, ePrec) =
-    let qbind q qsep xs ts e = (q + " " + (string_of_formals xs) + (string_of_triggers ts) + qsep + (r 5 e), 6) in
+    let qbind q qsep xs ts e = (q + " " + (string_of_formals xs) + qsep + (string_of_triggers ts) + (r 5 e), 6) in
     match e with
     | ELoc (loc, ee) -> try (r prec ee, prec) with err -> raise (LocErr (loc, err))
     | EVar x -> (sid x, 99)
@@ -102,8 +102,8 @@ and string_of_formals (xs:formal list):string = String.concat " " (List.map stri
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
 and string_of_pformal (x:id, t:typ, _, _, _) = string_of_formal (x, Some t)
 and string_of_pformals (xs:pformal list):string = String.concat " " (List.map string_of_pformal xs)
-and string_of_trigger (es:exp list):string = "" // TODO
-and string_of_triggers (ts:exp list list):string = "" // TODO
+and string_of_trigger (es:exp list):string = "{:pattern (" + (string_of_exps es) + ")}"
+and string_of_triggers (ts:exp list list):string = String.concat " " (List.map string_of_trigger ts)
 and string_of_exp (e:exp):string = string_of_exp_prec 90 e
 and string_of_exps (es:exp list):string = String.concat " " (List.map string_of_exp es)
 and string_of_exps_tail (es:exp list):string = String.concat "" (List.map (fun e -> " " + string_of_exp e) es)
