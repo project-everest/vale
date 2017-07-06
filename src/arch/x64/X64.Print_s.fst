@@ -131,7 +131,7 @@ let print_ins (ins:ins) (p:printer) =
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
-  | Jump dst -> p.ins_name " jump" [dst] ^ (print_operand dst p)
+  | Bt64 src pos -> p.ins_name " bt" [src; pos] ^ print_ops src pos
 
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =

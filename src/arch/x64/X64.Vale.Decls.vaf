@@ -11,6 +11,7 @@ open X64.Machine_s
 open X64.Vale.State_i
 
 val cf : (flags:int) -> bool
+val zf : (flags:int) -> bool
 
 unfold let va_subscript = Map.sel
 unfold let va_update = Map.upd
@@ -286,16 +287,24 @@ procedure{:instruction Ins(S.Mov64(dst,src))} Mov64(inout dst_operand dst:uint64
 {
 }
 
-procedure{:instruction Ins(S.Jump(dst))} JumpShort(operand dst:uint64)
-    requires
-      true;
-    modifies
-      rip;
-    ensures
-      rip == dst;
-{
-}
+//procedure{:instruction Ins(S.Jump(dst))} JumpShort(operand dst:uint64)
+//    requires
+//      true;
+//    modifies
+//      rip;
+//    ensures
+//      rip == dst;
+//{
+//}
 
+procedure{:instuction Ins(S.Bt64(src, pos))} Bt64(operand src:uint64, operand pos:uint64)
+      modifies
+        efl;
+      ensures
+         
+{
+    
+} 
 
 procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load64(
     out dst_operand dst:uint64,

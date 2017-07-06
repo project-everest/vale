@@ -27,7 +27,7 @@ type ins =
   | And64      : dst:dst_op -> src:operand -> ins
   | Shr64      : dst:dst_op -> amt:operand -> ins
   | Shl64      : dst:dst_op -> amt:operand -> ins
-  | Jump       : dstaddr:operand -> ins
+  | Bt64       : src:operand -> pos:operand -> ins
 
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
@@ -113,6 +113,24 @@ let update_cf (flags:uint64) (new_cf:bool) : (new_flags:uint64{cf new_flags == n
     else
       flags
 
+//let zf (flags:uint64) : (r:bool{(r=true ==> (lte flags nat64_max) /\ (gte flags 2uL)) /\(r=false ==> (lte flags (sub nat64_max 2uL))) })  =
+let zf (flags:uint64) : bool =
+  if  (rem flags  4uL = 2uL) || (rem flags 4uL = 3uL) then true
+  else false
+
+
+
+let update_zf (flags:uint64) (new_zf:bool) : (new_flags:uint64{zf new_flags == new_zf}) =
+  if new_zf then
+    if not (zf flags) then
+      flags +^ 2uL
+    else
+      flags
+  else
+    if (zf flags) then
+      flags -^ 2uL
+    else
+      flags
 
 
 let st (a:Type) = state -> a * state
@@ -340,10 +358,15 @@ let eval_ins (ins:ins) : st unit =
   | Shl64 dst amt ->
     update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
 
-  | Jump dstaddr ->
-    check (valid_operand dstaddr);;
-    update_operand_preserve_flags (OReg Rip) (eval_operand dstaddr s)
-
+  | Bt64 src pos ->
+    check (valid_operand src);;
+    check (valid_operand pos);;
+    let bits = eval_operand src s in
+    let position = eval_operand pos s in
+    let bitset = (u (v bits `shift_right` v position) &^ u 1) in
+    let new_carry = (bitset = u 1) in
+    update_flags (update_cf s.flags new_carry)
+  
   | _ -> fail
 
 (*
@@ -355,17 +378,6 @@ let decr (c:code) (s:state) :nat =
     let n = eval_operand inv s in
     if v n >= 0 then v n else 0
   | _             -> 0
-
-let decrs (s:state) : nat = 0
- 
-(* load the binary program. Input program is a list of ( memory address, machine encoding) *)
-assume val load_prog (m:mem) (c:list (int* uint64)) : Tot mem
-assume val next (r:reg) (s:state)  : Tot uint64  
-assume val decode (menc:uint64) : Tot code 
-assume val to_int (u:uint64) : Tot int
-(* returns a machine encoding *)
-assume val fetch (r:reg{Rip? r}) (s:state) : Tot uint64
-type decodemap = map uint64 code
 
 (*
  * these functions return an option state
