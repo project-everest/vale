@@ -131,6 +131,7 @@ lemma lemma_reduce128(h:int, h2:uint64, h1:uint64, h0:uint64, g:int, g2:uint64, 
     ensures  g2 < 4 ==> lowerUpper128(h0, h1) == mod2_128(modp(h))
     ensures  g2 >= 4 ==> lowerUpper128(g0, g1) == mod2_128(modp(h))
 {
+    assert mod2_128(g - 0x4_00000000_00000000_00000000_00000000) == mod2_128(g) by {reveal_mod2_128();}
     if (g2 < 4)
     {
         assert 0 <= h < 0x3_ffffffff_ffffffff_ffffffff_fffffffb by { reveal_lowerUpper192(); }
@@ -156,7 +157,6 @@ lemma lemma_reduce128(h:int, h2:uint64, h1:uint64, h0:uint64, g:int, g2:uint64, 
             }
             mod2_128(h - 0x3_ffffffff_ffffffff_ffffffff_fffffffb);
             mod2_128(g - 0x4_00000000_00000000_00000000_00000000);
-            { reveal_mod2_128(); }
             mod2_128(g);
             {
                 reveal_lowerUpper128(); reveal_lowerUpper192(); reveal_mod2_128();

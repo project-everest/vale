@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args', 'dafny_default_args_nonlarith', 'fstar_default_args', 'do_dafny', 'do_fstar')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'do_dafny', 'do_fstar')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
@@ -46,20 +46,20 @@ env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths]
 # Table of special-case Dafny source which requires non-default arguments
 #
 verify_options = {
-  'src/arch/arm/nlarith.s.dfy': BuildOptions(dafny_default_args),
-  'src/arch/arm/bitvectors.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'src/crypto/aes/aes-x64/aes_main.i.dfy': BuildOptions(dafny_default_args_nonlarith),
-  'src/lib/math/mul_nonlinear.i.dfy': BuildOptions(dafny_default_args),
-  'src/lib/math/div_nonlinear.i.dfy': BuildOptions(dafny_default_args),
-  'src/crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'src/crypto/hashing/sha-x64/sha256_vale_main.i.dfy': BuildOptions(dafny_default_args_nonlarith),
-  'src/lib/math/div.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:60'),
-  'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_nonlarith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:120'),
-  'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_nonlarith + ' /timeLimit:120'),
+  'src/arch/arm/nlarith.s.dfy': BuildOptions(dafny_default_args_nlarith),
+  'src/arch/arm/bitvectors.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
+  'src/crypto/aes/aes-x64/aes_main.i.dfy': BuildOptions(dafny_default_args_larith),
+  'src/lib/math/mul_nonlinear.i.dfy': BuildOptions(dafny_default_args_nlarith),
+  'src/lib/math/div_nonlinear.i.dfy': BuildOptions(dafny_default_args_nlarith),
+  'src/crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
+  'src/crypto/hashing/sha-x64/sha256_vale_main.i.dfy': BuildOptions(dafny_default_args_larith),
+  'src/lib/math/div.i.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:60'),
+  'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
+  'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
+  'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
 
   # .dfy files default to this set of options
-  '.dfy': BuildOptions(dafny_default_args_nonlarith),
+  '.dfy': BuildOptions(dafny_default_args_larith),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),
@@ -69,7 +69,7 @@ verify_options = {
   'tools/Vale/test/tactics1.vaf': None,
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
-  '.vad': BuildOptions(dafny_default_args_nonlarith),
+  '.vad': BuildOptions(dafny_default_args_larith),
   '.vaf': BuildOptions(fstar_default_args),
 
   # Disable verification by adding 'filename': None
