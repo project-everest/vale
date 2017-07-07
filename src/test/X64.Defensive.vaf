@@ -1,14 +1,13 @@
 include "../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
-module Test
+module X64.Defensive 
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 open Manifest
 #set-options "--z3rlimit 20"
 
-let is_inside_u_region (addr:uint64) (u:memlayout) = ( addr < get_u_start + get_u_size) /\ ( addr > = get_u_start)  
 #endverbatim
 
 #token &= precedence :=
@@ -31,7 +30,7 @@ procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint
        is_inside_u_region (dst, offset, u);
        mem[dst + offset] != old(mem)[dst + offset] ==> And64(mem[bitmap_address + Shl64(Shr64((dst + offset), 9), 3)], Shr64(Shl64(1, (dst + offset)), 3)) == 1;
 {
-       ghost var bitmap_address:uint64 := get_bitmap_start(u);
+       //ghost var bitmap_address:uint64 := get_bitmap_start(u);
       // var u_addr_mask:uint64 :=0xFFFFFFFFE0000000; 
        Mov64(r8, dst);
        Add64(r8, offset);
@@ -39,12 +38,14 @@ procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint
        And64(rax, 0xFFFFFFFFE0000000);
        Xor64(rax, 0x20000000);
        if ( zf(efl) ) {  
-            Mov64(rdx, bitmap_address);
+            Mov64(rdx, const(get_bitmap_start(u)));
             Mov64(rcx, r8);
             Shr64(rcx, 9);
             Mov64(rax, r8);
             Shr64(rax, 3);
-            Load64(rcx, rdx, rcx*8); 
+            IMul64(rcx, 8);
+            Add64(rdx, rcx);
+            Load64(rcx, rdx, 0); 
             Bt64(rcx, rax);
         } else {
             assume false;

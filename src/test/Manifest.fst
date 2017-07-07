@@ -14,12 +14,12 @@ type calltable =
   | MkCalltable : calltable_start:int -> calltable_size: uint64 -> entries: (list calltable_entry) -> calltable
 
 type umemlayout =
- | MkUmemlayout :  u_start:int -> u_size:uint64 ->
-                   bitmap_address:int -> bitmap_size:uint64 ->
+ | MkUmemlayout :  u_start:uint64 -> u_size:uint64 ->
+                   bitmap_address:uint64 -> bitmap_size:uint64 ->
 		   ctable: calltable ->
-		   code_start:int -> code_size: uint64 ->
-		   heap_start: int -> heap_and_stack_size:uint64 ->
-		   stack_start:int -> umemlayout
+		   code_start:uint64 -> code_size: uint64 ->
+		   heap_start: uint64 -> heap_and_stack_size:uint64 ->
+		   stack_start:uint64 -> umemlayout
 
 
 let get_u_start (m:umemlayout) = m.u_start
@@ -31,3 +31,6 @@ let get_heap_start (m:umemlayout) = m.heap_start
 let get_stack_start (m:umemlayout) = m.stack_start
 
 let address_within_procedure (fname:string) (dst:int) (env:umemlayout) = true
+
+val is_inside_u_region (addr:uint64) (u:umemlayout) : bool
+let is_inside_u_region (addr:uint64) (u:umemlayout) = ( addr <^ ((get_u_start u) +^ (get_u_size u))) && ( addr >=^ (get_u_start u))  

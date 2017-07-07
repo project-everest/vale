@@ -138,6 +138,11 @@ procedure Ifs(inline i:int, ghost g:int)
     if (eax <= ebx)
     {
         Imm(ebx, 1);
+        if (eax == ebx ) {
+          Imm(ebx, 2);
+        } else {
+            assume false;
+        }
     }
     else if (le(eax, 10)) // same as "eax <= 10"
     {

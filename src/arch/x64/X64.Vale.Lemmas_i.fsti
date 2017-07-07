@@ -9,6 +9,7 @@ unfold let code = S.code
 unfold let codes = S.codes
 
 let cf (flags:int) : bool = S.cf (S.u (int_to_nat64 flags))
+let zf (flags:int) : bool = S.zf (S.u (int_to_nat64 flags))
 
 let eval_code (c:code) (s:state) : option state =
   match S.eval_code c (state_to_S s) with

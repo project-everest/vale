@@ -36,8 +36,11 @@ unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
 unfold let va_const_operand (n:int) = OConst n
 unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
 unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
+
+unfold let va_op_cmp_flags () =  0uL
 unfold let va_const_cmp (n:int) : va_cmp = OConst n
 unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
+unfold let va_coerce_register_to_reg_operand (r:va_register) : va_operand = OReg r
 unfold let va_op_register (r:reg) : va_register = r
 unfold let va_op_reg_operand_reg (r:reg) : va_reg_operand = OReg r
 unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
@@ -109,8 +112,8 @@ val va_cmp_le (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_ge (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_lt (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_gt (o1:va_operand) (o2:va_operand) : ocmp
-val va_cmp_zf (o1:va_operand) :ocmp
-val va_cmp_cf (o1:va_opeand): ocmp
+val va_cmp_zf (o1:nat64) :ocmp
+val va_cmp_cf (o1:nat64): ocmp
 
 unfold let va_get_block (c:va_code{Block? c}) : va_codes = Block?.block c
 unfold let va_get_ifCond (c:va_code{IfElse? c}) : ocmp = IfElse?.ifCond c
@@ -215,6 +218,7 @@ module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
 let cf = Lemmas_i.cf
+let zf = Lemmas_i.zf
 let ins = S.ins
 type ocmp = S.ocmp
 
@@ -224,8 +228,10 @@ let va_cmp_le o1 o2 = S.OLe o1 o2
 let va_cmp_ge o1 o2 = S.OGe o1 o2
 let va_cmp_lt o1 o2 = S.OLt o1 o2
 let va_cmp_gt o1 o2 = S.OGt o1 o2
-let va_cmp_zf o1 = true
-let va_cmp_cf o1 = true
+
+
+let va_cmp_zf o1 = S.OCf 
+let va_cmp_cf o1 = S.OZf
 
 let va_eval_code = Lemmas_i.eval_code
 let eval_ocmp = Lemmas_i.eval_ocmp
@@ -305,7 +311,7 @@ procedure{:instuction Ins(S.Bt64(src, pos))} Bt64(operand src:uint64, operand po
       modifies
         efl;
       ensures
-         true;
+         logand64(shift_right64(src, pos), 1) == (if cf(efl) then 1 else 0);
 {
     
 } 
@@ -317,7 +323,7 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load
     reads
         mem;
     requires
-        valid_src_addr(mem, src + offset);
+        valid_src_addr(mem, old(src) + offset);
     ensures
         dst == mem[old(src) + offset];
 {

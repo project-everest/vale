@@ -36,6 +36,10 @@ type ocmp =
   | OGe: o1:operand -> o2:operand -> ocmp
   | OLt: o1:operand -> o2:operand -> ocmp
   | OGt: o1:operand -> o2:operand -> ocmp
+  | OCf: ocmp
+  | ONcf:ocmp
+  | OZf: ocmp
+  | ONzf:ocmp
 
 type code = precode ins ocmp
 type codes = list code
@@ -275,6 +279,10 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
   | OGe o1 o2 -> eval_operand o1 s >=^ eval_operand o2 s
   | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
   | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
+  | OCf -> (cf s.flags)
+  | ONcf -> not (cf s.flags)
+  | OZf -> (zf s.flags)
+  | ONzf -> not (zf s.flags)
 
 (* These wrappers of the operators from FStar.UInt are only present
    because we discovered that using specs of the form (v a + v b) % pow2 64

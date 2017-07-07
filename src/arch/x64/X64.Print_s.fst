@@ -98,6 +98,10 @@ let cmp_not(o:ocmp) : ocmp =
   | OGe o1 o2 -> OLt o1 o2
   | OLt o1 o2 -> OGe o1 o2
   | OGt o1 o2 -> OLe o1 o2
+  | OCf -> ONcf
+  | ONcf -> OCf
+  | OZf -> ONzf
+  | ONzf -> OZf
 
 // Sanity check
 let _ = assert (forall o . o == cmp_not (cmp_not o))
@@ -145,6 +149,11 @@ let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   | OGe o1 o2 -> print_ops o1 o2 ^ "  jae "^ "L" ^ string_of_int counter ^ "\n"
   | OLt o1 o2 -> print_ops o1 o2 ^ "  jb " ^ "L" ^ string_of_int counter ^ "\n"
   | OGt o1 o2 -> print_ops o1 o2 ^ "  ja " ^ "L" ^ string_of_int counter ^ "\n"
+  (* TODO: Fix codes properly *)
+  | OCf  -> " jb " ^ "L" ^ string_of_int counter ^ "\n"
+  | ONcf  -> " jae " ^ "L" ^ string_of_int counter ^ "\n"
+  | OZf  -> " je " ^ "L" ^ string_of_int counter ^ "\n"
+  | ONzf -> " jee " ^ "L" ^ string_of_int counter ^ "\n"
 
 let rec print_block (b:codes) (n:int) (p:printer) : string * int =
   match b with
