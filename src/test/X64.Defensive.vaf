@@ -22,7 +22,6 @@ procedure operator(<<=) (inout operand dst:uint64, operand src:uint64) := Shl64;
 procedure operator(:=) (out operand dst:int, operand src:int) := Mov64;
 procedure operator(+=) (inout operand dst:int, operand src:int) := Add64;
 
-
 procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint64,  ghost u:umemlayout)
       requires
          true;
@@ -39,20 +38,21 @@ procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint
        Mov64(rax, r8);
        And64(rax, 0xFFFFFFFFE0000000);
        Xor64(rax, 0x20000000);
-       if (zf(efl) == 1){  
+       if ( zf(efl) ) {  
             Mov64(rdx, bitmap_address);
             Mov64(rcx, r8);
             Shr64(rcx, 9);
             Mov64(rax, r8);
             Shr64(rax, 3);
             Load64(rcx, rdx, rcx*8); 
-            Bt64(rcx, rax);  
-            if ( cf(efl) == 1){
-               Store64(dst, src, offset);
-            } else{
-               assume false;
-            }
+            Bt64(rcx, rax);
         } else {
-           assume false;
+            assume false;
         }
+        if ( cf(efl) ){
+               Store64(dst, src, offset);
+        } else{
+               assume false;
+        }
+       
 }

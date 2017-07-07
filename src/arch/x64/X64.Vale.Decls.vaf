@@ -109,6 +109,8 @@ val va_cmp_le (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_ge (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_lt (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_gt (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_zf (o1:va_operand) :ocmp
+val va_cmp_cf (o1:va_opeand): ocmp
 
 unfold let va_get_block (c:va_code{Block? c}) : va_codes = Block?.block c
 unfold let va_get_ifCond (c:va_code{IfElse? c}) : ocmp = IfElse?.ifCond c
@@ -222,6 +224,8 @@ let va_cmp_le o1 o2 = S.OLe o1 o2
 let va_cmp_ge o1 o2 = S.OGe o1 o2
 let va_cmp_lt o1 o2 = S.OLt o1 o2
 let va_cmp_gt o1 o2 = S.OGt o1 o2
+let va_cmp_zf o1 = true
+let va_cmp_cf o1 = true
 
 let va_eval_code = Lemmas_i.eval_code
 let eval_ocmp = Lemmas_i.eval_ocmp
@@ -301,7 +305,7 @@ procedure{:instuction Ins(S.Bt64(src, pos))} Bt64(operand src:uint64, operand po
       modifies
         efl;
       ensures
-         
+         true;
 {
     
 } 
