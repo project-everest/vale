@@ -242,7 +242,7 @@ procedure{:refined}{:bridge} poly1305_iteration(
     assert hh == (n * n) * h2 + n * h1 + h0 && modp(h * r) == modp(hh);
 }
 
-procedure{:timeLimitMultiplier 2} poly1305_blocks(
+procedure{:timeLimitMultiplier 20} poly1305_blocks(
           operand ctx:uint64,
     inout operand inp:uint64,
     inout operand len:uint64,
@@ -348,6 +348,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         reveal poly1305_heap_blocks;
     }
 
+    assert{:split_here} true;
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
             n == 0x1_0000_0000_0000_0000;

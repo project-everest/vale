@@ -1526,6 +1526,7 @@ ensures
     rSTR(r0, sp, 104, Public);
     rSTR(r0, sp, 108, Public);
     rSTR(r0, sp, 112, Public);
+    assert ValidSrcAddrs(mem, sp, 29, Public);
 }
 
 // Wrapper around the inner version that conforms to the calling convention

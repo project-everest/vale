@@ -39,6 +39,7 @@ procedure Copy64()
     Store64(rdi, rcx, 56);
 }
 
+/*
 procedure Copy128()
     requires/ensures
         rsi + 128 <= rdi;
@@ -85,3 +86,4 @@ procedure Copy128()
     Load64(rax, rsi, 120);
     Store64(rdi, rax, 120);
 }
+*/
