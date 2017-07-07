@@ -1519,6 +1519,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
 // convert imperative updates to functional let assignments
 let rec let_updates_stmts (scope:Map<id, typ option>) (ss:stmt list):(Set<id> * stmt list)=
   let (_, updates, ss_rev) = List.fold let_update_stmt_rev (scope, Set.empty, []) ss in
+  let updates = Set.filter (fun x -> Map.containsKey x scope) updates in
   (updates, List.rev ss_rev)
 and let_update_stmt_rev (scope:Map<id, typ option>, updates:Set<id>, ss_rev:stmt list) (s:stmt):(Map<id, typ option> * Set<id> * stmt list) =
   let (scope, updates, s) = let_update_stmt scope updates s in

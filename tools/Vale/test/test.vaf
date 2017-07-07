@@ -38,6 +38,12 @@ procedure Calls()
     if (rbx == 2)
     {
         Add64Wrap(rax, rbx);
+        if (rbx == 3)
+        {
+            ghost var dummy := 2;
+            Add64Wrap(rax, rbx);
+            z := z + 2;
+        }
         z := z + 2;
     }
     assert z == rax;
