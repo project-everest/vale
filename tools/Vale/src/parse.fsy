@@ -281,7 +281,14 @@ Stmt
   | ASSERT Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], EBool true, $2, $5)) }
   | ASSERT LBRACECOLON AnyId RBRACE LITBOOL SEMI
     {
-      stmtAt $1 (if $3 = Id "split_here" && snd $5 then SAssert ({assert_attrs_default with is_split = true}, EBool true) else parse_err "Must use: assert {:split_here} true;" )
+      let attrs =
+        match ($3, snd $5) with
+        | (_, false) -> parse_err "expected 'assert{...} true'"
+        | (Id "split_here", true) -> {assert_attrs_default with is_split = true}
+        | (Id "fast_block", true) -> {assert_attrs_default with is_fastblock = true}
+        | _ -> parse_err ("unknown attribute: " + (err_id $3))
+        in
+      stmtAt $1 (SAssert (attrs, EBool true))
     }
   | ASSERT LBRACECOLON AnyId RBRACE LBRACECOLON AnyId RBRACE LITBOOL SEMI
     {

@@ -78,7 +78,7 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool}
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_fastblock:bool}
 type lhs = id * (typ option * ghost) option
 type stmt =
 | SLoc of loc * stmt
@@ -92,6 +92,7 @@ type stmt =
 | SAssign of lhs list * exp
 | SLetUpdates of formal list * stmt // used to turn imperative updates into functional 'let' assignments
 | SBlock of stmt list
+| SFastBlock of stmt list // optimized proof for statements in block
 | SIfElse of stmt_modifier * exp * stmt list * stmt list
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list

@@ -95,6 +95,8 @@ type build_env =
     eReq:bool -> exp;
     prefix:string; // for inline if/else
     conds:exp list; // for inline if/else
+    gen_fast_block:exp list -> stmt list -> stmt list;
+    gen_fast_block_funs:unit -> decls;
   }
 
 // Turn multiple assignments into series of individual assignments
@@ -136,6 +138,7 @@ let rec build_code_stmt (env:env) (s:stmt):exp list =
   | SLoc (loc, s) ->
       try List.map (fun e -> ELoc (loc, e)) (build_code_stmt env s) with err -> raise (LocErr (loc, err))
   | SBlock b -> [build_code_block env b]
+  | SFastBlock b -> [build_code_block env b]
   | SIfElse (SmPlain, cmp, ss1, ss2) ->
       let e1 = build_code_block env ss1 in
       let e2 = build_code_block env ss2 in
@@ -764,6 +767,9 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
   | SVar (x, t, g, a, eOpt) -> (Ghost, false, [EsGhost [SVar (x, t, g, a, mapOpt sub_src eOpt)]])
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
+  | SFastBlock b ->
+      let ss = benv.gen_fast_block [EVar src; EVar res] b in
+      (NotGhost, true, [EsStmts ss])
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_src e in
       let ss1 = build_lemma_ghost_stmts env benv src res loc ss1 in
@@ -986,6 +992,50 @@ let fArg (x, t, g, io, a):exp list =
 //  | XOperand _ -> [vaApp "op" [EVar x]]
   | _ -> []
   in
+
+let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt list) * (unit -> decls)) =
+  let next_sym = ref 0 in
+  let funs = ref ([]:decls) in
+  let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
+  let fParams = area_fun_params EmitCode p.prets p.pargs in
+  let fIns (s:stmt):exp =
+    let err () = internalErr "make_gen_fast_block" in
+    match skip_loc_stmt s with
+    | SAssign ([], e) ->
+      (
+        match skip_loc e with
+        | EApply(Id x, es) ->
+            let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
+            let es = List.map get_code_exp es in
+            let es = List.map (map_exp stateToOp) es in
+            vaApp ("fast_ins_" + x) es
+        | _ -> err ()
+      )
+    | _ -> err ()
+    in
+  let gen_fast_block args ss =
+    incr next_sym;
+    let id = Reserved ("ins_" + (string !next_sym) + "_" + (string_of_id p.pname)) in
+    let inss = List.map fIns ss in
+    let fBody = EApply (Id "list", inss) in
+    let fCode =
+      {
+        fname = id;
+        fghost = Ghost;
+        fargs = fParams;
+        fret = TName (Reserved "inss");
+        fbody = Some fBody;
+        fattrs = [];
+      }
+      in
+    let dFun = DFun fCode in
+    funs := (loc, dFun)::!funs;
+    let eIns = EApply (id, fArgs) in
+    let sLemma = SAssign ([], EApply (Reserved "lemma_strong_post_norm", eIns::args)) in
+    [sLemma]
+    in
+  let gen_fast_block_funs () = List.rev !funs in
+  (gen_fast_block, gen_fast_block_funs)
 
 // Generate framing postcondition, which limits the variables that may be modified:
 //   ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
@@ -1450,6 +1500,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
           | SVar (x, _, XGhost, _, _) -> x::(List.concat xss)
           | _ -> List.concat xss
           in
+        let (gen_fast_block, gen_fast_block_funs) = make_gen_fast_block loc p in
         let benv =
           {
             proc = p;
@@ -1468,6 +1519,8 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             eReq = eReq;
             prefix = "";
             conds = [];
+            gen_fast_block = gen_fast_block;
+            gen_fast_block_funs = gen_fast_block_funs;
           }
           in
         let rstmts = stmts_refined stmts in
@@ -1512,7 +1565,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             [(loc, DFun fCode)] @ dAbstracts @ [(loc, DProc pRefined)] @ dBridge
         else
           let pLemma = build_lemma env benv b1 rstmts (gen_estmts stmts) in
-          [(loc, DFun fCode); (loc, DProc pLemma)]
+          [(loc, DFun fCode)] @ (gen_fast_block_funs ()) @ [(loc, DProc pLemma)]
     in
   fSpecs @ bodyDecls //@ blockLemmaDecls
 
@@ -1558,6 +1611,9 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
   | SBlock b ->
       let (u, b) = let_updates_stmts scope b in
       (scope, Set.union updates u, make_let u (SBlock b))
+  | SFastBlock b ->
+      let (u, b) = let_updates_stmts scope b in
+      (scope, Set.union updates u, make_let u (SFastBlock b))
   | SIfElse (g, e, b1, b2) ->
       let (u1, b1) = let_updates_stmts scope b1 in
       let (u2, b2) = let_updates_stmts scope b2 in
@@ -1581,7 +1637,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
         let fs (s:stmt):stmt list map_modify =
           let modGhost = if !reprint_ghost_stmts then Unchanged else Replace [] in
           match s with
-          | SLoc _ | SLabel _ | SGoto _ | SReturn | SLetUpdates _ | SBlock _ -> Unchanged
+          | SLoc _ | SLabel _ | SGoto _ | SReturn | SLetUpdates _ | SBlock _ | SFastBlock _ -> Unchanged
           | SIfElse ((SmInline | SmPlain), _, _, _) -> Unchanged
           | SWhile _ when !reprint_loop_invs -> Unchanged
           | SWhile (e, _, (l, _), s) -> Replace [SWhile (e, [], (l, []), s)]

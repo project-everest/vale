@@ -137,6 +137,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
         ({env with ids = ids}, [SAssign (xs, fee e)])
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> (env, [SBlock (rs b)])
+    | SFastBlock b -> (env, [SFastBlock (rs b)])
     | SIfElse (g, e, b1, b2) -> (env, [SIfElse (g, fee e, rs b1, rs b2)])
     | SWhile (e, invs, ed, b) ->
         (env, [SWhile (fee e, List_mapSnd fee invs, mapSnd (List.map fee) ed, rs b)])
@@ -671,6 +672,58 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
 
 ///////////////////////////////////////////////////////////////////////////////
 
+let is_assert_fast_block (s:stmt):bool =
+  match skip_loc_stmt s with
+  | SAssert ({is_fastblock = true}, e) ->
+    (
+      match skip_loc e with
+      | EBool true -> true
+      | _ -> false
+    )
+  | _ -> false
+
+let is_fast_call (env:env) (s:stmt):bool =
+  match skip_loc_stmt s with
+  | SAssign ([], e) ->
+    (
+      match skip_loc e with
+      | EApply(x, _) ->
+        (
+          match Map.tryFind x env.procs with
+          | Some p when attrs_get_bool (Id "fast_instruction") false p.pattrs -> true
+          | _ -> false
+        )
+      | _ -> false
+    )
+  | _ -> false
+
+let rec add_fast_blocks_stmt (env:env) (s:stmt):stmt =
+  let r = add_fast_blocks_stmt env in
+  let rs = add_fast_blocks_stmts env in
+  match s with
+  | SLoc (loc, s) -> SLoc (loc, r s)
+  | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SAssign _ | SCalc _ | SVar _ | SForall _ | SExists _-> s
+  | SLetUpdates _ -> internalErr "SLetUpdates"
+  | SFastBlock b -> internalErr "SFastBlock"
+  | SBlock b -> SBlock (rs b)
+  | SIfElse (g, e, b1, b2) -> SIfElse (g, e, rs b1, rs b2)
+  | SWhile (e, invs, ed, b) -> SWhile (e, invs, ed, rs b)
+and collect_fast_blocks_stmts (env:env) (ss:stmt list):(stmt list * stmt list) =
+  match ss with
+  | s::ss when is_fast_call env s ->
+      let (ss1, ss2) = collect_fast_blocks_stmts env ss in
+      (s::ss1, ss2)
+  | _ -> ([], ss)
+and add_fast_blocks_stmts (env:env) (ss:stmt list):stmt list =
+  match ss with
+  | [] -> []
+  | s::ss when is_assert_fast_block s ->
+      let (ss1, ss2) = collect_fast_blocks_stmts env ss in
+      (SFastBlock ss1)::(add_fast_blocks_stmts env ss2)
+  | s::ss -> (add_fast_blocks_stmt env s)::(add_fast_blocks_stmts env ss)
+
+///////////////////////////////////////////////////////////////////////////////
+
 let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
   match d with
   | DVar (x, t, XAlias (AliasThread, e), _) ->
@@ -746,6 +799,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             let ss = resolve_overload_stmts envp ss in
             //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
             let ss = rewrite_vars_stmts envp ss in
+            let ss = add_fast_blocks_stmts envp ss in
             Some ss
         in
       (env, DProc {p with pbody = resolveBody}, DProc {p with pbody = body; pspecs = specs})

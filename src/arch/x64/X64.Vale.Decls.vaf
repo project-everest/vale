@@ -285,7 +285,7 @@ procedure{:instruction Ins(S.Mov64(dst,src))} Mov64(inout dst_operand dst:uint64
 {
 }
 
-procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load64(
+procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64(
     out dst_operand dst:uint64,
         reg_operand src:uint64,
         inline offset:int)
@@ -298,7 +298,7 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))} Load
 {
 }
 
-procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))} Store64(
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store64(
         reg_operand dst:uint64,
         operand src:uint64,
         inline offset:int)

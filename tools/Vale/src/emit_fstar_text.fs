@@ -138,6 +138,7 @@ let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
+  | SFastBlock ss -> internalErr "fast_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp e) + " then");
       emit_block ps false eOut ss1;

@@ -53,7 +53,7 @@ let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
 let and_of_list = binary_op_of_list BAnd (EBool true)
 let or_of_list = binary_op_of_list BOr (EBool false)
 
-let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false}
+let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false; is_fastblock = false}
 
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
 
@@ -150,6 +150,7 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> [SBlock (map_stmts fe fs b)]
+    | SFastBlock b -> [SFastBlock (map_stmts fe fs b)]
     | SIfElse (g, e, b1, b2) -> [SIfElse (g, fe e, map_stmts fe fs b1, map_stmts fe fs b2)]
     | SWhile (e, invs, ed, b) ->
         [SWhile (
@@ -180,6 +181,7 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
     | SVar (x, t, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> rs b
+    | SFastBlock b -> rs b
     | SIfElse (g, e, b1, b2) -> [re e] @ (rs b1) @ (rs b2)
     | SWhile (e, invs, ed, b) -> [re e] @ (List.map re (List.map snd invs)) @ (List.map re (snd ed)) @ (rs b)
     | SForall (xs, ts, ex, e, b) -> (List.collect (List.map re) ts) @ [re e] @ (rs b)

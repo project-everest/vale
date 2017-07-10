@@ -161,6 +161,9 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> emit_block ps ss
+  | SFastBlock ss ->
+      emit_stmt ps (SAssert ({assert_attrs_default with is_fastblock = true}, EBool true));
+      emit_stmts ps ss
   | SIfElse (sm, e, ss1, []) ->
       ps.PrintLine ((string_of_stmt_modifier sm) + "if (" + (string_of_exp e) + ")");
       emit_block ps ss1
