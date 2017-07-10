@@ -23,30 +23,32 @@ procedure operator(+=) (inout operand dst:int, operand src:int) := Add64;
 
 procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint64,  ghost u:umemlayout)
       requires
-         true;
+         dst+offset < nat64_max; 
+          dst > 0;
+          offset > 0;
+          get_u_start(u) < nat64_max;
+          get_bitmap_start(u) < nat64_max;
+          shift_right64(dst+offset, 9)*8  < nat64_max;
       modifies
          mem; efl; r8; rdx; rcx; rax;
       ensures
-       is_inside_u_region (dst, offset, u);
        mem[dst + offset] != old(mem)[dst + offset] ==> And64(mem[bitmap_address + Shl64(Shr64((dst + offset), 9), 3)], Shr64(Shl64(1, (dst + offset)), 3)) == 1;
 {
-       //ghost var bitmap_address:uint64 := get_bitmap_start(u);
-      // var u_addr_mask:uint64 :=0xFFFFFFFFE0000000; 
        Mov64(r8, dst);
        Add64(r8, offset);
        Mov64(rax, r8);
-       And64(rax, 0xFFFFFFFFE0000000);
-       Xor64(rax, 0x20000000);
+       And64(rax, const(get_u_start(u)));
+       Xor64(rax,0x20000000);
        if ( zf(efl) ) {  
-            Mov64(rdx, const(get_bitmap_start(u)));
+           Mov64(rdx, const(get_bitmap_start(u)));
             Mov64(rcx, r8);
             Shr64(rcx, 9);
             Mov64(rax, r8);
             Shr64(rax, 3);
-            IMul64(rcx, 8);
+           IMul64(rcx, 8);
             Add64(rdx, rcx);
-            Load64(rcx, rdx, 0); 
-            Bt64(rcx, rax);
+         //   Load64(rcx, rdx, 0); 
+        //    Bt64(rcx, rax);
         } else {
             assume false;
         }
@@ -56,4 +58,31 @@ procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint
                assume false;
         }
        
+}
+
+//Assume that Verified functions do not call back untrusted functions
+procedure CallVerifiedFunction(register dst:uint64, ghost u:umemlayout)
+   requires
+       is_known_verified_entrypoint(dst, u);
+    ensures
+       // code section has not changed
+       forall i :: 0 <= i && i < (get_code_size u) && i % 8 == 0 ==> mem[(get_code_start u) + i] == old(mem[(get_code_start u) + i]);
+       //stack has not changed
+       forall i :: 0 <= i && i < (get_stack_size u) && i % 8 == 0 ==> mem[(get_stack_start u) + i] == old(mem[(get_stack_start u) + i]);{
+        //invoke call; not supported yet
+	// call dst
+  }
+
+
+procedure CallUntrustedFunction(register dst:uint64, ghost u:umemlayout)
+    requires
+      is_known_untrusted_entrypoint(dst, u);
+    ensures
+     //code section has not changed
+     forall i :: 0 <= i && i < (get_code_size u) && i % 8 == 0 ==> mem[(get_code_start u) + i] == old(mem[(get_code_start u) + i]);
+     //post condition complicated because this function can inturn call verified function. Thus the entire memory (except code section) can change
+     // ???
+
+{
+     //What should be the appropriate post-condition here?
 }
