@@ -10,7 +10,7 @@ let sid (x:id):string =
   match x with
   | Id s -> s
   | Reserved s -> qprefix "va_" s
-  | Operator s -> internalErr "custom operator"
+  | Operator s -> internalErr (sprintf "custom operator: %A" x)
 
 // non-associative: (n, n+1, n+1)
 // left-associative: (n, n, n+1)
@@ -26,7 +26,7 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BAdd -> (30, 30, 31)
   | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
-  | BOldAt | BIn | BCustom _ -> internalErr ("binary operator")
+  | BOldAt | BIn | BCustom _ -> internalErr (sprintf "binary operator: %A" op)
 
 let string_of_bop (op:bop):string =
   match op with
@@ -46,7 +46,7 @@ let string_of_bop (op:bop):string =
   | BMul -> "`op_Multiply`"
   | BDiv -> "`op_Division`"
   | BMod -> "`op_Modulus`"
-  | BOldAt | BIn | BCustom _ -> internalErr "binary operator"
+  | BOldAt | BIn | BCustom _ -> internalErr (sprintf "binary operator: %A" op)
 
 let string_of_ghost (g:ghost) = ""
 let string_of_var_storage (g:var_storage) = ""
@@ -74,12 +74,12 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
-    | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Uop _, ([] | (_::_::_))) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Bop op, [e1; e2]) ->
         let (pe, p1, p2) = prec_of_bop op in
         ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
-    | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr "binary operator"
+    | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr (sprintf "binary operator: %A" e)
     | EApply (Id "tuple", es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EApply (Id "list", es) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
 //    | EOp (MultiOp MSet, es) -> notImplemented "MSet"
@@ -88,14 +88,14 @@ let rec string_of_exp_prec prec e =
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2]) -> ("{" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "}", 90)
-    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
+    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
     | EApply (x, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
     | EBind (Lambda, [], xs, ts, e) -> qbind "fun" " -> " xs ts e
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " = " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
-    | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr "EBind"
+    | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formals (xs:formal list):string = String.concat " " (List.map string_of_formal xs)

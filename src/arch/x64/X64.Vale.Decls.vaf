@@ -279,7 +279,7 @@ var{:state reg(R15)} r15:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-procedure{:instruction Ins(S.Mov64(dst,src))} Mov64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst_operand dst:uint64, operand src:uint64)
     ensures
         dst == old(src);
 {
@@ -307,9 +307,9 @@ procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fas
     requires
         valid_dst_addr(mem, dst + offset);
     ensures
-        mem == old(mem)[old(dst + offset) := src];
+        mem == old(mem[dst + offset := src]);
 {
-    assert Map.equal(mem, old(mem)[old(dst + offset) := src]);
+    assert Map.equal(mem, old(mem[dst + offset := src]));
 }
 
 procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst_operand dst:uint64, operand src:uint64)
@@ -322,7 +322,7 @@ procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst_operand dst:uint64
 {
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures
@@ -339,7 +339,7 @@ procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst_operan
 {
 }
 
-procedure{:instruction Ins(S.AddCarry64(dst, src))} Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap(inout dst_operand dst:uint64, operand src:uint64)
     modifies
         efl;
     ensures
@@ -366,7 +366,7 @@ procedure{:instruction Ins(S.Sub64(dst, src))} Sub64Wrap(inout dst_operand dst:u
 {
 }
 
-procedure{:instruction Ins(S.Mul64(src))} Mul64Wrap(operand src:uint64)
+procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(operand src:uint64)
     modifies
         efl;
         rax;
@@ -379,7 +379,7 @@ procedure{:instruction Ins(S.Mul64(src))} Mul64Wrap(operand src:uint64)
 #verbatim
 #reset-options "--z3cliopt smt.arith.nl=true --initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
-procedure{:instruction Ins(S.IMul64(dst, src))} IMul64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst_operand dst:uint64, operand src:uint64)
     requires
         dst * src < nat64_max;
     modifies

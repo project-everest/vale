@@ -1008,6 +1008,7 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt 
             let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
             let es = List.map get_code_exp es in
             let es = List.map (map_exp stateToOp) es in
+            let es = List.map exp_refined es in
             vaApp ("fast_ins_" + x) es
         | _ -> err ()
       )
