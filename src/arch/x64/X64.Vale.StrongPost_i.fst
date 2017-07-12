@@ -3,7 +3,7 @@ open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 
-#reset-options "--initial_fuel 1 --max_fuel 1 --initial_ifuel 1 --max_ifuel 1 --z3rlimit 7"
+#reset-options "--initial_fuel 1 --max_fuel 1 --initial_ifuel 1 --max_ifuel 1 --z3rlimit 20"
 
 // REVIEW: Hide polymorphic Map functions behind monomorphic functions
 // until we have a better way to prevent the nat64 type argument from getting normalized
@@ -96,6 +96,12 @@ let lemma_strong_post_ins (i:ins) (inss:list ins) (s0:state) (sN:state) : Ghost 
     let a = logand64 (s0.regs dst) (eval_operand_norm src s0) in
     if dst <> Rsp && valid_operand_norm src s0 then
       let (bM, sM) = va_lemma_And64 b0 s0 sN (OReg dst) src in
+      some_post sM
+    else none_post ()
+  | Shr64 (OReg dst) src ->
+    let a = shift_right64 (s0.regs dst) (eval_operand_norm src s0) in
+    if dst <> Rsp && valid_operand_norm src s0 then
+      let (bM, sM) = va_lemma_Shr64 b0 s0 sN (OReg dst) src in
       some_post sM
     else none_post ()
   | _ -> assume false; None

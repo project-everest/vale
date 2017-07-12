@@ -418,7 +418,7 @@ procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst_operand dst:uint6
 {
 }
 
-procedure{:instruction Ins(S.Shr64(dst, amt))} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
+procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
     modifies
         efl;
     ensures
