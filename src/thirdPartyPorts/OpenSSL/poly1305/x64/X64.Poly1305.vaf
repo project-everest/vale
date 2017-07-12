@@ -376,6 +376,46 @@ procedure poly1305_reduce(
 //    lemma_poly_reduce(n, p, hd, old(d3), h10, rax, hh);
 }
 
+procedure poly1305_reduce_regs(
+    ghost hd:int,
+    ghost n:int,
+    ghost p:int)
+    returns(ghost hh:int)
+    modifies
+        rax;
+        efl;
+        r10;
+        r14;
+        rbx;
+        rbp;
+    requires
+        n == 0x1_0000_0000_0000_0000;
+        p == n * n * 4 - 5;
+        hd == (n * n) * r10 + n * rbx + r14;
+        r10 / 4 * 4 + r10 / 4 < 0x1_0000_0000_0000_0000;
+        rax == 0xffff_ffff_ffff_fffc;
+    ensures
+//        p > 0;  // TODO: Shouldn't need this!
+//        hh == (n * n) * rbp + n * rbx + r14;
+//        hd % p == hh % p;
+//        rbp < 5;
+{
+//    lemma_BitwiseAdd64();
+//    lemma_poly_bits64();
+
+    And64(rax, r10);
+    Mov64(rbp, r10);
+    Shr64(r10, 2);
+    And64(rbp, 3);
+    Add64Wrap(rax, r10);
+    Add64Wrap(r14, rax);
+    Adc64Wrap(rbx, 0);
+    Adc64Wrap(rbp, 0);
+
+    ghost var rbx0 := n * old(rbx) + old(r14);
+    hh := rbx0 + rax + (old(r10) % 4) * (n * n);
+//    lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
+}
 
 procedure poly1305_iteration(
     inout dst_operand d1:uint64,
