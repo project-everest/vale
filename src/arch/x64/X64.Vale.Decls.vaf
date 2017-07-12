@@ -400,7 +400,7 @@ procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst_operand dst:uint6
 {
 }
 
-procedure{:instruction Ins(S.And64(dst, src))} And64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout dst_operand dst:uint64, operand src:uint64)
     modifies 
         efl;
     ensures

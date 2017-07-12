@@ -3,6 +3,8 @@ open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 
+#reset-options "--z3rlimit 7"
+
 val mem_contains : m:mem -> i:int -> bool
 val mem_sel : m:mem -> i:int -> nat64
 val mem_upd : m:mem -> i:int -> n:nat64 -> mem
@@ -27,6 +29,7 @@ type ins =
   | Adc64Wrap : dst:va_operand -> src:va_operand -> ins
   | Mul64Wrap : src:va_operand -> ins
   | IMul64 : dst:va_operand -> src:va_operand -> ins
+  | And64 : dst:va_operand -> amt:va_operand -> ins
 
 unfold let va_fast_ins_Mov64 = Mov64
 unfold let va_fast_ins_Load64 = Load64
@@ -35,6 +38,7 @@ unfold let va_fast_ins_Add64Wrap = Add64Wrap
 unfold let va_fast_ins_Adc64Wrap = Adc64Wrap
 unfold let va_fast_ins_Mul64Wrap = Mul64Wrap
 unfold let va_fast_ins_IMul64 = IMul64
+unfold let va_fast_ins_And64 = And64
 
 unfold let va_inss = list ins
 
@@ -117,6 +121,13 @@ let rec strong_post (inss:list ins) (s0:state) (sN:state) : Type0 =
       (exists (x:nat64) (f:nat64).
         x == a /\
         strong_post inss ({update_reg dst x s0 with flags = f}) sN)
+  | (And64 (OReg Rsp) _)::_ -> True
+  | (And64 (OReg dst) src)::inss ->
+    let a = logand64 (s0.regs dst) (eval_operand_norm src s0) in
+    not (valid_operand_norm src s0) \/
+    (exists (x:nat64) (f:nat64).
+      x == a /\
+      strong_post inss ({update_reg dst x s0 with flags = f}) sN)
   | _ -> True
 
 let rec inss_to_codes (inss:list ins) : list va_code =
@@ -133,6 +144,8 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   | (Mul64Wrap src)::inss -> (va_code_Mul64Wrap src)::(inss_to_codes inss)
   | (IMul64 (OReg Rsp) _)::inss -> []
   | (IMul64 (OReg dst) src)::inss -> (va_code_IMul64 (OReg dst) src)::(inss_to_codes inss)
+  | (And64 (OReg Rsp) _)::inss -> []
+  | (And64 (OReg dst) src)::inss -> (va_code_And64 (OReg dst) src)::(inss_to_codes inss)
   | _ -> []
 
 val va_lemma_strong_post_norm : inss:list ins -> s0:state -> sN:state -> Lemma
