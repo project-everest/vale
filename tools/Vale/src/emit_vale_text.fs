@@ -148,10 +148,15 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ) contents;
       ps.Unindent();
       ps.PrintLine("}")
-  | SVar (x, tOpt, g, a, eOpt) ->
+  | SVar (x, tOpt, Immutable, XGhost, [], Some e) ->
+      let st = match tOpt with None -> "" | Some t -> ":" + (string_of_typ t) in
+      ps.PrintLine ("let " + (sid x) + st + " := " + (string_of_exp e) + ";")
+  | SVar (x, tOpt, _, g, a, eOpt) ->
       let st = match tOpt with None -> "" | Some t -> ":" + (string_of_typ t) in
       let rhs = match eOpt with None -> "" | Some e -> " := " + (string_of_exp e) in
       ps.PrintLine ((string_of_var_storage g) + "var " + (sid x) + st + rhs + ";")
+  | SAlias (x, y) ->
+      ps.PrintLine ("let " + (sid x) + " @= " + (sid y) + ";")
   | SAssign ([], EOp (Uop (UCustomAssign s), [e])) ->
       ps.PrintLine ((string_of_exp e) + " " + s + ";")
   | SAssign (lhss, EOp (Uop (UCustomAssign s), [e])) ->

@@ -759,8 +759,9 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
   | SCalc (oop, contents) ->
       let ccs = List.map (build_lemma_calcContents env benv src res loc sub_src) contents in
       (Ghost, false, [EsGhost [SCalc (oop, ccs)]])
-  | SVar (_, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
-  | SVar (x, t, g, a, eOpt) -> (Ghost, false, [EsGhost [SVar (x, t, g, a, mapOpt sub_src eOpt)]])
+  | SVar (_, _, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
+  | SVar (x, t, m, g, a, eOpt) -> (Ghost, false, [EsGhost [SVar (x, t, m, g, a, mapOpt sub_src eOpt)]])
+  | SAlias _ -> (Ghost, false, [])
   | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_src e in
@@ -831,7 +832,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
                     //   reveal_va_spec_P();
                     //   reveal_va_spec_Q();
                     let ghosts = benv.is_refined_while_ghosts in
-                    let ghostOlds = List.map (fun x -> SVar (old_id x, None, XGhost, [], Some (EVar x))) ghosts in
+                    let ghostOlds = List.map (fun x -> SVar (old_id x, None, Immutable, XGhost, [], Some (EVar x))) ghosts in
                     let ghostMap = List.map (fun x -> (x, EVar (old_id x))) ghosts in
                     let ghostExps = List.map EVar ghosts in
                     let reveal_of_spec x = SAssign ([], EOp(Uop UReveal, [EVar x])) in
@@ -868,7 +869,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
                     let fromInvs invs = and_of_list (List.map (fun (loc, e) -> ELoc (loc, e)) invs) in
                     let invExp = EOp (Bop BImply, [fromInvs invs0; ex (fromInvs invs1)]) in
                     let invInvs = (loc, makeSpecForalls [(benv.proc.pname, []); (xf, ghostExps)] None foralls invExp) in
-                    let wPre = List.map (fun x -> SVar (prev_id x, None, XGhost, [], Some (EVar x))) ghosts in
+                    let wPre = List.map (fun x -> SVar (prev_id x, None, Immutable, XGhost, [], Some (EVar x))) ghosts in
                     // assert forall id, g :: va_trigger_P(va_id, g, i) ==> va_trigger_P(id, g, prev_i);
                     let esPost = (List.map (fun (x, _) -> EVar x) foralls) @ (List.map (fun x -> EVar (prev_id x)) ghosts) in
                     let ePost = makeSpecTrigger xf (EVar (Reserved "id")) esPost in
@@ -1120,7 +1121,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
   *)
   let formal_to_var (f:pformal) =
     match f with
-    | (id,t,vstorag,_,attrs) -> SVar (id, Some t, vstorag, attrs, None)
+    | (id, t, vstorag, _, attrs) -> SVar (id, Some t, Immutable, vstorag, attrs, None)
   let ghost_returns_var_decls = List.map formal_to_var (List.filter is_ghost_formal p.prets) in
   let trEx = makeSpecTriggerExists p.pname (List.map (fun (x, _) -> EVar x) (List.collect ghostFormal p.prets)) in
   let forallBody = ghost_returns_var_decls @ (stmts_abstract true (stmts_of_estmts false true estmts)) @ [SAssert (assert_attrs_default, trEx)] in
@@ -1138,6 +1139,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
     pinline = Outline;
     pargs = pargs @ pspecMods @ pformals_calls;
     prets = prets;
+    palias = [];
     pspecs = condReqs @ opaqueReqs @ opaqueEnss;
     pbody = Some (reveals @ [forallStmt]);
     pattrs = (Id "warnShadowing", [EBool false])::(List.filter filter_proc_attr p.pattrs);
@@ -1177,9 +1179,9 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   let lCM  = (cM, Some (Some tCode, NotGhost)) in
   let sBlock = lemma_block (sM, None) lCM (bM, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
   let sReveal = SAssign ([], EOp (Uop UReveal, [EVar codeName])) in // reveal_va_code_Q();
-  let sOldS = SVar (Reserved "old_s", (if !concise_lemmas then Some tState else None), XPhysical, [], Some (EVar s0)) in
+  let sOldS = SVar (Reserved "old_s", (if !concise_lemmas then Some tState else None), Immutable, XPhysical, [], Some (EVar s0)) in
   let eb1 = vaApp "get_block" [EVar cM] in
-  let sb1 = SVar (b1, (if !concise_lemmas then Some tCodes else None), XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);
+  let sb1 = SVar (b1, (if !concise_lemmas then Some tCodes else None), Immutable, XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);
 
   // Generate well-formedness for operands:
   //   requires va_is_dst_int(dummy, s0)
@@ -1249,7 +1251,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
           | AciIfElse (_, esi) -> List.map (fun (x,_) -> EVar x) esi.esi_formals
           in
         let absArgsCalls = List.collect args_of_call calls in
-        let sLocalsToAbstract = List.collect formals_of_call calls |> List.map (fun (x,t) -> SVar (x,t,XPhysical,[],None)) in
+        let sLocalsToAbstract = List.collect formals_of_call calls |> List.map (fun (x,t) -> SVar (x, t, Immutable, XPhysical, [], None)) in
         let absArgs = absArgsIo @ absArgsMods @ absArgsCalls in
         // Generate call from concrete lemma to abstract lemma:
         //   va_abstract_Q(iii, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_reg(EAX, va_s0), ..., va_get_reg(EAX, va_s17));
@@ -1266,6 +1268,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       pinline = Outline;
       pargs = argB::pargs;
       prets = retB::retR::prets;
+      palias = [];
       pspecs = (loc, req)::(List.map clean_unrefined reqs) @ pspecs_u_reqs @ (loc, ens)::pspecs_u_enss @ enss;
       pbody = Some ([sReveal; sOldS] @ sLocalsToAbstract @ sBlock @ (if benv.is_instruction then [] else [sb1]) @ sStmts);
       pattrs = List.filter filter_proc_attr p.pattrs;
@@ -1328,6 +1331,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       pinline = Outline;
       pargs = pargs;
       prets = prets;
+      palias = [];
       pspecs = (loc, req)::(List.map clean_unrefined reqs) @ (loc, ens)::(List.map clean_unrefined (List.concat pspecs)) @ ensFrame;
       pbody = Some (sStmts);
       pattrs = List.filter filter_proc_attr p.pattrs;
@@ -1445,7 +1449,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
         let is_refined_while_proc = isRefined && (is_while_proc stmts) in
         let fGhost s xss =
           match s with
-          | SVar (x, _, XGhost, _, _) -> x::(List.concat xss)
+          | SVar (x, _, _, XGhost, _, _) -> x::(List.concat xss)
           | _ -> List.concat xss
           in
         let benv =
@@ -1526,7 +1530,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
         let fs (s:stmt):stmt list map_modify =
           let modGhost = if !reprint_ghost_stmts then Unchanged else Replace [] in
           match s with
-          | SLoc _ | SLabel _ | SGoto _ | SReturn | SBlock _ -> Unchanged
+          | SLoc _ | SLabel _ | SGoto _ | SReturn | SBlock _ | SAlias _ -> Unchanged
           | SIfElse ((SmInline | SmPlain), _, _, _) -> Unchanged
           | SWhile _ when !reprint_loop_invs -> Unchanged
           | SWhile (e, _, (l, _), s) -> Replace [SWhile (e, [], (l, []), s)]
