@@ -480,7 +480,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let s = new CalcStmt(start_tok, end_tok, calcOp, lines, hints, stepOps, attrs) in
         stmts.Add(s)
         stmts
-    | SVar (x, tOpt, g, a, eOpt) ->
+    | SVar (x, tOpt, _, g, a, eOpt) ->
         let is_ghost:bool = var_storage_to_bool g in
         let start_tok =
             if is_ghost then create_token loc "ghost"
@@ -505,6 +505,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
             let s = new VarDeclStmt(start_tok, end_tok, lhss, update) :> Statement in
             stmts.Add(s)
             stmts
+    | SAlias _ -> internalErr "SAlias"
     | SAssign ([], e) ->
         let exp = create_expression built_ins loc e in
         let end_tok = create_token loc ";" in

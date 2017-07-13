@@ -70,6 +70,7 @@ type attrs = attr list
 type var_alias =
 | AliasThread // thread-local variable, such as register
 | AliasLocal // procedure-local variable
+type mutability = Mutable | Immutable
 type var_storage =
 | XGhost // ghost, no storage space
 | XPhysical // ordinary non-ghost variable (supplies its own storage space)
@@ -88,7 +89,8 @@ type stmt =
 | SAssume of exp
 | SAssert of assert_attrs * exp
 | SCalc of bop option * calcContents list
-| SVar of id * typ option * var_storage * attrs * exp option
+| SVar of id * typ option * mutability * var_storage * attrs * exp option
+| SAlias of id * id
 | SAssign of lhs list * exp
 | SLetUpdates of formal list * stmt // used to turn imperative updates into functional 'let' assignments
 | SBlock of stmt list
@@ -126,6 +128,7 @@ type proc_decl =
     pargs:pformal list;
     prets:pformal list;
     pspecs:(loc * spec) list;
+    palias:(id * id) list;
     pbody:stmt list option;
     pattrs:attrs;
   }

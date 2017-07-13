@@ -26,6 +26,7 @@ let operatorToken (tok:string) (isCustom:bool) (s:string):(loc -> token) option 
   | ">" -> Some (fun loc -> GT (loc, (isCustom, s)))
   | "=" -> Some (fun loc -> EQ (loc, (isCustom, s)))
   | ":=" -> Some (fun loc -> COLONEQ (loc, (isCustom, s)))
+  | "@=" -> Some (fun loc -> ATEQ (loc, (isCustom, s)))
   | "<=" -> Some (fun loc -> LE (loc, (isCustom, s)))
   | ">=" -> Some (fun loc -> GE (loc, (isCustom, s)))
   | "==" -> Some (fun loc -> EQEQ (loc, (isCustom, s)))
