@@ -54,7 +54,6 @@ val swap_add: a:int -> b:int -> c:int -> Lemma
       (a + b + c = a + c + b)
 let swap_add a b c = ()
 
-
 // p used to be a refinement to p > 0 and r1 a nat.
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
@@ -137,10 +136,9 @@ let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:in
       	((h2*n + h1) *(r1/4)) p;
       assert ((h*r) % p == hh % p)
 
-(*
-let lemma_poly_reduce (n:int) (p:int{ p > 0 }) (h:nat) (h2:int) (h10:int) (c:int) (hh:int) =
-  admit ()
+let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
+  admit()
 
 let lemma_poly_bits64 =
   admit ()
-*)
+

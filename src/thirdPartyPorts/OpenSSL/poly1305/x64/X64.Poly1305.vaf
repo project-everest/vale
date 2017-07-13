@@ -45,6 +45,7 @@ open X64.Poly1305.Math_i
 unfold let n = nat64_max
 #endverbatim
 
+/*
 procedure poly1305_multiply(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,
@@ -329,6 +330,7 @@ procedure poly1305_multiply_fast_block(
     //assert hh == gd2 * (n * n) + gd1 * n + gd0;
     lemma_poly_multiply(n, p, r, h, r11, r1, old(r14), old(rbx), old(rbp), r13, gd0, gd1, gd2, hh);
 }
+*/
 
 /*
 procedure poly1305_reduce(
@@ -349,12 +351,13 @@ procedure poly1305_reduce(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-//        n == 0x1_0000_0000_0000_0000;
-//        p == n * n * 4 - 5;
-//        hd == (n * n) * d3 + n * h1 + h0;
-//        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
-//        rax == 0xffff_ffff_ffff_fffc;
+        n == 0x1_0000_0000_0000_0000;
+        p == n * n * 4 - 5;
+        hd == (n * n) * d3 + n * h1 + h0;
+        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
+        rax == 0xffff_ffff_ffff_fffc;
     ensures
+//        p > 0;  // TODO: Shouldn't need this!
 //        hh == (n * n) * h2 + n * h1 + h0;
 //        hd % p == hh % p;
 //        h2 < 5;
@@ -416,10 +419,11 @@ procedure poly1305_reduce_regs(
     hh := rbx0 + rax + (old(r10) % 4) * (n * n);
 //    lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
 }
+*/
 
 procedure poly1305_reduce_regs_fast_block(
     ghost hd:int,
-    ghost n:int,
+    //ghost n:int,
     ghost p:int)
     returns(ghost hh:int)
     modifies
@@ -430,19 +434,19 @@ procedure poly1305_reduce_regs_fast_block(
         rbx;
         rbp;
     requires
-        n == 0x1_0000_0000_0000_0000;
+        //n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
         hd == (n * n) * r10 + n * rbx + r14;
         r10 / 4 * 4 + r10 / 4 < 0x1_0000_0000_0000_0000;
         rax == 0xffff_ffff_ffff_fffc;
     ensures
-//        p > 0;  // TODO: Shouldn't need this!
-//        hh == (n * n) * rbp + n * rbx + r14;
-//        hd % p == hh % p;
-//        rbp < 5;
+        p > 0;  // TODO: Shouldn't need this!
+        hh == (n * n) * rbp + n * rbx + r14;
+        hd % p == hh % p;
+        rbp < 5;
 {
 //    lemma_BitwiseAdd64();
-//    lemma_poly_bits64();
+    lemma_poly_bits64();
 
     assert{:fast_block} true;
     And64(rax, r10);
@@ -456,9 +460,10 @@ procedure poly1305_reduce_regs_fast_block(
 
     ghost var rbx0 := n * old(rbx) + old(r14);
     hh := rbx0 + rax + (old(r10) % 4) * (n * n);
-//    lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
+    lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
 }
 
+/*
 procedure poly1305_iteration(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,
@@ -1133,15 +1138,15 @@ Store64(ctx, h0,  0, Public, ctx_id);
 */
 #verbatim
 
-let print_poly1305 (p:printer) : FStar.All.ML unit =
-  let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
-  print_header p;
-  print_proc "poly1305" poly_code 0 p;
-  print_footer p
-
-let main () : FStar.All.ML unit =
-  print_poly1305 masm;
-  print_string "\n\n";
-  print_poly1305 gcc
+//let print_poly1305 (p:printer) : FStar.All.ML unit =
+//  let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
+//  print_header p;
+//  print_proc "poly1305" poly_code 0 p;
+//  print_footer p
+//
+//let main () : FStar.All.ML unit =
+//  print_poly1305 masm;
+//  print_string "\n\n";
+//  print_poly1305 gcc
 
 #endverbatim
