@@ -110,6 +110,7 @@ procedure Ifs(inline i:int, ghost g:int)
         a @= eax;
         b @= ebx;
         g2 := g1 + 1;
+        g3 := a;
     modifies
         eax; ebx;
     requires

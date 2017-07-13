@@ -32,13 +32,14 @@ let conj_semi_exps (es:(loc * exp) list):exp =
   let es = List.map (fun (loc, e) -> ELoc (loc, e)) es in
   and_of_list es
 
-let make_spec (f:exp -> spec) (es:(loc * exp) list) (lets:(id * typ option * exp) list):(loc * spec) list =
+let make_spec (old:bool) (f:exp -> spec) (es:(loc * exp) list) (lets:(id * typ option * exp) list):(loc * spec) list =
   match (lets, es) with
   | (_, []) -> []
   | ([], _) -> List_mapSnd f es
   | (_, (loc, _)::_) ->
+      let fee e = if old then EOp (Uop UOld, [e]) else e in
       let e = conj_semi_exps es in
-      let e = List.fold (fun e (x, t, ee) -> EBind (BindLet, [ee], [(x, t)], [], e)) e (List.rev lets) in
+      let e = List.fold (fun e (x, t, ee) -> EBind (BindLet, [fee ee], [(x, t)], [], e)) e (List.rev lets) in
       [(loc, f e)]
 
 type plet =
@@ -386,21 +387,21 @@ SemiExps
 Req: REQUIRES Attrs {}
 
 Spec
-  : REQUIRES SemiExps { make_spec Requires $2 }
+  : REQUIRES SemiExps { make_spec false Requires $2 }
   | REQUIRES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
     {
       (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
       let f e = Requires (EOp (Uop UUnrefinedSpec, [e])) in
-      make_spec f $6
+      make_spec false f $6
     }
   | ENSURES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
     {
       (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
       let f e = Ensures (EOp (Uop UUnrefinedSpec, [e])) in
-      make_spec f $6
+      make_spec true f $6
     }
-  | ENSURES SemiExps { make_spec Ensures $2 }
-  | REQUIRES SLASH ENSURES SemiExps { fun lets -> (make_spec Requires $4 lets) @ (make_spec Ensures $4 lets) }
+  | ENSURES SemiExps { make_spec true Ensures $2 }
+  | REQUIRES SLASH ENSURES SemiExps { fun lets -> (make_spec false Requires $4 lets) @ (make_spec true Ensures $4 lets) }
   | READS SemiExps { fun lets -> List_mapSnd (fun e -> Modifies (false, e)) $2 }
   | MODIFIES SemiExps { fun lets -> List_mapSnd (fun e -> Modifies (true, e)) $2 }
 Specs
