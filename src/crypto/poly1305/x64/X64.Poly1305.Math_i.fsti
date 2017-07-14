@@ -51,3 +51,10 @@ val lemma_poly_bits64 : u:unit -> Lemma
     (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0ffffffc)} logand64 x 0x0ffffffc0ffffffc < nat64_max / 16) /\
     (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0ffffffc)} (logand64 x 0x0ffffffc0ffffffc) % 4 == 0) /\
     (forall (x:nat64)  (y:nat64) . (logand64 x y) == (logand64 y x)))
+
+val lemma_mul_strict_upper_bound : x:nat -> x_bound:int -> y:nat -> y_bound:int -> Lemma
+  (requires 
+    x < x_bound /\
+    y < y_bound)
+  (ensures x * y < x_bound * y_bound)
+    

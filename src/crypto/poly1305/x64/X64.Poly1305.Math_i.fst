@@ -140,5 +140,7 @@ let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int
   admit()
 
 let lemma_poly_bits64 =
-  admit ()
+  admit()
 
+let lemma_mul_strict_upper_bound (x:nat) (x_bound:int) (y:nat) (y_bound:int) =
+  admit()

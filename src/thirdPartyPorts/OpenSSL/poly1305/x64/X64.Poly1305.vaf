@@ -459,7 +459,6 @@ procedure poly1305_reduce_regs_fast_block(
     lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
 }
 
-/*
 procedure poly1305_iteration(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,
@@ -472,7 +471,7 @@ procedure poly1305_iteration(
     ghost r1:nat64,
     ghost r:int,
     ghost h:int,
-    ghost n:int,
+    //ghost n:int,
     ghost p:int)
     //HACK: returns(ghost hh:int)
     modifies
@@ -488,16 +487,16 @@ procedure poly1305_iteration(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-//        n == 0x1_0000_0000_0000_0000;
-//        p == n * n * 4 - 5;
-//        r == r1 * n + r0;
-//        h == h2 * (n * n) + h1 * n + h0;
-//        r0 < n / 16;
-//        r1 < n / 16;
-//        r1 % 4 == 0;
-//        s1 == r1 + r1 / 4;
-//        h2 < 7;
-//        rax == r1;
+        n == 0x1_0000_0000_0000_0000;
+        p == n * n * 4 - 5;
+        r == r1 * n + r0;
+        h == h2 * (n * n) + h1 * n + h0;
+        r0 < n / 16;
+        r1 < n / 16;
+        r1 % 4 == 0;
+        s1 == r1 + r1 / 4;
+        h2 < 7;
+        rax == r1;
     ensures
 //        // hh == (n * n) * h2 + n * h1 + h0;
 //        // modp(h * r) == modp(hh);
@@ -513,13 +512,24 @@ procedure poly1305_iteration(
 //        // lemma_mul_strict_upper_bound(x, xb, y, yb);
 //        assume false;       // TODO
 //    }
+    // TODO:  This version leads Z3 off into the weeds and times out with F* (but not Dafny)
+    //assume forall x:nat, xb, y:nat, yb { x*y, xb*yb } :: x < xb && y < yb ==> x * y < xb * yb;
 
-    (ghost var hd) := poly1305_multiply(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, n, p);
-    (ghost var hh) := poly1305_reduce(d3, h0, h1, h2, hd, n, p);
+    lemma_mul_strict_upper_bound(h2, 7, r0, n / 16);
+    lemma_mul_strict_upper_bound(h0, n, r1, n / 16);
+    lemma_mul_strict_upper_bound(h1, n, r0, n / 16);
+    lemma_mul_strict_upper_bound(h2, n, s1, n / 8);
+    lemma_mul_strict_upper_bound(h0, n, r0, n / 16);
+    lemma_mul_strict_upper_bound(h1, n, s1, n / 8);
+    lemma_mul_strict_upper_bound(h2, 7, s1, 5 * n / 64);
+
+    (ghost var hd) := poly1305_multiply(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, /* n, */ p);
+    (ghost var hh) := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
 //    reveal modp;
 //    assert hh == (n * n) * h2 + n * h1 + h0 && modp(h * r) == modp(hh);
 }
 
+/*
 /*
 procedure{:timeLimitMultiplier 2} poly1305_blocks(
           operand ctx:uint64,
