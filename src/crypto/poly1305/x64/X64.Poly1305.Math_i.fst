@@ -144,3 +144,21 @@ let lemma_poly_bits64 =
 
 let lemma_mul_strict_upper_bound (x:nat) (x_bound:int) (y:nat) (y_bound:int) =
   admit()
+
+let lemma_bytes_shift_power2 (y:nat64) =
+  admit()
+
+let lemma_bytes_and_mod (x:nat64) (y:nat64) =
+  admit()
+
+let lemma_mod_power2_lo (x0:nat64) (x1:nat64) (y:int) (z:int) =
+  admit()
+
+let lemma_power2_add64 (n:nat) =
+  admit()
+
+let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
+  admit()
+
+let lemma_poly_demod (p:int) (h:int) (x:int) (r:int) =
+  admit()
