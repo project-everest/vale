@@ -349,12 +349,14 @@ def add_kremlin(env):
     gmp_dll = FindFile('libgmp-10.dll', os.environ['PATH'].split(';'))
     if gmp_dll != None:
       env.PrependENVPath('PATH', os.path.dirname(str(gmp_dll)))
-  env['KREMLIN_FLAGS'] = '-warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc'
+  env['KREMLIN_FLAGS'] = '-fnouint128 -warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc -drop FStar'
   kremlin = Builder(action='cd ${TARGET.dir} && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
                            suffix = '.c',
                            src_suffix = '.json',
                            emitter = kremlin_emitter)
-
+  # Copy pre-generated FStar.h; could be regenerared using
+  # krml -fnouint128 -I ../kremlin/kremlib -skip-compilation ulib/FStar.UInt128.fst
+  env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
   env.Append(BUILDERS = {'Kremlin' : kremlin})
 
 # Pseudo-builder that takes Dafny code and extracts it via Kremlin
