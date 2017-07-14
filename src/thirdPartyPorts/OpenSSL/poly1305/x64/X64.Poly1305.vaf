@@ -473,7 +473,7 @@ procedure poly1305_iteration(
     ghost h:int,
     //ghost n:int,
     ghost p:int)
-    //HACK: returns(ghost hh:int)
+    returns(ghost hh:int)
     modifies
         rax; rdx;
         efl;
@@ -487,7 +487,7 @@ procedure poly1305_iteration(
         @h1 == OReg(Rbx);
         @h2 == OReg(Rbp);
     requires
-        n == 0x1_0000_0000_0000_0000;
+        //n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
         r == r1 * n + r0;
         h == h2 * (n * n) + h1 * n + h0;
@@ -498,19 +498,15 @@ procedure poly1305_iteration(
         h2 < 7;
         rax == r1;
     ensures
-//        // hh == (n * n) * h2 + n * h1 + h0;
-//        // modp(h * r) == modp(hh);
-//        // HACK: workaround for lack of {:bridge}/returns:
-//        exists hh ::
-//            (   hh == (n * n) * h2 + n * h1 + h0
-//             && modp(h * r) == modp(hh)
-//             );
-//        h2 < 5;
+        p > 0;      // TODO: Shouldn't need this!
+        hh == (n * n) * h2 + n * h1 + h0;
+        (h * r) % p == hh % p;
+        h2 < 5;
 {
+//    Previous version used a forall statement, which isn't yet supported for F*
 //    forall x:nat, xb, y:nat, yb :| x < xb && y < yb :: x * y < xb * yb
 //    {
-//        // lemma_mul_strict_upper_bound(x, xb, y, yb);
-//        assume false;       // TODO
+//        lemma_mul_strict_upper_bound(x, xb, y, yb);
 //    }
     // TODO:  This version leads Z3 off into the weeds and times out with F* (but not Dafny)
     //assume forall x:nat, xb, y:nat, yb { x*y, xb*yb } :: x < xb && y < yb ==> x * y < xb * yb;
@@ -524,9 +520,9 @@ procedure poly1305_iteration(
     lemma_mul_strict_upper_bound(h2, 7, s1, 5 * n / 64);
 
     (ghost var hd) := poly1305_multiply(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, /* n, */ p);
-    (ghost var hh) := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
+    hh := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
 //    reveal modp;
-//    assert hh == (n * n) * h2 + n * h1 + h0 && modp(h * r) == modp(hh);
+    assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
 /*
