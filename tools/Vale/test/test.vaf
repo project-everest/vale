@@ -10,7 +10,7 @@ procedure p()
     modifies
         rax; efl;
     requires
-        rax < 10;
+        0 <= rax < 10 <= 11;
     ensures
         rax == old(rax) + 4;
 {

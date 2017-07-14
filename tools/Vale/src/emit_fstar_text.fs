@@ -77,8 +77,21 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Bop op, [e1; e2]) ->
-        let (pe, p1, p2) = prec_of_bop op in
-        ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
+      (
+        let isChainOp (op:bop):bool =
+          match op with
+          | BLe | BGe | BLt | BGt -> true
+          | _ -> false
+          in
+        match (op, skip_loc e1) with
+        | (op, EOp (Bop op1, [e11; e12])) when isChainOp op && isChainOp op1 ->
+            // Convert (a <= b) < c into (a <= b) && (b < c)
+            let e2 = EOp (Bop op, [e12; e2]) in
+            (r prec (EOp (Bop BAnd, [e1; e2])), 0)
+        | _ ->
+            let (pe, p1, p2) = prec_of_bop op in
+            ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
+      )
     | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr (sprintf "binary operator: %A" e)
     | EApply (Id "tuple", es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EApply (Id "list", es) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
