@@ -3,6 +3,7 @@ module X64.Poly1305.Math_i
 open FStar.Mul
 open X64.Machine_s   // needed for nat64
 open X64.Vale.Decls  // needed for shift_right64, logand64
+open X64.Poly1305.Spec_s // for modp
 
 let lowerUpper128 (l:nat64) (u:nat64) : nat128 =
     0x10000000000000000 `op_Multiply` u + l
@@ -102,3 +103,12 @@ val lemma_mod_hi : x0:nat64 -> x1:nat64 -> z:nat64 -> Lemma
 val lemma_poly_demod : p:int -> h:int -> x:int -> r:int -> Lemma
   (requires p > 0)
   (ensures p > 0 /\ ((h % p + x) * r) % p == ((h + x) * r) % p)
+
+val lemma_reduce128 : h:int -> h2:nat64 -> h1:nat64 -> h0:nat64 -> g:int -> g2:nat64 -> g1:nat64 -> g0:nat64 -> Lemma
+  (requires h2 < 5 /\
+            g == h + 5 /\
+            h == lowerUpper192 (lowerUpper128 h0 h1) h2 /\
+            g == lowerUpper192 (lowerUpper128 g0 g1) g2)
+  (ensures
+            (g2 < 4 ==> lowerUpper128 h0 h1 == (modp h) % nat128_max) /\
+            (g2 >= 4 ==> lowerUpper128 g0 g1 == (modp h) % nat128_max))
