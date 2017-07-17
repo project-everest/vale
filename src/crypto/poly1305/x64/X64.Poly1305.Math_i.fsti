@@ -77,7 +77,7 @@ val lemma_bytes_and_mod : x:nat64 -> y:nat64 -> Lemma
   (ensures 
     shift_left64 y 3 < 64 /\
     (let z = shift_left64 1 (shift_left64 y 3) in
-     z <> 0 /\ logand64 x z-1 == x % z))
+     z <> 0 /\ X64.Vale.Decls.logand64 x (z-1) == x % z))
 
 val lemma_mod_power2_lo : x0:nat64 -> x1:nat64 -> y:int -> z:int -> Lemma
   (requires 

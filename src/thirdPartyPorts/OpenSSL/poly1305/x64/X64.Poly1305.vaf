@@ -731,8 +731,7 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     ghost var padLast := pow2(nExtra * 8);
     //lemma_BitwiseAdd64();
 
-    if (nExtra < 8)
-    {
+    if (nExtra < 8) {
         lemma_bytes_shift_power2(nExtra);
         Mov64(rcx, nExtra);
         Shl64(rcx, 3);
@@ -761,48 +760,48 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         Add64Wrap(h0, rdx);
         Adc64Wrap(h1, 0);
         Adc64Wrap(h2, 0);
-    }
-//    else
-//    {
-//        lemma_bytes_shift_power2(nExtra - 8);
-//        Mov64(rcx, nExtra);
-//        Sub64(rcx, 8);
-//        Shl64(rcx, 3);
-//        Mov64(rdx, 1);
-//        Shl64(rdx, rcx);
-//        assert padLast == lowerUpper128(0, rdx) by
-//        {
+    } else {
+        lemma_bytes_shift_power2(nExtra - 8);
+        Mov64(rcx, nExtra);
+        Sub64(rcx, 8);
+        Shl64(rcx, 3);
+        Mov64(rdx, 1);
+        Shl64(rdx, rcx);
+
+        lemma_power2_add64(8 * nExtra - 64);
+        assert padLast == lowerUpper128(0, rdx);
+//        assert padLast == lowerUpper128(0, rdx) by {
 //            lemma_power2_add64(8 * nExtra - 64);
 //            reveal lowerUpper128;
 //        }
-//
-//        // inpLast := (inpLast % padLast)
-//        lemma_bytes_and_mod(r9, nExtra - 8);
-//        lemma_mod_hi(r8, r9, power2(8 * (nExtra - 8)));
-//        Mov64(rcx, rdx);
-//        Sub64(rcx, 1);
-//        And64(r9, rcx);
-//        assert lowerUpper128(r8, r9) == inpLast % padLast;
-//
-//        // h += (inpLast % padLast)
-//        Add64Wrap(h0, r8);
-//        Adc64Wrap(h1, r9);
-//        Adc64Wrap(h2, 0);
-//
-//        Add64Wrap(h0, 0);
-//        Adc64Wrap(h1, rdx);
-//        Adc64Wrap(h2, 0);
-//    }
-//
-//    ghost var h := hBlocks + (inpLast % padLast) + padLast;
-//    assert h == h2 * (n * n) + h1 * n + h0 by { reveal lowerUpper192; reveal lowerUpper128; }
-//    assert r == r1 * n + r0 by { reveal lowerUpper128; }
-//    poly1305_iteration(r8, r9, r10, r0, s1, h0, h1, h2, r1, r, h, n, p);
-//    exists hLast :: (hLast == h2 * (n * n) + h1 * n + h0 && modp(h * r) == modp(hLast));
-//
-//    assert hLast == lowerUpper192(lowerUpper128(h0, h1), h2) by { reveal lowerUpper192; reveal lowerUpper128; }
-//    lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
-//    assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal modp; }
+
+        // inpLast := (inpLast % padLast)
+        lemma_bytes_and_mod(r9, nExtra - 8);
+        lemma_mod_hi(r8, r9, pow2(8 * (nExtra - 8)));
+        Mov64(rcx, rdx);
+        Sub64(rcx, 1);
+        And64(r9, rcx);
+        assert lowerUpper128(r8, r9) == inpLast % padLast;
+
+        // h += (inpLast % padLast)
+        Add64Wrap(h0, r8);
+        Adc64Wrap(h1, r9);
+        Adc64Wrap(h2, 0);
+
+        Add64Wrap(h0, 0);
+        Adc64Wrap(h1, rdx);
+        Adc64Wrap(h2, 0);
+    }
+
+    ghost var h := hBlocks + (inpLast % padLast) + padLast;
+    assert h == h2 * (n * n) + h1 * n + h0; // by { reveal lowerUpper192; reveal lowerUpper128; }
+    assert r == r1 * n + r0; // by { reveal lowerUpper128; }
+    (ghost var hLast) := poly1305_iteration(r8, r9, r10, r0, s1, h0, h1, h2, r1, r, h, /* n,*/ p);
+    //exists hLast :: (hLast == h2 * (n * n) + h1 * n + h0 && modp(h * r) == modp(hLast));
+
+    assert hLast == lowerUpper192(lowerUpper128(h0, h1), h2); // by { reveal lowerUpper192; reveal lowerUpper128; }
+    lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
+    assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r); // by { reveal modp; }
 }
 
 /*
