@@ -723,10 +723,10 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         inpLast == lowerUpper128(r8, r9);
         1 <= nExtra && nExtra < 16;
     ensures
-//        h2 < 5;
-//        let padLast := power2(nExtra * 8);
-//        let hLast := lowerUpper192(lowerUpper128(h0, h1), h2);
-//        modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r);
+        h2 < 5;
+        let padLast := pow2(nExtra * 8);
+        let hLast := lowerUpper192(lowerUpper128(h0, h1), h2);
+        modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r);
 {
     ghost var padLast := pow2(nExtra * 8);
     //lemma_BitwiseAdd64();
