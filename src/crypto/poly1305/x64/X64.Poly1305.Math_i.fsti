@@ -4,6 +4,7 @@ open FStar.Mul
 open X64.Machine_s   // needed for nat64
 open X64.Vale.Decls  // needed for shift_right64, logand64
 open X64.Poly1305.Spec_s // for modp
+open X64.Vale.State_i // for add_wrap
 
 let lowerUpper128 (l:nat64) (u:nat64) : nat128 =
     0x10000000000000000 `op_Multiply` u + l
@@ -112,3 +113,11 @@ val lemma_reduce128 : h:int -> h2:nat64 -> h1:nat64 -> h0:nat64 -> g:int -> g2:n
   (ensures
             (g2 < 4 ==> lowerUpper128 h0 h1 == (modp h) % nat128_max) /\
             (g2 >= 4 ==> lowerUpper128 g0 g1 == (modp h) % nat128_max))
+
+val lemma_add_key : old_h0:nat64 -> old_h1:nat64 -> h_in:int -> key_s0:nat64 -> key_s1:nat64 -> key_s:int -> h0:nat64 -> h1:nat64 -> Lemma
+  (requires h_in == lowerUpper128 old_h0 old_h1 /\
+            key_s == lowerUpper128 key_s0 key_s1 /\
+            h0 == add_wrap old_h0 key_s0 /\
+            (let c = old_h0 + key_s0 >= nat64_max in
+             h1 == add_wrap (add_wrap old_h1 key_s1) (if c then 1 else 0)))
+  (ensures lowerUpper128 h0 h1 == (h_in + key_s) % nat128_max)

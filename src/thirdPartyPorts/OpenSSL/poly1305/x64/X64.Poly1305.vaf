@@ -857,7 +857,6 @@ procedure poly1305_reduce_last(
     Add64(h1, r9);
 }
 
-/*
 // h := (h + key_s) % 2^128
 procedure poly1305_add_key_s(
     inout dst_operand h0:uint64,
@@ -874,17 +873,21 @@ procedure poly1305_add_key_s(
         @key_s0 == OReg(Rax);
         @key_s1 == OReg(Rdx);
     requires
-//        h_in == lowerUpper128(h0, h1);
-//        key_s == lowerUpper128(key_s0, key_s1);
+        h_in == lowerUpper128(h0, h1);
+        key_s == lowerUpper128(key_s0, key_s1);
     ensures
-//        lowerUpper128(h0, h1) == mod2_128(h_in + key_s);
+        lowerUpper128(h0, h1) == (h_in + key_s) % nat128_max;
 {
 //    lemma_BitwiseAdd64();
 
     Add64Wrap(h0, key_s0);
     Adc64Wrap(h1, key_s1);
 
-//    ghost var c := if Cf(efl) then 0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000 else 0;
+    lemma_add_key(old(h0), old(h1), h_in, key_s0, key_s1, key_s, h0, h1);
+
+//    ghost var c := if cf(efl) then 0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000 else 0;
+//    assert (h_in + key_s) % nat128_max == (c + lowerUpper128(h0, h1)) % nat128_max;
+//    assert (c + lowerUpper128(h0, h1)) % nat128_max == lowerUpper128(h0, h1);
 //    calc
 //    {
 //        mod2_128(h_in + key_s);              { reveal lowerUpper128; }
@@ -893,6 +896,7 @@ procedure poly1305_add_key_s(
 //    }
 }
 
+/*
 /*
 procedure{:timeLimitMultiplier 2} poly1305_impl(
           operand ctx:uint64,

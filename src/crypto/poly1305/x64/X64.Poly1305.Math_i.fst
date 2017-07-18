@@ -165,3 +165,6 @@ let lemma_poly_demod (p:int) (h:int) (x:int) (r:int) =
 
 let lemma_reduce128  (h:int) (h2:nat64) (h1:nat64) (h0:nat64) (g:int) (g2:nat64) (g1:nat64) (g0:nat64) =
   admit()
+
+let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) = 
+  admit()
