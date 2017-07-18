@@ -13,6 +13,9 @@ let lowerUpper192 (l:nat128) (u:nat64) : int =
     0x100000000000000000000000000000000 `op_Multiply` u + l
 
 
+val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
+
 // p used to be a refinement to p > 0 and r1 a nat.
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)

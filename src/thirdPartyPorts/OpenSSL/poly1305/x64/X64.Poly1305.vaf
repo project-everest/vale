@@ -525,7 +525,18 @@ procedure poly1305_iteration(
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
-/*
+
+#verbatim
+
+let disjoint (ptr1:int) (num_bytes1:int) (ptr2:int) (num_bytes2:int) =
+    ptr1 + num_bytes1 <= ptr2 \/ ptr2 + num_bytes2 <= ptr1
+
+let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
+    size == 64 /\
+    (forall (a:int) . addr <= a && a < addr+num_bytes && (a - addr) % 8 = 0 ==> mem `Map.contains` a)
+
+#endverbatim
+
 procedure{:timeLimitMultiplier 2} poly1305_blocks(
           operand ctx:uint64,
     inout dst_operand inp:uint64,
@@ -543,9 +554,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     ghost r:int,
     ghost h_in:int,
     ghost n:int,
-    ghost p:int,
-    ghost ctx_id:heaplet_id,
-    ghost inp_id:heaplet_id)
+    ghost p:int)
+//    ghost ctx_id:heaplet_id,
+//    ghost inp_id:heaplet_id)
     returns(ghost h:int)
     modifies
         rax; rdx; r15;
@@ -569,14 +580,14 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         p == n * n * 4 - 5;
         len % 16 == 0; // REVIEW: may be stronger than necessary
         inp + len < nat64_max;
-        ctx_id != inp_id;
-        ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, inp, 64, Public, len);
-        let h0_in := mem[ctx_id].mem64[ctx + 0].v;
-        let h1_in := mem[ctx_id].mem64[ctx + 8].v;
-        let h2_in := mem[ctx_id].mem64[ctx + 16].v;
-        let r0_in := mem[ctx_id].mem64[ctx + 24].v;
-        let r1_in := mem[ctx_id].mem64[ctx + 32].v;
+        disjoint(ctx, 24*8, inp, len);
+        validSrcAddrs(mem, ctx, 64, 24 * 8);
+        validSrcAddrs(mem, inp, 64, len);
+        let h0_in := mem[ctx + 0];
+        let h1_in := mem[ctx + 8];
+        let h2_in := mem[ctx + 16];
+        let r0_in := mem[ctx + 24];
+        let r1_in := mem[ctx + 32];
         h_in == h2_in * (n * n) + h1_in * n + h0_in;
         r == r1_in * n + r0_in;
         r0_in < n / 16;
@@ -586,22 +597,25 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         padbit < 2;
     ensures
         h2 < 5;
-        ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, old(inp), 64, Public, old(len));
-        mem == old(mem)[ctx_id := mem[ctx_id]];
-        h0 == mem[ctx_id].mem64[ctx + 0].v;
-        h1 == mem[ctx_id].mem64[ctx + 8].v;
-        h2 == mem[ctx_id].mem64[ctx + 16].v;
-        r0 == mem[ctx_id].mem64[ctx + 24].v;
-        r1 == mem[ctx_id].mem64[ctx + 32].v;
+        validSrcAddrs(mem, ctx, 64, 24 * 8);
+        validSrcAddrs(mem, old(inp), 64, old(len));
+        // TODO: What's should this say instead?
+        //mem == old(mem)[ctx_id := mem[ctx_id]];
+        h0 == mem[ctx + 0];
+        h1 == mem[ctx + 8];
+        h2 == mem[ctx + 16];
+        r0 == mem[ctx + 24];
+        r1 == mem[ctx + 32];
         s1 == r1 + r1 / 4;
         ctx == old(ctx); // REVIEW: framing should add this automatically
         inp == old(inp + len);
-        forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[ctx_id].mem64[i] == old(mem)[ctx_id].mem64[i];
-        let r0_in := mem[ctx_id].mem64[ctx + 24].v;
-        let r1_in := mem[ctx_id].mem64[ctx + 32].v;
+        forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
+        let r0_in := mem[ctx + 24];
+        let r1_in := mem[ctx + 32];
         h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
         modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), old(inp + len));
+extern;
+/*
 {
     lemma_BitwiseAdd64();
     lemma_poly_bits64();
@@ -645,8 +659,8 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
             rax == r1;
             inp + 16 * r15 == old(inp) + length;
             length == old(len);
-            ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-            ValidSrcAddrs(mem, inp_id, old(inp), 64, Public, length);
+            validSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
+            validSrcAddrs(mem, inp_id, old(inp), 64, Public, length);
             ctx == old(ctx); // REVIEW: framing should add this automatically
             forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[ctx_id].mem64[i] == old(mem)[ctx_id].mem64[i];
             modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp);
@@ -897,7 +911,6 @@ procedure poly1305_add_key_s(
 }
 
 /*
-/*
 procedure{:timeLimitMultiplier 2} poly1305_impl(
           operand ctx:uint64,
     inout dst_operand inp:uint64,
@@ -931,8 +944,8 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
         p == n * n * 4 - 5;
         inp + len < 0x1_0000_0000_0000_0000;
         ctx_id != inp_id;
-        ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, inp, 64, Public, (len + 15) / 16 * 16);
+        validSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
+        validSrcAddrs(mem, inp_id, inp, 64, Public, (len + 15) / 16 * 16);
         let key_r0 := mem[ctx_id].mem64[ctx + 24].v;
         let key_r1 := mem[ctx_id].mem64[ctx + 32].v;
         let key_s0 := mem[ctx_id].mem64[ctx + 40].v;
@@ -941,8 +954,8 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
         key_s == lowerUpper128(key_s0, key_s1);
     ensures
         ctx == old(ctx);
-        ValidSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, old(inp), 64, Public, old(len) + 15 / 16 * 16);
+        validSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
+        validSrcAddrs(mem, inp_id, old(inp), 64, Public, old(len) + 15 / 16 * 16);
         mem == old(mem)[ctx_id := mem[ctx_id]];
         h == lowerUpper128(h0, h1);
         let inp_mem := heapletTo128(mem[inp_id].mem64, old(inp), old(len));
@@ -1047,9 +1060,9 @@ procedure{:timeLimitMultiplier 2} poly1305(
     ghost p:int,
     ghost ctx_in:nat64,
     ghost inp_in:nat64,
-    ghost len_in:nat64,
-    ghost ctx_id:heaplet_id,
-    ghost inp_id:heaplet_id)
+    ghost len_in:nat64)
+//    ghost ctx_id:heaplet_id,
+//    ghost inp_id:heaplet_id)
     returns(ghost h:int)
     modifies
         rax; rcx; rdx; r8; r9; r10; r13; r15;
@@ -1071,8 +1084,8 @@ procedure{:timeLimitMultiplier 2} poly1305(
         p == n * n * 4 - 5;
         inp_in + len_in < 0x1_0000_0000_0000_0000;
         ctx_id != inp_id;
-        ValidSrcAddrs(mem, ctx_id, ctx_in, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, inp_in, 64, Public, (len_in + 15) / 16 * 16);
+        validSrcAddrs(mem, ctx_id, ctx_in, 64, Public, 24 * 8);
+        validSrcAddrs(mem, inp_id, inp_in, 64, Public, (len_in + 15) / 16 * 16);
         let key_r0 := mem[ctx_id].mem64[ctx_in + 24].v;
         let key_r1 := mem[ctx_id].mem64[ctx_in + 32].v;
         let key_s0 := mem[ctx_id].mem64[ctx_in + 40].v;
@@ -1080,8 +1093,8 @@ procedure{:timeLimitMultiplier 2} poly1305(
         key_r == lowerUpper128(key_r0, key_r1);
         key_s == lowerUpper128(key_s0, key_s1);
     ensures
-        ValidSrcAddrs(mem, ctx_id, ctx_in, 64, Public, 24 * 8);
-        ValidSrcAddrs(mem, inp_id, inp_in, 64, Public, len_in + 15 / 16 * 16);
+        validSrcAddrs(mem, ctx_id, ctx_in, 64, Public, 24 * 8);
+        validSrcAddrs(mem, inp_id, inp_in, 64, Public, len_in + 15 / 16 * 16);
         mem == old(mem)[ctx_id := mem[ctx_id]];
         let h0_out := mem[ctx_id].mem64[ctx_in].v;
         let h1_out := mem[ctx_id].mem64[ctx_in + 8].v;
@@ -1142,7 +1155,7 @@ Store64(ctx, h0,  0, Public, ctx_id);
 }
 
 */
-*/
+
 #verbatim
 
 let print_poly1305 (p:printer) : FStar.All.ML unit =
