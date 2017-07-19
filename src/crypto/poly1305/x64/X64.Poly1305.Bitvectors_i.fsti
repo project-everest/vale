@@ -8,9 +8,9 @@ val lemma_shr2: x:uint_t 64 -> Lemma (shift_right #64 x 2 == udiv #64 x 4)
 val lemma_shr4: x:uint_t 64 -> Lemma (shift_right #64 x 4 == udiv #64 x 16)
 
 val lemma_and_mod_n: x:uint_t 64 -> Lemma (logand #64 x 3 == mod #64 x 4 /\ 
-				      logand #64 x 15 == mod #64 x 16)
+					  logand #64 x 15 == mod #64 x 16)
 val lemma_clear_lower_2: x:uint_t 8 -> Lemma (logand #8 x 0xfc == 
-					mul_mod #8 (udiv #8 x 4) 4)
+					     mul_mod #8 (udiv #8 x 4) 4)
 val lemma_and_constants: x:uint_t 64 ->
   Lemma (logand #64 x 0 == 0 /\ logand #64 x 0xffffffffffffffff == x)
 val lemma_poly_constants: x:uint_t 64 -> 
@@ -40,7 +40,6 @@ val lemma_bv128_64_64_and: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
 		   y == bv128_64_64 y1 y0 /\
 		   z == bv128_64_64 z1 z0))
 	(ensures (z == bvand #128 x y))
-
 
 val lemma_bytes_shift_constants0: unit -> Lemma
     (shift_left #64 0 3 == 0 /\
@@ -96,7 +95,7 @@ val lemma_bytes_and_mod: x: uint_t 64 -> y:uint_t 64 ->
 	(ensures (shift_left #64 y 3 < 64 /\ 
 		   (shift_left #64 1 (shift_left #64 y 3)) <> 0 /\ 
 		   logand #64 x (((shift_left #64 1 (shift_left #64 y 3))) - 1) == 
-		   mod #64 x (shift_left #64 1 (shift_left #64 y 3))))
+		     mod #64 x (shift_left #64 1 (shift_left #64 y 3))))
 
 val lemma_bytes_power2: unit ->
 Lemma (ensures (pow2 0 == 0x1 /\

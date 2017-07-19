@@ -50,23 +50,22 @@ let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0
 let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
   ()
 
-
 // is lowerUpper128 useful?
-val lowerUpper128: l:uint_t 64 -> u:uint_t 64 -> Tot (uint_t 128)
-let lowerUpper128 l u = l + (0x10000000000000000 * u)
+// val lowerUpper128: l:uint_t 64 -> u:uint_t 64 -> Tot (uint_t 128)
+// let lowerUpper128 l u = l + (0x10000000000000000 * u)
 
-val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
-  y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
-  z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
-  Lemma (requires (z0 == logand #64 x0 y0 /\
-		   z1 == logand #64 x1 y1 /\
-		   x == lowerUpper128 x1 x0 /\
-		   y == lowerUpper128 y1 y0 /\
-		   z == lowerUpper128 z1 z0))
-	(ensures (z == logand #128 x y))
-let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = ()
+// val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
+//   y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
+//   z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
+//   Lemma (requires (z0 == logand #64 x0 y0 /\
+// 		   z1 == logand #64 x1 y1 /\
+// 		   x == lowerUpper128 x1 x0 /\
+// 		   y == lowerUpper128 y1 y0 /\
+// 		   z == lowerUpper128 z1 z0))
+// 	(ensures (z == logand #128 x y))
+// let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = ()
 
-#reset-options "--smtencoding.elim_box true --z3rlimit_factor 2 --z3cliopt smt.case_split=3"
+#reset-options "--smtencoding.elim_box true --z3cliopt smt.case_split=3"
 let lemma_bytes_shift_constants0 x =
   assert_by_tactic (bv_tac())
     (shift_left #64 0 3 == (0 <: uint_t 64));
@@ -109,46 +108,63 @@ let lemma_bytes_shift_constants7 x =
     (shift_left #64 1 56 == (0x100000000000000 <: uint_t 64))
 
 let lemma_bytes_and_mod0 x = 
-  assert_by_tactic (bv_tac ()) (logand #64 x (0x1 - 1) == mod #64 x 0x1)
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x (0x1 - 1) == mod #64 x 0x1)
 
 let lemma_bytes_and_mod1 x = 
-  assert_by_tactic (bv_tac ()) (logand #64 x (0x100 - 1) == mod #64 x 0x100)
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x (0x100 - 1) == mod #64 x 0x100)
 
 let lemma_bytes_and_mod2 x = 
-  assert_by_tactic (bv_tac ()) (logand #64 x (0x10000 - 1) == mod #64 x 0x10000)
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x (0x10000 - 1) == mod #64 x 0x10000)
 let lemma_bytes_and_mod3 x =
-  assert_by_tactic (bv_tac ())(logand #64 x (0x1000000 - 1) == mod #64 x 0x1000000)
+  assert_by_tactic (bv_tac ())
+    (logand #64 x (0x1000000 - 1) == mod #64 x 0x1000000)
 
 let lemma_bytes_and_mod4 x = 
-  assert_by_tactic (bv_tac ()) (logand #64 x (0x100000000 - 1) == mod #64 x 0x100000000)
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x (0x100000000 - 1) == mod #64 x 0x100000000)
 
 let lemma_bytes_and_mod5 x = 
-  assert_by_tactic (bv_tac ()) (logand #64 x (0x10000000000 - 1) == mod #64 x 0x10000000000)
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x (0x10000000000 - 1) == mod #64 x 0x10000000000)
 
 let lemma_bytes_and_mod6 x = 
-  assert_by_tactic (bv_tac ()) (logand #64 x (0x1000000000000 - 1) == mod #64 x 0x1000000000000)
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x (0x1000000000000 - 1) == mod #64 x 0x1000000000000)
 
 let lemma_bytes_and_mod7 x = 
   assert_by_tactic (bv_tac ()) 
     (logand #64 x (0x100000000000000 - 1) == mod #64 x 0x100000000000000)
 
 let lemma_bytes_and_mod x y =
-    lemma_bytes_shift_constants0 ();
+  match y with
+  | 0 ->
+      lemma_bytes_shift_constants0 ();
+      lemma_bytes_and_mod0 x
+  | 1 ->
     lemma_bytes_shift_constants1 ();
+    lemma_bytes_and_mod1 x
+  | 2 ->
     lemma_bytes_shift_constants2 ();
+    lemma_bytes_and_mod2 x    
+  | 3 ->
     lemma_bytes_shift_constants3 ();
-    lemma_bytes_shift_constants4 ();
+    lemma_bytes_and_mod3 x
+  | 4 -> 
+     lemma_bytes_shift_constants4 ();
+     lemma_bytes_and_mod4 x
+  | 5 ->
     lemma_bytes_shift_constants5 ();
+    lemma_bytes_and_mod5 x
+  | 6 ->
     lemma_bytes_shift_constants6 ();
+    lemma_bytes_and_mod6 x
+  | 7 ->
     lemma_bytes_shift_constants7 ();
-    lemma_bytes_and_mod0 x;
-    lemma_bytes_and_mod1 x;
-    lemma_bytes_and_mod2 x;
-    lemma_bytes_and_mod3 x;
-    lemma_bytes_and_mod4 x;
-    lemma_bytes_and_mod5 x;
-    lemma_bytes_and_mod6 x;
-    lemma_bytes_and_mod7 x; ()
+    lemma_bytes_and_mod7 x
+  | _ -> magic ()
 
 let lemma_bytes_power2 () =
   assert_norm (pow2 0 == 0x1);
@@ -162,13 +178,23 @@ let lemma_bytes_power2 () =
   ()
 
 let lemma_bytes_shift_power2 y =
-    lemma_bytes_shift_constants0 ();
-    lemma_bytes_shift_constants1 ();
-    lemma_bytes_shift_constants2 ();
-    lemma_bytes_shift_constants3 ();
-    lemma_bytes_shift_constants4 ();
-    lemma_bytes_shift_constants5 ();
-    lemma_bytes_shift_constants6 ();
-    lemma_bytes_shift_constants7 ();
-    lemma_bytes_power2 ()
+  (match y with
+  | 0 -> 
+    lemma_bytes_shift_constants0 ()
+  | 1 -> 
+    lemma_bytes_shift_constants1 ()
+  | 2 ->
+    lemma_bytes_shift_constants2 ()
+  | 3 ->
+    lemma_bytes_shift_constants3 ()
+  | 4 ->
+    lemma_bytes_shift_constants4 ()
+  | 5 ->
+    lemma_bytes_shift_constants5 ()
+  | 6 ->
+    lemma_bytes_shift_constants6 ()
+  | 7 ->
+    lemma_bytes_shift_constants7 ()
+  | _ -> ());
+  lemma_bytes_power2 ()
 
