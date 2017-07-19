@@ -3,6 +3,8 @@ open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 
+#reset-options "--z3rlimit 20"
+
 val mem_contains : m:mem -> i:int -> bool
 val mem_sel : m:mem -> i:int -> nat64
 val mem_upd : m:mem -> i:int -> n:nat64 -> mem
@@ -27,6 +29,8 @@ type ins =
   | Adc64Wrap : dst:va_operand -> src:va_operand -> ins
   | Mul64Wrap : src:va_operand -> ins
   | IMul64 : dst:va_operand -> src:va_operand -> ins
+  | And64 : dst:va_operand -> amt:va_operand -> ins
+  | Shr64 : dst:va_operand -> amt:va_operand -> ins
 
 unfold let va_fast_ins_Mov64 = Mov64
 unfold let va_fast_ins_Load64 = Load64
@@ -35,6 +39,8 @@ unfold let va_fast_ins_Add64Wrap = Add64Wrap
 unfold let va_fast_ins_Adc64Wrap = Adc64Wrap
 unfold let va_fast_ins_Mul64Wrap = Mul64Wrap
 unfold let va_fast_ins_IMul64 = IMul64
+unfold let va_fast_ins_And64 = And64
+unfold let va_fast_ins_Shr64 = Shr64
 
 unfold let va_inss = list ins
 
@@ -117,8 +123,71 @@ let rec strong_post (inss:list ins) (s0:state) (sN:state) : Type0 =
       (exists (x:nat64) (f:nat64).
         x == a /\
         strong_post inss ({update_reg dst x s0 with flags = f}) sN)
+  | (And64 (OReg Rsp) _)::_ -> True
+  | (And64 (OReg dst) src)::inss ->
+    let a = logand64 (s0.regs dst) (eval_operand_norm src s0) in
+    not (valid_operand_norm src s0) \/
+    (exists (x:nat64) (f:nat64).
+      x == a /\
+      strong_post inss ({update_reg dst x s0 with flags = f}) sN)
+  | (Shr64 (OReg Rsp) _)::_ -> True
+  | (Shr64 (OReg dst) src)::inss ->
+    let a = shift_right64 (s0.regs dst) (eval_operand_norm src s0) in
+    not (valid_operand_norm src s0) \/
+    (exists (x:nat64) (f:nat64).
+      x == a /\
+      strong_post inss ({update_reg dst x s0 with flags = f}) sN)
   | _ -> True
 
+[@"opaque_to_smt"]
+let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state): Type0 = 
+    match inss with
+    | [] -> 
+      (forall okN regsN flagsN memN. 
+        let sN = {ok=okN; regs=regsN; flags=flagsN; mem=memN} in
+          ( (~(okN == s0.ok /\
+             memN == s0.mem /\
+            flagsN == s0.flags /\
+            all_regs_match s0 sN)) \/
+            post sN))
+    (* | (Mov64 (OReg Rsp) _) :: _ -> False *)
+    (* | (Mov64 (OReg dst) src) :: inss -> *)
+    (*   valid_operand_norm src s0 /\ *)
+    (*   (forall x. x == eval_operand_norm src s0 ==> *)
+    (*         wp_code inss post (update_reg dst x s0)) *)
+    (*   (\* let post' = wp_code inss post in *\) *)
+    (*   (\* (valid_operand_norm src s0) /\ *\) *)
+    (*   (\* post' (update_reg dst (eval_operand_norm src s0) s0) *\) *)
+    (* | (Load64 (OReg Rsp) _ _) :: inss -> False *)
+    | (Load64 (OReg dst) (OReg src) offset) :: inss ->
+      mem_contains s0.mem (s0.regs src + offset) /\
+      (forall x.
+        ~ (x == mem_sel s0.mem (s0.regs src + offset)) \/
+        wp_code inss post (update_reg dst x s0))
+    (* | (Store64 (OReg dst) src offset) :: inss -> *)
+    (*   let post' = wp_code inss post in *)
+    (*   (valid_operand_norm src s0) /\ *)
+    (*   (mem_contains s0.mem (s0.regs dst + offset)) /\ *)
+    (*   post' (update_mem (s0.regs dst + offset) (eval_operand_norm src s0) s0) *)
+    (* | (Add64Wrap (OReg Rsp) _) :: inss -> wp_code inss post s0 *)
+    // | (Add64Wrap (OReg dst) src) :: inss ->
+    //   let post' = wp_code inss post in
+    //   (valid_operand_norm src s0) /\
+    //   (forall a x f. 
+    //     (~ (a == s0.regs dst + eval_operand_norm src s0 /\
+    //           x == (if a < nat64_max then a else a - nat64_max) /\
+    //           cf f == (a >= nat64_max))) \/
+    //     post' ({update_reg dst x s0 with flags = f}))
+    // | (Adc64Wrap (OReg Rsp) _) :: inss -> wp_code inss post s0
+    // | (Adc64Wrap (OReg dst) src) :: inss ->
+    //   let post' = wp_code inss post in
+    //   (valid_operand_norm src s0) /\
+    //   (forall a x f.
+    //   (~ (a == s0.regs dst + eval_operand_norm src s0 + (if cf s0.flags then 1 else 0) /\
+    //       x == (if a < nat64_max then a else a - nat64_max) /\
+    //       cf f == (a >= nat64_max))) \/
+    //     post' ({update_reg dst x s0 with flags = f}))
+    | _ -> True
 
 let rec inss_to_codes (inss:list ins) : list va_code =
   match inss with
@@ -134,6 +203,10 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   | (Mul64Wrap src)::inss -> (va_code_Mul64Wrap src)::(inss_to_codes inss)
   | (IMul64 (OReg Rsp) _)::inss -> []
   | (IMul64 (OReg dst) src)::inss -> (va_code_IMul64 (OReg dst) src)::(inss_to_codes inss)
+  | (And64 (OReg Rsp) _)::inss -> []
+  | (And64 (OReg dst) src)::inss -> (va_code_And64 (OReg dst) src)::(inss_to_codes inss)
+  | (Shr64 (OReg Rsp) _)::inss -> []
+  | (Shr64 (OReg dst) src)::inss -> (va_code_Shr64 (OReg dst) src)::(inss_to_codes inss)
   | _ -> []
 
 val va_lemma_strong_post_norm : inss:list ins -> s0:state -> sN:state -> Lemma

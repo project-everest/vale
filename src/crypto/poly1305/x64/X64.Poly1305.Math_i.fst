@@ -5,7 +5,7 @@ open FStar.Tactics.Canon
 open FStar.Math.Lemmas
 open FStar.Math.Lib
 open FStar.Mul
-
+open X64.Vale.State_i   // needed for mem
 (*
 open FStar.Mul
 open FStar.UInt
@@ -20,6 +20,23 @@ lemma_BitwiseMul64()
 // these settings make it super slow
 // #reset-options "--z3rlimit_factor 4 --z3rlimit 300 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 
+
+let rec poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k - i)) =
+        admit()
+(*
+    requires i <= k
+    requires (k - i) % 16 == 0
+    requires forall j :: i <= j < k && (j - i) % 8 == 0 ==> j in m
+    decreases k - i
+*)
+(*
+    if i = k then h
+    else
+        let kk = k - 16 in
+        let hh = poly1305_heap_blocks h pad r m i kk in
+        modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
+*)
 
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true"
@@ -53,7 +70,6 @@ let lemma_mul_div_sep a b c = ()
 val swap_add: a:int -> b:int -> c:int -> Lemma
       (a + b + c = a + c + b)
 let swap_add a b c = ()
-
 
 // p used to be a refinement to p > 0 and r1 a nat.
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
@@ -137,10 +153,42 @@ let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:in
       	((h2*n + h1) *(r1/4)) p;
       assert ((h*r) % p == hh % p)
 
-(*
-let lemma_poly_reduce (n:int) (p:int{ p > 0 }) (h:nat) (h2:int) (h10:int) (c:int) (hh:int) =
-  admit ()
+let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
+  admit()
 
 let lemma_poly_bits64 =
-  admit ()
-*)
+  admit()
+
+let lemma_mul_strict_upper_bound (x:nat) (x_bound:int) (y:nat) (y_bound:int) =
+  admit()
+
+let lemma_bytes_shift_power2 (y:nat64) =
+  admit()
+
+let lemma_bytes_and_mod (x:nat64) (y:nat64) =
+  admit()
+
+let lemma_mod_power2_lo (x0:nat64) (x1:nat64) (y:int) (z:int) =
+  admit()
+
+let lemma_power2_add64 (n:nat) =
+  admit()
+
+let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
+  admit()
+
+let lemma_poly_demod (p:int) (h:int) (x:int) (r:int) =
+  admit()
+
+let lemma_reduce128  (h:int) (h2:nat64) (h1:nat64) (h0:nat64) (g:int) (g2:nat64) (g1:nat64) (g0:nat64) =
+  admit()
+
+let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) = 
+  admit()
+
+let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
+  admit()
+
+let lemma_poly1305_heap_hash_blocks (h) (pad) (r) (m) (i) (k) (len) =
+  admit()
+  // decreases k - i

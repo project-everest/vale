@@ -25,9 +25,12 @@ val lemma_bv128_64_64_and_helper: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
   z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
   Lemma (requires (z0 == bvand #64 x0 y0 /\
 		   z1 == bvand #64 x1 y1 /\
-		   x == bvor #128 (bvshl #128 (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0) /\
-		   y == bvor #128 (bvshl #128 (bv_uext #64 #64 y1) 64) (bv_uext #64 #64 y0) /\
-		   z == bvor #128 (bvshl #128 (bv_uext #64 #64 z1) 64) (bv_uext #64 #64 z0)))
+		   x == bvor #128 (bvshl #128 (bv_uext #64 #64 x1) 64) 
+							   (bv_uext #64 #64 x0) /\
+		   y == bvor #128 (bvshl #128 (bv_uext #64 #64 y1) 64) 
+							   (bv_uext #64 #64 y0) /\
+		   z == bvor #128 (bvshl #128 (bv_uext #64 #64 z1) 64) 
+							   (bv_uext #64 #64 z0)))
 	(ensures (z == bvand #128 x y))
 val bv128_64_64: x1:bv_t 64 -> x0:bv_t 64 -> Tot (bv_t 128)
 

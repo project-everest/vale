@@ -13,3 +13,4 @@ tools/FsLexYacc/
 *.suo
 *~
 .sconsign.dblite
+*hints

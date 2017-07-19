@@ -34,9 +34,13 @@ unfold let va_register = reg
 unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
 unfold let va_const_operand (n:int) = OConst n
 unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
+unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
 unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
 unfold let va_const_cmp (n:int) : va_cmp = OConst n
 unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
+unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
+unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
+unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
 unfold let va_op_register (r:reg) : va_register = r
 unfold let va_op_reg_operand_reg (r:reg) : va_reg_operand = OReg r
 unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
@@ -187,6 +191,7 @@ val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> sN:
 (* maybe we want these to be transparent*)
 val logxor64 : (x:nat64) -> (y:nat64) -> nat64
 val logand64 : (x:nat64) -> (y:nat64) -> nat64
+val logand128 : (x:nat128) -> (y:nat128) -> nat128
 val shift_left64 : (x:nat64) -> (amt:nat64) -> nat64
 val shift_right64 : (x:nat64) -> (amt:nat64) -> nat64
 
@@ -241,6 +246,15 @@ let logxor64 (x:nat64) (y:nat64) : nat64 =
 
 let logand64 (x:nat64) (y:nat64) : nat64 =
   S.logand x y
+
+let logand128 (x:nat128) (y:nat128) : nat128 =
+  FStar.UInt.logand #128 x y
+(*
+  if FStar.UInt.fits x 64
+  && FStar.UInt.fits y 64
+  then FStar.UInt.logand #64 x y
+  else 0
+*)
 
 let shift_left64 (x:nat64) (amt:nat64) : nat64 =
   S.shift_left x amt
@@ -400,7 +414,7 @@ procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst_operand dst:uint6
 {
 }
 
-procedure{:instruction Ins(S.And64(dst, src))} And64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout dst_operand dst:uint64, operand src:uint64)
     modifies 
         efl;
     ensures
@@ -418,7 +432,7 @@ procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst_operand dst:uint6
 {
 }
 
-procedure{:instruction Ins(S.Shr64(dst, amt))} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
+procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
     modifies
         efl;
     ensures

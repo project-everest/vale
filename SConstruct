@@ -136,6 +136,11 @@ AddOption('--NOVERIFY',
   default=False,
   action='store_true',
   help='Verify and compile, or compile only')
+AddOption('--NOCOLOR',
+  dest='nocolor',
+  default=False,
+  action='store_true',
+  help="Don't add color to build output")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -184,7 +189,27 @@ dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
 fstar_default_args = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
   + ' --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'\
-  + ' --max_fuel 0 --max_ifuel 1 --initial_ifuel 0 --hint_info'
+  + ' --max_fuel 0 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
+
+####################################################################
+#
+#   Add support for color in the output
+#
+####################################################################
+
+colors = {}
+colors['cyan']   = '\033[96m'
+colors['purple'] = '\033[95m'
+colors['blue']   = '\033[94m'
+colors['green']  = '\033[92m'
+colors['yellow'] = '\033[93m'
+colors['red']    = '\033[91m'
+colors['end']    = '\033[0m'
+
+# If the output is not a terminal or user opts out, remove the colors
+if (not sys.stdout.isatty()) or GetOption('nocolor'):
+   for key, value in colors.iteritems():
+      colors[key] = ''
 
 ####################################################################
 #
@@ -212,7 +237,7 @@ def docmd(env, cmd):
     #print('back from cmd')
   except:
     e = sys.exc_info()[0]
-    print ("Error invoking: %s" % cmd)
+    print ("%sError invoking: %s%s" % (colors['red'], cmd, colors['end']))
     print formatExceptionInfo()
     #print ("Exception: %s" % e)
     Exit(1)
@@ -731,18 +756,18 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   lines = []
   depsBackupFile = 'obj/fstarDepsBackup.d'
   try:
-    print('F* dependency analysis: starting')
+    print('%sF* dependency analysis: starting%s' % (colors['blue'], colors['end']))
     args = ["--dep", "make"] + includes + files
     cmd = [fstar] + args
     print(" ".join(cmd))
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
-    print('F* dependency analysis: done')
+    print('%sF* dependency analysis: done%s' % (colors['blue'], colors['end']))
     fstar_deps_ok = True
     lines = o.splitlines()
   except subprocess.CalledProcessError as e:
     print(e)
     print(e.output)
-    print('F* dependency analysis: done, but with errors')
+    print('%sF* dependency analysis: done, but with errors%s' % (colors['red'], colors['end']))
     if os.path.isfile(depsBackupFile):
       print('  loading dependencies from ' + depsBackupFile)
       with open(depsBackupFile, 'r') as myfile:
@@ -862,15 +887,18 @@ def report_verification_failures():
           if x is not None:
             filename = bf_to_filename(x)
             if filename.endswith('.tmp') and os.path.isfile(filename):
-              print '##### Verification error.  Printing contents of ' + filename + ' #####'
+              print '##### %sVerification error%s. ' % (colors['red'], colors['end']),
+              print 'Printing contents of ' + filename + ' #####' 
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
+                  if "(Error)" in line:
+                    line = "%s%s%s" % (colors['red'], line, colors['end'])
                   print line
 
 def display_build_status():
   report_verification_failures()
   if do_fstar and not fstar_deps_ok:
-    raise Exception('Initial F* dependency analysis failed; you might need to run scons again.')
+    raise Exception('%sInitial F* dependency analysis failed; you might need to run scons again.%s' % (colors['red'], colors['end']))
 
 atexit.register(display_build_status)

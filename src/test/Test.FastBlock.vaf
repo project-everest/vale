@@ -1,0 +1,43 @@
+
+include "../arch/x64/X64.Vale.Decls.vaf"
+
+#verbatim
+(* To compile this file do:
+   -- vale.exe -fstarText -in Test.FastBlock.vaf -out Test.FastBlock.fst -outi Test.FastBlock.fsti
+   -- fstar Test.FastBlock.fst --include ../arch/x64/ --log_queries --hint_info --z3refresh --debug Test.FastBlock --debug_level print_normalized_terms |& tee weakest_pre_dump
+   
+*)
+#endverbatim
+
+#verbatim interface implementation
+module Test.FastBlock
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls
+open X64.Vale.StrongPost_i
+#set-options "--z3rlimit 20"
+#endverbatim
+
+#verbatim
+assume val va_lemma_weakest_pre_norm: inss:list ins -> s0:state -> sN:state -> PURE state
+  (fun (post:(state -> Type)) ->
+      forall ok0 regs0 flags0 mem0. {:pattern ({ok = ok0; regs = regs0; flags = flags0; mem = mem0})}
+        ok0 == s0.ok /\ regs0 == s0.regs /\ flags0 == s0.flags /\ mem0 == s0.mem /\
+        s0.ok /\
+        Some sN == va_eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 /\
+        normalize (wp_code inss post ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})) ==>
+        post sN)
+#endverbatim
+
+procedure Copy64()
+    requires/ensures
+        Map.contains(mem, rsi);
+    reads
+        rsi; mem;
+    modifies
+        rax;
+{
+    assert{:fast_block} true;
+    Load64(rax, rsi, 0);
+    assert (rax == mem[rsi + 0]);
+}
