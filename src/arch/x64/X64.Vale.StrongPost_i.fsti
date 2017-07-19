@@ -119,6 +119,56 @@ let rec strong_post (inss:list ins) (s0:state) (sN:state) : Type0 =
         strong_post inss ({update_reg dst x s0 with flags = f}) sN)
   | _ -> True
 
+[@"opaque_to_smt"]
+let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state): Type0 = 
+    match inss with
+    | [] -> 
+      (forall okN regsN flagsN memN. 
+        let sN = {ok=okN; regs=regsN; flags=flagsN; mem=memN} in
+          ( (~(okN == s0.ok /\
+             memN == s0.mem /\
+            flagsN == s0.flags /\
+            all_regs_match s0 sN)) \/
+            post sN))
+    (* | (Mov64 (OReg Rsp) _) :: _ -> False *)
+    (* | (Mov64 (OReg dst) src) :: inss -> *)
+    (*   valid_operand_norm src s0 /\ *)
+    (*   (forall x. x == eval_operand_norm src s0 ==> *)
+    (*         wp_code inss post (update_reg dst x s0)) *)
+    (*   (\* let post' = wp_code inss post in *\) *)
+    (*   (\* (valid_operand_norm src s0) /\ *\) *)
+    (*   (\* post' (update_reg dst (eval_operand_norm src s0) s0) *\) *)
+    (* | (Load64 (OReg Rsp) _ _) :: inss -> False *)
+    | (Load64 (OReg dst) (OReg src) offset) :: inss ->
+      mem_contains s0.mem (s0.regs src + offset) /\
+      (forall x.
+        ~ (x == mem_sel s0.mem (s0.regs src + offset)) \/
+        wp_code inss post (update_reg dst x s0))
+    (* | (Store64 (OReg dst) src offset) :: inss -> *)
+    (*   let post' = wp_code inss post in *)
+    (*   (valid_operand_norm src s0) /\ *)
+    (*   (mem_contains s0.mem (s0.regs dst + offset)) /\ *)
+    (*   post' (update_mem (s0.regs dst + offset) (eval_operand_norm src s0) s0) *)
+    (* | (Add64Wrap (OReg Rsp) _) :: inss -> wp_code inss post s0 *)
+    // | (Add64Wrap (OReg dst) src) :: inss ->
+    //   let post' = wp_code inss post in
+    //   (valid_operand_norm src s0) /\
+    //   (forall a x f. 
+    //     (~ (a == s0.regs dst + eval_operand_norm src s0 /\
+    //           x == (if a < nat64_max then a else a - nat64_max) /\
+    //           cf f == (a >= nat64_max))) \/
+    //     post' ({update_reg dst x s0 with flags = f}))
+    // | (Adc64Wrap (OReg Rsp) _) :: inss -> wp_code inss post s0
+    // | (Adc64Wrap (OReg dst) src) :: inss ->
+    //   let post' = wp_code inss post in
+    //   (valid_operand_norm src s0) /\
+    //   (forall a x f.
+    //   (~ (a == s0.regs dst + eval_operand_norm src s0 + (if cf s0.flags then 1 else 0) /\
+    //       x == (if a < nat64_max then a else a - nat64_max) /\
+    //       cf f == (a >= nat64_max))) \/
+    //     post' ({update_reg dst x s0 with flags = f}))
+    | _ -> True
+
 let rec inss_to_codes (inss:list ins) : list va_code =
   match inss with
   | (Mov64 (OReg Rsp) _)::inss -> []
@@ -147,4 +197,3 @@ val va_lemma_strong_post_norm : inss:list ins -> s0:state -> sN:state -> Lemma
       normalize (strong_post inss
         ({ok = ok0; regs = regs0; flags = flags0; mem = mem0})
         ({ok = okN; regs = regsN; flags = flagsN; mem = memN})))
-
