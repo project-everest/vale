@@ -124,3 +124,4 @@ let va_lemma_strong_post_norm inss s0 sN =
   assert_to_norm (strong_post inss s0 sN);
   ()
 
+let va_lemma_wp_norm inss post s0 = admit ()
