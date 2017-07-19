@@ -3,8 +3,6 @@ module X64.Semantics_s
 open FStar.BaseTypes
 open X64.Machine_s
 
-let _ = assert_norm (pow2 32 = nat32_max) // Sanity check our constant
-let _ = assert_norm (pow2 64 = nat64_max) // Sanity check our constant
 type uint64 = UInt64.t
 
 let map (key:eqtype) (value:Type) = Map.t key value
