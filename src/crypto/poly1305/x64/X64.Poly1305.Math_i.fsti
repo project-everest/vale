@@ -12,7 +12,9 @@ let lowerUpper128 (l:nat64) (u:nat64) : nat128 =
 let lowerUpper192 (l:nat128) (u:nat64) : int =
     0x100000000000000000000000000000000 `op_Multiply` u + l
 
-
+let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
+  fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
+  
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
                          (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
 
@@ -124,3 +126,19 @@ val lemma_add_key : old_h0:nat64 -> old_h1:nat64 -> h_in:int -> key_s0:nat64 -> 
             (let c = old_h0 + key_s0 >= nat64_max in
              h1 == add_wrap (add_wrap old_h1 key_s1) (if c then 1 else 0)))
   (ensures lowerUpper128 h0 h1 == (h_in + key_s) % nat128_max)
+
+val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0:nat64 -> y1:nat64 -> z:nat128 -> z0:nat64 -> z1:nat64 -> Lemma
+  (requires z0 == logand64 x0 y0 /\
+            z1 == logand64 x1 y1 /\
+            x == lowerUpper128 x0 x1 /\
+            y == lowerUpper128 y0 y1 /\
+            z == lowerUpper128 z0 z1)
+  (ensures z == logand128 x y)
+  
+val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma
+  (requires i <= k && k <= i + len /\
+            (k - i) % 16 == 0 /\
+            (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
+  (ensures poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k)
+          
+    

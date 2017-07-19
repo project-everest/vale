@@ -5,7 +5,7 @@ open FStar.Tactics.Canon
 open FStar.Math.Lemmas
 open FStar.Math.Lib
 open FStar.Mul
-open X64.Semantics_s   // needed for mem
+open X64.Vale.State_i   // needed for mem
 (*
 open FStar.Mul
 open FStar.UInt
@@ -22,7 +22,7 @@ lemma_BitwiseMul64()
 
 
 let rec poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) =
+        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k - i)) =
         admit()
 (*
     requires i <= k
@@ -185,3 +185,10 @@ let lemma_reduce128  (h:int) (h2:nat64) (h1:nat64) (h0:nat64) (g:int) (g2:nat64)
 
 let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) = 
   admit()
+
+let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
+  admit()
+
+let lemma_poly1305_heap_hash_blocks (h) (pad) (r) (m) (i) (k) (len) =
+  admit()
+  // decreases k - i
