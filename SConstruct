@@ -189,7 +189,7 @@ dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
 fstar_default_args = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
   + ' --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'\
-  + ' --max_fuel 0 --max_ifuel 1 --initial_ifuel 0 --hint_info'
+  + ' --max_fuel 0 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
 
 ####################################################################
 #
