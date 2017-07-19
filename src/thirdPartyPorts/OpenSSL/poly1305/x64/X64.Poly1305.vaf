@@ -527,6 +527,11 @@ procedure poly1305_iteration(
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
+#verbatim interface
+
+let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
+
+#endverbatim
 
 procedure{:timeLimitMultiplier 2} poly1305_blocks(
           operand ctx:uint64,
@@ -604,9 +609,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         let r0_in := mem[ctx + 24];
         let r1_in := mem[ctx + 32];
         h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
-//        len % 16 == 0; // TODO: Shouldn't need to repeat this
-//        forall j :: old(inp) <= j && j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> mem?[j];
-//        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), old(inp + len));
+        (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
+        forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
+        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), old(inp + len));
 {
     h := 0;
     assume false;
