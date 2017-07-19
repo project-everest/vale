@@ -28,6 +28,23 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
   | ([s], a) -> (s, a)
   | (_::_, a) -> parse_err "more than one storage specifier for variable"
 
+let conj_semi_exps (es:(loc * exp) list):exp =
+  let es = List.map (fun (loc, e) -> ELoc (loc, e)) es in
+  and_of_list es
+
+let make_spec (old:bool) (f:exp -> spec) (es:(loc * exp) list) (lets:(id * typ option * exp) list):(loc * spec) list =
+  match (lets, es) with
+  | (_, []) -> []
+  | ([], _) -> List_mapSnd f es
+  | (_, (loc, _)::_) ->
+      let fee e = if old then EOp (Uop UOld, [e]) else e in
+      let e = conj_semi_exps es in
+      let e = List.fold (fun e (x, t, ee) -> EBind (BindLet, [fee ee], [(x, t)], [], e)) e (List.rev lets) in
+      [(loc, f e)]
+
+type plet =
+| PLetVal of id * typ option * exp
+| PLetAlias of id * id
 %}
 
 %start start
@@ -44,7 +61,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> LT GT EQ LE GE EQEQ NE
 %token <loc * (bool * string)> PLUS MINUS STAR SLASH PERCENT
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
-%token <loc * (bool * string)> COLONEQ
+%token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
@@ -296,7 +313,9 @@ Stmt
     }
   | CALC CalcOpOpt LBRACE CalcContents RBRACE { stmtAt $1 (SCalc ($2, $4)) }
   | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp(Uop UReveal, [EVar $2]))) }
-  | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, g, a, $4)) }
+  | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
+  | LET Formal COLONEQ Exp SEMI { let (x, t) = $2 in stmtAt $1 (SVar (x, t, Immutable, XGhost, [], Some $4)) }
+  | LET AnyId ATEQ AnyId SEMI { stmtAt $1 (SAlias ($2, $4)) }
   | ExpAssign SEMI { $1 }
   | Exp1 SEMI { stmtAt (one_loc_of_exp $2 $1) (SAssign ([], $1)) }
 IfStmt
@@ -345,37 +364,49 @@ ProcFormals
   : { [] }
   | ProcFormals1 { $1 }
 
+LetBind
+  : Formal COLONEQ Exp SEMI { let (x, t) = $1 in ([(x, t, $3)], []) }
+  | AnyId ATEQ AnyId SEMI { ([], [($1, $3)]) }
+
+LetBinds
+  : { ([], []) }
+  | LetBind LetBinds { let (v, a) = $1 in let (lv, la) = $2 in (v @ lv, a @ la) }
+
+Lets
+  : { ([], []) }
+  | LET LetBinds Lets { let (v, a) = $2 in let (lv, la) = $3 in (v @ lv, a @ la) }
+
 SemiExps
   : { [] }
   | Exp SEMI SemiExps { ($2, $1)::$3 }
   | LET Formal COLONEQ Exp SEMI SemiExps
     {
-      let es = List.map (fun (loc, e) -> ELoc (loc, e)) $6 in
-      let conj = and_of_list es in
-      [($1, EBind (BindLet, [$4], [$2], [], conj))]
+      [($1, EBind (BindLet, [$4], [$2], [], conj_semi_exps $6))]
     }
 
 Req: REQUIRES Attrs {}
 
 Spec
-  : REQUIRES SemiExps { List_mapSnd Requires $2 }
+  : REQUIRES SemiExps { make_spec false Requires $2 }
   | REQUIRES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
     {
       (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
-      List_mapSnd (fun e -> Requires (EOp (Uop UUnrefinedSpec, [e]))) $6
+      let f e = Requires (EOp (Uop UUnrefinedSpec, [e])) in
+      make_spec false f $6
     }
   | ENSURES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
     {
       (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
-      List_mapSnd (fun e -> Ensures (EOp (Uop UUnrefinedSpec, [e]))) $6
+      let f e = Ensures (EOp (Uop UUnrefinedSpec, [e])) in
+      make_spec true f $6
     }
-  | ENSURES SemiExps { List_mapSnd Ensures $2 }
-  | REQUIRES SLASH ENSURES SemiExps { (List_mapSnd Requires $4) @ (List_mapSnd Ensures $4) }
-  | READS SemiExps { List_mapSnd (fun e -> Modifies (false, e)) $2 }
-  | MODIFIES SemiExps { List_mapSnd (fun e -> Modifies (true, e)) $2 }
+  | ENSURES SemiExps { make_spec true Ensures $2 }
+  | REQUIRES SLASH ENSURES SemiExps { fun lets -> (make_spec false Requires $4 lets) @ (make_spec true Ensures $4 lets) }
+  | READS SemiExps { fun lets -> List_mapSnd (fun e -> Modifies (false, e)) $2 }
+  | MODIFIES SemiExps { fun lets -> List_mapSnd (fun e -> Modifies (true, e)) $2 }
 Specs
-  : { [] }
-  | Spec Specs { $1 @ $2 }
+  : { fun lets -> [] }
+  | Spec Specs { fun lets -> ($1 lets) @ ($2 lets) }
 
 Invariants
   : { [] }
@@ -405,12 +436,23 @@ Decl
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
 */
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ AnyId SEMI
-    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $10])::$2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
-    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = None; pattrs = $2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs LBRACE Block RBRACE
-    { (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = Some $10; pattrs = $2}) }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Lets Specs COLONEQ AnyId SEMI
+    {
+      let (lv, la) = $8 in
+      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; palias = la; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $11])::$2})
+    }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Lets Specs EXTERN SEMI
+    {
+      let (lv, la) = $8 in
+      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; palias = la; pspecs = $9 lv; pbody = None; pattrs = $2})
+    }
+  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Lets Specs LBRACE Block RBRACE
+    {
+      let (lv, la) = $8 in
+      let bodyLets = List.map (fun (x, t, e) -> SVar (x, t, Immutable, XGhost, [], Some e)) lv in
+      let body = bodyLets @ $11 in
+      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; palias = la; pspecs = $9 lv; pbody = Some body; pattrs = $2})
+    }
 
 Decls
   : { [] }

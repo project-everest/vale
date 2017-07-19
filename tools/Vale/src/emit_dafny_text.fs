@@ -126,10 +126,11 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ) contents;
       ps.Unindent();
       ps.PrintLine("}")
-  | SVar (x, tOpt, g, a, eOpt) ->
+  | SVar (x, tOpt, _, g, a, eOpt) ->
       let st = match tOpt with None -> "" | Some t -> ":" + (string_of_typ t) in
       let rhs = match eOpt with None -> "" | Some e -> " := " + (string_of_exp e) in
       ps.PrintLine ((string_of_var_storage g) + "var " + (sid x) + st + rhs + ";")
+  | SAlias _ -> internalErr "SAlias"
   | SAssign ([], e) -> ps.PrintLine ((string_of_exp e) + ";")
   | SAssign (lhss, e) when List.forall (fun (x, d) -> d = None) lhss ->
       ps.PrintLine ((String.concat ", " (List.map (fun (x, _) -> sid x) lhss)) + " := " + (string_of_exp e) + ";")

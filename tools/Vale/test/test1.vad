@@ -105,15 +105,27 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
 }
 
 procedure Ifs(inline i:int, ghost g:int)
+    let
+        g1 := g + 1;
+        a @= eax;
+        b @= ebx;
+        g2 := g1 + 1;
+        g3 := a;
     modifies
         eax; ebx;
     requires
         g < eax;
+        g < a;
+        g2 == g + 2;
     ensures
         i < 10 ==> eax == old(eax) + i;
         1 <= ebx <= 3;
+        1 <= b <= 3;
         eax <= old(ebx) ==> ebx == 1;
+        g2 == g + 2;
 {
+    assert g2 == g + 2;
+    assert a == eax;
     (ghost var h) := Ghosts(g);
     ghost if (eax < ebx)
     {
@@ -132,12 +144,16 @@ procedure Ifs(inline i:int, ghost g:int)
     }
     else
     {
+        let a := eax;
         Add(eax, 10);
+        assert eax == a + 10;
     }
 
-    if (eax <= ebx)
+    if (a <= b)
     {
-        Imm(ebx, 1);
+        let a @= b;
+        Imm(a, 1); // Imm(ebx, 1);
+        assert ebx == 1;
     }
     else if (le(eax, 10)) // same as "eax <= 10"
     {
@@ -147,6 +163,8 @@ procedure Ifs(inline i:int, ghost g:int)
     {
         Imm(ebx, 3);
     }
+    assert a == eax;
+    assert b == ebx;
 }
 
 procedure Whiles()

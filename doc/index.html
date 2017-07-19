@@ -193,8 +193,8 @@ INCLUDE ::= include "STRING"
 DECL ::=
   | <a href="#state">var</a> x : TYPE ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> LETS SPECS { STMTS }
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> LETS SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
@@ -213,6 +213,12 @@ PRETS ::= PRET , ... , PRET
 <a href="#parameters">PRET</a> ::=
   | ghost x : TYPE
   | TYPE x : TYPE
+
+LETS ::= LET ... LET
+LET ::= let LETBIND ; ... LETBIND ;
+LETBIND ::=
+  | FORMAL := EXP
+  | x1 @= x2
 
 SPECS ::= SPEC ... SPEC
 SPEC ::=
@@ -236,6 +242,8 @@ STMT ::=
   | p ( EXP , ... , EXP) ;
   | ASSIGN ;
   | <i>[</i>ghost<i>]</i> var x <i>[</i>: TYPE<i>]</i> <i>[</i>:= EXP<i>]</i> ;
+  | let x <i>[</i>: TYPE<i>]</i> := e ;
+  | let x1 @= x2 ;
   | forall FORMALS TRIGGERS <i>[</i>:| EXP<i>]</i> :: EXP { STMTS }
   | exists FORMALS TRIGGERS :: EXP ;
   | while ( EXP ) INVARIANTS DECREASE { STMTS }
@@ -351,6 +359,12 @@ procedures p(ghost x:int) returns(ghost y:int)
 
 
 
+let x @= eax; y @= ebx; z := 3 + 3;
+
+
+
+
+
 
 
 
@@ -371,7 +385,9 @@ calc { x; x * 1; { myLemma(x); } 1 * x; }
 reveal myOpaqueFunction;
 Increment(x);
 x := 5;
-ghost var x:uint32 := 33 + 44;
+ghost var x:uint32 := 33 + 44; // mutable x
+let x := eax; // copy eax's current value into immutable x
+let x @= eax; // let x be an alias for register eax
 forall x:int, y:int :| x &lt; y :: x &lt;= y { ... }
 exists x:int :| 0 &lt;= x;
 while (eax != 0) invariant true; decreases *; { ... }
