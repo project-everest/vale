@@ -1,5 +1,7 @@
 module X64.Poly1305.Bitvectors_i
 
+(*
+
 open FStar.BV
 open FStar.Mul
 module U = FStar.UInt
@@ -95,3 +97,4 @@ val lemma_bytes_shift_power2: y:uint_t' 64 ->
 	(ensures  (U.shift_left #64 y 3 < 64 /\
 		   y * 8 == U.shift_left #64 y 3 /\
 		   pow2 (U.shift_left #64 y 3) == U.shift_left #64 1 (U.shift_left #64 y 3)))
+*)

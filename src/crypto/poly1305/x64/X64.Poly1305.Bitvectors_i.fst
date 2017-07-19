@@ -1,5 +1,6 @@
 module X64.Poly1305.Bitvectors_i
 
+(*
 open FStar.BV
 open FStar.Tactics
 open FStar.Tactics.Derived
@@ -155,3 +156,4 @@ let lemma_bytes_shift_power2 y =
     assume (y * 8 == U.shift_left #64 y 3);
     lemma_bytes_shift_constants ();
     lemma_bytes_power2 ()
+*)

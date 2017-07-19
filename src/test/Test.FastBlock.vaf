@@ -1,3 +1,6 @@
+
+include "../arch/x64/X64.Vale.Decls.vaf"
+
 #verbatim
 (* To compile this file do:
    -- vale.exe -fstarText -in Test.FastBlock.vaf -out Test.FastBlock.fst -outi Test.FastBlock.fsti
@@ -5,8 +8,6 @@
    
 *)
 #endverbatim
-
-include "../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module Test.FastBlock
