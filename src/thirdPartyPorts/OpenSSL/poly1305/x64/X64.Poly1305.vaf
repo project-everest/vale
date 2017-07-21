@@ -32,7 +32,7 @@ include "../../../../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module X64.Poly1305
-#reset-options "--z3rlimit_factor 4 --z3rlimit 400 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
+#reset-options "--z3rlimit 1600 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
@@ -910,43 +910,33 @@ procedure poly1305_add_key_s(
 //        lowerUpper128(h0, h1);
 //    }
 }
+*/
 
-/*
-procedure{:timeLimitMultiplier 2} poly1305_impl(
+// TODO: Procedure was consistently sending Z3 into the woods when frame was true
+procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
           reg_operand ctx:uint64,
-    inout dst_operand inp:uint64,
-    inout dst_operand len:uint64,
-    inout dst_operand r0:uint64,
-    inout dst_operand r1:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
     ghost key_r:nat128,
     ghost key_s:nat128,
-    //ghost n:int,
     ghost p:int)
 //    ghost ctx_id:heaplet_id,
 //    ghost inp_id:heaplet_id)
     returns(ghost h:int)
+    let ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
+        n := nat64_max;
+        p := n * n * 4 - 5;
+
+    requires/ensures
+        ok;
     modifies
         rax; rcx; rdx; r8; r9; r10; r13; r15;
+        rdi; rsi; rdx; r11; r12; r14; rbx; rbp;
         efl;
         mem;
     requires
-        @ctx == OReg(Rdi);
-        @inp == OReg(Rsi);
-        @len == OReg(Rdx);
-        @r0 == OReg(R11);
-        @r1 == OReg(R12);
-        @h0 == OReg(R14);
-        @h1 == OReg(Rbx);
-        @h2 == OReg(Rbp);
-        //n == 0x1_0000_0000_0000_0000;
-        p == n * n * 4 - 5;
-        inp + len < 0x1_0000_0000_0000_0000;
         disjoint(ctx, 24*8, inp, (len + 15) / 16 * 16);
         validSrcAddrs(mem, ctx, 64, 24 * 8);
         validSrcAddrs(mem, inp, 64, (len + 15) / 16 * 16);
+        inp + len < nat64_max;
         let key_r0 := mem[ctx + 24];
         let key_r1 := mem[ctx + 32];
         let key_s0 := mem[ctx + 40];
@@ -973,6 +963,7 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
     lemma_poly_bits64();
     //lemma_BitwiseAdd64();
 
+    assert{:fast_block} true;
     Mov64(rax, 0);
     Store64(ctx, rax,  0);
     Store64(ctx, rax,  8);
@@ -991,7 +982,7 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
     assert r == r0 + n * r1; //by { reveal lowerUpper128; }
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
             0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
-    assert r == and128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff);
+    assert r == logand128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff);
 ////    by
 ////    {
 ////        reveal lowerUpper128;
@@ -999,16 +990,17 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
 ////            0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
 ////    }
 //
-//    Mov64(rax, len);
-//    And64(rax, 15);
-//    Sub64(len, rax);
-//    // assert rax == len_in % 16;
-//    // assert len == len_in / 16 * 16;
-//    Store64(ctx, rax, 56);
-//    Store64(ctx, len, 64);
-//
-//    Mov64(rcx, 1);
-//    h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
+    assert{:fast_block} true;
+    Mov64(rax, len);
+    And64(rax, 15);
+    Sub64(len, rax);
+    // assert rax == len_in % 16;
+    // assert len == len_in / 16 * 16;
+    Store64(ctx, rax, 56);
+    Store64(ctx, len, 64);
+
+    Mov64(rcx, 1);
+    h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
 //    assert modp(0) == 0;
 ////    by
 ////    {
@@ -1045,6 +1037,7 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
 ////        by { reveal poly1305_hash; }
 }
 
+/*
 // poly1305(ctx, inp, len)
 //
 // Note that this reads 16-byte chunks directly from the input buffer,

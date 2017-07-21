@@ -362,7 +362,7 @@ procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))} Sub64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout dst_operand dst:uint64, operand src:uint64)
     requires
         0 <= dst - src;
     modifies 

@@ -31,7 +31,8 @@ type ins =
   | IMul64 : dst:va_operand -> src:va_operand -> ins
   | And64 : dst:va_operand -> amt:va_operand -> ins
   | Shr64 : dst:va_operand -> amt:va_operand -> ins
-
+  | Sub64 : dst:va_operand -> src:va_operand -> ins
+ 
 unfold let va_fast_ins_Mov64 = Mov64
 unfold let va_fast_ins_Load64 = Load64
 unfold let va_fast_ins_Store64 = Store64
@@ -41,6 +42,7 @@ unfold let va_fast_ins_Mul64Wrap = Mul64Wrap
 unfold let va_fast_ins_IMul64 = IMul64
 unfold let va_fast_ins_And64 = And64
 unfold let va_fast_ins_Shr64 = Shr64
+unfold let va_fast_ins_Sub64 = Sub64
 
 unfold let va_inss = list ins
 
@@ -137,6 +139,14 @@ let rec strong_post (inss:list ins) (s0:state) (sN:state) : Type0 =
     (exists (x:nat64) (f:nat64).
       x == a /\
       strong_post inss ({update_reg dst x s0 with flags = f}) sN)
+  | (Sub64 (OReg Rsp) _)::_ -> True
+  | (Sub64 (OReg dst) src)::inss ->
+      not (valid_operand_norm src s0) \/
+      not (0 <= s0.regs dst - eval_operand_norm src s0) \/
+      (exists a x (f:nat64).
+        a == s0.regs dst - eval_operand_norm src s0 /\
+        x == a /\
+        strong_post inss ({update_reg dst x s0 with flags = f}) sN)  
   | _ -> True
 
 [@"opaque_to_smt"]
@@ -207,6 +217,8 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   | (And64 (OReg dst) src)::inss -> (va_code_And64 (OReg dst) src)::(inss_to_codes inss)
   | (Shr64 (OReg Rsp) _)::inss -> []
   | (Shr64 (OReg dst) src)::inss -> (va_code_Shr64 (OReg dst) src)::(inss_to_codes inss)
+  | (Sub64 (OReg Rsp) _)::inss -> []
+  | (Sub64 (OReg dst) src)::inss -> (va_code_Sub64 (OReg dst) src)::(inss_to_codes inss)
   | _ -> []
 
 val va_lemma_strong_post_norm : inss:list ins -> s0:state -> sN:state -> Lemma
