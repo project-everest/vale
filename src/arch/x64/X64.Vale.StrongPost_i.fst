@@ -104,6 +104,11 @@ let lemma_strong_post_ins (i:ins) (inss:list ins) (s0:state) (sN:state) : Ghost 
       let (bM, sM) = va_lemma_Shr64 b0 s0 sN (OReg dst) src in
       some_post sM
     else none_post ()
+  | Sub64 (OReg dst) src ->
+    if dst <> Rsp && valid_operand_norm src s0 && 0 <= (s0.regs dst) - (eval_operand_norm src s0) then
+      let (bM, sM) = va_lemma_Sub64 b0 s0 sN (OReg dst) src in
+      some_post sM
+    else none_post ()
   | _ -> assume false; None
 
 let rec lemma_strong_post (inss:list ins) (s0:state) (sN:state) : Lemma
