@@ -4,20 +4,29 @@ open FStar.BV
 open FStar.Mul
 open FStar.UInt
 
-val lemma_shr2: x:uint_t 64 -> Lemma (shift_right #64 x 2 == udiv #64 x 4)
+val lemma_shr2: (x:uint_t 64) -> Lemma
+  ((shift_right #64 x 2 == udiv #64 x 4))
+  [SMTPat (shift_right #64 x 2)]
 val lemma_shr4: x:uint_t 64 -> Lemma (shift_right #64 x 4 == udiv #64 x 16)
-
+				    [SMTPat (shift_right #64 x 4)]
 val lemma_and_mod_n: x:uint_t 64 -> Lemma (logand #64 x 3 == mod #64 x 4 /\ 
-					  logand #64 x 15 == mod #64 x 16)
-val lemma_clear_lower_2: x:uint_t 8 -> Lemma (logand #8 x 0xfc == 
-					     mul_mod #8 (udiv #8 x 4) 4)
+					 logand #64 x 15 == mod #64 x 16))
+				   [SMTPat (logand #64 x 3); 
+				    SMTPat (logand #64 x 15)]
+				    
+val lemma_clear_lower_2: x:uint_t 8 -> 
+  Lemma (logand #8 x 0xfc == mul_mod #8 (udiv #8 x 4) 4)
+  [SMTPat (logand #8 x 0xfc)]
 val lemma_and_constants: x:uint_t 64 ->
   Lemma (logand #64 x 0 == 0 /\ logand #64 x 0xffffffffffffffff == x)
+  [SMTPat (logand #64 x 0); SMTPat (logand #64 x 0xffffffffffffffff)]
 val lemma_poly_constants: x:uint_t 64 -> 
   Lemma (logand #64 x 0x0ffffffc0fffffff < 0x1000000000000000 /\
 	 logand #64 x 0x0ffffffc0ffffffc < 0x1000000000000000 /\
 	 mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == 0)
-	 
+  [SMTPat (logand #64 x 0x0ffffffc0fffffff);
+   SMTPat (logand #64 x 0x0ffffffc0ffffffc);
+   SMTPat (logand #64 x 0x0ffffffc0ffffffc)]
 val lemma_and_commutes: x:uint_t 64 -> y:uint_t 64 ->
   Lemma (logand #64 x y == logand #64 y x)
 val lemma_bv128_64_64_and_helper: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->

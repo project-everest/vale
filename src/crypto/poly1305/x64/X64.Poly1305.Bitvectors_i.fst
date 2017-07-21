@@ -49,21 +49,6 @@ let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0
 let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
   ()
 
-// is lowerUpper128 useful?
-// val lowerUpper128: l:uint_t 64 -> u:uint_t 64 -> Tot (uint_t 128)
-// let lowerUpper128 l u = l + (0x10000000000000000 * u)
-
-// val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
-//   y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
-//   z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
-//   Lemma (requires (z0 == logand #64 x0 y0 /\
-// 		   z1 == logand #64 x1 y1 /\
-// 		   x == lowerUpper128 x1 x0 /\
-// 		   y == lowerUpper128 y1 y0 /\
-// 		   z == lowerUpper128 z1 z0))
-// 	(ensures (z == logand #128 x y))
-// let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = ()
-
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.case_split=3"
 let lemma_bytes_shift_constants0 x =
   assert_by_tactic (bv_tac())
@@ -198,3 +183,16 @@ let lemma_bytes_shift_power2 y =
   lemma_bytes_power2 ()
 
 
+// val lowerUpper128: l:uint_t 64 -> u:uint_t 64 -> Tot (uint_t 128)
+// let lowerUpper128 l u = l + (0x10000000000000000 * u)
+
+// val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
+//   y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
+//   z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
+//   Lemma (requires (z0 == logand #64 x0 y0 /\
+// 		   z1 == logand #64 x1 y1 /\
+// 		   x == lowerUpper128 x1 x0 /\
+// 		   y == lowerUpper128 y1 y0 /\
+// 		   z == lowerUpper128 z1 z0))
+// 	(ensures (z == logand #128 x y))
+// let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = ()
