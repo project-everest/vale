@@ -18,7 +18,7 @@ lemma_BitwiseMul64()
 // private unfold let op_Star = op_Multiply
 
 // these settings make it super slow
-// #reset-options "--z3rlimit_factor 4 --z3rlimit 300 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
+// #reset-options "--z3rlimit 1200 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 
 
 let rec poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 

@@ -32,7 +32,7 @@ include "../../../../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module X64.Poly1305
-#reset-options "--z3rlimit_factor 4 --z3rlimit 400 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
+#reset-options "--z3rlimit 1600 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
