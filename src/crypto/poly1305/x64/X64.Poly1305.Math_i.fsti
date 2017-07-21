@@ -21,7 +21,7 @@ val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int)
 // p used to be a refinement to p > 0 and r1 a nat.
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
-val lemma_poly_multiply : n:int -> p:int -> r:int -> h:int -> r0:int -> r1:int -> h0:int -> h1:int -> h2:int -> s1:int -> d0:int -> d1:int -> d2:int -> hh:int -> Lemma
+val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -> h0:int -> h1:int -> h2:int -> s1:int -> d0:int -> d1:int -> d2:int -> hh:int -> Lemma
   (requires 
     p > 0 /\
     r1 >= 0 /\
@@ -127,13 +127,13 @@ val lemma_add_key : old_h0:nat64 -> old_h1:nat64 -> h_in:int -> key_s0:nat64 -> 
              h1 == add_wrap (add_wrap old_h1 key_s1) (if c then 1 else 0)))
   (ensures lowerUpper128 h0 h1 == (h_in + key_s) % nat128_max)
 
-val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0:nat64 -> y1:nat64 -> z:nat128 -> z0:nat64 -> z1:nat64 -> Lemma
-  (requires z0 == logand64 x0 y0 /\
-            z1 == logand64 x1 y1 /\
-            x == lowerUpper128 x0 x1 /\
-            y == lowerUpper128 y0 y1 /\
-            z == lowerUpper128 z0 z1)
-  (ensures z == logand128 x y)
+// val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0:nat64 -> y1:nat64 -> z:nat128 -> z0:nat64 -> z1:nat64 -> Lemma
+//   (requires z0 == logand64 x0 y0 /\
+//             z1 == logand64 x1 y1 /\
+//             x == lowerUpper128 x0 x1 /\
+//             y == lowerUpper128 y0 y1 /\
+//             z == lowerUpper128 z0 z1)
+//   (ensures z == logand128 x y)
   
 val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma
   (requires i <= k && k <= i + len /\
