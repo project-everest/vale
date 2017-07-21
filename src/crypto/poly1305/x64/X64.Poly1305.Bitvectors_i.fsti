@@ -10,7 +10,7 @@ val lemma_shr2: (x:uint_t 64) -> Lemma
 val lemma_shr4: x:uint_t 64 -> Lemma (shift_right #64 x 4 == udiv #64 x 16)
 				    [SMTPat (shift_right #64 x 4)]
 val lemma_and_mod_n: x:uint_t 64 -> Lemma (logand #64 x 3 == mod #64 x 4 /\ 
-					 logand #64 x 15 == mod #64 x 16))
+					 logand #64 x 15 == mod #64 x 16)
 				   [SMTPat (logand #64 x 3); 
 				    SMTPat (logand #64 x 15)]
 				    
