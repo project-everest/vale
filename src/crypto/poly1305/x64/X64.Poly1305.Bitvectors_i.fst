@@ -42,12 +42,14 @@ let lemma_and_commutes x y =
     (logand #64 x y == logand #64 y x)
 
 let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
-  ()
+// TODO
+  admit()
 
 let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
 
 let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
-  ()
+// TODO
+  admit()
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.case_split=3"
 let lemma_bytes_shift_constants0 x =
