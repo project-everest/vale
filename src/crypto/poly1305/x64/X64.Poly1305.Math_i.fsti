@@ -134,11 +134,16 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
             y == lowerUpper128 y0 y1 /\
             z == lowerUpper128 z0 z1)
   (ensures z == logand128 x y)
-  
+            
+let lemma_h_combiner (h:int) (h0 h1 h2:nat64) : Lemma 
+  (requires h == h2 * (0x10000000000000000 * 0x10000000000000000) + h1 * 0x10000000000000000 + h0)
+  (ensures h == lowerUpper192 (lowerUpper128 h0 h1) h2)
+= ()
+
 val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma
   (requires i <= k && k <= i + len /\
             (k - i) % 16 == 0 /\
             (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
   (ensures poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k)
-          
-    
+
+val hi_mid_lo (h:int) (h0 h1 h2:nat64) : bool 

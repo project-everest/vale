@@ -56,7 +56,7 @@ let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
 
 #endverbatim
 
-
+/*
 procedure poly1305_multiply(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,
@@ -526,10 +526,15 @@ procedure poly1305_iteration(
 //    reveal modp;
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
+*/
 
 #verbatim interface
 
 let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
+
+//let hi_mid_lo (h:int) (h0 h1 h2:nat64) : bool = 
+//    let open FStar.Mul in
+//        h = h2 * nat128_max + h1 * nat64_max + h0
 
 #endverbatim
 
@@ -609,6 +614,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         let r0_in := mem[ctx + 24];
         let r1_in := mem[ctx + 32];
         h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
+        hi_mid_lo(h, h0, h1, h2);
         (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
         forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
         modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), old(inp + len));
@@ -699,6 +705,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     Store64(ctx, h2, 16, Public, ctx_id);
 }
 */
+
+
+/*
 
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:timeLimitMultiplier 2} poly1305_last_block(
@@ -1001,6 +1010,9 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 
     Mov64(rcx, 1);
     h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
+       assert hi_mid_lo(h, h0, h1, h2);
+//       assert 
+//        h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
 //    assert modp(0) == 0;
 ////    by
 ////    {
@@ -1008,7 +1020,8 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 ////        assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
 ////    }
 //
-//    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
+    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
+//    lemma_h_combiner(h, h0, h1, h2);
 //    assert h == lowerUpper192(lowerUpper128(h0, h1), h2);
 ////        by { reveal lowerUpper192; reveal lowerUpper128; }
 //
@@ -1155,18 +1168,18 @@ procedure{:timeLimitMultiplier 2} poly1305(
     Mov64(ctx, rax);
 }
 */
-
-#verbatim
-
-let print_poly1305 (p:printer) : FStar.All.ML unit =
-  let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
-  print_header p;
-  print_proc "poly1305" poly_code 0 p;
-  print_footer p
-
-let main () : FStar.All.ML unit =
-  print_poly1305 masm;
-  print_string "\n\n";
-  print_poly1305 gcc
-
-#endverbatim
+//
+//#verbatim
+//
+//let print_poly1305 (p:printer) : FStar.All.ML unit =
+//  let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
+//  print_header p;
+//  print_proc "poly1305" poly_code 0 p;
+//  print_footer p
+//
+//let main () : FStar.All.ML unit =
+//  print_poly1305 masm;
+//  print_string "\n\n";
+//  print_poly1305 gcc
+//
+//#endverbatim

@@ -157,3 +157,6 @@ let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat6
 let lemma_poly1305_heap_hash_blocks (h) (pad) (r) (m) (i) (k) (len) =
   admit()
   // decreases k - i
+  
+let hi_mid_lo (h:int) (h0 h1 h2:nat64) : bool = 
+  h = h2 * nat128_max + h1 * nat64_max + h0
