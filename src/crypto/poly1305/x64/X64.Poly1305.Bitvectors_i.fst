@@ -10,45 +10,85 @@ open FStar.UInt.Base
 // tweak options?
 #reset-options "--smtencoding.elim_box true"
 
+
+
+
+val lemma_shr2: (x:uint_t 64) -> Lemma
+  ((shift_right #64 x 2 == udiv #64 x 4))
+  // [SMTPat (shift_right #64 x 2)]
 let lemma_shr2 x = 
    assert_by_tactic (bv_tac()) (shift_right #64 x 2 == udiv #64 x 4)
-   
+
+val lemma_shr4: x:uint_t 64 -> Lemma (shift_right #64 x 4 == udiv #64 x 16)
+				    // [SMTPat (shift_right #64 x 4)]
 let lemma_shr4 x =
   assert_by_tactic (bv_tac ()) (shift_right #64 x 4 == udiv #64 x 16)
 
-let lemma_and_mod_n x =
-  assert_by_tactic (seq split (bv_tac ())) 
-    (logand #64 x 3 == mod #64 x 4 /\ logand #64 x 15 == mod #64 x 16)
+val lemma_and_mod_3: x:uint_t 64 -> Lemma (logand #64 x 3 == mod #64 x 4)
+				   // [SMTPat (logand #64 x 3)]
+let lemma_and_mod_3 x =
+  assert_by_tactic (bv_tac ())
+    (logand #64 x 3 == mod #64 x 4)
+    
+val lemma_and_mod_15: x:uint_t 64 -> Lemma (logand #64 x 15 == mod #64 x 16)
+				   // [SMTPat (logand #64 x 15)]
+let lemma_and_mod_15 x =
+  assert_by_tactic (bv_tac ()) 
+    (logand #64 x 15 == mod #64 x 16)
 
 let lemma_clear_lower_2 x =
   assert_by_tactic (bv_tac ())
   (logand #8 x 0xfc == mul_mod #8 (udiv #8 x 4) 4)
 
-let lemma_and_constants x =
-  assert_by_tactic (seq split (bv_tac ()))
-  (logand #64 x 0 == (0 <: uint_t 64) /\ 
-   logand #64 x 0xffffffffffffffff == x)
+val lemma_and_0: x:uint_t 64 ->
+  Lemma (logand #64 x 0 == 0)
+  // [SMTPat (logand #64 x 0)]
+let lemma_and_0 x =
+  assert_by_tactic (bv_tac ())
+  (logand #64 x 0 == (0 <: uint_t 64))
 
-let lemma_poly_constants x =
- assert_by_tactic (split;; split;; 
-		   bv_tac_lt 64;;
-		   bv_tac_lt 64;;
-		   bv_tac ()) 
-   (logand #64 x 0x0ffffffc0fffffff < (0x1000000000000000 <: uint_t 64) /\
-     logand #64 x 0x0ffffffc0ffffffc < (0x1000000000000000 <: uint_t 64) /\
-     mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64))
+val lemma_and_ones: x:uint_t 64 ->
+  Lemma (logand #64 x 0xffffffffffffffff == x)
+  // [SMTPat (logand #64 x 0xffffffffffffffff)]
+let lemma_and_ones x =
+   assert_by_tactic (bv_tac ())
+     (logand #64 x 0xffffffffffffffff == x)
 
+val lemma_poly_constants_1: x:uint_t 64 -> 
+  Lemma (logand #64 x 0x0ffffffc0fffffff < 0x1000000000000000)
+  // [SMTPat (logand #64 x 0x0ffffffc0fffffff)]
+let lemma_poly_constants_1 x =
+  assert_by_tactic (bv_tac_lt 64)
+    (logand #64 x 0x0ffffffc0fffffff < (0x1000000000000000 <: uint_t 64))
+
+val lemma_poly_constants_2: x:uint_t 64 ->
+  Lemma (logand #64 x 0x0ffffffc0ffffffc < 0x1000000000000000)
+  // [SMTPat (logand #64 x 0x0ffffffc0ffffffc)]
+let lemma_poly_constants_2 x =
+  assert_by_tactic (bv_tac_lt 64)
+    (logand #64 x 0x0ffffffc0ffffffc < (0x1000000000000000 <: uint_t 64))
+
+val lemma_poly_constants_3: x:uint_t 64 ->
+  Lemma (mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == 0)
+  // [SMTPat (logand #64 x 0x0ffffffc0ffffffc)]
+let lemma_poly_constants_3 x =
+  assert_by_tactic (bv_tac ())
+    (mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64))
+
+val lemma_and_commutes: x:uint_t 64 -> y:uint_t 64 ->
+  Lemma (logand #64 x y == logand #64 y x)
+  // [SMTPat (logand #64 x y == logand #64 y x)]
 let lemma_and_commutes x y =
   assert_by_tactic (bv_tac ())
     (logand #64 x y == logand #64 y x)
 
-let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
-  admit ()
+// let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
+//   admit ()
 
-let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
+// let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
 
-let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
-  admit ()
+// let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
+//   admit ()
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.case_split=3"
 let lemma_bytes_shift_constants0 x =
@@ -183,17 +223,22 @@ let lemma_bytes_shift_power2 y =
   | _ -> ());
   lemma_bytes_power2 ()
 
-
-// val lowerUpper128: l:uint_t 64 -> u:uint_t 64 -> Tot (uint_t 128)
 // let lowerUpper128 l u = l + (0x10000000000000000 * u)
+// let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = admit ()
 
-// val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
-//   y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
-//   z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
-//   Lemma (requires (z0 == logand #64 x0 y0 /\
-// 		   z1 == logand #64 x1 y1 /\
-// 		   x == lowerUpper128 x1 x0 /\
-// 		   y == lowerUpper128 y1 y0 /\
-// 		   z == lowerUpper128 z1 z0))
-// 	(ensures (z == logand #128 x y))
-// let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = ()
+// open X64.Vale.Decls  // needed for shift_right64, logand64
+// open X64.Machine_s   // needed for mem
+
+// #reset-options "--smtencoding.elim_box true --smtencoding.nl_arith_repr native"
+
+// let lemma_poly_bits64 () =
+//   assert(forall (x:nat64). shift_right #64 x 2 == x / 4);
+//   assert(forall (x:nat64) (y:nat64). logand64 x y == logand #64 x y);
+//   assert(forall (x:nat64). logand #64 x 3 == mod #64 x 4);
+//   assert(forall (x:nat64). logand #64 x 15 == mod #64 x 16);
+//   assert(forall (x:nat64). logand #64 x 0 == 0);
+//   assert ((forall (x:nat64).	logand #64 x 0xffffffffffffffff == x));
+//   assert (forall (x:nat64). logand #64 x 0xfffffffffffffffc == (x / 4) * 4);
+//   assert (forall (x:nat64). logand #64 x 0x0ffffffc0fffffff < nat64_max / 16);
+//   assert (forall (x:nat64). logand #64 x 0x0ffffffc0ffffffc < nat64_max / 16);
+//   assert (forall (x:nat64). mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == 0)
