@@ -31,29 +31,30 @@ val lemma_poly_constants: x:uint_t 64 ->
    SMTPat (logand #64 x 0x0ffffffc0ffffffc)]
 val lemma_and_commutes: x:uint_t 64 -> y:uint_t 64 ->
   Lemma (logand #64 x y == logand #64 y x)
-// val lemma_bv128_64_64_and_helper: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
-//   y:bv_t 128 -> y0:bv_t 64 -> y1:bv_t 64 ->
-//   z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
-//   Lemma (requires (z0 == bvand #64 x0 y0 /\
-// 		   z1 == bvand #64 x1 y1 /\
-// 		   x == bvor #128 (bvshl #128 (bv_uext #64 #64 x1) 64) 
-// 							   (bv_uext #64 #64 x0) /\
-// 		   y == bvor #128 (bvshl #128 (bv_uext #64 #64 y1) 64) 
-// 							   (bv_uext #64 #64 y0) /\
-// 		   z == bvor #128 (bvshl #128 (bv_uext #64 #64 z1) 64) 
-// 							   (bv_uext #64 #64 z0)))
-// 	(ensures (z == bvand #128 x y))
-// val bv128_64_64: x1:bv_t 64 -> x0:bv_t 64 -> Tot (bv_t 128)
+  
+val lemma_bv128_64_64_and_helper: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
+  y:bv_t 128 -> y0:bv_t 64 -> y1:bv_t 64 ->
+  z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
+  Lemma (requires (z0 == bvand #64 x0 y0 /\
+		   z1 == bvand #64 x1 y1 /\
+		   x == bvor #128 (bvshl #128 (bv_uext #64 #64 x1) 64) 
+							   (bv_uext #64 #64 x0) /\
+		   y == bvor #128 (bvshl #128 (bv_uext #64 #64 y1) 64) 
+							   (bv_uext #64 #64 y0) /\
+		   z == bvor #128 (bvshl #128 (bv_uext #64 #64 z1) 64) 
+							   (bv_uext #64 #64 z0)))
+	(ensures (z == bvand #128 x y))
+val bv128_64_64: x1:bv_t 64 -> x0:bv_t 64 -> Tot (bv_t 128)
 
-// val lemma_bv128_64_64_and: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
-//   y:bv_t 128 -> y0:bv_t 64 -> y1:bv_t 64 ->
-//   z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
-//   Lemma (requires (z0 == bvand #64 x0 y0 /\
-// 		   z1 == bvand #64 x1 y1 /\
-// 		   x == bv128_64_64 x1 x0 /\
-// 		   y == bv128_64_64 y1 y0 /\
-// 		   z == bv128_64_64 z1 z0))
-// 	(ensures (z == bvand #128 x y))
+val lemma_bv128_64_64_and: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
+  y:bv_t 128 -> y0:bv_t 64 -> y1:bv_t 64 ->
+  z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
+  Lemma (requires (z0 == bvand #64 x0 y0 /\
+		   z1 == bvand #64 x1 y1 /\
+		   x == bv128_64_64 x1 x0 /\
+		   y == bv128_64_64 y1 y0 /\
+		   z == bv128_64_64 z1 z0))
+	(ensures (z == bvand #128 x y))
 
 val lemma_bytes_shift_constants0: unit -> Lemma
     (shift_left #64 0 3 == 0 /\

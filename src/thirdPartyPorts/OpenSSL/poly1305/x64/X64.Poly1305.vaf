@@ -910,7 +910,7 @@ procedure poly1305_add_key_s(
 //        lowerUpper128(h0, h1);
 //    }
 }
-*/
+
 
 // TODO: Procedure was consistently sending Z3 into the woods when frame was true
 procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
