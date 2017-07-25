@@ -32,7 +32,7 @@ include "../../../../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module X64.Poly1305
-#reset-options "--z3rlimit 1600 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
+#reset-options "--z3rlimit 30 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
@@ -538,6 +538,7 @@ let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
 
 #endverbatim
 
+
 procedure{:timeLimitMultiplier 2} poly1305_blocks(
           operand ctx:uint64,
     inout dst_operand inp:uint64,
@@ -622,6 +623,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     h := 0;
     assume false;
 }
+
 /*
 {
     lemma_BitwiseAdd64();
@@ -921,6 +923,82 @@ procedure poly1305_add_key_s(
 }
 */
 
+/*
+procedure poly1305_blocks_fake(
+          operand ctx:uint64,
+    inout dst_operand inp:uint64,
+    inout dst_operand len:uint64,
+          operand padbit:uint64,
+    inout dst_operand d1:uint64,
+    inout dst_operand d2:uint64,
+    inout dst_operand d3:uint64,
+    inout dst_operand r0:uint64,
+    inout dst_operand r1:uint64,
+    inout dst_operand s1:uint64,
+    inout dst_operand h0:uint64,
+    inout dst_operand h1:uint64,
+    inout dst_operand h2:uint64,
+    ghost r:int,
+    ghost h_in:int,
+    ghost p:int)
+    returns(ghost h:int)
+    modifies
+        rax; rdx; r15;
+        efl;
+        mem;
+    requires
+    ensures
+        h2 < 5;
+        validSrcAddrs(mem, ctx, 64, 24 * 8);
+        validSrcAddrs(mem, old(inp), 64, old(len));
+        // TODO: What's should this say instead?
+        //mem == old(mem)[ctx_id := mem[ctx_id]];
+        h0 == mem[ctx + 0];
+        h1 == mem[ctx + 8];
+        h2 == mem[ctx + 16];
+        r0 == mem[ctx + 24];
+        r1 == mem[ctx + 32];
+        s1 == r1 + r1 / 4;
+        ctx == old(ctx); // REVIEW: framing should add this automatically
+        inp == old(inp + len);
+        forall i :: ctx + 24 <= i && i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
+        let r0_in := mem[ctx + 24];
+        let r1_in := mem[ctx + 32];
+        h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
+        hi_mid_lo(h, h0, h1, h2);
+//        (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
+//        forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
+//        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), old(inp + len));
+{
+    h := 0;
+    assume false;
+}
+procedure {:frame false} test(
+          reg_operand ctx:uint64,
+    ghost key_r:nat128,
+    ghost key_s:nat128,
+    ghost p:int)
+    returns(ghost h:int)
+    let ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
+        n := nat64_max;
+        p := n * n * 4 - 5;
+
+    requires/ensures
+        ok;
+    modifies
+        rax; rcx; rdx; r8; r9; r10; r13; r15;
+        rdi; rsi; rdx; r11; r12; r14; rbx; rbp;
+        efl;
+        mem;
+    requires
+    ensures
+{
+    ghost var r:nat128 := lowerUpper128(r0, r1);
+    h := poly1305_blocks_fake(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
+    assert hi_mid_lo(h, h0, h1, h2);
+}
+*/
+
 // TODO: Procedure was consistently sending Z3 into the woods when frame was true
 procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
           reg_operand ctx:uint64,
@@ -1044,7 +1122,7 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 //    Load64(rax, ctx, 40);
 //    Load64(rdx, ctx, 48);
 //    poly1305_add_key_s(h0, h1, rax, rdx, h, key_s);
-    h := lowerUpper128(h0, h1);
+//    h := lowerUpper128(h0, h1);
 //
 //    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, inp_in, len_in), inp_in, len_in);
 ////        by { reveal poly1305_hash; }
