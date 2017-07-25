@@ -1,6 +1,7 @@
 module X64.Poly1305.Math_i
 
 open FStar.Tactics
+open Canon
 open FStar.Tactics.Canon
 open FStar.Math.Lemmas
 open FStar.Math.Lib
@@ -76,7 +77,7 @@ let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:in
     (ensures ((h2*n + h1)*((p+5)*x) + y + (h1*r0 + h0*r1)*n + h0*r0 ==
      	      y + (h0*r1 + h1*r0 + h2*(5*x))* n + 
     	      (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p)) =
-     assert_by_tactic canon ((h2*n+h1)*((p+5)*x) == (h2*n+h1)*5*x + ((h2*n+h1)*x)*p);
+     assert_by_tactic (compiled_canon ()) ((h2*n+h1)*((p+5)*x) == (h2*n+h1)*5*x + ((h2*n+h1)*x)*p);
     calc (
       (h2*n + h1)*((p+5)*x) + (y + (h1*r0 + h0*r1)*n + h0*r0)
       &= (h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0) &| using z3
@@ -84,13 +85,13 @@ let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:in
       	 using (swap_add ((h2*n + h1)*5*x) 
 			 (((h2*n + h1)*x)*p)
       			 ((h2*r0)*(n*n) + (h1*r0 + h0*r1)*n + h0*r0))
-      &= y + (h0*r1 + h1*r0 + h2*(5*x))*n + (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p &|| canon
+      &= y + (h0*r1 + h1*r0 + h2*(5*x))*n + (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p &|| (compiled_canon ())
       )
   in
     calc(  
       h*r 
       &= (h2*(n*n) + h1*n + h0)*(r1*n + r0) &| using z3
-      &= (h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0 &|| canon
+      &= (h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0 &|| (compiled_canon ())
       &= ((h2*n+h1)*((p+5)*(r1/4)))+(h2*r0)*(n*n)+ 
     	 (h1*r0+h0*r1)*n + h0*r0 &| using (slash_star_axiom (n*n) 4 (p+5);
 					   lemma_mul_div_comm (p+5) 4 r1; 
