@@ -188,63 +188,65 @@ let example (dst:dst_op) (src:operand) :st unit =
 //let test (dst:dst_op) (src:operand) (s:state) :state =
 //  run (example dst src) s
 
-abstract
-let logxor (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && FStar.UInt.fits y 64
-  then FStar.UInt.logxor #64 x y
-  else 0
+// abstract
+// let logxor (x:int) (y:int) : nat64 =
+//   if FStar.UInt.fits x 64
+//   && FStar.UInt.fits y 64
+//   then FStar.UInt.logxor #64 x y
+//   else 0
 
-let logxor_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    FStar.UInt.fits y 64) ==>
-                    logxor x y = FStar.UInt.logxor #64 x y)
-          [SMTPat (logxor x y)]
-  = ()          
+// let logxor_uint64 (x:int) (y:int)
+//   : Lemma (ensures (FStar.UInt.Types.fits x 64 /\
+//                     FStar.UInt.fits y 64) ==>
+//                     logxor x y = FStar.UInt.logxor #64 x y)
+//           [SMTPat (logxor x y)]
+//   = ()          
 
-abstract
-let logand (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && FStar.UInt.fits y 64
-  then FStar.UInt.logand #64 x y
-  else 0
+// abstract
+// let logand (x:int) (y:int) : nat64 =
+//   if FStar.UInt.fits x 64
+//   && FStar.UInt.fits y 64
+//   then FStar.UInt.logand #64 x y
+//   else 0
 
-let logand_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    FStar.UInt.fits y 64) ==>
-                    logand x y = FStar.UInt.logand #64 x y)
-          [SMTPat (logand x y)]
-  = ()          
+// let logand_uint64 (x:int) (y:int)
+//   : Lemma (ensures (FStar.UInt.fits x 64 /\
+//                     FStar.UInt.fits y 64) ==>
+//                     logand x y = FStar.UInt.logand #64 x y)
+//           [SMTPat (logand x y)]
+//   = ()          
 
-abstract
-let shift_right (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && y >= 0
-  then FStar.UInt.shift_right #64 x y
-  else 0
+// abstract
+// let shift_right (x:int) (y:int) : nat64 =
+//   if FStar.UInt.fits x 64
+//   && y >= 0
+//   then FStar.UInt.shift_right #64 x y
+//   else 0
 
-let shift_right_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    0 <= y /\
-                    y < 64 ==>
-                    shift_right x y = FStar.UInt.shift_right #64 x y))
-          [SMTPat (shift_right x y)]
-  = ()          
+// let shift_right_uint64 (x:int) (y:int)
+//   : Lemma (ensures (FStar.UInt.fits x 64 /\
+//                     0 <= y /\
+//                     y < 64 ==>
+//                     shift_right x y = FStar.UInt.shift_right #64 x y))
+//           [SMTPat (shift_right x y)]
+//   = ()          
 
-abstract
-let shift_left (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && y >= 0
-  then FStar.UInt.shift_left #64 x y
-  else 0
+// abstract
+// let shift_left (x:int) (y:int) : nat64 =
+//   if FStar.UInt.fits x 64
+//   && y >= 0
+//   then FStar.UInt.shift_left #64 x y
+//   else 0
 
-let shift_left_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    0 <= y /\
-                    y < 64 ==>
-                    shift_left x y = FStar.UInt.shift_left #64 x y))
-          [SMTPat (shift_left x y)]
-  = ()          
+// let shift_left_uint64 (x:int) (y:int)
+//   : Lemma (ensures (FStar.UInt.fits x 64 /\
+//                     0 <= y /\
+//                     y < 64 ==>
+//                     shift_left x y = FStar.UInt.shift_left #64 x y))
+//           [SMTPat (shift_left x y)]
+//   = ()          
+
+open FStar.UInt.Vectors
 
 let eval_ocmp (s:state) (c:ocmp) :bool =
   match c with
@@ -325,17 +327,17 @@ let eval_ins (ins:ins) : st unit =
 
   | Xor64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (u (v (eval_operand dst s) `logxor` v (eval_operand src s)))
+    update_operand dst ins (u (logxor #64 (v (eval_operand dst s)) (v (eval_operand src s))))
 
   | And64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (u (v (eval_operand dst s) `logand` v (eval_operand src s)))
+    update_operand dst ins (u (logand #64 (v (eval_operand dst s)) (v (eval_operand src s))))
 
   | Shr64 dst amt ->
-    update_operand dst ins (u (v (eval_operand dst s) `shift_right` v (eval_operand amt s)))
+    update_operand dst ins (u (shift_right #64 (v (eval_operand dst s)) (v (eval_operand amt s))))
 
   | Shl64 dst amt ->
-    update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
+    update_operand dst ins (u (shift_left #64 (v (eval_operand dst s)) (v (eval_operand amt s))))
 
   | _ -> fail
 
@@ -356,7 +358,7 @@ let decr (c:code) (s:state) :nat =
 
 val eval_code:  c:code           -> s:state -> Tot (option state) (decreases %[c; decr c s; 1])
 val eval_codes: l:codes          -> s:state -> Tot (option state) (decreases %[l])
-val eval_while: c:code{While? c} -> s:state -> Tot (option state) (decreases %[c; decr c s; 0])
+val eval_while: c:code{While? c} -> s0:state -> Tot (option state) (decreases %[c; decr c s0; 0])
 
 let rec eval_code c s =
   match c with

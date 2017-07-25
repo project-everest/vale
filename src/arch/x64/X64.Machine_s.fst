@@ -1,4 +1,5 @@
 module X64.Machine_s
+open FStar.UInt.Types
 
 unfold let nat32_max = 0x100000000
 unfold let nat64_max = 0x10000000000000000
@@ -9,9 +10,10 @@ let _ = assert_norm (pow2 32 = nat32_max)
 let _ = assert_norm (pow2 64 = nat64_max)
 let _ = assert_norm (pow2 128 = nat128_max)
 
-type nat64 = x:nat{x < nat64_max}
+type nat64 = uint_t 64
+//TODO: something about this.
 assume val int_to_nat64 : i:int -> n:nat64{0 <= i && i < nat64_max ==> i == n}
-type nat128 = x:nat{x < nat128_max}
+type nat128 = uint_t 128
 
 type reg =
   | Rax
