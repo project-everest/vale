@@ -49,9 +49,6 @@ let eval_operand (o:operand) (s:state) : nat64 =
   | OMem m -> eval_mem (eval_maddr m s) s
 
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = fun r' -> if reg_to_int r = reg_to_int r' then v else s.regs r' }
-
-let update_reg'(r:reg) (v:nat64) (s:state) : state =
   { s with regs = fun r' -> if  r = r' then v else s.regs r' }
 
 let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = Map.upd s.mem ptr v }

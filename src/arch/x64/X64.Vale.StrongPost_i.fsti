@@ -32,7 +32,7 @@ type ins =
   | And64 : dst:va_operand -> amt:va_operand -> ins
   | Shr64 : dst:va_operand -> amt:va_operand -> ins
   | Sub64 : dst:va_operand -> src:va_operand -> ins
- 
+
 unfold let va_fast_ins_Mov64 = Mov64
 unfold let va_fast_ins_Load64 = Load64
 unfold let va_fast_ins_Store64 = Store64
@@ -146,7 +146,7 @@ let rec strong_post (inss:list ins) (s0:state) (sN:state) : Type0 =
       (exists a x (f:nat64).
         a == s0.regs dst - eval_operand_norm src s0 /\
         x == a /\
-        strong_post inss ({update_reg dst x s0 with flags = f}) sN)  
+        strong_post inss ({update_reg dst x s0 with flags = f}) sN)
   | _ -> True
 
 let rec inss_to_codes (inss:list ins) : list va_code =
@@ -172,9 +172,9 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   | _ -> []
 
 [@"opaque_to_smt"]
-let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state): Type0 = 
+let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state): Type0 =
   match inss with
-  | [] -> 
+  | [] ->
        (forall okN regsN flagsN memN.
        let sN = {ok=okN; regs=regsN; flags=flagsN; mem=memN} in
        okN == s0.ok /\
@@ -195,8 +195,9 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state): Type0 =
   | (Store64 (OReg dst) src offset) :: inss ->
     (valid_operand_norm src s0) /\
     (mem_contains s0.mem (s0.regs dst + offset)) /\
-    (forall x. x == eval_operand_norm src s0 ==>
-      wp_code inss post (update_mem (s0.regs dst + offset) x s0)) 
+    (forall x.
+       x == mem_upd s0.mem (s0.regs dst + offset) (eval_operand_norm src s0) ==>
+       wp_code inss post ({s0 with mem = x}))
   | _ -> True
 
 
@@ -217,21 +218,44 @@ let wp_code_delta = [
   "X64.Vale.StrongPost_i.wp_code";
   "X64.Vale.StrongPost_i.all_regs_match";
   "X64.Vale.StrongPost_i.regs_match";
-  "X64.Vale.StrongPost_i.eval_operand_norm";  
-  "X64.Vale.State_i.update_reg'";
+  "X64.Vale.StrongPost_i.eval_operand_norm";
+  "X64.Vale.State_i.update_reg";
+  "X64.Vale.State_i.update_mem";
   "X64.Vale.State_i.__proj__Mkstate__item__regs";
   "X64.Vale.State_i.__proj__Mkstate__item__ok" ;
-  "X64.Vale.State_i.__proj__Mkstate__item__flags"; 
-  "X64.Vale.State_i.__proj__Mkstate__item__mem"; 
+  "X64.Vale.State_i.__proj__Mkstate__item__flags";
+  "X64.Vale.State_i.__proj__Mkstate__item__mem";
+  "X64.Vale.StrongPost_i.valid_operand_norm"
   ]
 
-val lemma_weakest_pre_norm: inss:list ins -> s0:state -> PURE state
+[@"uninterpreted_by_smt"]
+val lemma_weakest_pre_norm: inss:list ins -> s0:state -> sN:state -> PURE state
   (fun (post:(state -> Type)) ->
-     forall ok0 regs0 flags0 mem0. 
+     forall ok0 regs0 flags0 mem0.
         ok0 == s0.ok /\
         regs0 == s0.regs /\
         flags0 == s0.flags /\
         mem0 == s0.mem ==>
         s0.ok /\
+        Some sN == va_eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 /\
         Prims.norm [delta_only wp_code_delta; zeta; iota; primops]
-                   (wp_code inss post ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
+                   (wp_code inss
+                            (fun final_state -> final_state == sN
+                                              ==> post final_state)
+                     ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
+
+(* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
+(* let test_lemma (s0:state) = *)
+(*     assume (s0.ok); *)
+(*     assume (mem_contains s0.mem (s0.regs Rsi)); *)
+(*     assume (mem_contains s0.mem (s0.regs Rcx)); *)
+(*     let i1 = Prims.set_range_of (Load64 (OReg Rax) (OReg Rsi) 0) *)
+(*                                 (mk_range "load-instruction-1" 1 1 2 0) in *)
+(*     let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0) *)
+(*                                 (mk_range "load-instruction-2" 2 1 3 0) in *)
+(*     let i3 = Mov64 (OReg Rax) (OReg Rbx) in                                    *)
+(*     let sN = lemma_weakest_pre_norm [i1; i2; i3] s0 in *)
+(*     //this assertion is what F* uses to implicitly instantiate *)
+(*     //the post-condition predicate in lemma_weakest_pre_norm *)
+(*     assert (state_eq sN (update_reg Rbx (sN.regs Rbx)  *)
+(*                         (update_reg Rax (sN.regs Rax) s0))) *)
