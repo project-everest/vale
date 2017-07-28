@@ -30,4 +30,4 @@ let using x = fun () -> x
 let z3 = ()
 let done = ()
 let qed = ()
-let ( &. ) (#a : Type) (x:a) (_:unit) = ()
+(* let ( &. ) (#a : Type) (x:a) (_:unit) = () *)
