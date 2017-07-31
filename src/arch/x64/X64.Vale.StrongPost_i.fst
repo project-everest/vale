@@ -141,4 +141,41 @@ let va_lemma_strong_post_norm inss s0 sN =
   assert_to_norm (strong_post inss s0 sN);
   ()
 
+
+
+let rec lemma_weak_pre (inss:list ins) (s0:state) (post: state -> Type) (sN:state) : Lemma
+  (requires
+    Some sN == va_eval_code (va_Block (inss_to_codes inss)) s0 /\
+    s0.ok)
+  (ensures
+    wp_code inss (fun sN' -> sN' == sN ==> post sN') s0) =
+  match inss with
+  | [] ->
+      let _ = va_lemma_empty s0 sN in
+      let regs = [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp; Rsp; R8; R9; R10; R11; R12; R13; R14; R15] in
+      lemma_regs_match_self regs s0;
+      assert_norm (wp_code inss s0 (fun sN' -> sN' == sN ==> post sN'));
+      ()
+  | i::inss ->
+    (
+      match lemma_strong_post_ins i inss s0 sN with
+      | None -> ()
+      | Some sM -> lemma_strong_post inss sM sN
+    )
+
+assume val lemma_weak_pre_ins: (i:ins) -> (inss:list ins) -> 
+			       (s0:state) -> (sN:state) ->
+			       (post: state -> Type) -> 
+  Ghost (state -> Type)
+         (requires (s0.ok /\
+		    Some sN == va_eval_code (va_Block (inss_to_codes (i::inss))) s0))
+	 (ensures (fun post' ->
+		     match sM with
+		     | None -> wp_code (i::inss) (fun sN' -> sN' == sM ==> post sN') s0
+		     | Some sM ->
+			    Some sN == va_eval_code (va_Block (inss_to_codes inss)) sM /\
+			    sM.ok /\
+			    wp
+		    
+
 let lemma_weakest_pre_norm inss s0 = admit ()
