@@ -229,8 +229,8 @@ let wp_code_delta = [
   ]
 
 [@"uninterpreted_by_smt"]
-val lemma_weakest_pre_norm: inss:list ins -> s0:state -> sN:state -> PURE state
-  (fun (post:(state -> Type)) ->
+val lemma_weakest_pre_norm: inss:list ins -> s0:state -> sN:state -> PURE unit
+  (fun (post:(unit -> Type)) ->
      forall ok0 regs0 flags0 mem0.
         ok0 == s0.ok /\
         regs0 == s0.regs /\
@@ -240,8 +240,7 @@ val lemma_weakest_pre_norm: inss:list ins -> s0:state -> sN:state -> PURE state
         Some sN == va_eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 /\
         Prims.norm [delta_only wp_code_delta; zeta; iota; primops]
                    (wp_code inss
-                            (fun final_state -> final_state == sN
-                                              ==> post final_state)
+                            (fun final_state -> final_state==sN ==> post ())
                      ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
 
 (* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
