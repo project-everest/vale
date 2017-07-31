@@ -43,6 +43,18 @@ function{:opaque} WordToBytes(w:uint32) : seq<uint8>
 //      uint8(w              % 256) ]
 }
 
+function{:opaque} Word64ToBytes(w:uint64) : seq<uint8>
+    ensures |Word64ToBytes(w)| == 8;
+{
+    BEUintToSeqByte(w as int, 8)
+}
+
+function{:opaque} Word128ToBytes(w:uint128) : seq<uint8>
+    ensures |Word128ToBytes(w)| == 16;
+{
+    BEUintToSeqByte(w as int, 16)
+}
+
 function {:opaque} Uint64ToBytes(u:uint64) : seq<uint8>
     ensures |Uint64ToBytes(u)| == 8;
 {
@@ -61,6 +73,13 @@ function WordSeqToBytes(ws:seq<uint32>) : seq<uint8>
     //ensures var bytes := WordSeqToBytes(ws); forall i :: 0 <= i < |ws| ==> bytes[i*4..(i+1)*4] == WordToBytes(ws[i]);
 {
     if |ws| == 0 then [] else WordToBytes(ws[0]) + WordSeqToBytes(ws[1..])
+}
+
+function Word64SeqToBytes(ws:seq<uint64>) : seq<uint8>
+    ensures |Word64SeqToBytes(ws)| == |ws| * 8;
+    //ensures var bytes := WordSeqToBytes(ws); forall i :: 0 <= i < |ws| ==> bytes[i*4..(i+1)*4] == WordToBytes(ws[i]);
+{
+    if |ws| == 0 then [] else Word64ToBytes(ws[0]) + Word64SeqToBytes(ws[1..])
 }
 
 function RepeatByte(b:uint8, count:int) : seq<uint8>

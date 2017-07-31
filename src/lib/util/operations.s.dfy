@@ -59,6 +59,11 @@ function method {:opaque} BitNot(x:bv32): bv32
     !x
 }
 
+function method {:opaque} BitNot64(x:bv64): bv64
+{
+    !x
+}
+
 function method {:opaque} BitShiftLeft(x:bv32, amount:int): bv32
     requires 0 <= amount < 32;
 {
@@ -67,6 +72,18 @@ function method {:opaque} BitShiftLeft(x:bv32, amount:int): bv32
 
 function method {:opaque} BitShiftRight(x:bv32, amount:int): bv32
     requires 0 <= amount < 32;
+{
+    x >> amount
+}
+
+function method {:opaque} BitShiftLeft64(x:bv64, amount:int): bv64
+    requires 0 <= amount < 64;
+{
+    x << amount
+}
+
+function method {:opaque} BitShiftRight64(x:bv64, amount:int): bv64
+    requires 0 <= amount < 64;
 {
     x >> amount
 }
@@ -83,6 +100,13 @@ function method {:opaque} BitRotateLeft(x:bv32, amount:int): bv32
 {
     // TODO: Replace with Dafny's builtin operator for this
     (x << amount) | (x >> (32 - amount))
+}
+
+function method {:opaque} BitRotateRight64(x:bv64, amount:int): bv64
+    requires 0 <= amount < 64;
+{
+    // TODO: Replace with Dafny's builtin operator for this
+    (x >> amount) | (x << (64 - amount))
 }
 
 ////////////////////////
@@ -104,6 +128,11 @@ function BitwiseNot(x:uint32) : uint32
     BitsToWord(BitNot(WordToBits(x)))
 }
 
+function BitwiseNot64(x:uint64) : uint64
+{
+    BitsToWord64(BitNot64(WordToBits64(x)))
+}
+
 function BitwiseXor(x:uint32, y:uint32) : uint32
 {
     BitsToWord(BitXor(WordToBits(x), WordToBits(y)))
@@ -120,6 +149,12 @@ function RotateRight(x:uint32, amount:uint32) : uint32
     BitsToWord(BitRotateRight(WordToBits(x), amount))
 }
 
+function RotateRight64(x:uint64, amount:uint32) : uint64
+    requires amount < 64;
+{
+    BitsToWord64(BitRotateRight64(WordToBits64(x), amount))
+}
+
 function RotateLeft(x:uint32, amount:uint32):uint32
     requires amount < 32;
 {
@@ -130,6 +165,12 @@ function RightShift(x:uint32, amount:uint32) : uint32
     requires amount < 32;
 {
     BitsToWord(BitShiftRight(WordToBits(x), amount))
+}
+
+function RightShift64(x:uint64, amount:uint64) : uint64
+    requires amount < 64;
+{
+    BitsToWord64(BitShiftRight64(WordToBits64(x), amount))
 }
 
 function LeftShift(x:uint32, amount:uint32) : uint32
