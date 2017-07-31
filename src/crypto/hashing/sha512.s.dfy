@@ -9,6 +9,8 @@ module sha512_s {
 import opened operations_s
 import opened words_and_bytes_s
 
+datatype Alg = SHA384 | SHA512
+
 function method{:opaque} K_SHA512(t:uint32) : uint64
     requires 0 <= t < 80;
 {
@@ -32,6 +34,13 @@ function method{:opaque} K_SHA512(t:uint32) : uint64
   0x06f067aa72176fba, 0x0a637dc5a2c898a6, 0x113f9804bef90dae, 0x1b710b35131c471b,
   0x28db77f523047d84, 0x32caab7b40c72493, 0x3c9ebe0a15c9bebc, 0x431d67c49c100d4c,
   0x4cc5d4becb3e42b6, 0x597f299cfc657e2a, 0x5fcb6fab3ad6faec, 0x6c44198c4a475817][t]
+}
+
+function method{:opaque} InitialH_SHA384(j:int) : uint64
+    requires 0 <= j <= 7;
+{
+  [0xcbbb9d5dc1059ed8, 0x629a292a367cd507, 0x9159015a3070dd17, 0x152fecd8f70e5939,
+   0x67332667ffc00b31, 0x8eb44a8768581511, 0xdb0c2e0d64f98fa7, 0x47b5481dbefa4fa4][j]
 }
 
 function method{:opaque} InitialH_SHA512(j:int) : uint64
@@ -104,10 +113,18 @@ predicate IsCompleteSHA512Trace(z:SHA512Trace)
 function TBlk(blk:int):bool { true }
 function TStep(t:uint64):bool { true }
 
-predicate SHA512TraceHasCorrectHs(z:SHA512Trace)
+function InitialH(alg:Alg, j:int) : uint64
+  requires 0 <= j <= 7;
+{
+  match alg
+    case SHA384 => InitialH_SHA384(j)
+    case SHA512 => InitialH_SHA512(j)
+}
+
+predicate SHA512TraceHasCorrectHs(z:SHA512Trace, alg:Alg)
     requires IsCompleteSHA512Trace(z);
 {
-    (forall j :: 0 <= j < 8 ==> z.H[0][j] == InitialH_SHA512(j)) &&
+    (forall j :: 0 <= j < 8 ==> z.H[0][j] == InitialH(alg, j)) &&
     (forall blk:int {:trigger TBlk(blk)} :: TBlk(blk) ==> forall j ::
         0 <= blk < |z.M| && 0 <= j < 8 ==> z.H[blk+1][j] == BitwiseAdd64(ConvertAtoHToSeq(z.atoh[blk][64])[j], z.H[blk][j]))
 }
@@ -143,9 +160,9 @@ predicate SHA512TraceHasCorrectatohs(z:SHA512Trace)
             z.atoh[blk][t+1].a == BitwiseAdd64(T1, T2))
 }
 
-predicate {:autoReq} SHA512TraceIsCorrect(z:SHA512Trace)
+predicate {:autoReq} SHA512TraceIsCorrect(z:SHA512Trace, alg:Alg)
 {
-    SHA512TraceHasCorrectHs(z) && SHA512TraceHasCorrectWs(z) && SHA512TraceHasCorrectatohs(z)
+    SHA512TraceHasCorrectHs(z, alg) && SHA512TraceHasCorrectWs(z) && SHA512TraceHasCorrectatohs(z)
 }
 
 function MaxBytesForSHA() : int { 0x1FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF }
@@ -156,19 +173,35 @@ predicate WordSeqIsProperlySHAPaddedByteSeq(ws:seq<uint64>, bytes:seq<uint8>)
     && Word64SeqToBytes(ws) == bytes + [0x80 as uint8] + RepeatByte(0, ((128 - 1 - 128/8) - (|bytes| % 128)) % 128) + Word128ToBytes((|bytes| * 8) as uint128)
 }
 
-predicate DoesTraceDemonstrateSHA512(z:SHA512Trace, message:seq<uint8>, hash:seq<uint64>)
+function HashLength(alg:Alg) : int
+{
+  match alg   
+    case SHA384 => 6
+    case SHA512 => 8
+}
+
+predicate DoesTraceDemonstrateSHA512(z:SHA512Trace, alg:Alg, message:seq<uint8>, hash:seq<uint64>)
 {
        IsCompleteSHA512Trace(z)
-    && SHA512TraceIsCorrect(z)
+    && SHA512TraceIsCorrect(z, alg)
     && |message| <= MaxBytesForSHA()
     && WordSeqIsProperlySHAPaddedByteSeq(ConcatenateSeqs(z.M), message)
-    && hash == z.H[|z.H|-1]
+    && hash == z.H[|z.H|-1][0..HashLength(alg)]
+}
+
+predicate IsSHA384(message:seq<uint8>, hash:seq<uint64>)
+{
+    exists z:SHA512Trace :: DoesTraceDemonstrateSHA512(z, Alg.SHA384, message, hash)
 }
 
 predicate IsSHA512(message:seq<uint8>, hash:seq<uint64>)
 {
-    exists z:SHA512Trace :: DoesTraceDemonstrateSHA512(z, message, hash)
+    exists z:SHA512Trace :: DoesTraceDemonstrateSHA512(z, Alg.SHA512, message, hash)
 }
+
+function {:axiom} SHA384(message:seq<uint8>) : seq<uint64>
+    requires |message| <= MaxBytesForSHA();
+    ensures  IsSHA384(message, SHA384(message));
 
 function {:axiom} SHA512(message:seq<uint8>) : seq<uint64>
     requires |message| <= MaxBytesForSHA();
