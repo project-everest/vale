@@ -1033,7 +1033,7 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt 
     let dFun = DFun fCode in
     funs := (loc, dFun)::!funs;
     let eIns = EApply (id, fArgs) in
-    let sLemma = SAssign ([], EApply (Reserved "lemma_strong_post_norm", eIns::args)) in
+    let sLemma = SAssign ([], EApply (Reserved "lemma_weakest_pre_norm", eIns::args)) in
     [sLemma]
     in
   let gen_fast_block_funs () = List.rev !funs in
