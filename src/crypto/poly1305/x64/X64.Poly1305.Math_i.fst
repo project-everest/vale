@@ -76,7 +76,7 @@ let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:in
     (ensures ((h2*n + h1)*((p+5)*x) + y + (h1*r0 + h0*r1)*n + h0*r0 ==
      	      y + (h0*r1 + h1*r0 + h2*(5*x))* n + 
     	      (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p)) =
-     assert_by_tactic canon ((h2*n+h1)*((p+5)*x) == (h2*n+h1)*5*x + ((h2*n+h1)*x)*p);
+     assert_by_tactic ((h2*n+h1)*((p+5)*x) == (h2*n+h1)*5*x + ((h2*n+h1)*x)*p) canon;
     calc (
       (h2*n + h1)*((p+5)*x) + (y + (h1*r0 + h0*r1)*n + h0*r0)
       &= (h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0) &| using z3
