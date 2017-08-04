@@ -21,7 +21,9 @@ procedure operator(<<=) (inout operand dst:uint64, operand src:uint64) := Shl64;
 procedure operator(:=) (out operand dst:int, operand src:int) := Mov64;
 procedure operator(+=) (inout operand dst:int, operand src:int) := Add64;
 
-procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint64,  ghost u:umemlayout)
+
+
+procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint64,  inline u:umemlayout)
       requires
          dst+offset < nat64_max; 
           dst > 0;
@@ -33,6 +35,10 @@ procedure SafeWrite(register dst:uint64, register src:uint64, inline offset:uint
          mem; efl; r8; rdx; rcx; rax;
       ensures
        mem[dst + offset] != old(mem)[dst + offset] ==> And64(mem[bitmap_address + Shl64(Shr64((dst + offset), 9), 3)], Shr64(Shl64(1, (dst + offset)), 3)) == 1;
+       //invariant: unfold the stack and make sure that the return addresses are marked unwritable
+       // The antecedent should be a recursive F* predicate.
+       //Work-in-progress. Does not type check
+       for(i= rbp; i<=stack_start; i = mem[i]) ==> And64(mem[bitmap_address + Shl64(Shr64(mem[rbp + 4], 9), 3)], Shr64(Shl64(1, mem[rbp + 4]), 3)) == 0;
 {
        Mov64(r8, dst);
        Add64(r8, offset);

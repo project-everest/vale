@@ -9,7 +9,7 @@ open X64.Vale.Decls
 #endverbatim
 
 //Should we strengthen the post condition when source and destination overlap?
-procedure Memcpy(in register rsi:uint64, in register rdi:uint64, ghost len:uint64)
+procedure Memcpy(in register rsi:uint64, in register rdi:uint64, len:uint64)
     requires/ensures
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rsi + i);
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rdi + i);
@@ -17,7 +17,7 @@ procedure Memcpy(in register rsi:uint64, in register rdi:uint64, ghost len:uint6
         if (rsi + len < rdi) || (rdi + len < rsi) {
              forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
 	     if (len % 8 != 0) {
-	          // This is required because of memory is 8 byte aligned, always
+	          // This is required because memory is 8 byte aligned, always
 	          mem[rsi + len/8] & ((1 << (len % 8)) - 1) = mem[rdi + len/8] & ((1 << (len % 8))-1);               
              }
 	} 
@@ -27,11 +27,20 @@ procedure Memcpy(in register rsi:uint64, in register rdi:uint64, ghost len:uint6
     modifies
         mem;
 {
-
+    Load(rax, rsi, 0);
+    Store(rdi, rax, 0);
+    Load(rbx, rsi, 4);
+    Store(rdi, rbx, 4);
+    Load(rcx, rsi, 8);
+    Store(rdi, rcx, 8);
+    Load(rdx, rsi, 12);
+    Store(rdi, rdx, 11);
+    Load(rbp, rsi, 16);
+    Store(rdi, rbp, 16);
 }
 
 
-procedure Memmove(in register rsi:uint64, in register rdi:uint64, ghost len:uint64)
+procedure Memmove(in register rsi:uint64, in register rdi:uint64, len:uint64)
     requires/ensures
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rsi + i);
         forall i :: 0 <= i && i < 64 && i % 8 == 0 ==> Map.contains(mem, rdi + i);
