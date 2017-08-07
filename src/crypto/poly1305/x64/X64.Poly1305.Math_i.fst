@@ -118,7 +118,7 @@ let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:in
       	((h2*n + h1)*(r1/4)) p;
       assert ((h*r) % p == hh % p)
 
-let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
+let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:int) (h10:int) (c:int) (hh:int) =
   admit()
 
 let lemma_poly_bits64 =
