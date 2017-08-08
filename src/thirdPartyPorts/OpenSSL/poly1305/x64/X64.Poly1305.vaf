@@ -57,7 +57,7 @@ let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
 
 #endverbatim
 
-/* TEMP
+/* TEMP1
 procedure poly1305_multiply(
     inout dst_operand d1:uint64,
     inout dst_operand d2:uint64,
@@ -462,7 +462,6 @@ procedure poly1305_reduce_regs_fast_block(
     lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
 }
 
-TEMP */
 
 procedure poly1305_iteration(
     inout dst_operand d1:uint64,
@@ -508,12 +507,6 @@ procedure poly1305_iteration(
         modp(h * r) == modp(hh); 
         h2 < 5;
 {
-    hh := 0;
-    assume false;
-}
-
-/* TEMP1
-{
 //    Previous version used a forall statement, which isn't yet supported for F*
 //    forall x:nat, xb, y:nat, yb :| x < xb && y < yb :: x * y < xb * yb
 //    {
@@ -535,7 +528,7 @@ procedure poly1305_iteration(
     reveal_opaque(modp');
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
-
+TEMP1*/
 #verbatim interface
 
 let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
@@ -709,8 +702,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
 }
 */
 
-TEMP1 */
-
+/* TEMP2
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:timeLimitMultiplier 2} poly1305_last_block(
     inout dst_operand h0:uint64,
@@ -832,7 +824,6 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal_opaque(modp'); }
 }
 
-/* TEMP2
 
 // h := (h % p) % 2^128;
 procedure poly1305_reduce_last(
@@ -926,6 +917,8 @@ procedure poly1305_add_key_s(
 //    }
 }
 
+TEMP2*/
+
 // TODO: Procedure was consistently sending Z3 into the woods when frame was true
 procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
           reg_operand ctx:uint64,
@@ -994,10 +987,8 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 
     ghost var r:nat128 := lowerUpper128_opaque(r0, r1);
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
-    lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
-        0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
-    assert r == logand128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff)
-    by
+
+    assert r == logand128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff) by
     {
         reveal_opaque(lowerUpper128);
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
@@ -1169,6 +1160,7 @@ procedure{:timeLimitMultiplier 2} poly1305(
 }
 */
 
+/* TEMP3
 #verbatim
 
 let print_poly1305 (p:printer) : FStar.All.ML unit =
@@ -1183,5 +1175,4 @@ let main () : FStar.All.ML unit =
   print_poly1305 gcc
 
 #endverbatim
-
-TEMP2 */
+TEMP3 */
