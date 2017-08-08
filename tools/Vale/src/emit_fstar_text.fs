@@ -124,6 +124,16 @@ and string_of_args (es:exp list):string = match es with [] -> "()" | _ -> string
 
 let string_of_lhs_formal ((x, tOpt):lhs):string = match tOpt with Some (t, _) -> string_of_formal (x, t) | _ -> sid x
 
+let val_string_of_formals (xs:formal list) =
+  match xs with
+  | [] -> (sid (Reserved "dummy")) + ":unit"
+  | _ -> String.concat " -> " (List.map string_of_formal_bare xs)
+
+let let_string_of_formals (useTypes:bool) (xs:formal list) =
+  match xs with
+  | [] -> "()"
+  | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
+
 let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
   match s with
   | SLoc (loc, s) -> try emit_stmt ps eOut s with err -> raise (LocErr (loc, err))
@@ -155,32 +165,41 @@ let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
   | SFastBlock ss -> internalErr "fast_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp e) + " then");
-      emit_block ps false eOut ss1;
+      emit_block ps "" eOut ss1;
       ps.PrintLine ("else");
-      emit_block ps false eOut ss2
+      emit_block ps (match eOut with None -> ";" | Some _ -> "") eOut ss2
   | SWhile (e, invs, (_, ed), ss) -> notImplemented "while"
-  | SForall ([], [], EBool true, e, ss) ->
-      // TODO
-      ps.PrintLine "(";
+  | SForall (xs, ts, ex, e, ss) ->
+    (
+      let l = sid (Reserved "forall_lemma") in
+      ps.PrintLine ("let " + l + " " + (let_string_of_formals true xs) + " : Lemma");
       ps.Indent ();
-      emit_stmts ps None ss;
-      ps.PrintLine ("assert " + (string_of_exp e) + ";");
-      ps.Unindent ();
-      ps.PrintLine ");";
-      ps.PrintLine ("assume " + (string_of_exp e) + ";");
-  | SForall (xs, ts, ex, e, ss) -> notImplemented "forall statements"
+      ps.PrintLine ("(requires " + (string_of_exp ex) + ")");
+      ps.PrintLine ("(ensures " + (string_of_exp e) + ")");
+      match (xs, ts) with
+      | ([], []) ->
+          ps.PrintLine "=";
+          ps.Unindent ();
+          emit_block ps (" in " + l + " ();") None ss
+      | ([], _::_) -> err "trigger only allowed with one or more variables"
+      | (_::_, ([] | _::_::_)) -> err "in fstar mode, forall statements must have exactly one trigger"
+      | (_::_, [t]) ->
+          ps.PrintLine ("[SMTPat (" + (string_of_exp e) + ")] =");
+          ps.Unindent ();
+          emit_block ps " in" None ss
+    )
   | SExists (xs, ts, e) -> notImplemented "exists statements"
 and emit_stmts (ps:print_state) (eOut:exp option) (stmts:stmt list) =
   List.iter (emit_stmt ps None) stmts;
   match eOut with
-  | None -> internalErr "emit_stmts"
+  | None -> ps.PrintLine "()"
   | Some e -> ps.PrintLine (string_of_exp_prec 0 e)
-and emit_block (ps:print_state) (semi:bool) (eOut:exp option) (stmts:stmt list) =
+and emit_block (ps:print_state) (suffix:string) (eOut:exp option) (stmts:stmt list) =
   ps.PrintLine "(";
   ps.Indent ();
   emit_stmts ps eOut stmts;
   ps.Unindent ();
-  ps.PrintLine (if semi then ");" else ")")
+  ps.PrintLine (")" + suffix)
 
 let collect_spec (loc:loc, s:spec):(exp list * exp list) =
   try
@@ -193,16 +212,6 @@ let collect_spec (loc:loc, s:spec):(exp list * exp list) =
 let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
   let (rs, es) = List.unzip (List.map collect_spec ss) in
   (List.concat rs, List.concat es)
-
-let val_string_of_formals (xs:formal list) =
-  match xs with
-  | [] -> (sid (Reserved "dummy")) + ":unit"
-  | _ -> String.concat " -> " (List.map string_of_formal_bare xs)
-
-let let_string_of_formals (useTypes:bool) (xs:formal list) =
-  match xs with
-  | [] -> "()"
-  | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");

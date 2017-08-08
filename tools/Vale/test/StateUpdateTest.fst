@@ -42,8 +42,7 @@ irreducible let va_lemma_state_update_test va_b0 va_s0 va_sN =
   let (Mkstate ok0 regs0 flags0 mem0 :va_state) = va_s0 in
   // and now this works.
   let s1 = update_reg Rdx (regs0 Rax) (Mkstate ok0 regs0 flags0 mem0) in
-  assert_by_tactic (norm[Simpl;Delta;Primops];; dump "before trefl";; trivial;; dump "trivial")
-    (regs0 Rax == s1.regs Rax);
+  assert_by_tactic (regs0 Rax == s1.regs Rax) (norm[Simpl;Delta;Primops];; dump "before trefl";; trivial;; dump "trivial");
 
   let (va_b4, va_s4) = (va_lemma_Mov64 va_b2 va_s2 va_sM (va_op_dst_operand_reg Rcx)
     (va_op_operand_reg Rdx)) in

@@ -9,6 +9,28 @@ open X64.Vale.StrongPost_i
 #set-options "--z3rlimit 20"
 #endverbatim
 
+/*
+procedure Copy16()
+    requires/ensures
+        rsi + 16 <= rdi;
+        forall i {Map.contains(mem, i)}:: rsi <= i < rsi + 16 && (i - rsi) % 8 == 0 ==> Map.contains(mem, i);
+        forall i {Map.contains(mem, i)}:: rdi <= i < rdi + 16 && (i - rdi) % 8 == 0 ==> Map.contains(mem, i);
+    ensures
+        forall i :: 0 <= i && i < 16 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
+    reads
+        rsi; rdi;
+    modifies
+        rax; rbx;
+        mem;
+{
+    assert{:fast_block} true;
+    Load64(rax, rsi, 0);
+    Load64(rbx, rsi, 8);
+    Store64(rdi, rax, 0);
+    Store64(rdi, rbx, 8);
+}
+*/
+/*
 procedure Copy64()
     requires/ensures
         rsi + 64 <= rdi;
@@ -40,6 +62,8 @@ procedure Copy64()
     Store64(rdi, rbx, 48);
     Store64(rdi, rcx, 56);
 }
+
+*/
 
 procedure Copy128()
     requires/ensures

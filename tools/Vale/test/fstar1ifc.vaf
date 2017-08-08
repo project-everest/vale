@@ -129,7 +129,11 @@ procedure p()
 }
 
 #verbatim
+assume val make_opaque : #a:Type -> a -> a
+assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
+
 let double (x:int):int = x + x
+let opaque_double = make_opaque double
 #endverbatim
 
 procedure Calls()
@@ -141,9 +145,22 @@ procedure Calls()
     Increment(eax);
     Imm(ebx, double(1));
     assert ebx == 2;
+    ghost if (ebx <= ebx)
+    {
+        assert 2 == 2;
+    }
     if (ebx <= ebx)
     {
         Add(eax, ebx);
+    }
+    assert 1 + 2 == 3 by { assert 1 + 2 == 2 + 1; }
+    forall x:int, y:int {x + y} :| x >= 0 && y >= 0 :: x + y == y + x
+    {
+        assert x + y >= 0;
+        ghost if (x < y)
+        {
+            assert x <= y;
+        }
     }
 }
 
@@ -151,6 +168,9 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
     ensures
         g2 == g1 + 1;
 {
+    assert opaque_double(3) == 6 by { reveal_opaque(double); }
+    assert opaque_double(3) == 6;
+    //assert opaque_double(4) == 8;
     g2 := g1 + 1;
 }
 

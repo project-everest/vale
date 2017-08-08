@@ -18,12 +18,10 @@ let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
                          (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
 
-// p used to be a refinement to p > 0 and r1 a nat.
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
 val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -> h0:int -> h1:int -> h2:int -> s1:int -> d0:int -> d1:int -> d2:int -> hh:int -> Lemma
   (requires 
-    p > 0 /\
     r1 >= 0 /\
     n > 0 /\
     4 * (n * n) == p + 5 /\
@@ -35,13 +33,11 @@ val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -
     d1 == h0 * r1 + h1 * r0 + h2 * s1 /\
     d2 == h2 * r0 /\
     hh == d2 * (n * n) + d1 * n + d0)
-	(ensures (p > 0) /\ (h * r) % p == hh % p)
+	(ensures (h * r) % p == hh % p)
 
 // p used to be a refinement to p > 0 and h a nat.
-val lemma_poly_reduce : n:int -> p:int -> h:int -> h2:int -> h10:int -> c:int -> hh:int -> Lemma
+val lemma_poly_reduce : n:int -> p:pos -> h:nat -> h2:int -> h10:int -> c:int -> hh:int -> Lemma
   (requires
-    p > 0 /\
-    h >= 0 /\
     n * n > 0 /\
     h2 >= 0 /\  // TODO: Shouldn't need to add this
     4 * (n * n) == p + 5 /\
@@ -49,7 +45,7 @@ val lemma_poly_reduce : n:int -> p:int -> h:int -> h2:int -> h10:int -> c:int ->
     h10 == h % (n * n) /\
     c == (h2 / 4) + (h2 / 4) * 4 /\
     hh == h10 + c + (h2 % 4) * (n * n))
-  (ensures (p > 0) /\ (h % p == hh % p))
+  (ensures h % p == hh % p)
 
 val lemma_poly_bits64 : u:unit -> Lemma
   (requires True)

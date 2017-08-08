@@ -97,7 +97,7 @@ if do_dafny:
 #
 # build cbc-exe
 #
-if do_dafny and env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
+if do_dafny and (env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64'):   # x86 and x64 only
   cbc_asm = env.ExtractValeCode(
     ['src/crypto/aes/$AES_ARCH_DIR/aes.vad', 'src/crypto/aes/$AES_ARCH_DIR/cbc.vad'], # Vale source
     'src/crypto/aes/$AES_ARCH_DIR/cbc_main.i.dfy',              # Dafny main
@@ -110,7 +110,7 @@ else:
 #
 # build aes-exe
 #
-if do_dafny and env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
+if do_dafny and (env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64'):   # x86 and x64 only
   aes_asm = env.ExtractValeCode(
     ['src/crypto/aes/$AES_ARCH_DIR/aes.vad'],        # Vale source
     'src/crypto/aes/$AES_ARCH_DIR/aes_main.i.dfy',   # Dafny main
