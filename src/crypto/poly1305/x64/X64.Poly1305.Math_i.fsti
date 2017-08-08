@@ -5,12 +5,23 @@ open X64.Machine_s   // needed for nat64
 open X64.Vale.Decls  // needed for shift_right64, logand64
 open X64.Poly1305.Spec_s // for modp
 open X64.Vale.State_i // for add_wrap
+open Opaque_i
 
 let lowerUpper128 (l:nat64) (u:nat64) : nat128 =
     0x10000000000000000 `op_Multiply` u + l
 
+let lowerUpper128_opaque = make_opaque lowerUpper128
+
 let lowerUpper192 (l:nat128) (u:nat64) : int =
     0x100000000000000000000000000000000 `op_Multiply` u + l
+
+let lowerUpper192_opaque = make_opaque lowerUpper192
+
+let mod2_128' x:int = x % nat128_max
+
+let mod2_128 = make_opaque mod2_128'
+
+let modp = make_opaque modp'
 
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
@@ -90,7 +101,7 @@ val lemma_mod_power2_lo : x0:nat64 -> x1:nat64 -> y:int -> z:int -> Lemma
     z > 0 /\
     0 <= x0 % z /\ 
     x0 % z < 0x10000000000000000 /\
-    (lowerUpper128 x0 x1) % z == (lowerUpper128 (x0 % z) 0))
+    (lowerUpper128_opaque x0 x1) % z == (lowerUpper128_opaque (x0 % z) 0))
     
 val lemma_power2_add64 : n:nat -> Lemma
   (requires True)
@@ -99,8 +110,9 @@ val lemma_power2_add64 : n:nat -> Lemma
 val lemma_mod_hi : x0:nat64 -> x1:nat64 -> z:nat64 -> Lemma
   (requires z <> 0)
   (ensures
-    lowerUpper128 0 z <> 0 /\
-    (lowerUpper128 x0 x1) % (lowerUpper128 0 z) == lowerUpper128 x0 (x1 % z))
+    z <> 0 /\
+    lowerUpper128_opaque 0 z <> 0 /\
+    (lowerUpper128_opaque x0 x1) % (lowerUpper128_opaque 0 z) == lowerUpper128_opaque x0 (x1 % z))
 
 val lemma_poly_demod : p:int -> h:int -> x:int -> r:int -> Lemma
   (requires p > 0)
@@ -109,26 +121,26 @@ val lemma_poly_demod : p:int -> h:int -> x:int -> r:int -> Lemma
 val lemma_reduce128 : h:int -> h2:nat64 -> h1:nat64 -> h0:nat64 -> g:int -> g2:nat64 -> g1:nat64 -> g0:nat64 -> Lemma
   (requires h2 < 5 /\
             g == h + 5 /\
-            h == lowerUpper192 (lowerUpper128 h0 h1) h2 /\
-            g == lowerUpper192 (lowerUpper128 g0 g1) g2)
+            h == lowerUpper192_opaque (lowerUpper128_opaque h0 h1) h2 /\
+            g == lowerUpper192_opaque (lowerUpper128_opaque g0 g1) g2)
   (ensures
-            (g2 < 4 ==> lowerUpper128 h0 h1 == (modp h) % nat128_max) /\
-            (g2 >= 4 ==> lowerUpper128 g0 g1 == (modp h) % nat128_max))
+            (g2 < 4 ==> lowerUpper128_opaque h0 h1 == mod2_128 (modp h)) /\
+            (g2 >= 4 ==> lowerUpper128_opaque g0 g1 == mod2_128 (modp h)))
 
 val lemma_add_key : old_h0:nat64 -> old_h1:nat64 -> h_in:int -> key_s0:nat64 -> key_s1:nat64 -> key_s:int -> h0:nat64 -> h1:nat64 -> Lemma
-  (requires h_in == lowerUpper128 old_h0 old_h1 /\
-            key_s == lowerUpper128 key_s0 key_s1 /\
+  (requires h_in == lowerUpper128_opaque old_h0 old_h1 /\
+            key_s == lowerUpper128_opaque key_s0 key_s1 /\
             h0 == add_wrap old_h0 key_s0 /\
             (let c = old_h0 + key_s0 >= nat64_max in
              h1 == add_wrap (add_wrap old_h1 key_s1) (if c then 1 else 0)))
-  (ensures lowerUpper128 h0 h1 == (h_in + key_s) % nat128_max)
+  (ensures lowerUpper128_opaque h0 h1 == mod2_128 (h_in + key_s))
 
 val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0:nat64 -> y1:nat64 -> z:nat128 -> z0:nat64 -> z1:nat64 -> Lemma
   (requires z0 == logand64 x0 y0 /\
             z1 == logand64 x1 y1 /\
-            x == lowerUpper128 x0 x1 /\
-            y == lowerUpper128 y0 y1 /\
-            z == lowerUpper128 z0 z1)
+            x == lowerUpper128_opaque x0 x1 /\
+            y == lowerUpper128_opaque y0 y1 /\
+            z == lowerUpper128_opaque z0 z1)
   (ensures z == logand128 x y)
   
 val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma

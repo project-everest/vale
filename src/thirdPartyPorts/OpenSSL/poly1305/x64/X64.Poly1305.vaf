@@ -39,6 +39,7 @@ open X64.Vale.Decls
 open X64.Vale.StrongPost_i
 open X64.Poly1305.Spec_s
 open X64.Poly1305.Math_i
+open Opaque_i
 #endverbatim
 
 #verbatim interface
@@ -523,7 +524,7 @@ procedure poly1305_iteration(
 
     (ghost var hd) := poly1305_multiply(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, /* n, */ p);
     hh := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
-//    reveal modp;
+    reveal_opaque(modp);
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
@@ -643,7 +644,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     h := h_in;
     assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
     {
-        reveal modp;
+        reveal_opaque(modp);
         reveal poly1305_heap_blocks;
     }
 
@@ -689,7 +690,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
         {
             reveal poly1305_heap_blocks;
-            reveal modp;
+            reveal_opaque(modp);
             lemma_poly_demod(p, hp, hq - hp, r);
         }
     }
@@ -728,19 +729,19 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         //n == 0x1_0000_0000_0000_0000;
         p == n * n * 4 - 5;
         h2 < 5;
-        hBlocks == lowerUpper192(lowerUpper128(h0, h1), h2);
-        r == lowerUpper128(r0, r1);
+        hBlocks == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
+        r == lowerUpper128_opaque(r0, r1);
         rax == r1;
         r0 < n / 16;
         r1 < n / 16;
         r1 % 4 == 0;
         s1 == r1 + r1 / 4;
-        inpLast == lowerUpper128(r8, r9);
+        inpLast == lowerUpper128_opaque(r8, r9);
         1 <= nExtra && nExtra < 16;
     ensures
         h2 < 5;
         let padLast := pow2(nExtra * 8);
-        let hLast := lowerUpper192(lowerUpper128(h0, h1), h2);
+        let hLast := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
         modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r);
 {
     ghost var padLast := pow2(nExtra * 8);
@@ -765,7 +766,7 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         And64(r8, rcx);
         Mov64(r9, 0);
         assert r8 == old(r8) % padLast;
-        assert lowerUpper128(r8, r9) == inpLast % padLast;
+        assert lowerUpper128_opaque(r8, r9) == inpLast % padLast;
 
         // h += (inpLast % padLast)
         Add64Wrap(h0, r8);
@@ -783,12 +784,12 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         Mov64(rdx, 1);
         Shl64(rdx, rcx);
 
-        lemma_power2_add64(8 * nExtra - 64);
-        assert padLast == lowerUpper128(0, rdx);
-//        assert padLast == lowerUpper128(0, rdx) by {
-//            lemma_power2_add64(8 * nExtra - 64);
-//            reveal lowerUpper128;
-//        }
+        //lemma_power2_add64(8 * nExtra - 64);
+        //assert padLast == lowerUpper128_opaque(0, rdx);
+        assert padLast == lowerUpper128_opaque(0, rdx) by {
+            lemma_power2_add64(8 * nExtra - 64);
+            reveal_opaque(lowerUpper128);
+        }
 
         // inpLast := (inpLast % padLast)
         lemma_bytes_and_mod(r9, nExtra - 8);
@@ -796,7 +797,7 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         Mov64(rcx, rdx);
         Sub64(rcx, 1);
         And64(r9, rcx);
-        assert lowerUpper128(r8, r9) == inpLast % padLast;
+        assert lowerUpper128_opaque(r8, r9) == inpLast % padLast;
 
         // h += (inpLast % padLast)
         Add64Wrap(h0, r8);
@@ -809,14 +810,14 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     }
 
     ghost var h := hBlocks + (inpLast % padLast) + padLast;
-    assert h == h2 * (n * n) + h1 * n + h0; // by { reveal lowerUpper192; reveal lowerUpper128; }
-    assert r == r1 * n + r0; // by { reveal lowerUpper128; }
+    assert h == h2 * (n * n) + h1 * n + h0 by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
+    assert r == r1 * n + r0 by { reveal_opaque(lowerUpper128); }
     (ghost var hLast) := poly1305_iteration(r8, r9, r10, r0, s1, h0, h1, h2, r1, r, h, /* n,*/ p);
     //exists hLast :: (hLast == h2 * (n * n) + h1 * n + h0 && modp(h * r) == modp(hLast));
 
-    assert hLast == lowerUpper192(lowerUpper128(h0, h1), h2); // by { reveal lowerUpper192; reveal lowerUpper128; }
+    assert hLast == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2) by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
     lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
-    assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r); // by { reveal modp; }
+    assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal_opaque(modp); }
 }
 
 // h := (h % p) % 2^128;
@@ -834,9 +835,9 @@ procedure poly1305_reduce_last(
         @h2 == OReg(Rbp);
     requires
         h2 < 5;
-        h == lowerUpper192(lowerUpper128(h0, h1), h2);
+        h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
     ensures
-        lowerUpper128(h0, h1) == modp(h) % nat128_max;
+        lowerUpper128_opaque(h0, h1) == mod2_128(modp(h));
 {
 //    lemma_BitwiseAdd64();
 //    lemma_BitwiseSub64();
@@ -849,8 +850,8 @@ procedure poly1305_reduce_last(
     Adc64Wrap(r9, 0);
     Adc64Wrap(r10, 0);
 
-    assert h + 5 == lowerUpper192(lowerUpper128(r8, r9), r10);
-//        by { reveal lowerUpper128; reveal lowerUpper192; }
+    assert h + 5 == lowerUpper192_opaque(lowerUpper128_opaque(r8, r9), r10)
+        by { reveal_opaque(lowerUpper128); reveal_opaque(lowerUpper192); }
     lemma_reduce128(h, old(h2), old(h1), old(h0), h + 5, r10, r9, r8);
 
     Shr64(r10, 2);
@@ -888,10 +889,10 @@ procedure poly1305_add_key_s(
         @key_s0 == OReg(Rax);
         @key_s1 == OReg(Rdx);
     requires
-        h_in == lowerUpper128(h0, h1);
-        key_s == lowerUpper128(key_s0, key_s1);
+        h_in == lowerUpper128_opaque(h0, h1);
+        key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
-        lowerUpper128(h0, h1) == (h_in + key_s) % nat128_max;
+        lowerUpper128_opaque(h0, h1) == mod2_128(h_in + key_s);
 {
 //    lemma_BitwiseAdd64();
 
@@ -901,13 +902,13 @@ procedure poly1305_add_key_s(
     lemma_add_key(old(h0), old(h1), h_in, key_s0, key_s1, key_s, h0, h1);
 
 //    ghost var c := if cf(efl) then 0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000 else 0;
-//    assert (h_in + key_s) % nat128_max == (c + lowerUpper128(h0, h1)) % nat128_max;
-//    assert (c + lowerUpper128(h0, h1)) % nat128_max == lowerUpper128(h0, h1);
+//    assert (h_in + key_s) % nat128_max == (c + lowerUpper128_opaque(h0, h1)) % nat128_max;
+//    assert (c + lowerUpper128_opaque(h0, h1)) % nat128_max == lowerUpper128_opaque(h0, h1);
 //    calc
 //    {
-//        mod2_128(h_in + key_s);              { reveal lowerUpper128; }
-//        mod2_128(c + lowerUpper128(h0, h1)); { reveal mod2_128; }
-//        lowerUpper128(h0, h1);
+//        mod2_128(h_in + key_s);              { reveal_opaque(lowerUpper128); }
+//        mod2_128(c + lowerUpper128_opaque(h0, h1)); { reveal mod2_128; }
+//        lowerUpper128_opaque(h0, h1);
 //    }
 }
 
@@ -940,15 +941,15 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
         let key_r1 := mem[ctx + 32];
         let key_s0 := mem[ctx + 40];
         let key_s1 := mem[ctx + 48];
-        key_r == lowerUpper128(key_r0, key_r1);
-        key_s == lowerUpper128(key_s0, key_s1);
+        key_r == lowerUpper128_opaque(key_r0, key_r1);
+        key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
 //        ctx == old(ctx);
 //        validSrcAddrs(mem, ctx, 64, 24 * 8);
 //        validSrcAddrs(mem, old(inp), 64, old(len) + 15 / 16 * 16);
 //        // TODO: What does this mean now?
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
-//        h == lowerUpper128(h0, h1);
+//        h == lowerUpper128_opaque(h0, h1);
 //        let inp_mem := heapletTo128(mem, old(inp), old(len));
 //        // TODO: Figure out why there's an internal Vale error on the inp_mem?[j] invocation
 //        //forall j :: old(inp) <= j < old(inp) + old(len) && (j - old(inp)) % 16 == 0 ==> inp_mem?[j];
@@ -977,18 +978,18 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     Store64(ctx, r0, 24);
     Store64(ctx, r1, 32);
 
-    ghost var r:nat128 := lowerUpper128(r0, r1);
-    assert r == r0 + n * r1; //by { reveal lowerUpper128; }
+    ghost var r:nat128 := lowerUpper128_opaque(r0, r1);
+    assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
+    lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
+        0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
+    assert r == logand128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff)
+    by
+    {
+        reveal_opaque(lowerUpper128);
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
             0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
-    assert r == logand128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff);
-////    by
-////    {
-////        reveal lowerUpper128;
-////        lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
-////            0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
-////    }
-//
+    }
+
     assert{:fast_block} true;
     Mov64(rax, len);
     And64(rax, 15);
@@ -1000,16 +1001,15 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 
     Mov64(rcx, 1);
     h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
-//    assert modp(0) == 0;
-////    by
-////    {
-////        reveal modp;
-////        assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
-////    }
+    assert modp(0) == 0 by
+    {
+        reveal_opaque(modp);
+        //assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
+    }
 //
 //    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
-//    assert h == lowerUpper192(lowerUpper128(h0, h1), h2);
-////        by { reveal lowerUpper192; reveal lowerUpper128; }
+//    assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
+//        by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
 //
 //    Load64(r15, ctx, 56); // assert r15 == len_in % 16;
 //    if (r15 != 0)
@@ -1017,20 +1017,20 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 //        Load64(rax, ctx, 32);
 //        Load64(r8, inp, 0);
 //        Load64(r9, inp, 8);
-//        assert lowerUpper128(r8, r9) == heapletTo128(mem, inp_in, len_in)[inp];
-////            by { reveal heapletTo128; reveal lowerUpper128; }
-//        poly1305_last_block(h0, h1, h2, r0, r13, r15, h, r1, r, lowerUpper128(r8, r9), /*n,*/ p);
-//        h := lowerUpper192(lowerUpper128(h0, h1), h2);
+//        assert lowerUpper128_opaque(r8, r9) == heapletTo128(mem, inp_in, len_in)[inp];
+////            by { reveal heapletTo128; reveal_opaque(lowerUpper128); }
+//        poly1305_last_block(h0, h1, h2, r0, r13, r15, h, r1, r, lowerUpper128_opaque(r8, r9), /*n,*/ p);
+//        h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
 //    }
 //
 //    //lemma_add_mod128(modp(h), key_s);
 //    poly1305_reduce_last(h0, h1, h2, h);
-//    h := lowerUpper128(h0, h1);
+//    h := lowerUpper128_opaque(h0, h1);
 //
 //    Load64(rax, ctx, 40);
 //    Load64(rdx, ctx, 48);
 //    poly1305_add_key_s(h0, h1, rax, rdx, h, key_s);
-    h := lowerUpper128(h0, h1);
+    h := lowerUpper128_opaque(h0, h1);
 //
 //    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, inp_in, len_in), inp_in, len_in);
 ////        by { reveal poly1305_hash; }
@@ -1088,8 +1088,8 @@ procedure{:timeLimitMultiplier 2} poly1305(
         let key_r1 := mem[ctx_in + 32];
         let key_s0 := mem[ctx_in + 40];
         let key_s1 := mem[ctx_in + 48];
-        key_r == lowerUpper128(key_r0, key_r1);
-        key_s == lowerUpper128(key_s0, key_s1);
+        key_r == lowerUpper128_opaque(key_r0, key_r1);
+        key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
         validSrcAddrs(mem, ctx, 64, 24 * 8);
         validSrcAddrs(mem, inp, 64, (len + 15) / 16 * 16);
@@ -1097,7 +1097,7 @@ procedure{:timeLimitMultiplier 2} poly1305(
         //mem == old(mem)[ctx_id := mem[ctx_id]];
         let h0_out := mem[ctx_in];
         let h1_out := mem[ctx_in + 8];
-        h == lowerUpper128(h0_out, h1_out);
+        h == lowerUpper128_opaque(h0_out, h1_out);
         let inp_mem := heapletTo128(mem, inp_in, len_in);
         // TODO: Figure out why there's an internal Vale error on the inp_mem?[j] invocation
         //forall j :: inp_in <= j < inp_in + len_in && (j - inp_in) % 16 == 0 ==> inp_mem?[j];
