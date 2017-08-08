@@ -120,13 +120,9 @@ env['DAFNY'] = Dir(env['DAFNY_PATH']).File('Dafny.exe')
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
   env['KREMLIN'] = File(kremlin_path + '/_build/src/Kremlin.native')
-else:
-  kremlin_path = '#tools/Kremlin'
-  env['KREMLIN'] = File(kremlin_path + '/Kremlin.native')
+  kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
-
-kremlib_path = kremlin_path + '/kremlib'
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
@@ -377,8 +373,9 @@ def extract_dafny_code(env, kremlin_dfys):
     target_file_base = os.path.join(target_path, os.path.splitext(json_file)[0].replace('.', '_'))
     target_file_c = target_file_base+'.c'
     target_file_h = target_file_base+'.h'
-    outputs = env.Kremlin(source=json, target=target_file_c)
-    kremlin_outputs.append(outputs)
+    if 'KREMLIN_HOME' in os.environ:
+      outputs = env.Kremlin(source=json, target=target_file_c)
+      kremlin_outputs.append(outputs)
   return kremlin_outputs
   
 # Compile Vale .vad to Dafny .gen.dfy  
@@ -435,7 +432,11 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
 # returns the exe target and the stdout after executing the exe test target
 def build_test(env, inputs, include_dir, output_base_name):
   testenv = env.Clone()
-  testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
+  if 'KREMLIN_HOME' in os.environ:
+    testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
+  else:
+    # We need gcc_compat.h from kremlib:
+    testenv.Append(CPPPATH=['#tools/Kremlin/kremlib', 'src/lib/util', include_dir])
   inputs_obj = []
   for inp in inputs:
     inps = str(inp)
@@ -455,7 +456,7 @@ def build_test(env, inputs, include_dir, output_base_name):
   a = env.Alias('runtest', '', built)
   #AlwaysBuild(a)
   return a
-  
+
 # Add pseudobuilders to env.  
 def add_extract_code(env):
   env.AddMethod(extract_vale_code, "ExtractValeCode")
@@ -524,7 +525,8 @@ add_dafny_verifier(env)
 add_dafny_compiler(env)
 add_dafny_kremlin(env)
 add_vale_builder(env)
-add_kremlin(env)
+if 'KREMLIN_HOME' in os.environ:
+  add_kremlin(env)
 add_extract_code(env)
 env.AddMethod(verify_files_in, "VerifyFilesIn")
 env.AddMethod(verify_vale_files, "VerifyValeFiles")

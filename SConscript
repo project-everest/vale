@@ -58,9 +58,10 @@ sha_asm = env.ExtractValeCode(
   'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
   'sha256'                                                   # Base name for the ASM files and EXE
   )
-sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
-sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
-env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
+if 'KREMLIN_HOME' in os.environ:
+  sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
+  sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
+  env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
 
 #
 # build cbc-exe
@@ -103,15 +104,12 @@ else:
 
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
-else:
-  kremlin_path = '#tools/Kremlin'
-
-kremlib_path = kremlin_path + '/kremlib'
+  kremlib_path = kremlin_path + '/kremlib'
 
 #
 # Build the OpenSSL engine
 #
-if env['OPENSSL_PATH'] != None:
+if env['OPENSSL_PATH'] != None and 'KREMLIN_HOME' in os.environ:
   engineenv = env.Clone()
   engineenv.Append(CPPPATH=[kremlib_path, '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
   cdeclenv = engineenv.Clone(CCFLAGS='/Ox /Zi /Gd /LD') # compile __cdecl so it can call OpenSSL code
