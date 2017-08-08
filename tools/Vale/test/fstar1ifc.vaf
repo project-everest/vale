@@ -82,7 +82,15 @@ assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s_0:va_stat
   (requires True)
   (ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\ sM == s_0))
 
+assume val make_opaque : #a:Type -> a -> a
+assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
+unfold let va_make_opaque = make_opaque
+unfold let va_reveal_opaque = reveal_opaque
+
+let double (x:int):int = x + x
+let opaque_double = make_opaque double
 #endverbatim
+
 
 
 
@@ -127,14 +135,6 @@ procedure p()
     Increment(eax);
     Increment(eax);
 }
-
-#verbatim
-assume val make_opaque : #a:Type -> a -> a
-assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
-
-let double (x:int):int = x + x
-let opaque_double = make_opaque double
-#endverbatim
 
 procedure Calls()
     modifies
