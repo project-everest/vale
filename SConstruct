@@ -54,12 +54,12 @@ else:
 # Retrieve tool-specific command overrides passed in by the user
 AddOption('--DAFNY',
   dest='do_dafny',
-  default=True,
+  default=False,
   action='store_true',
   help='Verify Dafny files')
 AddOption('--NODAFNY',
   dest='do_dafny',
-  default=True,
+  default=False,
   action='store_false',
   help='Do not verify Dafny files')
 AddOption('--DAFNYPATH',
@@ -70,12 +70,12 @@ AddOption('--DAFNYPATH',
   help='Specify the path to Dafny tool binaries')
 AddOption('--FSTAR',
   dest='do_fstar',
-  default=False,
+  default=True,
   action='store_true',
   help='Verify F* files')
 AddOption('--NOFSTAR',
   dest='do_fstar',
-  default=False,
+  default=True,
   action='store_false',
   help='Do not verify F* files')
 AddOption('--FSTARPATH',
