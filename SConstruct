@@ -13,6 +13,7 @@ import platform
 
 Import("*")
 
+is_clean = (not os.path.isdir('obj') and not os.path.isdir('bin'))
 
 target_arch='x86'
 target_x='86'
@@ -721,12 +722,6 @@ fstar_deps_ok = False
 def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths):
   import subprocess
   global fstar_deps_ok
-  import distutils.dir_util
-  # create obj directory
-  distutils.dir_util.mkpath('obj')
-  for d in fstar_include_paths:
-    if d.startswith('obj/'):
-      distutils.dir_util.mkpath(d)
   # find all .fst, .fsti, and .vaf files in src_directories
   fst_files = []
   vaf_files = []
@@ -756,12 +751,12 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   lines = []
   depsBackupFile = 'obj/fstarDepsBackup.d'
   try:
-    print('%sF* dependency analysis: starting%s' % (colors['blue'], colors['end']))
+    print('%sF* dependency analysis: starting%s' % (colors['cyan'], colors['end']))
     args = ["--dep", "make"] + includes + files
     cmd = [fstar] + args
     print(" ".join(cmd))
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
-    print('%sF* dependency analysis: done%s' % (colors['blue'], colors['end']))
+    print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
     fstar_deps_ok = True
     lines = o.splitlines()
   except subprocess.CalledProcessError as e:
@@ -853,13 +848,30 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['verify_options', 'verify_paths', 'fstar_include_paths'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
 # F* dependencies
 if do_fstar:
-  predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
+  import distutils.dir_util
+  # create obj directory
+  distutils.dir_util.mkpath('obj')
+  for d in fstar_include_paths:
+    if d.startswith('obj/'):
+      distutils.dir_util.mkpath(d)
+  found_manual_dependencies = True
+  for target in manual_dependencies:
+    source = manual_dependencies[target]
+    Depends(target, source)
+    if not os.path.isfile(source):
+      found_manual_dependencies = False
+  if found_manual_dependencies:
+    predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
+  else:
+    if is_clean:
+      # clean build: build everything (no dependency analysis needed)
+      fstar_deps_ok = True
 
 # Verification
 env.VerifyFilesIn(verify_paths)

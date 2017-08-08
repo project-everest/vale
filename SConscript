@@ -18,6 +18,16 @@ verify_paths = [
 ]
 Export('verify_paths')
 
+# A few .fst/.fsti files depend on .fsti files generated from .vaf files.
+# Without manually writing the dependencies for these, the dependency
+# analysis will miss them the first time scons runs.
+manual_dependencies = {
+  'obj/arch/x64/X64.Vale.StrongPost_i.vfsti': 'obj/arch/x64/X64.Vale.Decls.fsti',
+  'obj/arch/x64/X64.Vale.StrongPost_i.vfst': 'obj/arch/x64/X64.Vale.Decls.fsti',
+  'obj/Vale/test/StateUpdateTest.vfst': 'obj/arch/x64/X64.Vale.Decls.fsti',
+}
+Export('manual_dependencies')
+
 #
 # All include paths for FStar should be in this list.
 # All files should use exactly the include paths in this list.
