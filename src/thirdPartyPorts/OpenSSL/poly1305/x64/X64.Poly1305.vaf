@@ -769,7 +769,6 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         lemma_bytes_and_mod(r8, nExtra);
         assert logand64(r8, shift_left64(1, shift_left64(nExtra, 3)) - 1) == r8 % shift_left64(1, shift_left64(nExtra, 3));
         assert padLast == shift_left64(1, shift_left64(nExtra, 3));
-        assume false;
         lemma_mod_power2_lo(r8, r9, nExtra, pow2(nExtra * 8));
         Mov64(rcx, rdx);
         Sub64(rcx, 1);
