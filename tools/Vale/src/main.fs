@@ -265,6 +265,7 @@ let main (argv) =
     try
     (
       if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
+      precise_opaque := !emitFStarText;
       let decls = build_decls empty_env decls in
       (match !reprint_file with
         | None -> ()
@@ -280,7 +281,8 @@ let main (argv) =
             Emit_vale_text.emit_decls rps (List.rev (!reprint_decls_rev));
             rstream.Close ()
         );
-      if !emitFStarText then Emit_fstar_text.emit_decls ps decls
+      if !emitFStarText then
+        Emit_fstar_text.emit_decls ps decls
       else
         if !dafnyDirect then
           // Initialize Dafny objects

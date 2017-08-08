@@ -20,6 +20,7 @@ let reprint_ghost_stmts = ref true;
 let reprint_loop_invs = ref true;
 let reprint_blank_lines = ref true;
 let concise_lemmas = ref true;
+let precise_opaque = ref false;
 
 type print_state =
   {
@@ -1231,7 +1232,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   let ens = Ensures (vaApp "ensure" ([EVar b0] @ (if !concise_lemmas then [EVar bM] else []) @ [EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
   let lCM  = (cM, Some (Some tCode, NotGhost)) in
   let sBlock = lemma_block (sM, None) lCM (bM, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
-  let sReveal = SAssign ([], EOp (Uop UReveal, [EVar codeName])) in // reveal_va_code_Q();
+  let eReveal = if !precise_opaque then EApply (codeName, fArgs) else EVar codeName in
+  let sReveal = SAssign ([], EOp (Uop UReveal, [eReveal])) in // reveal_va_code_Q();
   let sOldS = SVar (Reserved "old_s", (if !concise_lemmas then Some tState else None), Immutable, XPhysical, [], Some (EVar s0)) in
   let eb1 = vaApp "get_block" [EVar cM] in
   let sb1 = SVar (b1, (if !concise_lemmas then Some tCodes else None), Immutable, XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);

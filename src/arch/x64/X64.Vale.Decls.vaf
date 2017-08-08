@@ -14,6 +14,8 @@ val cf : (flags:int) -> bool
 
 unfold let va_subscript = Map.sel
 unfold let va_update = Map.upd
+unfold let va_make_opaque = Opaque_i.make_opaque
+unfold let va_reveal_opaque = Opaque_i.reveal_opaque
 
 (* Type aliases *)
 unfold let va_bool = bool

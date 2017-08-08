@@ -12,6 +12,15 @@ let sid (x:id):string =
   | Reserved s -> qprefix "va_" s
   | Operator s -> internalErr (sprintf "custom operator: %A" x)
 
+let prefix_id (prefix:string) (x:id):id =
+  match x with
+  | Id s -> Id (prefix + s)
+  | Reserved s -> Reserved (prefix + s)
+  | Operator s -> internalErr (sprintf "prefix_id: %A %A" prefix s)
+
+let transparent_id (x:id):id = prefix_id "transparent_" x
+let irreducible_id (x:id):id = prefix_id "irreducible_" x
+
 // non-associative: (n, n+1, n+1)
 // left-associative: (n, n, n+1)
 // right-associative: (n, n+1, n)
@@ -70,7 +79,7 @@ let rec string_of_exp_prec prec e =
     | EBool true -> ("True", 99)
     | EBool false -> ("False", 99)
     | EString s -> ("\"" + s + "\"", 99)
-    | EOp (Uop UReveal, [EVar x]) -> ("()", 90) // TODO
+    | EOp (Uop UReveal, [EApply (x, es)]) -> (r prec (vaApp "reveal_opaque" [EApply (transparent_id x, es)]), prec)
     | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
@@ -215,18 +224,33 @@ let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
+  let isOpaqueAttr (x, es) = match (x, es) with (Id "opaque", ([] | [EBool true])) -> true | _ -> false in
+  let isOpaque = List.exists isOpaqueAttr f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
-  psi.PrintLine ("val " + (sid f.fname) + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret));
-  // TODO: opaque
-  ( match f.fbody with
+  let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
+  let printBody x e =
+    ps.PrintLine ("let " + x + " " + (let_string_of_formals false f.fargs) + " =");
+    ps.Indent ();
+    ps.PrintLine (string_of_exp e);
+    ps.Unindent ()
+    in
+  if isOpaque then
+    ps.PrintLine (sVal (sid (transparent_id f.fname)));
+    ( match f.fbody with
+      | None -> ()
+      | Some e -> printBody (sid (transparent_id f.fname)) e
+    );
+    psi.PrintLine (sVal (sid f.fname));
+    let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
+    let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
+    printBody (sid f.fname) eOpaque
+  else
+  (
+    match f.fbody with
     | None -> ()
-    | Some e ->
-        ps.PrintLine ("let " + (sid f.fname) + " " + (let_string_of_formals false f.fargs) + " =");
-        ps.Indent ();
-        ps.PrintLine (string_of_exp e);
-        ps.Unindent ()
+    | Some e -> printBody (sid f.fname) e
   )
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
@@ -236,29 +260,31 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   ps.PrintLine ("");
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
-  let irreducible = (match ps.print_interface with None -> "irreducible " | Some psi -> "") in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
-  let printPType s =
-    psi.Indent ();
+  let printPType (ps:print_state) s =
+    ps.Indent ();
     let st = String.concat " * " (List.map string_of_pformal p.prets) in
-    psi.PrintLine (s + "Ghost (" + st + ")");
-    psi.PrintLine ("(requires " + (string_of_exp rs) + ")");
+    ps.PrintLine (s + "Ghost (" + st + ")");
+    ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
-    psi.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
-    psi.Unindent ();
+    ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
+    ps.Unindent ();
     in
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
     | _ ->
-        psi.PrintLine (irreducible + "val " + (sid p.pname) + " : " + (val_string_of_formals args));
-        printPType "-> "
+        psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
+        printPType psi "-> "
   );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
+        ps.PrintLine ("irreducible val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
+        printPType ps "-> "
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        ps.PrintLine (irreducible + "let " + (sid p.pname) + " " + formals + " =");
+        ps.PrintLine ("irreducible let " + (sid (irreducible_id p.pname)) + " " + formals + " =");
+//        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
@@ -270,9 +296,10 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
           | None -> ()
           | Some e ->
               ps.PrintLine ") <: ("
-              printPType "";
+              printPType ps "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
-        )
+        );
+        ps.PrintLine ("let " + (sid p.pname) + " = " + (sid (irreducible_id p.pname)))
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
