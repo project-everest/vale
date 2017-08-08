@@ -904,7 +904,7 @@ def report_verification_failures():
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
-                  if "(Error)" in line:
+                  if "(Error)" in line or "failed" in line:
                     line = "%s%s%s" % (colors['red'], line, colors['end'])
                   print line
 
