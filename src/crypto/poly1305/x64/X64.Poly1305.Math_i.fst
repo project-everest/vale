@@ -39,7 +39,7 @@ let rec poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int)
 *)
 
 
-#reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true --max_fuel 1 --max_ifuel 1"
+#reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true --max_fuel 1 --max_ifuel 1 --z3rlimit 100"
 
 val lemma_mul_div_comm: a:nat -> b:pos -> c:nat ->
     Lemma (requires (c % b = 0 /\ a % b = 0))
