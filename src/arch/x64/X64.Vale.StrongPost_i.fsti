@@ -32,16 +32,14 @@ unfold let va_fast_ins_Sub64 = Sub64
 
 unfold let va_inss = list ins
 
-let valid_maddr_norm (r:range) (addr:maddr) (s:state) : Type0 =
-  labeled r "Failed to prove that the memory address is valid"
-	    (Map.contains s.mem (eval_maddr addr s))
+let valid_maddr_norm (addr:maddr) (s:state) : bool =
+  Map.contains s.mem (eval_maddr addr s)
 
-let valid_operand_norm (r:range) (o:operand) (s:state) : Type0 =
-  labeled r "Failed to prove that the operand is valid"
-    (match o with
-    | OConst n -> b2t (0 <= n && n < nat64_max)
-    | OReg r -> True
-    | OMem m -> valid_maddr_norm r m s)
+let valid_operand_norm (o:operand) (s:state) : bool =
+    match o with
+    | OConst n -> 0 <= n && n < nat64_max
+    | OReg r -> true
+    | OMem m -> valid_maddr_norm m s
 
 let eval_operand_norm (o:operand) (s:state) : nat64 =
   match o with
@@ -101,27 +99,26 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
        post sN)
   | hd :: inss ->
     begin
-    let r_info = range_of hd in
       match hd with
       | (Mov64 (OReg Rsp) _) -> False
       | (Mov64 (OReg dst) src) ->
-	valid_operand_norm r_info src s0 /\
+	valid_operand_norm src s0 /\
 	(forall x. x == eval_operand_norm src s0 ==>
               wp_code inss post (update_reg dst x s0))
       | (Load64 (OReg Rsp) _ _) -> False
       | (Load64 (OReg dst) (OReg src) offset) ->
-	  valid_maddr_norm r_info (MConst (s0.regs src + offset)) s0 /\
+	  valid_maddr_norm (MConst (s0.regs src + offset)) s0 /\
 	(forall x. x == Map.sel s0.mem (s0.regs src + offset) ==>
               wp_code inss post (update_reg dst x s0))
       | (Store64 (OReg dst) src offset) ->
-	(valid_operand_norm r_info src s0) /\
+	(valid_operand_norm src s0) /\
 	(Map.contains s0.mem (s0.regs dst + offset)) /\
 	(forall x.
 	  x == Map.upd s0.mem (s0.regs dst + offset) (eval_operand_norm src s0) ==>
 	  wp_code inss post ({s0 with mem = x}))
       | (Add64Wrap (OReg Rsp) _) -> False
       | (Add64Wrap (OReg dst) src) ->
-	(valid_operand_norm r_info src s0) /\
+	(valid_operand_norm src s0) /\
 	(forall a x (f:nat64).
 	     a == s0.regs dst + eval_operand_norm src s0 /\
 	     x == (if a < nat64_max then a else a - nat64_max) /\
@@ -129,7 +126,7 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
 	       wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Adc64Wrap (OReg Rsp) _) -> False
       | (Adc64Wrap (OReg dst) src) ->
-	(valid_operand_norm r_info src s0) /\
+	(valid_operand_norm src s0) /\
 	(forall a x (f:nat64).
 	     a == s0.regs dst + eval_operand_norm src s0 + 
 		  (if cf s0.flags then 1 else 0) /\
@@ -137,7 +134,7 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
 		   cf f == (a >= nat64_max) ==>
 	       wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Mul64Wrap src) ->
-	(valid_operand_norm r_info src s0) /\
+	(valid_operand_norm src s0) /\
 	(forall (rax:nat64) (rdx:nat64) (f:nat64).
 	  nat64_max `op_Multiply` rdx + rax == 
 		    s0.regs Rax `op_Multiply` eval_operand_norm src s0 ==>
@@ -146,7 +143,7 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
       | (IMul64 (OReg Rsp) _) -> False
       | (IMul64 (OReg dst) src) ->
 	let a = s0.regs dst `op_Multiply` eval_operand_norm src s0 in
-	  (valid_operand_norm r_info src s0) /\
+	  (valid_operand_norm src s0) /\
 	  (a < nat64_max) /\ //TODO:label this
 	  (forall (x:nat64) (f:nat64).
 	     x == a ==>
@@ -154,20 +151,20 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
       | (And64 (OReg Rsp) _) -> False
       | (And64 (OReg dst) src) ->
 	let a = logand64 (s0.regs dst) (eval_operand_norm src s0) in
-	(valid_operand_norm r_info src s0) /\
+	(valid_operand_norm src s0) /\
 	(forall (x:nat64) (f:nat64).
 	  x == a ==>
 	  wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Shr64 (OReg Rsp) _) -> False
       | (Shr64 (OReg dst) src) ->
 	let a = shift_right64 (s0.regs dst) (eval_operand_norm src s0) in
-	(valid_operand_norm r_info src s0) /\
+	(valid_operand_norm src s0) /\
 	(forall (x:nat64) (f:nat64).
 	  x == a ==>
 	  wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Sub64 (OReg Rsp) _) -> False
       | (Sub64 (OReg dst) src) ->
-	       (valid_operand_norm r_info src s0) /\
+	       (valid_operand_norm src s0) /\
 	       (0 <= s0.regs dst - eval_operand_norm src s0) /\
 	       (forall a x (f:nat64).
                a == s0.regs dst - eval_operand_norm src s0 /\
