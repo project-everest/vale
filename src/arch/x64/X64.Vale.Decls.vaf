@@ -393,7 +393,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(operand s
 }
 
 #verbatim
-#reset-options "--z3cliopt smt.arith.nl=true --initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#reset-options "--z3cliopt smt.arith.nl=true --initial_fuel 2 --max_fuel 2 --z3rlimit 100"
 #endverbatim
 procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst_operand dst:uint64, operand src:uint64)
     requires

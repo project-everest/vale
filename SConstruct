@@ -90,6 +90,16 @@ AddOption('--FSTARZ3',
   default='',
   action='store',
   help='Specify the path to z3 or z3.exe for F*')
+AddOption('--FSTAR-MY-VERSION',
+  dest='fstar_my_version',
+  default=False,
+  action='store_true',
+  help='Use version of F* that does not necessarily match .fstar_version')
+AddOption('--FSTAR-Z3-MY-VERSION',
+  dest='fstar_z3_my_version',
+  default=False,
+  action='store_true',
+  help='Use version of Z3 that does not necessarily match .fstar_z3_version')
 AddOption('--DARGS',
   dest='dafny_user_args',
   type='string',
@@ -154,6 +164,8 @@ env['OPENSSL_PATH'] = GetOption('openssl_path')
 
 do_dafny = GetOption('do_dafny')
 do_fstar = GetOption('do_fstar')
+fstar_my_version = GetOption('fstar_my_version')
+fstar_z3_my_version = GetOption('fstar_z3_my_version')
 
 # --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
 # the other build flavors do not redundently re-verify the same results.
@@ -702,6 +714,61 @@ def verify_files_in(env, directories):
       files = recursive_glob(env, d+'/*.vaf', strings=True)
       verify_vale_fstar_files(env, files)
     
+def check_fstar_z3_version(fstar_z3):
+  import subprocess
+  z3_version_file = ".fstar_z3_version"
+  if os.path.isfile(z3_version_file):
+    with open(z3_version_file, 'r') as myfile:
+      lines = myfile.read().splitlines()
+    version = lines[0]
+    versions = version.split('.')
+    cmd = [fstar_z3, '--version']
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    lines = o.splitlines()
+    line = lines[0]
+    for word in line.split(' '):
+      if '.' in word:
+        nums = word.split('.')
+        higher = False
+        lower = False
+        for i in range(min(len(nums), len(versions))):
+          if nums[i] < versions[i]:
+            lower = True
+            break
+          if nums[i] > versions[i]:
+            higher = True
+            break
+        if higher or (not lower and len(nums) >= len(versions)):
+          return
+        break
+    print('%sExpected Z3 version >= %s%s%s, but z3 --version returned the following:%s' % (colors['red'], colors['yellow'], version, colors['red'], colors['end']))
+    for line in lines:
+      print('  ' + line)
+    print('%sGet a recent Z3 executable from https://github.com/FStarLang/binaries/tree/master/z3-tested, modify .fstar_z3_version, or use the --FSTAR-Z3-MY-VERSION option to override%s' % (colors['cyan'], colors['end']))
+    Exit(1)
+
+def check_fstar_version():
+  import subprocess
+  fstar_version_file = ".fstar_version"
+  if os.path.isfile(fstar_version_file):
+    with open(fstar_version_file, 'r') as myfile:
+      lines = myfile.read().splitlines()
+    version = lines[0]
+    fstar = str(env['FSTAR'])
+    cmd = [fstar, '--version']
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    lines = o.splitlines()
+    for line in lines:
+      if '=' in line:
+        key, v = line.split('=', 1)
+        if key == 'commit' and v == version:
+          return
+    print('%sExpected F* version %scommit=%s%s, but fstar --version returned the following:%s' % (colors['red'], colors['yellow'], version, colors['red'], colors['end']))
+    for line in lines:
+      print('  ' + line)
+    print('%sGet F* version %s from https://github.com/FStarLang/FStar, modify .fstar_version, or use the --FSTAR-MY-VERSION option to override%s' % (colors['cyan'], version, colors['end']))
+    Exit(1)
+
 ####################################################################
 #
 #   FStar dependency analysis
@@ -827,6 +894,11 @@ if sys.platform == 'win32':
 else:
   env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
 
+# Check F* version
+if do_fstar and not fstar_my_version:
+  check_fstar_version()
+
+# Find Z3 for F*
 if do_fstar and verify:
   fstar_z3 = GetOption('fstar_z3')
   if fstar_z3 == '':
@@ -837,10 +909,12 @@ if do_fstar and verify:
       else:
         find_z3 = FindFile('z3', os.environ['PATH'].split(':'))
       if find_z3 == None:
-        print('Could not find z3 executable.  Either put z3 in your path, or put it in the directory tools/Z3/, or use the --FSTARZ3=<z3-executable> option.')
+        print('%sCould not find z3 executable.  Either put z3 in your path, or put it in the directory tools/Z3/, or use the --FSTARZ3=<z3-executable> option.%s' % (colors['red'], colors['end']))
         Exit(1)
       else:
         fstar_z3 = str(find_z3)
+  if not fstar_z3_my_version:
+    check_fstar_z3_version(fstar_z3)
   env['FSTAR_Z3_PATH'] = '--smt ' + fstar_z3
 else:
   env['FSTAR_Z3_PATH'] = ''
