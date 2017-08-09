@@ -33,7 +33,7 @@ unfold let va_fast_ins_Sub64 = Sub64
 unfold let va_inss = list ins
 
 let valid_maddr_norm (r:range) (addr:maddr) (s:state) : Type0 =
-  labeled r "Failed to prove that the memory address is valid"
+  labeled r (string_of_maddr addr)
 	    (Map.contains s.mem (eval_maddr addr s))
 
 let valid_operand_norm (r:range) (o:operand) (s:state) : Type0 =
@@ -110,7 +110,7 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
               wp_code inss post (update_reg dst x s0))
       | (Load64 (OReg Rsp) _ _) -> False
       | (Load64 (OReg dst) (OReg src) offset) ->
-	  valid_maddr_norm r_info (MConst (s0.regs src + offset)) s0 /\
+	  valid_maddr_norm r_info (MReg src offset) s0 /\
 	(forall x. x == Map.sel s0.mem (s0.regs src + offset) ==>
               wp_code inss post (update_reg dst x s0))
       | (Store64 (OReg dst) src offset) ->
@@ -190,6 +190,8 @@ let wp_code_delta = [
   "X64.Vale.State_i.__proj__Mkstate__item__mem";
   "X64.Vale.StrongPost_i.valid_operand_norm";
   "X64.Vale.StrongPost_i.valid_maddr_norm";
+  "X64.Machine_s.string_of_maddr";
+  "X64.Machine_s.string_of_reg";
   "X64.Vale.StrongPost_i.augment"
   ]
 
@@ -210,18 +212,18 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
 		     
 
 (* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
-// let test_lemma (s0:state) (sN:state) =
-//     assume (s0.ok);
-//     // assume (Map.contains s0.mem (s0.regs Rsi));
-//     assume (Map.contains s0.mem (s0.regs Rcx));
-//     let i1 = Prims.set_range_of (Load64 (OReg Rax) (OReg Rsi) 0)
-//                                 (mk_range "load-instruction-1" 1 1 2 0) in
-//     let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0)
-//                                 (mk_range "load-instruction-2" 2 1 3 0) in
-//     let i3 = Mov64 (OReg Rax) (OReg Rbx) in
-//     assume (Some sN == va_eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0);
-//     va_lemma_weakest_pre_norm [i1; i2; i3] s0 sN;
-//     //this assertion is what F* uses to implicitly instantiate
-//     //the post-condition predicate in lemma_weakest_pre_norm
-//     assert (state_eq sN (update_reg Rbx (sN.regs Rbx)
-//                         (update_reg Rax (sN.regs Rax) s0)))
+let test_lemma (s0:state) (sN:state) =
+    assume (s0.ok);
+    // assume (Map.contains s0.mem (s0.regs Rsi));
+    assume (Map.contains s0.mem (s0.regs Rcx));
+    let i1 = Prims.set_range_of (Load64 (OReg Rax) (OReg Rsi) 0)
+                                (mk_range "load-instruction-1" 1 1 2 0) in
+    let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0)
+                                (mk_range "load-instruction-2" 2 1 3 0) in
+    let i3 = Mov64 (OReg Rax) (OReg Rbx) in
+    assume (Some sN == va_eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0);
+    va_lemma_weakest_pre_norm [i1; i2; i3] s0 sN;
+    //this assertion is what F* uses to implicitly instantiate
+    //the post-condition predicate in lemma_weakest_pre_norm
+    assert (state_eq sN (update_reg Rbx (sN.regs Rbx)
+                        (update_reg Rax (sN.regs Rax) s0)))

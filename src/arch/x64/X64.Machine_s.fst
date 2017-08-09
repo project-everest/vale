@@ -31,10 +31,37 @@ type reg =
   | R14
   | R15
 
+let string_of_reg (r:reg) =
+  match r with
+  | Rax -> "Rax"
+  | Rbx -> "Rbx"
+  | Rcx -> "Rcx"
+  | Rdx -> "Rdx"
+  | Rsi -> "Rsi"
+  | Rdi -> "Rdi"
+  | Rbp -> "Rbp"
+  | Rsp -> "Rsp"
+  | R8  -> "R8"
+  | R9  -> "R9"
+  | R10 -> "R10"
+  | R11 -> "R11"
+  | R12 -> "R12"
+  | R13 -> "R13"
+  | R14 -> "R14"
+  | R15 -> "R15"
+
 type maddr =
   | MConst: n:int -> maddr
   | MReg: r:reg -> offset:int -> maddr
   | MIndex: base:reg -> scale:int -> index:reg -> offset:int -> maddr
+
+let string_of_maddr (addr:maddr) : string =
+  match addr with
+  | MConst n -> string_of_int n
+  // | MReg r offset -> strcat (string_of_int offset) (strcat ("(")
+  // 				       (strcat (string_of_reg r) (")")))
+  | MReg r ofs -> string_of_reg r
+  | _ -> "todo Mindex"
 
 type operand =
   | OConst: n:int -> operand
