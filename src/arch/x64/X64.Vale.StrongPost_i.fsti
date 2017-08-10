@@ -32,6 +32,9 @@ unfold let va_fast_ins_Sub64 = Sub64
 
 unfold let va_inss = list ins
 
+unfold let va_ins_range (filename:string) (line:int) (col:int) (i:ins) =
+  Prims.set_range_of i (mk_range filename line col line col)
+
 let valid_maddr_norm (addr:maddr) (s:state) : bool =
   Map.contains s.mem (eval_maddr addr s)
  
@@ -39,7 +42,7 @@ let valid_maddr (r:range) (addr:maddr) (s:state) : Type0 =
   let msg = normalize_term (
       strcat (strcat ("Memory address ") (string_of_maddr addr))
 	     (" is invalid")) in
-  labeled r msg
+  labeled (normalize_term r) msg
 	  (valid_maddr_norm addr s)
 
 let valid_operand_norm (o:operand) (s:state) : bool =
@@ -227,6 +230,7 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
 		     
 
 (* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
+(*
 let test_lemma (s0:state) (sN:state) =
     assume (s0.ok);
     //assume (Map.contains s0.mem (s0.regs Rsi));
@@ -242,3 +246,4 @@ let test_lemma (s0:state) (sN:state) =
     //the post-condition predicate in lemma_weakest_pre_norm
     assert (state_eq sN (update_reg Rbx (sN.regs Rbx)
                         (update_reg Rax (sN.regs Rax) s0)))
+*)

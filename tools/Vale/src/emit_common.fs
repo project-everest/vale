@@ -1002,16 +1002,17 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt 
   let fParams = area_fun_params EmitCode p.prets p.pargs in
   let fIns (s:stmt):exp =
     let err () = internalErr "make_gen_fast_block" in
-    match skip_loc_stmt s with
-    | SAssign ([], e) ->
+    match skip_get_loc_stmt loc s with
+    | (loc, SAssign ([], e)) ->
       (
-        match skip_loc e with
-        | EApply(Id x, es) ->
+        match skip_get_loc loc e with
+        | (loc, EApply(Id x, es)) ->
             let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
             let es = List.map get_code_exp es in
             let es = List.map (map_exp stateToOp) es in
             let es = List.map exp_refined es in
-            vaApp ("fast_ins_" + x) es
+            let eIns = vaApp ("fast_ins_" + x) es in
+            vaApp "ins_range" [EString loc.loc_file; EInt (bigint loc.loc_line); EInt (bigint loc.loc_col); eIns]
         | _ -> err ()
       )
     | _ -> err ()

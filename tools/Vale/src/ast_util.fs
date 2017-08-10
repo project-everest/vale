@@ -105,6 +105,11 @@ let rec skip_loc (e:exp):exp =
   | ELoc (_, e) -> skip_loc e
   | _ -> e
 
+let rec skip_get_loc (l:loc) (e:exp):(loc * exp) =
+  match e with
+  | ELoc (l, e) -> skip_get_loc l e
+  | _ -> (l, e)
+
 let skip_loc_opt (e:exp option):exp option =
   match e with
   | None -> None
@@ -199,6 +204,11 @@ let rec skip_loc_stmt (s:stmt):stmt =
   match s with
   | SLoc (_, s) -> skip_loc_stmt s
   | _ -> s
+
+let rec skip_get_loc_stmt (l:loc) (s:stmt):(loc * stmt) =
+  match s with
+  | SLoc (l, s) -> skip_get_loc_stmt l s
+  | _ -> (l, s)
 
 let rec skip_locs_stmt (s:stmt):stmt list = map_stmt skip_locs (fun s -> match s with SLoc (_, s) -> Replace (skip_locs_stmt s) | _ -> Unchanged) s
 
