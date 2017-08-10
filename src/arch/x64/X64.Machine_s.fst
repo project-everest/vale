@@ -58,9 +58,8 @@ type maddr =
 let string_of_maddr (addr:maddr) : string =
   match addr with
   | MConst n -> string_of_int n
-  // | MReg r offset -> strcat (string_of_int offset) (strcat ("(")
-  // 				       (strcat (string_of_reg r) (")")))
-  | MReg r ofs -> string_of_reg r
+  | MReg r offset -> strcat (string_of_int offset) (strcat "(" 
+						  (strcat (string_of_reg r) (")")))
   | _ -> "todo Mindex"
 
 type operand =
