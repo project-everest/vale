@@ -40,6 +40,7 @@ open X64.Vale.StrongPost_i
 open X64.Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open Opaque_i
+open FStar.Tactics
 #endverbatim
 
 #verbatim interface
@@ -919,6 +920,24 @@ procedure poly1305_add_key_s(
 
 TEMP2*/
 
+#verbatim
+let retain_only (nss:list string) : tactic unit =
+  prune "";; //removes every top-level assertion which has "" as a prefix; so prune everything
+  addns "Prims" ;; //keep prims always
+  _ig <-- mapM addns nss ;  //add back only things in nss
+  return ()
+
+let retain_only_modp () = 
+    retain_only ["Opaque_i"; "X64.Poly1305.Spec_s"; "X64.Poly1305"; "X64.Poly1305.Math_i"] //; "FStar.Seq"]`
+
+let modp_0 () : Lemma
+  (requires True)
+  (ensures modp 0 == 0)
+    =
+    reveal_opaque modp';
+    ()
+#endverbatim
+
 // TODO: Procedure was consistently sending Z3 into the woods when frame was true
 procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
           reg_operand ctx:uint64,
@@ -1008,7 +1027,10 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
     assert modp(0) == 0 by
     {
-        reveal_opaque(modp');
+        modp_0();
+//        reveal_opaque(modp');
+//        assert_by_tactic(modp(0) == 0, retain_only_modp());
+//        assume false;
         //assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
     }
 //
@@ -1016,7 +1038,7 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 //    assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
 //        by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
 //
-//    Load64(r15, ctx, 56); // assert r15 == len_in % 16;
+//https://www.andrew.cmu.edu/user/bparno/publication.html    Load64(r15, ctx, 56); // assert r15 == len_in % 16;
 //    if (r15 != 0)
 //    {
 //        Load64(rax, ctx, 32);
