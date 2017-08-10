@@ -227,18 +227,18 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
 		     
 
 (* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
-let test_lemma (s0:state) (sN:state) =
-    assume (s0.ok);
-    //assume (Map.contains s0.mem (s0.regs Rsi));
-    assume (Map.contains s0.mem (s0.regs Rcx));
-    let i1 = Prims.set_range_of (Load64 (OReg Rax) (OReg Rsi) 0)
-                                (mk_range "load-instruction-1" 1 1 2 0) in
-    let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0)
-                                (mk_range "load-instruction-2" 2 1 3 0) in
-    let i3 = Mov64 (OReg Rax) (OReg Rbx) in
-    assume (Some sN == va_eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0);
-    va_lemma_weakest_pre_norm [i1; i2; i3] s0 sN;
-    //this assertion is what F* uses to implicitly instantiate
-    //the post-condition predicate in lemma_weakest_pre_norm
-    assert (state_eq sN (update_reg Rbx (sN.regs Rbx)
-                        (update_reg Rax (sN.regs Rax) s0)))
+// let test_lemma (s0:state) (sN:state) =
+//     assume (s0.ok);
+//     //assume (Map.contains s0.mem (s0.regs Rsi));
+//     assume (Map.contains s0.mem (s0.regs Rcx));
+//     let i1 = Prims.set_range_of (Load64 (OReg Rax) (OReg Rsi) 0)
+//                                 (mk_range "load-instruction-1" 1 1 2 0) in
+//     let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0)
+//                                 (mk_range "load-instruction-2" 2 1 3 0) in
+//     let i3 = Mov64 (OReg Rax) (OReg Rbx) in
+//     assume (Some sN == va_eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0);
+//     va_lemma_weakest_pre_norm [i1; i2; i3] s0 sN;
+//     //this assertion is what F* uses to implicitly instantiate
+//     //the post-condition predicate in lemma_weakest_pre_norm
+//     assert (state_eq sN (update_reg Rbx (sN.regs Rbx)
+//                         (update_reg Rax (sN.regs Rax) s0)))
