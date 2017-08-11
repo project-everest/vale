@@ -1033,7 +1033,14 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 //        assume false;
         //assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
     }
-//
+
+    ghost var i := inp_in;
+    ghost var k := inp_in + len_in / 16 * 16;
+    assert i <= k;
+    assert (k - i) % 16 == 0;
+    assert forall j :: i <= j < k && (j - i) % 8 == 0 ==> in_mem(j, mem);   // Passes
+    assert forall j :: i <= i && j < i + (len_in + 15) / 16 * 16 && (j - i) % 8 == 0 ==> in_mem(j, mem);  // Fails
+
 //    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
 //    assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
 //        by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
