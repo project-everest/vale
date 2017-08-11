@@ -43,7 +43,7 @@ let valid_maddr (r:range) (addr:maddr) (s:state) : Type0 =
       strcat (strcat ("Memory address ") (string_of_maddr addr))
 	     (" is invalid")) in
   labeled (normalize_term r) msg
-	  (valid_maddr_norm addr s)
+	  (Map.contains s.mem (eval_maddr addr s))
 
 let valid_operand_norm (o:operand) (s:state) : bool =
   match o with
@@ -52,7 +52,7 @@ let valid_operand_norm (o:operand) (s:state) : bool =
   | OMem m -> valid_maddr_norm m s
 
 let valid_operand (r:range) (o:operand) (s:state)  =
-  labeled r "Failed to prove that the operand is valid"
+  labeled (normalize_term r) "Failed to prove that the operand is valid"
     (match o with
     | OConst n -> b2t (0 <= n && n < nat64_max)
     | OReg r -> True
@@ -126,7 +126,7 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
               wp_code inss post (update_reg dst x s0))
       | (Load64 (OReg Rsp) _ _) -> False
       | (Load64 (OReg dst) (OReg src) offset) ->
-      	  valid_maddr r_info (MReg src offset) s0 /\
+      	valid_maddr r_info (MReg src offset) s0 /\
       	(forall x. x == Map.sel s0.mem (s0.regs src + offset) ==>
               wp_code inss post (update_reg dst x s0))
       | (Store64 (OReg dst) src offset) ->
@@ -210,26 +210,30 @@ let wp_code_delta = [
   "X64.Vale.StrongPost_i.valid_maddr";
   "X64.Machine_s.string_of_maddr";
   "X64.Machine_s.string_of_reg";
-  "X64.Vale.StrongPost_i.augment"
+  "X64.Vale.StrongPost_i.augment";
+  "X64.Vale.StrongPost_i.va_ins_range"
   ]
-
 
 [@"uninterpreted_by_smt"]
 val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
   (fun (post:(unit -> Type)) ->
      forall ok0 regs0 flags0 mem0.
+       // Prims.norm [] (
         ok0 == s0.ok /\
         regs0 == s0.regs /\
         flags0 == s0.flags /\
-        mem0 == s0.mem ==>
+	mem0 == s0.mem ==>
         s0.ok /\
         Some sN == va_eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 /\
         Prims.norm [delta_only wp_code_delta; zeta; iota; primops]
-                   (wp_code (normalize_term inss) (augment sN post)
+                   (wp_code (inss) (augment sN post)
                      ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
-		     
+
+val start_norm (x:unit) : PURE unit
+  (fun (post:unit -> Type) -> Prims.norm [delta_only wp_code_delta; zeta; iota; primops] (post ()))
 
 (* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
+
 // let test_lemma (s0:state) (sN:state) =
 //     assume (s0.ok);
 //     //assume (Map.contains s0.mem (s0.regs Rsi));
@@ -239,7 +243,7 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
 //     let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0)
 //                                 (mk_range "load-instruction-2" 2 1 3 0) in
 //     let i3 = Mov64 (OReg Rax) (OReg Rbx) in
-//     assume (Some sN == va_eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0);
+//     assume (Some sN == va_eval_code (normalize_term (va_Block (inss_to_codes [i1;i2;i3]))) s0);
 //     va_lemma_weakest_pre_norm [i1; i2; i3] s0 sN;
 //     //this assertion is what F* uses to implicitly instantiate
 //     //the post-condition predicate in lemma_weakest_pre_norm

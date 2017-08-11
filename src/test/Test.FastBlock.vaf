@@ -24,9 +24,12 @@ procedure Copy64()
     reads
         rsi; mem;
     modifies
-        rax;
+        rax; rbx;
 {
     assert{:fast_block} true;
     Load64(rax, rsi, 0);
     assert (rax == mem[rsi + 0]);
+  /*  assert{:fast_block} true;
+    Load64(rbx, rsi, 0);
+    assert (rax == rbx); */
 }
