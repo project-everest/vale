@@ -157,3 +157,6 @@ let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat6
 let lemma_poly1305_heap_hash_blocks (h) (pad) (r) (m) (i) (k) (len) =
   admit()
   // decreases k - i
+
+let lemma_add_mod128 (x y :int) =
+  reveal_opaque mod2_128'

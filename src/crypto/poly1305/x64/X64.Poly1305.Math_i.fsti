@@ -37,7 +37,10 @@ let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
     
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
-  
+
+let applyHeapletTo128 (m:mem) (i:int) (len:nat) (index:int) : nat128 =
+  heapletTo128 m i len index 
+
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
                          (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
 
@@ -162,4 +165,6 @@ val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:in
            // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
   (ensures poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k)
           
-    
+val lemma_add_mod128 (x y :int) : Lemma
+  (requires True)
+  (ensures mod2_128 ((mod2_128 x) + y) == mod2_128 (x + y))
