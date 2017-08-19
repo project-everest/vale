@@ -47,17 +47,6 @@ open FStar.Tactics
 unfold let n = nat64_max
 #endverbatim
 
-#verbatim interface
-
-let disjoint (ptr1:int) (num_bytes1:int) (ptr2:int) (num_bytes2:int) =
-    ptr1 + num_bytes1 <= ptr2 \/ ptr2 + num_bytes2 <= ptr1
-
-let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
-    size == 64 /\
-    (forall (a:int) . addr <= a && a < addr+num_bytes && (a - addr) % 8 = 0 ==> mem `Map.contains` a)
-
-#endverbatim
-
 /* TEMP1
 procedure poly1305_multiply(
     inout dst_operand d1:uint64,
@@ -598,8 +587,9 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         h2 < 5;
         validSrcAddrs(mem, ctx, 64, 24 * 8);
         validSrcAddrs(mem, old(inp), 64, old(len));
-        // TODO: What's should this say instead?
+        // Replaced the line below with memModified
         //mem == old(mem)[ctx_id := mem[ctx_id]];
+        memModified(old(mem), mem, old(ctx), 24 * 8);
         h0 == mem[ctx + 0];
         h1 == mem[ctx + 8];
         h2 == mem[ctx + 16];
@@ -973,8 +963,9 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 //        ctx == old(ctx);
 //        validSrcAddrs(mem, ctx, 64, 24 * 8);
 //        validSrcAddrs(mem, old(inp), 64, old(len) + 15 / 16 * 16);
-//        // TODO: What does this mean now?
+//        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
+//        memModified(old(mem), mem, old(ctx), 24 * 8);
 //        h == lowerUpper128_opaque(h0, h1);
 //        let inp_mem := heapletTo128(mem, old(inp), old(len));
 //        // TODO: Figure out why there's an internal Vale error on the inp_mem?[j] invocation
@@ -986,6 +977,7 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     ghost var len_in := len;
     ghost var key_r0 := mem[ctx + 24];
     ghost var key_r1 := mem[ctx + 32];
+    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
     lemma_poly_bits64();
     //lemma_BitwiseAdd64();
 
@@ -1013,6 +1005,7 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
             0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
     }
+    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
 
     assert{:fast_block} true;
     Mov64(rax, len);
@@ -1024,7 +1017,9 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     Store64(ctx, len, 64);
 
     Mov64(rcx, 1);
+    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
     h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
+    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // False here
     assert modp(0) == 0 by
     {
         modp_0();
@@ -1034,18 +1029,11 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
         //assert p == 0x3_ffffffff_ffffffff_ffffffff_fffffffb;
     }
 
-    ghost var i := inp_in;
-    ghost var k := inp_in + len_in / 16 * 16;
-    assert i <= k;
-    assert (k - i) % 16 == 0;
-    assert forall j :: i <= j < k && (j - i) % 8 == 0 ==> in_mem(j, mem);   // Passes
-    assert forall j :: i <= i && j < i + (len_in + 15) / 16 * 16 && (j - i) % 8 == 0 ==> in_mem(j, mem);  // Fails
-
-//    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
+    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
 //    assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
 //        by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
 //
-//https://www.andrew.cmu.edu/user/bparno/publication.html    Load64(r15, ctx, 56); // assert r15 == len_in % 16;
+//    Load64(r15, ctx, 56); // assert r15 == len_in % 16;
 //    if (r15 != 0)
 //    {
 //        Load64(rax, ctx, 32);
@@ -1127,8 +1115,9 @@ procedure{:timeLimitMultiplier 2} poly1305(
     ensures
         validSrcAddrs(mem, ctx, 64, 24 * 8);
         validSrcAddrs(mem, inp, 64, (len + 15) / 16 * 16);
-        // TODO: What does this mean now?
+        // Replaced line below with memModified
         //mem == old(mem)[ctx_id := mem[ctx_id]];
+        memModified(old(mem), mem, old(ctx), 24 * 8);
         let h0_out := mem[ctx_in];
         let h1_out := mem[ctx_in + 8];
         h == lowerUpper128_opaque(h0_out, h1_out);

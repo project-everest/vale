@@ -23,6 +23,18 @@ let mod2_128 = make_opaque mod2_128'
 
 let modp = make_opaque modp'
 
+(* TODO: These definitions should be in some more general location *)
+let disjoint (ptr1:int) (num_bytes1:int) (ptr2:int) (num_bytes2:int) =
+    ptr1 + num_bytes1 <= ptr2 \/ ptr2 + num_bytes2 <= ptr1
+
+let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
+    size == 64 /\
+    (forall (a:int) . {:pattern (mem `Map.contains` a)} addr <= a && a < addr+num_bytes && (a - addr) % 8 = 0 ==> mem `Map.contains` a)
+
+let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
+    (forall (a:int) . {:pattern (new_mem `Map.contains` a)} old_mem `Map.contains` a <==> new_mem `Map.contains` a) /\
+    (forall (a:int) . {:pattern (new_mem.[a])} a < ptr || a >= ptr + num_bytes ==> old_mem.[a] == new_mem.[a])
+    
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
   
@@ -146,7 +158,8 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
 val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma
   (requires i <= k && k <= i + len /\
             (k - i) % 16 == 0 /\
-            (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
+            validSrcAddrs m i  64 ((len + 15) / 16 * 16))
+           // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
   (ensures poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k)
           
     
