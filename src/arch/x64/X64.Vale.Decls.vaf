@@ -197,6 +197,10 @@ val logand128 : (x:nat128) -> (y:nat128) -> nat128
 val shift_left64 : (x:nat64) -> (amt:nat64) -> nat64
 val shift_right64 : (x:nat64) -> (amt:nat64) -> nat64
 
+val reveal_logand128 (x y:nat128) : Lemma
+    (requires True)
+    (ensures logand128 x y == FStar.UInt.logand #128 x y)
+
 val printer : Type0
 val print_string : string -> FStar.All.ML unit
 val print_header : printer -> FStar.All.ML unit
@@ -265,6 +269,8 @@ let shift_left64 (x:nat64) (amt:nat64) : nat64 =
 
 let shift_right64 (x:nat64) (amt:nat64) : nat64 =
   S.shift_right x amt
+
+let reveal_logand128 (x y:nat128) = ()
 
 let printer = P.printer
 let print_string = FStar.IO.print_string
