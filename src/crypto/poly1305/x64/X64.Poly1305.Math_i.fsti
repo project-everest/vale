@@ -36,7 +36,7 @@ val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -
 	(ensures (h * r) % p == hh % p)
 
 // p used to be a refinement to p > 0 and h a nat.
-val lemma_poly_reduce : n:int -> p:pos -> h:nat -> h2:int -> h10:int -> c:int -> hh:int -> Lemma
+val lemma_poly_reduce : n:int -> p:pos -> h:nat -> h2:nat -> h10:int -> c:int -> hh:int -> Lemma
   (requires
     n * n > 0 /\
     h2 >= 0 /\  // TODO: Shouldn't need to add this

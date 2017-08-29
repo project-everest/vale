@@ -19,24 +19,25 @@ lemma_BitwiseMul64()
 
 // private unfold let op_Star = op_Multiply
 
-// #reset-options "--z3rlimit 1200 --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 
-let rec poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k - i)) =
-        admit()
-(*
-    requires i <= k
-    requires (k - i) % 16 == 0
-    requires forall j :: i <= j < k && (j - i) % 8 == 0 ==> j in m
-    decreases k - i
-*)
-(*
+
+let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k-i))
+    =
     if i = k then h
     else
         let kk = k - 16 in
-        let hh = poly1305_heap_blocks h pad r m i kk in
+	assert (i >= 0 ==> precedes (kk - i) (k-i));
+	assert (i < 0 ==> precedes (kk - i) (k-i));
+	let hh = poly1305_heap_blocks' h pad r m i kk in
         modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
-*)
+
+(* Getting a weird error otherwise, will file an issue 
+   when this gets merged in fstar branch *)
+let poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
+ = poly1305_heap_blocks' h pad r m i k
 
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true --max_fuel 1 --max_ifuel 1 --z3rlimit 100 --using_facts_from Prims --using_facts_from FStar.Math"
@@ -118,9 +119,21 @@ let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:in
       	((h2*n + h1)*(r1/4)) p;
       assert ((h*r) % p == hh % p)
 
-let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:int) (h10:int) (c:int) (hh:int) =
-  admit()
-
+let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) =
+  lemma_div_mod h (n*n);
+  assert (h == (n*n)*h2 + h10);
+  calc(
+    h 
+      &= (n*n)*h2 + h10 &| using (lemma_div_mod h (n*n))
+      &= (n*n)*((h2 / 4) * 4 + h2 % 4) + h10 &| using z3
+      &= h10 + (h2 % 4)*(n*n) + (h2 / 4) * (p+5) &|| 
+					(paren_mul_right (h2/4) 4 (n*n); canon)
+      &= h10 + (h2 % 4)*(n*n) + (h2/4)*5 + p*(h2/4) &|| canon
+      &= h10 + (h2 % 4)*(n*n) + c + p*(h2/4) &| using z3
+      &= hh + p*(h2/4) &| using z3);
+  assume (hh >= 0); // this is provable in this case, but so annoying
+  lemma_mod_plus hh (h2/4) p
+ 
 let lemma_poly_bits64 =
   admit()
 
