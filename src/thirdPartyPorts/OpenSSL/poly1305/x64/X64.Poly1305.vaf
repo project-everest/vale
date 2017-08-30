@@ -988,7 +988,7 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     ghost var len_in := len;
     ghost var key_r0 := mem[ctx + 24];
     ghost var key_r1 := mem[ctx + 32];
-    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
+    //assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
     lemma_poly_bits64();
     //lemma_BitwiseAdd64();
 
@@ -1016,7 +1016,7 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
             0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
     }
-    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
+    //assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
 
     assert{:fast_block} true;
     Mov64(rax, len);
@@ -1028,9 +1028,9 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     Store64(ctx, len, 64);
 
     Mov64(rcx, 1);
-    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
+    //assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // True here
     h := poly1305_blocks(ctx, inp, len, rcx, r8, r9, r10, r0, r1, r13, h0, h1, h2, r, 0, /*n,*/ p);
-    assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // False here
+    //assert validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);     // False here
     assert modp(0) == 0 by
     {
         modp_0();
@@ -1059,13 +1059,13 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
 
     // assert modp(h) == poly1305_hash_blocks(0, nat128_max, r, heapletTo128(mem, inp_in, len_in), inp_in, (inp_in + len_in / 16 * 16));        // True
     // where modp(h) is the spec's hBlocks
-    ghost var hBlocks_raw := h;
-    ghost var nBlocks := len_in / 16;
-    ghost var nExtra := len_in % 16;
-    ghost var padBlocks := nat128_max;
-    ghost var start := inp_in;
-    ghost var amap := heapletTo128(mem, inp_in, len_in);
-    ghost var hBlocks := modp(h);
+//    ghost var hBlocks_raw := h;
+//    ghost var nBlocks := len_in / 16;
+//    ghost var nExtra := len_in % 16;
+//    ghost var padBlocks := nat128_max;
+//    ghost var start := inp_in;
+//    ghost var amap := heapletTo128(mem, inp_in, len_in);
+//    ghost var hBlocks := modp(h);
 //    ghost var hBlocks := poly1305_hash_blocks(0, nat128_max, r, amap, inp_in, (inp_in + len_in / 16 * 16));        
 //    assert hBlocks == poly1305_hash_blocks(0, padBlocks, r, amap, inp_in, inp_in + 16 * nBlocks);
 //    assert r == logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
@@ -1105,24 +1105,24 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
             by { /* reveal heapletTo128; */ reveal_opaque(lowerUpper128); }
         poly1305_last_block(h0, h1, h2, r0, r13, r15, h, r1, r, lowerUpper128_opaque(r8, r9), /*n,*/ p);
         h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
-        ghost var hLast := h;
-        ghost var padLast := pow2(nExtra*8);
-        assert modp(hLast) == modp((modp(hBlocks_raw) + pow2(nExtra*8) + (a % pow2(nExtra*8))) * r);
-        assert modp(hLast) == modp((hBlocks + pow2(nExtra*8) + (a % pow2(nExtra*8))) * r);
-        assert modp(hLast) == modp((hBlocks + padLast + (a % padLast)) * r);
+//        ghost var hLast := h;
+//        ghost var padLast := pow2(nExtra*8);
+//        assert modp(hLast) == modp((modp(hBlocks_raw) + pow2(nExtra*8) + (a % pow2(nExtra*8))) * r);
+//        assert modp(hLast) == modp((hBlocks + pow2(nExtra*8) + (a % pow2(nExtra*8))) * r);
+//        assert modp(hLast) == modp((hBlocks + padLast + (a % padLast)) * r);
     }
 
     lemma_add_mod128(modp(h), key_s);       // Gives us mod2_128(mod2_128(modp(hBlocks_raw)) + key_s) == mod2_128(modp(hBlocks_raw) + key_s)
     poly1305_reduce_last(h0, h1, h2, h);    // Gives us: lowerUpper128_opaque(h0, h1) == mod2_128(modp(hBlocks_raw));
     h := lowerUpper128_opaque(h0, h1);      //           h' := mod2_128(modp(hBlocks));
-    ghost var h_prime := h;
+    //ghost var h_prime := h;
     //assert h_prime == mod2_128(modp(hBlocks_raw));      // True
 
     Load64(rax, ctx, 40);
     Load64(rdx, ctx, 48);
     poly1305_add_key_s(h0, h1, rax, rdx, h, key_s); // Gives us lowerUpper128_opaque(h0, h1) == mod2_128(h_in + key_s);
     h := lowerUpper128_opaque(h0, h1);      // final_h := mod2_128(h' + key_s)
-    ghost var final_h := h;
+    //ghost var final_h := h;
     //assert final_h == mod2_128(h_prime + key_s);  // True
     //             == mod2_128(mod2_128(modp(hBlocks_raw)) + key_s)
     //             == mod2_128(modp(hBlocks_raw) + key_s)               From lemma_add_mod128 above
