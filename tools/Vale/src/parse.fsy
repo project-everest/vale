@@ -202,7 +202,9 @@ OpToken
   | LTEQEQGT { $1 }
 AnyIdOrOp
   : AnyId { $1 }
+/*
   | OPERATOR LPAREN OpToken RPAREN { let (_, (_, s)) = $3 in Operator s }
+*/
 CalcOp
   : LTEQEQGT { BEquiv }
   | EQEQGT { BImply }
@@ -418,12 +420,12 @@ Decl
 /*
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
-*/
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Lets Specs COLONEQ AnyId SEMI
     {
       let (lv, la) = $8 in
       (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; palias = la; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $11])::$2})
     }
+*/
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Lets Specs EXTERN SEMI
     {
       let (lv, la) = $8 in

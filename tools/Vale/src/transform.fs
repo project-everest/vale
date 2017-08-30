@@ -172,71 +172,6 @@ let match_proc_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):((pf
   (List.zip p.prets rets, List.zip p.pargs args)
 
 ///////////////////////////////////////////////////////////////////////////////
-// Resolve overloading
-
-let rec resolve_overload_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
-  let isProcVar x =
-    match Map.tryFind x env.ids with
-    | None -> false
-    | Some (GhostLocal _ | InlineLocal) -> false
-    | Some (ProcLocal _ | ThreadLocal _ | OperandLocal _ | StateInfo _ | OperandAlias _) -> true
-    in
-  let rewriteLhs e =
-    match lhss with
-    | [(x, None)] when isProcVar x ->
-      (
-        match Map.tryFind (Operator ":=") env.procs with
-        | Some {pargs = [(_, _, _, In, _)]; prets = [_]; pattrs = attrs} ->
-            let e = EApply (attrs_get_id (Reserved "alias") attrs, [e]) in
-            resolve_overload_assign env lhss e
-        | Some {pargs = [(_, _, _, Out, _); (_, _, _, In, _)]; prets = []; pattrs = attrs} ->
-            let e = EApply (attrs_get_id (Reserved "alias") attrs, [EVar x; e]) in
-            resolve_overload_assign env [] e
-        | _ -> err ("operator ':=' must be overloaded to assign to variable " + (err_id x))
-      )
-    | _ -> (lhss, e)
-    in
-  match (lhss, e) with
-  | (_, ELoc (loc, e)) ->
-      try let (lhss, e) = resolve_overload_assign env lhss e in (lhss, ELoc (loc, e))
-      with err -> raise (LocErr (loc, err))
-  | ([], EOp (Uop (UCustomAssign op), [e])) ->
-    (
-      match Map.tryFind (Operator op) env.procs with
-      | Some {pargs = [(_, _, _, InOut, _)]; prets = []; pattrs = attrs} ->
-          let e = EApply (attrs_get_id (Reserved "alias") attrs, [e]) in
-          resolve_overload_assign env lhss e
-      | _ -> err ("operator '" + op + "' must be overloaded to use as a postfix operator")
-    )
-  | ([(x, None)], EOp (Uop (UCustomAssign op), [e])) ->
-    (
-      match Map.tryFind (Operator op) env.procs with
-      | Some {pargs = [(_, _, _, InOut, _); (_, _, _, In, _)]; prets = []; pattrs = attrs} ->
-          let e = EApply (attrs_get_id (Reserved "alias") attrs, [EVar x; e]) in
-          resolve_overload_assign env [] e
-      | _ -> err ("operator '" + op + "' must be overloaded to use as an assignment operator")
-    )
-  | (_, EApply(x, es)) ->
-    (
-      match Map.tryFind x env.procs with
-      | None -> rewriteLhs e
-      | Some p -> (lhss, e)
-    )
-  | _ -> rewriteLhs e
-
-let resolve_overload_stmt (env:env) (s:stmt):(env * stmt list) =
-  let rec fs (env:env) (s:stmt):(env * stmt list) map_modify =
-    match s with
-    | SAssign (lhss, e) ->
-        let (lhss, e) = resolve_overload_assign env lhss e in
-        Replace (env, [SAssign (lhss, e)])
-    | _ -> Unchanged
-    in
-  env_map_stmt (fun _ e -> e) fs env s
-let resolve_overload_stmts (env:env) (ss:stmt list):stmt list =
-  List.concat (snd (List_mapFoldFlip resolve_overload_stmt env ss))
-
-///////////////////////////////////////////////////////////////////////////////
 // Propagate variables through state via assumes (if requested)
 
 (*
@@ -751,11 +686,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
       let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
       let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
       let envp = if isRecursive then {envp with procs = Map.add p.pname {p with pspecs = specs} envp.procs} else envp in
-      let resolveBody =
-        match p.pbody with
-        | None -> None
-        | Some ss -> let ss = resolve_overload_stmts envp ss in Some ss
-        in
+      let resolveBody = p.pbody in
       let body =
         match p.pbody with
         | None -> None
@@ -769,7 +700,6 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
               in
             let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
             let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
-            let ss = resolve_overload_stmts envp ss in
             //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
             let ss = rewrite_vars_stmts envp ss in
             Some ss
