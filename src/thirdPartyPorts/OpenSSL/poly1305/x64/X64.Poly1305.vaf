@@ -935,7 +935,7 @@ let modp_0 () : Lemma
 
 let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
-#reset-options "--z3rlimit 50"
+#reset-options "--z3rlimit 100"
 
 #endverbatim
 
@@ -1058,14 +1058,15 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     //  modp(h) == poly1305_hash_blocks 0 nat128_max r (heapletTo128 mem inp_in len_in) inp_in (inp_in + len_in / 16 * 16)
 
     // assert modp(h) == poly1305_hash_blocks(0, nat128_max, r, heapletTo128(mem, inp_in, len_in), inp_in, (inp_in + len_in / 16 * 16));        // True
-    // where h is the spec's hBlocks
+    // where modp(h) is the spec's hBlocks
     ghost var hBlocks_raw := h;
     ghost var nBlocks := len_in / 16;
     ghost var nExtra := len_in % 16;
     ghost var padBlocks := nat128_max;
     ghost var start := inp_in;
     ghost var amap := heapletTo128(mem, inp_in, len_in);
-    ghost var hBlocks := poly1305_hash_blocks(0, nat128_max, r, amap, inp_in, (inp_in + len_in / 16 * 16));        
+    ghost var hBlocks := modp(h);
+//    ghost var hBlocks := poly1305_hash_blocks(0, nat128_max, r, amap, inp_in, (inp_in + len_in / 16 * 16));        
 //    assert hBlocks == poly1305_hash_blocks(0, padBlocks, r, amap, inp_in, inp_in + 16 * nBlocks);
 //    assert r == logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
     reveal_logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
@@ -1090,8 +1091,6 @@ procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
     //assert r15 == len_in % 16;        // True
     if (r15 != 0)
     {
-// TODO
-assume false;
         assert{:fast_block} true;
         Load64(rax, ctx, 32);
         Load64(r8, inp, 0);
@@ -1106,29 +1105,35 @@ assume false;
             by { /* reveal heapletTo128; */ reveal_opaque(lowerUpper128); }
         poly1305_last_block(h0, h1, h2, r0, r13, r15, h, r1, r, lowerUpper128_opaque(r8, r9), /*n,*/ p);
         h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
+        ghost var hLast := h;
+        ghost var padLast := pow2(nExtra*8);
+        assert modp(hLast) == modp((modp(hBlocks_raw) + pow2(nExtra*8) + (a % pow2(nExtra*8))) * r);
+        assert modp(hLast) == modp((hBlocks + pow2(nExtra*8) + (a % pow2(nExtra*8))) * r);
+        assert modp(hLast) == modp((hBlocks + padLast + (a % padLast)) * r);
     }
 
     lemma_add_mod128(modp(h), key_s);       // Gives us mod2_128(mod2_128(modp(hBlocks_raw)) + key_s) == mod2_128(modp(hBlocks_raw) + key_s)
     poly1305_reduce_last(h0, h1, h2, h);    // Gives us: lowerUpper128_opaque(h0, h1) == mod2_128(modp(hBlocks_raw));
     h := lowerUpper128_opaque(h0, h1);      //           h' := mod2_128(modp(hBlocks));
     ghost var h_prime := h;
-    assert h_prime == mod2_128(modp(hBlocks_raw));      // True
+    //assert h_prime == mod2_128(modp(hBlocks_raw));      // True
 
     Load64(rax, ctx, 40);
     Load64(rdx, ctx, 48);
     poly1305_add_key_s(h0, h1, rax, rdx, h, key_s); // Gives us lowerUpper128_opaque(h0, h1) == mod2_128(h_in + key_s);
     h := lowerUpper128_opaque(h0, h1);      // final_h := mod2_128(h' + key_s)
     ghost var final_h := h;
-    assert final_h == mod2_128(h_prime + key_s);  // True
+    //assert final_h == mod2_128(h_prime + key_s);  // True
     //             == mod2_128(mod2_128(modp(hBlocks_raw)) + key_s)
     //             == mod2_128(modp(hBlocks_raw) + key_s)               From lemma_add_mod128 above
     //             == mod2_128(modp(hBlocks_raw) + key_s)               From lemma_add_mod128 above
 
-    assert poly1305_hash(key_r, key_s, heapletTo128(mem, inp_in, len_in), inp_in, len_in)
-        == (hBlocks + key_s) % nat128_max;
-
-    assert (hBlocks + key_s) % nat128_max == mod2_128(hBlocks + key_s) by { reveal_opaque(mod2_128'); }
-    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, inp_in, len_in), inp_in, len_in);
+//    assert poly1305_hash(key_r, key_s, heapletTo128(mem, inp_in, len_in), inp_in, len_in)
+//        == (hBlocks + key_s) % nat128_max;
+//
+//    assert (hBlocks + key_s) % nat128_max == mod2_128(hBlocks + key_s) by { reveal_opaque(mod2_128'); }
+    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, inp_in, len_in), inp_in, len_in)
+        by { reveal_opaque(mod2_128'); reveal_opaque(modp'); }
 //        by { reveal poly1305_hash; }
 }
 
