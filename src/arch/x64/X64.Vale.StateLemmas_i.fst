@@ -11,9 +11,7 @@ let state_to_S (s:state) : S.state = {
   S.ok = s.ok;
   S.regs = (fun r -> S.u (s.regs r));
   S.flags = S.u (int_to_nat64 s.flags);
-  S.mem =
-    (let mappings i = S.u (Map.sel s.mem i) in
-    S.mem_make mappings (Map.domain s.mem));
+  S.mem = s.mem;
 }
 
 let state_of_S (s:S.state) : state =
@@ -21,15 +19,12 @@ let state_of_S (s:S.state) : state =
     ok = ok;
     regs = (fun r -> UInt64.v (regs r));
     flags = UInt64.v flags;
-    mem =
-      (let mappings i = UInt64.v (Map.sel mem i) in
-      S.mem_make mappings (Map.domain mem));
+    mem = mem;
   }
 
 let lemma_to_ok s = ()
 let lemma_to_flags s = ()
-let lemma_to_mem_contains s i = ()
-let lemma_to_mem_sel s i = ()
+let lemma_to_mem s = ()
 let lemma_to_reg s r = ()
 let lemma_to_eval_operand s o = ()
 let lemma_to_valid_operand s o = ()
@@ -44,5 +39,4 @@ let lemma_to_of s =
   let { S.ok = ok; S.regs = regs; S.flags = flags; S.mem = mem } = s in
   let { S.ok = ok''; S.regs = regs''; S.flags = flags''; S.mem = mem'' } = s'' in
   assert (feq regs regs'');
-  assert (Map.equal mem mem'');
   ()

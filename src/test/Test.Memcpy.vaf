@@ -2,34 +2,40 @@ include "../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module Test.Memcpy
+module M = Memory_i_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
-open X64.Vale.StrongPost_i
+//open X64.Vale.StrongPost_i
 #set-options "--z3rlimit 20"
 #endverbatim
 
-/*
-procedure Copy16()
+procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
     requires/ensures
-        rsi + 16 <= rdi;
-        forall i {Map.contains(mem, i)}:: rsi <= i < rsi + 16 && (i - rsi) % 8 == 0 ==> Map.contains(mem, i);
-        forall i {Map.contains(mem, i)}:: rdi <= i < rdi + 16 && (i - rdi) % 8 == 0 ==> Map.contains(mem, i);
+        M.locs_disjoint(list(loc_buffer64(bsrc), loc_buffer64(bdst)));
+        buffer64_readable(mem, bsrc);
+        buffer64_readable(mem, bdst);
+        Seq.length(buffer64_as_seq(mem, bsrc)) == 2;
+        Seq.length(buffer64_as_seq(mem, bdst)) == 2;
+        rsi == buffer_addr(bsrc);
+        rdi == buffer_addr(bdst);
     ensures
-        forall i :: 0 <= i && i < 16 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
+        forall i :: 0 <= i && i < 2 ==>
+            Seq.index(buffer64_as_seq(mem, bdst), i) == Seq.index(buffer64_as_seq(mem, bsrc), i);
+        modifies_mem(loc_buffer64(bdst), old(mem), mem);
     reads
         rsi; rdi;
     modifies
         rax; rbx;
         mem;
 {
-    assert{:fast_block} true;
-    Load64(rax, rsi, 0);
-    Load64(rbx, rsi, 8);
-    Store64(rdi, rax, 0);
-    Store64(rdi, rbx, 8);
+//    assert{:fast_block} true;
+    Load64(rax, rsi, 0, bsrc, 0);
+    Load64(rbx, rsi, 8, bsrc, 1);
+    Store64(rdi, rax, 0, bdst, 0);
+    Store64(rdi, rbx, 8, bdst, 1);
 }
-*/
+
 /*
 procedure Copy64()
     requires/ensures
@@ -62,8 +68,6 @@ procedure Copy64()
     Store64(rdi, rbx, 48);
     Store64(rdi, rcx, 56);
 }
-
-*/
 
 procedure Copy128()
     requires/ensures
@@ -112,3 +116,4 @@ procedure Copy128()
     Load64(rax, rsi, 120);
     Store64(rdi, rax, 120);
 }
+*/

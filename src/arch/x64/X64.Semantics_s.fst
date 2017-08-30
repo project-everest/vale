@@ -2,16 +2,15 @@ module X64.Semantics_s
 
 open FStar.BaseTypes
 open X64.Machine_s
+module M = Memory_i_s
 
 type uint64 = UInt64.t
 
 let map (key:eqtype) (value:Type) = Map.t key value
 
 // syntax for map accesses, m.[key] and m.[key] <- value
-unfold
-let op_String_Access     = Map.sel
-unfold
-let op_String_Assignment = Map.upd
+unfold let op_String_Access     = Map.sel
+unfold let op_String_Assignment = Map.upd
 
 type ins =
   | Mov64      : dst:dst_op -> src:operand -> ins
@@ -37,11 +36,9 @@ type ocmp =
 type code = precode ins ocmp
 type codes = list code
 
-(* TODO: Eventually this should be a map to bytes.  Simplifying for now *)
-type mem = map int uint64
-assume val mem_make (#v:Type0) (mappings:int -> v) (domain:Set.set int) : m:(map int v){
-  Set.equal (Map.domain m) domain /\
-  (forall (i:int).{:pattern (Map.sel m i)} Map.sel m i == mappings i)}
+//assume val mem_make (#v:Type0) (mappings:int -> v) (domain:Set.set int) : m:(map int v){
+//  Set.equal (Map.domain m) domain /\
+//  (forall (i:int).{:pattern (Map.sel m i)} Map.sel m i == mappings i)}
 
 noeq type state = {
   ok: bool;
@@ -54,7 +51,7 @@ let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
 assume val havoc : state -> ins -> uint64
 
 unfold let eval_reg (r:reg) (s:state) : uint64 = s.regs r
-unfold let eval_mem (ptr:int) (s:state) : uint64 = s.mem.[ptr]
+unfold let eval_mem (ptr:int) (s:state) : uint64 = UInt64.uint_to_t (load_mem64 ptr s.mem)
 
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.UInt64 in
@@ -73,10 +70,11 @@ let eval_operand (o:operand) (s:state) : uint64 =
 let update_reg' (r:reg) (v:uint64) (s:state) : state =
   { s with regs = fun r' -> if r' = r then v else s.regs r' }
 
-let update_mem (ptr:int) (v:uint64) (s:state) : state = { s with mem = s.mem.[ptr] <- v }
+let update_mem (ptr:int) (v:uint64) (s:state) : state =
+  { s with mem = store_mem64 ptr (UInt64.v v) s.mem }
 
 let valid_maddr (m:maddr) (s:state) : bool =
-  s.mem `Map.contains` (eval_maddr m s)
+  valid_mem64 (eval_maddr m s) s.mem
 
 let valid_operand (o:operand) (s:state) : bool =
   match o with
@@ -87,7 +85,7 @@ let valid_operand (o:operand) (s:state) : bool =
 let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) : state =
   match o with
   | OReg r -> update_reg' r v s
-  | OMem m -> update_mem (eval_maddr m s) v s
+  | OMem m -> update_mem (eval_maddr m s) v s // see valid_maddr for how eval_maddr connects to b and i
 
 let update_operand' (o:dst_op) (ins:ins) (v:uint64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }

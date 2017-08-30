@@ -1,5 +1,6 @@
 #verbatim interface
 module X64.Vale.Decls
+module M = Memory_i_s
 
 // This interface should hide all of Semantics_s.
 // (It should not refer to Semantics_s, directly or indirectly.)
@@ -32,6 +33,19 @@ unfold let va_shift_amt = operand
 unfold let va_cmp = operand
 unfold let va_register = reg
 
+(* Abbreviations *)
+unfold let buffer64_readable (m:mem) (b:buffer64) : GTot Type0 = M.buffer_readable m b
+unfold let buffer64_as_seq (m:mem) (b:buffer64) : GTot (Seq.seq nat64) = M.buffer_as_seq m b
+unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
+unfold let valid_src_addr (m:mem) (b:buffer64) (i:int) : Type0 =
+  0 <= i /\ i < Seq.length (buffer64_as_seq m b) /\ buffer64_readable m b
+unfold let valid_dst_addr (m:mem) (b:buffer64) (i:int) : Type0 =
+  0 <= i /\ i < Seq.length (buffer64_as_seq m b) /\ buffer64_readable m b
+unfold let buffer64_read (b:buffer64) (i:int) (m:mem) : nat64 = M.buffer_read b i m
+unfold let buffer64_write (b:buffer64) (i:int) (v:nat64) (m:mem) : mem = M.buffer_write b i v m
+unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
+unfold let loc_buffer64 (b:buffer64) : GTot M.loc = M.loc_buffer b
+
 (* Constructors *)
 unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
 unfold let va_const_operand (n:int) = OConst n
@@ -51,25 +65,22 @@ unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 
 (* Predicates *)
 unfold let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
-unfold let va_is_dst_operand_uint64 (o:operand) (s:va_state) = valid_dst o
-unfold let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = valid_operand o s
+let va_is_dst_operand_uint64 (o:operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
+let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
 unfold let va_is_src_register_int (r:reg) (s:va_state) = True
 unfold let va_is_dst_register (r:reg) (s:va_state) = True
 unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = True
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
-unfold let valid_src_addr (m:mem) (addr:int) : bool = m `Map.contains` addr
-unfold let valid_dst_addr (m:mem) (addr:int) : bool = m `Map.contains` addr 
 
 (* Getters *)
 unfold let va_get_ok (s:va_state) : bool = s.ok
 unfold let va_get_flags (s:va_state) : int = s.flags
 unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
 unfold let va_get_mem (s:va_state) : mem = s.mem
-unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
-unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state  = { sK with ok = sM.ok }
-unfold let va_update_flags  (sM:va_state) (sK:va_state) : va_state  = { sK with flags = sM.flags }
+unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
+unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
 
 unfold
 let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
@@ -306,28 +317,38 @@ procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst
 procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64(
     out dst_operand dst:uint64,
         reg_operand src:uint64,
-        inline offset:int)
+        inline offset:int,
+        ghost b:buffer64,
+        ghost index:int)
     reads
         mem;
     requires
-        valid_src_addr(mem, src + offset);
+        valid_src_addr(mem, b, index);
+        src + offset == buffer_addr(b) + 8 * index;
     ensures
-        dst == mem[old(src) + offset];
+        dst == buffer64_read(b, index, mem);
 {
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
 }
 
 procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store64(
         reg_operand dst:uint64,
         operand src:uint64,
-        inline offset:int)
+        inline offset:int,
+        ghost b:buffer64,
+        ghost index:int)
     modifies
         mem;
     requires
-        valid_dst_addr(mem, dst + offset);
+        valid_dst_addr(mem, b, index);
+        dst + offset == buffer_addr(b) + 8 * index;
     ensures
-        mem == old(mem[dst + offset := src]);
+        modifies_mem(loc_buffer64(b), old(mem), mem);
+        mem == old(buffer64_write(b, index, src, mem));
 {
-    assert Map.equal(mem, old(mem[dst + offset := src]));
+    lemma_valid_mem64(b, index, old(mem));
+    lemma_store_mem64(b, index, old(src), old(mem));
 }
 
 procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst_operand dst:uint64, operand src:uint64)
