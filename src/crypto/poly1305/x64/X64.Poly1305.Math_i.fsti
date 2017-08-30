@@ -102,9 +102,8 @@ val lemma_mod_hi : x0:nat64 -> x1:nat64 -> z:nat64 -> Lemma
     lowerUpper128 0 z <> 0 /\
     (lowerUpper128 x0 x1) % (lowerUpper128 0 z) == lowerUpper128 x0 (x1 % z))
 
-val lemma_poly_demod : p:int -> h:int -> x:int -> r:int -> Lemma
-  (requires p > 0)
-  (ensures p > 0 /\ ((h % p + x) * r) % p == ((h + x) * r) % p)
+val lemma_poly_demod : p:pos -> h:int -> x:int -> r:int -> Lemma
+  (((h % p + x) * r) % p == ((h + x) * r) % p)
 
 val lemma_reduce128 : h:int -> h2:nat64 -> h1:nat64 -> h0:nat64 -> g:int -> g2:nat64 -> g1:nat64 -> g0:nat64 -> Lemma
   (requires h2 < 5 /\
