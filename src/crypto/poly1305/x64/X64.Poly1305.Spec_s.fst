@@ -53,7 +53,7 @@ let poly1305_hash_hblocks (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start
   let nBlocks = len / 16 in
   let nExtra = len % 16 in
   let padBlocks = nat128_max in
-  let hBlocks = poly1305_hash_blocks 0 padBlocks r inp start start + 16 * nBlocks in
+  let hBlocks = poly1305_hash_blocks 0 padBlocks r inp start (start + 16 * nBlocks) in
   hBlocks
 
 let poly1305_hash (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
@@ -61,7 +61,7 @@ let poly1305_hash (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (l
   let nBlocks = len / 16 in
   let nExtra = len % 16 in
   let padBlocks = nat128_max in
-  let hBlocks = poly1305_hash_blocks 0 padBlocks r inp start start + 16 * nBlocks in
+  let hBlocks = poly1305_hash_blocks 0 padBlocks r inp start (start + 16 * nBlocks) in
   if nExtra = 0 then
     (hBlocks + key_s) % nat128_max
   else
