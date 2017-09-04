@@ -46,10 +46,7 @@ method{:main} Main(ghost env:HostEnvironment)
     printHeader(asm_choice);
     var win := (platform_choice == Win);
 
-    printProcPlatform("poly1305",
-        va_code_poly1305(win, OReg(X86Edi), OReg(X86Esi), OReg(X86Edx), OReg(X86R11), OReg(X86R12),
-            OReg(X86R14), OReg(X86Ebx), OReg(X86Ebp)),
-        0, 0, asm_choice, platform_choice);
+    printProcPlatform("poly1305", va_code_poly1305(win), 0, 0, asm_choice, platform_choice);
 
     printFooter(asm_choice);
 }

@@ -16,17 +16,6 @@ import opened heaplets_i
 import opened operations_i
 #endverbatim
 
-#token += precedence :=
-#token &= precedence :=
-#token ^= precedence :=
-#token ~= precedence :=
-
-procedure operator(:=) (out operand dst:int, operand src:int) := Mov32;
-procedure operator(+=) (inout operand dst:int, operand src:int) := Add32Wrap;
-procedure operator(&=) (inout operand dst:int, operand src:int) := And32;
-procedure operator(^=) (inout operand dst:int, operand src:int) := Xor32;
-procedure operator(~=) (inout operand dst:int) := Not32;   // Usage awaits the ability to say: edx ~= edx.
-
 procedure {:refined} {:timeLimitMultiplier 2} ComputeOneStep_SHA256_core(
   inline offset:uint32,
   inline K:uint32,    // Round constant
@@ -94,78 +83,66 @@ procedure {:refined} {:timeLimitMultiplier 2} ComputeOneStep_SHA256_core(
   ghost var g := stack[0][offset + 5];
   ghost var h := stack[0][offset + 6];
 
-  eax := ebp;
+  Mov32(eax, ebp);
   StoreStack(7 - offset, eax);     // b_final := a
   LoadStack(ebx, offset);          // b
   StoreStack(8 - offset, ebx);     // c_final := b
   LoadStack(ecx, offset + 1);   // c
   StoreStack(9 - offset, ecx);     // d_final := c
-  edx    := ebx;
+  Mov32(edx, ebx);
 
   lemma_BitwiseCommutative(ebx, eax);
-  ebx &= eax; // b & a
-  edx &= ecx; // b & c
+  And32(ebx, eax); // b & a
+  And32(edx, ecx); // b & c
   lemma_BitwiseCommutative(ecx, eax);
-  ecx &= eax; // c & a
-  ebx ^= ecx;
-  ebx ^= edx; // my_maj
-  forall :: ebx == Maj(a, b, c)
-  {
-    reveal_Maj();
-  }
+  And32(ecx, eax); // c & a
+  Xor32(ebx, ecx);
+  Xor32(ebx, edx); // my_maj
+  assert ebx == Maj(a, b, c) by { reveal_Maj(); }
   //    After above block, live: 
   //    eax == a
   //    ebx == my_maj
 
   // Calculate bsig0
-  ecx := eax;
-  edx := eax;
+  Mov32(ecx, eax);
+  Mov32(edx, eax);
   Ror32(eax, 2);
   Ror32(ecx, 13);
-  eax ^= ecx;
+  Xor32(eax, ecx);
   Ror32(edx, 22);
-  eax ^= edx;   // == bsig0
-  forall :: eax == BSIG0(a)
-  {
-    reveal_BSIG0();
-  }
-  eax += ebx; // == T2
+  Xor32(eax, edx);   // == bsig0
+  assert eax == BSIG0(a) by { reveal_BSIG0(); }
+  Add32Wrap(eax, ebx); // == T2
 
   // Calculate my_ch
   LoadStack(ebx, offset + 3);  // e
   StoreStack(11 - offset, ebx);    // f_final := e
-  edx    := ebx;
+  Mov32(edx, ebx);
   Not32(edx);
   LoadStack(ecx, offset + 5);  // g
   StoreStack(13 - offset, ecx);    // h_final := g
-  edx    &= ecx; // !e & g
+  And32(edx, ecx); // !e & g
   LoadStack(ecx, offset + 4);  // f
   StoreStack(12 - offset, ecx);    // g_final := f
   lemma_BitwiseCommutative(ecx, ebx);
-  ecx    &= ebx; // f & e  // Need commutativity
+  And32(ecx, ebx); // f & e  // Need commutativity
   lemma_BitwiseCommutative(ecx, edx);
-  ecx    ^= edx; // my_ch  // Need commutativity
-  forall :: ecx == Ch(e, f, g)
-  {
-    reveal_Ch();
-  }
+  Xor32(ecx, edx); // my_ch  // Need commutativity
+  assert ecx == Ch(e, f, g) by { reveal_Ch(); }
   //    After above block, live: 
   //      eax == T2
   //      ebx == e
   //      ecx == my_ch
 
   // Calculate bsig1
-  edx := ebx;
-  edi := ebx;
+  Mov32(edx, ebx);
+  Mov32(edi, ebx);
   Ror32(edx, 6);
   Ror32(edi, 11);
-  edx ^= edi;
+  Xor32(edx, edi);
   Ror32(ebx, 25);
-  edx ^= ebx;   // == bsig1
-  forall :: edx == BSIG1(e)
-  {
-    reveal_BSIG1();
-  }
+  Xor32(edx, ebx);   // == bsig1
+  assert edx == BSIG1(e) by  { reveal_BSIG1(); }
   //    After above block, live: 
   //      eax == T2
   //      ecx == my_ch
@@ -173,16 +150,16 @@ procedure {:refined} {:timeLimitMultiplier 2} ComputeOneStep_SHA256_core(
 
   // Calculate T1
   LoadStack(ebx, offset + 6);      // h
-  ebx += edx; // Frees edx
-  ebx += ecx; // Frees ecx
+  Add32Wrap(ebx, edx); // Frees edx
+  Add32Wrap(ebx, ecx); // Frees ecx
   Add32Wrap(ebx, K);
   Load(ecx, esi, W_offset, W_taint, W_id);
-  ebx += ecx; // T1
+  Add32Wrap(ebx, ecx); // T1
   lemma_BitwiseAdd32Commutative(eax, ebx);
-  eax += ebx; // T2 + T1 == a_final
-  ebp := eax;    // a_final := eax
+  Add32Wrap(eax, ebx); // T2 + T1 == a_final
+  Mov32(ebp, eax);    // a_final := eax
   LoadStack(eax, offset + 2);    // d
-  eax += ebx; // d + T1
+  Add32Wrap(eax, ebx); // d + T1
   StoreStack(10 - offset, eax);   // e_final := eax
 
   // OBSERVE: Triggers
@@ -640,30 +617,30 @@ procedure {:refined} SHA256_ComputeInitialWs_bitwise(
     reveal_SSIG0();
     reveal_SSIG1();
     Load(eax, esi, 4*(t+14), taint, W_id);
-    ebx := eax;
-    ecx := eax;
+    Mov32(ebx, eax);
+    Mov32(ecx, eax);
     Ror32(ebx, 17);
     Ror32(ecx, 19);
-    ebx ^= ecx;
+    Xor32(ebx, ecx);
     Shr32(eax, 10);
-    ebx ^= eax; // ebx == SSIG1(W[t-2])
+    Xor32(ebx, eax); // ebx == SSIG1(W[t-2])
 
     Load(edx, esi, 4*(t+9), taint, W_id);
     lemma_BitwiseAdd32Commutative(edx, ebx);
-    edx += ebx; // edx == W[t-7] + SSIG1(W[t-2])
+    Add32Wrap(edx, ebx); // edx == W[t-7] + SSIG1(W[t-2])
 
     Load(eax, esi, 4*(t+1), taint, W_id);
-    ebx := eax;
-    ecx := eax;
+    Mov32(ebx, eax);
+    Mov32(ecx, eax);
     Ror32(ebx, 7);
     Ror32(ecx, 18);
-    ebx ^= ecx;
+    Xor32(ebx, ecx);
     Shr32(eax, 3);
-    ebx ^= eax; // ebx == SSIG0(W[t-15])
-    edx += ebx;
+    Xor32(ebx, eax); // ebx == SSIG0(W[t-15])
+    Add32Wrap(edx, ebx);
 
     Load(eax, esi, 4*t, taint, W_id);
-    edx += eax; // edx == W[t-7] + SSIG1(W[t-2]) + SSIG0(W[t-15]) + W[t-16]
+    Add32Wrap(edx, eax); // edx == W[t-7] + SSIG1(W[t-2]) + SSIG0(W[t-15]) + W[t-16]
 
     Store(esi, edx, 4*(t+16), taint, W_id);
 }

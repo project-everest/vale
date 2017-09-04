@@ -162,7 +162,7 @@ procedure poly1305_multiply(
 }
 
 procedure poly1305_multiply_regs(ghost r1:nat64) returns(ghost hh:int)
-    let
+    lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := nat64_max;
         p := n * n * 4 - 5;
@@ -247,7 +247,7 @@ procedure poly1305_multiply_regs(ghost r1:nat64) returns(ghost hh:int)
 }
 
 procedure poly1305_multiply_fast_block(ghost r1:nat64) returns(ghost hh:int)
-    let
+    lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := nat64_max;
         p := n * n * 4 - 5;
@@ -913,17 +913,16 @@ procedure poly1305_add_key_s(
 
 // TODO: Procedure was consistently sending Z3 into the woods when frame was true
 procedure{:timeLimitMultiplier 2} {:frame false} poly1305_impl(
-          reg_operand ctx:uint64,
+//          reg_operand ctx:uint64,
     ghost key_r:nat128,
-    ghost key_s:nat128,
-    ghost p:int)
+    ghost key_s:nat128)
 //    ghost ctx_id:heaplet_id,
 //    ghost inp_id:heaplet_id)
     returns(ghost h:int)
-    let ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
+    lets
+        ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := nat64_max;
         p := n * n * 4 - 5;
-
     requires/ensures
         ok;
     modifies

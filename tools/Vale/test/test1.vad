@@ -105,18 +105,23 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
 }
 
 procedure Ifs(inline i:int, ghost g:int)
-    let
+    lets
         g1 := g + 1;
         a @= eax;
+    requires
+        g != 0;
+    lets
+        gdiv := 100 / g;
         b @= ebx;
         g2 := g1 + 1;
         g3 := a;
     modifies
-        eax; ebx;
+        eax; b;
     requires
         g < eax;
         g < a;
         g2 == g + 2;
+        gdiv != 7;
     ensures
         i < 10 ==> eax == old(eax) + i;
         1 <= ebx <= 3;
