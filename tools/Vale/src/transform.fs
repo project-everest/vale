@@ -31,6 +31,7 @@ type env =
     raw_procs:Map<id, proc_decl>;
     ids:Map<id, id_info>;
     mods:Map<id, bool>;
+    lets:(loc * lets) list
     state:exp;
     abstractOld:bool; // if true, x --> va_old_x in abstract lemma
     checkMods:bool;
@@ -43,6 +44,7 @@ let empty_env:env =
     raw_procs = Map.empty;
     ids = Map.empty;
     mods = Map.empty;
+    lets = [];
     state = EVar (Reserved "s");
     abstractOld = false;
     checkMods = false;
@@ -83,6 +85,14 @@ let stmts_abstract (useOld:bool) (ss:stmt list):stmt list =
 let stmts_refined (ss:stmt list):stmt list =
   map_stmts exp_refined (fun _ -> Unchanged) ss
 
+let make_operand_alias (x:id) (env:env) =
+  if not (Map.containsKey x env.ids) then err ("cannot find declaration of '" + (err_id x) + "'") else
+  let info = Map.find x env.ids in
+  match info with
+  | OperandLocal _ | StateInfo _ | OperandAlias _ -> OperandAlias (x, info)
+  | GhostLocal _ | ProcLocal _ | ThreadLocal _ | InlineLocal _ ->
+      err ("'" + (err_id x) + "' must be an operand or state member")
+
 let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
   map_apply_modify (f env e) (fun () ->
     let r = env_map_exp f env in
@@ -92,7 +102,14 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
     | EBind (b, es, fs, ts, e) ->
         let es = List.map r es in
-        let env = {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids fs} in
+        let env =
+          match (b, List.map (exp_abstract false) es, fs) with
+          | (BindAlias, [EVar y], [(x, t)]) ->
+              {env with ids = Map.add x (make_operand_alias y env) env.ids}
+          | (BindAlias, _, _) -> internalErr (sprintf "BindAlias %A %A" es fs)
+          | (_, _, _) ->
+              {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids fs}
+          in
         let r = env_map_exp f env in
         EBind (b, es, fs, List.map (List.map r) ts, r e)
     | EOp (Uop UOld, [e]) ->
@@ -134,8 +151,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
         ({env with ids = ids}, [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
       )
     | SAlias (x, y) ->
-        if not (Map.containsKey y env.ids) then err ("cannot find declaration of '" + (err_id y) + "'") else
-        let ids = Map.add x (OperandAlias (y, Map.find y env.ids)) env.ids in
+        let ids = Map.add x (make_operand_alias y env) env.ids in
         ({env with ids = ids}, [SAlias (x, y)])
     | SAssign (xs, e) ->
         let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal (Mutable, t)) ids) env.ids xs in
@@ -163,6 +179,34 @@ and env_map_calc_contents (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt 
 let env_next_stmt (env:env) (s:stmt):env =
   let (env, _) = env_map_stmt (fun _ e -> e) (fun _ _ -> Unchanged) env s in
   env
+
+let env_map_spec (fe:env -> exp -> exp) (fs:env -> loc * spec -> (env * (loc * spec) list) map_modify) (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) =
+  map_apply_modify (fs env (loc, s)) (fun () ->
+    let fee = fe env in
+    match s with
+    | Requires (r, e) -> (env, [(loc, Requires (r, fee e))])
+    | Ensures (r, e) -> (env, [(loc, Ensures (r, fee e))])
+    | Modifies (b, e) -> (env, [(loc, Modifies (b, fee e))])
+    | SpecRaw (RawSpec _) -> internalErr "SpecRaw"
+    | SpecRaw (Lets ls) ->
+        let map_let env (loc, l) =
+          match l with
+          | LetsVar (x, t, e) ->
+              let ids = Map.add x (GhostLocal (Immutable, t)) env.ids in
+              let env = {env with ids = ids; lets = (loc, l)::env.lets} in
+              (env, [(loc, LetsVar (x, t, fee e))])
+          | LetsAlias (x, y) ->
+              let ids = Map.add x (make_operand_alias y env) env.ids in
+              let env = {env with ids = ids; lets = (loc, l)::env.lets} in
+              (env, [(loc, l)])
+        in
+        let (env, ls) = List_mapFoldFlip map_let env ls in
+        let ls = List.concat ls in
+        (env, [(loc, SpecRaw (Lets ls))])
+  )
+let env_map_specs (fe:env -> exp -> exp) (fs:env -> loc * spec -> (env * (loc * spec) list) map_modify) (env:env) (specs:(loc * spec) list):(env * (loc * spec) list) =
+  let (env, specs) = List_mapFoldFlip (env_map_spec fe fs) env specs in
+  (env, List.concat specs)
 
 let match_proc_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):((pformal * lhs) list * (pformal * exp) list) =
   let (nap, nac) = (List.length p.pargs, List.length args) in
@@ -532,11 +576,63 @@ let rewrite_vars_stmt (env:env) (s:stmt):(env * stmt list) =
 let rewrite_vars_stmts (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip rewrite_vars_stmt env ss))
 
+// Turn SpecRaw into Requires/Ensures/Modifies
+// Compute env.lets
+// Remove Lets from specs (replace with local let expressions)
+// Directly substitute LetsAlias into Modifies (because we don't have let expressions for modifies)
+let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_modify =
+  match s with
+  | Requires _ | Ensures _ | Modifies _ -> internalErr "desugar_spec"
+  | SpecRaw (RawSpec (r, es)) ->
+    (
+      let es = exps_of_spec_exps es in
+      let let_of_lets (old:bool) (loc:loc, l:lets):(loc * bindOp * formal * exp) =
+        let fOld old e = if old then EOp (Uop UOld, [e]) else e in
+        match l with
+        | LetsVar (x, t, e) -> (loc, BindLet, (x, t), fOld old e)
+        | LetsAlias (x, y) -> (loc, BindAlias, (x, None), EVar y)
+        in
+      let applyLets old =
+        match env.lets with
+        | [] -> es
+        | lets ->
+            let e = and_of_list (List.map snd es) in
+            let lets = List.map (let_of_lets old) lets in
+            let addLet e (loc, bind, (x, t), ee) = ELoc (loc, EBind (bind, [ee], [(x, t)], [], e)) in
+            let e = List.fold addLet e lets in
+            [(loc, e)]
+        in
+      let reqs refined = List_mapSnd (fun e -> Requires (refined, e)) (applyLets false) in
+      let enss refined = List_mapSnd (fun e -> Ensures (refined, e)) (applyLets true) in
+      match r with
+      | RRequires refined -> Replace (env, reqs refined)
+      | REnsures refined -> Replace (env, enss refined)
+      | RRequiresEnsures -> Replace (env, (reqs Refined) @ (enss Refined))
+      | RModifies m ->
+          let rewrite env e =
+            match e with
+            | EVar x when Map.containsKey x env.ids ->
+              (
+                let rec f x info =
+                  match info with
+                  | OperandAlias (x, info) -> f x info
+                  | _ -> Replace (EVar x)
+                  in
+                f x (Map.find x env.ids)
+              )
+            | _ -> Unchanged
+            in
+          let mods m = List_mapSnd (fun e -> Modifies (m, env_map_exp rewrite env e)) es in
+          Replace (env, mods m)
+    )
+  | SpecRaw (Lets _) -> PostProcess (fun (env, _) -> (env, []))
+  
 let rewrite_vars_spec (envIn:env) (envOut:env) (s:spec):spec =
   match s with
-  | Requires e -> Requires (rewrite_vars_exp envIn e)
-  | Ensures e -> Ensures (rewrite_vars_exp envOut e)
+  | Requires (r, e) -> Requires (r, rewrite_vars_exp envIn e)
+  | Ensures (r, e) -> Ensures (r, rewrite_vars_exp envOut e)
   | Modifies (m, e) -> Modifies (m, rewrite_vars_exp envOut e)
+  | SpecRaw _ -> internalErr "rewrite_vars_spec"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Add extra asserts for p's ensures clauses and for called procedures' requires clauses,
@@ -561,8 +657,8 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
   let rec fs (loc:loc) (s:stmt):stmt list map_modify =
     let reqAssert (f:exp -> exp) (loc, spec) =
       match spec with
-      | Requires (EOp (Uop UUnrefinedSpec, _)) -> []
-      | Requires e -> [SLoc (loc, SAssert (assert_attrs_default, f e))]
+      | Requires (Unrefined, _) -> []
+      | Requires (Refined, e) -> [SLoc (loc, SAssert (assert_attrs_default, f e))]
       | _ -> []
       in
     let rec assign e =
@@ -618,8 +714,8 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     }
     *)
     match s with
-    | Ensures (EOp (Uop UUnrefinedSpec, _)) -> []
-    | Ensures e -> [hideResults [SLoc (loc, SAssert (assert_attrs_default, e))]]
+    | Ensures (Unrefined, _) -> []
+    | Ensures (Refined, e) -> [hideResults [SLoc (loc, SAssert (assert_attrs_default, e))]]
     | _ -> []
     in
   let ensStmts = List.collect ensStmt p.pspecs in
@@ -647,7 +743,9 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
       let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
       let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
       let ok = EVar (Id "ok") in
-      let okSpecs = [(loc, Requires ok); (loc, Ensures ok); (loc, Modifies (true, ok))] in
+      let okMod = SpecRaw (RawSpec (RModifies true, [(loc, SpecExp ok)])) in
+      let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
+      let okSpecs = [(loc, okMod); (loc, okReqEns)] in
       let pspecs = if isRefined || isFrame then okSpecs @ p.pspecs else p.pspecs in
       let addParam isRet ids (x, t, g, io, a) =
         match g with
@@ -658,12 +756,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
         | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
         | XGhost -> Map.add x (GhostLocal ((if isRet then Mutable else Immutable), Some t)) ids
         in
-      let addPAlias ids (x, y) =
-        if not (Map.containsKey y ids) then err ("cannot find declaration of '" + (err_id y) + "'") else
-        Map.add x (OperandAlias (y, Map.find y ids)) ids
-        in
-      let mods = List.collect (fun (loc, s) -> match s with Modifies (modifies, e) -> [(loc, modifies, e)] | _ -> []) pspecs in
-      let mod_id (loc, modifies, e) =
+      let mod_id (env:env) (loc, modifies, e) =
         let mod_err () = err "expression in modifies clause must be a variable declared as var{:state f(...)} x:t;"
         loc_apply loc e (fun e ->
           match e with
@@ -676,16 +769,51 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             )
           | _ -> mod_err ())
         in
+      // parameters, return values, lets must all be unique
+      let xArgsRets = List.map (fun (x, _, _, _, _) -> x) (p.pargs @ p.prets) in
+      let specs = List.collect (fun (loc, s) -> match s with SpecRaw s -> [(loc, s)] | _ -> internalErr "!SpecRaw") pspecs in
+      let lets = List.collect (fun (_, s) -> match s with (Lets ls) -> ls | _ -> []) specs in
+      let xLets = List.map (fun (_, s) -> match s with LetsVar (x, _, _) | LetsAlias (x, _) -> x) lets in
+      let rec checkUnique xs xset =
+        match xs with
+        | [] -> ()
+        | x::xs ->
+            if Set.contains x xset then err ("'" + (err_id x) + "' declared twice") else
+            checkUnique xs (Set.add x xset)
+        in
+      checkUnique (xArgsRets @ xLets) (Set.empty);
       let envpIn = env in
-      let envpIn = {envpIn with mods = Map.ofList (List.map mod_id mods)} in
-      let envpIn = {envpIn with ids = List.fold (addParam false) env.ids p.pargs} in
-      let envpIn = {envpIn with ids = List.fold addPAlias envpIn.ids p.palias} in
-      let envp = {envpIn with ids = List.fold (addParam true) envpIn.ids p.prets} in
-      let envp = {envp with checkMods = isRefined || isFrame} in
+      // Add parameters to env for both requires and ensures.
+      // For ensures, add return values to env.
+      // For requires, remove return values from env -- for each return value named x, remove any
+      // globals named x, so that requires and ensures don't see two different x variables.
+      // This makes it sane to share "lets" declarations between requires and ensures.
+      let envpIn = {envpIn with ids = List.fold (addParam false) envpIn.ids p.pargs} in
+      let envpIn = {envpIn with ids = List.fold (fun ids (x, _, _, _, _) -> Map.remove x ids) envpIn.ids p.prets} in
+      // Desugar specs and update p so other procedures see desugared version
+      let (envDesugar, pspecs) = env_map_specs (fun _ e -> e) desugar_spec envpIn pspecs in
+      let lets = List.rev envDesugar.lets in
+      let bodyLet (loc:loc, l:lets) =
+        match l with
+        | LetsVar (x, t, e) -> SLoc (loc, SVar (x, t, Immutable, XGhost, [], Some e))
+        | LetsAlias (x, y) -> SLoc (loc, SAlias (x, y))
+        in
+      let bodyLets = List.map bodyLet lets in
+      let body = mapOpt (fun ss -> bodyLets @ ss) p.pbody in
+      let pReprint = p in
+      let p = {p with pbody = body; pspecs = pspecs} in
+      // Compute mods list and final environment for body
+      let mods = List.collect (fun (loc, s) -> match s with Modifies (m, e) -> [(loc, m, e)] | _ -> []) pspecs in
+      let envpIn = {envpIn with mods = Map.ofList (List.map (mod_id envpIn) mods)} in
       let envpIn = {envpIn with abstractOld = true} in
-      let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
+      let envp = envpIn in
+      let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
+      let envp = {envp with checkMods = isRefined || isFrame} in
+      let envp = {envp with abstractOld = false} in
       let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
       let envp = if isRecursive then {envp with procs = Map.add p.pname {p with pspecs = specs} envp.procs} else envp in
+      let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
+      // Process body
       let resolveBody = p.pbody in
       let body =
         match p.pbody with
@@ -704,7 +832,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             let ss = rewrite_vars_stmts envp ss in
             Some ss
         in
-      (env, DProc {p with pbody = resolveBody}, DProc {p with pbody = body; pspecs = specs})
+      (env, DProc pReprint, DProc {p with pbody = body; pspecs = specs})
     )
   | _ -> (env, d, d)
 

@@ -15,6 +15,16 @@ let lexbufOpt = ref (None:LexBuffer<byte> option)
 let dafny_opts_rev = ref []
 
 let main (argv) =
+  let in_files_rev = ref ([]:(string * bool) list) in
+  let includes_rev = ref ([]:string list) in
+  let suffixMap_rev = ref ([]:(string * string) list) in
+  let sourceDir = ref "." in
+  let destDir = ref "." in
+  let outfile = ref (None:string option) in
+  let dafnyDirect = ref false in
+  let emitFStarText = ref false in
+  let arg_list = argv |> Array.toList in
+  let debug_flags = ref (Set.empty:Set<string>) in
   let print_error_loc locOpt =
     match locOpt with
     | None -> printfn "\nerror:"
@@ -27,11 +37,13 @@ let main (argv) =
     in
   let rec print_error locOpt e =
     match e with
-    | LocErr (loc, e) -> print_error (Some loc) e
+    | (LocErr (loc, e)) as x ->
+        if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; print_error_loc locOpt; printfn "%s" (x.ToString ())
+        print_error (Some loc) e
     | (Err s) as x ->
         print_error_loc locOpt
         printfn "%s" s
-        //print_endline ""; print_endline "internal details:"; print_endline (x.ToString ());
+        if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; printfn "%s" (x.ToString ());
         exit 1
     | (InternalErr s) as x ->
         print_error_loc locOpt
@@ -47,16 +59,6 @@ let main (argv) =
     in
   try
   (
-    let in_files_rev = ref ([]:(string * bool) list) in
-    let includes_rev = ref ([]:string list) in
-    let suffixMap_rev = ref ([]:(string * string) list) in
-    let sourceDir = ref "." in
-    let destDir = ref "." in
-    let outfile = ref (None:string option) in
-    let dafnyDirect = ref false in
-    let emitFStarText = ref false in
-    let arg_list = argv |> Array.toList in
-    let debug_flags = ref (Set.empty:Set<string>) in
     let parse_argv (args:string list) =
       let rec match_args (arg_list:string list) =
         match arg_list with

@@ -192,8 +192,8 @@ INCLUDE ::= include "STRING"
 DECL ::=
   | <a href="#state">var</a> x : TYPE ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> LETS SPECS { STMTS }
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> LETS SPECS extern ;
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
@@ -213,19 +213,18 @@ PRETS ::= PRET , ... , PRET
   | ghost x : TYPE
   | TYPE x : TYPE
 
-LETS ::= LET ... LET
-LET ::= let LETBIND ; ... LETBIND ;
-LETBIND ::=
-  | FORMAL := EXP
-  | x1 @= x2
-
 SPECS ::= SPEC ... SPEC
 SPEC ::=
   | reads x ; ... ; x ;
   | modifies x ; ... ; x ;
+  | lets LETBIND ; ... LETBIND ;
   | requires LEXP ; ... LEXP ;
   | ensures LEXP ; ... LEXP ;
   | requires / ensures LEXP ; ... LEXP ;
+
+LETBIND ::=
+  | FORMAL := EXP
+  | x1 @= x2
 
 LEXP ::=
   | EXP
@@ -358,11 +357,10 @@ procedures p(ghost x:int) returns(ghost y:int)
 
 
 
-let x @= eax; y @= ebx; z := 3 + 3;
 
 
 
-
+lets x @= eax; y @= ebx; z := 3 + 3;
 
 
 

@@ -17,7 +17,7 @@ type formal = id * typ option
 type uop = 
 | UNot | UNeg | UOld | UIs of id
 | UConst
-| UReveal | UGhostOnly | UToOperand | UUnrefinedSpec
+| UReveal | UGhostOnly | UToOperand
 | UCustom of string | UCustomAssign of string
 
 type bop =
@@ -48,7 +48,8 @@ type bindOp =
 | Forall
 | Exists
 | Lambda
-| BindLet
+| BindLet // x := e
+| BindAlias // x @= eax (different from x := eax in treatment of old(x))
 | BindSet
 
 type exp =
@@ -99,10 +100,30 @@ type stmt =
 | SExists of formal list * triggers * exp
 and calcContents = {calc_exp:exp; calc_op:bop option; calc_hints:stmt list list}
 
+type is_refined = Refined | Unrefined
+type raw_spec_kind =
+| RRequires of is_refined
+| REnsures of is_refined
+| RRequiresEnsures
+| RModifies of bool // false => reads, true => modifies
+
+type lets =
+| LetsVar of id * typ option * exp
+| LetsAlias of id * id
+
+type spec_exp =
+| SpecExp of exp
+| SpecLet of id * typ option * exp
+
+type spec_raw = // spec before desugaring
+| RawSpec of raw_spec_kind * (loc * spec_exp) list
+| Lets of (loc * lets) list
+
 type spec =
-| Requires of exp
-| Ensures of exp
+| Requires of is_refined * exp
+| Ensures of is_refined * exp
 | Modifies of bool * exp // false => reads, true => modifies
+| SpecRaw of spec_raw
 
 type inline_kind = Outline | Inline
 type inout = In | Out | InOut
@@ -126,7 +147,6 @@ type proc_decl =
     pargs:pformal list;
     prets:pformal list;
     pspecs:(loc * spec) list;
-    palias:(id * id) list;
     pbody:stmt list option;
     pattrs:attrs;
   }

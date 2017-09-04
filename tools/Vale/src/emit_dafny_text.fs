@@ -70,7 +70,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("!" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr ("unary operator " + (sprintf "%A" e))
     | EOp (Bop op, [e1; e2]) ->
         let (pe, p1, p2) = prec_of_bop op in
@@ -90,6 +90,7 @@ let rec string_of_exp_prec prec e =
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" xs ts e
     | EBind (Lambda, [], xs, _, e) -> ("(" + (string_of_formals xs) + " => " + (r 5 e) + ")", 90)
     | EBind (BindLet, [ex], [x], [], e) -> ("var " + (string_of_formal x) + " := " + (r 5 ex) + "; " + (r 5 e), 6)
+    | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr ("EBind " + (sprintf "%A" e))
   in if prec <= ePrec then s else "(" + s + ")"
@@ -174,9 +175,10 @@ and emit_block (ps:print_state) (stmts:stmt list) =
 let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
   try
     match s with
-    | Requires e -> ps.PrintLine ("requires " + (string_of_exp e))
-    | Ensures e -> ps.PrintLine ("ensures  " + (string_of_exp e))
+    | Requires (_, e) -> ps.PrintLine ("requires " + (string_of_exp e))
+    | Ensures (_, e) -> ps.PrintLine ("ensures  " + (string_of_exp e))
     | Modifies _ -> ()
+    | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =

@@ -75,7 +75,6 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UToOperand, [e]) -> ("@" + (r 99 e), 90)
     | EOp (Uop UOld, [e]) -> ("old(" + (r 99 e) + ")", 90)
     | EOp (Uop UConst, [e]) -> ("const(" + (r 99 e) + ")", 90)
-    | EOp (Uop UUnrefinedSpec, [e]) -> ("{:refined false} " + (r 99 e), 90)
     | EOp (Uop (UReveal | UGhostOnly | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator:%A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
     | EOp (Bop BIn, [e1; e2]) ->
@@ -98,7 +97,7 @@ let rec string_of_exp_prec prec e =
     | EBind (Lambda, [], xs, _, e) -> ("(" + (string_of_formals xs) + " => " + (r 5 e) + ")", 90)
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " := " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
-    | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr "EBind"
+    | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _) -> internalErr "EBind"
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ghost (g:ghost) = match g with Ghost -> "ghost " | NotGhost -> ""
 and string_of_stmt_modifier (sm:stmt_modifier) = match sm with SmPlain -> "" | SmGhost -> "ghost " | SmInline -> "inline "
@@ -198,14 +197,67 @@ and emit_block (ps:print_state) (stmts:stmt list) =
   ps.Unindent ();
   ps.PrintLine "}"
 
+let string_of_is_refined (r:is_refined) =
+  match r with
+  | Refined -> ""
+  | Unrefined -> "{:refined false}"
+
+let string_of_raw_spec_kind (r:raw_spec_kind) =
+  match r with
+  | RRequires r -> "requires" + (string_of_is_refined r)
+  | REnsures r -> "ensures" + (string_of_is_refined r)
+  | RRequiresEnsures -> "requires/ensures"
+  | RModifies false -> "reads"
+  | RModifies true -> "modifies"
+
+let emit_spec_exp (ps:print_state) (loc:loc, s:spec_exp):unit =
+  match s with
+  | SpecExp e -> ps.PrintLine ((string_of_exp e) + ";")
+  | SpecLet (x, t, e) -> ps.PrintLine ("let " + (string_of_formal (x, t)) + " := " + (string_of_exp e) + ";")
+
+let rec emit_lets (ps:print_state) (ls:lets list) (aliases:(id * id) list):unit =
+  let flush () =
+    match aliases with
+    | [] -> ()
+    | _ ->
+        let f (x, y) = (sid x) + " @= " + (sid y) + ";" in
+        ps.PrintLine (String.concat " " (List.map f (List.rev aliases)))
+    in
+  match ls with
+  | [] -> flush ()
+  | (LetsVar (x, t, e))::ls ->
+      flush ();
+      ps.PrintLine ((string_of_formal (x, t)) + " := " + (string_of_exp e) + ";");
+      emit_lets ps ls []
+  | (LetsAlias (x, y))::ls ->
+      emit_lets ps ls ((x, y)::aliases)
+
 let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
   try
     match s with
-    | Requires (EOp (Uop UUnrefinedSpec, [e])) -> ps.PrintLine ("requires{:refined false} " + (string_of_exp e) + ";")
-    | Requires e -> ps.PrintLine ("requires " + (string_of_exp e) + ";")
-    | Ensures e -> ps.PrintLine ("ensures  " + (string_of_exp e) + ";")
+    | Requires (r, e) ->
+        ps.PrintLine ("requires" + (string_of_is_refined r) + " " + (string_of_exp e) + ";")
+    | Ensures (r, e) ->
+        ps.PrintLine ("ensures" + (string_of_is_refined r) + "  " + (string_of_exp e) + ";")
     | Modifies (false, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
     | Modifies (true, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | SpecRaw (RawSpec ((RModifies _) as r, es)) ->
+        ps.PrintLine (string_of_raw_spec_kind r);
+        ps.Indent ();
+        let es = exps_of_spec_exps es in
+        let ses = List.map (fun (_, e) -> (string_of_exp e) + ";") es in
+        ps.PrintLine (String.concat " " ses);
+        ps.Unindent()
+    | SpecRaw (RawSpec (r, es)) ->
+        ps.PrintLine (string_of_raw_spec_kind r);
+        ps.Indent ();
+        List.iter (emit_spec_exp ps) es;
+        ps.Unindent()
+    | SpecRaw (Lets ls) ->
+        ps.PrintLine "lets";
+        ps.Indent ();
+        emit_lets ps (List.map snd ls) [];
+        ps.Unindent()
   with err -> raise (LocErr (loc, err))
 
 let string_of_attr (x:id, es:exp list):string =

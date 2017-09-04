@@ -74,7 +74,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
     | EOp (Bop op, [e1; e2]) ->
         let (pe, p1, p2) = prec_of_bop op in
@@ -94,6 +94,7 @@ let rec string_of_exp_prec prec e =
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
     | EBind (Lambda, [], xs, ts, e) -> qbind "fun" " -> " xs ts e
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " = " + (r 5 ex) + " in " + (r 5 e), 6)
+    | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr "EBind"
   in if prec <= ePrec then s else "(" + s + ")"
@@ -155,9 +156,10 @@ and emit_block (ps:print_state) (stmts:stmt list) =
 let collect_spec (loc:loc, s:spec):(exp list * exp list) =
   try
     match s with
-    | Requires e -> ([e], [])
-    | Ensures e -> ([], [e])
+    | Requires (_, e) -> ([e], [])
+    | Ensures (_, e) -> ([], [e])
     | Modifies _ -> ([], [])
+    | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
 
 let collect_specs (ss:(loc * spec) list):(exp list * exp list) =

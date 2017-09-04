@@ -64,6 +64,9 @@ let exp_of_conjuncts (es:exp list):exp =
   | [] -> EBool true
   | h::t -> List.fold (fun conj e -> EOp (Bop BAnd, [conj; e])) h t
 
+let require e = Requires (Refined, e)
+let ensure e = Ensures (Refined, e)
+
 let gen_lemma_sym_count = ref 0
 let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count
 
@@ -201,22 +204,16 @@ let formals_of_call aci =
   | AciCall (_, esc) -> esc.esc_id_decls
   | AciIfElse (_, esi) -> esi.esi_formals
 
-let clean_unrefined (loc:loc, s:spec):(loc * spec) =
-  match s with
-  | Requires (EOp (Uop UUnrefinedSpec, [e])) -> (loc, Requires e)
-  | Ensures  (EOp (Uop UUnrefinedSpec, [e])) -> (loc, Ensures e)
-  | _ -> (loc, s)
-
 let skip_unrefined (loc:loc, s:spec):(loc * spec) list =
   match s with
-  | Requires (EOp (Uop UUnrefinedSpec, [e])) -> []
-  | Ensures  (EOp (Uop UUnrefinedSpec, [e])) -> []
+  | Requires (Unrefined, _) -> []
+  | Ensures  (Unrefined, _) -> []
   | _ -> [(loc, s)]
 
 let get_unrefined (loc:loc, s:spec):(loc * spec) list =
   match s with
-  | Requires (EOp (Uop UUnrefinedSpec, [e])) -> [(loc, Requires e)]
-  | Ensures  (EOp (Uop UUnrefinedSpec, [e])) -> [(loc, Ensures e)]
+  | Requires (Unrefined, _) -> [(loc, s)]
+  | Ensures  (Unrefined, _) -> [(loc, s)]
   | _ -> []
 
 type emit_area_fun = EmitCode | EmitReq | EmitEns
@@ -591,6 +588,7 @@ let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * (id * ty
         )
       | _ -> []
     )
+  | SpecRaw _ -> internalErr "SpecRaw"
 
 let specMod (env:env) (area:emit_area_mod) (loc:loc, s:spec):formal list =
   List.map (fun (_, (x, t)) -> (x, Some t)) (specModIo env area (loc, s))
@@ -714,7 +712,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
           | (false, _, _) | (_, true, _) | (_, _, []) -> (sTrigger, [], EBool true, [])
           | _ ->
               let pspecs = List.collect skip_unrefined p.pspecs in
-              let posts = List.collect (fun (_, sp) -> match sp with Ensures e -> [e] | _ -> []) pspecs in
+              let posts = List.collect (fun (_, sp) -> match sp with Ensures (_, e) -> [e] | _ -> []) pspecs in
               let inp = List.concat (List.map2 (fun (fid, _, storage, _, _) actl -> if storage = XGhost || storage = XInline then [(fid, actl)] else []) p.pargs es) in
               let outp = List.map (fun ((fid, _, _, _, _), _, (id, _)) -> (fid, EVar id)) ghost_out_map in
               let m = Map.ofList (inp @ outp) in
@@ -958,18 +956,19 @@ and build_lemma_block (env:env) (benv:build_env) (code:exp) (src:id) (res:id) (l
 let build_lemma_spec (env:env) (src:id) (res:exp) (loc:loc, s:spec):((loc * spec) list * exp list) =
   try
     match s with
-    | Requires e ->
+    | Requires (r, e) ->
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", EVar src)] in
-        ([(loc, Requires (subst_reserved_exp m e))], [])
-    | Ensures e ->
+        ([(loc, Requires (r, subst_reserved_exp m e))], [])
+    | Ensures (r, e) ->
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", res)] in
-        ([(loc, Ensures (subst_reserved_exp m e))], [])
+        ([(loc, Ensures (r, subst_reserved_exp m e))], [])
     | Modifies (readWrite, e) ->
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", EVar src)] in
         ([], [subst_reserved_exp m e])
+    | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
 
 let filter_proc_attr (x, es) =
@@ -1068,10 +1067,10 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
         let args = List.map make_arg ((*List.map ArgState c.esc_procArgs @*) c.esc_specMods) in
         let args = c.esc_nonmod_exps @ args in
         let e = makeSpecForall c.esc_proc.pname (Some c.esc_call_id) c.esc_foralls (EApply (spec_of_call c, args)) in
-        [(c.esc_loc, Requires (add_antecedents guards e))]
+        [(c.esc_loc, require (add_antecedents guards e))]
     | AciIfElse (guards, i) ->
         let build_ite (e, i, x, y) = EOp (Bop BEq, [EVar i; EOp (Cond, [e; EVar x; EVar y])]) in
-        List.map (fun q -> (loc, Requires (add_antecedents guards (build_ite q)))) i.esi_replacements
+        List.map (fun q -> (loc, require (add_antecedents guards (build_ite q)))) i.esi_replacements
     in
   let opaqueReqs = List.collect req_of_call calls in
 
@@ -1108,7 +1107,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
   //    ensures  forall va_id:va_int, g:int{:trigger va_trigger_Q(va_id, g)} :: va_trigger_Q(va_id, g) ==> va_spec_Q(iii, g, va_old_dummy, dummy, ..., va_x23_ebx)
   let ensForalls = List.collect ghostFormal p.pargs in
   let eEns = EApply (benv.spec_name, List.map (fun x -> EVar x) ((List.map specArgEns specArgs) @ specModsEns)) in
-  let opaqueEnss = [(loc, Ensures (makeSpecForall p.pname None ensForalls eEns))] in
+  let opaqueEnss = [(loc, ensure (makeSpecForall p.pname None ensForalls eEns))] in
 
   (* Generate body of abstract lemma Q as a forall statement:
   forall va_id:va_int, g:int
@@ -1132,14 +1131,13 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
         let trigger = makeSpecTrigger p.pname (EVar (Reserved "id")) (List.map (fun (x, _) -> EVar x) ensForalls) in
         SForall ((Reserved "id", Some tInt)::ensForalls, [[trigger]], benv.eReq true, eEns, forallBody)
     in
-  let condReqs = List.map (fun e -> (loc, Requires e)) benv.conds in
+  let condReqs = List.map (fun e -> (loc, require e)) benv.conds in
   {
     pname = Reserved (benv.prefix + "abstract_" + (string_of_id p.pname));
     pghost = Ghost;
     pinline = Outline;
     pargs = pargs @ pspecMods @ pformals_calls;
     prets = prets;
-    palias = [];
     pspecs = condReqs @ opaqueReqs @ opaqueEnss;
     pbody = Some (reveals @ [forallStmt]);
     pattrs = (Id "warnShadowing", [EBool false])::(List.filter filter_proc_attr p.pattrs);
@@ -1174,8 +1172,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   let prets = area_proc_params true emitArea p.prets p.pargs in
   let pargs = area_proc_params false emitArea p.prets p.pargs in
   let pargs = [argS; argR] @ pargs in
-  let req = Requires (vaApp "require" [EVar b0; EApply (codeName, fArgs); EVar s0; EVar sN]) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
-  let ens = Ensures (vaApp "ensure" ([EVar b0] @ (if !concise_lemmas then [EVar bM] else []) @ [EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
+  let req = require (vaApp "require" [EVar b0; EApply (codeName, fArgs); EVar s0; EVar sN]) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
+  let ens = ensure (vaApp "ensure" ([EVar b0] @ (if !concise_lemmas then [EVar bM] else []) @ [EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
   let lCM  = (cM, Some (Some tCode, NotGhost)) in
   let sBlock = lemma_block (sM, None) lCM (bM, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
   let sReveal = SAssign ([], EOp (Uop UReveal, [EVar codeName])) in // reveal_va_code_Q();
@@ -1195,7 +1193,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
     (List.collect (reqIsArg true) p.prets) @
     (List.collect (reqIsArg false) p.pargs)
     in
-  let reqsIs = List.map (fun e -> (loc, Requires e)) reqIsExps in
+  let reqsIs = List.map (fun e -> (loc, require e)) reqIsExps in
 
   let reveal_spec = SAssign ([], EOp(Uop UReveal, [EVar benv.spec_name])) in
 
@@ -1231,7 +1229,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       in
     let ensForalls = List.collect ghostFormal p.pargs in // ensures forall va_id:va_int, g:int ...
     let eEns = EApply (benv.spec_name, specArgsEns @ specModsEns) in // ensures ... va_spec_Q(iii, g, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
-    let enss = [(loc, Ensures (makeSpecForall p.pname None ensForalls eEns)); (loc, Ensures eFrame)] in
+    let enss = [(loc, ensure (makeSpecForall p.pname None ensForalls eEns)); (loc, ensure eFrame)] in
 
     let (sLocalsToAbstract, sStmts) =
       if benv.is_instruction then
@@ -1268,8 +1266,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       pinline = Outline;
       pargs = argB::pargs;
       prets = retB::retR::prets;
-      palias = [];
-      pspecs = (loc, req)::(List.map clean_unrefined reqs) @ pspecs_u_reqs @ (loc, ens)::pspecs_u_enss @ enss;
+      pspecs = (loc, req)::reqs @ pspecs_u_reqs @ (loc, ens)::pspecs_u_enss @ enss;
       pbody = Some ([sReveal; sOldS] @ sLocalsToAbstract @ sBlock @ (if benv.is_instruction then [] else [sb1]) @ sStmts);
       pattrs = List.filter filter_proc_attr p.pattrs;
     }
@@ -1323,7 +1320,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let ss = stmts_refined (stmts_of_estmts true true estmts) in
         [sReveal; sOldS] @ sBlock @ [sb1] @ ss
       in
-    let ensFrame = if benv.is_bridge || benv.is_framed then [(loc, Ensures eFrame)] else [] in
+    let ensFrame = if benv.is_bridge || benv.is_framed then [(loc, ensure eFrame)] else [] in
     let (pspecs, pmods) = List.unzip (List.map (build_lemma_spec env s0 (EVar sM)) p.pspecs) in
     {
       pname = Reserved ("lemma_" + (string_of_id p.pname));
@@ -1331,8 +1328,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       pinline = Outline;
       pargs = pargs;
       prets = prets;
-      palias = [];
-      pspecs = (loc, req)::(List.map clean_unrefined reqs) @ (loc, ens)::(List.map clean_unrefined (List.concat pspecs)) @ ensFrame;
+      pspecs = (loc, req)::reqs @ (loc, ens)::(List.concat pspecs) @ ensFrame;
       pbody = Some (sStmts);
       pattrs = List.filter filter_proc_attr p.pattrs;
     }
@@ -1353,15 +1349,15 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let reqs =
     List.collect (fun (loc, s) ->
         match s with
-        | Requires (EOp (Uop UUnrefinedSpec, _)) when isRefined -> []
-        | Requires e -> [ELoc (loc, e)]
+        | Requires (Unrefined, _) when isRefined -> []
+        | Requires (_, e) -> [ELoc (loc, e)]
         | _ -> []
       ) p.pspecs in
   let enss =
     List.collect (fun (loc, s) ->
         match s with
-        | Ensures (EOp (Uop UUnrefinedSpec, _)) when isRefined -> []
-        | Ensures e -> [ELoc (loc, e)]
+        | Ensures (Unrefined, _) when isRefined -> []
+        | Ensures (_, e) -> [ELoc (loc, e)]
         | _ -> []
       ) p.pspecs in
   let eReq use_old = and_of_list (List.map (exp_abstract use_old) reqs) in

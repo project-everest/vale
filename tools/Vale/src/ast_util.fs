@@ -55,6 +55,14 @@ let or_of_list = binary_op_of_list BOr (EBool false)
 
 let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false}
 
+let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
+  match es with
+  | [] -> []
+  | (loc, SpecExp e)::es -> (loc, e)::(exps_of_spec_exps es)
+  | (loc, SpecLet (x, t, e))::es ->
+      let es = List.map snd (exps_of_spec_exps es) in
+      [(loc, EBind (BindLet, [e], [(x, t)], [], and_of_list es))]
+
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
 
 let map_apply_modify (m:'a map_modify) (g:unit -> 'a):'a =
@@ -93,9 +101,10 @@ let map_attrs (fe:exp -> exp) (attrs:attrs):attrs =
 
 let gather_spec (f:exp -> 'a list -> 'a) (s:spec):'a list =
   match s with
-  | Requires e -> [gather_exp f e]
-  | Ensures e -> [gather_exp f e]
+  | Requires (_, e) -> [gather_exp f e]
+  | Ensures (_, e) -> [gather_exp f e]
   | Modifies (_, e) -> [gather_exp f e]
+  | SpecRaw _ -> internalErr "SpecRaw"
 
 let gather_specs (f:exp -> 'a list -> 'a) (ss:spec list):'a list =
   List.collect (gather_spec f) ss

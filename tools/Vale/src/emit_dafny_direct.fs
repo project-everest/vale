@@ -262,7 +262,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let exp = create_expression built_ins loc e in
           let id = create_token loc (sid x + "?") in
           new ExprDotName(id, exp, id.``val``, null) :> Expression
-      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UUnrefinedSpec | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
+      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
       | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
       | EOp (Bop op, [e1; e2]) ->
           if need_rel_chain x
@@ -383,6 +383,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           left.Add(new CasePattern(bvar.tok, bvar))
           right.Add(create_expression built_ins loc ex)
           new LetExpr(tok, left, right, e, true, null) :> Expression
+      | EBind (BindAlias, _, _, _, e) -> create_expression built_ins loc e
       | EBind (BindSet, [], xs, ts, e) ->
           notImplemented "BindSet"
       | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr "EBind"
@@ -650,9 +651,10 @@ let build_lemma (built_ins:BuiltIns) (loc:loc) (p:proc_decl):Lemma =
   let modAttrs:Attributes = null in
   let gen_spec (x:(loc * spec)):unit =
     match x with
-    | (loc, Requires e) -> reqs.Add(new MaybeFreeExpression(create_expression built_ins loc e, false))
-    | (loc, Ensures e) -> ens.Add(new MaybeFreeExpression(create_expression built_ins loc e, false, null))
+    | (loc, Requires (_, e)) -> reqs.Add(new MaybeFreeExpression(create_expression built_ins loc e, false))
+    | (loc, Ensures (_, e)) -> ens.Add(new MaybeFreeExpression(create_expression built_ins loc e, false, null))
     | (loc, Modifies _) -> () //no-op
+    | (_, SpecRaw _) -> internalErr "SpecRaw"
   List.iter (gen_spec) p.pspecs
   let attrs = create_pattrs built_ins loc p.pattrs in
   let body_start = create_token loc "{" in
