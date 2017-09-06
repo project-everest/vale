@@ -34,6 +34,7 @@ let type_of_typ (t:typ) : Tot Type0 =
 val buffer (t:typ) : Type0
 val buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : GTot (Seq.seq (type_of_typ t))
 val buffer_readable (#t:typ) (h:mem) (b:buffer t) : GTot Type0
+val buffer_length (#t:typ) (b:buffer t) : GTot int
 val loc : Type u#0
 val loc_none : loc
 val loc_union (s1 s2:loc) : GTot loc
@@ -64,6 +65,11 @@ let locs_disjoint (ls:list loc) : Type0 = normalize (locs_disjoint_rec ls)
 val modifies_goal_directed (s:loc) (h1 h2:mem) : GTot Type0
 val lemma_modifies_goal_directed (s:loc) (h1 h2:mem) : Lemma
   (modifies s h1 h2 == modifies_goal_directed s h1 h2)
+
+val buffer_length_buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : Lemma
+  (requires True)
+  (ensures (Seq.length (buffer_as_seq h b) == buffer_length b))
+  [SMTPat (Seq.length (buffer_as_seq h b))]
 
 val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   (requires
@@ -150,14 +156,14 @@ val modifies_goal_directed_trans2 (s12:loc) (h1 h2:mem) (s13:loc) (h3:mem) : Lem
 val buffer_read (#t:typ) (b:buffer t) (i:int) (h:mem) : Pure (type_of_typ t)
   (requires True)
   (ensures (fun v ->
-    0 <= i /\ i < Seq.length (buffer_as_seq h b) /\ buffer_readable h b ==>
+    0 <= i /\ i < buffer_length b /\ buffer_readable h b ==>
     v == Seq.index (buffer_as_seq h b) i
   ))
 
 val buffer_write (#t:typ) (b:buffer t) (i:int) (v:type_of_typ t) (h:mem) : Pure mem
   (requires True)
   (ensures (fun h' ->
-    0 <= i /\ i < Seq.length (buffer_as_seq h b) /\ buffer_readable h b ==>
+    0 <= i /\ i < buffer_length b /\ buffer_readable h b ==>
     modifies (loc_buffer b) h h' /\
     buffer_readable h' b /\
     buffer_as_seq h' b == Seq.upd (buffer_as_seq h b) i v

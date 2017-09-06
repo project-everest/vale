@@ -47,6 +47,7 @@ let buffer_as_seq #t h b =
   Seq.init len contents
 
 let buffer_readable #t h b = M.buffer_readable h b
+let buffer_length #t b = UInt32.v (M.buffer_length b)
 let loc = M.loc
 let loc_none = M.loc_none
 let loc_union = M.loc_union
@@ -57,6 +58,8 @@ let modifies = M.modifies
 
 let modifies_goal_directed s h1 h2 = modifies s h1 h2
 let lemma_modifies_goal_directed s h1 h2 = ()
+
+let buffer_length_buffer_as_seq #t h b = M.buffer_length_buffer_as_seq h b
 
 let modifies_buffer_elim #t1 b p h h' =
   M.modifies_buffer_elim b p h h';
