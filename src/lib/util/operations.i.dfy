@@ -46,12 +46,46 @@ lemma lemma_WordToBitsPreservesZeroness(w:uint32)
     }
 }
 
+lemma lemma_WordToBitsPreservesZeroness64(w:uint64)
+    ensures  w == 0 <==> WordToBits64(w) == 0;
+{
+    reveal_WordToBits64();
+    lemma_WordToBitsToWord64(w);
+
+    if w == 0 {
+        calc {
+            WordToBits64(w);
+            w as bv64;
+            0 as bv64;
+            0;
+        }
+    }
+    else {
+        assert WordToBits64(w) != 0;
+    }
+
+    if WordToBits64(w) == 0 {
+        assert w == 0;
+    }
+    else {
+        assert w != 0;
+    }
+}
+
 lemma lemma_BitsToWordPreservesZeroness(b:bv32)
     ensures  b == 0 <==> BitsToWord(b) == 0;
 {
     var w := BitsToWord(b);
     lemma_WordToBitsPreservesZeroness(w);
     lemma_BitsToWordToBits(b);
+}
+
+lemma lemma_BitsToWordPreservesZeroness64(b:bv64)
+    ensures  b == 0 <==> BitsToWord64(b) == 0;
+{
+    var w := BitsToWord64(b);
+    lemma_WordToBitsPreservesZeroness64(w);
+    lemma_BitsToWordToBits64(b);
 }
 
 lemma lemma_BitsAndWordConversions()
@@ -133,6 +167,12 @@ lemma lemma_BitXorWithItself(x:bv32)
     reveal_BitXor();
 }
 
+lemma lemma_BitXorWithItself64(x:bv64)
+    ensures BitXor64(x, x) == 0;
+{
+    reveal_BitXor64();
+}
+
 lemma lemma_BitwiseXorWithItself(x:uint32)
     ensures BitwiseXor(x, x) == 0;
 {
@@ -142,6 +182,19 @@ lemma lemma_BitwiseXorWithItself(x:uint32)
             { lemma_BitXorWithItself(WordToBits(x)); }
         BitsToWord(0);
             { lemma_BitsToWordPreservesZeroness(0); }
+        0;
+    }
+}
+
+lemma lemma_BitwiseXor64WithItself(x:uint64)
+    ensures BitwiseXor64(x, x) == 0;
+{
+    calc {
+        BitwiseXor64(x, x);
+        BitsToWord64(BitXor64(WordToBits64(x), WordToBits64(x)));
+            { lemma_BitXorWithItself64(WordToBits64(x)); }
+        BitsToWord64(0);
+            { lemma_BitsToWordPreservesZeroness64(0); }
         0;
     }
 }
