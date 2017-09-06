@@ -329,8 +329,8 @@ lemma lemma_ifElse(pred:obool, ift:code, iff:code, fixedTime:bool,
 
 predicate method publicRegisterTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)
 {
-    forall r :: r in tsAnalysis.regTaint && tsAnalysis.regTaint[r].Public?
-        ==> (r in tsExpected.regTaint && tsExpected.regTaint[r].Public?)
+    forall r :: r in tsExpected.regTaint && tsExpected.regTaint[r].Public?
+        ==> (r in tsAnalysis.regTaint && tsAnalysis.regTaint[r].Public?)
 }
 
 predicate method publicTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)

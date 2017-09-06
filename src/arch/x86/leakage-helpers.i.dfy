@@ -2040,27 +2040,27 @@ lemma lemma_ifElse(pred:obool, ift:code, iff:code, fixedTime:bool,
 
 predicate method publicXMMTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)
 {
-    forall x :: x in tsAnalysis.xmmTaint && tsAnalysis.xmmTaint[x].Public?
-        ==> (x in tsExpected.xmmTaint && tsExpected.xmmTaint[x].Public?)
+    forall x :: x in tsExpected.xmmTaint && tsExpected.xmmTaint[x].Public?
+        ==> (x in tsAnalysis.xmmTaint && tsAnalysis.xmmTaint[x].Public?)
 }
  
 predicate method publicFlagTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)
 
 {
-    tsAnalysis.flagsTaint == Public 
-        ==> tsExpected.flagsTaint == Public
+    tsExpected.flagsTaint == Public
+        ==> tsAnalysis.flagsTaint == Public
 }
  
 predicate method publicStackTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)
 {
-    forall s :: s in tsAnalysis.stackTaint && tsAnalysis.stackTaint[s].Public?
-        ==> (s in tsExpected.stackTaint && tsExpected.stackTaint[s].Public?)
+    forall s :: s in tsExpected.stackTaint && tsExpected.stackTaint[s].Public?
+        ==> (s in tsAnalysis.stackTaint && tsAnalysis.stackTaint[s].Public?)
 }
  
 predicate method publicRegisterTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)
 {
-    forall r :: r in tsAnalysis.regTaint && tsAnalysis.regTaint[r].Public?
-        ==> (r in tsExpected.regTaint && tsExpected.regTaint[r].Public?)
+    forall r :: r in tsExpected.regTaint && tsExpected.regTaint[r].Public?
+        ==> (r in tsAnalysis.regTaint && tsAnalysis.regTaint[r].Public?)
 }
 
 predicate method publicTaintsAreAsExpected(tsAnalysis:taintState, tsExpected:taintState)
