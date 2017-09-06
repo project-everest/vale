@@ -1186,14 +1186,12 @@ procedure {:frame false} poly1305(
     ghost var old_mem := mem;
 
     h := poly1305_impl(ctx, key_r, key_s, /*n,*/ p);
-       /*
     ghost var a := ctx + 72;
     assert ctx == old_ctx;
     assert ctx + 9*8 == ctx + 72;
     assert a >= ctx + 9*8;
     assert mem[a] == old_mem[a];
-    assert mem[ctx + 72] == old_mem[ctx + 72];
-    */
+//    assert mem[ctx + 72] == old_mem[ctx + 72];
 //    assert mem[ctx + 72] == old_h1;
 
 //    assert {:fast_block} true;

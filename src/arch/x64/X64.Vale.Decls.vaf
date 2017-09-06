@@ -12,7 +12,8 @@ open X64.Vale.State_i
 
 val cf : (flags:int) -> bool
 
-unfold let va_subscript = Map.sel
+//unfold let va_subscript = Map.sel
+unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 unfold let va_update = Map.upd
 unfold let va_make_opaque = Opaque_i.make_opaque
 unfold let va_reveal_opaque = Opaque_i.reveal_opaque
