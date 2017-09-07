@@ -8,6 +8,7 @@ open FStar.Mul
 open Calc
 open X64.Vale.State_i   // needed for mem
 open X64.Poly1305.Bitvectors_i
+open Bitvectors128
 
 (*
 open FStar.Mul
@@ -260,16 +261,16 @@ let lemma_reduce128  (h:int) (h2:nat64) (h1:nat64) (h0:nat64) (g:int) (g2:nat64)
 let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) = 
   admit()
 
-let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
-  admit()
 
-
+// #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 2 --max_ifuel 2 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 25"
 // let rec lemma_poly1305_heap_hash_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) (len:nat)
 //   (k:int{i <= k /\ (k - i) % 16 == 0 /\ k <= i + len /\
-//     (forall j . {:pattern (m `Map.contains` j)} i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j)}) :
+//     (forall j . {:pattern (m `Map.contains` j)} i <= j /\ j < i + (len + 15) / 16 * 16 /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) :
 //   Lemma (requires True)
-// 	(ensures (poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k))
+// 	(ensures
+// 	    poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k)
 //   (decreases (k-i)) =
+//     assume(forall j . i <= j /\ j < i + len /\ (j - i) % 16 == 0 ==> heapletTo128 m i len j >= 0);
 //     let heapb = poly1305_heap_blocks h pad r m i k in
 //     let hashb = poly1305_hash_blocks h pad r (heapletTo128 m i len) i k in
 //     if i = k then

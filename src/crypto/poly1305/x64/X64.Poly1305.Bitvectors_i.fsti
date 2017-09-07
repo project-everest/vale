@@ -3,6 +3,7 @@ module X64.Poly1305.Bitvectors_i
 open FStar.BV
 open FStar.Mul
 open FStar.UInt
+open Bitvectors128
 
 val lemma_shr2: (x:uint_t 64) -> Lemma
   ((shift_right #64 x 2 == udiv #64 x 4))
@@ -29,29 +30,6 @@ val lemma_poly_constants: x:uint_t 64 ->
    SMTPat (logand #64 x 0x0ffffffc0ffffffc)]
 val lemma_and_commutes: x:uint_t 64 -> y:uint_t 64 ->
   Lemma (logand #64 x y == logand #64 y x)
-val lemma_bv128_64_64_and_helper: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
-  y:bv_t 128 -> y0:bv_t 64 -> y1:bv_t 64 ->
-  z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
-  Lemma (requires (z0 == bvand #64 x0 y0 /\
-		   z1 == bvand #64 x1 y1 /\
-		   x == bvor #128 (bvshl #128 (bv_uext #64 #64 x1) 64) 
-							   (bv_uext #64 #64 x0) /\
-		   y == bvor #128 (bvshl #128 (bv_uext #64 #64 y1) 64) 
-							   (bv_uext #64 #64 y0) /\
-		   z == bvor #128 (bvshl #128 (bv_uext #64 #64 z1) 64) 
-							   (bv_uext #64 #64 z0)))
-	(ensures (z == bvand #128 x y))
-val bv128_64_64: x1:bv_t 64 -> x0:bv_t 64 -> Tot (bv_t 128)
-
-val lemma_bv128_64_64_and: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
-  y:bv_t 128 -> y0:bv_t 64 -> y1:bv_t 64 ->
-  z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
-  Lemma (requires (z0 == bvand #64 x0 y0 /\
-		   z1 == bvand #64 x1 y1 /\
-		   x == bv128_64_64 x1 x0 /\
-		   y == bv128_64_64 y1 y0 /\
-		   z == bv128_64_64 z1 z0))
-	(ensures (z == bvand #128 x y))
 
 val lemma_bytes_shift_constants0: unit -> Lemma
     (shift_left #64 0 3 == 0 /\
@@ -124,3 +102,13 @@ val lemma_bytes_shift_power2: y:uint_t 64 ->
 	(ensures  (shift_left #64 y 3 < 64 /\
 		   y * 8 == shift_left #64 y 3 /\
 		   pow2 (shift_left #64 y 3) == shift_left #64 1 (shift_left #64 y 3)))
+
+val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
+  y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
+  z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
+  Lemma (requires (z0 == logand #64 x0 y0 /\
+		   z1 == logand #64 x1 y1 /\
+		   x == lowerUpper128 x0 x1 /\
+		   y == lowerUpper128 y0 y1 /\
+		   z == lowerUpper128 z0 z1))
+	(ensures (z == logand #128 x y))

@@ -1,14 +1,17 @@
 module X64.Poly1305.Bitvectors_i
+
+open FStar.UInt
 open FStar.BV
 open FStar.Tactics
 open FStar.Tactics.Derived
 open FStar.Tactics.BV
+open Bitvectors128
 open FStar.Mul
-open FStar.UInt
+open Calc
+
 
 // tweak options?
 #reset-options "--smtencoding.elim_box true"
-
 let lemma_shr2 x = 
    assert_by_tactic (shift_right #64 x 2 == udiv #64 x 4) (bv_tac())
    
@@ -44,16 +47,6 @@ let lemma_and_commutes x y =
   assert_by_tactic 
     (logand #64 x y == logand #64 y x)
     (bv_tac ())
-
-let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
-// TODO
-  admit()
-
-let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
-
-let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
-// TODO
-  admit()
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.case_split=3"
 let lemma_bytes_shift_constants0 x =
@@ -164,17 +157,33 @@ let lemma_bytes_shift_power2 y =
   | _ -> ());
   lemma_bytes_power2 ()
 
+#reset-options "--max_fuel 0 --max_ifuel 1 --z3rlimit 6 --smtencoding.elim_box true --z3cliopt smt.arith.nl=false"
+let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 =
+  lemma_bv128_lowerUpper_B128 x0 x1;
+  lemma_bv128_lowerUpper_B128 y0 y1;
+  lemma_bv128_lowerUpper_B128 z0 z1;
+  calc
+    (int2bv z0 &= bvand (int2bv x0) (int2bv y0) &| using
+	   (assert_by_tactic (int2bv (logand x0 y0) == bvand (int2bv x0) (int2bv y0))
+		   (apply_lemma (quote (int2bv_logand #64 #x0 #y0));; trefl);
+	     z3));
+	     	    assume(False);
+  calc
+    (int2bv z1 &= bvand (int2bv x1) (int2bv y1) &| using
+	  (assert_by_tactic (int2bv (logand x1 y1) == bvand (int2bv x1) (int2bv y1))
+	    (apply_lemma (quote (int2bv_logand #64 #x1 #y1));; trefl);
+	    z3));
 
-// val lowerUpper128: l:uint_t 64 -> u:uint_t 64 -> Tot (uint_t 128)
-// let lowerUpper128 l u = l + (0x10000000000000000 * u)
+  int2bv_lemma_1 x (lowerUpper128 x0 x1);
+  int2bv_lemma_1 y (lowerUpper128 y0 y1);
+  int2bv_lemma_1 z (lowerUpper128 z0 z1);
+  lemma_bv128_64_64_and (int2bv #128 x) (int2bv #64 x0) (int2bv #64 x1) 
+			(int2bv #128 y) (int2bv #64 y0) (int2bv #64 y1) 
+			(int2bv #128 z) (int2bv #64 z0) (int2bv #64 z1);
+  assert_by_tactic (int2bv (logand x y) == bvand (int2bv x) (int2bv y))
+  		   (apply_lemma (quote (int2bv_logand #128 #x #y));; trefl);
+  assert (int2bv z == bvand (int2bv x) (int2bv y));
+  int2bv_lemma_2 #128 z (logand #128 x y)
 
-// val lemma_lowerUpper128_and: x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 ->
-//   y:uint_t 128 -> y0:uint_t 64 -> y1:uint_t 64 ->
-//   z:uint_t 128 -> z0:uint_t 64 -> z1:uint_t 64 ->
-//   Lemma (requires (z0 == logand #64 x0 y0 /\
-// 		   z1 == logand #64 x1 y1 /\
-// 		   x == lowerUpper128 x1 x0 /\
-// 		   y == lowerUpper128 y1 y0 /\
-// 		   z == lowerUpper128 z1 z0))
-// 	(ensures (z == logand #128 x y))
-// let lemma_lowerUpper128_and x x0 x1 y y0 y1 z z0 z1 = ()
+
+
