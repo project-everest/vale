@@ -30,7 +30,7 @@ let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
 
 let constTimeInvariant (ts:taintState) (s:traceState) (s':traceState) =
     publicValuesAreSame ts s s'
-  /\ s.trace == s'.trace
+  /\ s.trace = s'.trace
 
 
 let isConstantTimeGivenStates (code:code) (ts:taintState) (s1:traceState) (s2:traceState) =
@@ -40,7 +40,7 @@ let isConstantTimeGivenStates (code:code) (ts:taintState) (s1:traceState) (s2:tr
    /\ s1.state.ok /\ (Some?.v r1).state.ok
    /\ s2.state.ok /\ (Some?.v r2).state.ok
    /\ constTimeInvariant ts s1 s2
-  ) ==> (Some?.v r1).trace == (Some?.v r2).trace
+  ) ==> (Some?.v r1).trace = (Some?.v r2).trace
 
 let isConstantTime (code:code) (ts:taintState) =
   forall s1 s2.
