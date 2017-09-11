@@ -25,6 +25,7 @@ manual_dependencies = {
   'obj/arch/x64/X64.Vale.StrongPost_i.vfsti': 'obj/arch/x64/X64.Vale.Decls.fsti',
   'obj/arch/x64/X64.Vale.StrongPost_i.vfst': 'obj/arch/x64/X64.Vale.Decls.fsti',
   'obj/Vale/test/StateUpdateTest.vfst': 'obj/arch/x64/X64.Vale.Decls.fsti',
+  'obj/Vale/test/StateUpdateTest.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
 }
 Export('manual_dependencies')
 
