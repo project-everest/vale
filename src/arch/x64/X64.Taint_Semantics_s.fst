@@ -16,7 +16,10 @@ type observation =
 noeq type traceState = {
   state: state;
   trace: list observation;
+  memTaint: map int taint;
 }
+
+type tainted_ins = |TaintedIns: i:ins -> t:option taint -> tainted_ins
 
 let operand_obs (s:traceState) (o:operand) : list observation =
   match o with
@@ -26,8 +29,8 @@ let operand_obs (s:traceState) (o:operand) : list observation =
       | MReg reg _ -> [MemAccess (eval_reg reg s.state)]
       | MIndex base _ index _ -> [MemAccessOffset (eval_reg base s.state) (eval_reg index s.state)]
   
-let ins_obs (ins:ins) (s:traceState) : (list observation) =
-  match ins with
+let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
+  match ins.i with
   | Mov64 dst src ->
       (operand_obs s dst) @ (operand_obs s src)
   | Add64 dst src ->
@@ -43,30 +46,130 @@ let ins_obs (ins:ins) (s:traceState) : (list observation) =
   | Shr64 dst amt -> (operand_obs s dst) @ (operand_obs s amt)
   | Shl64 dst amt -> (operand_obs s dst) @ (operand_obs s amt)
 
-val taint_eval_code: c:code -> s:traceState -> Tot (option traceState)
-(decreases %[c; decr c s.state; 1])
-val taint_eval_codes: l:codes -> s:traceState -> Tot (option traceState)
-(decreases %[l])
-val taint_eval_while: c:code{While? c} -> s:traceState -> Tot (option traceState)
-(decreases %[c; decr c s.state; 0])
+(* Checks if the taint of an operand matches the ins annotation *)
+let taint_match (o:operand) (t:taint) (memTaint:map int taint) (s:state) : bool =
+  match o with
+    | OConst _ | OReg _ -> true
+    | OMem m -> 
+        let ptr = eval_maddr m s in
+	memTaint.[ptr] = t
 
+let update_taint (memTaint:map int taint) (dst:dst_op) (t:taint) (s:state) =
+  match dst with
+    | OReg _ -> memTaint
+    | OMem m -> let ptr = eval_maddr m s in
+        memTaint.[ptr] <- t
+
+let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
+  match ins.t with
+  (* No taint in this ins, we execute with the Intel semantics *)
+  | None -> let s = run (eval_ins ins.i) ts.state in
+    {ts with state = s}
+  (* Taint annotation, we use tainted semantics *)
+  | Some t -> match ins.i with
+    | Mov64 dst src -> 
+      (* Checks that the taint information on src is correct *)
+      let s = run (check (taint_match src t ts.memTaint)) ts.state in
+      (* Propagates the taint information before modifying memory *)
+      let memTaint = update_taint ts.memTaint dst t s in
+      (* Execute the instruction *)
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+      
+    | Add64 dst src ->
+      (* Check that both operands have the correct taint *)
+      let s = run (check (taint_match src t ts.memTaint);; check (taint_match dst t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+     
+    | AddLea64 dst src1 src2 ->
+      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src1 t ts.memTaint);; check (taint_match src2 t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | AddCarry64 dst src -> 
+      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | Sub64 dst src ->
+      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | Mul64 src ->
+      let s = run (check (taint_match src t ts.memTaint)) ts.state in
+      let s = run (eval_ins ins.i) s in
+      {ts with state = s}
+
+    | IMul64 dst src -> 
+      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | Xor64 dst src ->
+      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | And64 dst src ->
+      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | Shr64 dst amt ->
+      let s = run (check (taint_match dst t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+    | Shl64 dst amt ->
+      let s = run (check (taint_match dst t ts.memTaint)) ts.state in
+      let memTaint = update_taint ts.memTaint dst t s in
+      let s = run (eval_ins ins.i) s in
+      {state = s; trace = ts.trace; memTaint = memTaint}
+
+type tainted_code = precode tainted_ins ocmp
+type tainted_codes = list tainted_code
+
+let tainted_decr (c:tainted_code) (s:state) : nat =
+  match c with
+  | While _ _ inv ->
+    let n = eval_operand inv s in
+    if UInt64.v n >= 0 then UInt64.v n else 0
+    | _ -> 0
+
+val taint_eval_code: c:tainted_code -> s:traceState -> Tot (option traceState)
+(decreases %[c; tainted_decr c s.state; 1])
+val taint_eval_codes: l:tainted_codes -> s:traceState -> Tot (option traceState)
+(decreases %[l])
+val taint_eval_while: c:tainted_code{While? c} -> s:traceState -> Tot (option traceState)
+(decreases %[c; tainted_decr c s.state; 0])
 
 (* Adds the observations to the eval_code.
    Returns None if eval_code returns None *)
 let rec taint_eval_code c s =
   match c with
-    | Ins ins -> begin match eval_code c s.state with
-      | None -> None
-      | Some s2 -> Some ({state = s2; trace = ins_obs ins s})
-    end
+    | Ins ins -> let obs = ins_obs ins s in
+      Some ({taint_eval_ins ins s with trace = obs})
+    
     | Block l -> taint_eval_codes l s
+    
     | IfElse ifCond ifTrue ifFalse ->
       let b = eval_ocmp s.state ifCond in
       (* We add the BranchPredicate to the trace *)
-      let s' = {state=s.state; trace=BranchPredicate(b)::s.trace} in
+      let s' = {s with trace=BranchPredicate(b)::s.trace} in
       (* We evaluate the branch with the new trace *)
       if b then taint_eval_code ifTrue s' else taint_eval_code ifFalse s'
-    | While _ _ _ -> None
+    
+    | While _ _ _ -> taint_eval_while c s
 
 and taint_eval_codes l s =
 match l with
@@ -78,7 +181,7 @@ match l with
 	 and append the trace of this instruction *)
 	else taint_eval_codes
 	  tl
-	  ({state = (Some?.v s_opt).state;
+	  ({(Some?.v s_opt) with
 	    trace = (Some?.v s_opt).trace @ s.trace})
 
 and taint_eval_while c s0 =
@@ -88,12 +191,12 @@ and taint_eval_while c s0 =
 
   if UInt64.v n0 <= 0 then
     (* if loop invariant <= 0, the guard must be false, and we add the corresponding BranchPredicate *)
-    if b then None else Some ({state = s0.state; trace = BranchPredicate(false)::s0.trace})
+    if b then None else Some ({s0 with trace = BranchPredicate(false)::s0.trace})
   else // loop invariant > 0
     if not b then None // guard must evaluate to true
     else
       // We add the branchpredicate to the trace
-      let s0 = {state = s0.state; trace = BranchPredicate(true)::s0.trace} in
+      let s0 = {s0 with trace = BranchPredicate(true)::s0.trace} in
       let s_opt = taint_eval_code body s0 in
       if None? s_opt then None
       else

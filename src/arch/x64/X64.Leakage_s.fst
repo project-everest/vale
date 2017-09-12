@@ -5,14 +5,7 @@ open X64.Semantics_s
 open X64.Taint_Semantics_s
 
 noeq type taintState = 
-  | TaintState: regTaint: (reg -> taint) -> memTaint: map int taint -> flagsTaint: taint -> taintState
-
-let publicMemValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
-  forall i.
-       (Map.contains ts.memTaint i) /\ (ts.memTaint.[i] = Public) 
-     ==> (  (Map.contains s1.state.mem i) /\ (Map.contains s2.state.mem i)
-        /\ s1.state.mem.[i] = s2.state.mem.[i]
-	)
+  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> taintState
 
 let publicFlagValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
   ts.flagsTaint = Public ==> (s1.state.flags = s2.state.flags)
@@ -24,8 +17,7 @@ let publicRegisterValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) 
 
 
 let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
-    publicMemValuesAreSame ts s1 s2
-  /\ publicRegisterValuesAreSame ts s1 s2
+   publicRegisterValuesAreSame ts s1 s2
   /\ publicFlagValuesAreSame ts s1 s2
 
 let constTimeInvariant (ts:taintState) (s:traceState) (s':traceState) =
@@ -33,7 +25,7 @@ let constTimeInvariant (ts:taintState) (s:traceState) (s':traceState) =
   /\ s.trace = s'.trace
 
 
-let isConstantTimeGivenStates (code:code) (ts:taintState) (s1:traceState) (s2:traceState) =
+let isConstantTimeGivenStates (code:tainted_code) (ts:taintState) (s1:traceState) (s2:traceState) =
   let r1 = taint_eval_code code s1 in
   let r2 = taint_eval_code code s2 in
   ( (Some? r1) /\ (Some? r2)
@@ -42,11 +34,11 @@ let isConstantTimeGivenStates (code:code) (ts:taintState) (s1:traceState) (s2:tr
    /\ constTimeInvariant ts s1 s2
   ) ==> (Some?.v r1).trace = (Some?.v r2).trace
 
-let isConstantTime (code:code) (ts:taintState) =
+let isConstantTime (code:tainted_code) (ts:taintState) =
   forall s1 s2.
       isConstantTimeGivenStates code ts s1 s2
 
-let isExplicitLeakageFreeGivenStates (code:code) (ts:taintState) (ts':taintState) (s1:traceState) (s2:traceState) =
+let isExplicitLeakageFreeGivenStates (code:tainted_code) (ts:taintState) (ts':taintState) (s1:traceState) (s2:traceState) =
   let r1 = taint_eval_code code s1 in
   let r2 = taint_eval_code code s2 in
  ( Some? r1 /\ Some? r2
@@ -55,10 +47,10 @@ let isExplicitLeakageFreeGivenStates (code:code) (ts:taintState) (ts':taintState
   /\ constTimeInvariant ts s1 s2
  ) ==> publicValuesAreSame ts' (Some?.v r1) (Some?.v r2)
 
-let isExplicitLeakageFree (code:code) (ts:taintState) (ts':taintState) =
+let isExplicitLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
   forall s1 s2.
     isExplicitLeakageFreeGivenStates code ts ts' s1 s2
 
-let isLeakageFree (code:code) (ts:taintState) (ts':taintState) =
+let isLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
     isConstantTime code ts
   /\ isExplicitLeakageFree code ts ts'
