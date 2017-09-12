@@ -136,7 +136,22 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
       let s = run (eval_ins ins.i) s in
       {state = s; trace = ts.trace; memTaint = memTaint}
 
-type tainted_code = precode tainted_ins ocmp
+type tainted_ocmp = |TaintedOCmp: o:ocmp -> t:option taint -> tainted_ocmp
+
+let get_fst_ocmp (o:ocmp) = match o with
+  | OEq o1 _ | ONe o1 _ | OLe o1 _ | OGe o1 _ | OLt o1 _ | OGt o1 _ -> o1
+
+let get_snd_ocmp (o:ocmp) = match o with
+  | OEq _ o2 | ONe _ o2 | OLe _ o2 | OGe _ o2 | OLt _ o2 | OGt _ o2 -> o2
+
+let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
+  match c.t with
+  | None -> ts, eval_ocmp ts.state c.o
+  | Some t ->
+    let s = run (check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
+    {ts with state = s}, eval_ocmp s c.o
+
+type tainted_code = precode tainted_ins tainted_ocmp
 type tainted_codes = list tainted_code
 
 let tainted_decr (c:tainted_code) (s:state) : nat =
@@ -163,9 +178,9 @@ let rec taint_eval_code c s =
     | Block l -> taint_eval_codes l s
     
     | IfElse ifCond ifTrue ifFalse ->
-      let b = eval_ocmp s.state ifCond in
+      let st, b = taint_eval_ocmp s ifCond in
       (* We add the BranchPredicate to the trace *)
-      let s' = {s with trace=BranchPredicate(b)::s.trace} in
+      let s' = {st with trace=BranchPredicate(b)::s.trace} in
       (* We evaluate the branch with the new trace *)
       if b then taint_eval_code ifTrue s' else taint_eval_code ifFalse s'
     
@@ -187,7 +202,7 @@ match l with
 and taint_eval_while c s0 =
   let While cond body inv = c in
   let n0 = eval_operand inv s0.state in
-  let b = eval_ocmp s0.state cond in
+  let (s0, b) = taint_eval_ocmp s0 cond in
 
   if UInt64.v n0 <= 0 then
     (* if loop invariant <= 0, the guard must be false, and we add the corresponding BranchPredicate *)
