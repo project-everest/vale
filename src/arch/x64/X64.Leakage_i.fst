@@ -192,10 +192,7 @@ let check_if_shl_consumes_fixed_time (dst:dst_op) src ts taint =
 
 
 let check_if_instruction_consumes_fixed_time (ins:tainted_ins) ts =
-  let taint = match ins.t with
-    | None -> Public
-    | Some t -> t
-  in
+  let taint = ins.t in
   match ins.i with
 
   | Mov64 dst src -> check_if_mov_consumes_fixed_time dst src ts taint
@@ -232,10 +229,7 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
   | Block block -> check_if_block_consumes_fixed_time block ts
 
   | IfElse ifCond ifTrue ifFalse ->
-    let cond_taint = match ifCond.ot with
-      | None -> Public
-      | Some t -> t
-    in
+    let cond_taint = ifCond.ot in
     let o1 = operand_taint (get_fst_ocmp ifCond.o) ts in
     let o2 = operand_taint (get_snd_ocmp ifCond.o) ts in
     let predTaint = merge_taint (merge_taint o1 o2) cond_taint in
@@ -261,10 +255,7 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
   | _ -> false, ts
   
 and check_if_loop_consumes_fixed_time (pred:tainted_ocmp) (body:tainted_code) (ts:taintState) : bool * taintState =
-  let cond_taint = match pred.ot with
-    | None -> Public
-    | Some t -> t
-  in
+  let cond_taint = pred.ot in
   let o1 = operand_taint (get_fst_ocmp pred.o) ts in
   let o2 = operand_taint (get_snd_ocmp pred.o) ts in
   let predTaint = merge_taint (merge_taint o1 o2) cond_taint in

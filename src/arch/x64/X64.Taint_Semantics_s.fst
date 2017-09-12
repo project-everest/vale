@@ -19,7 +19,7 @@ noeq type traceState = {
   memTaint: map int taint;
 }
 
-type tainted_ins = |TaintedIns: i:ins -> t:option taint -> tainted_ins
+type tainted_ins = |TaintedIns: i:ins -> t:taint -> tainted_ins
 
 let operand_obs (s:traceState) (o:operand) : list observation =
   match o with
@@ -61,12 +61,8 @@ let update_taint (memTaint:map int taint) (dst:dst_op) (t:taint) (s:state) =
         memTaint.[ptr] <- t
 
 let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
-  match ins.t with
-  (* No taint in this ins, we execute with the Intel semantics *)
-  | None -> let s = run (eval_ins ins.i) ts.state in
-    {ts with state = s}
-  (* Taint annotation, we use tainted semantics *)
-  | Some t -> match ins.i with
+  let t = ins.t in
+  match ins.i with
     | Mov64 dst src -> 
       (* Checks that the taint information on src is correct *)
       let s = run (check (taint_match src t ts.memTaint)) ts.state in
@@ -136,7 +132,7 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
       let s = run (eval_ins ins.i) s in
       {state = s; trace = ts.trace; memTaint = memTaint}
 
-type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:option taint -> tainted_ocmp
+type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:taint -> tainted_ocmp
 
 let get_fst_ocmp (o:ocmp) = match o with
   | OEq o1 _ | ONe o1 _ | OLe o1 _ | OGe o1 _ | OLt o1 _ | OGt o1 _ -> o1
@@ -145,10 +141,8 @@ let get_snd_ocmp (o:ocmp) = match o with
   | OEq _ o2 | ONe _ o2 | OLe _ o2 | OGe _ o2 | OLt _ o2 | OGt _ o2 -> o2
 
 let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
-  match c.ot with
-  | None -> ts, eval_ocmp ts.state c.o
-  | Some t ->
-    let s = run (check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
+  let t = c.ot in
+  let s = run (check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
     {ts with state = s}, eval_ocmp s c.o
 
 type tainted_code = precode tainted_ins tainted_ocmp
