@@ -136,7 +136,7 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
       let s = run (eval_ins ins.i) s in
       {state = s; trace = ts.trace; memTaint = memTaint}
 
-type tainted_ocmp = |TaintedOCmp: o:ocmp -> t:option taint -> tainted_ocmp
+type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:option taint -> tainted_ocmp
 
 let get_fst_ocmp (o:ocmp) = match o with
   | OEq o1 _ | ONe o1 _ | OLe o1 _ | OGe o1 _ | OLt o1 _ | OGt o1 _ -> o1
@@ -145,7 +145,7 @@ let get_snd_ocmp (o:ocmp) = match o with
   | OEq _ o2 | ONe _ o2 | OLe _ o2 | OGe _ o2 | OLt _ o2 | OGt _ o2 -> o2
 
 let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
-  match c.t with
+  match c.ot with
   | None -> ts, eval_ocmp ts.state c.o
   | Some t ->
     let s = run (check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
