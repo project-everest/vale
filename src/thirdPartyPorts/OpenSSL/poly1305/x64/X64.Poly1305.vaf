@@ -512,6 +512,10 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
 }
 */
 
+#verbatim
+#reset-options "--z3rlimit 200"
+#endverbatim
+
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:timeLimitMultiplier 2} poly1305_last_block(
     inout dst_operand h0:uint64,
@@ -636,6 +640,9 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal_opaque(modp'); }
 }
 
+#verbatim
+#reset-options "--z3rlimit 20"
+#endverbatim
 
 // h := (h % p) % 2^128;
 procedure poly1305_reduce_last(
@@ -1013,7 +1020,8 @@ procedure {:frame false} poly1305(
 #verbatim
 
 let print_poly1305 (p:printer) : FStar.All.ML unit =
-  let poly_code = va_code_poly1305_multiply (OReg R8) (OReg R9) (OReg R10) (OReg R11) (OReg R13) (OReg R14) (OReg Rbx) (OReg Rbp) in
+  let poly_code = va_code_poly1305 false (OReg Rdi) (OReg Rsi) (OReg Rdx) (OReg R11) 
+                                   (OReg R12) (OReg R14) (OReg Rbx) (OReg Rbp) in
   print_header p;
   print_proc "poly1305" poly_code 0 p;
   print_footer p
