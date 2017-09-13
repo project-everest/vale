@@ -1129,18 +1129,18 @@ procedure {:frame false} poly1305(
         key_r == lowerUpper128_opaque(key_r0, key_r1);
         key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
-//        validSrcAddrs(mem, ctx, 64, 24 * 8);
-//        validSrcAddrs(mem, inp, 64, (len + 15) / 16 * 16);
+//        validSrcAddrs(mem, ctx_in, 64, 24 * 8);
+//        validSrcAddrs(mem, inp, 64, (len_in + 15) / 16 * 16);
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
 //        memModified(old(mem), mem, old(ctx), 24 * 8);
-//        let h0_out := mem[ctx_in];
-//        let h1_out := mem[ctx_in + 8];
-//        h == lowerUpper128_opaque(h0_out, h1_out);
-//        let inp_mem := heapletTo128(mem, inp_in, len_in);
+        let h0_out := mem[ctx_in];
+        let h1_out := mem[ctx_in + 8];
+        h == lowerUpper128_opaque(h0_out, h1_out);
+        let inp_mem := heapletTo128(mem, inp_in, len_in);
 //        // TODO: Figure out why there's an internal Vale error on the inp_mem?[j] invocation
 //        //forall j :: inp_in <= j < inp_in + len_in && (j - inp_in) % 16 == 0 ==> inp_mem?[j];
-//        h == poly1305_hash(key_r, key_s, inp_mem, inp_in, len_in);
+        h == poly1305_hash(key_r, key_s, inp_mem, inp_in, len_in);
         h1 == old(h1);
         h2 == old(h2);
         ctx == old(ctx);
@@ -1184,7 +1184,8 @@ procedure {:frame false} poly1305(
 //    assert mem[ctx + 72] == old_h1;
 //    ghost var old_ctx := ctx;
 //    ghost var old_mem := mem;
-
+    ghost var old_inp := rsi;
+    ghost var old_len := rdx;
     h := poly1305_impl(ctx, key_r, key_s, /*n,*/ p);
 //    ghost var a := ctx + 72;
 //    assert ctx == old_ctx;
@@ -1194,8 +1195,12 @@ procedure {:frame false} poly1305(
 //    assert mem[ctx + 72] == old_mem[ctx + 72];
 //    assert mem[ctx + 72] == old_h1;
 
-//    assert {:fast_block} true;
+    heapletTo128_all_preserved(mem, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
+    assert {:fast_block} true;
     Store64(ctx, h0,  0);
+//    assert heapletTo128(mem, old_inp, old_len) == heapletTo128(pre_mem, old_inp, old_len);
+//    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, old_inp, old_len), old_inp, old_len);
+//    assume false;
     Store64(ctx, h1,  8);
 
     Load64(h1,  ctx, 72);

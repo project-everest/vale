@@ -38,6 +38,19 @@ let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
 
+val heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) : Lemma 
+  (requires  (forall (a:int) . m `Map.contains` a <==> m' `Map.contains` a) /\
+             (forall (a:int) .  m' `Map.contains` a /\ (i <= a) /\ a < (i + len) ==> m.[a] == m'.[a]))
+  (ensures  heapletTo128 m i len == heapletTo128 m' i len)
+             
+val heapletTo128_all_preserved (m:mem)(i:int) (len:nat) : Lemma 
+  (requires True)
+  (ensures (forall (m':mem) .
+             (forall (a:int) . m `Map.contains` a <==> m' `Map.contains` a) /\
+             (forall (a:int) .  m' `Map.contains` a /\ (i <= a) /\ a < (i + len) ==> m.[a] == m'.[a])
+             ==>
+             heapletTo128 m i len == heapletTo128 m' i len))
+
 let applyHeapletTo128 (m:mem) (i:int) (len:nat) (index:int) : nat128 =
   heapletTo128 m i len index 
 
