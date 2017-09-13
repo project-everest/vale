@@ -1141,14 +1141,14 @@ procedure {:frame false} poly1305(
 //        // TODO: Figure out why there's an internal Vale error on the inp_mem?[j] invocation
 //        //forall j :: inp_in <= j < inp_in + len_in && (j - inp_in) % 16 == 0 ==> inp_mem?[j];
 //        h == poly1305_hash(key_r, key_s, inp_mem, inp_in, len_in);
-//        h1 == old(h1);
-//        h2 == old(h2);
-//        ctx == old(ctx);
-//        inp == old(inp);
-//        r1 == old(r1);
-//        r13 == old(r13);
-//        h0 == old(h0);
-//        r15 == old(r15);
+        h1 == old(h1);
+        h2 == old(h2);
+        ctx == old(ctx);
+        inp == old(inp);
+        r1 == old(r1);
+        r13 == old(r13);
+        h0 == old(h0);
+        r15 == old(r15);
 {
     h := 0; 
     Mov64(rax, ctx);
@@ -1170,7 +1170,7 @@ procedure {:frame false} poly1305(
     //   56: will hold len % 16
     //   64: will hold len / 16 * 16
     //   72, 80, 88, 96, 104, 112, 120, 128: callee-save registers
-    ghost var old_h1 := h1;
+//    ghost var old_h1 := h1;
     assert {:fast_block} true;
     Store64(ctx, h1,  72);
     Store64(ctx, h2,  80);
@@ -1181,33 +1181,33 @@ procedure {:frame false} poly1305(
     Store64(ctx, h0,  120);
     Store64(ctx, r15, 128);
 
-    assert mem[ctx + 72] == old_h1;
-    ghost var old_ctx := ctx;
-    ghost var old_mem := mem;
+//    assert mem[ctx + 72] == old_h1;
+//    ghost var old_ctx := ctx;
+//    ghost var old_mem := mem;
 
     h := poly1305_impl(ctx, key_r, key_s, /*n,*/ p);
-    ghost var a := ctx + 72;
-    assert ctx == old_ctx;
-    assert ctx + 9*8 == ctx + 72;
-    assert a >= ctx + 9*8;
-    assert mem[a] == old_mem[a];
+//    ghost var a := ctx + 72;
+//    assert ctx == old_ctx;
+//    assert ctx + 9*8 == ctx + 72;
+//    assert a >= ctx + 9*8;
+//    assert mem[a] == old_mem[a];
 //    assert mem[ctx + 72] == old_mem[ctx + 72];
 //    assert mem[ctx + 72] == old_h1;
 
 //    assert {:fast_block} true;
-//    Store64(ctx, h0,  0);
-//    Store64(ctx, h1,  8);
-//
-//    Load64(h1,  ctx, 72);
-//    assert h1 == old_h1;
-//    Load64(h2,  ctx, 80);
-//    Load64(rax, ctx, 88);
-//    Load64(inp, ctx, 96);
-//    Load64(r1,  ctx, 104);
-//    Load64(r13, ctx, 112);
-//    Load64(h0,  ctx, 120);
-//    Load64(r15, ctx, 128);
-//    Mov64(ctx, rax);
+    Store64(ctx, h0,  0);
+    Store64(ctx, h1,  8);
+
+    Load64(h1,  ctx, 72);
+    //assert h1 == old_h1;
+    Load64(h2,  ctx, 80);
+    Load64(rax, ctx, 88);
+    Load64(inp, ctx, 96);
+    Load64(r1,  ctx, 104);
+    Load64(r13, ctx, 112);
+    Load64(h0,  ctx, 120);
+    Load64(r15, ctx, 128);
+    Mov64(ctx, rax);
 }
 
 /* TEMP3

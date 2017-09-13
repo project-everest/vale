@@ -33,7 +33,7 @@ let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
 
 let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
     (forall (a:int) . {:pattern (new_mem `Map.contains` a)} old_mem `Map.contains` a <==> new_mem `Map.contains` a) /\
-    (forall (a:int) . {:pattern (new_mem.[a])} a < ptr || a >= ptr + num_bytes ==> old_mem.[a] == new_mem.[a])
+    (forall (a:int) . {:pattern (new_mem.[a]) \/ Map.sel new_mem a} a < ptr || a >= ptr + num_bytes ==> old_mem.[a] == new_mem.[a])
     
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
