@@ -462,7 +462,7 @@ def add_dafny_verifier(env):
 
 def verify_fstar(env, targetfile, sourcefile):
   temptargetfile = targetfile + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$FSTAR $VERIFIER_FLAGS $FSTAR_Z3_PATH $SOURCE $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
+  temptarget = env.Command(temptargetfile, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
   return env.CopyAs(source=temptarget, target=targetfile)
 
 # Add env.FStar(), to verify a .fst or .fsti file into a .vfst or .vfsti
@@ -980,7 +980,7 @@ def report_verification_failures():
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
-                  if "(Error)" in line:
+                  if "(Error)" in line or "failed" in line:
                     line = "%s%s%s" % (colors['red'], line, colors['end'])
                   print line
 

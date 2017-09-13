@@ -22,6 +22,11 @@ lemma_BitwiseMul64()
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 
+let heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) =
+  admit()
+
+let heapletTo128_all_preserved (m:mem)(i:int) (len:nat) =
+  admit()
 
 let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k-i))
@@ -284,3 +289,6 @@ let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat6
 let lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) (k) (len:nat) =
   admit()
   // decreases k - i
+
+let lemma_add_mod128 (x y :int) =
+  reveal_opaque mod2_128'
