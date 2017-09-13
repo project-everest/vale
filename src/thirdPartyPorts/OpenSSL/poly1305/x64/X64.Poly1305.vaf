@@ -1129,11 +1129,11 @@ procedure {:frame false} poly1305(
         key_r == lowerUpper128_opaque(key_r0, key_r1);
         key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
-//        validSrcAddrs(mem, ctx_in, 64, 24 * 8);
-//        validSrcAddrs(mem, inp, 64, (len_in + 15) / 16 * 16);
+        validSrcAddrs(mem, ctx_in, 64, 24 * 8);
+        validSrcAddrs(mem, inp_in, 64, (len_in + 15) / 16 * 16);
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
-//        memModified(old(mem), mem, old(ctx), 24 * 8);
+        memModified(old(mem), mem, ctx_in, 24 * 8);
         let h0_out := mem[ctx_in];
         let h1_out := mem[ctx_in + 8];
         h == lowerUpper128_opaque(h0_out, h1_out);
