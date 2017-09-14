@@ -46,19 +46,29 @@ let set_taint (dst:dst_op) ts taint =
   | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint
   | OMem m -> ts (* Ensured by taint semantics *)
 
+let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintState) =
+  let b, ts' = res in
+  ((b2t b) ==> isConstantTime (Ins ins) ts) (*/\ ((b2t b) ==> isLeakageFree (Ins ins) ts ts')*)
+
+val check_if_mov_consumes_fixed_time: (dst:dst_op) -> (src:operand) -> (ts:taintState) -> (taint:taint) -> (res:(bool*taintState){ins_consumes_fixed_time (TaintedIns (Mov64 dst src) taint) ts res})
+
 let check_if_mov_consumes_fixed_time (dst:dst_op) src ts taint =
   let ftSrc = operand_does_not_use_secrets src ts in
   let ftDst = operand_does_not_use_secrets dst ts in
   let fixedTime = ftSrc && ftDst in
 
   assert_by_tactic (forall s1 s2. (operand_does_not_use_secrets dst ts /\ publicValuesAreSame ts s1 s2)  ==>
-    (operand_obs s1 dst) = (operand_obs s2 dst)) (s1 <-- forall_intro; s2 <-- forall_intro; apply_lemma (quote (lemma_operand_obs ts dst)));
-(*  assert_by_tactic (fixedTime ==> isConstantTime (Ins (TaintedIns (Mov64 dst src) taint)) ts) (apply_lemma (quote lemma_operand_obs)); *)
+    (operand_obs s1 dst) = (operand_obs s2 dst)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs ts dst)));
+  assert_by_tactic (forall s1 s2. (operand_does_not_use_secrets src ts /\ publicValuesAreSame ts s1 s2)  ==>
+    (operand_obs s1 src) = (operand_obs s2 src)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs ts src)));
+
+  assert(fixedTime ==> isConstantTime (Ins (TaintedIns (Mov64 dst src) taint)) ts);
 
   let srcTaint = merge_taint (operand_taint src ts) taint in
   match dst with
     | OReg r -> fixedTime, (set_taint dst ts srcTaint)
     | OMem m -> fixedTime, ts (* Handled by taint semantics *)
+
 
 let check_if_add_consumes_fixed_time (dst:dst_op) src ts taint =
   let ftSrc = operand_does_not_use_secrets src ts in
