@@ -903,14 +903,6 @@ procedure {:frame false} poly1305_impl(
 // affect the result.
 procedure {:frame false} poly1305(
     inline win:bool,
-    inout dst_operand ctx:uint64,
-    inout dst_operand inp:uint64,
-    inout dst_operand len:uint64,
-    inout dst_operand r0:uint64,
-    inout dst_operand r1:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
     ghost key_r:nat128,
     ghost key_s:nat128,
     //ghost n:int,
@@ -921,7 +913,7 @@ procedure {:frame false} poly1305(
 //    ghost ctx_id:heaplet_id,
 //    ghost inp_id:heaplet_id)
     returns(ghost h:int)
-    let ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
+    lets ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
     requires/ensures
         ok;
     modifies
@@ -997,7 +989,7 @@ procedure {:frame false} poly1305(
 
     ghost var old_inp := rsi;
     ghost var old_len := rdx;
-    h := poly1305_impl(ctx, key_r, key_s, /*n,*/ p);
+    h := poly1305_impl(key_r, key_s);
     heapletTo128_all_preserved(mem, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
 
     assert {:fast_block} true;
@@ -1018,8 +1010,7 @@ procedure {:frame false} poly1305(
 #verbatim
 
 let print_poly1305 (p:printer) : FStar.All.ML unit =
-  let poly_code = va_code_poly1305 false (OReg Rdi) (OReg Rsi) (OReg Rdx) (OReg R11) 
-                                   (OReg R12) (OReg R14) (OReg Rbx) (OReg Rbp) in
+  let poly_code = va_code_poly1305 false in
   print_header p;
   print_proc "poly1305" poly_code 0 p;
   print_footer p
