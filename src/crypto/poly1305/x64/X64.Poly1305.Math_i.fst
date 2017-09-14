@@ -28,23 +28,17 @@ let heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) =
 let heapletTo128_all_preserved (m:mem)(i:int) (len:nat) =
   admit()
 
-let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k-i))
-    =
-    if i = k then h
-    else
-        let kk = k - 16 in
-	assert (i >= 0 ==> precedes (kk - i) (k-i));
-	assert (i < 0 ==> precedes (kk - i) (k-i));
-	let hh = poly1305_heap_blocks' h pad r m i kk in
-        modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
-
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
 let poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
                          (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
  = poly1305_heap_blocks' h pad r m i k
 
+let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ 
+                              (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==>
+                                 m `Map.contains` j)}) =
+  ()                                 
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true --max_fuel 1 --max_ifuel 1 --smtencoding.nl_arith_repr native --z3rlimit 100 --using_facts_from Prims --using_facts_from FStar.Math.Lemmas"
 

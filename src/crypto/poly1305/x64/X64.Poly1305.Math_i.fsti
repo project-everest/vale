@@ -43,7 +43,7 @@ val heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) : Lemma
              (forall (a:int) .  m' `Map.contains` a /\ (i <= a) /\ a < (i + len) ==> m.[a] == m'.[a]))
   (ensures  heapletTo128 m i len == heapletTo128 m' i len)
              
-val heapletTo128_all_preserved (m:mem)(i:int) (len:nat) : Lemma 
+val heapletTo128_all_preserved (m:mem) (i:int) (len:nat) : Lemma 
   (requires True)
   (ensures (forall (m':mem) .
              (forall (a:int) . m `Map.contains` a <==> m' `Map.contains` a) /\
@@ -54,8 +54,27 @@ val heapletTo128_all_preserved (m:mem)(i:int) (len:nat) : Lemma
 let applyHeapletTo128 (m:mem) (i:int) (len:nat) (index:int) : nat128 =
   heapletTo128 m i len index 
 
+
+let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k-i))
+    =
+    if i = k then h
+    else
+        let kk = k - 16 in
+	assert (i >= 0 ==> precedes (kk - i) (k-i));
+	assert (i < 0 ==> precedes (kk - i) (k-i));
+	let hh = poly1305_heap_blocks' h pad r m i kk in
+        modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
+
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
                          (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
+
+val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ 
+                              (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==>
+                                 m `Map.contains` j)}) : Lemma
+  (requires True)
+  (ensures poly1305_heap_blocks h pad r m i k = poly1305_heap_blocks' h pad r m i k)
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
