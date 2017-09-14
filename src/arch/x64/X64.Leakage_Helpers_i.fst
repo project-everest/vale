@@ -1,5 +1,6 @@
 module X64.Leakage_Helpers_i
 open X64.Semantics_s
+open X64.Machine_s
 open X64.Taint_Semantics_s
 open X64.Leakage_s
 

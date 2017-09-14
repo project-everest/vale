@@ -5,6 +5,8 @@ open X64.Taint_Semantics_s
 open X64.Leakage_s
 open X64.Leakage_Helpers_i
 
+open FStar.Tactics
+
 let merge_taint t1 t2 =
   if Secret? t1 || Secret? t2 then
     Secret
@@ -31,16 +33,27 @@ let operand_does_not_use_secrets op ts =
   | OConst _ | OReg _ -> true
   | OMem m -> maddr_does_not_use_secrets m ts
 
+val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -> (s2:traceState) -> Lemma
+ (requires (operand_does_not_use_secrets dst ts) /\ publicValuesAreSame ts s1 s2)
+(ensures (operand_obs s1 dst) = (operand_obs s2 dst))
+
+let lemma_operand_obs ts dst s1 s2 = match dst with
+  | OConst _ | OReg _ -> ()
+  | OMem m -> ()
+  
 let set_taint (dst:dst_op) ts taint =
   match dst with
   | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint
   | OMem m -> ts (* Ensured by taint semantics *)
-      
 
 let check_if_mov_consumes_fixed_time (dst:dst_op) src ts taint =
   let ftSrc = operand_does_not_use_secrets src ts in
   let ftDst = operand_does_not_use_secrets dst ts in
   let fixedTime = ftSrc && ftDst in
+
+  assert_by_tactic (forall s1 s2. (operand_does_not_use_secrets dst ts /\ publicValuesAreSame ts s1 s2)  ==>
+    (operand_obs s1 dst) = (operand_obs s2 dst)) (s1 <-- forall_intro; s2 <-- forall_intro; apply_lemma (quote (lemma_operand_obs ts dst)));
+(*  assert_by_tactic (fixedTime ==> isConstantTime (Ins (TaintedIns (Mov64 dst src) taint)) ts) (apply_lemma (quote lemma_operand_obs)); *)
 
   let srcTaint = merge_taint (operand_taint src ts) taint in
   match dst with
