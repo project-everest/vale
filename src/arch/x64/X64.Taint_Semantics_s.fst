@@ -1,6 +1,8 @@
 module X64.Taint_Semantics_s
 
 open FStar.BaseTypes
+open FStar.List.Tot.Base
+
 open X64.Machine_s
 open X64.Semantics_s
 
@@ -19,7 +21,43 @@ noeq type traceState = {
   memTaint: map int taint;
 }
 
-type tainted_ins = |TaintedIns: i:ins -> t:taint -> tainted_ins
+type ins_tag =
+  | Mov
+  | Add
+  | AddLea
+  | AddCarry
+  | Sub
+  | Mul
+  | IMul
+  | Xor
+  | And
+  | Shr
+  | Shl
+
+let ndsts (i : ins_tag) : nat = match i with
+  | Mul -> 2
+  | _ -> 1
+
+let nsrcs (i:ins_tag) : nat = match i with
+  | Mov | Mul -> 1
+  | AddLea -> 3
+  | _ -> 2
+
+let create_ins (ids:(ins_tag * list dst_op * list operand){let i, d, s = ids in length d = ndsts i && length s = nsrcs i}) : ins = let i, dsts, srcs = ids in
+  match i with
+  | Mov -> Mov64 (hd dsts) (hd srcs)
+  | Add -> Add64 (hd dsts) (hd (tl srcs))
+  | AddLea -> AddLea64 (hd dsts) (hd (tl srcs)) (hd (tl (tl srcs)))
+  | AddCarry -> AddCarry64 (hd dsts) (hd (tl srcs))
+  | Sub -> Sub64 (hd dsts) (hd (tl srcs))
+  | Mul -> Mul64 (hd srcs)
+  | IMul -> IMul64 (hd dsts) (hd (tl srcs))
+  | Xor -> Xor64 (hd dsts) (hd (tl srcs))
+  | And -> And64 (hd dsts) (hd (tl srcs))
+  | Shr -> Shr64 (hd dsts) (hd (tl srcs))
+  | Shl -> Shl64 (hd dsts) (hd (tl srcs))
+
+type tainted_ins = |TaintedIns: ids:(ins_tag * list dst_op * list operand){let i, d, s = ids in length d = ndsts i && length s = nsrcs i} -> ins: ins{ins = create_ins ids} -> t:taint -> tainted_ins
 
 let operand_obs (s:traceState) (o:operand) : list observation =
   match o with
@@ -28,23 +66,17 @@ let operand_obs (s:traceState) (o:operand) : list observation =
       | MConst _ -> []
       | MReg reg _ -> [MemAccess (eval_reg reg s.state)]
       | MIndex base _ index _ -> [MemAccessOffset (eval_reg base s.state) (eval_reg index s.state)]
-  
+
+let rec operand_obs_list (s:traceState) (o:list operand) : list observation =
+  match o with
+  | [] -> []
+  | hd :: tl -> operand_obs s hd @ (operand_obs_list s tl)
+
+let dst_to_op (x:dst_op) : operand = x
+
 let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
-  match ins.i with
-  | Mov64 dst src ->
-      (operand_obs s dst) @ (operand_obs s src)
-  | Add64 dst src ->
-      (operand_obs s dst) @ (operand_obs s src)
-  | AddLea64 dst src1 src2 ->
-      (operand_obs s dst) @ (operand_obs s src1) @ (operand_obs s src2)
-  | AddCarry64 dst src -> (operand_obs s dst) @ (operand_obs s src)
-  | Sub64 dst src -> (operand_obs s dst) @ (operand_obs s src)
-  | Mul64 src -> operand_obs s src
-  | IMul64 dst src -> (operand_obs s dst) @ (operand_obs s src)
-  | Xor64 dst src -> (operand_obs s dst) @ (operand_obs s src)
-  | And64 dst src -> (operand_obs s dst) @ (operand_obs s src)
-  | Shr64 dst amt -> (operand_obs s dst) @ (operand_obs s amt)
-  | Shl64 dst amt -> (operand_obs s dst) @ (operand_obs s amt)
+  let (i, dsts, srcs) = ins.ids in
+  (operand_obs_list s (List.Tot.Base.map dst_to_op dsts)) @ (operand_obs_list s srcs)
 
 (* Checks if the taint of an operand matches the ins annotation *)
 let taint_match (o:operand) (t:taint) (memTaint:map int taint) (s:state) : bool =
@@ -54,76 +86,28 @@ let taint_match (o:operand) (t:taint) (memTaint:map int taint) (s:state) : bool 
         let ptr = eval_maddr m s in
 	memTaint.[ptr] = t
 
+let rec taint_match_list o t memTaint s : bool = match o with
+  | [] -> true
+  | hd::tl -> (taint_match hd t memTaint s) && taint_match_list tl t memTaint s
+
 let update_taint (memTaint:map int taint) (dst:dst_op) (t:taint) (s:state) =
   match dst with
     | OReg _ -> memTaint
     | OMem m -> let ptr = eval_maddr m s in
         memTaint.[ptr] <- t
 
+val update_taint_list: (memTaint:map int taint) -> (dst:list dst_op) -> (t:taint) -> (s:state) -> Tot (map int taint) (decreases %[dst])
+let rec update_taint_list memTaint (dst:list dst_op) t s = match dst with
+  | [] -> memTaint
+  | hd :: tl -> update_taint_list (update_taint memTaint hd t s) tl t s
+
 let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
   let t = ins.t in
-  let s, memTaint = match ins.i with
-    | Mov64 dst src -> 
-      (* Checks that the taint information on src is correct *)
-      let s = run (check (taint_match src t ts.memTaint)) ts.state in
-      (* Propagates the taint information before modifying memory *)
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-      
-    | Add64 dst src ->
-      (* Check that both operands have the correct taint *)
-      let s = run (check (taint_match src t ts.memTaint);; check (taint_match dst t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-     
-    | AddLea64 dst src1 src2 ->
-      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src1 t ts.memTaint);; check (taint_match src2 t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-    
-    | AddCarry64 dst src -> 
-      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-      
-
-    | Sub64 dst src ->
-      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-      
-    | Mul64 src ->
-      let s = run (check (taint_match src t ts.memTaint)) ts.state in
-      s, ts.memTaint
-      
-    | IMul64 dst src -> 
-      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-  
-    | Xor64 dst src ->
-      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-  
-    | And64 dst src ->
-      let s = run (check (taint_match dst t ts.memTaint);; check (taint_match src t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-  
-    | Shr64 dst amt ->
-      let s = run (check (taint_match dst t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-  
-    | Shl64 dst amt ->
-      let s = run (check (taint_match dst t ts.memTaint)) ts.state in
-      let memTaint = update_taint ts.memTaint dst t s in
-      s, memTaint
-  
-  in
+  let i, dsts, srcs = ins.ids in
+  let s = run (check (taint_match_list srcs t ts.memTaint)) ts.state in
+  let memTaint = update_taint_list ts.memTaint dsts t s in
   (* Execute the instruction *)
-  let s = run (eval_ins ins.i) s in
+  let s = run (eval_ins ins.ins) s in
   {state = s; trace = ts.trace; memTaint = memTaint}
 
 type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:taint -> tainted_ocmp

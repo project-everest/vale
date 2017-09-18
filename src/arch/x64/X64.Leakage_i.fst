@@ -50,6 +50,41 @@ let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintS
   let b, ts' = res in
   ((b2t b) ==> isConstantTime (Ins ins) ts) (*/\ ((b2t b) ==> isLeakageFree (Ins ins) ts ts')*)
 
+let rec operands_do_not_use_secrets ops ts = match ops with
+  | [] -> true
+  | hd :: tl -> operand_does_not_use_secrets hd ts && (operands_do_not_use_secrets tl ts)
+
+let rec sources_taint srcs ts taint = match srcs with
+  | [] -> taint
+  | hd :: tl -> merge_taint (operand_taint hd ts) (sources_taint tl ts taint)
+
+let rec set_taints dsts ts taint = match dsts with
+  | [] -> ts
+  | hd :: tl -> set_taints tl (set_taint hd ts taint) taint
+
+val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (ts:taintState) -> (res:(bool*taintState)(*{ins_consumes_fixed_time ins ts res}*))
+
+let check_if_ins_consumes_fixed_time ins ts =
+  let i, dsts, srcs = ins.ids in
+  let ftSrcs = operands_do_not_use_secrets srcs ts in
+  let ftDsts = operands_do_not_use_secrets (List.Tot.Base.map dst_to_op dsts) ts in
+  let fixedTime = ftSrcs && ftDsts in
+
+  assert_by_tactic (forall dst s1 s2. (operand_does_not_use_secrets dst ts /\ publicValuesAreSame ts s1 s2)  ==>
+    (operand_obs s1 dst) = (operand_obs s2 dst)) (dst <-- forall_intro; s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs ts)));
+
+  assert (forall s1 s2. (operands_do_not_use_secrets dsts ts /\ publicValuesAreSame ts s1 s2) ==>
+    (operand_obs_list s1 dsts) = (operand_obs_list s2 dsts));
+(*  assert (fixedTime ==> (isConstantTime (Ins ins) ts)); *)
+  let taint = sources_taint srcs ts ins.t in
+  let ts' = set_taints dsts ts taint in
+  (* TODO : Probably check on dsts for fixedTime *)
+  (* Handle Xor *)
+  match i with
+    | Mov -> fixedTime, ts
+    | _ -> false, (TaintState ts'.regTaint Secret)
+  
+
 val check_if_mov_consumes_fixed_time: (dst:dst_op) -> (src:operand) -> (ts:taintState) -> (taint:taint) -> (res:(bool*taintState){ins_consumes_fixed_time (TaintedIns (Mov64 dst src) taint) ts res})
 
 let check_if_mov_consumes_fixed_time (dst:dst_op) src ts taint =
