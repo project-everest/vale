@@ -500,8 +500,6 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
 */
 }
 
-/* TMP1
-
 #verbatim
 #reset-options "--z3rlimit 200"
 #endverbatim
@@ -981,7 +979,7 @@ procedure {:frame false} poly1305(
     ghost var old_inp := rsi;
     ghost var old_len := rdx;
     h := poly1305_impl(key_r, key_s);
-    heapletTo128_all_preserved(mem, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
+    heapletTo128_all_preserved(mem, ctx, 9 * 8, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
 
     assert {:fast_block} true;
     Store64(ctx, h0,  0);
@@ -1013,4 +1011,3 @@ let main () : FStar.All.ML unit =
 
 #endverbatim
 
-TMP1*/ 

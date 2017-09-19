@@ -22,11 +22,37 @@ lemma_BitwiseMul64()
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 
+(*
 let heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) =
   admit()
+*)
+(*
+let heapletTo128_preserved (m:mem) (ptr num_bytes i:int) (len:nat) (m':mem) :  
+  Lemma(memModified m m' ptr num_bytes /\
+        disjoint ptr num_bytes i ((len + 15) / 16 * 16)
+        ==> heapletTo128 m i len == heapletTo128 m' i len)
+  =
+  let open FStar.FunctionalExtensionality in
+  assert (memModified m m' ptr num_bytes /\
+          disjoint ptr num_bytes i ((len + 15) / 16 * 16) 
+          ==> feq (heapletTo128 m i len) (heapletTo128 m' i len));
+  ()
+*)
+let heapletTo128_all_preserved (m:mem) (ptr num_bytes i:int) (len:nat) =
+  let equality_test (m':mem) = heapletTo128 m i len == heapletTo128 m' i len in
+  let heapletTo128_preserved (m':mem) :  
+  Lemma(memModified m m' ptr num_bytes /\
+        disjoint ptr num_bytes i ((len + 15) / 16 * 16)
+        ==> equality_test m')
+        =
+        let open FStar.FunctionalExtensionality in
+        assert (memModified m m' ptr num_bytes /\
+               disjoint ptr num_bytes i ((len + 15) / 16 * 16) 
+               ==> feq (heapletTo128 m i len) (heapletTo128 m' i len));
+        () in        
+  FStar.Classical.forall_intro (heapletTo128_preserved);
+  ()
 
-let heapletTo128_all_preserved (m:mem)(i:int) (len:nat) =
-  admit()
 
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
