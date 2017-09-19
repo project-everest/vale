@@ -2,11 +2,11 @@ include "leakage-helpers.i.dfy"
 include "vale.i.dfy"
 include "leakage.s.dfy"
 
-module x86_const_time_i {
+module x64_const_time_i {
 
-import opened x86_leakage_helpers
-import opened x86_vale_i
-import opened x86_leakage_s
+import opened x64_leakage_helpers
+import opened x64_vale_i
+import opened x64_leakage_s
 
 method mergeTaint(t1:taint, t2:taint)
     returns (taint:taint)
@@ -49,6 +49,45 @@ method operandTaint(op:operand, ts:taintState)
         case OStack(slot)       =>
             if slot in ts.stackTaint {
                 operandTaint := ts.stackTaint[slot];
+            } else {
+                operandTaint := Secret;
+            }
+        case OHeap(addr, taint) => {
+            operandTaint := taint;
+        }
+    }
+}
+
+method operandTaint64(op:operand, ts:taintState)
+    returns (operandTaint:taint)
+
+    ensures operandTaint == specOperandTaint64(op, ts)
+    ensures operandTaint == Public ==>
+        ((op.OReg?   ==>
+            ((op.r.X86Xmm? && op.r.xmm in ts.xmmTaint)
+            || op.r in ts.regTaint))
+        && (op.OStack? ==> op.s in ts.stackTaint))
+{
+    match op {
+        case OConst(_)          => operandTaint := Public;
+        case OReg(reg)          =>
+            if reg.X86Xmm? {
+                if reg.xmm in ts.xmmTaint {
+                    operandTaint := ts.xmmTaint[reg.xmm];
+                } else {
+                    operandTaint := Secret;
+                }
+            } else if reg in ts.regTaint {
+                operandTaint := ts.regTaint[reg];
+            } else {
+                operandTaint := Secret;
+            }
+
+        case OStack(slot)       =>
+            if slot in ts.stackTaint && slot + 1 in ts.stackTaint {
+                var taint1 := ts.stackTaint[slot];
+                var taint2 := ts.stackTaint[slot + 1];
+                operandTaint := mergeTaint(taint1, taint2);
             } else {
                 operandTaint := Secret;
             }
@@ -119,6 +158,31 @@ method setTaint(value:Value, ts:taintState, valueTaint:taint)
     }
 }
 
+method setTaint64(value:Value, ts:taintState, valueTaint:taint)
+    returns (ts':taintState)
+
+    requires value.Operand?;
+
+    requires value.o.OConst? == false;
+    requires value.o.OHeap? == false;
+    ensures value.o.OReg?
+        ==> ts' == ts.(regTaint := ts.regTaint[value.o.r := valueTaint]);
+    ensures value.o.OStack?
+        ==> ts' == ts.(stackTaint := ts.stackTaint[value.o.s := valueTaint][value.o.s + 1 := valueTaint]);
+    ensures value.o.OHeap?  ==> ts == ts';
+{
+    match value.o {
+        case OReg(reg)      =>
+            ts' := ts.(regTaint := ts.regTaint[reg := valueTaint]);
+
+        case OStack(slot)   =>
+            ts' := ts.(stackTaint := ts.stackTaint[slot := valueTaint][slot + 1 := valueTaint]);
+
+        case OHeap(_, _)    =>
+            ts' := ts;
+    }
+}
+
 method checkIfMov32ConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -152,6 +216,41 @@ method checkIfMov32ConsumesFixedTime(ins:ins, ts:taintState)
 
     lemma_Mov32Helper1(ins, fixedTime, ts, ts');
     lemma_Mov32Helper2(ins, fixedTime, ts, ts');
+}
+
+method checkIfMov64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Mov64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcMov64;
+    var dst := ins.dstMov64;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        fixedTime := fixedTime && !(srcTaint.Secret? && dst.taint.Public?);
+        ts' := ts;
+    } else {
+        ts' := setTaint64(Operand(dst), ts, srcTaint);
+    }
+
+    if fixedTime == false {
+        return;
+    }
+
+    lemma_Mov64Helper1(ins, fixedTime, ts, ts');
+    lemma_Mov64Helper2(ins, fixedTime, ts, ts');
 }
 
 method checkIfNot32ConsumesFixedTime(ins:ins, ts:taintState)
@@ -254,6 +353,80 @@ method checkIfAdd32ConsumesFixedTime(ins:ins, ts:taintState)
     lemma_Add32Helper2(ins, fixedTime, ts, ts');
 }
 
+method checkIfAdd64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Add64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcAdd64;
+    var dst := ins.dstAdd64;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_Add64Helper1(ins, fixedTime, ts, ts');
+    lemma_Add64Helper2(ins, fixedTime, ts, ts');
+}
+
+method checkIfAddLea64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.AddLea64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src1 := ins.src1AddLea64;
+    var src2 := ins.src2AddLea64;
+    var dst := ins.dstAddLea64;
+
+    var ftSrc1 := operandDoesNotUseSecrets(src1, ts);
+    var ftSrc2 := operandDoesNotUseSecrets(src2, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+
+    fixedTime := ftSrc1 && ftSrc2 && ftDst;
+
+    var src1Taint := operandTaint64(src1, ts);
+    var src2Taint := operandTaint64(src2, ts);
+    var dstTaint := operandTaint64(dst, ts);
+
+    var srcTaint := mergeTaint(src1Taint, src2Taint);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_AddLea64Helper1(ins, fixedTime, ts, ts');
+    lemma_AddLea64Helper2(ins, fixedTime, ts, ts');
+}
+
 method checkIfSub32ConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -288,6 +461,40 @@ method checkIfSub32ConsumesFixedTime(ins:ins, ts:taintState)
     lemma_Sub32Helper2(ins, fixedTime, ts, ts');
 }
 
+method checkIfSub64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Sub64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcSub64;
+    var dst := ins.dstSub64;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_Sub64Helper1(ins, fixedTime, ts, ts');
+    lemma_Sub64Helper2(ins, fixedTime, ts, ts');
+}
+
 method checkIfMul32ConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -309,6 +516,63 @@ method checkIfMul32ConsumesFixedTime(ins:ins, ts:taintState)
 
     lemma_Mul32Helper1(ins, fixedTime, ts, ts');
     lemma_Mul32Helper2(ins, fixedTime, ts, ts');
+}
+
+method checkIfMul64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Mul64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcMul64;
+    fixedTime := operandDoesNotUseSecrets(src, ts);
+
+    var eaxTaint := operandTaint64(OReg(X86Eax), ts);
+    var srcTaint := operandTaint64(src, ts);
+    var taint := mergeTaint(srcTaint, eaxTaint);
+
+    ts' := setTaint64(Operand(OReg(X86Eax)), ts, taint);
+    ts' := setTaint64(Operand(OReg(X86Edx)), ts', taint);
+    ts' := ts'.(flagsTaint := Secret);
+
+    lemma_Mul64Helper1(ins, fixedTime, ts, ts');
+    lemma_Mul64Helper2(ins, fixedTime, ts, ts');
+}
+
+method checkIfIMul64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.IMul64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcIMul64;
+    var dst := ins.dstIMul64;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_IMul64Helper1(ins, fixedTime, ts, ts');
+    lemma_IMul64Helper2(ins, fixedTime, ts, ts');
 }
 
 method checkIfAddCarryConsumesFixedTime(ins:ins, ts:taintState)
@@ -348,6 +612,43 @@ method checkIfAddCarryConsumesFixedTime(ins:ins, ts:taintState)
     lemma_AddCarryHelper2(ins, fixedTime, ts, ts');
 }
 
+method checkIfAddCarry64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.AddCarry64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcAddCarry64;
+    var dst := ins.dstAddCarry64;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    var flagTaint := ts.flagsTaint;
+    taint := mergeTaint(taint, flagTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_AddCarry64Helper1(ins, fixedTime, ts, ts');
+    lemma_AddCarry64Helper2(ins, fixedTime, ts, ts');
+}
+
 method checkIfXor32ConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -385,6 +686,43 @@ method checkIfXor32ConsumesFixedTime(ins:ins, ts:taintState)
     lemma_Xor32Helper2(ins, fixedTime, ts, ts');
 }
 
+method checkIfXor64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Xor64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcXorq;
+    var dst := ins.dstXorq;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else if dst.OReg? && src.OReg? && src == dst {
+        ts' := setTaint64(Operand(dst), ts, Public);
+        ts' := ts'.(flagsTaint := Secret);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_Xor64Helper1(ins, fixedTime, ts, ts');
+    lemma_Xor64Helper2(ins, fixedTime, ts, ts');
+}
+
 method checkIfAnd32ConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -417,6 +755,40 @@ method checkIfAnd32ConsumesFixedTime(ins:ins, ts:taintState)
 
     lemma_And32Helper1(ins, fixedTime, ts, ts');
     lemma_And32Helper2(ins, fixedTime, ts, ts');
+}
+
+method checkIfAnd64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.And64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var src := ins.srcAnd64;
+    var dst := ins.dstAnd64;
+
+    var ftSrc := operandDoesNotUseSecrets(src, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftSrc && ftDst;
+
+    var srcTaint := operandTaint64(src, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(srcTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_And64Helper1(ins, fixedTime, ts, ts');
+    lemma_And64Helper2(ins, fixedTime, ts, ts');
 }
 
 method checkIfGetCfConsumesFixedTime(ins:ins, ts:taintState)
@@ -582,6 +954,40 @@ method checkIfShl32ConsumesFixedTime(ins:ins, ts:taintState)
     lemma_Shl32Helper2(ins, fixedTime, ts, ts');
 }
 
+method checkIfShl64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Shl64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var amt := ins.amountShlConst64;
+    var dst := ins.dstShlConst64;
+
+    var ftAmt := operandDoesNotUseSecrets(amt, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftAmt && ftDst;
+
+    var amtTaint := operandTaint64(amt, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(amtTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_Shl64Helper1(ins, fixedTime, ts, ts');
+    lemma_Shl64Helper2(ins, fixedTime, ts, ts');
+}
+
 method checkIfShr32ConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -614,6 +1020,40 @@ method checkIfShr32ConsumesFixedTime(ins:ins, ts:taintState)
 
     lemma_Shr32Helper1(ins, fixedTime, ts, ts');
     lemma_Shr32Helper2(ins, fixedTime, ts, ts');
+}
+
+method checkIfShr64ConsumesFixedTime(ins:ins, ts:taintState)
+    returns (fixedTime:bool, ts':taintState)
+
+    requires ins.Shr64?;
+    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
+    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
+    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
+{
+    var amt := ins.amountShrConst64;
+    var dst := ins.dstShrConst64;
+
+    var ftAmt := operandDoesNotUseSecrets(amt, ts);
+    var ftDst := operandDoesNotUseSecrets(dst, ts);
+    fixedTime := ftAmt && ftDst;
+
+    var amtTaint := operandTaint64(amt, ts);
+    var dstTaint := operandTaint64(dst, ts);
+    var taint := mergeTaint(amtTaint, dstTaint);
+
+    if dst.OConst? {
+        fixedTime := false;
+        ts' := ts;
+    } else if dst.OHeap? {
+        ts' := ts.(flagsTaint := Secret);
+        fixedTime := fixedTime && !(taint.Secret? && dst.taint.Public?);
+    } else {
+        ts' := setTaint64(Operand(dst), ts, taint);
+        ts' := ts'.(flagsTaint := Secret);
+    }
+
+    lemma_Shr64Helper1(ins, fixedTime, ts, ts');
+    lemma_Shr64Helper2(ins, fixedTime, ts, ts');
 }
 
 method checkIfAESNI_encConsumesFixedTime(ins:ins, ts:taintState)
@@ -889,20 +1329,31 @@ method checkIfInstructionConsumesFixedTime(ins:ins, ts:taintState)
     ensures fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
 {
     match ins {
-        case Mov32(dst,src)     => fixedTime, ts' := checkIfMov32ConsumesFixedTime(ins, ts);
         case Rand(x)            => fixedTime, ts' := checkIfRandConsumesFixedTime(ins, ts);
+        case Mov32(dst,src)     => fixedTime, ts' := checkIfMov32ConsumesFixedTime(ins, ts);
+        case Mov64(dst,src)     => fixedTime, ts' := checkIfMov64ConsumesFixedTime(ins, ts);
         case Add32(dst, src)    => fixedTime, ts' := checkIfAdd32ConsumesFixedTime(ins, ts);
+        case Add64(dst, src)    => fixedTime, ts' := checkIfAdd64ConsumesFixedTime(ins, ts);
+        case AddLea64(dst, src1, src2) => fixedTime, ts' := checkIfAddLea64ConsumesFixedTime(ins, ts);
         case Sub32(dst, src)    => fixedTime, ts' := checkIfSub32ConsumesFixedTime(ins, ts);
+        case Sub64(dst, src)    => fixedTime, ts' := checkIfSub64ConsumesFixedTime(ins, ts);
         case Mul32(src)         => fixedTime, ts' := checkIfMul32ConsumesFixedTime(ins, ts);
+        case Mul64(src)         => fixedTime, ts' := checkIfMul64ConsumesFixedTime(ins, ts);
+        case IMul64(dst, src)   => fixedTime, ts' := checkIfIMul64ConsumesFixedTime(ins, ts);
         case AddCarry(dst, src) => fixedTime, ts' := checkIfAddCarryConsumesFixedTime(ins, ts);
+        case AddCarry64(dst, src) => fixedTime, ts' := checkIfAddCarry64ConsumesFixedTime(ins, ts);
         case Xor32(dst, src)    => fixedTime, ts' := checkIfXor32ConsumesFixedTime(ins, ts);
+        case Xor64(dst, src)    => fixedTime, ts' := checkIfXor64ConsumesFixedTime(ins, ts);
         case And32(dst, src)    => fixedTime, ts' := checkIfAnd32ConsumesFixedTime(ins, ts);
+        case And64(dst, src)    => fixedTime, ts' := checkIfAnd64ConsumesFixedTime(ins, ts);
         case Not32(dst)         => fixedTime, ts' := checkIfNot32ConsumesFixedTime(ins, ts);
         case GetCf(dst)         => fixedTime, ts' := checkIfGetCfConsumesFixedTime(ins, ts);
         case Rol32(dst, amount) => fixedTime, ts' := checkIfRol32ConsumesFixedTime(ins, ts);
         case Ror32(dst, amount) => fixedTime, ts' := checkIfRor32ConsumesFixedTime(ins, ts);
         case Shl32(dst, amount) => fixedTime, ts' := checkIfShl32ConsumesFixedTime(ins, ts);
+        case Shl64(dst, amount) => fixedTime, ts' := checkIfShl64ConsumesFixedTime(ins, ts);
         case Shr32(dst, amount) => fixedTime, ts' := checkIfShr32ConsumesFixedTime(ins, ts);
+        case Shr64(dst, amount) => fixedTime, ts' := checkIfShr64ConsumesFixedTime(ins, ts);
         case BSwap32(dst)       => fixedTime, ts' := checkIfBSwap32ConsumesFixedTime(ins, ts);
         case AESNI_enc(dst, src)                => fixedTime, ts' := checkIfAESNI_encConsumesFixedTime(ins, ts);
         case AESNI_enc_last(dst, src)           => fixedTime, ts' := checkIfAESNI_enc_lastConsumesFixedTime(ins, ts);
@@ -1102,8 +1553,8 @@ lemma{:fuel evalCode, 0}{:fuel evalWhile, 0} lemma_checkIfLoopConsumesFixedTimeH
     requires state1'.ok;
     requires state2.ok;
     requires state2'.ok;
-    requires specOperandTaint(pred.o1, ts).Public?;
-    requires specOperandTaint(pred.o2, ts).Public?;
+    requires specOperandTaint64(pred.o1, ts).Public?;
+    requires specOperandTaint64(pred.o2, ts).Public?;
     requires specOperandDoesNotUseSecrets(pred.o1, ts);
     requires specOperandDoesNotUseSecrets(pred.o2, ts);
     requires constTimeInvariant(ts, state1, state2);
@@ -1116,10 +1567,10 @@ lemma{:fuel evalCode, 0}{:fuel evalWhile, 0} lemma_checkIfLoopConsumesFixedTimeH
                  && pre_guard_state2.ok
                  && loop_end1.ok
                  && loop_end2.ok
-                 && ValidSourceOperand(pre_guard_state1, 32, pred.o1)
-                 && ValidSourceOperand(pre_guard_state1, 32, pred.o2)
-                 && ValidSourceOperand(pre_guard_state2, 32, pred.o1)
-                 && ValidSourceOperand(pre_guard_state2, 32, pred.o2)
+                 && ValidSourceOperand(pre_guard_state1, 64, pred.o1)
+                 && ValidSourceOperand(pre_guard_state1, 64, pred.o2)
+                 && ValidSourceOperand(pre_guard_state2, 64, pred.o1)
+                 && ValidSourceOperand(pre_guard_state2, 64, pred.o2)
                  && evalOBool(pre_guard_state1, pred)
                  && evalOBool(pre_guard_state2, pred)
                  && branchRelation(pre_guard_state1, loop_start1, true)
@@ -1131,8 +1582,8 @@ lemma{:fuel evalCode, 0}{:fuel evalWhile, 0} lemma_checkIfLoopConsumesFixedTimeH
     decreases n1;
     ensures  constTimeInvariant(ts, state1', state2');
 {
-    lemma_ValuesOfPublic32BitOperandAreSame(ts, state1, state2, pred.o1);
-    lemma_ValuesOfPublic32BitOperandAreSame(ts, state1, state2, pred.o2);
+    lemma_ValuesOfPublic64BitOperandAreSame(ts, state1, state2, pred.o1);
+    lemma_ValuesOfPublic64BitOperandAreSame(ts, state1, state2, pred.o2);
     assert evalOBool(state1, pred) == evalOBool(state2, pred);
 
     if n1 == 0 {
@@ -1175,8 +1626,8 @@ method { :timeLimitMultiplier 2 } checkIfLoopConsumesFixedTime(pred:obool, body:
     while (!done)
         invariant taintStateModInvariant(ts, ts');
         invariant taintStateSubset(ts, ts');
-        invariant done ==> specOperandTaint(pred.o1, ts').Public?;
-        invariant done ==> specOperandTaint(pred.o2, ts').Public?;
+        invariant done ==> specOperandTaint64(pred.o1, ts').Public?;
+        invariant done ==> specOperandTaint64(pred.o2, ts').Public?;
         invariant done ==> specOperandDoesNotUseSecrets(pred.o1, ts');
         invariant done ==> specOperandDoesNotUseSecrets(pred.o2, ts');
         invariant done ==>
@@ -1185,10 +1636,10 @@ method { :timeLimitMultiplier 2 } checkIfLoopConsumesFixedTime(pred:obool, body:
                      && pre_guard_state2.ok
                      && loop_end1.ok
                      && loop_end2.ok
-                     && ValidSourceOperand(pre_guard_state1, 32, pred.o1)
-                     && ValidSourceOperand(pre_guard_state1, 32, pred.o2)
-                     && ValidSourceOperand(pre_guard_state2, 32, pred.o1)
-                     && ValidSourceOperand(pre_guard_state2, 32, pred.o2)
+                     && ValidSourceOperand(pre_guard_state1, 64, pred.o1)
+                     && ValidSourceOperand(pre_guard_state1, 64, pred.o2)
+                     && ValidSourceOperand(pre_guard_state2, 64, pred.o1)
+                     && ValidSourceOperand(pre_guard_state2, 64, pred.o2)
                      && evalOBool(pre_guard_state1, pred)
                      && evalOBool(pre_guard_state2, pred)
                      && branchRelation(pre_guard_state1, loop_start1, true)
@@ -1199,8 +1650,8 @@ method { :timeLimitMultiplier 2 } checkIfLoopConsumesFixedTime(pred:obool, body:
                      ==> constTimeInvariant(ts', loop_end1, loop_end2);
         decreases *;
     {
-        o1 := operandTaint(pred.o1, ts');
-        o2 := operandTaint(pred.o2, ts');
+        o1 := operandTaint64(pred.o1, ts');
+        o2 := operandTaint64(pred.o2, ts');
         predTaint := mergeTaint(o1, o2);
 
         if predTaint.Secret? {
@@ -1208,8 +1659,8 @@ method { :timeLimitMultiplier 2 } checkIfLoopConsumesFixedTime(pred:obool, body:
             return;
         }
 
-        assert specOperandTaint(pred.o1, ts').Public?;
-        assert specOperandTaint(pred.o2, ts').Public?;
+        assert specOperandTaint64(pred.o1, ts').Public?;
+        assert specOperandTaint64(pred.o2, ts').Public?;
 
         o1Public := operandDoesNotUseSecrets(pred.o1, ts');
         if o1Public == false {
@@ -1239,10 +1690,10 @@ method { :timeLimitMultiplier 2 } checkIfLoopConsumesFixedTime(pred:obool, body:
                          && constTimeInvariant(ts', pre_guard_state1, pre_guard_state2)
                          && loop_end1.ok
                          && loop_end2.ok
-                         && ValidSourceOperand(pre_guard_state1, 32, pred.o1)
-                         && ValidSourceOperand(pre_guard_state1, 32, pred.o2)
-                         && ValidSourceOperand(pre_guard_state2, 32, pred.o1)
-                         && ValidSourceOperand(pre_guard_state2, 32, pred.o2)
+                         && ValidSourceOperand(pre_guard_state1, 64, pred.o1)
+                         && ValidSourceOperand(pre_guard_state1, 64, pred.o2)
+                         && ValidSourceOperand(pre_guard_state2, 64, pred.o1)
+                         && ValidSourceOperand(pre_guard_state2, 64, pred.o2)
                          && evalOBool(pre_guard_state1, pred)
                          && evalOBool(pre_guard_state2, pred)
                          && branchRelation(pre_guard_state1, loop_start1, true)
@@ -1332,8 +1783,8 @@ method checkIfCodeConsumesFixedTime(code:code, ts:taintState)
             }
 
         case IfElse(pred, ift, iff) =>
-            var o1 := operandTaint(pred.o1, ts);
-            var o2 := operandTaint(pred.o2, ts);
+            var o1 := operandTaint64(pred.o1, ts);
+            var o2 := operandTaint64(pred.o2, ts);
             var predTaint := mergeTaint(o1, o2);
 
             ts' := ts;
