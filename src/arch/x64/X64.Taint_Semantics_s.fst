@@ -21,43 +21,24 @@ noeq type traceState = {
   memTaint: map int taint;
 }
 
-type ins_tag =
-  | Mov
-  | Add
-  | AddLea
-  | AddCarry
-  | Sub
-  | Mul
-  | IMul
-  | Xor
-  | And
-  | Shr
-  | Shl
-
-let ndsts (i : ins_tag) : nat = match i with
-  | Mul -> 2
-  | _ -> 1
-
-let nsrcs (i:ins_tag) : nat = match i with
-  | Mov | Mul -> 1
-  | AddLea -> 3
-  | _ -> 2
-
-let create_ins (ids:(ins_tag * list dst_op * list operand){let i, d, s = ids in length d = ndsts i && length s = nsrcs i}) : ins = let i, dsts, srcs = ids in
+// Extract a list of destinations written to and a list of sources read from
+// TODO: Do we really need the first option to be dst_op or would operand suffice and simplify our lives later?
+let extract_operands (i:ins) : (list dst_op * list operand) =
   match i with
-  | Mov -> Mov64 (hd dsts) (hd srcs)
-  | Add -> Add64 (hd dsts) (hd (tl srcs))
-  | AddLea -> AddLea64 (hd dsts) (hd (tl srcs)) (hd (tl (tl srcs)))
-  | AddCarry -> AddCarry64 (hd dsts) (hd (tl srcs))
-  | Sub -> Sub64 (hd dsts) (hd (tl srcs))
-  | Mul -> Mul64 (hd srcs)
-  | IMul -> IMul64 (hd dsts) (hd (tl srcs))
-  | Xor -> Xor64 (hd dsts) (hd (tl srcs))
-  | And -> And64 (hd dsts) (hd (tl srcs))
-  | Shr -> Shr64 (hd dsts) (hd (tl srcs))
-  | Shl -> Shl64 (hd dsts) (hd (tl srcs))
-
-type tainted_ins = |TaintedIns: ids:(ins_tag * list dst_op * list operand){let i, d, s = ids in length d = ndsts i && length s = nsrcs i} -> ins: ins{ins = create_ins ids} -> t:taint -> tainted_ins
+  | Mov64 dst src -> [dst], [src]
+  | Add64 dst src -> [dst], [dst; src]
+  | AddLea64 dst src1 src2 -> [dst], [dst; src1; src2]
+  | AddCarry64 dst src -> [dst], [dst; src]
+  | Sub64 dst src -> [dst], [dst; src]
+  | Mul64 src -> [OReg Rax; OReg Rdx], [OReg Rax; src]
+  | IMul64 dst src -> [dst], [dst; src]
+  | Xor64 dst src -> [dst], [dst; src]
+  | And64 dst src -> [dst], [dst; src]
+  | Shr64 dst amt -> [dst], [dst; amt]
+  | Shl64 dst amt -> [dst], [dst; amt]
+  
+type tainted_ins = |TaintedIns: ops:(ins * list dst_op * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
+                                -> t:taint -> tainted_ins
 
 let operand_obs (s:traceState) (o:operand) : list observation =
   match o with
@@ -75,7 +56,7 @@ let rec operand_obs_list (s:traceState) (o:list operand) : list observation =
 let dst_to_op (x:dst_op) : operand = x
 
 let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
-  let (i, dsts, srcs) = ins.ids in
+  let (i, dsts, srcs) = ins.ops in
   (operand_obs_list s (List.Tot.Base.map dst_to_op dsts)) @ (operand_obs_list s srcs)
 
 (* Checks if the taint of an operand matches the ins annotation *)
@@ -103,11 +84,11 @@ let rec update_taint_list memTaint (dst:list dst_op) t s = match dst with
 
 let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
   let t = ins.t in
-  let i, dsts, srcs = ins.ids in
+  let i, dsts, srcs = ins.ops in
   let s = run (check (taint_match_list srcs t ts.memTaint)) ts.state in
   let memTaint = update_taint_list ts.memTaint dsts t s in
   (* Execute the instruction *)
-  let s = run (eval_ins ins.ins) s in
+  let s = run (eval_ins i) s in
   {state = s; trace = ts.trace; memTaint = memTaint}
 
 type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:taint -> tainted_ocmp

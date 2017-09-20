@@ -37,9 +37,11 @@ val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -
  (requires (operand_does_not_use_secrets dst ts) /\ publicValuesAreSame ts s1 s2)
 (ensures (operand_obs s1 dst) = (operand_obs s2 dst))
 
+#reset-options "--z3rlimit 20"
 let lemma_operand_obs ts dst s1 s2 = match dst with
   | OConst _ | OReg _ -> ()
   | OMem m -> ()
+#reset-options "--z3rlimit 5"
   
 let set_taint (dst:dst_op) ts taint =
   match dst with
@@ -80,7 +82,7 @@ let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintS
 val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
 
 let check_if_ins_consumes_fixed_time ins ts =
-  let i, dsts, srcs = ins.ids in
+  let i, dsts, srcs = ins.ops in
   let ftSrcs = operands_do_not_use_secrets srcs ts in
   let dsts2 = List.Tot.Base.map dst_to_op dsts in
   let ftDsts = operands_do_not_use_secrets dsts2 ts in
@@ -96,7 +98,7 @@ let check_if_ins_consumes_fixed_time ins ts =
   (* TODO : Probably check on dsts for fixedTime *)
   (* Handle Xor *)
 (*  let b, ts' =*) match i with
-    | Mov -> fixedTime, ts
+    | Mov64 dst src -> fixedTime, ts
     | _ -> false, (TaintState ts'.regTaint Secret)
 (*  in
   b, ts'
