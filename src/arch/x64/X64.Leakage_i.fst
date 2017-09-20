@@ -46,10 +46,6 @@ let set_taint (dst:dst_op) ts taint =
   | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint
   | OMem m -> ts (* Ensured by taint semantics *)
 
-let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintState) =
-  let b, ts' = res in
-  ((b2t b) ==> isConstantTime (Ins ins) ts) (*/\ ((b2t b) ==> isLeakageFree (Ins ins) ts ts')*)
-
 let rec operands_do_not_use_secrets ops ts = match ops with
   | [] -> true
   | hd :: tl -> operand_does_not_use_secrets hd ts && (operands_do_not_use_secrets tl ts)
@@ -77,7 +73,11 @@ let rec set_taints dsts ts taint = match dsts with
   | [] -> ts
   | hd :: tl -> set_taints tl (set_taint hd ts taint) taint
 
-val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (ts:taintState) -> (res:(bool*taintState)(*{ins_consumes_fixed_time ins ts res}*))
+let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintState) =
+  let b, ts' = res in
+  ((b2t b) ==> isConstantTime (Ins ins) ts) (*/\ ((b2t b) ==> isLeakageFree (Ins ins) ts ts')*)
+
+val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
 
 let check_if_ins_consumes_fixed_time ins ts =
   let i, dsts, srcs = ins.ids in
@@ -86,7 +86,7 @@ let check_if_ins_consumes_fixed_time ins ts =
   let ftDsts = operands_do_not_use_secrets dsts2 ts in
   let fixedTime = ftSrcs && ftDsts in
 
-  assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets dsts2 ts /\ publicValuesAreSame ts s1 s2) ==>
+  assert_by_tactic (forall s1 s2. {:pattern (publicValuesAreSame ts s1 s2)} (operands_do_not_use_secrets dsts2 ts /\ publicValuesAreSame ts s1 s2) ==>
     (operand_obs_list s1 dsts2) = (operand_obs_list s2 dsts2)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts dsts2))); 
 
   assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets srcs ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 srcs) = (operand_obs_list s2 srcs)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts srcs)));
@@ -95,11 +95,14 @@ let check_if_ins_consumes_fixed_time ins ts =
   let ts' = set_taints dsts ts taint in
   (* TODO : Probably check on dsts for fixedTime *)
   (* Handle Xor *)
-  match i with
+(*  let b, ts' =*) match i with
     | Mov -> fixedTime, ts
     | _ -> false, (TaintState ts'.regTaint Secret)
-  
+(*  in
+  b, ts'
+*)  
 
+(*
 val check_if_mov_consumes_fixed_time: (dst:dst_op) -> (src:operand) -> (ts:taintState) -> (taint:taint) -> (res:(bool*taintState){ins_consumes_fixed_time (TaintedIns (Mov64 dst src) taint) ts res})
 
 let check_if_mov_consumes_fixed_time (dst:dst_op) src ts taint =
@@ -263,7 +266,7 @@ let check_if_shl_consumes_fixed_time (dst:dst_op) src ts taint =
 	  fixedTime, (TaintState ts.regTaint Secret)
     | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)  
 
-
+*)
 let check_if_instruction_consumes_fixed_time (ins:tainted_ins) ts =
   let taint = ins.t in
   match ins.i with
