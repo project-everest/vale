@@ -22,8 +22,7 @@ noeq type traceState = {
 }
 
 // Extract a list of destinations written to and a list of sources read from
-// TODO: Do we really need the first option to be dst_op or would operand suffice and simplify our lives later?
-let extract_operands (i:ins) : (list dst_op * list operand) =
+let extract_operands (i:ins) : (list operand * list operand) =
   match i with
   | Mov64 dst src -> [dst], [src]
   | Add64 dst src -> [dst], [dst; src]
@@ -37,7 +36,7 @@ let extract_operands (i:ins) : (list dst_op * list operand) =
   | Shr64 dst amt -> [dst], [dst; amt]
   | Shl64 dst amt -> [dst], [dst; amt]
   
-type tainted_ins = |TaintedIns: ops:(ins * list dst_op * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
+type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
                                 -> t:taint -> tainted_ins
 
 let operand_obs (s:traceState) (o:operand) : list observation =
@@ -57,7 +56,7 @@ let dst_to_op (x:dst_op) : operand = x
 
 let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
   let (i, dsts, srcs) = ins.ops in
-  (operand_obs_list s (List.Tot.Base.map dst_to_op dsts)) @ (operand_obs_list s srcs)
+  (operand_obs_list s dsts @ operand_obs_list s srcs)
 
 (* Checks if the taint of an operand matches the ins annotation *)
 let taint_match (o:operand) (t:taint) (memTaint:map int taint) (s:state) : bool =
@@ -71,14 +70,15 @@ let rec taint_match_list o t memTaint s : bool = match o with
   | [] -> true
   | hd::tl -> (taint_match hd t memTaint s) && taint_match_list tl t memTaint s
 
-let update_taint (memTaint:map int taint) (dst:dst_op) (t:taint) (s:state) =
+let update_taint (memTaint:map int taint) (dst:operand) (t:taint) (s:state) =
   match dst with
+    | OConst _ -> memTaint
     | OReg _ -> memTaint
     | OMem m -> let ptr = eval_maddr m s in
         memTaint.[ptr] <- t
 
-val update_taint_list: (memTaint:map int taint) -> (dst:list dst_op) -> (t:taint) -> (s:state) -> Tot (map int taint) (decreases %[dst])
-let rec update_taint_list memTaint (dst:list dst_op) t s = match dst with
+val update_taint_list: (memTaint:map int taint) -> (dst:list operand) -> (t:taint) -> (s:state) -> Tot (map int taint) (decreases %[dst])
+let rec update_taint_list memTaint (dst:list operand) t s = match dst with
   | [] -> memTaint
   | hd :: tl -> update_taint_list (update_taint memTaint hd t s) tl t s
 

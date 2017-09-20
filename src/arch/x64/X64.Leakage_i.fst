@@ -43,8 +43,9 @@ let lemma_operand_obs ts dst s1 s2 = match dst with
   | OMem m -> ()
 #reset-options "--z3rlimit 5"
   
-let set_taint (dst:dst_op) ts taint =
+let set_taint (dst:operand) ts taint =
   match dst with
+  | OConst _ -> ts  (* Shouldn't actually happen *)
   | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint
   | OMem m -> ts (* Ensured by taint semantics *)
 
@@ -80,16 +81,15 @@ let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintS
   ((b2t b) ==> isConstantTime (Ins ins) ts) (*/\ ((b2t b) ==> isLeakageFree (Ins ins) ts ts')*)
 
 val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
-
+#reset-options "--z3rlimit 20"
 let check_if_ins_consumes_fixed_time ins ts =
   let i, dsts, srcs = ins.ops in
   let ftSrcs = operands_do_not_use_secrets srcs ts in
-  let dsts2 = List.Tot.Base.map dst_to_op dsts in
-  let ftDsts = operands_do_not_use_secrets dsts2 ts in
+  let ftDsts = operands_do_not_use_secrets dsts ts in
   let fixedTime = ftSrcs && ftDsts in
 
-  assert_by_tactic (forall s1 s2. {:pattern (publicValuesAreSame ts s1 s2)} (operands_do_not_use_secrets dsts2 ts /\ publicValuesAreSame ts s1 s2) ==>
-    (operand_obs_list s1 dsts2) = (operand_obs_list s2 dsts2)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts dsts2))); 
+  assert_by_tactic (forall s1 s2. {:pattern (publicValuesAreSame ts s1 s2)} (operands_do_not_use_secrets dsts ts /\ publicValuesAreSame ts s1 s2) ==>
+    (operand_obs_list s1 dsts) = (operand_obs_list s2 dsts)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts dsts))); 
 
   assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets srcs ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 srcs) = (operand_obs_list s2 srcs)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts srcs)));
   assert (fixedTime ==> (isConstantTime (Ins ins) ts));
