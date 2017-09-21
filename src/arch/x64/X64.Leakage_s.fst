@@ -15,10 +15,13 @@ let publicRegisterValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) 
       ts.regTaint r = Public
     ==> (s1.state.regs r = s2.state.regs r)
 
+let publicMemValuesAreSame (s1:traceState) (s2:traceState) =
+  forall x. (Public? (s1.memTaint.[x])) ==> (s1.state.mem.[x] = s2.state.mem.[x])
 
 let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
    publicRegisterValuesAreSame ts s1 s2
   /\ publicFlagValuesAreSame ts s1 s2
+  /\ publicMemValuesAreSame s1 s2
 
 let constTimeInvariant (ts:taintState) (s:traceState) (s':traceState) =
     publicValuesAreSame ts s s'
