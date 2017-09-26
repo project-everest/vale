@@ -169,12 +169,16 @@ val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = in
   (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
 
-#set-options "--z3rlimit 60"
+//#set-options "--z3rlimit 60"
 
 let lemma_mov_leakage_free ts ins =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
-  assert (b2t b ==> isConstantTime (Ins ins) ts);
-  assert (forall s1 s2. b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2);
+  let p s1 s2 = b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2 in
+  let my_lemma s1 s2 : Lemma(p s1 s2) = lemma_mov_same_public ts ins s1 s2 in
+  let open FStar.Classical in
+  forall_intro_2 my_lemma;
+  //assert (b2t b ==> isConstantTime (Ins ins) ts);
+  //assert (forall s1 s2. b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2);
   ()
 
 (*
