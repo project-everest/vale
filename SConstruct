@@ -724,7 +724,7 @@ def check_fstar_z3_version(fstar_z3):
     version = lines[0]
     versions = version.split('.')
     cmd = [fstar_z3, '--version']
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
     lines = o.splitlines()
     line = lines[0]
     for word in line.split(' '):
@@ -757,7 +757,7 @@ def check_fstar_version():
     version = lines[0]
     fstar = str(env['FSTAR'])
     cmd = [fstar, '--version']
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
     lines = o.splitlines()
     for line in lines:
       if '=' in line:
@@ -823,7 +823,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
     args = ["--dep", "make"] + includes + files
     cmd = [fstar] + args
     print(" ".join(cmd))
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
     print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
     fstar_deps_ok = True
     lines = o.splitlines()
