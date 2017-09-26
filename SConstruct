@@ -155,7 +155,7 @@ def docmd(env, cmd):
   except:
     e = sys.exc_info()[0]
     print ("Error invoking: %s" % cmd)
-    print formatExceptionInfo()
+    print (formatExceptionInfo())
     #print ("Exception: %s" % e)
     Exit(1)
   result = []
@@ -578,11 +578,11 @@ def report_verification_failures():
           if x is not None:
             filename = bf_to_filename(x)
             if filename.endswith('.tmp') and os.path.isfile(filename):
-              print '##### Verification error.  Printing contents of ' + filename + ' #####'
+              print('##### Verification error.  Printing contents of ' + filename + ' #####')
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
-                  print line
+                  print(line)
 
 def display_build_status():
     report_verification_failures()
