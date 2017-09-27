@@ -33,13 +33,13 @@ let lemma_weak_pre_ins (i:ins) (inss:list ins)
 			       (s0:state) (sN:state) (post: unit -> Type) :
   Ghost (option state)
          (requires (s0.ok /\
-		    Some sN == va_eval_code (va_Block (inss_to_codes (i::inss))) s0) /\
+		    eval_code (va_Block (inss_to_codes (i::inss))) s0 sN) /\
 		    wp_code (i::inss) (augment sN post) s0)
 	 (ensures (fun sM ->
 		     match sM with
 		     | None -> False
 		     | Some sM ->
-			    Some sN == va_eval_code (va_Block (inss_to_codes inss)) sM /\
+			    eval_code (va_Block (inss_to_codes inss)) sM sN /\
 			    sM.ok /\
 			    wp_code inss (augment sN post) sM)) =
   let b0 = inss_to_codes (i::inss) in
@@ -122,7 +122,7 @@ let lemma_weak_pre_ins (i:ins) (inss:list ins)
 
  let rec lemma_weak_pre (inss:list ins) (s0:state) (sN:state) (post: unit -> Type0) : Lemma
   (requires
-    Some sN == va_eval_code (va_Block (inss_to_codes inss)) s0 /\
+    eval_code (va_Block (inss_to_codes inss)) s0 sN /\
     s0.ok /\
     wp_code inss (augment sN post) s0)
   (ensures
@@ -151,7 +151,7 @@ let lemma_weakest_pre_norm' (inss: list ins) (s0: state) (sN:state) (#post:unit 
      	    flags0 == s0.flags /\
      	    mem0 == s0.mem ==>
 	    s0.ok /\
-	    Some sN == va_eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 /\
+	    eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 sN /\
 	    Prims.norm [delta_only wp_code_delta; zeta; iota; primops]
 		       (wp_code (normalize_term inss) (augment sN post)
 				   ({ok=ok0; regs=regs0; flags=flags0; mem=mem0}))))

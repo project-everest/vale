@@ -165,7 +165,7 @@ and print_code (c:code) (n:int) (p:printer) : string * int =
     let false_str, n' = print_code false_code n' p in
     let label2 = "L" ^ string_of_int n2 ^ ":\n" in
     cmp ^ true_str ^ jmp ^ label1 ^ false_str ^ label2, n'
-  | While cond body inv ->
+  | While cond body ->
     let n1 = n in
     let n2 = n + 1 in
     let jmp = "  jmp L" ^ string_of_int n2 ^ "\n" in

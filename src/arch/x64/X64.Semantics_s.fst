@@ -341,54 +341,36 @@ let eval_ins (ins:ins) : st unit =
   | _ -> fail
 
 (*
- * the decreases clause
- *)
-let decr (c:code) (s:state) :nat =
-  match c with
-  | While _ _ inv ->
-    let n = eval_operand inv s in
-    if v n >= 0 then v n else 0
-  | _             -> 0
-
-(*
  * these functions return an option state
- * None case arises when the while loop invariant fails to hold
+ * None case arises when the while loop runs out of fuel
  *)
 
-val eval_code:  c:code           -> s:state -> Tot (option state) (decreases %[c; decr c s; 1])
-val eval_codes: l:codes          -> s:state -> Tot (option state) (decreases %[l])
-val eval_while: c:code{While? c} -> s:state -> Tot (option state) (decreases %[c; decr c s; 0])
+// TODO: IfElse and While should havoc the flags
 
-let rec eval_code c s =
+val eval_code:  c:code           -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
+val eval_codes: l:codes          -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; l])
+val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
+
+let rec eval_code c fuel s =
   match c with
   | Ins ins                       -> Some (run (eval_ins ins) s)
-  | Block l                       -> eval_codes l s
-  | IfElse ifCond ifTrue ifFalse  -> if eval_ocmp s ifCond then eval_code ifTrue s else eval_code ifFalse s
-  | While _ _ _                   -> eval_while c s
+  | Block l                       -> eval_codes l fuel s
+  | IfElse ifCond ifTrue ifFalse  -> if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
+  | While b c                     -> eval_while b c fuel s
 
-and eval_codes l s =
+and eval_codes l fuel s =
   match l with
   | []   -> Some s
   | c::tl ->
-    let s_opt = eval_code c s in
-    if None? s_opt then None else eval_codes tl (Some?.v s_opt)
+    let s_opt = eval_code c fuel s in
+    if None? s_opt then None else eval_codes tl fuel (Some?.v s_opt)
 
-and eval_while c s0 = (* trying to mimic the eval_while predicate using a function *)
-  let While cond body inv = c in
-  let n0 = eval_operand inv s0 in
-  let b = eval_ocmp s0 cond in
-
-  if v n0 <= 0 then
-    if b then None else Some s0  //if loop invariant is <= 0, the guard must be false
-  else  //loop invariant > 0
-    if not b then None  //guard must evaluate to true
-    else
-      let s_opt = eval_code body s0 in
-      if None? s_opt then None
-      else
-        let s1 = Some?.v s_opt in
-        if not s1.ok then Some s1  //this is from the reference semantics, if ok flag is unset, return
-        else
-          let n1 = eval_operand inv s1 in
-          if v n1 >= v n0 then None  //loop invariant must decrease
-          else eval_while c s1
+and eval_while b c fuel s0 =
+  if fuel = 0 then None else
+  if not (eval_ocmp s0 b) then Some s0
+  else
+    match eval_code c (fuel - 1) s0 with
+    | None -> None
+    | Some s1 ->
+      if s1.ok then eval_while b c (fuel - 1) s1  // success: continue to next iteration
+      else Some s1  // failure: propagate failure immediately
