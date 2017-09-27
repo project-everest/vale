@@ -144,9 +144,19 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
-let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
+let string_of_outs_exp (outs:formal list option):string =
+  match outs with
+  | None -> "()"
+  | Some fs -> string_of_exp_prec 0 (EApply (Id "tuple", List.map (fun (x, _) -> EVar x) fs))
+
+let string_of_outs_formals (outs:formal list option):string =
+  match outs with
+  | None -> "()"
+  | Some fs -> "(" + (String.concat ", " (List.map string_of_formal fs)) + ")"
+
+let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
   match s with
-  | SLoc (loc, s) -> try emit_stmt ps eOut s with err -> raise (LocErr (loc, err))
+  | SLoc (loc, s) -> try emit_stmt ps outs s with err -> raise (LocErr (loc, err))
   | SLabel _ -> err "unsupported feature: labels (unstructured code)"
   | SGoto _ -> err "unsupported feature: 'goto' (unstructured code)"
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
@@ -167,18 +177,42 @@ let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
       ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_formal outs)) + ") =");
       ps.PrintLine "(";
       ps.Indent ();
-      let eOut = EApply (Id "tuple", List.map (fun (x, _) -> EVar x) outs) in
-      emit_stmt ps (Some eOut) s;
+      emit_stmt ps (Some outs) s;
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
   | SFastBlock ss -> internalErr "fast_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp e) + " then");
-      emit_block ps "" eOut ss1;
+      emit_block ps "" outs ss1;
       ps.PrintLine ("else");
-      emit_block ps (match eOut with None -> ";" | Some _ -> "") eOut ss2
-  | SWhile (e, invs, (_, ed), ss) -> notImplemented "while"
+      emit_block ps (match outs with None -> ";" | Some _ -> "") outs ss2
+  | SWhile (e, invs, (_, ed), ss) ->
+      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_formal fs) in
+      let sWhile = sid (Reserved "while") in
+      let sParams = match outs with None -> "()" | Some fs -> string_of_formals fs in
+      ps.PrintLine ("let rec " + sWhile + " " + sParams + " : Ghost (" + st + ")");
+      ps.Indent ();
+      let inv = and_of_list (List.map snd invs) in
+      ps.PrintLine ("(requires " + (string_of_exp inv) + ")");
+      ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> " + (string_of_exp inv) + "))");
+      let () =
+        match (ed, outs) with
+        | ([], Some ((x, _)::_)) -> ps.PrintLine ("(decreases " + (sid x) + ")")
+        | (_::_, _) -> ps.PrintLine ("(decreases (" + (String.concat ", " (List.map string_of_exp ed)) + "))")
+        | ([], _) -> ()
+        in
+      ps.PrintLine "=";
+      ps.PrintLine ("if " + (string_of_exp e) + " then");
+      ps.Indent ();
+      ps.PrintLine ("let " + (string_of_outs_formals outs) + " =");
+      emit_block ps "" outs ss;
+      let args = match outs with None -> "()" | Some fs -> String.concat " " (List.map (fun (x, _) -> sid x) fs) in
+      ps.PrintLine ("in " + sWhile + " " + args);
+      ps.Unindent ();
+      ps.PrintLine ("else " + (string_of_outs_exp outs));
+      ps.Unindent ();
+      ps.PrintLine ("in " + sWhile + " " + args)
   | SForall (xs, ts, ex, e, ss) ->
     (
       let l = sid (Reserved "forall_lemma") in
@@ -199,15 +233,13 @@ let rec emit_stmt (ps:print_state) (eOut:exp option) (s:stmt):unit =
           emit_block ps " in" None ss
     )
   | SExists (xs, ts, e) -> notImplemented "exists statements"
-and emit_stmts (ps:print_state) (eOut:exp option) (stmts:stmt list) =
+and emit_stmts (ps:print_state) (outs:formal list option) (stmts:stmt list) =
   List.iter (emit_stmt ps None) stmts;
-  match eOut with
-  | None -> ps.PrintLine "()"
-  | Some e -> ps.PrintLine (string_of_exp_prec 0 e)
-and emit_block (ps:print_state) (suffix:string) (eOut:exp option) (stmts:stmt list) =
+  ps.PrintLine (string_of_outs_exp outs)
+and emit_block (ps:print_state) (suffix:string) (outs:formal list option) (stmts:stmt list) =
   ps.PrintLine "(";
   ps.Indent ();
-  emit_stmts ps eOut stmts;
+  emit_stmts ps outs stmts;
   ps.Unindent ();
   ps.PrintLine (")" + suffix)
 
@@ -258,7 +290,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
   let (rs, es) = collect_specs p.pspecs in
-  let (rs, es) = (exp_of_conjuncts rs, exp_of_conjuncts es) in
+  let (rs, es) = (and_of_list rs, and_of_list es) in
   ps.PrintLine ("");
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
@@ -291,8 +323,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
         let (_, ss) = let_updates_stmts mutable_scope ss in
-        let eRet = EApply (Id "tuple", List.map (fun (x, _, _, _, _) -> EVar x) p.prets) in
-        emit_stmts ps (Some eRet) ss;
+        let outs = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
+        emit_stmts ps (Some outs) ss;
         ps.Unindent ();
         ( match tactic with
           | None -> ()
