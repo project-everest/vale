@@ -141,9 +141,6 @@ val lemma_mov_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins
  (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
-#set-options "--z3rlimit 40"
-
-
 let lemma_mov_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
@@ -151,17 +148,6 @@ let lemma_mov_same_public ts ins s1 s2 =
   let r2 = taint_eval_ins ins s2 in
   match i with
     | Mov64 dst src -> 
-      assert (b2t b ==> operand_does_not_use_secrets src ts);
-      assert (Public? (sources_taint srcs ts ins.t) ==> Public? (operand_taint dst ts'));
-      assert (Secret? ins.t /\ OReg? dst ==> Secret? (operand_taint dst ts'));
-      assert (b2t b /\ Secret? ins.t /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2);
-      assert (b2t b /\ Public? ins.t /\ r1.state.ok /\ r2.state.ok ==> taint_match src Public s1.memTaint s1.state /\ taint_match src Public s2.memTaint s2.state);
-
-      assert_by_tactic (operand_does_not_use_secrets src ts /\ Public? (operand_taint src ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match src Public s1.memTaint s1.state /\ taint_match src Public s2.memTaint s2.state ==> eval_operand src s1.state = eval_operand src s2.state) (h <-- implies_intro; apply_lemma (quote (lemma_public_op_are_same ts src)));
-      assert (b2t b /\ Public? ins.t /\ Public? (operand_taint src ts) /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> operand_does_not_use_secrets src ts /\ Public? (operand_taint src ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match src Public s1.memTaint s1.state /\ taint_match src Public s2.memTaint s2.state);
-      assert (b2t b /\ Public? ins.t /\ Public? (operand_taint src ts) /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> eval_operand src s1.state = eval_operand src s2.state);
-      assert (b2t b /\ Public? ins.t /\ Secret? (operand_taint src ts) /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2);
-
       assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
 
 val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mov64? i}) -> Lemma
@@ -169,17 +155,12 @@ val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = in
   (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
 
-//#set-options "--z3rlimit 60"
-
 let lemma_mov_leakage_free ts ins =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let p s1 s2 = b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2 in
   let my_lemma s1 s2 : Lemma(p s1 s2) = lemma_mov_same_public ts ins s1 s2 in
   let open FStar.Classical in
-  forall_intro_2 my_lemma;
-  //assert (b2t b ==> isConstantTime (Ins ins) ts);
-  //assert (forall s1 s2. b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2);
-  ()
+  forall_intro_2 my_lemma
 
 (*
 val check_if_mov_consumes_fixed_time: (dst:dst_op) -> (src:operand) -> (ts:taintState) -> (taint:taint) -> (res:(bool*taintState){ins_consumes_fixed_time (TaintedIns (Mov64 dst src) taint) ts res})
