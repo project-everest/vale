@@ -138,27 +138,81 @@ val lemma_public_flags_same: (ts:taintState) -> (ins:tainted_ins) -> Lemma (fora
 
 let lemma_public_flags_same ts ins = ()
 
-val lemma_mov_same_public: (ts:taintState) -> (ins:tainted_ins) -> (s1:traceState) -> (s2:traceState) -> Lemma
+val lemma_mov_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mov64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
-
-#set-options "--z3rlimit 3000"
 
 let lemma_mov_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
-  match i with
-    | Mul64 _ -> admit()
-    | Xor64 _ _ -> admit()
-    | AddCarry64 dst src -> admit()
-    | Shl64 dst src | Shr64 dst src -> admit()
-    | Mov64 dst src | Add64 dst src | Sub64 dst src | AddLea64 dst src1 src2 | IMul64 dst src | And64 dst src ->
-         assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
-    | _ -> admit()
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+  
+val lemma_add_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Add64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
-val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins) -> Lemma
+let lemma_add_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_sub_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Sub64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+#set-options "--z3rlimit 60"
+let lemma_sub_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_imul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in IMul64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+let lemma_imul_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_and_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in And64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+let lemma_and_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_addlea_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in AddLea64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+let lemma_addlea_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+#set-options "--z3rlimit 20"
+val lemma_ins_same_public: (ts:taintState) -> (ins:tainted_ins) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+let lemma_ins_same_public ts ins s1 s2 = admit()
+
+val lemma_ins_leakage_free: (ts:taintState) -> (ins:tainted_ins) -> Lemma
  (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
@@ -166,190 +220,9 @@ val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins) -> Lemma
 let lemma_mov_leakage_free ts ins =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let p s1 s2 = b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2 in
-  let my_lemma s1 s2 : Lemma(p s1 s2) = lemma_mov_same_public ts ins s1 s2 in
+  let my_lemma s1 s2 : Lemma(p s1 s2) = lemma_ins_same_public ts ins s1 s2 in
   let open FStar.Classical in
   forall_intro_2 my_lemma
-
-(*
-val check_if_mov_consumes_fixed_time: (dst:dst_op) -> (src:operand) -> (ts:taintState) -> (taint:taint) -> (res:(bool*taintState){ins_consumes_fixed_time (TaintedIns (Mov64 dst src) taint) ts res})
-
-let check_if_mov_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  assert_by_tactic (forall s1 s2. (operand_does_not_use_secrets dst ts /\ publicValuesAreSame ts s1 s2)  ==>
-    (operand_obs s1 dst) = (operand_obs s2 dst)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs ts dst)));
-  assert_by_tactic (forall s1 s2. (operand_does_not_use_secrets src ts /\ publicValuesAreSame ts s1 s2)  ==>
-    (operand_obs s1 src) = (operand_obs s2 src)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs ts src)));
-
-  assert(fixedTime ==> isConstantTime (Ins (TaintedIns (Mov64 dst src) taint)) ts);
-
-  let srcTaint = merge_taint (operand_taint src ts) taint in
-  match dst with
-    | OReg r -> fixedTime, (set_taint dst ts srcTaint)
-    | OMem m -> fixedTime, ts (* Handled by taint semantics *)
-
-
-let check_if_add_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint srcTaint dstTaint) taint in
-  match dst with
-    | OReg r -> let ts = (set_taint dst ts taint) in
-	fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_addlea_consumes_fixed_time (dst:dst_op) src1 src2 ts taint =
-  let ftSrc1 = operand_does_not_use_secrets src1 ts in
-  let ftSrc2 = operand_does_not_use_secrets src2 ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc1 && ftSrc2 && ftDst in
-
-  let src1Taint = operand_taint src1 ts in
-  let src2Taint = operand_taint src2 ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint src1Taint src2Taint) (merge_taint dstTaint taint) in
-
-  match dst with
-    | OReg r -> let ts = (set_taint dst ts taint) in
-	   fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m ->  (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_addcarry_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint srcTaint dstTaint) taint in
-
-  let taint = merge_taint (ts.flagsTaint) taint in
-  match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_sub_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint dstTaint srcTaint) taint in
-
-  match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_mul_consumes_fixed_time src ts taint =
-  let fixedTime = operand_does_not_use_secrets src ts in
-
-  let eaxTaint = operand_taint (OReg Rax) ts in
-  let srcTaint = operand_taint src ts in
-  let taint = merge_taint (merge_taint srcTaint eaxTaint) taint in
-
-  let ts = set_taint (OReg Rax) ts taint in
-  let ts = set_taint (OReg Rdx) ts taint in
-  fixedTime, (TaintState ts.regTaint Secret)
-
-
-let check_if_imul_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint dstTaint srcTaint) taint in
-
-  match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_xor_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint dstTaint srcTaint) taint in
-
-  if dst = src then
-    let ts = set_taint dst ts Public in
-    fixedTime, (TaintState ts.regTaint Secret)
-  else match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_and_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint dstTaint srcTaint) taint in
-
-  match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)
-
-let check_if_shr_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint dstTaint srcTaint) taint in
-
-  match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)  
-
-let check_if_shl_consumes_fixed_time (dst:dst_op) src ts taint =
-  let ftSrc = operand_does_not_use_secrets src ts in
-  let ftDst = operand_does_not_use_secrets dst ts in
-  let fixedTime = ftSrc && ftDst in
-
-  let srcTaint = operand_taint src ts in
-  let dstTaint = operand_taint dst ts in
-  let taint = merge_taint (merge_taint dstTaint srcTaint) taint in
-
-  match dst with
-    | OReg r -> let ts = set_taint dst ts taint in
-	  fixedTime, (TaintState ts.regTaint Secret)
-    | OMem m -> (fixedTime && (not (Secret? taint && Public? dstTaint))), (TaintState ts.regTaint Secret)  
-
-*)
-let check_if_instruction_consumes_fixed_time (ins:tainted_ins) ts =
-  let taint = ins.t in
-  match ins.i with
-
-  | Mov64 dst src -> check_if_mov_consumes_fixed_time dst src ts taint
-  | Add64 dst src -> check_if_add_consumes_fixed_time dst src ts taint
-  | AddLea64 dst src1 src2 -> check_if_addlea_consumes_fixed_time dst src1 src2 ts taint
-  | AddCarry64 dst src -> check_if_addcarry_consumes_fixed_time dst src ts taint
-  | Sub64 dst src -> check_if_sub_consumes_fixed_time dst src ts taint
-  | Mul64 src -> check_if_mul_consumes_fixed_time src ts taint
-  | IMul64 dst src -> check_if_imul_consumes_fixed_time dst src ts taint
-  | Xor64 dst src -> check_if_xor_consumes_fixed_time dst src ts taint
-  | And64 dst src -> check_if_and_consumes_fixed_time dst src ts taint
-  | Shr64 dst amt -> check_if_shr_consumes_fixed_time dst amt ts taint
-  | Shl64 dst amt -> check_if_shl_consumes_fixed_time dst amt ts taint
 
 let combine_reg_taints regs1 regs2 =
     fun x -> merge_taint (regs1 x) (regs2 x)
