@@ -107,6 +107,7 @@ let check_if_ins_consumes_fixed_time ins ts =
   assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets srcs ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 srcs) = (operand_obs_list s2 srcs)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts srcs)));
   assert (fixedTime ==> (isConstantTime (Ins ins) ts));
   let taint = sources_taint srcs ts ins.t in
+  let taint = if AddCarry64? i then merge_taint taint ts.flagsTaint else taint in
   let ts' = set_taints dsts ts taint in
   let b, ts' = match i with
     | Mov64 dst src -> begin
@@ -137,9 +138,11 @@ val lemma_public_flags_same: (ts:taintState) -> (ins:tainted_ins) -> Lemma (fora
 
 let lemma_public_flags_same ts ins = ()
 
-val lemma_mov_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mov64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
- (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+val lemma_mov_same_public: (ts:taintState) -> (ins:tainted_ins) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+#set-options "--z3rlimit 3000"
 
 let lemma_mov_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -147,10 +150,15 @@ let lemma_mov_same_public ts ins s1 s2 =
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
   match i with
-    | Mov64 dst src -> 
-      assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+    | Mul64 _ -> admit()
+    | Xor64 _ _ -> admit()
+    | AddCarry64 dst src -> admit()
+    | Shl64 dst src | Shr64 dst src -> admit()
+    | Mov64 dst src | Add64 dst src | Sub64 dst src | AddLea64 dst src1 src2 | IMul64 dst src | And64 dst src ->
+         assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+    | _ -> admit()
 
-val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mov64? i}) -> Lemma
+val lemma_mov_leakage_free: (ts:taintState) -> (ins:tainted_ins) -> Lemma
  (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
