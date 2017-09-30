@@ -116,7 +116,7 @@ let check_if_ins_consumes_fixed_time ins ts =
 	| OReg r -> fixedTime, ts'
 	| OMem m -> (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), ts'
     end
-    | Mul64 _ -> fixedTime, (TaintState ts.regTaint Secret)
+    | Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret)
     | Xor64 dst src -> 
         (* Special case for Xor : xor-ing an operand with itself erases secret data *)
         if dst = src then
@@ -153,6 +153,7 @@ val lemma_add_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
+#set-options "--z3rlimit 60"
 let lemma_add_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
@@ -164,7 +165,6 @@ val lemma_sub_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
-#set-options "--z3rlimit 60"
 let lemma_sub_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
@@ -205,19 +205,111 @@ let lemma_addlea_same_public ts ins s1 s2 =
   let r2 = taint_eval_ins ins s2 in
   assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
 
+val lemma_addcarry_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in AddCarry64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+#set-options "--z3rlimit 80"
+let lemma_addcarry_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  match i with
+    | AddCarry64 dst src ->  assert (Secret? ts.flagsTaint /\ OReg? dst ==> Secret? (operand_taint dst ts'));
+  assert (Public? ts.flagsTaint /\ publicValuesAreSame ts s1 s2 ==> s1.state.flags = s2.state.flags);
+  assert (b2t b /\ Public? ins.t /\ Public? (operand_taint src ts) /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> eval_operand src s1.state = eval_operand src s2.state);
+  assert (b2t b /\ Public? ins.t /\ Public? (operand_taint dst ts) /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> eval_operand dst s1.state = eval_operand dst s2.state);
+  assert (b2t b /\ Secret? (operand_taint src ts) /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2);
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_mul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mul64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+#set-options "--z3rlimit 100"
+let lemma_mul_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  match i with
+    | Mul64 src -> 
+    assert (b2t b /\ Public? ins.t /\ Public? (operand_taint src ts) /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> eval_operand src s1.state = eval_operand src s2.state);
+    assert (Secret? (operand_taint (OReg Rax) ts) /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2);
+    assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_shr_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Shr64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+let lemma_shr_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+val lemma_shl_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Shl64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+let lemma_shl_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+#set-options "--z3rlimit 100"
+val lemma_xor_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in Xor64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
+
+val lemma_aux_xor: (x:int{FStar.UInt.fits x 64}) -> Lemma (logxor x x = 0)
+
+let lemma_aux_xor x = 
+  FStar.UInt.logxor_self #64 x
+  
+let lemma_xor_same_public ts ins s1 s2 =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  match i with
+  | Xor64 dst src ->
+    if dst = src then (assert_by_tactic (forall (v:int{FStar.UInt.fits v 64}). logxor v v = 0) (v <-- forall_intro; apply_lemma (quote lemma_aux_xor)); 
+    assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2))
+
+    else
+    assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+
+
+
 #set-options "--z3rlimit 20"
 val lemma_ins_same_public: (ts:taintState) -> (ins:tainted_ins) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
-let lemma_ins_same_public ts ins s1 s2 = admit()
+let lemma_ins_same_public ts ins s1 s2 = let i, _, _ = ins.ops in
+  match i with
+  | Mov64 _ _ -> lemma_mov_same_public ts ins s1 s2
+  | Add64 _ _ -> lemma_add_same_public ts ins s1 s2
+  | AddLea64 _ _ _ -> lemma_addlea_same_public ts ins s1 s2
+  | Sub64 _ _ -> lemma_sub_same_public ts ins s1 s2
+  | IMul64 _ _ -> lemma_imul_same_public ts ins s1 s2
+  | And64 _ _ -> lemma_and_same_public ts ins s1 s2
+  | Mul64 _ -> lemma_mul_same_public ts ins s1 s2
+  | Xor64 _ _ -> lemma_xor_same_public ts ins s1 s2
+  | AddCarry64 _ _ -> lemma_addcarry_same_public ts ins s1 s2
+  | Shl64 _ _ -> lemma_shl_same_public ts ins s1 s2
+  | Shr64 _ _ -> lemma_shr_same_public ts ins s1 s2
 
 val lemma_ins_leakage_free: (ts:taintState) -> (ins:tainted_ins) -> Lemma
  (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
-
-let lemma_mov_leakage_free ts ins =
+let lemma_ins_leakage_free ts ins =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let p s1 s2 = b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2 in
   let my_lemma s1 s2 : Lemma(p s1 s2) = lemma_ins_same_public ts ins s1 s2 in
