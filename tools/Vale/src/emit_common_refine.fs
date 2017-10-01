@@ -2,7 +2,7 @@
 //   - call transform.fs
 //   - then generate lemmas
 
-module Emit_common
+module Emit_common_refine
 
 open Ast
 open Ast_util

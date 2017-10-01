@@ -59,7 +59,7 @@ let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
       | DProc p ->
           let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
           let envp = add_proc env p in
-          let build_proc = if !fstar then Emit_common_lemmas.build_proc else Emit_common.build_proc in
+          let build_proc = if !fstar then Emit_common_lemmas.build_proc else Emit_common_refine.build_proc in
           (envp, if verify then build_proc (if isRecursive then envp else env) loc p else [])
       | _ -> (env, if verify then [(loc, d2)] else [])
       in
