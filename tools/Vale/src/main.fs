@@ -3,7 +3,8 @@ open Ast_util
 open Parse
 open Parse_util
 open Transform
-open Emit_common
+open Emit_common_base
+open Emit_common_top
 open Microsoft.Dafny
 open Microsoft.FSharp.Math
 open Microsoft.FSharp.Text.Lexing
