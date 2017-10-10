@@ -444,60 +444,58 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
     }
 
+//    while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
+//        invariant
+//            n == 0x1_0000_0000_0000_0000;
+//            r == r1 * n + r0;
+//            h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
+//            r0 < n / 16;
+//            r1 < n / 16;
+//            r1 % 4 == 0;
+//            s1 == r1 + r1 / 4;
+//            h2 < 5;
+//            rax == r1;
+//            inp + 16 * r15 == old(inp) + length;
+//            length == old(len);
+//            validSrcAddrs(mem, ctx, 64, 24 * 8);
+//            validSrcAddrs(mem, old(inp), 64, length);
+//            ctx == old(ctx); // REVIEW: framing should add this automatically
+//            forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
+//            //modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
+//            //mem == old(mem)[ctx_id := mem[ctx_id]];
+//            memModified(old(mem), mem, old(ctx), 3 * 8);
+//        decreases
+//            r15;
+//    {
+//        ghost var hp := h;
+//        h := h + n * n * padbit + n * mem[inp + 8] + mem[inp];
+//        ghost var hq := h;
+//        
+//        assume false;
+//
+//        Add64Wrap(h0, Mem(inp, 0)); // accumulate input
+//        Adc64Wrap(h1, Mem(inp, 8));
+//        AddLea64(inp, inp, 16);
+//        Adc64Wrap(h2, padbit);
+//
+//        h :=poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, p);
+//
+//        Mov64(rax, r1);
+//        Sub64(r15, 1); // len-=16
+//
+//        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) by
+//        {
+//            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
+//            reveal_opaque(modp');
+//            lemma_poly_demod(p, hp, hq - hp, r);
+//        }
+//    }
+
     assume false;
-
-    /*
-    while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
-        invariant
-            n == 0x1_0000_0000_0000_0000;
-            r == r1 * n + r0;
-            h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
-            r0 < n / 16;
-            r1 < n / 16;
-            r1 % 4 == 0;
-            s1 == r1 + r1 / 4;
-            h2 < 5;
-            rax == r1;
-            inp + 16 * r15 == old(inp) + length;
-            length == old(len);
-            validSrcAddrs(mem, ctx_id, ctx, 64, Public, 24 * 8);
-            validSrcAddrs(mem, inp_id, old(inp), 64, Public, length);
-            ctx == old(ctx); // REVIEW: framing should add this automatically
-            forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[ctx_id].mem64[i] == old(mem)[ctx_id].mem64[i];
-            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp);
-            mem == old(mem)[ctx_id := mem[ctx_id]];
-        decreases
-            r15;
-    {
-        ghost var hp := h;
-        h := h + n * n * padbit + n * mem[inp_id].mem64[inp + 8].v + mem[inp_id].mem64[inp].v;
-        ghost var hq := h;
-
-        Add64Wrap(h0, Mem(inp, 0, Public, inp_id)); // accumulate input
-        Adc64Wrap(h1, Mem(inp, 8, Public, inp_id));
-        AddLea64(inp, inp, 16);
-        Adc64Wrap(h2, padbit);
-
-        poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, n, p);
-
-        Mov64(rax, r1);
-        Sub64(r15, 1); // len-=16
-
-        exists hh :: hh == (n * n) * h2 + n * h1 + h0 && modp(h * r) == modp(hh);
-        h := hh;
-
-        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem[inp_id].mem64, old(inp), inp) by
-        {
-            reveal poly1305_heap_blocks;
-            reveal_opaque(modp');
-            lemma_poly_demod(p, hp, hq - hp, r);
-        }
-    }
 
     Store64(ctx, h0, 0);
     Store64(ctx, h1, 8);
     Store64(ctx, h2, 16);
-*/
 }
 
 #verbatim

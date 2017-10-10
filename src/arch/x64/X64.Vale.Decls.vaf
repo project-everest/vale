@@ -49,6 +49,29 @@ unfold let va_op_reg_operand_reg (r:reg) : va_reg_operand = OReg r
 unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
 unfold let va_coerce_operand_to_dst_operand (o:va_operand{valid_dst o}) : va_dst_operand = o
 unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
+unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
+  match o with
+  | OConst n -> OConst (n + offset)
+  | OReg r -> OMem (MReg r offset)
+  | _ -> OConst 42
+
+unfold let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) : operand =
+  va_opr_code_Mem base offset
+
+(*
+function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
+    requires x86_ValidState(s)
+    requires base.OReg?
+    requires ValidMemAddr(MReg(base.r, offset))
+    requires ValidSrcAddr(s.heaplets, id, va_get_reg64(base.r, s) + offset, 64, taint)
+    ensures  Valid64BitSourceOperand(to_state(s), OHeap(MReg(base.r, offset), taint))
+    ensures  eval_op64(to_state(s), OHeap(MReg(base.r, offset), taint)) == s.heaplets[id].mem64[va_get_reg64(base.r, s) + offset].v
+{
+    reveal_x86_ValidState();
+    va_opr_code_Mem(base, offset, taint)
+}
+*)
+
 
 (* Predicates *)
 unfold let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
@@ -123,12 +146,13 @@ unfold let va_get_ifFalse (c:va_code{IfElse? c}) : va_code = IfElse?.ifFalse c
 unfold let va_get_whileCond (c:va_code{While? c}) : ocmp = While?.whileCond c
 unfold let va_get_whileBody (c:va_code{While? c}) : va_code = While?.whileBody c
 
-(* ok for now but no need to actually expose the definition.
-   instead expose lemmas about it *)
-let va_state_eq (s0:va_state) (s1:va_state) : Type0 = state_eq s0 s1
 
 val eval_code : c:va_code -> s0:va_state -> s1:va_state -> Type0
 val eval_while : b:ocmp -> c:va_code -> n:nat -> s0:va_state -> s1:va_state -> Type0
+
+(* ok for now but no need to actually expose the definition.
+   instead expose lemmas about it *)
+let va_state_eq (s0:va_state) (s1:va_state) : Type0 = state_eq s0 s1
 
 let va_require (block:va_codes) (c:va_code) (s0:va_state) (s1:va_state) : Type0 =
   Cons? block /\
@@ -191,6 +215,12 @@ val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> sN:
     cond == eval_ocmp s0 ifb /\
     sM == s0 /\
     (if cond then eval_code ct sM sN else eval_code cf sM sN)))
+
+unfold let eval_while_va_code  (b:ocmp) (c:va_code) (n:nat) (s0:va_state) (sN:va_state) = s0.ok ==> eval_while b c n s0 sN
+
+(* Temporary assumptions to get while loops working *)
+let va_whileInv (b:ocmp) (c:va_code) (n:int) (s0:va_state) (sN:va_state) =
+  n >= 0 /\ eval_while b c n s0 sN
 
 val va_lemma_while : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost (nat * va_state)
   (requires (eval_code (While b c) s0 sN))
@@ -336,6 +366,11 @@ var{:state reg(R14)} r14:int;
 var{:state reg(R15)} r15:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
+
+procedure{:operand} Mem_in(operand base:int, inline offset:int) returns(operand o:int)
+    reads
+        mem;
+    extern;
 
 procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst_operand dst:uint64, operand src:uint64)
     ensures
