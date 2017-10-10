@@ -120,6 +120,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
   in if prec <= ePrec then s else "(" + s + ")"
+and string_of_ret (x:id, t:typ option) = match t with None -> internalErr (sprintf "string_of_ret: %A" x) | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formals (xs:formal list):string = String.concat " " (List.map string_of_formal xs)
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
@@ -188,7 +189,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("else");
       emit_block ps (match outs with None -> ";" | Some _ -> "") outs ss2
   | SWhile (e, invs, (_, ed), ss) ->
-      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_formal fs) in
+      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_ret fs) in
       let sWhile = sid (Reserved "while") in
       let sParams = match outs with None -> "()" | Some fs -> string_of_formals fs in
       ps.PrintLine ("let rec " + sWhile + " " + sParams + " : Ghost (" + st + ")");

@@ -20,6 +20,7 @@ type build_env =
     is_instruction:bool;
     is_operand:bool;
     is_framed:bool;
+    is_terminating:bool;
     code_name:id;
     frame_exp:id -> exp;
     gen_fast_block:exp list -> stmt list -> stmt list;
@@ -131,15 +132,44 @@ let specModIo (env:env) (loc:loc, s:spec):(inout * (id * typ)) list =
     )
   | SpecRaw _ -> internalErr "SpecRaw"
 
-let lemma_block (sM:lhs) (cM:lhs) (bM:lhs) (eb:exp) (es0:exp) (esN:exp):stmt list =
-  let eBlock = vaApp "lemma_block" [eb; es0; esN] in
-  [SAssign ([sM; cM; bM], eBlock)] // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
+type stmt_env =
+  {
+    env:env;
+    benv:build_env;
+    b1:id; // code in forward order, shrinking to []
+    r1:id; // code in reverse order, growing from []
+    bM:id;
+    rM:id;
+    code:exp;
+    s0:id;
+    f0:id;
+    sM:id;
+    fM:id;
+    sN:id;
+    loc:loc;
+  }
 
-let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id) (src:id) (res:id) (resIn:id) (loc:loc) (s:stmt):ghost * bool * stmt list =
+let listIf (b:bool) (l:'a list) = if b then l else []
+let listIfNot (b:bool) (l:'a list) = if b then [] else l
+let total_suffix (b:bool) = if b then "_total" else ""
+
+let lemma_block (total:bool) (sM:lhs) (cM:lhs) (bM:lhs) (f0:lhs) (eb:exp) (es0:exp) (esN:exp):stmt list =
+  let xBlock = "lemma_block" + total_suffix total in
+  let eBlock = vaApp xBlock (listIfNot total [eb; es0; esN]) in
+  [SAssign ((if total then [f0] else [sM; cM; bM]), eBlock)] // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
+
+let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
+  let env = senv.env in
+  let benv = senv.benv in
+  let loc = senv.loc in
+  let s0 = senv.s0 in
+  let sM = senv.sM in
+  let code = senv.code in
   let sub es e = subst_reserved_exp (Map.ofList [(Reserved "s", es)]) e in
-  let sub_src e = sub (EVar src) e in
+  let sub_s0 e = sub (EVar s0) e in
+  let total = benv.is_terminating in
   let rec assign lhss e =
-    let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (src, None) | _ -> xd) lhss in
+    let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
     | EApply (x, es) when Map.containsKey x env.procs ->
@@ -147,62 +177,73 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand _ -> true | _ -> false) p.prets in
         let pretsArgs = pretsOp @ pargs in
-        let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> sub_src e | _ -> e) es in
-        let es = List.map (fun e -> match e with EOp (CodeLemmaOp, [_; e]) -> sub_src e | _ -> e) es in
+        let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> sub_s0 e | _ -> e) es in
+        let es = List.map (fun e -> match e with EOp (CodeLemmaOp, [_; e]) -> sub_s0 e | _ -> e) es in
         let es = List.map (map_exp stateToOp) es in
-        let lemmaPrefix = "lemma_" in
-        let lem = vaApp (lemmaPrefix + (string_of_id x)) ([EVar block; EVar src; EVar resIn] @ es) in
-        let blockLhss = List.map varLhsOfId [b1; res] in
-        (NotGhost, false, [SAssign (blockLhss @ lhss, lem)])
-    | _ -> (Ghost, false, [SAssign (lhss, sub_src e)])
+        let xLemma = "lemma_" + (string_of_id x) in
+        let bh = if total then vaApp "hd" [EVar senv.b1] else EVar senv.b1 in
+        let lem = vaApp xLemma ([bh; EVar s0] @ listIfNot total [EVar senv.sN] @ es) in
+        let blockLhss = List.map varLhsOfId (if total then [sM; senv.fM] else [senv.bM; sM]) in
+        let sLem = SAssign (blockLhss @ lhss, lem) in
+        (NotGhost, false, [sLem])
+    | _ -> (Ghost, false, [SAssign (lhss, sub_s0 e)])
     in
   match s with
   | SLoc (loc, s) ->
       try
-        let (g, b, ss) = build_lemma_stmt env benv block b1 code src res resIn loc s in
+        let (g, b, ss) = build_lemma_stmt {senv with loc = loc} s in
         (g, b, List.map (fun s -> SLoc (loc, s)) ss)
       with err -> raise (LocErr (loc, err))
   | SLabel _ -> err "unsupported feature: labels (unstructured code)"
   | SGoto _ -> err "unsupported feature: 'goto' (unstructured code)"
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
-  | SAssume e -> (Ghost, false, [SAssume (sub_src e)])
-  | SAssert (attrs, e) -> (Ghost, false, [SAssert (attrs, sub_src e)])
+  | SAssume e -> (Ghost, false, [SAssume (sub_s0 e)])
+  | SAssert (attrs, e) -> (Ghost, false, [SAssert (attrs, sub_s0 e)])
   | SCalc (oop, contents) ->
-      let ccs = List.map (build_lemma_calcContents env benv src res loc sub_src) contents in
+      let ccs = List.map (build_lemma_calcContents senv sub_s0) contents in
       (Ghost, false, [SCalc (oop, ccs)])
   | SVar (_, _, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
-  | SVar (x, t, m, g, a, eOpt) -> (Ghost, false, [SVar (x, t, m, g, a, mapOpt sub_src eOpt)])
+  | SVar (x, t, m, g, a, eOpt) -> (Ghost, false, [SVar (x, t, m, g, a, mapOpt sub_s0 eOpt)])
   | SAlias _ -> (Ghost, false, [])
   | SLetUpdates _ -> internalErr "SLetUpdates"
-  | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
+  | SBlock b -> (NotGhost, true, build_lemma_block senv b)
   | SFastBlock b ->
-      let ss = benv.gen_fast_block [EVar src; EVar res] b in
+      let ss = benv.gen_fast_block [EVar s0; EVar sM] b in
       (NotGhost, true, ss)
   | SIfElse (SmGhost, e, ss1, ss2) ->
-      let e = sub_src e in
-      let ss1 = build_lemma_ghost_stmts env benv src res loc ss1 in
-      let ss2 = build_lemma_ghost_stmts env benv src res loc ss2 in
+      let e = sub_s0 e in
+      let ss1 = build_lemma_ghost_stmts senv ss1 in
+      let ss2 = build_lemma_ghost_stmts senv ss2 in
       (Ghost, false, [SIfElse (SmGhost, e, ss1, ss2)])
   | SIfElse (SmPlain, e, ss1, ss2) ->
-      let cond = Reserved ("cond_" + (reserved_id code)) in
+      let codeId = match code with EVar x -> x | _ -> internalErr (sprintf "SIfElse: %A" code) in
+      let cond = Reserved ("cond_" + (reserved_id codeId)) in
       let i1 = string (gen_lemma_sym ()) in
       let s1 = Reserved("s" + i1) in
-      let codeCond = vaApp "get_ifCond" [EVar code] in
-      let codet = vaApp "get_ifTrue" [EVar code] in
-      let codef = vaApp "get_ifFalse" [EVar code] in
-      let lem = vaApp "lemma_ifElse" [codeCond; codet; codef; EVar src; EVar res] in
+      let sCode = listIf total [SAssign ([varLhsOfId codeId], vaApp "hd" [EVar senv.b1])] in
+      let codeCond = vaApp "get_ifCond" [code] in
+      let codet = vaApp "get_ifTrue" [code] in
+      let codef = vaApp "get_ifFalse" [code] in
+      let xIfElse = "lemma_ifElse" + total_suffix total in
+      let lem = vaApp xIfElse ([codeCond; codet; codef; EVar s0] @ listIfNot total [EVar sM]) in
       let s1Lhs = (s1, Some (Some tState, Ghost)) in
-      let sb1 = SAssign ([varLhsOfId cond; s1Lhs], lem) in
-      let sbT = build_lemma_block env benv codet s1 res loc ss1 in
-      let sbF = build_lemma_block env benv codef s1 res loc ss2 in
-      (NotGhost, true, [sb1; SIfElse (SmPlain, EVar cond, sbT, sbF)])
+      let sMLhs = (senv.sM, Some (Some tState, Ghost)) in
+      let fMLhs = (senv.fM, Some (Some tFuel, Ghost)) in
+      let sb1 = SAssign ([varLhsOfId cond; s1Lhs] @ listIf total [sMLhs; fMLhs], lem) in
+      let sbT = build_lemma_block { senv with s0 = s1; code = codet } ss1 in
+      let sbF = build_lemma_block { senv with s0 = s1; code = codef } ss2 in
+      let lemT = vaApp "lemma_ifElseTrue_total" [codeCond; codet; codef; EVar s0; EVar senv.f0] in
+      let lemF = vaApp "lemma_ifElseFalse_total" [codeCond; codet; codef; EVar s0; EVar senv.f0] in
+      let slemT = listIf total [SAssign ([], lemT)] in
+      let slemF = listIf total [SAssign ([], lemF)] in
+      (NotGhost, true, sCode @ [sb1; SIfElse (SmPlain, EVar cond, sbT @ slemT, sbF @ slemF)])
   | SIfElse (SmInline, e, ss1, ss2) ->
-      let sbT = build_lemma_block env benv (EVar code) src res loc ss1 in
-      let sbF = build_lemma_block env benv (EVar code) src res loc ss2 in
+      let sbT = build_lemma_block senv ss1 in
+      let sbF = build_lemma_block senv ss2 in
       (NotGhost, true, [SIfElse (SmPlain, e, sbT, sbF)])
   | SWhile (e, invs, ed, ss) ->
-      let codeCond = vaApp "get_whileCond" [EVar code] in
-      let codeBody = vaApp "get_whileBody" [EVar code] in
+      let codeCond = vaApp "get_whileCond" [code] in
+      let codeBody = vaApp "get_whileBody" [code] in
       let i1 = string (gen_lemma_sym ()) in
       let i2 = string (gen_lemma_sym ()) in
       let (n1, s1, r1) = (Reserved ("n" + i1), Reserved ("s" + i1), Reserved ("sW" + i1)) in
@@ -216,20 +257,20 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
           (EVar xc, EVar xb, [sCond; sBody])
         else (codeCond, codeBody, [])
         in
-      let lem = vaApp "lemma_while" [codeCond; codeBody; EVar src; EVar res] in
-      let lemTrue = vaApp "lemma_whileTrue" [codeCond; codeBody; EVar n1; EVar r1; EVar res] in
-      let lemFalse = vaApp "lemma_whileFalse" [codeCond; codeBody; EVar r1; EVar res] in
+      let lem = vaApp "lemma_while" [codeCond; codeBody; EVar s0; EVar sM] in
+      let lemTrue = vaApp "lemma_whileTrue" [codeCond; codeBody; EVar n1; EVar r1; EVar sM] in
+      let lemFalse = vaApp "lemma_whileFalse" [codeCond; codeBody; EVar r1; EVar sM] in
       let n1Lhs = (n1, Some (Some tInt, Ghost)) in
       let s1Lhs = (s1, Some (Some tState, Ghost)) in
       let r1Lhs = (r1, Some (Some tState, Ghost)) in
       let r2Lhs = (r2, Some (Some tState, Ghost)) in
       let slem = SAssign ([n1Lhs; r1Lhs], lem) in
       let slemTrue = SAssign ([s1Lhs; r2Lhs], lemTrue) in
-      let slemFalse = SAssign ([(res, None)], lemFalse) in
-      let whileInv = vaApp "whileInv" [codeCond; codeBody; EVar n1; EVar r1; EVar res] in
+      let slemFalse = SAssign ([(sM, None)], lemFalse) in
+      let whileInv = vaApp "whileInv" [codeCond; codeBody; EVar n1; EVar r1; EVar sM] in
       let r1Update = SAssign ([(r1, None)], EVar r2) in
       let n1Update = SAssign ([(n1, None)], EOp (Bop BSub, [EVar n1; EInt bigint.One])) in
-      let sbBody = build_lemma_block env benv codeBody s1 r2 loc ss in
+      let sbBody = build_lemma_block { senv with code = codeBody; s0 = s1; sM = r2 } ss in
       let nCond = EOp (Bop BGt, [EVar n1; EInt bigint.Zero]) in
       let invFrame = (loc, benv.frame_exp r1) in
       let invFrames = if benv.is_framed then [invFrame] else [] in
@@ -244,70 +285,79 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
       (NotGhost, true, sCodeVars @ [slem; sWhile; slemFalse])
   | SAssign (lhss, e) -> assign lhss e
   | SForall (xs, ts, ex, e, ss) ->
-      let ts = List.map (List.map sub_src) ts in
-      let ex = sub_src ex in
-      let e = sub_src e in
-      let ss = build_lemma_ghost_stmts env benv src res loc ss in
+      let ts = List.map (List.map sub_s0) ts in
+      let ex = sub_s0 ex in
+      let e = sub_s0 e in
+      let ss = build_lemma_ghost_stmts senv ss in
       (Ghost, false, [SForall (xs, ts, ex, e, ss)])
   | SExists (xs, ts, e) ->
-      let ts = List.map (List.map sub_src) ts in
-      let e = sub_src e in
+      let ts = List.map (List.map sub_s0) ts in
+      let e = sub_s0 e in
       (Ghost, false, [SExists (xs, ts, e)])
-and build_lemma_ghost_stmt (env:env) (benv:build_env) (src:id) (res:id) (loc:loc) (s:stmt):stmt list =
-  let dummyId = Reserved "dummy" in
-  let (g, _, ss) = build_lemma_stmt env benv dummyId dummyId dummyId src res res loc s in
+and build_lemma_ghost_stmt (senv:stmt_env) (s:stmt):stmt list =
+  let (g, _, ss) = build_lemma_stmt { senv with sN = senv.sM } s in
   (match g with Ghost -> () | NotGhost -> err "Only ghost statements allowed here.  Ghost statements include 'forall', 'ghost if', lemma calls, assignments to ghost variables, assertions, etc, but not 'while' or 'if' or procedure calls.");
   ss
-and build_lemma_ghost_stmts (env:env) (benv:build_env) (src:id) (res:id) (loc:loc) (stmts:stmt list):stmt list =
-  List.collect (build_lemma_ghost_stmt env benv src res loc) stmts
-and build_lemma_calcContents (env:env) (benv:build_env) (src:id) (res:id) (loc:loc) (sub_src:exp -> exp) (cc:calcContents):calcContents =
+and build_lemma_ghost_stmts (senv:stmt_env) (stmts:stmt list):stmt list =
+  List.collect (build_lemma_ghost_stmt senv) stmts
+and build_lemma_calcContents (senv:stmt_env) (sub_s0:exp -> exp) (cc:calcContents):calcContents =
   let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
-  {calc_exp = sub_src e; calc_op = oop; calc_hints = List.map (build_lemma_ghost_stmts env benv src res loc) hints}
-and build_lemma_stmts (env:env) (benv:build_env) (block:id) (src:id) (res:id) (loc:loc) (stmts:stmt list):stmt list =
+  {calc_exp = sub_s0 e; calc_op = oop; calc_hints = List.map (build_lemma_ghost_stmts senv) hints}
+and build_lemma_stmts (senv:stmt_env) (stmts:stmt list):stmt list =
+  let total = senv.benv.is_terminating in
   match stmts with
   | [] ->
-      let lem = vaApp "lemma_empty" [EVar src; EVar res] in
-      [SAssign ([(res, None)], lem)]
+      let xEmpty = "lemma_empty" + total_suffix total in
+      let lem = vaApp xEmpty ([EVar senv.s0] @ (if total then [EVar senv.b1; EVar senv.r1; EVar senv.f0] else [EVar senv.sM])) in
+      [SAssign ([(senv.sM, None)] @ listIf total [(senv.fM, None)], lem)]
   | hd::tl ->
     (
       let i1 = string (gen_lemma_sym ()) in
-      let (r1, c1, b1) = (Reserved ("s" + i1), Reserved ("c" + i1), Reserved ("b" + i1)) in
-      let (ghost, addBlockLemma, sb2) = build_lemma_stmt env benv block b1 c1 src r1 res loc hd in
+      let (s1, f1, fc1, c1, b1, r1) = (Reserved ("s" + i1), Reserved ("f" + i1), Reserved ("fc" + i1), Reserved ("c" + i1), Reserved ("b" + i1), Reserved ("r" + i1)) in
+      let senv1 = { senv with bM = b1; rM = r1; code = EVar c1; sM = s1; fM = fc1; sN = senv.sM } in
+      let senv2 = { senv with b1 = b1; r1 = r1; s0 = s1; f0 = f1; } in
+      let (ghost, addBlockLemma, sb2) = build_lemma_stmt senv1 hd in
+      let mergeLhss =  [varLhsOfId senv1.bM; varLhsOfId senv1.rM; (f1, None)] in
+      let esMerge = [EVar senv1.b1; EVar senv1.r1; EVar senv1.s0; EVar senv1.f0; EVar senv1.sM; EVar fc1] in
+      let sMerge = listIf total [SAssign (mergeLhss, vaApp "lemma_merge_total" esMerge)] in
       match (ghost, addBlockLemma) with
       | (Ghost, _) ->
-          let sb3 = build_lemma_stmts env benv block src res loc tl in
+          let sb3 = build_lemma_stmts senv tl in
           sb2 @ sb3
       | (NotGhost, true) ->
-          let sLoc = one_loc_of_stmt loc hd in
-          let sb1 = lemma_block (varLhsOfId r1) (varLhsOfId c1) (varLhsOfId b1) (EVar block) (EVar src) (EVar res) in
-          let sb3 = build_lemma_stmts env benv b1 r1 res loc tl in
-          sb1 @ sb2 @ sb3
+          let sLoc = one_loc_of_stmt senv.loc hd in
+          let sb1 = lemma_block total (varLhsOfId s1) (varLhsOfId c1) (varLhsOfId b1) (senv.f0, None) (EVar senv.b1) (EVar senv.s0) (EVar senv.sM) in
+          let sb3 = build_lemma_stmts senv2 tl in
+          sb1 @ sb2 @ sMerge @ sb3
       | (NotGhost, false) ->
-          let sb3 = build_lemma_stmts env benv b1 r1 res loc tl in
-          sb2 @ sb3
+          let sb3 = build_lemma_stmts senv2 tl in
+          sb2 @ sMerge @ sb3
     )
-and build_lemma_block (env:env) (benv:build_env) (code:exp) (src:id) (res:id) (loc:loc) (stmts:stmt list):stmt list =
+and build_lemma_block (senv:stmt_env) (stmts:stmt list):stmt list =
+  let total = senv.benv.is_terminating in
   let i0 = string (gen_lemma_sym ()) in
   let b0 = Reserved ("b" + i0) in
-  let codeCond = vaApp "get_block" [code] in
-  let sb1 = SAssign (List.map varLhsOfId [b0], codeCond) in
-  let sb2 = build_lemma_stmts env benv b0 src res loc stmts in
-  sb1::sb2
+  let r0 = Reserved ("r" + i0) in
+  let codeCond = vaApp "get_block" [senv.code] in
+  let sb1 = SAssign ([varLhsOfId b0], codeCond) in
+  let sb2 = SAssign ([varLhsOfId r0], vaApp "CNil" []) in
+  let sb3 = build_lemma_stmts { senv with b1 = b0; r1 = r0 } stmts in
+  [sb1] @ listIf total [sb2] @ sb3
 
-let build_lemma_spec (env:env) (src:id) (res:exp) (loc:loc, s:spec):((loc * spec) list * exp list) =
+let build_lemma_spec (env:env) (s0:id) (sM:exp) (loc:loc, s:spec):((loc * spec) list * exp list) =
   try
     match s with
     | Requires (r, e) ->
         let e = exp_refined e in
-        let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", EVar src)] in
+        let m = Map.ofList [(Reserved "old_s", EVar s0); (Reserved "s", EVar s0)] in
         ([(loc, Requires (r, subst_reserved_exp m e))], [])
     | Ensures (r, e) ->
         let e = exp_refined e in
-        let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", res)] in
+        let m = Map.ofList [(Reserved "old_s", EVar s0); (Reserved "s", sM)] in
         ([(loc, Ensures (r, subst_reserved_exp m e))], [])
     | Modifies (readWrite, e) ->
         let e = exp_refined e in
-        let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", EVar src)] in
+        let m = Map.ofList [(Reserved "old_s", EVar s0); (Reserved "s", EVar s0)] in
         ([], [subst_reserved_exp m e])
     | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
@@ -410,7 +460,7 @@ let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
     fattrs = [(Id "opaque", [])];
   }
 
-let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
+let build_lemma (env:env) (benv:build_env) (b1:id) (r1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
   // generate va_lemma_Q
   let p = benv.proc in
   let loc = benv.loc in
@@ -428,24 +478,32 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     va_bM := va_ltmp2;
     var va_b1:va_codes := va_get_block(va_cM);
   *)
-  let (b0, s0, bM, sM, cM, sN) = (Reserved "b0", Reserved "s0", Reserved "bM", Reserved "sM", Reserved "cM", Reserved "sN") in
-  let argB = (b0, tCodes, XPhysical, In, []) in
-  let retB = (bM, tCodes, XPhysical, In, []) in
-  let retR = (sM, tState, XPhysical, In, []) in
+  let total = benv.is_terminating in
+  let (b0, r0, s0, f0) = (Reserved "b0", Reserved "r0", Reserved "s0", Reserved "f0") in
+  let (bM, sM, fM, cM) = (Reserved "bM", Reserved "sM", Reserved "fM", Reserved "cM") in
+  let sN = Reserved "sN" in
+  let argB = (b0, (if total then tCode else tCodes), XPhysical, In, []) in
   let argS = (s0, tState, XPhysical, In, []) in
+  let argF = (f0, tFuel, XPhysical, In, []) in
+  let retB = (bM, tCodes, XPhysical, In, []) in
+  let retS = (sM, tState, XPhysical, In, []) in
+  let retF = (fM, tFuel, XPhysical, In, []) in
   let argR = (sN, tState, XPhysical, In, []) in
   let prets = make_proc_params true p.prets p.pargs in
   let pargs = make_proc_params false p.prets p.pargs in
-  let pargs = [argS; argR] @ pargs in
-  let req = require (vaApp "require" [EVar b0; EApply (codeName, fArgs); EVar s0; EVar sN]) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
-  let ens = ensure (vaApp "ensure" ([EVar b0; EVar bM] @ [EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
+  let pargs = (if total then [argS] else [argS; argR]) @ pargs in
+  let xReq = "require" + total_suffix total in
+  let xEns = "ensure" + total_suffix total in
+  let req = require (vaApp xReq ([EVar b0; EApply (codeName, fArgs); EVar s0] @ listIfNot total [EVar sN])) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
+  let ens = ensure (vaApp xEns (if total then [EVar b0; EVar s0; EVar sM; EVar fM] else [EVar b0; EVar bM; EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
   let lCM  = (cM, Some (Some tCode, NotGhost)) in
-  let sBlock = lemma_block (sM, None) lCM (bM, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
+  let sBlock = lemma_block total (sM, None) lCM (bM, None) (f0, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
   let eReveal = if !precise_opaque then EApply (codeName, fArgs) else EVar codeName in
   let sReveal = SAssign ([], EOp (Uop UReveal, [eReveal])) in // reveal_va_code_Q();
   let sOldS = SVar (Reserved "old_s", Some tState, Immutable, XPhysical, [], Some (EVar s0)) in
-  let eb1 = vaApp "get_block" [EVar cM] in
+  let eb1 = vaApp "get_block" [EVar (if total then b0 else cM)] in
   let sb1 = SVar (b1, Some tCodes, Immutable, XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);
+  let sb2 = SVar (r1, Some tCodes, Immutable, XPhysical, [], Some (vaApp "CNil" [])) in
 
   // Generate well-formedness for operands:
   //   requires va_is_dst_int(dummy, s0)
@@ -482,19 +540,21 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     }
   *)
   let pargs = argB::pargs in
-  let prets = retB::retR::prets in
+  let prets = (if total then [retS; retF] else [retB; retS]) @ prets in
   let reqs = if benv.is_framed then reqsIs else [] in
   let sStmts =
     if benv.is_instruction then
       // Body of instruction lemma
-      let ss = build_lemma_ghost_stmts env benv sM sM loc stmts in
+      let dummy = Reserved "dummy" in
+      let senv = { env = env; benv = benv; b1 = dummy; r1 = dummy; bM = dummy; rM = dummy; code = EVar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
+      let ss = build_lemma_ghost_stmts senv stmts in
       [sReveal; sOldS] @ sBlock @ ss
     else if benv.is_operand then
       err "operand procedures must be declared extern"
     else
       // Body of ordinary lemma
       let ss = stmts_refined bstmts in
-      [sReveal; sOldS] @ sBlock @ [sb1] @ ss
+      [sReveal; sOldS] @ sBlock @ [sb1] @ listIf total [sb2] @ ss
     in
   let ensFrame = if benv.is_framed then [(loc, ensure eFrame)] else [] in
   let (pspecs, pmods) = List.unzip (List.map (build_lemma_spec env s0 (EVar sM)) p.pspecs) in
@@ -530,9 +590,10 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     match p.pbody with
     | None -> []
     | Some stmts ->
-        let s0 = Reserved "s0" in
+        let (s0, f0, sM, fM) = (Reserved "s0", Reserved "f0", Reserved "sM", Reserved "fM") in
         let i1 = string (gen_lemma_sym ()) in
         let b1 = Reserved ("b" + i1) in
+        let r1 = Reserved ("r" + i1) in
         let fGhost s xss =
           match s with
           | SVar (x, _, _, XGhost, _, _) -> x::(List.concat xss)
@@ -546,6 +607,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             is_instruction = isInstruction;
             is_operand = isOperand;
             is_framed = attrs_get_bool (Id "frame") true p.pattrs;
+            is_terminating = attrs_get_bool (Id "terminates") false p.pattrs;
             code_name = codeName;
             frame_exp = makeFrame env p s0;
             gen_fast_block = gen_fast_block;
@@ -554,8 +616,10 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
           in
         let rstmts = stmts_refined stmts in
         let fCode = build_code env benv rstmts in
-        let bstmts = build_lemma_stmts env benv b1 (Reserved "s0") (Reserved "sM") loc stmts in
-        let pLemma = build_lemma env benv b1 rstmts bstmts in
+        let dummy = Reserved "dummy" in
+        let senv = { env = env; benv = benv; b1 = b1; r1 = r1; bM = dummy; rM = dummy; code = EVar dummy; s0 = s0; f0 = f0; sM = sM; fM = fM; sN = dummy; loc = loc;} in
+        let bstmts = build_lemma_stmts senv stmts in
+        let pLemma = build_lemma env benv b1 r1 rstmts bstmts in
         [(loc, DFun fCode)] @ (gen_fast_block_funs ()) @ [(loc, DProc pLemma)]
     in
   bodyDecls //@ blockLemmaDecls

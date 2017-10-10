@@ -57,13 +57,23 @@ let va_cmp_le (a:va_register) (b:va_register) : ocmp = OLe a b
 
 let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
 
+type va_fuel = int
+
+unfold let va_hd = Cons?.hd
+
 let va_require (b0:va_codes) (c:va_code) (s0:va_state) (sN:va_state) : Type =
-    Cons? b0
- /\ Cons?.hd b0 = c
+     Cons? b0
+  /\ Cons?.hd b0 = c
+
+let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
+  b0 = c
 
 let va_ensure (b0:va_codes) (b1:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : Type =
     Cons? b0
  /\ Cons?.tl b0 = b1
+
+let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
+  True
 
 #endverbatim
 
@@ -78,13 +88,37 @@ assume val va_lemma_block : b0:va_codes -> s0:va_state -> sN:va_state -> Ghost (
   (requires True)
   (ensures (fun (s1, c1, b1) -> b0 = c1::b1))
 
+assume val va_lemma_block_total : unit -> Ghost (f1:va_fuel)
+  (requires True)
+  (ensures (fun (f1) -> f1 == 0))
+
 assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
   (requires True)
   (ensures (fun sM -> s0 == sM /\ sM == sN))
 
-assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s_0:va_state -> sN:va_state -> Ghost (bool * va_state)
+assume val va_lemma_empty_total : s0:va_state -> bN:va_codes -> rN:va_codes -> f0:va_fuel -> Ghost ((sM:va_state) * (fM:va_fuel))
   (requires True)
-  (ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\ sM == s_0))
+  (ensures (fun (sM, fM) -> s0 == sM))
+
+assume val va_lemma_merge_total : b0:va_codes -> r0:va_codes -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> Ghost ((bN:va_codes) * (rN:va_codes) * (fN:va_fuel))
+  (requires (Cons? b0))
+  (ensures (fun (bN, rN, fN) -> Cons? b0 /\ bN == Cons?.tl b0))
+
+assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> sN:va_state -> Ghost (bool * va_state)
+  (requires True)
+  (ensures  (fun (cond, sM) -> cond == eval_ocmp s0 ifb /\ sM == s0))
+
+assume val va_lemma_ifElse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> Ghost (bool * va_state * va_state * va_fuel)
+  (requires True)
+  (ensures  (fun (cond, sM, sN, f0) -> cond == eval_ocmp s0 ifb /\ sM == s0))
+
+assume val va_lemma_ifElseTrue_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> f0:va_fuel -> Lemma
+  (requires True)
+  (ensures  True)
+
+assume val va_lemma_ifElseFalse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> f0:va_fuel -> Lemma
+  (requires True)
+  (ensures  True)
 
 let va_whileInv (b:ocmp) (c:va_code) (n:int) (s0:va_state) (sN:va_state) =
   n >= 0
@@ -122,35 +156,35 @@ let opaque_double = make_opaque double
 
 
 
-procedure Imm(out register x:int, inline y:int)
+procedure{:terminates} Imm(out register x:int, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure Increment(inout register x:int)
+procedure{:terminates} Increment(inout register x:int)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure Add(inout register x:int, register y:int)
+procedure{:terminates} Add(inout register x:int, register y:int)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure AddReg(inout register x:int, register y:int)
+procedure{:terminates} AddReg(inout register x:int, register y:int)
     ensures
         x == old(x + y);
 {
     Add(x, y); // coerces y from register to operand
 }
 
-procedure p()
+procedure{:terminates} p()
     modifies
         eax;
     requires
@@ -162,7 +196,7 @@ procedure p()
     Increment(eax);
 }
 
-procedure Calls()
+procedure{:terminates} Calls()
     modifies
         eax; ebx;
     ensures
@@ -190,7 +224,8 @@ procedure Calls()
     }
 }
 
-procedure WhileTest()
+/*
+procedure{:terminates} WhileTest()
     modifies
         eax; ebx;
     requires
@@ -211,8 +246,9 @@ procedure WhileTest()
         Increment(ebx);
     }
 }
+*/
 
-procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+procedure{:terminates} Ghosts(ghost g1:int) returns(ghost g2:int)
     ensures
         g2 == g1 + 1;
 {
