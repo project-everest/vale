@@ -282,7 +282,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
         ps.Unindent ();
         gen_forall l f xs; 
       in
-      ps.PrintLine ("let " + l + " " + (let_string_of_formals true xs) + " : Lemma ");
+      ps.PrintLine ("let " + l + " () : Lemma ");
       match (xs, ts) with
       | ([], []) ->
           ps.PrintLine ("(requires " + (string_of_exp ex) + ")");
@@ -301,6 +301,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
           ps.Unindent ()
           ps.PrintLine "in";      
         )
+        ps.PrintLine(l + "();");
     )
   | SExists (xs, ts, e) -> notImplemented "exists statements"
 and emit_stmts (ps:print_state) (outs:formal list option) (stmts:stmt list) =
