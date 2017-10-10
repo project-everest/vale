@@ -152,6 +152,11 @@ AddOption('--NOCOLOR',
   default=False,
   action='store_true',
   help="Don't add color to build output")
+AddOption('--DUMPARGS',
+  dest='dump_args',
+  default=False,
+  action='store_true',
+  help="Print arguments that will be passed to the verification tools")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -988,5 +993,17 @@ def display_build_status():
   report_verification_failures()
   if do_fstar and not fstar_deps_ok:
     raise Exception('%sInitial F* dependency analysis failed; you might need to run scons again.%s' % (colors['red'], colors['end']))
+
+
+def print_env_options(options):
+  for option in options:
+    if option in env and len(env[option]) > 0:
+      print "%s " % env[option],
+
+if GetOption('dump_args'):
+  print "Currently using the following F* args:"
+  print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
+  sys.exit(1)
+
 
 atexit.register(display_build_status)
