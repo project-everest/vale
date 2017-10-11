@@ -49,6 +49,7 @@ unfold let n = nat64_max
 
 #endverbatim
 
+/* TMP1
 procedure poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
@@ -333,6 +334,7 @@ procedure poly1305_iteration(
     reveal_opaque(modp');
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
+TMP1 */
 
 #verbatim
 #reset-options "--z3rlimit 40"
@@ -469,20 +471,14 @@ procedure {:frame false} poly1305_blocks(
             validSrcAddrs(mem, old(inp), 64, length);
             ctx == old(ctx); // REVIEW: framing should add this automatically
             forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
-            //modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
+            (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
+            validSrcAddrs(mem, old(inp), 64, inp - old(inp));  // Precondition for poly1305_heap_blocks; Not needed in Dafny version
+            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
             //mem == old(mem)[ctx_id := mem[ctx_id]];
             memModified(old(mem), mem, old(ctx), 3 * 8);
         decreases
             r15;
     {
-        assert length >= 16;
-        assert old(inp) == inp - length + 16 * r15;
-        assert length >= 16 * r15;
-        assert old(inp) <= inp;
-        assert (inp - old(inp)) % 16 == 0;
-        assert forall j :: old(inp) <= j < inp && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
-        //assert poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) >= 0;
-
         ghost var hp := h;
         h := h + n * n * padbit + n * mem[inp + 8] + mem[inp];
         ghost var hq := h;
@@ -514,6 +510,7 @@ procedure {:frame false} poly1305_blocks(
     Store64(ctx, h2, 16);
 }
 
+/* TMP2
 #verbatim
 #reset-options "--z3rlimit 200"
 #endverbatim
@@ -1024,3 +1021,4 @@ let main () : FStar.All.ML unit =
   print_poly1305 gcc
 
 #endverbatim
+TMP2  */
