@@ -46,11 +46,9 @@ open FStar.Tactics
 #verbatim interface
 
 unfold let n = nat64_max
-let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
 
 #endverbatim
 
-/* TMP1
 procedure poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
@@ -336,8 +334,6 @@ procedure poly1305_iteration(
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
-TMP1 */
-
 #verbatim
 #reset-options "--z3rlimit 40"
 #endverbatim
@@ -407,8 +403,12 @@ procedure {:frame false} poly1305_blocks(
         r0 == mem[ctx + 24];
         r1 == mem[ctx + 32];
         s1 == r1 + r1 / 4;
-        ctx == old(ctx); // REVIEW: framing should add this automatically
         inp == old(inp + len);
+
+        // Framing
+        rcx == old(rcx);
+        ctx == old(ctx); // REVIEW: framing should add this automatically
+
         // TODO: The following is redundant with memModified above, and yet it seems to be necessary for poly_impl 
         //       to go through, presumably because it uses more liberal triggers?
         forall i :: ctx + 24 <= i && i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
@@ -418,6 +418,7 @@ procedure {:frame false} poly1305_blocks(
         (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
         validSrcAddrs(mem, old(inp), 64, len); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
         modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), old(inp + len));
+
 {
     h := 0;
     //lemma_BitwiseAdd64();
@@ -513,7 +514,6 @@ procedure {:frame false} poly1305_blocks(
     Store64(ctx, h2, 16);
 }
 
-/* TMP2
 #verbatim
 #reset-options "--z3rlimit 200"
 #endverbatim
@@ -1024,4 +1024,3 @@ let main () : FStar.All.ML unit =
   print_poly1305 gcc
 
 #endverbatim
-TMP2 */

@@ -56,14 +56,10 @@ let heapletTo128_all_preserved (m:mem) (ptr num_bytes i:int) (len:nat) =
 
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
-let poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
+let poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) (k) : int
  = poly1305_heap_blocks' h pad r m i k
 
-let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ 
-                              (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==>
-                                 m `Map.contains` j)}) =
+let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) (k) =
   ()                                 
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true --max_fuel 1 --max_ifuel 1 --smtencoding.nl_arith_repr native --z3rlimit 100 --using_facts_from Prims --using_facts_from FStar.Math.Lemmas"

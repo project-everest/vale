@@ -24,6 +24,8 @@ let mod2_128 = make_opaque mod2_128'
 let modp = make_opaque modp'
 
 (* TODO: These definitions should be in some more general location *)
+unfold let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
+
 let disjoint (ptr1:int) (num_bytes1:int) (ptr2:int) (num_bytes2:int) =
     ptr1 + num_bytes1 <= ptr2 \/ ptr2 + num_bytes2 <= ptr1
 
@@ -56,7 +58,8 @@ let applyHeapletTo128 (m:mem) (i:int) (len:nat) (index:int) : nat128 =
 
 
 let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . {:pattern (m `Map.contains` j)} i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : Tot int (decreases (k-i))
+        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))})
+        : Tot int (decreases (k-i))
     =
     if i = k then h
     else
@@ -67,12 +70,11 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int)
         modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
 
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))}) : int
 
 val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
                          (k:int{i <= k /\ (k - i) % 16 == 0 /\ 
-                              (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==>
-                                 m `Map.contains` j)}) : Lemma
+                              (validSrcAddrs m i 64 (k - i))}) : Lemma
   (requires True)
   (ensures poly1305_heap_blocks h pad r m i k = poly1305_heap_blocks' h pad r m i k)
 
@@ -189,7 +191,7 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
             z == lowerUpper128_opaque z0 z1)
   (ensures z == logand128 x y)
   
-val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma
+val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))} -> len:nat -> Lemma
   (requires i <= k && k <= i + len /\
             (k - i) % 16 == 0 /\
             validSrcAddrs m i  64 ((len + 15) / 16 * 16))
