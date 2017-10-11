@@ -44,9 +44,13 @@ open FStar.Tactics
 #endverbatim
 
 #verbatim interface
+
 unfold let n = nat64_max
+let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
+
 #endverbatim
 
+/* TMP1
 procedure poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
@@ -332,13 +336,13 @@ procedure poly1305_iteration(
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
-#verbatim interface
+TMP1 */
 
-let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
-
+#verbatim
+#reset-options "--z3rlimit 40"
 #endverbatim
 
-procedure{:timeLimitMultiplier 2} poly1305_blocks(
+procedure {:frame false} poly1305_blocks(
 //          operand ctx:uint64,
 //    inout dst_operand inp:uint64,
 //    inout dst_operand len:uint64,
@@ -361,6 +365,8 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         ctx @= rdi; inp @= rsi; len @= rdx; padbit @= rcx; d1 @= r8; d2 @= r9; d3 @= r10;
         r0 @= r11; r1 @= r12; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
         p := n * n * 4 - 5;
+    requires/ensures
+        ok;
     reads
         ctx; padbit; r11; r13;
     modifies
@@ -444,41 +450,50 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
         reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
     }
 
-//    while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
-//        invariant
-//            n == 0x1_0000_0000_0000_0000;
-//            r == r1 * n + r0;
-//            h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
-//            r0 < n / 16;
-//            r1 < n / 16;
-//            r1 % 4 == 0;
-//            s1 == r1 + r1 / 4;
-//            h2 < 5;
-//            rax == r1;
-//            inp + 16 * r15 == old(inp) + length;
-//            length == old(len);
-//            validSrcAddrs(mem, ctx, 64, 24 * 8);
-//            validSrcAddrs(mem, old(inp), 64, length);
-//            ctx == old(ctx); // REVIEW: framing should add this automatically
-//            forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
-//            //modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
-//            //mem == old(mem)[ctx_id := mem[ctx_id]];
-//            memModified(old(mem), mem, old(ctx), 3 * 8);
-//        decreases
-//            r15;
-//    {
-//        ghost var hp := h;
-//        h := h + n * n * padbit + n * mem[inp + 8] + mem[inp];
-//        ghost var hq := h;
-//        
-//        assume false;
+    while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
+        invariant
+            n == 0x1_0000_0000_0000_0000;
+            r == r1 * n + r0;
+            h == h2 * (0x1_0000_0000_0000_0000 * 0x1_0000_0000_0000_0000) + h1 * 0x1_0000_0000_0000_0000 + h0;
+            r0 < n / 16;
+            r1 < n / 16;
+            r1 % 4 == 0;
+            s1 == r1 + r1 / 4;
+            h2 < 5;
+            rax == r1;
+            inp + 16 * r15 == old(inp) + length;
+            length == old(len);
+            r15 * 16 <= length;    // Not needed with Dafny version
+            validSrcAddrs(mem, ctx, 64, 24 * 8);
+            validSrcAddrs(mem, old(inp), 64, length);
+            ctx == old(ctx); // REVIEW: framing should add this automatically
+            forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
+            //modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
+            //mem == old(mem)[ctx_id := mem[ctx_id]];
+            memModified(old(mem), mem, old(ctx), 3 * 8);
+        decreases
+            r15;
+    {
+        assert length >= 16;
+        assert old(inp) == inp - length + 16 * r15;
+        assert length >= 16 * r15;
+        assert old(inp) <= inp;
+        assert (inp - old(inp)) % 16 == 0;
+        assert forall j :: old(inp) <= j < inp && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
+        //assert poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) >= 0;
+
+        ghost var hp := h;
+        h := h + n * n * padbit + n * mem[inp + 8] + mem[inp];
+        ghost var hq := h;
+        
+        assume false;
 //
 //        Add64Wrap(h0, Mem(inp, 0)); // accumulate input
 //        Adc64Wrap(h1, Mem(inp, 8));
 //        AddLea64(inp, inp, 16);
 //        Adc64Wrap(h2, padbit);
 //
-//        h :=poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, p);
+//        h := poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1, r, h, p);
 //
 //        Mov64(rax, r1);
 //        Sub64(r15, 1); // len-=16
@@ -489,7 +504,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
 //            reveal_opaque(modp');
 //            lemma_poly_demod(p, hp, hq - hp, r);
 //        }
-//    }
+    }
 
     assume false;
 
@@ -498,6 +513,7 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
     Store64(ctx, h2, 16);
 }
 
+/* TMP2
 #verbatim
 #reset-options "--z3rlimit 200"
 #endverbatim
@@ -1008,4 +1024,4 @@ let main () : FStar.All.ML unit =
   print_poly1305 gcc
 
 #endverbatim
-
+TMP2 */
