@@ -153,10 +153,14 @@ let string_of_outs_exp (outs:formal list option):string =
   | None -> "()"
   | Some fs -> string_of_exp_prec 0 (EApply (Id "tuple", List.map (fun (x, _) -> EVar x) fs))
 
+let name_of_formal (x:id, t:typ option) = sid x
+let type_of_formal (x:id, t:typ option) = match t with None -> "_" | Some t -> (string_of_typ t)
+
 let string_of_outs_formals (outs:formal list option):string =
   match outs with
   | None -> "()"
-  | Some fs -> "(" + (String.concat ", " (List.map string_of_formal fs)) + ")"
+  //| Some fs -> "(" + (String.concat ", " (List.map string_of_formal fs)) + ")"
+  | Some fs -> "(" + (String.concat ", " (List.map name_of_formal fs)) + "):(" + (String.concat " * " (List.map type_of_formal fs)) + ")"
 
 let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
   match s with
