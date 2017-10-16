@@ -426,7 +426,7 @@ procedure {:frame false} poly1305_blocks(
         let r1_in := mem[ctx + 32];
         h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
         (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
-        validSrcAddrs(mem, old(inp), 64, len); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
+        validSrcAddrs(mem, old(inp), 64, old(len)); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
         modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), old(inp + len));
 
 {
@@ -480,6 +480,7 @@ procedure {:frame false} poly1305_blocks(
             validSrcAddrs(mem, ctx, 64, 24 * 8);
             validSrcAddrs(mem, old(inp), 64, length);
             ctx == old(ctx); // REVIEW: framing should add this automatically
+            rcx == old(rcx); // REVIEW: framing should add this automatically
             forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
             (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
             validSrcAddrs(mem, old(inp), 64, inp - old(inp));  // Precondition for poly1305_heap_blocks; Not needed in Dafny version
@@ -490,32 +491,42 @@ procedure {:frame false} poly1305_blocks(
             r15;
     {
         ghost var hp := h;
+        ghost var old_mem := mem;
         h := h + n * n * padbit + n * mem[inp + 8] + mem[inp];
         ghost var hq := h;
         
 
+        assert {:fast_block} true;
         Add64Wrap(h0, Mem(inp, 0)); // accumulate input
         Adc64Wrap(h1, Mem(inp, 8));
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 
+        ghost var old_h := h2 * (n * n) + h1 * n + h0;
 
         h := poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1);
-        assume false;
-//
-//
-//        Mov64(rax, r1);
+
+        Mov64(rax, r1);
         Sub64(r15, 1); // len-=16
-//
-//        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) by
-//        {
-//            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
-//            reveal_opaque(modp');
-//            lemma_poly_demod(p, hp, hq - hp, r);
-//        }
+
+        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) by
+        {
+            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
+            reveal_opaque(modp');
+            lemma_poly_demod(p, hp, hq - hp, r);
+
+            assume false;
+            assert h == (n * n) * h2 + n * h1 + h0;  // From poly1305_iteration
+            assert modp(h) == modp(old_h * r);       // From poly1305_iteration
+            assert modp(hp) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, old_mem, old(inp), inp - 16);  // From loop invariant
+            // Unfolding poly1305_heap_blocks:
+            assert poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) ==
+                   //modp((modp(hp) + padbit * n * n + nat64_max * mem[inp - 16 + 8] + mem[inp - 16]) * r);
+                   modp((modp(hp) + old_h) * r);    // FAILS
+        }
     }
 
-    assume false;
+    lemma_heap_blocks_preserved(mem, modp(h_in), padbit * n * n, r, ctx, 24*8, old(inp), inp);
 
     Store64(ctx, h0, 0);
     Store64(ctx, h1, 8);

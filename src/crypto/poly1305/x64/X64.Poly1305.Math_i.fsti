@@ -78,6 +78,16 @@ val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int)
   (requires True)
   (ensures poly1305_heap_blocks h pad r m i k = poly1305_heap_blocks' h pad r m i k)
 
+// This framing lemma wasn't necessary when we used heaplets and should go away again when we swap to buffers
+val lemma_heap_blocks_preserved (m:mem) (h:int) (pad:int) (r:int) (ptr num_bytes i:int) (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))}) : Lemma
+  (requires True)
+  (ensures (forall (m':mem) .
+              memModified m m' ptr num_bytes /\
+              disjoint ptr num_bytes i (k - i) /\
+              validSrcAddrs m' i 64 (k - i)
+             ==>
+             poly1305_heap_blocks h pad r m i k == poly1305_heap_blocks h pad r m' i k))
+
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
 val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -> h0:int -> h1:int -> h2:int -> s1:int -> d0:int -> d1:int -> d2:int -> hh:int -> Lemma
