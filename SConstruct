@@ -1003,6 +1003,7 @@ def print_env_options(options):
 if GetOption('dump_args'):
   print "Currently using the following F* args:"
   print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
+  print fstar_default_args
   sys.exit(1)
 
 
