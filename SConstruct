@@ -1,3 +1,6 @@
+# for python2 to use the print() function, removing the print keyword
+from __future__ import print_function
+
 import re
 import sys
 import os, os.path
@@ -998,12 +1001,12 @@ def display_build_status():
 def print_env_options(options):
   for option in options:
     if option in env and len(env[option]) > 0:
-      print "%s " % env[option],
+      print("%s " % env[option], end='')
 
 if GetOption('dump_args'):
-  print "Currently using the following F* args:"
+  print("Currently using the following F* args:")
   print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
-  print fstar_default_args
+  print(fstar_default_args)
   sys.exit(1)
 
 
