@@ -341,7 +341,7 @@ procedure poly1305_iteration(
 }
 
 #verbatim
-#reset-options "--z3rlimit 40"
+#reset-options "--z3rlimit 160"
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -499,6 +499,7 @@ procedure {:frame false} poly1305_blocks(
         Adc64Wrap(h2, padbit);
 
         ghost var old_h := h2 * (n * n) + h1 * n + h0;
+        assert old_h == hq;
 
         h := poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1);
 
@@ -508,17 +509,26 @@ procedure {:frame false} poly1305_blocks(
         assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) by
         {
             reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp);
+            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp - 16);
             reveal_opaque(modp');
             lemma_poly_demod(p, hp, hq - hp, r);
 
-            assume false;
-            assert h == (n * n) * h2 + n * h1 + h0;  // From poly1305_iteration
-            assert modp(h) == modp(old_h * r);       // From poly1305_iteration
-            assert modp(hp) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, old_mem, old(inp), inp - 16);  // From loop invariant
-            // Unfolding poly1305_heap_blocks:
-            assert poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, old(inp), inp) ==
-                   //modp((modp(hp) + padbit * n * n + nat64_max * mem[inp - 16 + 8] + mem[inp - 16]) * r);
-                   modp((modp(hp) + old_h) * r);    // FAILS
+//            assert h == (n * n) * h2 + n * h1 + h0;  // From poly1305_iteration
+//            assert modp(h) == modp(old_h * r);       // From poly1305_iteration
+//            assert modp(hp) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, old_mem, old(inp), inp - 16);  // From loop invariant
+//            
+//            ghost var pad := padbit * n * n;
+//            assert poly1305_heap_blocks(modp(h_in), pad, r, mem, old(inp), inp) ==
+//                   poly1305_heap_blocks'(modp(h_in), pad, r, mem, old(inp), inp); // From reveal
+//            // Unfolding poly1305_heap_blocks:
+//            ghost var kk := inp - 16;
+//            ghost var hh := poly1305_heap_blocks'(modp(h_in), pad, r, mem, old(inp), kk);
+//            assert poly1305_heap_blocks'(modp(h_in), pad, r, mem, old(inp), inp) ==
+//                   //modp((modp(hp) + padbit * n * n + nat64_max * mem[inp - 16 + 8] + mem[inp - 16]) * r);  // FAILS
+//                   //modp((modp(hp) + old_h) * r);    // FAILS
+//                   //modp((hh + padbit * n * n + nat64_max * mem[inp - 16 + 8] + mem[inp - 16]) * r);
+//                   modp((hh + pad + nat64_max * mem[kk + 8] + mem[kk]) * r);        // TRUE (with enough rlimit)
+//            assert hh == modp(hp);
         }
     }
 
