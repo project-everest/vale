@@ -49,7 +49,6 @@ unfold let n = nat64_max
 
 #endverbatim
 
-/* TMP1
 procedure poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
@@ -264,7 +263,6 @@ procedure poly1305_reduce_regs_fast_block(
     hh := rbx0 + rax + (old(r10) % 4) * (n * n);
     lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
 }
-TMP1 */
 
 
 procedure poly1305_iteration(
@@ -328,7 +326,6 @@ procedure poly1305_iteration(
     // TODO:  This version leads Z3 off into the weeds and times out with F* (but not Dafny)
     //assume forall x:nat, xb, y:nat, yb { x*y, xb*yb } :: x < xb && y < yb ==> x * y < xb * yb;
 
-/* TMP3
     lemma_mul_strict_upper_bound(h2, 7, r0, n / 16);
     lemma_mul_strict_upper_bound(h0, n, r1, n / 16);
     lemma_mul_strict_upper_bound(h1, n, r0, n / 16);
@@ -341,7 +338,6 @@ procedure poly1305_iteration(
     hh := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
     reveal_opaque(modp');
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
-TMP3 */
 }
 
 #verbatim
@@ -533,7 +529,6 @@ procedure {:frame false} poly1305_blocks(
     Store64(ctx, h2, 16);
 }
 
-/* TMP2
 #verbatim
 #reset-options "--z3rlimit 200"
 #endverbatim
@@ -1044,4 +1039,3 @@ let main () : FStar.All.ML unit =
   print_poly1305 gcc
 
 #endverbatim
-TMP2  */
