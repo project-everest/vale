@@ -126,7 +126,7 @@ val taint_eval_while: c:tainted_code{While? c} -> s:traceState -> Tot (option tr
 let rec taint_eval_code c s =
   match c with
     | Ins ins -> let obs = ins_obs ins s in
-      Some ({taint_eval_ins ins s with trace = obs})
+      Some ({taint_eval_ins ins s with trace = obs @ s.trace})
     
     | Block l -> taint_eval_codes l s
     
@@ -145,12 +145,10 @@ match l with
       | c::tl -> 
 	let s_opt = taint_eval_code c s in
 	if None? s_opt then None
-	(* Recursively evaluate on the tail,
-	 and append the trace of this instruction *)
+	(* Recursively evaluate on the tail *)
 	else taint_eval_codes
 	  tl
-	  ({(Some?.v s_opt) with
-	    trace = (Some?.v s_opt).trace @ s.trace})
+	  (Some?.v s_opt)
 
 and taint_eval_while c s0 =
   let While cond body inv = c in
