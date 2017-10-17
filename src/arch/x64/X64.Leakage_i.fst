@@ -7,6 +7,8 @@ open X64.Leakage_Helpers_i
 
 open FStar.Tactics
 
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
+
 let merge_taint t1 t2 =
   if Secret? t1 || Secret? t2 then
     Secret
@@ -194,6 +196,7 @@ let lemma_and_same_public ts ins s1 s2 =
   let r2 = taint_eval_ins ins s2 in
   assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
 
+#set-options "--z3rlimit 80"
 val lemma_addlea_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in AddLea64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
@@ -209,7 +212,7 @@ val lemma_addcarry_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ 
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
-#set-options "--z3rlimit 80"
+#set-options "--z3rlimit 100"
 let lemma_addcarry_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
@@ -227,7 +230,6 @@ val lemma_mul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) ts ts' s1 s2))
 
-#set-options "--z3rlimit 100"
 let lemma_mul_same_public ts ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
@@ -322,18 +324,17 @@ let combine_reg_taints regs1 regs2 =
 let combine_taint_states (ts:taintState) (ts1:taintState) (ts2:taintState) =
   TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) (merge_taint ts1.flagsTaint ts2.flagsTaint)
   
-
 let rec check_if_block_consumes_fixed_time (block:tainted_codes) (ts:taintState) : bool * taintState =
   match block with
   | [] -> true, ts
   | hd::tl -> let fixedTime, ts_int = check_if_code_consumes_fixed_time hd ts in
-    if (not fixedTime) then fixedTime, ts
+    if (not fixedTime) then fixedTime, ts_int
     else check_if_block_consumes_fixed_time tl ts_int
     
 
 and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool * taintState =
   match code with
-  | Ins ins -> check_if_instruction_consumes_fixed_time ins ts
+  | Ins ins -> check_if_ins_consumes_fixed_time ins ts
   
   | Block block -> check_if_block_consumes_fixed_time block ts
 
@@ -357,12 +358,11 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
       if (not validIfFalse) then (false, ts)
       else
       (true, combine_taint_states ts tsIfTrue tsIfFalse)
-      
-
-    
-
+     
   | _ -> false, ts
-  
+
+
+(*
 and check_if_loop_consumes_fixed_time (pred:tainted_ocmp) (body:tainted_code) (ts:taintState) : bool * taintState =
   let cond_taint = pred.ot in
   let o1 = operand_taint (get_fst_ocmp pred.o) ts in
@@ -381,8 +381,43 @@ and check_if_loop_consumes_fixed_time (pred:tainted_ocmp) (body:tainted_code) (t
     let combined_ts = combine_taint_states ts ts next_ts in
     if (combined_ts = ts) then true, combined_ts
     else check_if_loop_consumes_fixed_time pred body combined_ts
+*)
+  
+val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> Lemma
+ (requires True)
+ (ensures (let b, ts' = check_if_code_consumes_fixed_time code ts in
+  (b2t b ==> isConstantTime code ts /\ isLeakageFree code ts ts')))
+ (decreases %[code; 0])
 
-val check_if_code_is_leakage_free: (code:tainted_code) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code ts tsExpected
+val lemma_block_leakage_free: (ts:taintState) -> (codes:tainted_codes) -> Lemma
+ (requires True)
+ (ensures (let b, ts' = check_if_block_consumes_fixed_time codes ts in
+  (b2t b ==> isConstantTime (Block codes) ts /\ isLeakageFree (Block codes) ts ts')))
+ (decreases %[codes;1])
+
+let test_lemma (code1: tainted_code) (code2:tainted_code) (ts:taintState) =
+  assert ((forall s. taint_eval_code code1 s == taint_eval_code code2 s) /\ check_if_code_consumes_fixed_time code1 ts == check_if_code_consumes_fixed_time code2 ts /\
+  isConstantTime code1 ts ==> isConstantTime code2 ts)
+
+#set-options "--z3rlimit 30"
+let rec lemma_code_leakage_free ts code = match code with
+  | Ins ins -> lemma_ins_leakage_free ts ins
+  | Block block -> lemma_block_leakage_free ts block
+  | IfElse ifCond ifTrue ifFalse -> admit()
+  | _ -> ()
+
+and lemma_block_leakage_free ts block = match block with
+  | [] -> ()
+  | hd :: tl -> 
+    let b, ts' = check_if_code_consumes_fixed_time hd ts in
+    lemma_code_leakage_free ts hd;
+    assume (check_if_code_consumes_fixed_time hd ts == check_if_block_consumes_fixed_time [hd] ts);
+    assume (forall s. taint_eval_code hd s == taint_eval_code (Block [hd]) s);
+    assume (b2t b ==> isConstantTime hd ts /\ isLeakageFree hd ts ts');
+    assert (b2t b ==> isConstantTime (Block [hd]) ts); (* /\ isLeakageFree (Block [hd]) ts ts'); *)
+    admit()
+  
+(* val check_if_code_is_leakage_free: (code:tainted_code) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code ts tsExpected
 	 /\ b ==> isConstantTime code ts})
 
 
@@ -393,3 +428,5 @@ let check_if_code_is_leakage_free code ts tsExpected =
     publicTaintsAreAsExpected ts' tsExpected
   else
     b
+
+*)
