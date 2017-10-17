@@ -225,7 +225,7 @@ colors['end']    = '\033[0m'
 
 # If the output is not a terminal or user opts out, remove the colors
 if (not sys.stdout.isatty()) or GetOption('nocolor'):
-   for key, value in colors.iteritems():
+   for key, value in colors.items():
       colors[key] = ''
 
 ####################################################################
