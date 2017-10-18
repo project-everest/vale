@@ -131,7 +131,20 @@ val lemma_block_explicit_leakage_free: (ts:taintState) -> (codes:tainted_codes) 
 let rec lemma_code_explicit_leakage_free ts code s1 s2 = match code with
   | Ins ins -> lemma_ins_leakage_free ts ins
   | Block block -> lemma_block_explicit_leakage_free ts block s1 s2
-  | IfElse ifCond ifTrue ifFalse -> admit()
+  | IfElse ifCond ifTrue ifFalse ->     
+    let b_fin, ts_fin = check_if_code_consumes_fixed_time code ts in
+    let st1, b1 = taint_eval_ocmp s1 ifCond in
+    let st1 = {st1 with trace=BranchPredicate(b1)::s1.trace} in
+    let st2, b2 = taint_eval_ocmp s2 ifCond in
+    let st2 = {st2 with trace=BranchPredicate(b2)::s2.trace} in
+    assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
+    monotone_ok_eval ifTrue st1;
+    monotone_ok_eval ifTrue st2;
+    lemma_code_explicit_leakage_free ts ifTrue st1 st2;
+    monotone_ok_eval ifFalse st1;
+    monotone_ok_eval ifFalse st2;
+    lemma_code_explicit_leakage_free ts ifFalse st1 st2;
+    ()
   | _ -> ()
 
 and lemma_block_explicit_leakage_free ts block s1 s2 = match block with
@@ -150,38 +163,10 @@ and lemma_block_explicit_leakage_free ts block s1 s2 = match block with
     monotone_ok_eval (Block tl) s'2
 
 val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> Lemma
- (requires True)
- (ensures (let b, ts' = check_if_code_consumes_fixed_time code ts in
-  (b2t b ==> isConstantTime code ts /\ isLeakageFree code ts ts')))
- (decreases %[code; 0])
+ (let b, ts' = check_if_code_consumes_fixed_time code ts in
+  (b2t b ==> isConstantTime code ts /\ isLeakageFree code ts ts'))
 
-val lemma_block_leakage_free: (ts:taintState) -> (codes:tainted_codes) -> Lemma
- (requires True)
- (ensures (let b, ts' = check_if_block_consumes_fixed_time codes ts in
-  (b2t b ==> isConstantTime (Block codes) ts /\ isLeakageFree (Block codes) ts ts')))
- (decreases %[codes;1])
-
-let rec lemma_code_leakage_free ts code = match code with
-  | Ins ins -> lemma_ins_leakage_free ts ins
-  | Block block -> lemma_block_leakage_free ts block
-  | IfElse ifCond ifTrue ifFalse -> admit()
-  | _ -> ()
-
-and lemma_block_leakage_free ts block = match block with
-  | [] -> ()
-  | hd :: tl -> 
-    let b, ts' = check_if_code_consumes_fixed_time hd ts in
-    lemma_code_leakage_free ts hd;
-    lemma_equal_eval_isConstant hd (Block[hd]) ts ts';
-    assume (b2t b ==> isConstantTime (Block [hd]) ts  /\ isLeakageFree (Block [hd]) ts ts');
-    lemma_block_leakage_free ts' tl;
-    let b_fin, ts_fin = check_if_block_consumes_fixed_time tl ts' in
-    assume (b2t b_fin ==> isConstantTime (Block tl) ts' /\ isLeakageFree (Block tl) ts' ts_fin);
-    assume ((b2t b) ==> check_if_block_consumes_fixed_time tl ts' == check_if_code_consumes_fixed_time (Block block) ts);
-    assert (forall s. let r = taint_eval_code hd s in taint_eval_code (Block block) s == (if None? r then r else taint_eval_code (Block tl) (Some?.v r)));
-    
-    
-    admit()
+let lemma_code_leakage_free ts code = FStar.Classical.forall_intro_2 (lemma_code_explicit_leakage_free ts code)
   
 (* val check_if_code_is_leakage_free: (code:tainted_code) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code ts tsExpected
 	 /\ b ==> isConstantTime code ts})
