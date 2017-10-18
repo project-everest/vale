@@ -314,10 +314,6 @@ procedure poly1305_iteration(
         modp(h * r) == modp(hh); 
         h2 < 5;
 {
-//TODO
-    hh := 0;
-    assume false;       
-
 //    Previous version used a forall statement, which isn't yet supported for F*
 //    forall x:nat, xb, y:nat, yb :| x < xb && y < yb :: x * y < xb * yb
 //    {
