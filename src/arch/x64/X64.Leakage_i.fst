@@ -85,27 +85,36 @@ val lemma_equal_eval_isConstant: (code1: tainted_code) -> (code2:tainted_code) -
   
 let lemma_equal_eval_isConstant code1 code2 ts ts' = FStar.Classical.forall_intro_2 (lemma_equal_eval_isConstant_aux code1 code2 ts ts')
 
-val monotone_ok_eval: (code:tainted_code) -> (s:traceState) ->
-  Lemma (let s' = taint_eval_code code s in
-    Some? s' /\ (Some?.v s').state.ok ==> s.state.ok)
+val monotone_ok_eval: (code:tainted_code) -> (s:traceState) -> Lemma
+ (requires True)
+ (ensures (let s' = taint_eval_code code s in
+    Some? s' /\ (Some?.v s').state.ok ==> s.state.ok))
+ (decreases %[code; 0])
 
+val monotone_ok_eval_block: (codes:tainted_codes) -> (s:traceState) -> Lemma
+ (requires True)
+ (ensures (let s' = taint_eval_codes codes s in
+    Some? s' /\ (Some?.v s').state.ok ==> s.state.ok))
+ (decreases %[codes;1])
+
+#set-options "--z3rlimit 20"
 let rec monotone_ok_eval code s = match code with
   | Ins ins -> ()
-  | Block block -> begin
-    match block with
-    | [] -> ()
-    | hd :: tl -> 
-      let s_fin = taint_eval_code (Block block) s in
-      let s' = taint_eval_code hd s in
-      assert (Some? s_fin ==> Some? s');
-      if None? s' then ()
-      else
-      monotone_ok_eval (Block tl) (Some?.v s');
-      assert (Some? s_fin /\ (Some?.v s_fin).state.ok ==> (Some?.v s').state.ok);
-      admit()
-  end
+  | Block block -> monotone_ok_eval_block block s
+  | IfElse ifCond ifTrue ifFalse ->
+    let st, b = taint_eval_ocmp s ifCond in
+    let st = {st with trace=BranchPredicate(b)::s.trace} in
+    if b then monotone_ok_eval ifTrue st else monotone_ok_eval ifFalse st
   | _ -> admit()
-  
+
+and monotone_ok_eval_block block s =
+  match block with
+  | [] -> ()
+  | hd :: tl -> 
+    let s' = taint_eval_code hd s in
+    if None? s' then () else
+    monotone_ok_eval_block tl (Some?.v s');
+    monotone_ok_eval hd s
 
 val lemma_code_explicit_leakage_free: (ts:taintState) -> (code:tainted_code) -> (s1:traceState) -> (s2:traceState) -> Lemma
  (requires True)
