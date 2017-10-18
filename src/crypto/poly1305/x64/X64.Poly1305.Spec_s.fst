@@ -26,36 +26,6 @@ let rec poly1305_hash_blocks (h:int) (pad:int) (r:int) (inp:int->nat128) (i:int)
     let hh = poly1305_hash_blocks h pad r inp i kk in
     modp' ((hh + pad + inp kk) * r)
 
-let poly1305_hash_r (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
-  let r = logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
-  r
-
-let poly1305_hash_nblocks (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
-  let r = logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
-  let nBlocks = len / 16 in
-  nBlocks
-
-let poly1305_hash_nExtra (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
-  let r = logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
-  let nBlocks = len / 16 in
-  let nExtra = len % 16 in
-  nExtra
-
-let poly1305_hash_padBlocks (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
-  let r = logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
-  let nBlocks = len / 16 in
-  let nExtra = len % 16 in
-  let padBlocks = nat128_max in
-  padBlocks
-
-let poly1305_hash_hblocks (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
-  let r = logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
-  let nBlocks = len / 16 in
-  let nExtra = len % 16 in
-  let padBlocks = nat128_max in
-  let hBlocks = poly1305_hash_blocks 0 padBlocks r inp start (start + 16 * nBlocks) in
-  hBlocks
-
 let poly1305_hash (key_r:nat128) (key_s:nat128) (inp:int->nat128) (start:int) (len:nat) :int =
   let r = logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
   let nBlocks = len / 16 in
