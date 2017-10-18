@@ -105,7 +105,7 @@ let rec monotone_ok_eval code s = match code with
     let st, b = taint_eval_ocmp s ifCond in
     let st = {st with trace=BranchPredicate(b)::s.trace} in
     if b then monotone_ok_eval ifTrue st else monotone_ok_eval ifFalse st
-  | _ -> admit()
+  | While _ _ _ -> admit()
 
 and monotone_ok_eval_block block s =
   match block with
@@ -139,8 +139,6 @@ and lemma_block_explicit_leakage_free ts block s1 s2 = match block with
   | hd :: tl ->
     let b, ts' = check_if_code_consumes_fixed_time hd ts in
     lemma_code_explicit_leakage_free ts hd s1 s2;
-    lemma_equal_eval_isConstant_aux hd (Block[hd]) ts ts' s1 s2;
-    assert (b2t b ==> isConstantTimeGivenStates (Block [hd]) ts s1 s2  /\ isExplicitLeakageFreeGivenStates (Block [hd]) ts ts' s1 s2);
     let s'1 = taint_eval_code hd s1 in
     let s'2 = taint_eval_code hd s2 in
     if None? s'1 || None? s'2 then ()
@@ -148,16 +146,8 @@ and lemma_block_explicit_leakage_free ts block s1 s2 = match block with
     let s'1 = Some?.v s'1 in
     let s'2 = Some?.v s'2 in
     lemma_block_explicit_leakage_free ts' tl s'1 s'2;
-    let b_fin, ts_fin = check_if_block_consumes_fixed_time tl ts' in
-    assert (b2t b_fin ==> isConstantTimeGivenStates (Block tl) ts' s'1 s'2 /\ isExplicitLeakageFreeGivenStates (Block tl) ts' ts_fin s'1 s'2);
-    assert ((b2t b) ==> check_if_block_consumes_fixed_time tl ts' == check_if_code_consumes_fixed_time (Block block) ts);
-    assert (forall s. let r = taint_eval_code hd s in taint_eval_code (Block block) s == (if None? r then r else taint_eval_code (Block tl) (Some?.v r)));
-    assert (taint_eval_code (Block block) s1 == taint_eval_code (Block tl) s'1); 
-    assert (taint_eval_code (Block block) s2 == taint_eval_code (Block tl) s'2); 
-    assert (b2t b ==> s1.state.ok /\ s'1.state.ok /\ s2.state.ok /\ s'2.state.ok /\ constTimeInvariant ts s1 s2 ==> constTimeInvariant ts' s'1 s'2); 
     monotone_ok_eval (Block tl) s'1;
-    monotone_ok_eval (Block tl) s'2;
-    ()
+    monotone_ok_eval (Block tl) s'2
 
 val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> Lemma
  (requires True)
