@@ -28,32 +28,32 @@ let constTimeInvariant (ts:taintState) (s:traceState) (s':traceState) =
   /\ s.trace = s'.trace
 
 
-let isConstantTimeGivenStates (code:tainted_code) (ts:taintState) (s1:traceState) (s2:traceState) =
-  let r1 = taint_eval_code code s1 in
-  let r2 = taint_eval_code code s2 in
+let isConstantTimeGivenStates (code:tainted_code) (fuel:nat) (ts:taintState) (s1:traceState) (s2:traceState) =
+  let r1 = taint_eval_code code fuel s1 in
+  let r2 = taint_eval_code code fuel s2 in
   ( (Some? r1) /\ (Some? r2)
    /\ s1.state.ok /\ (Some?.v r1).state.ok
    /\ s2.state.ok /\ (Some?.v r2).state.ok
    /\ constTimeInvariant ts s1 s2
   ) ==> (Some?.v r1).trace = (Some?.v r2).trace
 
-let isConstantTime (code:tainted_code) (ts:taintState) =
+let isConstantTime (code:tainted_code) (fuel:nat) (ts:taintState) =
   forall s1 s2.
-      isConstantTimeGivenStates code ts s1 s2
+      isConstantTimeGivenStates code fuel ts s1 s2
 
-let isExplicitLeakageFreeGivenStates (code:tainted_code) (ts:taintState) (ts':taintState) (s1:traceState) (s2:traceState) =
-  let r1 = taint_eval_code code s1 in
-  let r2 = taint_eval_code code s2 in
+let isExplicitLeakageFreeGivenStates (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) (s1:traceState) (s2:traceState) =
+  let r1 = taint_eval_code code fuel s1 in
+  let r2 = taint_eval_code code fuel s2 in
  ( Some? r1 /\ Some? r2
   /\ s1.state.ok /\ (Some?.v r1).state.ok
   /\ s2.state.ok /\ (Some?.v r2).state.ok
   /\ constTimeInvariant ts s1 s2
  ) ==> publicValuesAreSame ts' (Some?.v r1) (Some?.v r2)
 
-let isExplicitLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
+let isExplicitLeakageFree (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) =
   forall s1 s2.
-    isExplicitLeakageFreeGivenStates code ts ts' s1 s2
+    isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2
 
-let isLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
-    isConstantTime code ts
-  /\ isExplicitLeakageFree code ts ts'
+let isLeakageFree (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) =
+    isConstantTime code fuel ts
+  /\ isExplicitLeakageFree code fuel ts ts'

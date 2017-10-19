@@ -107,69 +107,52 @@ let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
 type tainted_code = precode tainted_ins tainted_ocmp
 type tainted_codes = list tainted_code
 
-let tainted_decr (c:tainted_code) (s:state) : nat =
-  match c with
-  | While _ _ inv ->
-    let n = eval_operand inv s in
-    if UInt64.v n >= 0 then UInt64.v n else 0
-    | _ -> 0
-
-val taint_eval_code: c:tainted_code -> s:traceState -> Tot (option traceState)
-(decreases %[c; tainted_decr c s.state; 1])
-val taint_eval_codes: l:tainted_codes -> s:traceState -> Tot (option traceState)
-(decreases %[l])
-val taint_eval_while: c:tainted_code{While? c} -> s:traceState -> Tot (option traceState)
-(decreases %[c; tainted_decr c s.state; 0])
+val taint_eval_code: c:tainted_code -> fuel:nat -> s:traceState -> Tot (option traceState)
+(decreases %[fuel; c; 1])
+val taint_eval_codes: l:tainted_codes -> fuel:nat -> s:traceState -> Tot (option traceState)
+(decreases %[fuel; l])
+val taint_eval_while: c:tainted_code{While? c} -> fuel:nat -> s:traceState -> Tot (option traceState)
+(decreases %[fuel; c; 0])
 
 (* Adds the observations to the eval_code.
    Returns None if eval_code returns None *)
-let rec taint_eval_code c s =
+let rec taint_eval_code c fuel s =
   match c with
     | Ins ins -> let obs = ins_obs ins s in
       Some ({taint_eval_ins ins s with trace = obs @ s.trace})
     
-    | Block l -> taint_eval_codes l s
+    | Block l -> taint_eval_codes l fuel s
     
     | IfElse ifCond ifTrue ifFalse ->
       let st, b = taint_eval_ocmp s ifCond in
       (* We add the BranchPredicate to the trace *)
       let s' = {st with trace=BranchPredicate(b)::s.trace} in
       (* We evaluate the branch with the new trace *)
-      if b then taint_eval_code ifTrue s' else taint_eval_code ifFalse s'
+      if b then taint_eval_code ifTrue fuel s' else taint_eval_code ifFalse fuel s'
     
-    | While _ _ _ -> taint_eval_while c s
+    | While _ _ -> taint_eval_while c fuel s
 
-and taint_eval_codes l s =
+and taint_eval_codes l fuel s =
 match l with
       | [] -> Some s
       | c::tl -> 
-	let s_opt = taint_eval_code c s in
+	let s_opt = taint_eval_code c fuel s in
 	if None? s_opt then None
 	(* Recursively evaluate on the tail *)
 	else taint_eval_codes
 	  tl
+	  fuel
 	  (Some?.v s_opt)
 
-and taint_eval_while c s0 =
-  let While cond body inv = c in
-  let n0 = eval_operand inv s0.state in
+and taint_eval_while c fuel s0 =
+  if fuel = 0 then None else
+  let While cond body = c in
   let (s0, b) = taint_eval_ocmp s0 cond in
-
-  if UInt64.v n0 <= 0 then
-    (* if loop invariant <= 0, the guard must be false, and we add the corresponding BranchPredicate *)
-    if b then None else Some ({s0 with trace = BranchPredicate(false)::s0.trace})
-  else // loop invariant > 0
-    if not b then None // guard must evaluate to true
-    else
-      // We add the branchpredicate to the trace
-      let s0 = {s0 with trace = BranchPredicate(true)::s0.trace} in
-      let s_opt = taint_eval_code body s0 in
-      if None? s_opt then None
-      else
-        let s1 = Some?.v s_opt in
-	if not s1.state.ok then Some s1 // from the reference semantics
-	else
-	  let n1 = eval_operand inv s1.state in
-	  if UInt64.v n1 >= UInt64.v n0 then None // loop invariant must decrease
-	  else taint_eval_while c s1
-    
+  if not b then Some ({s0 with trace = BranchPredicate(false)::s0.trace})
+  else
+    let s0 = {s0 with trace = BranchPredicate(true)::s0.trace} in
+    let s_opt = taint_eval_code body (fuel - 1) s0 in
+    match s_opt with
+    | None -> None
+    | Some s1 -> if not s1.state.ok then Some s1
+      else taint_eval_while c (fuel - 1) s1
