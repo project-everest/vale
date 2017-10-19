@@ -200,7 +200,7 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
         flags0 == s0.flags /\
         mem0 == s0.mem ==>
         s0.ok /\
-        Some sN == va_eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 /\
+        eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 sN /\
         Prims.norm [delta_only wp_code_delta; zeta; iota; primops]
                    (wp_code (normalize_term inss) (augment sN post)
                      ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
@@ -216,7 +216,7 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
 //     let i2 = Prims.set_range_of (Load64 (OReg Rbx) (OReg Rcx) 0)
 //                                 (mk_range "load-instruction-2" 2 1 3 0) in
 //     let i3 = Mov64 (OReg Rax) (OReg Rbx) in
-//     assume (Some sN == va_eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0);
+//     assume (eval_code (va_Block (inss_to_codes [i1;i2;i3])) s0 sN);
 //     va_lemma_weakest_pre_norm [i1; i2; i3] s0 sN;
 //     //this assertion is what F* uses to implicitly instantiate
 //     //the post-condition predicate in lemma_weakest_pre_norm

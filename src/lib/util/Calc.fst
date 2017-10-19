@@ -10,7 +10,7 @@ let ( &= ) (#a:Type) (x:a) (y:a) :
   = fun () -> y
 
 (** Combinator used to discharge equalities with SMT/lemmas*)
-let ( &| ) #a #req #ens ($f:(unit -> Pure a req ens)) (proof:unit -> Lemma req) 
+let ( &| ) #a #req (#ens : a -> Type0) ($f:(unit -> Pure a req ens)) (proof:unit -> Lemma req)
     : Tot (x:a{ens x})
   = proof (); f ()
 
@@ -18,7 +18,7 @@ let ( &| ) #a #req #ens ($f:(unit -> Pure a req ens)) (proof:unit -> Lemma req)
 (** Combinator used to discharge equalities with tactics*)
 let ( &|| ) #a #req #ens ($f:(unit -> Pure a req ens))
       (proof: tactic unit{by_tactic  
-	(rewrite_eqs_from_context;; norm[Delta];; proof) (squash req)}) 
+	(rewrite_eqs_from_context;; norm[delta];; proof) (squash req)}) 
 	: Tot (x:a{ens x}) = (); f ()  
 	//this is weird, but the sequencing "encourages" the
 	//normalizer to actually reduce f(), which is important below

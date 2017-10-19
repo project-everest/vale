@@ -21,6 +21,7 @@ let reprint_loop_invs = ref true;
 let reprint_blank_lines = ref true;
 let concise_lemmas = ref true;
 let precise_opaque = ref false;
+let fstar = ref false;
 
 type print_state =
   {
@@ -60,11 +61,6 @@ type print_state =
     if l = cl then ()
     else if f <> cf || i < ci || i > ci + 8 then this.cur_loc := l; this.print_out.WriteLine ("#line " + (string i) + " " + f)
     else this.PrintLine ""; this.SetLoc l
-
-let exp_of_conjuncts (es:exp list):exp =
-  match es with
-  | [] -> EBool true
-  | h::t -> List.fold (fun conj e -> EOp (Bop BAnd, [conj; e])) h t
 
 let require e = Requires (Refined, e)
 let ensure e = Ensures (Refined, e)
@@ -721,7 +717,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
               let inp = List.concat (List.map2 (fun (fid, _, storage, _, _) actl -> if storage = XGhost || storage = XInline then [(fid, actl)] else []) p.pargs es) in
               let outp = List.map (fun ((fid, _, _, _, _), _, (id, _)) -> (fid, EVar id)) ghost_out_map in
               let m = Map.ofList (inp @ outp) in
-              let ens = subst_reserved_exp m (exp_of_conjuncts posts) in
+              let ens = subst_reserved_exp m (and_of_list posts) in
               let ens = exp_abstract true ens in
               let ghost_tmps_exists_lhss = List.map (fun (pf, l, f) -> f) ghost_out_map in
               let assignments_from_tmps_to_ghost_actuals = List.map (fun a -> match a with (_, l, (rid, _)) -> SAssign ([l], EVar rid)) ghost_out_map in
@@ -799,6 +795,15 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
       let i2 = string (gen_lemma_sym ()) in
       let (n1, s1, r1) = (Reserved ("n" + i1), Reserved ("s" + i1), Reserved ("sW" + i1)) in
       let r2 = (Reserved ("sW" + i2)) in
+      let (codeCond, codeBody, sCodeVars) =
+        if !fstar then
+          // REVIEW: workaround for F* issue
+          let (xc, xb) = (Reserved ("sC" + i1), Reserved ("sB" + i1)) in
+          let sCond = SAssign ([(xc, None)], codeCond) in
+          let sBody = SAssign ([(xb, None)], codeBody) in
+          (EVar xc, EVar xb, [sCond; sBody])
+        else (codeCond, codeBody, [])
+        in
       let lem = vaApp "lemma_while" [codeCond; codeBody; EVar src; EVar res] in
       let lemTrue = vaApp "lemma_whileTrue" [codeCond; codeBody; EVar n1; EVar r1; EVar res] in
       let lemFalse = vaApp "lemma_whileFalse" [codeCond; codeBody; EVar r1; EVar res] in
@@ -909,7 +914,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
         in
       let whileBody = (EsStmts (slemTrue::wPre))::sbBody @ [EsStmts (r1Update::n1Update::wPost)] in
       let sWhile = EsWhile (nCond, (loc, whileInv)::invs @ invFrames, ed, whileBody) in
-      (NotGhost, true, [EsStmts (refinedStmts @ [slem]); sWhile; EsStmts [slemFalse]])
+      (NotGhost, true, [EsStmts (refinedStmts @ sCodeVars @ [slem]); sWhile; EsStmts [slemFalse]])
   | SAssign (lhss, e) -> assign lhss e
   | SForall (xs, ts, ex, e, ss) ->
       let ts = List.map (List.map sub_src) ts in

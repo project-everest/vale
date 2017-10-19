@@ -268,6 +268,7 @@ let main (argv) =
     (
       if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
       precise_opaque := !emitFStarText;
+      fstar := !emitFStarText;
       let decls = build_decls empty_env decls in
       (match !reprint_file with
         | None -> ()

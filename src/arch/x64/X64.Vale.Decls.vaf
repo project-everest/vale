@@ -12,7 +12,8 @@ open X64.Vale.State_i
 
 val cf : (flags:int) -> bool
 
-unfold let va_subscript = Map.sel
+//unfold let va_subscript = Map.sel
+unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 unfold let va_update = Map.upd
 unfold let va_make_opaque = Opaque_i.make_opaque
 unfold let va_reveal_opaque = Opaque_i.reveal_opaque
@@ -48,6 +49,29 @@ unfold let va_op_reg_operand_reg (r:reg) : va_reg_operand = OReg r
 unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
 unfold let va_coerce_operand_to_dst_operand (o:va_operand{valid_dst o}) : va_dst_operand = o
 unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
+unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
+  match o with
+  | OConst n -> OConst (n + offset)
+  | OReg r -> OMem (MReg r offset)
+  | _ -> OConst 42
+
+unfold let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) : operand =
+  va_opr_code_Mem base offset
+
+(*
+function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
+    requires x86_ValidState(s)
+    requires base.OReg?
+    requires ValidMemAddr(MReg(base.r, offset))
+    requires ValidSrcAddr(s.heaplets, id, va_get_reg64(base.r, s) + offset, 64, taint)
+    ensures  Valid64BitSourceOperand(to_state(s), OHeap(MReg(base.r, offset), taint))
+    ensures  eval_op64(to_state(s), OHeap(MReg(base.r, offset), taint)) == s.heaplets[id].mem64[va_get_reg64(base.r, s) + offset].v
+{
+    reveal_x86_ValidState();
+    va_opr_code_Mem(base, offset, taint)
+}
+*)
+
 
 (* Predicates *)
 unfold let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
@@ -106,7 +130,7 @@ unfold let va_CCons (hd:va_code) (tl:va_codes) : va_codes = hd::tl
 (** Constructors for va_code *)
 unfold let va_Block (block:va_codes) : va_code = Block block
 unfold let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
-unfold let va_While (whileCond:ocmp) (whileBody:va_code) (inv:operand) : va_code = While whileCond whileBody inv
+unfold let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
 
 val va_cmp_eq (o1:va_operand) (o2:va_operand) : ocmp
 val va_cmp_ne (o1:va_operand) (o2:va_operand) : ocmp
@@ -122,22 +146,24 @@ unfold let va_get_ifFalse (c:va_code{IfElse? c}) : va_code = IfElse?.ifFalse c
 unfold let va_get_whileCond (c:va_code{While? c}) : ocmp = While?.whileCond c
 unfold let va_get_whileBody (c:va_code{While? c}) : va_code = While?.whileBody c
 
+
+val eval_code : c:va_code -> s0:va_state -> s1:va_state -> Type0
+val eval_while : b:ocmp -> c:va_code -> n:nat -> s0:va_state -> s1:va_state -> Type0
+
 (* ok for now but no need to actually expose the definition.
    instead expose lemmas about it *)
 let va_state_eq (s0:va_state) (s1:va_state) : Type0 = state_eq s0 s1
 
-val va_eval_code : (c:va_code) -> (s:va_state) -> option va_state
-
 let va_require (block:va_codes) (c:va_code) (s0:va_state) (s1:va_state) : Type0 =
   Cons? block /\
   Cons?.hd block == c /\
-  Some s1 == va_eval_code (va_Block block) s0
+  eval_code (va_Block block) s0 s1
 
 let va_ensure (b0:va_codes) (b1:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : Type0 =
   Cons? b0 /\
   Cons?.tl b0 == b1 /\
-  Some s1 == va_eval_code (Cons?.hd b0) s0 /\
-  Some sN  == va_eval_code (va_Block b1) s1
+  eval_code (Cons?.hd b0) s0 s1 /\
+  eval_code (va_Block b1) s1 sN
 
 val eval_ocmp : s:va_state -> c:ocmp -> GTot bool
 
@@ -173,22 +199,57 @@ val lemma_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
 
 val va_lemma_block : (b0:va_codes) -> (s0:va_state) -> (sN:va_state) ->
   Ghost (va_state * va_code * va_codes)
-  (requires (Cons? b0 /\ Some sN == va_eval_code (va_Block b0) s0))
+  (requires (Cons? b0 /\ eval_code (va_Block b0) s0 sN))
   (ensures  (fun (s1, c_1, b1) ->
     b0 == va_CCons c_1 b1 /\
-    Some s1 == va_eval_code c_1 s0 /\
-    Some sN == va_eval_code (va_Block b1) s1))
+    eval_code c_1 s0 s1 /\
+    eval_code (va_Block b1) s1 sN))
 
 val va_lemma_empty : (s0:va_state) -> (sN:va_state) -> Ghost va_state
-  (requires (Some sN == va_eval_code (va_Block (va_CNil ())) s0))
+  (requires (eval_code (va_Block (va_CNil ())) s0 sN))
   (ensures  (fun sM -> sM == s0 /\ sM == sN))
 
 val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> sN:va_state -> Ghost (bool * va_state)
-  (requires (Some sN == va_eval_code (IfElse ifb ct cf) s0))
+  (requires (eval_code (IfElse ifb ct cf) s0 sN))
   (ensures  (fun (cond, sM) ->
     cond == eval_ocmp s0 ifb /\
     sM == s0 /\
-    Some sN == (if cond then va_eval_code ct sM else va_eval_code cf sM)))
+    (if cond then eval_code ct sM sN else eval_code cf sM sN)))
+
+unfold let eval_while_va_code  (b:ocmp) (c:va_code) (n:nat) (s0:va_state) (sN:va_state) = s0.ok ==> eval_while b c n s0 sN
+
+(* Temporary assumptions to get while loops working *)
+let va_whileInv (b:ocmp) (c:va_code) (n:int) (s0:va_state) (sN:va_state) =
+  n >= 0 /\ eval_while b c n s0 sN
+
+val va_lemma_while : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost (nat * va_state)
+  (requires (eval_code (While b c) s0 sN))
+  (ensures  (fun (n, s1) ->
+    eval_while b c n s0 sN /\
+    s1 == s0
+  ))
+
+val va_lemma_whileTrue : b:ocmp -> c:va_code -> n:nat -> s0:va_state -> sN:va_state -> Ghost (va_state * va_state)
+  (requires
+    n > 0 /\
+    eval_while b c n s0 sN
+  )
+  (ensures (fun (s0', s1) ->
+    n > 0 /\
+    s0' == s0 /\
+    eval_ocmp s0 b /\
+    eval_code c s0' s1 /\
+    (if s1.ok then eval_while b c (n - 1) s1 sN else s1 == sN)
+  ))
+
+val va_lemma_whileFalse : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost va_state
+   (requires True)        // BUG: Temporary hack, pending a fix in Vale
+//  (requires (eval_while b c 0 s0 sN))
+  (ensures (fun s1 ->
+    s1 == s0 /\
+    s1 == sN /\
+    not (eval_ocmp s0 b)
+  ))
 
 (* maybe we want these to be transparent*)
 val logxor64 : (x:nat64) -> (y:nat64) -> nat64
@@ -196,6 +257,10 @@ val logand64 : (x:nat64) -> (y:nat64) -> nat64
 val logand128 : (x:nat128) -> (y:nat128) -> nat128
 val shift_left64 : (x:nat64) -> (amt:nat64) -> nat64
 val shift_right64 : (x:nat64) -> (amt:nat64) -> nat64
+
+val reveal_logand128 (x y:nat128) : Lemma
+    (requires True)
+    (ensures logand128 x y == FStar.UInt.logand #128 x y)
 
 val printer : Type0
 val print_string : string -> FStar.All.ML unit
@@ -231,7 +296,8 @@ let va_cmp_ge o1 o2 = S.OGe o1 o2
 let va_cmp_lt o1 o2 = S.OLt o1 o2
 let va_cmp_gt o1 o2 = S.OGt o1 o2
 
-let va_eval_code = Lemmas_i.eval_code
+let eval_code = Lemmas_i.eval_code
+let eval_while = Lemmas_i.eval_while
 let eval_ocmp = Lemmas_i.eval_ocmp
 
 let lemma_cmp_eq s o1 o2 = ()
@@ -244,6 +310,9 @@ let lemma_cmp_gt s o1 o2 = ()
 let va_lemma_block = Lemmas_i.lemma_block
 let va_lemma_empty = Lemmas_i.lemma_empty
 let va_lemma_ifElse = Lemmas_i.lemma_ifElse
+let va_lemma_while = Lemmas_i.lemma_while
+let va_lemma_whileTrue = Lemmas_i.lemma_whileTrue
+let va_lemma_whileFalse = Lemmas_i.lemma_whileFalse
 
 let logxor64 (x:nat64) (y:nat64) : nat64 =
   S.logxor x y
@@ -265,6 +334,8 @@ let shift_left64 (x:nat64) (amt:nat64) : nat64 =
 
 let shift_right64 (x:nat64) (amt:nat64) : nat64 =
   S.shift_right x amt
+
+let reveal_logand128 (x y:nat128) = ()
 
 let printer = P.printer
 let print_string = FStar.IO.print_string
@@ -296,6 +367,11 @@ var{:state reg(R14)} r14:int;
 var{:state reg(R15)} r15:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
+
+procedure{:operand} Mem_in(operand base:int, inline offset:int) returns(operand o:int)
+    reads
+        mem;
+    extern;
 
 procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst_operand dst:uint64, operand src:uint64)
     ensures
