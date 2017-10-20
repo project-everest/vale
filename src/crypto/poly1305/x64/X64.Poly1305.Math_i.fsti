@@ -23,20 +23,6 @@ let mod2_128 = make_opaque mod2_128'
 
 let modp = make_opaque modp'
 
-(* TODO: These definitions should be in some more general location *)
-unfold let in_mem (addr:int) (m:mem) : bool = m `Map.contains` addr
-
-let disjoint (ptr1:int) (num_bytes1:int) (ptr2:int) (num_bytes2:int) =
-    ptr1 + num_bytes1 <= ptr2 \/ ptr2 + num_bytes2 <= ptr1
-
-let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
-    size == 64 /\
-    (forall (a:int) . {:pattern (mem `Map.contains` a)} addr <= a && a < addr+num_bytes && (a - addr) % 8 = 0 ==> mem `Map.contains` a)
-
-let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
-    (forall (a:int) . {:pattern (new_mem `Map.contains` a)} old_mem `Map.contains` a <==> new_mem `Map.contains` a) /\
-    (forall (a:int) . {:pattern (new_mem.[a]) \/ Map.sel new_mem a} a < ptr || a >= ptr + num_bytes ==> old_mem.[a] == new_mem.[a])
-    
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
 (*
