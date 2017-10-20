@@ -1,4 +1,4 @@
-module X64.Poly1305.Spec_s
+module Poly1305.Spec_s
 
 open FStar.Mul
 open FStar.UInt

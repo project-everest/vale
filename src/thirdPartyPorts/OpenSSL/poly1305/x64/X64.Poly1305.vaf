@@ -37,7 +37,7 @@ open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 open X64.Vale.StrongPost_i
-open X64.Poly1305.Spec_s
+open Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open Opaque_i
 open FStar.Tactics

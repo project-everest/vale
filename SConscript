@@ -47,6 +47,7 @@ fstar_include_paths = [
   'obj/arch/x64/',
   'src/lib/collections/',
   'src/lib/util',
+  'src/crypto/poly1305/',
   'src/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]
@@ -99,6 +100,7 @@ fstar_test_suite = [
   'src/crypto/poly1305/x64/',
   'src/lib/util/',
   'src/lib/collections/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
   'obj/arch/x64/X64.Vale.Decls.fst',
   'obj/arch/x64/X64.Vale.Decls.fsti'
