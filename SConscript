@@ -47,6 +47,7 @@ fstar_include_paths = [
   'obj/arch/x64/',
   'src/lib/collections/',
   'src/lib/util',
+  'src/crypto/poly1305/',
   'src/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]
@@ -90,6 +91,22 @@ if env['TARGET_ARCH']!='x86':
  verify_options['src/test/stack-test.vad'] = None
  
 Export('verify_options')
+
+#
+# Table of files we export to F*'s test suite
+#
+fstar_test_suite = [
+  'src/arch/x64/',
+  'src/crypto/poly1305/x64/',
+  'src/lib/util/',
+  'src/lib/collections/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  'obj/arch/x64/X64.Vale.Decls.fst',
+  'obj/arch/x64/X64.Vale.Decls.fsti'
+]
+
+Export('fstar_test_suite')
 
 #
 # build sha256-exe

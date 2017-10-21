@@ -214,14 +214,14 @@ procedure{:terminates} Calls()
         Add(eax, ebx);
     }
     assert 1 + 2 == 3 by { assert 1 + 2 == 2 + 1; }
-    forall x:int, y:int {x + y} :| x >= 0 && y >= 0 :: x + y == y + x
-    {
-        assert x + y >= 0;
-        ghost if (x < y)
-        {
-            assert x <= y;
-        }
-    }
+//    forall x:int, y:int {x + y} :| x >= 0 && y >= 0 :: x + y == y + x
+//    {
+//        assert x + y >= 0;
+//        ghost if (x < y)
+//        {
+//            assert x <= y;
+//        }
+//    }
 }
 
 /*

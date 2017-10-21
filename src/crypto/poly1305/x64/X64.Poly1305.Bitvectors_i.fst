@@ -37,9 +37,7 @@ let lemma_poly_constants x =
      mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64))
   (split;; split;; 
 		   bv_tac_lt 64;;
-                   smt;;
 		   bv_tac_lt 64;;
-                   smt;;
 		   bv_tac ())
                    
 let lemma_and_commutes x y =

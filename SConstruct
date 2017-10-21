@@ -1,3 +1,6 @@
+# for python2 to use the print() function, removing the print keyword
+from __future__ import print_function
+
 import re
 import sys
 import os, os.path
@@ -152,6 +155,22 @@ AddOption('--NOCOLOR',
   default=False,
   action='store_true',
   help="Don't add color to build output")
+AddOption('--DUMPARGS',
+  dest='dump_args',
+  default=False,
+  action='store_true',
+  help="Print arguments that will be passed to the verification tools")
+#AddOption('--FSTARTEST',
+#  dest='fstar_test_dir',
+#  type='string',
+#  default=None,
+#  action='store',
+#  help="Bundle up files to add to F*'s test suite ")
+AddOption('--FSTARTEST',
+  dest='fstar_test',
+  default=False,
+  action='store_true',
+  help="Bundle up files to add to F*'s test suite.  Results go into fstar_test_suite ")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -217,7 +236,7 @@ colors['end']    = '\033[0m'
 
 # If the output is not a terminal or user opts out, remove the colors
 if (not sys.stdout.isatty()) or GetOption('nocolor'):
-   for key, value in colors.iteritems():
+   for key, value in colors.items():
       colors[key] = ''
 
 ####################################################################
@@ -924,7 +943,7 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
@@ -988,5 +1007,43 @@ def display_build_status():
   report_verification_failures()
   if do_fstar and not fstar_deps_ok:
     raise Exception('%sInitial F* dependency analysis failed; you might need to run scons again.%s' % (colors['red'], colors['end']))
+
+
+def print_env_options(options):
+  for option in options:
+    if option in env and len(env[option]) > 0:
+      print("%s " % env[option], end='')
+
+if GetOption('dump_args'):
+  print("Currently using the following F* args:")
+  print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
+  print(fstar_default_args)
+  sys.exit(1)
+
+def make_copy(env, file, target_dir):
+  #print("Making a copy of %s" % file)
+  #env.AddMethod(Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE")), "Copy test file")
+  env.Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE"))
+
+def copy_fstar_test_files(env):
+  if GetOption('fstar_test'):
+    #print("Bundling")
+    #target_dir = GetOption('fstar_test_dir')
+    target_dir = 'fstar_test_suite' 
+    for f in fstar_test_suite: 
+      if f.endswith("fst") or f.endswith("fsti"):
+        make_copy(env, f, target_dir)
+      else:
+        files  = env.Glob(os.path.join(f, "*.fst"))
+        files += env.Glob(os.path.join(f, "*.fsti"))
+        files = ["%s" % f for f in files]
+
+        for f in files:
+          make_copy(env, f, target_dir)
+    warning = "Remember to run: cd fstar_test_suite; make deploy"
+    stars = "*" * len(warning)
+    print("\n%s\n%s\n%s\n" % (stars, warning, stars))
+
+copy_fstar_test_files(env)
 
 atexit.register(display_build_status)

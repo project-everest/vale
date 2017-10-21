@@ -8,11 +8,8 @@ type uint64 = UInt64.t
 let map (key:eqtype) (value:Type) = Map.t key value
 
 // syntax for map accesses, m.[key] and m.[key] <- value
-unfold
-let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
-
-unfold
-let op_String_Assignment = Map.upd
+unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
+unfold let op_String_Assignment = Map.upd
 
 type ins =
   | Mov64      : dst:dst_op -> src:operand -> ins
@@ -40,6 +37,7 @@ type codes = list code
 
 (* TODO: Eventually this should be a map to bytes.  Simplifying for now *)
 type mem = map int uint64
+(* REVIEW: Do we still need mem_make? *)
 assume val mem_make (#v:Type0) (mappings:int -> v) (domain:Set.set int) : m:(map int v){
   Set.equal (Map.domain m) domain /\
   (forall (i:int).{:pattern (Map.sel m i)} Map.sel m i == mappings i)}
@@ -71,6 +69,16 @@ let eval_operand (o:operand) (s:state) : uint64 =
   | OReg r -> eval_reg r s
   | OMem m -> eval_mem (eval_maddr m s) s
 
+open FStar.UInt64
+let eval_ocmp (s:state) (c:ocmp) :bool =
+  match c with
+  | OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
+  | ONe o1 o2 -> eval_operand o1 s <> eval_operand o2 s
+  | OLe o1 o2 -> eval_operand o1 s <=^ eval_operand o2 s
+  | OGe o1 o2 -> eval_operand o1 s >=^ eval_operand o2 s
+  | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
+  | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
+
 let update_reg' (r:reg) (v:uint64) (s:state) : state =
   { s with regs = fun r' -> if r' = r then v else s.regs r' }
 
@@ -90,10 +98,9 @@ let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) : state =
   | OReg r -> update_reg' r v s
   | OMem m -> update_mem (eval_maddr m s) v s
 
+// Default version havocs flags 
 let update_operand' (o:dst_op) (ins:ins) (v:uint64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
-
-open FStar.UInt64
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
 let cf (flags:uint64) : bool =
@@ -111,8 +118,7 @@ let update_cf (flags:uint64) (new_cf:bool) : (new_flags:uint64{cf new_flags == n
     else
       flags
 
-
-
+(* Define a stateful monad to simplify defining the instruction semantics *)
 let st (a:Type) = state -> a * state
 
 unfold
@@ -149,22 +155,14 @@ let check (valid: state -> bool) : st unit =
 unfold
 let run (f:st unit) (s:state) : state = snd (f s)
 
-(*
-let check_eval_operand (valid: operand -> state -> bool) (o:operand) : uint64 * st =
- check (valid o);;
- s <-- get();
- (2, return s)
-
- (eval_operand o s, return s)
-*)
-
+(* Monadic update operations *)
 unfold
 let update_operand_preserve_flags (dst:dst_op) (v:uint64) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand_preserve_flags' dst v s)
 
-(* Default version havocs flags *)
+// Default version havocs flags
 unfold
 let update_operand (dst:dst_op) (ins:ins) (v:uint64) :st unit =
   check (valid_operand dst);;
@@ -179,16 +177,7 @@ let update_flags (new_flags:uint64) :st unit =
   s <-- get;
   set ( { s with flags = new_flags } )
 
-abstract
-let example (dst:dst_op) (src:operand) :st unit =
-  check (valid_operand dst);;
-  check (valid_operand src);;
-  update_operand_preserve_flags dst 2uL
-
-//abstract
-//let test (dst:dst_op) (src:operand) (s:state) :state =
-//  run (example dst src) s
-
+(* Lots of wrappers for bitwise operations *)
 abstract
 let logxor (x:int) (y:int) : nat64 =
   if FStar.UInt.fits x 64
@@ -246,15 +235,6 @@ let shift_left_uint64 (x:int) (y:int)
                     shift_left x y = FStar.UInt.shift_left #64 x y))
           [SMTPat (shift_left x y)]
   = ()          
-
-let eval_ocmp (s:state) (c:ocmp) :bool =
-  match c with
-  | OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
-  | ONe o1 o2 -> eval_operand o1 s <> eval_operand o2 s
-  | OLe o1 o2 -> eval_operand o1 s <=^ eval_operand o2 s
-  | OGe o1 o2 -> eval_operand o1 s >=^ eval_operand o2 s
-  | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
-  | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
 
 (* These wrappers of the operators from FStar.UInt are only present
    because we discovered that using specs of the form (v a + v b) % pow2 64

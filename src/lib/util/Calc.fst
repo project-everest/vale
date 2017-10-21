@@ -10,7 +10,7 @@ let ( &= ) (#a:Type) (x:a) (y:a) :
   = fun () -> y
 
 (** Combinator used to discharge equalities with SMT/lemmas*)
-let ( &| ) #a #req #ens ($f:(unit -> Pure a req ens)) (proof:unit -> Lemma req) 
+let ( &| ) #a #req (#ens : a -> Type0) ($f:(unit -> Pure a req ens)) (proof:unit -> Lemma req)
     : Tot (x:a{ens x})
   = proof (); f ()
 
