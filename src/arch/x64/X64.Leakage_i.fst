@@ -272,17 +272,14 @@ val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> (fuel:nat
   (b2t b ==> isConstantTime code fuel ts /\ isLeakageFree code fuel ts ts'))
 
 let lemma_code_leakage_free ts code fuel = FStar.Classical.forall_intro_2 (lemma_code_explicit_leakage_free ts code fuel)
-  
-(* val check_if_code_is_leakage_free: (code:tainted_code) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code ts tsExpected
-	 /\ b ==> isConstantTime code ts})
 
+#set-options "--z3rlimit 20"
+val check_if_code_is_leakage_free: (code:tainted_code) -> (fuel:nat) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code fuel ts tsExpected
+	 /\ b ==> isConstantTime code fuel ts})
 
-let check_if_code_is_leakage_free code ts tsExpected = 
-  let b, ts' = check_if_code_consumes_fixed_time code ts in
-
+let check_if_code_is_leakage_free code fuel ts tsExpected = 
+  let b, ts' = check_if_code_consumes_fixed_time code fuel ts in
   if b then
     publicTaintsAreAsExpected ts' tsExpected
   else
     b
-
-*)
