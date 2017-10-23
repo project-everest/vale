@@ -40,6 +40,7 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   (requires
     loc_disjoint (loc_buffer b) p /\
     buffer_readable h b /\
+    UInt32.v (buffer_length b) > 0 /\
     modifies p h h'
   )
   (ensures
