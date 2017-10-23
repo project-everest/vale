@@ -839,7 +839,7 @@ method checkIfCodeisLeakageFree(code:code, ts:taintState, tsExpected:taintState)
     b := fixedTime;
 
     if (b) {
-        b := publicTaintsAreAsExpected(tsExpected, ts');
+        b := publicTaintsAreAsExpected(ts', tsExpected);
 
        if (b == false) {
             return;

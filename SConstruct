@@ -1,3 +1,6 @@
+# for python2 to use the print() function, removing the print keyword
+from __future__ import print_function
+
 import re
 import sys
 import os, os.path
@@ -152,6 +155,22 @@ AddOption('--NOCOLOR',
   default=False,
   action='store_true',
   help="Don't add color to build output")
+AddOption('--DUMPARGS',
+  dest='dump_args',
+  default=False,
+  action='store_true',
+  help="Print arguments that will be passed to the verification tools")
+#AddOption('--FSTARTEST',
+#  dest='fstar_test_dir',
+#  type='string',
+#  default=None,
+#  action='store',
+#  help="Bundle up files to add to F*'s test suite ")
+AddOption('--FSTARTEST',
+  dest='fstar_test',
+  default=False,
+  action='store_true',
+  help="Bundle up files to add to F*'s test suite.  Results go into fstar_test_suite ")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -188,13 +207,9 @@ env['FSTAR'] = Dir(env['FSTAR_PATH']).Dir('bin').File('fstar.exe')
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
   env['KREMLIN'] = File(kremlin_path + '/_build/src/Kremlin.native')
-else:
-  kremlin_path = '#tools/Kremlin'
-  env['KREMLIN'] = File(kremlin_path + '/Kremlin.native')
+  kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
-
-kremlib_path = kremlin_path + '/kremlib'
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
@@ -202,7 +217,7 @@ dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
 fstar_default_args = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
   + ' --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'\
-  + ' --max_fuel 0 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
+  + ' --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
 
 ####################################################################
 #
@@ -221,7 +236,7 @@ colors['end']    = '\033[0m'
 
 # If the output is not a terminal or user opts out, remove the colors
 if (not sys.stdout.isatty()) or GetOption('nocolor'):
-   for key, value in colors.iteritems():
+   for key, value in colors.items():
       colors[key] = ''
 
 ####################################################################
@@ -251,7 +266,7 @@ def docmd(env, cmd):
   except:
     e = sys.exc_info()[0]
     print ("%sError invoking: %s%s" % (colors['red'], cmd, colors['end']))
-    print formatExceptionInfo()
+    print (formatExceptionInfo())
     #print ("Exception: %s" % e)
     Exit(1)
   result = []
@@ -535,8 +550,9 @@ def extract_dafny_code(env, kremlin_dfys):
     target_file_base = os.path.join(target_path, os.path.splitext(json_file)[0].replace('.', '_'))
     target_file_c = target_file_base+'.c'
     target_file_h = target_file_base+'.h'
-    outputs = env.Kremlin(source=json, target=target_file_c)
-    kremlin_outputs.append(outputs)
+    if 'KREMLIN_HOME' in os.environ:
+      outputs = env.Kremlin(source=json, target=target_file_c)
+      kremlin_outputs.append(outputs)
   return kremlin_outputs
 
 # Compile Vale .vad to Dafny .gen.dfy
@@ -603,7 +619,11 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
 # returns the exe target and the stdout after executing the exe test target
 def build_test(env, inputs, include_dir, output_base_name):
   testenv = env.Clone()
-  testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
+  if 'KREMLIN_HOME' in os.environ:
+    testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
+  else:
+    # We need gcc_compat.h from kremlib:
+    testenv.Append(CPPPATH=['#tools/Kremlin/kremlib', 'src/lib/util', include_dir])
   inputs_obj = []
   for inp in inputs:
     inps = str(inp)
@@ -623,7 +643,7 @@ def build_test(env, inputs, include_dir, output_base_name):
   a = env.Alias('runtest', '', built)
   #AlwaysBuild(a)
   return a
-  
+
 # Add pseudobuilders to env.  
 def add_extract_code(env):
   env.AddMethod(extract_vale_code, "ExtractValeCode")
@@ -723,7 +743,7 @@ def check_fstar_z3_version(fstar_z3):
     version = lines[0]
     versions = version.split('.')
     cmd = [fstar_z3, '--version']
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
     lines = o.splitlines()
     line = lines[0]
     for word in line.split(' '):
@@ -756,7 +776,7 @@ def check_fstar_version():
     version = lines[0]
     fstar = str(env['FSTAR'])
     cmd = [fstar, '--version']
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
     lines = o.splitlines()
     for line in lines:
       if '=' in line:
@@ -822,7 +842,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
     args = ["--dep", "make"] + includes + files
     cmd = [fstar] + args
     print(" ".join(cmd))
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT)
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
     print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
     fstar_deps_ok = True
     lines = o.splitlines()
@@ -870,7 +890,8 @@ add_fstar_verifier(env)
 add_dafny_compiler(env)
 add_dafny_kremlin(env)
 add_vale_builders(env)
-add_kremlin(env)
+if do_fstar or 'KREMLIN_HOME' in os.environ:
+  add_kremlin(env)
 add_extract_code(env)
 env.AddMethod(verify_files_in, "VerifyFilesIn")
 env.AddMethod(verify_vale_dafny_files, "VerifyValeDafnyFiles")
@@ -922,7 +943,7 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
@@ -973,18 +994,56 @@ def report_verification_failures():
           if x is not None:
             filename = bf_to_filename(x)
             if filename.endswith('.tmp') and os.path.isfile(filename):
-              print '##### %sVerification error%s. ' % (colors['red'], colors['end']),
-              print 'Printing contents of ' + filename + ' #####' 
+              print('##### %sVerification error%s. ' % (colors['red'], colors['end']))
+              print('Printing contents of ' + filename + ' #####')
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
                   if "(Error)" in line or "failed" in line:
                     line = "%s%s%s" % (colors['red'], line, colors['end'])
-                  print line
+                  print(line)
 
 def display_build_status():
   report_verification_failures()
   if do_fstar and not fstar_deps_ok:
     raise Exception('%sInitial F* dependency analysis failed; you might need to run scons again.%s' % (colors['red'], colors['end']))
+
+
+def print_env_options(options):
+  for option in options:
+    if option in env and len(env[option]) > 0:
+      print("%s " % env[option], end='')
+
+if GetOption('dump_args'):
+  print("Currently using the following F* args:")
+  print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
+  print(fstar_default_args)
+  sys.exit(1)
+
+def make_copy(env, file, target_dir):
+  #print("Making a copy of %s" % file)
+  #env.AddMethod(Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE")), "Copy test file")
+  env.Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE"))
+
+def copy_fstar_test_files(env):
+  if GetOption('fstar_test'):
+    #print("Bundling")
+    #target_dir = GetOption('fstar_test_dir')
+    target_dir = 'fstar_test_suite' 
+    for f in fstar_test_suite: 
+      if f.endswith("fst") or f.endswith("fsti"):
+        make_copy(env, f, target_dir)
+      else:
+        files  = env.Glob(os.path.join(f, "*.fst"))
+        files += env.Glob(os.path.join(f, "*.fsti"))
+        files = ["%s" % f for f in files]
+
+        for f in files:
+          make_copy(env, f, target_dir)
+    warning = "Remember to run: cd fstar_test_suite; make deploy"
+    stars = "*" * len(warning)
+    print("\n%s\n%s\n%s\n" % (stars, warning, stars))
+
+copy_fstar_test_files(env)
 
 atexit.register(display_build_status)

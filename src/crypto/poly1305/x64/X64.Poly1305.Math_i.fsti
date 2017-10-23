@@ -3,7 +3,7 @@ module X64.Poly1305.Math_i
 open FStar.Mul
 open X64.Machine_s   // needed for nat64
 open X64.Vale.Decls  // needed for shift_right64, logand64
-open X64.Poly1305.Spec_s // for modp
+open Poly1305.Spec_s // for modp
 open X64.Vale.State_i // for add_wrap
 open Opaque_i
 
@@ -23,26 +23,56 @@ let mod2_128 = make_opaque mod2_128'
 
 let modp = make_opaque modp'
 
-(* TODO: These definitions should be in some more general location *)
-let disjoint (ptr1:int) (num_bytes1:int) (ptr2:int) (num_bytes2:int) =
-    ptr1 + num_bytes1 <= ptr2 \/ ptr2 + num_bytes2 <= ptr1
-
-let validSrcAddrs (mem:mem) (addr:int) (size:int) (num_bytes:int) =
-    size == 64 /\
-    (forall (a:int) . {:pattern (mem `Map.contains` a)} addr <= a && a < addr+num_bytes && (a - addr) % 8 = 0 ==> mem `Map.contains` a)
-
-let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
-    (forall (a:int) . {:pattern (new_mem `Map.contains` a)} old_mem `Map.contains` a <==> new_mem `Map.contains` a) /\
-    (forall (a:int) . {:pattern (new_mem.[a])} a < ptr || a >= ptr + num_bytes ==> old_mem.[a] == new_mem.[a])
-    
 let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
   fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
+(*
+val heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) : Lemma 
+  (requires memModified m m' ptr num_bytes /\
+            disjoint ptr num_bytes i ((len + 15) / 16 * 16))
+  (ensures  heapletTo128 m i len == heapletTo128 m' i len)
+ *)            
+val heapletTo128_all_preserved (m:mem) (ptr num_bytes i:int) (len:nat) : Lemma 
+  (requires True)
+  (ensures (forall (m':mem) .
+              memModified m m' ptr num_bytes /\
+              disjoint ptr num_bytes i ((len + 15) / 16 * 16)
+             ==>
+             heapletTo128 m i len == heapletTo128 m' i len))
 
 let applyHeapletTo128 (m:mem) (i:int) (len:nat) (index:int) : nat128 =
   heapletTo128 m i len index 
 
+
+let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))})
+        : Tot int (decreases (k-i))
+    =
+    if i = k then h
+    else
+        let kk = k - 16 in
+	assert (i >= 0 ==> precedes (kk - i) (k-i));
+	assert (i < 0 ==> precedes (kk - i) (k-i));
+	let hh = poly1305_heap_blocks' h pad r m i kk in
+        modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
+
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)}) : int
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))}) : int
+
+val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
+                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ 
+                              (validSrcAddrs m i 64 (k - i))}) : Lemma
+  (requires True)
+  (ensures poly1305_heap_blocks h pad r m i k = poly1305_heap_blocks' h pad r m i k)
+
+// This framing lemma wasn't necessary when we used heaplets and should go away again when we swap to buffers
+val lemma_heap_blocks_preserved (m:mem) (h:int) (pad:int) (r:int) (ptr num_bytes i:int) (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))}) : Lemma
+  (requires True)
+  (ensures (forall (m':mem) .
+              memModified m m' ptr num_bytes /\
+              disjoint ptr num_bytes i (k - i) /\
+              validSrcAddrs m' i 64 (k - i)
+             ==>
+             poly1305_heap_blocks h pad r m i k == poly1305_heap_blocks h pad r m' i k))
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
@@ -62,7 +92,7 @@ val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -
 	(ensures (h * r) % p == hh % p)
 
 // p used to be a refinement to p > 0 and h a nat.
-val lemma_poly_reduce : n:int -> p:pos -> h:nat -> h2:int -> h10:int -> c:int -> hh:int -> Lemma
+val lemma_poly_reduce : n:int -> p:pos -> h:nat -> h2:nat -> h10:int -> c:int -> hh:int -> Lemma
   (requires
     n * n > 0 /\
     h2 >= 0 /\  // TODO: Shouldn't need to add this
@@ -129,9 +159,8 @@ val lemma_mod_hi : x0:nat64 -> x1:nat64 -> z:nat64 -> Lemma
     lowerUpper128_opaque 0 z <> 0 /\
     (lowerUpper128_opaque x0 x1) % (lowerUpper128_opaque 0 z) == lowerUpper128_opaque x0 (x1 % z))
 
-val lemma_poly_demod : p:int -> h:int -> x:int -> r:int -> Lemma
-  (requires p > 0)
-  (ensures p > 0 /\ ((h % p + x) * r) % p == ((h + x) * r) % p)
+val lemma_poly_demod : p:pos -> h:int -> x:int -> r:int -> Lemma
+  (((h % p + x) * r) % p == ((h + x) * r) % p)
 
 val lemma_reduce128 : h:int -> h2:nat64 -> h1:nat64 -> h0:nat64 -> g:int -> g2:nat64 -> g1:nat64 -> g0:nat64 -> Lemma
   (requires h2 < 5 /\
@@ -158,7 +187,7 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
             z == lowerUpper128_opaque z0 z1)
   (ensures z == logand128 x y)
   
-val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (forall (j:int) . i <= j /\ j < k /\ (j - i) % 8 = 0 ==> m `Map.contains` j)} -> len:nat -> Lemma
+val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))} -> len:nat -> Lemma
   (requires i <= k && k <= i + len /\
             (k - i) % 16 == 0 /\
             validSrcAddrs m i  64 ((len + 15) / 16 * 16))

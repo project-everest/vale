@@ -140,7 +140,9 @@ DafnyInterface_refs = [Dir(env['DAFNY_PATH']).File(f).abspath for f in [
 ]]
 
 if sys.platform == 'win32':
-  env['CSC'] = env.Detect('csc')
+  # The default search path for env.Detect() is just windows\system32.
+  # Search along the OS PATH, then quote the name to avoid spaces-in-path issues.
+  env['CSC'] = '\"' + env.WhereIs('csc.exe', path=os.environ['PATH']) + '\"'
 else: # mono
   env['CSC'] = env.Detect('dmcs')
 

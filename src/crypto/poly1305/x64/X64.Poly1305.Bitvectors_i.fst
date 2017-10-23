@@ -30,7 +30,7 @@ let lemma_and_constants x =
    logand #64 x 0xffffffffffffffff == x)
   (seq split (bv_tac ()))
   
-let lemma_poly_constants x =
+let lemma_poly_constants x = 
  assert_by_tactic  
    (logand #64 x 0x0ffffffc0fffffff < (0x1000000000000000 <: uint_t 64) /\
      logand #64 x 0x0ffffffc0ffffffc < (0x1000000000000000 <: uint_t 64) /\

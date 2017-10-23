@@ -22,9 +22,9 @@ Export('verify_paths')
 # Without manually writing the dependencies for these, the dependency
 # analysis will miss them the first time scons runs.
 manual_dependencies = {
-  'obj/arch/x64/X64.Vale.StrongPost_i.vfsti': 'obj/arch/x64/X64.Vale.Decls.fsti',
-  'obj/arch/x64/X64.Vale.StrongPost_i.vfst': 'obj/arch/x64/X64.Vale.Decls.fsti',
-  'obj/Vale/test/StateUpdateTest.vfst': 'obj/arch/x64/X64.Vale.Decls.fsti',
+  'obj/arch/x64/X64.Vale.StrongPost_i.vfsti.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
+  'obj/arch/x64/X64.Vale.StrongPost_i.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
+  'obj/Vale/test/StateUpdateTest.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
 }
 Export('manual_dependencies')
 
@@ -48,6 +48,7 @@ fstar_include_paths = [
   'obj/arch/x64/',
   'src/lib/collections/',
   'src/lib/util',
+  'src/crypto/poly1305/',
   'src/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]
@@ -99,6 +100,22 @@ if env['TARGET_ARCH']!='x86':
 Export('verify_options')
 
 #
+# Table of files we export to F*'s test suite
+#
+fstar_test_suite = [
+  'src/arch/x64/',
+  'src/crypto/poly1305/x64/',
+  'src/lib/util/',
+  'src/lib/collections/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  'obj/arch/x64/X64.Vale.Decls.fst',
+  'obj/arch/x64/X64.Vale.Decls.fsti'
+]
+
+Export('fstar_test_suite')
+
+#
 # build sha256-exe
 #
 if do_dafny:
@@ -107,9 +124,10 @@ if do_dafny:
     'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
     'sha256'                                                   # Base name for the ASM files and EXE
     )
-  sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
-  sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
-  env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
+  if 'KREMLIN_HOME' in os.environ:
+    sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
+    sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
+    env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
 
 #
 # build cbc-exe
@@ -152,15 +170,12 @@ else:
 
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
-else:
-  kremlin_path = '#tools/Kremlin'
-
-kremlib_path = kremlin_path + '/kremlib'
+  kremlib_path = kremlin_path + '/kremlib'
 
 #
 # Build the OpenSSL engine
 #
-if do_dafny and env['OPENSSL_PATH'] != None:
+if do_dafny and env['OPENSSL_PATH'] != None and 'KREMLIN_HOME' in os.environ:
   engineenv = env.Clone()
   engineenv.Append(CPPPATH=[kremlib_path, '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
   cdeclenv = engineenv.Clone(CCFLAGS='/Ox /Zi /Gd /LD') # compile __cdecl so it can call OpenSSL code

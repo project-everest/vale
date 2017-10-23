@@ -23,16 +23,20 @@ type va_code =
   | Ins : ins:ins -> va_code
   | Block : block:va_codes -> va_code
   | IfElse : ifCond:ocmp -> ifTrue:va_code -> ifFalse:va_code -> va_code
+  | While : whileCond:ocmp -> whileBody:va_code -> va_code
 and va_codes = list va_code
 
 let va_CNil () = []
 let va_CCons x y = x::y
 let va_Block (block:va_codes) : Tot va_code = Block block
 let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
+let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
 let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
 let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
 let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
 let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
+let va_get_whileCond (c:va_code{While? c}) : GTot ocmp = While?.whileCond c
+let va_get_whileBody (c:va_code{While? c}) : GTot va_code = While?.whileBody c
 
 type va_state = map reg int
 let va_get_ok (s:va_state) : GTot Type = True
@@ -81,6 +85,28 @@ assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
 assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s_0:va_state -> sN:va_state -> Ghost (bool * va_state)
   (requires True)
   (ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\ sM == s_0))
+
+let va_whileInv (b:ocmp) (c:va_code) (n:int) (s0:va_state) (sN:va_state) =
+  n >= 0
+
+assume val va_lemma_while : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost ((n:nat) * (s1:va_state))
+  (requires True)
+  (ensures fun (n, s1) -> s1 == s0)
+
+assume val va_lemma_whileTrue : b:ocmp -> c:va_code -> n:nat -> s0:va_state -> sN:va_state -> Ghost ((s0':va_state) * (s1:va_state))
+  (requires n > 0)
+  (ensures fun (s0', s1) ->
+    s0' == s0 /\
+    eval_ocmp s0 b
+  )
+
+assume val va_lemma_whileFalse : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost (s1:va_state)
+  (requires True)
+  (ensures fun s1 ->
+    s1 == s0 /\
+    s0 == sN /\
+    not (eval_ocmp s0 b)
+  )
 
 assume val make_opaque : #a:Type -> a -> a
 assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
@@ -154,13 +180,35 @@ procedure Calls()
         Add(eax, ebx);
     }
     assert 1 + 2 == 3 by { assert 1 + 2 == 2 + 1; }
-    forall x:int, y:int {x + y} :| x >= 0 && y >= 0 :: x + y == y + x
+//    forall x:int, y:int {x + y} :| x >= 0 && y >= 0 :: x + y == y + x
+//    {
+//        assert x + y >= 0;
+//        ghost if (x < y)
+//        {
+//            assert x <= y;
+//        }
+//    }
+}
+
+procedure WhileTest()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax <= ebx;
+    ensures
+        0 <= eax <= ebx + 1;
+        2 * ebx - eax == old(2 * ebx - eax);
+        eax > ebx;
+{
+    while (eax <= ebx)
+        invariant
+            0 <= eax <= ebx + 1;
+            2 * ebx - eax == old(2 * ebx - eax);
+        decreases 1 + ebx - eax;
     {
-        assert x + y >= 0;
-        ghost if (x < y)
-        {
-            assert x <= y;
-        }
+        Increment(eax);
+        Increment(eax);
+        Increment(ebx);
     }
 }
 

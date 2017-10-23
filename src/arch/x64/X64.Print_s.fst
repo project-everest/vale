@@ -116,15 +116,16 @@ let print_ins (ins:ins) (p:printer) =
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
   | AddLea64 dst src1 src2 -> let name = p.ins_name "  lea" [dst; src1; src2] in
-                             if OReg? src1 && OConst? src2 then
-                               name ^ print_maddr (MReg (OReg?.r src1) (OConst?.n src2)) "qword" p
-                             else if OReg? src1 && OReg? src2 then
-                               name ^ print_maddr (MIndex (OReg?.r src1) 1 (OReg?.r src2) 0) "qword" p
-                             else
-                               "!!! INVALID AddLea64 operands: " ^ print_any src1 ^ ", " ^ print_any src2 ^ "!!!"
+                             let src = OMem (if OReg? src1 && OConst? src2 then
+                                                MReg (OReg?.r src1) (OConst?.n src2)
+                                             else if OReg? src1 && OReg? src2 then
+                                               MIndex (OReg?.r src1) 1 (OReg?.r src2) 0
+                                             else
+                                               MConst nat128_max) in  // Shouldn't hit this, but if we do, assembler will complain
+                             name ^ print_ops dst src
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
-  | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
+  | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p) ^ "\n"
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
   | Xor64 dst src -> p.ins_name "  xor" [dst; src] ^ print_ops dst src
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
@@ -165,13 +166,13 @@ and print_code (c:code) (n:int) (p:printer) : string * int =
     let false_str, n' = print_code false_code n' p in
     let label2 = "L" ^ string_of_int n2 ^ ":\n" in
     cmp ^ true_str ^ jmp ^ label1 ^ false_str ^ label2, n'
-  | While cond body inv ->
+  | While cond body ->
     let n1 = n in
     let n2 = n + 1 in
     let jmp = "  jmp L" ^ string_of_int n2 ^ "\n" in
-    let label1 = p.align() ^ " 16\nL" ^ string_of_int n1 ^ "\n" in
+    let label1 = p.align() ^ " 16\nL" ^ string_of_int n1 ^ ":\n" in
     let body_str, n' = print_code body (n + 2) p in
-    let label2 = p.align() ^ " 16\nL" ^ string_of_int n2 ^ "\n" in
+    let label2 = p.align() ^ " 16\nL" ^ string_of_int n2 ^ ":\n" in
     let cmp = print_cmp cond n1 p in
     jmp ^ label1 ^ body_str ^ label2 ^ cmp, n'
 
@@ -238,7 +239,7 @@ let gcc : printer =
   let align() = ".align" in
   let header() = ".text\n" in
   let footer() = "\n" in
-  let proc_name (name:string) = ".global " ^ name ^ "\n" in
+  let proc_name (name:string) = ".global " ^ name ^ "\n" ^ name ^ ":\n" in
   let ret (name:string) = "  ret\n\n" in
   {
   reg_prefix = reg_prefix;

@@ -149,6 +149,7 @@ and token = parse
 | "extern" { EXTERN (curLoc lexbuf) }
 | "procedure" { PROCEDURE (curLoc lexbuf) }
 | "implementation" { IMPLEMENTATION (curLoc lexbuf) }
+| "lets" { LETS (curLoc lexbuf) }
 | "requires" { REQUIRES (curLoc lexbuf) }
 | "ensures" { ENSURES (curLoc lexbuf) }
 | "reads" { READS (curLoc lexbuf) }

@@ -41,7 +41,6 @@
     <a href="#running">Running the Vale tool</a><br />
     <a href="#syntax">Vale syntax</a><br />
     <a href="#procedures">Procedures</a><br />
-    <a href="#overloading">Operator overloading</a><br />
     <a href="#interface">Interface between Vale and verification languages</a><br />
 
   <h2 id="verification">Verification, compilation, and execution</h2>
@@ -193,8 +192,8 @@ INCLUDE ::= include "STRING"
 DECL ::=
   | <a href="#state">var</a> x : TYPE ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> LETS SPECS { STMTS }
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> LETS SPECS extern ;
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
+  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
@@ -214,19 +213,18 @@ PRETS ::= PRET , ... , PRET
   | ghost x : TYPE
   | TYPE x : TYPE
 
-LETS ::= LET ... LET
-LET ::= let LETBIND ; ... LETBIND ;
-LETBIND ::=
-  | FORMAL := EXP
-  | x1 @= x2
-
 SPECS ::= SPEC ... SPEC
 SPEC ::=
   | reads x ; ... ; x ;
   | modifies x ; ... ; x ;
+  | lets LETBIND ; ... LETBIND ;
   | requires LEXP ; ... LEXP ;
   | ensures LEXP ; ... LEXP ;
   | requires / ensures LEXP ; ... LEXP ;
+
+LETBIND ::=
+  | FORMAL := EXP
+  | x1 @= x2
 
 LEXP ::=
   | EXP
@@ -359,11 +357,10 @@ procedures p(ghost x:int) returns(ghost y:int)
 
 
 
-let x @= eax; y @= ebx; z := 3 + 3;
 
 
 
-
+lets x @= eax; y @= ebx; z := 3 + 3;
 
 
 
@@ -699,88 +696,6 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     Operand return values may be instantiated with state variables, operands, or operand constructor applications.
     Constants passed as operand parameters may either be simple integer literals,
     or more complex expressions inside a "const(...)" expression.
-
-  <h2 id="overloading">Operator overloading</h2>
-
-  <p>
-    To allow Vale programs to use familiar C-like notation,
-    Vale allows user-defined operators.
-    Vale programs can define new operator tokens
-    constructed from the following characters:
-    <pre><code>
-      ! % + - * &amp; ^ | &lt; &gt; = . # : $ ? ` ~ @
-    </code></pre>
-
-  <p>
-    New operators must be distinct from Vale built-in operators, which are:
-    <pre><code>
-      @ . : :| ::
-      ! * / % + - &lt; &gt; = := &lt;= &gt;= == != &amp;&amp; || &lt;== ==&gt; &lt;==&gt;
-    </code></pre>
-
-  <p>
-    The "#token" declaration introduces a new token and gives it a precedence and associativity equal
-    to the precedence and associativity of a user-chosen builtin operator:
-
-    <pre><code>
-      #token ++ precedence !
-      #token += precedence :=
-    </code></pre>
-
-  <p>
-    In this example, "+=" is declared to have the same precedence as ":=",
-    and "++" is declared to have the same precedence as "!".
-
-  <p>
-    For infix operators, any of these operators may be used to indicate precedence:
-    <pre><code>
-      * / % + - &lt; &gt; = := &lt;= &gt;= == != &amp;&amp; || &lt;== ==&gt; &lt;==&gt;
-    </code></pre>
-
-  <p>
-    For postfix operators, the "!" is used to indicate precedence.
-
-  <p>
-    Vale programs can overload user-defined tokens and the builtin ":=" token
-    to represent procedures:
-
-    <pre><code>
-      procedure Mov(...) ... { ... }
-      procedure Add(...) ... { ... }
-      procedure Increment(...) ... { ... }
-
-      procedure operator(:=) (out operand dst:int, operand src:int) := Mov
-      procedure operator(+=) (inout operand dst:int, operand src:int) := Add
-      procedure operator(++) (inout operand dst:int) := Increment
-    </code></pre>
-
-  <p>
-    This example defines three procedure operators: ":=" as an alias for the Mov procedure,
-    "+=" as an alias for the Add procedure, and "++" as an alias for the Increment procedure.
-
-  <p>
-    Procedure operators only act on physical variables, not ghost variables
-    (see <a href="#procedures">procedures</a>
-    for more information about physical variables and ghost variables).
-    For example, "x += 5;" means "Add(x, 5);" if x is a physical variable,
-    but is not defined if x is a ghost variable.
-
-  <p>
-    Procedure operators for a user-defined infix token OP must be declared
-    to have two parameters, the first inout and the second in, and no return values.
-    Such an operator may only be used in a statement of the form "x OP EXP;".
-
-  <p>
-    Procedure operators for a user-defined postfix token OP must be declared
-    to have one inout parameters and no return values.
-    Such an operator may only be used in a statement of the form "x OP;".
-
-  <p>
-    Procedure operators for ":=" must either have one out parameter followed by
-    one in parameter (with no return values), or one in parameter and one return value.
-    Overloading the ":=" operator only affects statements of the form "x := EXP;"
-    where x is a physical variable and EXP is not a procedure call;
-    other uses of ":=" are unaffected.
 
   <h2 id="interface">Interface between Vale and verification languages</h2>
 

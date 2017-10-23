@@ -42,7 +42,7 @@ type precode (t_ins:Type0) (t_ocmp:Type0) =
   | Ins: ins:t_ins -> precode t_ins t_ocmp
   | Block: block:list (precode t_ins t_ocmp) -> precode t_ins t_ocmp
   | IfElse: ifCond:t_ocmp -> ifTrue:precode t_ins t_ocmp -> ifFalse:precode t_ins t_ocmp -> precode t_ins t_ocmp
-  | While: whileCond:t_ocmp -> whileBody:precode t_ins t_ocmp -> inv:operand -> precode t_ins t_ocmp
+  | While: whileCond:t_ocmp -> whileBody:precode t_ins t_ocmp -> precode t_ins t_ocmp
 
 let valid_dst (o:operand) : bool =
   not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
