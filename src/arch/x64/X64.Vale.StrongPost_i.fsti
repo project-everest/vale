@@ -9,8 +9,8 @@ val empty : unit //annoying
 
 type ins =
   | Mov64 : dst:va_operand -> src:va_operand -> ins
-  | Load64 : dst:va_operand -> src:va_operand -> offset:int -> ins
-  | Store64 : dst:va_operand -> src:va_operand -> offset:int -> ins
+  | Load64_buffer : dst:va_operand -> src:va_operand -> offset:int -> ins
+  | Store64_buffer : dst:va_operand -> src:va_operand -> offset:int -> ins
   | Add64Wrap : dst:va_operand -> src:va_operand -> ins
   | Adc64Wrap : dst:va_operand -> src:va_operand -> ins
   | Mul64Wrap : src:va_operand -> ins
@@ -20,8 +20,8 @@ type ins =
   | Sub64 : dst:va_operand -> src:va_operand -> ins
 
 unfold let va_fast_ins_Mov64 = Mov64
-unfold let va_fast_ins_Load64 = Load64
-unfold let va_fast_ins_Store64 = Store64
+unfold let va_fast_ins_Load64_buffer = Load64_buffer
+unfold let va_fast_ins_Store64_buffer = Store64_buffer
 unfold let va_fast_ins_Add64Wrap = Add64Wrap
 unfold let va_fast_ins_Adc64Wrap = Adc64Wrap
 unfold let va_fast_ins_Mul64Wrap = Mul64Wrap
@@ -33,7 +33,8 @@ unfold let va_fast_ins_Sub64 = Sub64
 unfold let va_inss = list ins
 
 let valid_maddr_norm (addr:maddr) (s:state) : bool =
-  Map.contains s.mem (eval_maddr addr s)
+  //Map.contains s.mem (eval_maddr addr s)
+  valid_mem64 (eval_maddr addr s) s.mem
 
 let valid_operand_norm (o:operand) (s:state) : bool =
     match o with
@@ -45,7 +46,8 @@ let eval_operand_norm (o:operand) (s:state) : nat64 =
   match o with
   | OConst n -> if 0 <= n && n < nat64_max then n else 0
   | OReg r -> s.regs r
-  | OMem m -> Map.sel s.mem (eval_maddr m s)
+  | OMem m -> load_mem64 (eval_maddr m s) s.mem
+             //Map.sel s.mem (eval_maddr m s)
 
 let rec regs_match (regs:list reg) (s0:state) (s1:state) =
   match regs with
@@ -61,11 +63,11 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   match inss with
   | (Mov64 (OReg Rsp) _)::inss -> []
   | (Mov64 (OReg dst) src)::inss -> (va_code_Mov64 (OReg dst) src)::(inss_to_codes inss)
-  | (Load64 (OReg Rsp) _ _)::inss -> []
-  | (Load64 (OReg dst) (OReg src) offset)::inss ->
-    (va_code_Load64 (OReg dst) (OReg src) offset)::(inss_to_codes inss)
-  | (Store64 (OReg dst) src offset)::inss -> 
-    (va_code_Store64 (OReg dst) src offset)::(inss_to_codes inss)
+  | (Load64_buffer (OReg Rsp) _ _)::inss -> []
+  | (Load64_buffer (OReg dst) (OReg src) offset)::inss ->
+    (va_code_Load64_buffer (OReg dst) (OReg src) offset)::(inss_to_codes inss)
+  | (Store64_buffer (OReg dst) src offset)::inss -> 
+    (va_code_Store64_buffer (OReg dst) src offset)::(inss_to_codes inss)
   | (Add64Wrap (OReg Rsp) _)::inss -> []
   | (Add64Wrap (OReg dst) src)::inss -> 
     (va_code_Add64Wrap (OReg dst) src)::(inss_to_codes inss)
@@ -105,17 +107,21 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
 	valid_operand_norm src s0 /\
 	(forall x. x == eval_operand_norm src s0 ==>
               wp_code inss post (update_reg dst x s0))
-      | (Load64 (OReg Rsp) _ _) -> False
-      | (Load64 (OReg dst) (OReg src) offset) ->
+      | (Load64_buffer (OReg Rsp) _ _) -> False
+      | (Load64_buffer (OReg dst) (OReg src) offset) ->
 	  valid_maddr_norm (MConst (s0.regs src + offset)) s0 /\
-	(forall x. x == Map.sel s0.mem (s0.regs src + offset) ==>
+	(forall x. x == eval_mem (s0.regs src + offset) s0 ==>
+                   //load_mem64 (s0.regs src + offset) s0.mem ==>
+                   //Map.sel s0.mem (s0.regs src + offset) ==>
               wp_code inss post (update_reg dst x s0))
-      | (Store64 (OReg dst) src offset) ->
+      | (Store64_buffer (OReg dst) src offset) ->
 	(valid_operand_norm src s0) /\
-	(Map.contains s0.mem (s0.regs dst + offset)) /\
+        (valid_mem64 (s0.regs dst + offset) s0.mem) /\
+	//(Map.contains s0.mem (s0.regs dst + offset)) /\
 	(forall x.
-	  x == Map.upd s0.mem (s0.regs dst + offset) (eval_operand_norm src s0) ==>
-	  wp_code inss post ({s0 with mem = x}))
+	  //x == Map.upd s0.mem (s0.regs dst + offset) (eval_operand_norm src s0) ==>
+          x == update_mem (s0.regs dst + offset) (eval_operand_norm src s0) s0 ==>
+	  wp_code inss post ({s0 with mem = x.mem}))
       | (Add64Wrap (OReg Rsp) _) -> False
       | (Add64Wrap (OReg dst) src) ->
 	(valid_operand_norm src s0) /\

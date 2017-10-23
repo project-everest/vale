@@ -89,9 +89,7 @@ verify_options = {
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
-  'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fsti': None,
-  'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': None,
-  'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
+  #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 }
 if env['TARGET_ARCH']!='x86':
  verify_options['src/test/memcpy.vad'] = None

@@ -34,7 +34,7 @@ let type_of_typ (t:typ) : Tot Type0 =
 val buffer (t:typ) : Type0
 val buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : GTot (Seq.seq (type_of_typ t))
 val buffer_readable (#t:typ) (h:mem) (b:buffer t) : GTot Type0
-val buffer_length (#t:typ) (b:buffer t) : GTot int
+val buffer_length (#t:typ) (b:buffer t) : GTot nat
 val loc : Type u#0
 val loc_none : loc
 val loc_union (s1 s2:loc) : GTot loc

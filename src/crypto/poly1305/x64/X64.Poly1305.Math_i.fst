@@ -22,47 +22,34 @@ lemma_BitwiseMul64()
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 0 --smtencoding.elim_box true --eager_inference --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native"
 
-(*
-let heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) =
-  admit()
-*)
-(*
-let heapletTo128_preserved (m:mem) (ptr num_bytes i:int) (len:nat) (m':mem) :  
-  Lemma(memModified m m' ptr num_bytes /\
-        disjoint ptr num_bytes i ((len + 15) / 16 * 16)
-        ==> heapletTo128 m i len == heapletTo128 m' i len)
-  =
-  let open FStar.FunctionalExtensionality in
-  assert (memModified m m' ptr num_bytes /\
-          disjoint ptr num_bytes i ((len + 15) / 16 * 16) 
-          ==> feq (heapletTo128 m i len) (heapletTo128 m' i len));
-  ()
-*)
-let heapletTo128_all_preserved (m:mem) (ptr num_bytes i:int) (len:nat) =
-  let equality_test (m':mem) = heapletTo128 m i len == heapletTo128 m' i len in
-  let heapletTo128_preserved (m':mem) :  
-  Lemma(memModified m m' ptr num_bytes /\
-        disjoint ptr num_bytes i ((len + 15) / 16 * 16)
-        ==> equality_test m')
-        =
-        let open FStar.FunctionalExtensionality in
-        assert (memModified m m' ptr num_bytes /\
-               disjoint ptr num_bytes i ((len + 15) / 16 * 16) 
-               ==> feq (heapletTo128 m i len) (heapletTo128 m' i len));
-        () in        
-  FStar.Classical.forall_intro (heapletTo128_preserved);
-  ()
-
-
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
-let poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) (k) : int
- = poly1305_heap_blocks' h pad r m i k
+let poly1305_heap_blocks  (h:int) (pad:int) (r:int) (m:mem) (b) (k): int
+ = poly1305_heap_blocks' h pad r m b k
 
-let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) (k) =
-  ()                                 
+let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b) (k) =
+  ()            
 
-let lemma_heap_blocks_preserved (m:mem) (h:int) (pad:int) (r:int) (ptr num_bytes i:int) (k) = admit()
+// let rec lemma_poly1305_heap_hash_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) (len:nat)
+//   (k:int{i <= k /\ (k - i) % 16 == 0 /\ k <= i + len /\
+//     (forall j . {:pattern (m `Map.contains` j)} i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j)}) :
+//   Lemma (requires True)
+// 	(ensures (poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k))
+//   (decreases (k-i)) =
+//     let heapb = poly1305_heap_blocks h pad r m i k in
+//     let hashb = poly1305_hash_blocks h pad r (heapletTo128 m i len) i k in
+//     if i = k then
+//       assert(heapb == hashb)
+//     else
+//       let kk = k - 16 in
+//       assert (i >= 0 ==> precedes (kk - i) (k-i));
+//       assert (i < 0 ==> precedes (kk - i) (k-i));
+//       lemma_poly1305_heap_hash_blocks' h pad r m i len kk
+
+
+let lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int) (m:mem) (b) (len) (k)  =
+  admit()
+  // decreases k - i
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.arith.nl=true --max_fuel 1 --max_ifuel 1 --smtencoding.nl_arith_repr native --z3rlimit 100 --using_facts_from Prims --using_facts_from FStar.Math.Lemmas"
 
@@ -293,28 +280,6 @@ let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s
 
 let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
   admit()
-
-
-// let rec lemma_poly1305_heap_hash_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) (len:nat)
-//   (k:int{i <= k /\ (k - i) % 16 == 0 /\ k <= i + len /\
-//     (forall j . {:pattern (m `Map.contains` j)} i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j)}) :
-//   Lemma (requires True)
-// 	(ensures (poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k))
-//   (decreases (k-i)) =
-//     let heapb = poly1305_heap_blocks h pad r m i k in
-//     let hashb = poly1305_hash_blocks h pad r (heapletTo128 m i len) i k in
-//     if i = k then
-//       assert(heapb == hashb)
-//     else
-//       let kk = k - 16 in
-//       assert (i >= 0 ==> precedes (kk - i) (k-i));
-//       assert (i < 0 ==> precedes (kk - i) (k-i));
-//       lemma_poly1305_heap_hash_blocks' h pad r m i len kk
-
-
-let lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) (k) (len:nat) =
-  admit()
-  // decreases k - i
 
 let lemma_add_mod128 (x y :int) =
   reveal_opaque mod2_128'

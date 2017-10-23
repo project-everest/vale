@@ -23,56 +23,45 @@ let mod2_128 = make_opaque mod2_128'
 
 let modp = make_opaque modp'
 
-let heapletTo128 (m:mem) (i:int) (len:nat) : (int->nat128) =
-  fun addr -> if i <= addr && addr < (i + len) && (addr - i) % 16 = 0 then m.[addr] + 0x10000000000000000 * m.[addr + 8] else 42
-(*
-val heapletTo128_preserved (m:mem) (m':mem) (i:int) (len:nat) : Lemma 
-  (requires memModified m m' ptr num_bytes /\
-            disjoint ptr num_bytes i ((len + 15) / 16 * 16))
-  (ensures  heapletTo128 m i len == heapletTo128 m' i len)
- *)            
-val heapletTo128_all_preserved (m:mem) (ptr num_bytes i:int) (len:nat) : Lemma 
-  (requires True)
-  (ensures (forall (m':mem) .
-              memModified m m' ptr num_bytes /\
-              disjoint ptr num_bytes i ((len + 15) / 16 * 16)
-             ==>
-             heapletTo128 m i len == heapletTo128 m' i len))
+// Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec
+let heapletTo128 (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) (len:nat{ len == buffer_length b}) : int->nat128 =
+  fun index -> if 0 <= index && index < len / 2 then 
+               (buffer64_read b (2*index) m) + 0x10000000000000000 * (buffer64_read b (2*index + 1) m) 
+            else 42
 
-let applyHeapletTo128 (m:mem) (i:int) (len:nat) (index:int) : nat128 =
-  heapletTo128 m i len index 
+let applyHeapletTo128 (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) (len:nat{ len == buffer_length b}) (index:int) : nat128 =
+  heapletTo128 m b len index 
 
-
-let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-        (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))})
-        : Tot int (decreases (k-i))
+let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) 
+        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0})
+        : Tot int (decreases k)
     =
-    if i = k then h
+    if k = 0 then h
     else
-        let kk = k - 16 in
-	assert (i >= 0 ==> precedes (kk - i) (k-i));
-	assert (i < 0 ==> precedes (kk - i) (k-i));
-	let hh = poly1305_heap_blocks' h pad r m i kk in
-        modp((hh + pad + nat64_max * m.[kk + 8] + m.[kk]) * r)
+        let kk = k - 2 in
+	//assert (i >= 0 ==> precedes (kk - i) (k-i));
+	//assert (i < 0 ==> precedes (kk - i) (k-i));
+	let hh = poly1305_heap_blocks' h pad r m b kk in
+        modp((hh + pad + nat64_max * (buffer64_read b (2 * kk + 8) m) + (buffer64_read b (2 * kk) m)) * r)
 
-val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))}) : int
+val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) 
+        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : int
 
-val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (i:int) 
-                         (k:int{i <= k /\ (k - i) % 16 == 0 /\ 
-                              (validSrcAddrs m i 64 (k - i))}) : Lemma
+val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) 
+        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : Lemma
   (requires True)
-  (ensures poly1305_heap_blocks h pad r m i k = poly1305_heap_blocks' h pad r m i k)
+  (ensures poly1305_heap_blocks h pad r m b k = poly1305_heap_blocks' h pad r m b k)
 
-// This framing lemma wasn't necessary when we used heaplets and should go away again when we swap to buffers
-val lemma_heap_blocks_preserved (m:mem) (h:int) (pad:int) (r:int) (ptr num_bytes i:int) (k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))}) : Lemma
+val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) 
+        (len:nat{ len == buffer_length b})
+        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : Lemma
   (requires True)
-  (ensures (forall (m':mem) .
-              memModified m m' ptr num_bytes /\
-              disjoint ptr num_bytes i (k - i) /\
-              validSrcAddrs m' i 64 (k - i)
-             ==>
-             poly1305_heap_blocks h pad r m i k == poly1305_heap_blocks h pad r m' i k))
+//i <= k && k <= i + len /\
+ //           (k - i) % 16 == 0 /\
+ //           validSrcAddrs m i  64 ((len + 15) / 16 * 16))
+           // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
+  (ensures poly1305_heap_blocks h pad r m b k == poly1305_hash_blocks h pad r (heapletTo128 m b len) k)
+          
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
@@ -187,13 +176,6 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
             z == lowerUpper128_opaque z0 z1)
   (ensures z == logand128 x y)
   
-val lemma_poly1305_heap_hash_blocks : h:int -> pad:int -> r:int -> m:mem -> i:int -> k:int{i <= k /\ (k - i) % 16 == 0 /\ (validSrcAddrs m i 64 (k - i))} -> len:nat -> Lemma
-  (requires i <= k && k <= i + len /\
-            (k - i) % 16 == 0 /\
-            validSrcAddrs m i  64 ((len + 15) / 16 * 16))
-           // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
-  (ensures poly1305_heap_blocks h pad r m i k == poly1305_hash_blocks h pad r (heapletTo128 m i len) i k)
-          
 val lemma_add_mod128 (x y :int) : Lemma
   (requires True)
   (ensures mod2_128 ((mod2_128 x) + y) == mod2_128 (x + y))
