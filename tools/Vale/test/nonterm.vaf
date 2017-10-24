@@ -5,7 +5,7 @@ var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
 #verbatim interface
-module Fstar1ifc
+module Nonterm
 
 module Map=FStar.Map
 let map = Map.t
@@ -64,16 +64,18 @@ val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 unfold let va_hd = Cons?.hd
 unfold let va_tl = Cons?.tl
 
-let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
-  b0 = c
+let va_require (b0:va_codes) (c:va_code) (s0:va_state) (sN:va_state) : Type =
+     Cons? b0
+  /\ Cons?.hd b0 = c
 
-let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
-  eval_code b0 s0 f1 s1
+let va_ensure (b0:va_codes) (b1:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : Type =
+    Cons? b0
+ /\ Cons?.tl b0 = b1
 
 #endverbatim
 
 #verbatim
-module Fstar1ifc
+module Nonterm
 
 assume val eval_code_assume (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 let eval_code = eval_code_assume
@@ -82,75 +84,41 @@ let eval_ocmp (s:va_state) (c:ocmp) : bool =
   match c with
   | OLe r1 r2 -> s.[r1] <= s.[r2]
 
-assume val va_lemma_empty_total : s0:va_state -> bN:va_codes -> Ghost ((sM:va_state) * (fM:va_fuel))
+assume val va_lemma_block : b0:va_codes -> s0:va_state -> sN:va_state -> Ghost ((s1:va_state) * (c1:va_code) * (b1:va_codes))
   (requires True)
-  (ensures (fun (sM, fM) ->
-    s0 == sM /\
-    eval_code (Block []) s0 fM sM
-  ))
+  (ensures (fun (s1, c1, b1) -> b0 = c1::b1))
 
-assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
-  (requires
-    Cons? b0 /\
-    eval_code (Cons?.hd b0) s0 f0 sM /\
-    eval_code (Block (Cons?.tl b0)) sM fM sN
-  )
-  (ensures (fun fN ->
-    eval_code (Block b0) s0 fN sN
-  ))
-
-assume val va_lemma_ifElse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> Ghost (bool * va_state * va_state * va_fuel)
+assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
   (requires True)
-  (ensures  (fun (cond, sM, sN, f0) -> cond == eval_ocmp s0 ifb /\ sM == s0))
+  (ensures (fun sM -> s0 == sM /\ sM == sN))
 
-assume val va_lemma_ifElseTrue_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> Lemma
-  (requires
-    eval_ocmp s0 ifb /\
-    eval_code ct s0 f0 sM
-  )
-  (ensures
-    eval_code (IfElse ifb ct cf) s0 f0 sM
-  )
+assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> sN:va_state -> Ghost (bool * va_state)
+  (requires True)
+  (ensures  (fun (cond, sM) -> cond == eval_ocmp s0 ifb /\ sM == s0))
 
-assume val va_lemma_ifElseFalse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> Lemma
-  (requires
-    not (eval_ocmp s0 ifb) /\
-    eval_code cf s0 f0 sM
-  )
-  (ensures
-    eval_code (IfElse ifb ct cf) s0 f0 sM
-  )
-
-let va_whileInv_total (b:ocmp) (c:va_code) (s0:va_state) (sN:va_state) (f0:va_fuel) : Type0 =
-  eval_code (While b c) s0 f0 sN
+let va_whileInv (b:ocmp) (c:va_code) (n:int) (s0:va_state) (sN:va_state) : Type0 =
+  n >= 0
 
 unfold let va_evalCond (b:ocmp) (s:va_state) : bool = eval_ocmp s b
 
-assume val va_lemma_while_total : b:ocmp -> c:va_code -> s0:va_state -> Ghost ((s1:va_state) * (f1:va_fuel))
+assume val va_lemma_while : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost ((n:nat) * (s1:va_state))
   (requires True)
-  (ensures fun (s1, f1) ->
+  (ensures fun (n, s1) -> s1 == s0)
+
+assume val va_lemma_whileTrue : b:ocmp -> c:va_code -> n:nat -> s0:va_state -> sN:va_state -> Ghost ((s0':va_state) * (s1:va_state))
+  (requires n > 0)
+  (ensures fun (s0', s1) ->
+    s0' == s0 /\
+    eval_ocmp s0 b
+  )
+
+assume val va_lemma_whileFalse : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost (s1:va_state)
+  (requires True)
+  (ensures fun s1 ->
     s1 == s0 /\
-    eval_code (While b c) s1 f1 s1
+    s0 == sN /\
+    not (eval_ocmp s0 b)
   )
-
-assume val va_lemma_whileTrue_total : b:ocmp -> c:va_code -> s0:va_state -> sW:va_state -> fW:va_fuel -> Ghost ((s1:va_state) * (f1:va_fuel))
-  (requires eval_ocmp sW b)
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
-
-assume val va_lemma_whileFalse_total : b:ocmp -> c:va_code -> s0:va_state -> sW:va_state -> fW:va_fuel -> Ghost ((s1:va_state) * (f1:va_fuel))
-  (requires not (eval_ocmp sW b))
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
-
-assume val va_lemma_whileMerge_total : c:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
-  (requires
-    While? c /\
-    eval_ocmp sM (While?.whileCond c) /\
-    eval_code c s0 f0 sM /\
-    eval_code (While?.whileBody c) sM fM sN
-  )
-  (ensures (fun fN ->
-    eval_code c s0 fN sN
-  ))
 
 assume val make_opaque : #a:Type -> a -> a
 assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
@@ -166,35 +134,35 @@ let opaque_double = make_opaque double
 
 
 
-procedure{:terminates} Imm(out register x:int, inline y:int)
+procedure{:terminates false} Imm(out register x:int, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure{:terminates} Increment(inout register x:int)
+procedure{:terminates false} Increment(inout register x:int)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure{:terminates} Add(inout register x:int, register y:int)
+procedure{:terminates false} Add(inout register x:int, register y:int)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure{:terminates} AddReg(inout register x:int, register y:int)
+procedure{:terminates false} AddReg(inout register x:int, register y:int)
     ensures
         x == old(x + y);
 {
     Add(x, y); // coerces y from register to operand
 }
 
-procedure{:terminates} p()
+procedure{:terminates false} p()
     modifies
         eax;
     requires
@@ -206,7 +174,7 @@ procedure{:terminates} p()
     Increment(eax);
 }
 
-procedure{:terminates} Calls()
+procedure{:terminates false} Calls()
     modifies
         eax; ebx;
     ensures
@@ -234,7 +202,7 @@ procedure{:terminates} Calls()
 //    }
 }
 
-procedure{:terminates} WhileTest()
+procedure{:terminates false} WhileTest()
     modifies
         eax; ebx;
     requires
@@ -256,7 +224,7 @@ procedure{:terminates} WhileTest()
     }
 }
 
-procedure{:terminates} Ghosts(ghost g1:int) returns(ghost g2:int)
+procedure{:terminates false} Ghosts(ghost g1:int) returns(ghost g2:int)
     ensures
         g2 == g1 + 1;
 {

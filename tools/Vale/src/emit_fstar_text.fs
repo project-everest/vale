@@ -204,7 +204,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.Indent ();
       let inv = and_of_list (List.map snd invs) in
       ps.PrintLine ("(requires " + (string_of_exp inv) + ")");
-      ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> " + (string_of_exp inv) + "))");
+      ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> (not (" + (string_of_exp e) + ")) /\ " + (string_of_exp inv) + "))");
       let () =
         match (ed, outs) with
         | ([], Some ((x, _)::_)) -> ps.PrintLine ("(decreases " + (sid x) + ")")
