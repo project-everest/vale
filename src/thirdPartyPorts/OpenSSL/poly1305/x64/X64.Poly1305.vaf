@@ -62,6 +62,13 @@ let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Ty
 
 let buffers_disjoint (b1 b2:buffer64) =
     locs_disjoint [loc_buffer b1; loc_buffer b2]
+
+let readable_words (len:nat) =
+    ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
+#endverbatim
+
+#verbatim
+#set-options "--lax" 
 #endverbatim
 
 /*
@@ -359,6 +366,7 @@ assume false;
 
 #verbatim
 #reset-options "--z3rlimit 160"
+#set-options "--lax" 
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -520,7 +528,7 @@ procedure {:frame false} poly1305_blocks(
         ghost var hq := h;
 
         
-        assume false;
+assume false;
 //        assert {:fast_block} true;
         Add64Wrap(h0, Mem(inp, 0)); // accumulate input
         Adc64Wrap(h1, Mem(inp, 8));
@@ -567,12 +575,12 @@ procedure {:frame false} poly1305_blocks(
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
     Store64_buffer(ctx, h1, 8, ctx_b, 1);
     Store64_buffer(ctx, h2, 16, ctx_b, 2);
-    assume false;
+assume false;
 }
 
-/*
 #verbatim
 #reset-options "--z3rlimit 200"
+#set-options "--lax" 
 #endverbatim
 
 // last 1..15 bytes, in case len is not a multiple of 16
@@ -701,6 +709,7 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
 
 #verbatim
 #reset-options "--z3rlimit 20"
+#set-options "--lax" 
 #endverbatim
 
 // h := (h % p) % 2^128;
@@ -817,6 +826,7 @@ let modp_0 () : Lemma
 let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
 #reset-options "--z3rlimit 200"
+#set-options "--lax" 
 
 #endverbatim
 
@@ -845,7 +855,7 @@ procedure {:frame false} poly1305_impl(
         //disjoint(ctx, 24*8, inp, (len + 15) / 16 * 16);
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, inp, inp_b, (len + 15) / 16 * 16);
+        validSrcAddrs64(mem, inp, inp_b, readable_words(len));
         inp + len < nat64_max;
         let key_r0 := buffer64_read(ctx_b, 3, mem);
         let key_r1 := buffer64_read(ctx_b, 4, mem);
@@ -856,7 +866,7 @@ procedure {:frame false} poly1305_impl(
     ensures
 //        ctx == old(ctx);
         validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, old(inp), inp_b, (old(len) + 15) / 16 * 16);
+        validSrcAddrs64(mem, old(inp), inp_b, readable_words(old(len)));
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
         //memModified(old(mem), mem, old(ctx), 9 * 8);
@@ -866,11 +876,11 @@ procedure {:frame false} poly1305_impl(
 //                                    buffer64_read(ctx_b, i, old(mem));
 
         h == lowerUpper128_opaque(h0, h1);
-        let inp_mem := heapletTo128(mem, inp_b, old(len));
+        let inp_mem := heapletTo128(mem, inp_b, readable_words(old(len))); //old(len));
 //        // TODO: Figure out why there's an internal Vale error on the inp_mem?[j] invocation
 //        //forall j :: old(inp) <= j < old(inp) + old(len) && (j - old(inp)) % 16 == 0 ==> inp_mem?[j];
 //        forall i :: ctx + 72 <= i && i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
-        h == poly1305_hash(key_r, key_s, inp_mem, old(inp), old(len));
+        h == poly1305_hash(key_r, key_s, inp_mem, old(len));
 //        // Framing
 //        rbx == old(rbx);
 //        rsi == old(rsi);
@@ -888,7 +898,7 @@ procedure {:frame false} poly1305_impl(
     lemma_poly_bits64();
     //lemma_BitwiseAdd64();
 
-    assert{:fast_block} true;
+    //assert{:fast_block} true;
     Mov64(rax, 0);
     Store64_buffer(ctx, rax,  0, ctx_b, 0);
     Store64_buffer(ctx, rax,  8, ctx_b, 1);
@@ -913,7 +923,8 @@ procedure {:frame false} poly1305_impl(
             0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
     }
 
-    assert{:fast_block} true;
+assume false;
+    //assert{:fast_block} true;
     Mov64(rax, len);
     And64(rax, 15);
     Sub64(len, rax);
@@ -931,7 +942,8 @@ procedure {:frame false} poly1305_impl(
 //        assert_by_tactic(modp(0) == 0, retain_only_modp());
     }
 
-    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_in, inp_in + len_in / 16 * 16, len_in);
+    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_b, inp_in + len_in / 16 * 16, len_in);
+
     reveal_logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
     assert r == bare_r(key_r);
     assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
@@ -961,9 +973,13 @@ procedure {:frame false} poly1305_impl(
     poly1305_add_key_s(h0, h1, rax, rdx, h, key_s);
     h := lowerUpper128_opaque(h0, h1);
 
-    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, inp_b, len_in), inp_in, len_in)
+    assert h == poly1305_hash(key_r, key_s, heapletTo128(mem, inp_b, len_in), len_in)
         by { reveal_opaque(mod2_128'); reveal_opaque(modp'); }
 }
+
+#verbatim
+#reset-options "--z3rlimit 200"
+#endverbatim
 
 // poly1305(ctx, inp, len)
 //
@@ -999,7 +1015,7 @@ procedure {:frame false} poly1305(
         //disjoint(ctx_in, 24*8, inp_in, (len_in + 15) / 16 * 16);
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx_in, ctx_b, 24);
-        validSrcAddrs64(mem, inp_in, inp_b, (len_in + 15) / 16 * 16);
+        validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in));
         inp_in + len_in < nat64_max;
         let key_r0 := buffer64_read(ctx_b, 3, mem);
         let key_r1 := buffer64_read(ctx_b, 4, mem);
@@ -1009,7 +1025,7 @@ procedure {:frame false} poly1305(
         key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
         validSrcAddrs64(mem, ctx_in, ctx_b, 24);
-        validSrcAddrs64(mem, inp_in, inp_b, (len_in + 15) / 16 * 16);
+        validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in));
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
         //memModified(old(mem), mem, ctx_in, 24 * 8);
@@ -1017,8 +1033,8 @@ procedure {:frame false} poly1305(
         let h0_out := buffer64_read(ctx_b, 0, mem);
         let h1_out := buffer64_read(ctx_b, 1, mem);
         h == lowerUpper128_opaque(h0_out, h1_out);
-        let inp_mem := heapletTo128(mem, inp_b, len_in);
-        h == poly1305_hash(key_r, key_s, inp_mem, inp_in, len_in);
+        let inp_mem := heapletTo128(mem, inp_b, readable_words(len_in));
+        h == poly1305_hash(key_r, key_s, inp_mem, len_in);
         h1 == old(h1);
         h2 == old(h2);
         ctx == old(ctx);
@@ -1037,6 +1053,7 @@ procedure {:frame false} poly1305(
         Mov64(inp, rdx);
         Mov64(len, r8);
     }
+    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
     // assert ctx == ctx_in;
     // assert inp == inp_in;
     // assert len == len_in;
@@ -1048,8 +1065,15 @@ procedure {:frame false} poly1305(
     //   56: will hold len % 16
     //   64: will hold len / 16 * 16
     //   72, 80, 88, 96, 104, 112, 120, 128: callee-save registers
-    assert {:fast_block} true;
+    //assert {:fast_block} true;
     Store64_buffer(ctx, h1,  72, ctx_b, 9);
+
+    assert buffer_readable(mem, inp_b);
+assume false;
+    assert readable_words(len) == buffer_length(inp_b);
+    assert buffer_addr(inp_b) == inp; 
+
+    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
     Store64_buffer(ctx, h2,  80, ctx_b, 10);
     Store64_buffer(ctx, rax, 88, ctx_b, 11);
     Store64_buffer(ctx, r9,  96, ctx_b, 12);
@@ -1062,10 +1086,11 @@ procedure {:frame false} poly1305(
     ghost var old_len := rdx;
     h := poly1305_impl(key_r, key_s, ctx_b, inp_b);
 
+assume false;
     // TODO: In theory, no longer needed
     //heapletTo128_all_preserved(mem, ctx, 9 * 8, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
 
-    assert {:fast_block} true;
+    //assert {:fast_block} true;
     Store64_buffer(ctx, h0,  0, ctx_b, 0);
     Store64_buffer(ctx, h1,  8, ctx_b, 8);
 
@@ -1080,6 +1105,7 @@ procedure {:frame false} poly1305(
     Mov64(ctx, rax);
 }
 
+/*
 #verbatim
 
 let print_poly1305 (p:printer) : FStar.All.ML unit =
