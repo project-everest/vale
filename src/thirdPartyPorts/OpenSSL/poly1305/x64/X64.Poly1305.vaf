@@ -40,7 +40,7 @@ open X64.Vale.StrongPost_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open Opaque_i
-open FStar.Tactics
+//open FStar.Tactics
 #endverbatim
 
 #verbatim interface
@@ -761,6 +761,7 @@ procedure poly1305_add_key_s(
 
 
 #verbatim
+(*
 let retain_only (nss:list string) : tactic unit =
   prune "";; //removes every top-level assertion which has "" as a prefix; so prune everything
   addns "Prims" ;; //keep prims always
@@ -769,6 +770,7 @@ let retain_only (nss:list string) : tactic unit =
 
 let retain_only_modp () = 
     retain_only ["Opaque_i"; "X64.Poly1305.Spec_s"; "X64.Poly1305"; "X64.Poly1305.Math_i"] //; "FStar.Seq"]`
+*)
 
 let modp_0 () : Lemma
   (requires True)
@@ -776,7 +778,6 @@ let modp_0 () : Lemma
     =
     reveal_opaque modp';
     ()
-
 let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
 #reset-options "--z3rlimit 200"
