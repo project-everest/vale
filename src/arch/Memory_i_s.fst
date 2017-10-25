@@ -92,12 +92,12 @@ let default_of_typ (t:typ) : type_of_typ t =
   | TBase TUInt64 -> 0
 
 let buffer_read #t b i h =
-  if i < 0 || i >= Arch_s.nat32_max then default_of_typ t else
+  if i < 0 || i >= Types_s.nat32_max then default_of_typ t else
   let v = M.buffer_read b (UInt32.uint_to_t i) h in
   v_to_typ t v
 
 let buffer_write #t b i v h =
-  if i < 0 || i >= Arch_s.nat32_max then h else
+  if i < 0 || i >= Types_s.nat32_max then h else
   let vu = v_of_typ t v in
   let h' = M.buffer_write b (UInt32.uint_to_t i) vu h in
   assert (v_to_typ t vu == v); // v_to_typ (v_of_typ v)

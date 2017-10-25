@@ -1,4 +1,4 @@
-module Arch_s
+module Types_s
 
 unfold let nat8_max = 0x100
 unfold let nat16_max = 0x10000

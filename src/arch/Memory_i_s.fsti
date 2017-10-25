@@ -3,10 +3,10 @@ module Memory_i_s
 // but we're currently including it in the trusted Semantics_s module(s),
 // so it has to be trusted.
 
-unfold let nat8 = Arch_s.nat8
-unfold let nat16 = Arch_s.nat16
-unfold let nat32 = Arch_s.nat32
-unfold let nat64 = Arch_s.nat64
+unfold let nat8 = Types_s.nat8
+unfold let nat16 = Types_s.nat16
+unfold let nat32 = Types_s.nat32
+unfold let nat64 = Types_s.nat64
 
 val heap : Type u#1
 val mem : Type u#1

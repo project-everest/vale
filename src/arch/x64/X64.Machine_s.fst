@@ -2,13 +2,13 @@ module X64.Machine_s
 
 module M = Memory_i_s
 
-unfold let nat32_max = Arch_s.nat32_max
-unfold let nat64_max = Arch_s.nat64_max
-unfold let nat128_max = Arch_s.nat128_max
+unfold let nat32_max = Types_s.nat32_max
+unfold let nat64_max = Types_s.nat64_max
+unfold let nat128_max = Types_s.nat128_max
 
-unfold let nat64 = Arch_s.nat64
+unfold let nat64 = Types_s.nat64
 assume val int_to_nat64 : i:int -> n:nat64{0 <= i && i < nat64_max ==> i == n}
-unfold let nat128 = Arch_s.nat128
+unfold let nat128 = Types_s.nat128
 
 type reg =
   | Rax
