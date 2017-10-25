@@ -48,19 +48,20 @@ open Opaque_i
 unfold let n = nat64_max
 
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
-    buffer_readable m b /\
+    (buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
     len == buffer_length b /\
     buffer_addr b == addr
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_mem (loc_buffer b) h1 h2 /\
+    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (buffer64_read b i h2)}
                         0 <= i /\ i < buffer_length b 
                      /\ (i < start || i > last) 
                     ==> buffer64_read b i h1
                      == buffer64_read b i h2)
 
-let buffers_disjoint (b1 b2:buffer64) =
+unfold let buffers_disjoint (b1 b2:buffer64) =
     locs_disjoint [loc_buffer b1; loc_buffer b2]
 
 let readable_words (len:nat) =
@@ -366,7 +367,6 @@ assume false;
 
 #verbatim
 #reset-options "--z3rlimit 160"
-#set-options "--lax" 
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -527,10 +527,11 @@ procedure {:frame false} poly1305_blocks(
         h := h + n * n * padbit + n * buffer64_read(inp_b, 1, mem) + buffer64_read(inp_b, 0, mem);
         ghost var hq := h;
 
+// TODO: Modify Mem_in in decls to take the extra ghost params.  Modify va_opr_lemma_Mem to accept those params and provide a stronger post        
         
-assume false;
 //        assert {:fast_block} true;
         Add64Wrap(h0, Mem(inp, 0)); // accumulate input
+assume false;
         Adc64Wrap(h1, Mem(inp, 8));
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
@@ -578,6 +579,7 @@ assume false;
 assume false;
 }
 
+/*
 #verbatim
 #reset-options "--z3rlimit 200"
 #set-options "--lax" 
@@ -1053,7 +1055,6 @@ procedure {:frame false} poly1305(
         Mov64(inp, rdx);
         Mov64(len, r8);
     }
-    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
     // assert ctx == ctx_in;
     // assert inp == inp_in;
     // assert len == len_in;
@@ -1066,14 +1067,20 @@ procedure {:frame false} poly1305(
     //   64: will hold len / 16 * 16
     //   72, 80, 88, 96, 104, 112, 120, 128: callee-save registers
     //assert {:fast_block} true;
+
+//    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
+//    assert buffers_disjoint(ctx_b, inp_b);
+//    assert locs_disjoint(list(loc_buffer(ctx_b), loc_buffer(inp_b)));
+//    assume readable_words(len_in) > 0;
+//    assert buffer_readable(mem, inp_b);
     Store64_buffer(ctx, h1,  72, ctx_b, 9);
 
-    assert buffer_readable(mem, inp_b);
-assume false;
-    assert readable_words(len) == buffer_length(inp_b);
-    assert buffer_addr(inp_b) == inp; 
-
-    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
+//    assert buffer_readable(mem, inp_b);
+////assume false;
+//    assert readable_words(len) == buffer_length(inp_b);
+//    assert buffer_addr(inp_b) == inp; 
+//
+//    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
     Store64_buffer(ctx, h2,  80, ctx_b, 10);
     Store64_buffer(ctx, rax, 88, ctx_b, 11);
     Store64_buffer(ctx, r9,  96, ctx_b, 12);
@@ -1121,3 +1128,5 @@ let main () : FStar.All.ML unit =
 
 #endverbatim
   */
+
+*/
