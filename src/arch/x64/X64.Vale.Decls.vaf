@@ -37,6 +37,7 @@ unfold let va_cmp = operand
 unfold let va_register = reg
 
 (* Constructors *)
+val va_fuel_default : unit -> va_fuel
 unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
 unfold let va_const_operand (n:int) = OConst n
 unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
@@ -332,6 +333,7 @@ let cf = Lemmas_i.cf
 let ins = S.ins
 type ocmp = S.ocmp
 type va_fuel = nat
+let va_fuel_default () = 0
 
 let va_cmp_eq o1 o2 = S.OEq o1 o2
 let va_cmp_ne o1 o2 = S.ONe o1 o2

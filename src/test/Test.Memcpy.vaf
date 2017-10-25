@@ -9,7 +9,6 @@ open X64.Vale.StrongPost_i
 #set-options "--z3rlimit 20"
 #endverbatim
 
-/*
 procedure Copy16()
     requires/ensures
         rsi + 16 <= rdi;
@@ -29,7 +28,7 @@ procedure Copy16()
     Store64(rdi, rax, 0);
     Store64(rdi, rbx, 8);
 }
-*/
+
 /*
 procedure Copy64()
     requires/ensures

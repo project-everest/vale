@@ -161,5 +161,5 @@ let lemma_weakest_pre_norm' (inss:list ins) (s0:state) (f0:va_fuel) (sN:state) (
   lemma_weak_pre inss s0 sN post
 *)
 
-let va_lemma_weakest_pre_norm inss s0 f0 sN =
+let va_lemma_weakest_pre_norm inss s0 f0 =
   admit () // connect with proof above

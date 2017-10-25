@@ -885,7 +885,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
             //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
             let ss = rewrite_vars_stmts envp ss in
-// TODO:            let ss = add_fast_blocks_stmts envp ss in
+            let ss = add_fast_blocks_stmts envp ss in
             Some ss
         in
       (env, DProc pReprint, DProc {p with pbody = body; pspecs = specs})

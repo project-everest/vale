@@ -23,7 +23,7 @@ type build_env =
     is_terminating:bool;
     code_name:id;
     frame_exp:id -> exp;
-    gen_fast_block:exp list -> stmt list -> stmt list;
+    gen_fast_block:lhs list -> exp list -> stmt list -> stmt list;
     gen_fast_block_funs:unit -> decls;
   }
 
@@ -207,8 +207,9 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> (NotGhost, true, build_lemma_block senv b)
   | SFastBlock b ->
-      let ss = benv.gen_fast_block [EVar s0; EVar sM] b in
-      (NotGhost, true, ss)
+      let sFuel = SAssign ([(senv.fM, Some (Some tFuel, Ghost))], vaApp "fuel_default" []) in
+      let ss = benv.gen_fast_block [(sM, Some (Some tState, Ghost))] [EVar s0; EVar senv.fM] b in
+      (NotGhost, true, sFuel::ss)
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_s0 e in
       let ss1 = build_lemma_ghost_stmts senv ss1 in
@@ -379,7 +380,7 @@ let fArg (x, t, g, io, a):exp list =
   | _ -> []
   in
 
-let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt list) * (unit -> decls)) =
+let make_gen_fast_block (loc:loc) (p:proc_decl):((lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
   let next_sym = ref 0 in
   let funs = ref ([]:decls) in
   let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
@@ -400,7 +401,7 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt 
       )
     | _ -> err ()
     in
-  let gen_fast_block args ss =
+  let gen_fast_block outs args ss =
     incr next_sym;
     let id = Reserved ("ins_" + (string !next_sym) + "_" + (string_of_id p.pname)) in
     let inss = List.map fIns ss in
@@ -418,7 +419,7 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((exp list -> stmt list -> stmt 
     let dFun = DFun fCode in
     funs := (loc, dFun)::!funs;
     let eIns = EApply (id, fArgs) in
-    let sLemma = SAssign ([], EApply (Reserved "lemma_weakest_pre_norm", eIns::args)) in
+    let sLemma = SAssign (outs, EApply (Reserved "lemma_weakest_pre_norm", eIns::args)) in
     [sLemma]
     in
   let gen_fast_block_funs () = List.rev !funs in
