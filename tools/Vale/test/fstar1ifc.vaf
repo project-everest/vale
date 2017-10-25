@@ -121,8 +121,10 @@ assume val va_lemma_ifElseFalse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> 
     eval_code (IfElse ifb ct cf) s0 f0 sM
   )
 
+assume val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0
+
 let va_whileInv_total (b:ocmp) (c:va_code) (s0:va_state) (sN:va_state) (f0:va_fuel) : Type0 =
-  eval_code (While b c) s0 f0 sN
+  eval_while_inv (While b c) s0 f0 sN
 
 unfold let va_evalCond (b:ocmp) (s:va_state) : bool = eval_ocmp s b
 
@@ -130,7 +132,7 @@ assume val va_lemma_while_total : b:ocmp -> c:va_code -> s0:va_state -> Ghost ((
   (requires True)
   (ensures fun (s1, f1) ->
     s1 == s0 /\
-    eval_code (While b c) s1 f1 s1
+    eval_while_inv (While b c) s1 f1 s1
   )
 
 assume val va_lemma_whileTrue_total : b:ocmp -> c:va_code -> s0:va_state -> sW:va_state -> fW:va_fuel -> Ghost ((s1:va_state) * (f1:va_fuel))
@@ -138,18 +140,24 @@ assume val va_lemma_whileTrue_total : b:ocmp -> c:va_code -> s0:va_state -> sW:v
   (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
 assume val va_lemma_whileFalse_total : b:ocmp -> c:va_code -> s0:va_state -> sW:va_state -> fW:va_fuel -> Ghost ((s1:va_state) * (f1:va_fuel))
-  (requires not (eval_ocmp sW b))
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
+  (requires
+    not (eval_ocmp sW b) /\
+    eval_while_inv (While b c) s0 fW sW
+  )
+  (ensures fun (s1, f1) ->
+    s1 == sW /\
+    eval_code (While b c) s0 f1 s1
+  )
 
 assume val va_lemma_whileMerge_total : c:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
   (requires
     While? c /\
     eval_ocmp sM (While?.whileCond c) /\
-    eval_code c s0 f0 sM /\
+    eval_while_inv c s0 f0 sM /\
     eval_code (While?.whileBody c) sM fM sN
   )
   (ensures (fun fN ->
-    eval_code c s0 fN sN
+    eval_while_inv c s0 fN sN
   ))
 
 assume val make_opaque : #a:Type -> a -> a

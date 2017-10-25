@@ -235,11 +235,15 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
       let lemF = vaApp "lemma_ifElseFalse_total" [codeCond; codet; codef; EVar s0; EVar senv.f0; EVar senv.sM] in
       let slemT = listIf total [SAssign ([], lemT)] in
       let slemF = listIf total [SAssign ([], lemF)] in
-      (NotGhost, true, listIf total sCode @ [sb1; SIfElse (SmPlain, EVar cond, sbT @ slemT, sbF @ slemF)])
+      (NotGhost, true, sCode @ [sb1; SIfElse (SmPlain, EVar cond, sbT @ slemT, sbF @ slemF)])
   | SIfElse (SmInline, e, ss1, ss2) ->
+      let codeId = match code with EVar x -> x | _ -> internalErr (sprintf "SIfElse: %A" code) in
+      let sCode = listIf total [SAssign ([varLhsOfId codeId], vaApp "hd" [EVar senv.b1])] in
+      let sState = listIf total [SVar (senv.sM, None, Mutable, XGhost, [], None)] in
+      let sFuel = listIf total [SVar (senv.fM, None, Mutable, XGhost, [], None)] in
       let sbT = build_lemma_block senv ss1 in
       let sbF = build_lemma_block senv ss2 in
-      (NotGhost, true, [SIfElse (SmPlain, e, sbT, sbF)])
+      (NotGhost, true, sCode @ sState @ sFuel @ [SIfElse (SmPlain, e, sbT, sbF)])
   | SWhile (e, invs, ed, ss) ->
       let codeId = match code with EVar x -> x | _ -> internalErr (sprintf "SWhile: %A" code) in
       let sCode = listIf total [SAssign ([varLhsOfId codeId], vaApp "hd" [EVar senv.b1])] in
@@ -550,9 +554,10 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     if benv.is_instruction then
       // Body of instruction lemma
       let dummy = Reserved "dummy" in
+      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [EVar b0; EVar s0]) in
       let senv = { env = env; benv = benv; b1 = dummy; bM = dummy; code = EVar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
       let ss = build_lemma_ghost_stmts senv stmts in
-      [sReveal; sOldS] @ sBlock @ ss
+      [sReveal; sOldS] @ sBlock @ listIf total [sState] @ ss
     else if benv.is_operand then
       err "operand procedures must be declared extern"
     else
@@ -610,7 +615,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             is_instruction = isInstruction;
             is_operand = isOperand;
             is_framed = attrs_get_bool (Id "frame") true p.pattrs;
-            is_terminating = attrs_get_bool (Id "terminates") false p.pattrs;
+            is_terminating = attrs_get_bool (Id "terminates") true p.pattrs;
             code_name = codeName;
             frame_exp = makeFrame env p s0;
             gen_fast_block = gen_fast_block;
