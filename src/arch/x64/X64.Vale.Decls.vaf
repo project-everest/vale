@@ -74,9 +74,14 @@ unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
   | OReg r -> OMem (MReg r offset)
   | _ -> OConst 42
 
-unfold let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) : operand =
+unfold let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base})//:operand{valid_operand base s}) 
+                            (offset:int) // Need this if we want to handle OConst as base values: { 0 <= (eval_operand base s) + offset && (eval_operand base s) + offset < nat64_max }) 
+                            (b:buffer64) 
+                            (index:int{valid_src_addr s.mem b index /\ 
+                                       (eval_operand base s) + offset == buffer_addr(b) + 8 `op_Multiply` index}) 
+                            : (o:operand{valid_operand o s}) =
+  lemma_valid_mem64 b index s.mem;
   va_opr_code_Mem base offset
-
 (*
 function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
     requires x86_ValidState(s)
@@ -406,7 +411,7 @@ var{:state reg(R15)} r15:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-procedure{:operand} Mem_in(operand base:int, inline offset:int) returns(operand o:int)
+procedure{:operand} Mem_in(operand base:int, inline offset:int, ghost b:buffer64, ghost index:int) returns(operand o:int)
     reads
         mem;
     extern;

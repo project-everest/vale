@@ -524,15 +524,18 @@ procedure {:frame false} poly1305_blocks(
     {
         ghost var hp := h;
         ghost var old_mem := mem;
+// TODO: Need to replace the 0 and 1 here and in the AdcWrap below with an actual (ghost) index
         h := h + n * n * padbit + n * buffer64_read(inp_b, 1, mem) + buffer64_read(inp_b, 0, mem);
         ghost var hq := h;
 
 // TODO: Modify Mem_in in decls to take the extra ghost params.  Modify va_opr_lemma_Mem to accept those params and provide a stronger post        
         
 //        assert {:fast_block} true;
-        Add64Wrap(h0, Mem(inp, 0)); // accumulate input
+assume valid_src_addr(mem, inp_b, 0);
+assume inp + 0 == buffer_addr(inp_b) + 8 * 0;
+        Add64Wrap(h0, Mem(inp, 0, inp_b, 0)); // accumulate input
 assume false;
-        Adc64Wrap(h1, Mem(inp, 8));
+        Adc64Wrap(h1, Mem(inp, 8, inp_b, 1));
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 
