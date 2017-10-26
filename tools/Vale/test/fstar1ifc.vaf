@@ -212,6 +212,25 @@ procedure WhileTest()
     }
 }
 
+procedure WhileTest2()
+    reads
+        ebx;
+    modifies
+        eax; 
+    requires
+        eax == 10;
+        ebx == 7;
+    ensures
+{
+    while (eax <= ebx)
+        invariant ebx == 7;
+        invariant 2 * eax <= 18;
+        decreases 7 - eax;
+    {
+        Increment(eax);
+    }
+}
+
 procedure Ghosts(ghost g1:int) returns(ghost g2:int)
     ensures
         g2 == g1 + 1;

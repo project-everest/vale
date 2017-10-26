@@ -49,7 +49,7 @@ unfold let n = nat64_max
 
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     (buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
-    len == buffer_length b /\
+    len <= buffer_length b /\
     buffer_addr b == addr
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
@@ -406,6 +406,7 @@ procedure {:frame false} poly1305_blocks(
         mem;
     requires
         //n == 0x1_0000_0000_0000_0000;
+        // Len is measured in bytes
         len % 16 == 0; // REVIEW: may be stronger than necessary
         inp + len < nat64_max;
         //disjoint(ctx, 24*8, inp, len);
@@ -466,7 +467,7 @@ procedure {:frame false} poly1305_blocks(
     ghost var length := len;
 
 //    assert {:fast_block} true;
-    Shr64(len, 4);
+    Shr64(len, 4);  // num_bytes / 16 ==> number of blocks
     // Slight difference: the original code has a special case for len == 0 here.
     // We can let len == 0 pass through because of the slight difference in the loop condition (see below)
     Mov64(r15, len); // reassign len
@@ -490,6 +491,11 @@ procedure {:frame false} poly1305_blocks(
         reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0); //old(inp), inp);
     }
 
+    ghost var word_index:int := 0;
+    assert r15 != 0 ==> 8*(2*word_index + 1) <= length;
+
+    assume false;
+
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
             ok;
@@ -504,6 +510,11 @@ procedure {:frame false} poly1305_blocks(
             rax == r1;
             inp + 16 * r15 == old(inp) + length;
             length == old(len);
+
+            8*(2*word_index + 1) <= length;
+            //2*r15 + 1 < length/8;
+            inp + 0 /* offset */ == buffer_addr(inp_b) + 8 * (2 * word_index);
+
             r15 * 16 <= length;    // Not needed with Dafny version
             padbit < 2;            // Not needed with Dafny version 
             validSrcAddrs64(mem, ctx, ctx_b, 24);
@@ -525,17 +536,17 @@ procedure {:frame false} poly1305_blocks(
         ghost var hp := h;
         ghost var old_mem := mem;
 // TODO: Need to replace the 0 and 1 here and in the AdcWrap below with an actual (ghost) index
-        h := h + n * n * padbit + n * buffer64_read(inp_b, 1, mem) + buffer64_read(inp_b, 0, mem);
+        h := h + n * n * padbit + n * buffer64_read(inp_b, 2*word_index+1, mem) + buffer64_read(inp_b, 2*word_index, mem);
         ghost var hq := h;
 
 // TODO: Modify Mem_in in decls to take the extra ghost params.  Modify va_opr_lemma_Mem to accept those params and provide a stronger post        
         
 //        assert {:fast_block} true;
-assume valid_src_addr(mem, inp_b, 0);
-assume inp + 0 == buffer_addr(inp_b) + 8 * 0;
-        Add64Wrap(h0, Mem(inp, 0, inp_b, 0)); // accumulate input
+//assume valid_src_addr(mem, inp_b, 0);
+//assume inp + 0 == buffer_addr(inp_b) + 8 * 0;
+        Add64Wrap(h0, Mem(inp, 0, inp_b, 2*word_index)); // accumulate input
 assume false;
-        Adc64Wrap(h1, Mem(inp, 8, inp_b, 1));
+        Adc64Wrap(h1, Mem(inp, 8, inp_b, 2*word_index+1));
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 
@@ -546,6 +557,7 @@ assume false;
 
         Mov64(rax, r1);
         Sub64(r15, 1); // len-=16
+        word_index := word_index + 1;
 
         assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, (inp - old(inp))/16) by
         {
@@ -934,7 +946,7 @@ assume false;
     And64(rax, 15);
     Sub64(len, rax);
     // assert rax == len_in % 16;
-    // assert len == len_in / 16 * 16;
+    // assert len == len_in / 16 * 16; == (num 16-byte blocks) * 16
     Store64_buffer(ctx, rax, 56, ctx_b, 7);
     Store64_buffer(ctx, len, 64, ctx_b, 8);
 
