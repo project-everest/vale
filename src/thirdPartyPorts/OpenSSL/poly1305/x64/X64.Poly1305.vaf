@@ -540,7 +540,10 @@ procedure {:frame false} poly1305_blocks(
 //        assert {:fast_block} true;
         Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
         Adc64Wrap(h1, Mem(inp, 8, inp_b, word_index+1));
+//assert false;   // Fails
         AddLea64(inp, inp, 16);
+// TODO: Problem!
+assert false;   // Passes!?
         Adc64Wrap(h2, padbit);
 
         ghost var old_h := h2 * (n * n) + h1 * n + h0;
@@ -576,8 +579,6 @@ procedure {:frame false} poly1305_blocks(
 //                   modp((hh + pad + nat64_max * mem[kk + 8] + mem[kk]) * r);        // TRUE (with enough rlimit)
 //            assert hh == modp(hp);
         }
-// TODO: Problem!
-assert false;
     }
 
     // TODO: In theory, we shouldn't need this lemma any more
