@@ -492,9 +492,7 @@ procedure {:frame false} poly1305_blocks(
     }
 
     ghost var word_index:int := 0;
-    assert r15 != 0 ==> 8*(2*word_index + 1) <= length;
-
-    assume false;
+    //assert r15 != 0 ==> 8*(word_index + 1) <= length;
 
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
@@ -511,9 +509,10 @@ procedure {:frame false} poly1305_blocks(
             inp + 16 * r15 == old(inp) + length;
             length == old(len);
 
-            8*(2*word_index + 1) <= length;
+            r15 != 0 ==> 8*(word_index + 1) <= length;
+            16 * r15 + 8 * word_index == length;
             //2*r15 + 1 < length/8;
-            inp + 0 /* offset */ == buffer_addr(inp_b) + 8 * (2 * word_index);
+            inp + 0 /* offset */ == buffer_addr(inp_b) + 8 * word_index;
 
             r15 * 16 <= length;    // Not needed with Dafny version
             padbit < 2;            // Not needed with Dafny version 
@@ -526,7 +525,7 @@ procedure {:frame false} poly1305_blocks(
             //validSrcAddrs64(mem, old(inp), inp_b, inp - old(inp));  // Precondition for poly1305_heap_blocks; Not needed in Dafny version
             0 <= (inp - old(inp))/16 <= old(len)/8;
             (inp - old(inp))/16 % 2 == 0;
-            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, (inp - old(inp))/16);
+            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index); //(inp - old(inp))/16);
             //mem == old(mem)[ctx_id := mem[ctx_id]];
             //memModified(old(mem), mem, old(ctx), 3 * 8);
             mem == old(mem);
@@ -535,18 +534,12 @@ procedure {:frame false} poly1305_blocks(
     {
         ghost var hp := h;
         ghost var old_mem := mem;
-// TODO: Need to replace the 0 and 1 here and in the AdcWrap below with an actual (ghost) index
-        h := h + n * n * padbit + n * buffer64_read(inp_b, 2*word_index+1, mem) + buffer64_read(inp_b, 2*word_index, mem);
+        h := h + n * n * padbit + n * buffer64_read(inp_b, word_index+1, mem) + buffer64_read(inp_b, word_index, mem);
         ghost var hq := h;
 
-// TODO: Modify Mem_in in decls to take the extra ghost params.  Modify va_opr_lemma_Mem to accept those params and provide a stronger post        
-        
 //        assert {:fast_block} true;
-//assume valid_src_addr(mem, inp_b, 0);
-//assume inp + 0 == buffer_addr(inp_b) + 8 * 0;
-        Add64Wrap(h0, Mem(inp, 0, inp_b, 2*word_index)); // accumulate input
-assume false;
-        Adc64Wrap(h1, Mem(inp, 8, inp_b, 2*word_index+1));
+        Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
+        Adc64Wrap(h1, Mem(inp, 8, inp_b, word_index+1));
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 
@@ -557,12 +550,12 @@ assume false;
 
         Mov64(rax, r1);
         Sub64(r15, 1); // len-=16
-        word_index := word_index + 1;
+        word_index := word_index + 2;
 
-        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, (inp - old(inp))/16) by
+        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index) by //(inp - old(inp))/16) by
         {
-            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, (inp - old(inp))/16);
-            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, (inp - old(inp) - 16)/16);
+            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index); //(inp - old(inp))/16);
+            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index - 2); //(inp - old(inp) - 16)/16);
             reveal_opaque(modp');
             lemma_poly_demod(p, hp, hq - hp, r);
 
@@ -583,6 +576,8 @@ assume false;
 //                   modp((hh + pad + nat64_max * mem[kk + 8] + mem[kk]) * r);        // TRUE (with enough rlimit)
 //            assert hh == modp(hp);
         }
+// TODO: Problem!
+assert false;
     }
 
     // TODO: In theory, we shouldn't need this lemma any more
@@ -591,6 +586,7 @@ assume false;
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
     Store64_buffer(ctx, h1, 8, ctx_b, 1);
     Store64_buffer(ctx, h2, 16, ctx_b, 2);
+// TODO: Remove me
 assume false;
 }
 
