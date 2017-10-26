@@ -68,6 +68,27 @@ let readable_words (len:nat) =
     ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
 #endverbatim
 
+procedure {:frame false} test()
+    requires/ensures
+        ok;
+    modifies rsi; efl;
+    requires
+{
+    while (rsi != 0) 
+        invariant
+            ok;
+        decreases
+            r15;
+    {
+        Adc64Wrap(rsi, rsi);
+assert false;   // Passes!?
+    }
+}
+
+/* TMP1
+
+
+
 #verbatim
 #set-options "--lax" 
 #endverbatim
@@ -408,142 +429,144 @@ procedure {:frame false} poly1305_blocks(
         //n == 0x1_0000_0000_0000_0000;
         // Len is measured in bytes
         len % 16 == 0; // REVIEW: may be stronger than necessary
-        inp + len < nat64_max;
+//        inp + len < nat64_max;
         //disjoint(ctx, 24*8, inp, len);
-        buffers_disjoint(ctx_b, inp_b);
-        validSrcAddrs64(mem, ctx, ctx_b, 24);
+//        buffers_disjoint(ctx_b, inp_b);
+//        validSrcAddrs64(mem, ctx, ctx_b, 24);
         validSrcAddrs64(mem, inp, inp_b, len / 8);
-// TODO: Would be nice to have some syntax for buffer64_read
-        let h0_in := buffer64_read(ctx_b, 0, mem);
-        let h1_in := buffer64_read(ctx_b, 1, mem);
-        let h2_in := buffer64_read(ctx_b, 2, mem);
-        let r0_in := buffer64_read(ctx_b, 3, mem);
-        let r1_in := buffer64_read(ctx_b, 4, mem);
-        h_in == h2_in * (n * n) + h1_in * n + h0_in;
-        r == r1_in * n + r0_in;
-        r0_in < n / 16;
-        r1_in < n / 16;
-        r1_in % 4 == 0;
-        h2_in < 5;
-        padbit < 2;
-    ensures
-        h2 < 5;
-        validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, old(inp), inp_b, old(len)/8);
-        // Replaced the line below with memModified
-        //mem == old(mem)[ctx_id := mem[ctx_id]];
-        //memModified(old(mem), mem, old(ctx), 3 * 8);
-        //modifies_mem(loc_buffer(ctx_b), old(mem), mem);
-        modifies_buffer_specific(ctx_b, old(mem), mem, 0, 2);
-        h0 == buffer64_read(ctx_b, 0, mem);
-        h1 == buffer64_read(ctx_b, 1, mem);
-        h2 == buffer64_read(ctx_b, 2, mem);
-        r0 == buffer64_read(ctx_b, 3, mem);
-        r1 == buffer64_read(ctx_b, 4, mem);
-        s1 == r1 + r1 / 4;
-        inp == old(inp + len);
-
-        // Framing
-        rcx == old(rcx);
-        ctx == old(ctx); // REVIEW: framing should add this automatically
-
-//        // TODO: The following is redundant with memModified above, and yet it seems to be necessary for poly_impl 
-//        //       to go through, presumably because it uses more liberal triggers?
-//        forall i :: 2 <= i < 24 ==> buffer64_read(ctx_b, i, mem) ==
-//                                    buffer64_read(ctx_b, i, old(mem));
-//        //forall i :: ctx + 24 <= i && i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
-        let r0_in := buffer64_read(ctx_b, 3, mem);
-        let r1_in := buffer64_read(ctx_b, 4, mem);
-        h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
-        (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
-        validSrcAddrs64(mem, old(inp), inp_b, old(len)); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
-        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, old(len) / 8); //old(inp), old(inp + len));
+//// TODO: Would be nice to have some syntax for buffer64_read
+//        let h0_in := buffer64_read(ctx_b, 0, mem);
+//        let h1_in := buffer64_read(ctx_b, 1, mem);
+//        let h2_in := buffer64_read(ctx_b, 2, mem);
+//        let r0_in := buffer64_read(ctx_b, 3, mem);
+//        let r1_in := buffer64_read(ctx_b, 4, mem);
+//        h_in == h2_in * (n * n) + h1_in * n + h0_in;
+//        r == r1_in * n + r0_in;
+//        r0_in < n / 16;
+//        r1_in < n / 16;
+//        r1_in % 4 == 0;
+//        h2_in < 5;
+//        padbit < 2;
+//    ensures
+//        h2 < 5;
+//        validSrcAddrs64(mem, ctx, ctx_b, 24);
+//        validSrcAddrs64(mem, old(inp), inp_b, old(len)/8);
+//        // Replaced the line below with memModified
+//        //mem == old(mem)[ctx_id := mem[ctx_id]];
+//        //memModified(old(mem), mem, old(ctx), 3 * 8);
+//        //modifies_mem(loc_buffer(ctx_b), old(mem), mem);
+//        modifies_buffer_specific(ctx_b, old(mem), mem, 0, 2);
+//        h0 == buffer64_read(ctx_b, 0, mem);
+//        h1 == buffer64_read(ctx_b, 1, mem);
+//        h2 == buffer64_read(ctx_b, 2, mem);
+//        r0 == buffer64_read(ctx_b, 3, mem);
+//        r1 == buffer64_read(ctx_b, 4, mem);
+//        s1 == r1 + r1 / 4;
+//        inp == old(inp + len);
+//
+//        // Framing
+//        rcx == old(rcx);
+//        ctx == old(ctx); // REVIEW: framing should add this automatically
+//
+////        // TODO: The following is redundant with memModified above, and yet it seems to be necessary for poly_impl 
+////        //       to go through, presumably because it uses more liberal triggers?
+////        forall i :: 2 <= i < 24 ==> buffer64_read(ctx_b, i, mem) ==
+////                                    buffer64_read(ctx_b, i, old(mem));
+////        //forall i :: ctx + 24 <= i && i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
+//        let r0_in := buffer64_read(ctx_b, 3, mem);
+//        let r1_in := buffer64_read(ctx_b, 4, mem);
+//        h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
+//        (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
+//        validSrcAddrs64(mem, old(inp), inp_b, old(len)); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
+//        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, old(len) / 8); //old(inp), old(inp + len));
 
 {
     h := 0;
     //lemma_BitwiseAdd64();
-    lemma_poly_bits64();
+    //lemma_poly_bits64();
 
     ghost var length := len;
 
 //    assert {:fast_block} true;
     Shr64(len, 4);  // num_bytes / 16 ==> number of blocks
+    assume len == length / 16;
     // Slight difference: the original code has a special case for len == 0 here.
     // We can let len == 0 pass through because of the slight difference in the loop condition (see below)
     Mov64(r15, len); // reassign len
 
-    Load64_buffer(r0, ctx, 24, ctx_b, 3); // load r
-    Load64_buffer(s1, ctx, 32, ctx_b, 4);
-
-    Load64_buffer(h0, ctx, 0, ctx_b, 0); // load hash value
-    Load64_buffer(h1, ctx, 8, ctx_b, 1);
-    Load64_buffer(h2, ctx, 16, ctx_b, 2);
-
-    Mov64(r1, s1);
-    Shr64(s1, 2);
-    Mov64(rax, r1);
-    Add64(s1, r1); // s1 = r1 + (r1 >> 2)
-
-    h := h_in;
-    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0) by //, old(inp), inp) by
-    {
-        reveal_opaque(modp');
-        reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0); //old(inp), inp);
-    }
-
+//    Load64_buffer(r0, ctx, 24, ctx_b, 3); // load r
+//    Load64_buffer(s1, ctx, 32, ctx_b, 4);
+//
+//    Load64_buffer(h0, ctx, 0, ctx_b, 0); // load hash value
+//    Load64_buffer(h1, ctx, 8, ctx_b, 1);
+//    Load64_buffer(h2, ctx, 16, ctx_b, 2);
+//
+//    Mov64(r1, s1);
+//    Shr64(s1, 2);
+//    Mov64(rax, r1);
+//    Add64(s1, r1); // s1 = r1 + (r1 >> 2)
+//
+//    h := h_in;
+//    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0) by //, old(inp), inp) by
+//    {
+//        reveal_opaque(modp');
+//        reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0); //old(inp), inp);
+//    }
+//
     ghost var word_index:int := 0;
     //assert r15 != 0 ==> 8*(word_index + 1) <= length;
 
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
             ok;
-            n == 0x1_0000_0000_0000_0000;
-            r == r1 * n + r0;
-            h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
-            r0 < n / 16;
-            r1 < n / 16;
-            r1 % 4 == 0;
-            s1 == r1 + r1 / 4;
-            h2 < 5;
-            rax == r1;
-            inp + 16 * r15 == old(inp) + length;
-            length == old(len);
+//            n == 0x1_0000_0000_0000_0000;
+//            r == r1 * n + r0;
+//            h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
+//            r0 < n / 16;
+//            r1 < n / 16;
+//            r1 % 4 == 0;
+//            s1 == r1 + r1 / 4;
+//            h2 < 5;
+//            rax == r1;
+//            inp + 16 * r15 == old(inp) + length;
+//            length == old(len);
 
             r15 != 0 ==> 8*(word_index + 1) <= length;
-            16 * r15 + 8 * word_index == length;
+//           16 * r15 + 8 * word_index == length;
             //2*r15 + 1 < length/8;
             inp + 0 /* offset */ == buffer_addr(inp_b) + 8 * word_index;
 
-            r15 * 16 <= length;    // Not needed with Dafny version
-            padbit < 2;            // Not needed with Dafny version 
-            validSrcAddrs64(mem, ctx, ctx_b, 24);
+//            r15 * 16 <= length;    // Not needed with Dafny version
+//            padbit < 2;            // Not needed with Dafny version 
+//            validSrcAddrs64(mem, ctx, ctx_b, 24);
             validSrcAddrs64(mem, old(inp), inp_b, length/8);
-            ctx == old(ctx); // REVIEW: framing should add this automatically
-            rcx == old(rcx); // REVIEW: framing should add this automatically
-            //forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
-            (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
-            //validSrcAddrs64(mem, old(inp), inp_b, inp - old(inp));  // Precondition for poly1305_heap_blocks; Not needed in Dafny version
-            0 <= (inp - old(inp))/16 <= old(len)/8;
-            (inp - old(inp))/16 % 2 == 0;
-            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index); //(inp - old(inp))/16);
-            //mem == old(mem)[ctx_id := mem[ctx_id]];
-            //memModified(old(mem), mem, old(ctx), 3 * 8);
-            mem == old(mem);
+//            ctx == old(ctx); // REVIEW: framing should add this automatically
+//            rcx == old(rcx); // REVIEW: framing should add this automatically
+//            //forall i :: ctx + 24 <= i < ctx + 24 * 8 && (i - ctx) % 8 == 0 ==> mem[i] == old(mem)[i];
+//            (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
+//            //validSrcAddrs64(mem, old(inp), inp_b, inp - old(inp));  // Precondition for poly1305_heap_blocks; Not needed in Dafny version
+//            0 <= (inp - old(inp))/16 <= old(len)/8;
+//            (inp - old(inp))/16 % 2 == 0;
+//            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index); //(inp - old(inp))/16);
+//            //mem == old(mem)[ctx_id := mem[ctx_id]];
+//            //memModified(old(mem), mem, old(ctx), 3 * 8);
+//            mem == old(mem);
         decreases
             r15;
     {
-        ghost var hp := h;
-        ghost var old_mem := mem;
-        h := h + n * n * padbit + n * buffer64_read(inp_b, word_index+1, mem) + buffer64_read(inp_b, word_index, mem);
-        ghost var hq := h;
+//        ghost var hp := h;
+//        ghost var old_mem := mem;
+//        h := h + n * n * padbit + n * buffer64_read(inp_b, word_index+1, mem) + buffer64_read(inp_b, word_index, mem);
+//        ghost var hq := h;
 
 //        assert {:fast_block} true;
-        Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
+//        Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
         Adc64Wrap(h1, Mem(inp, 8, inp_b, word_index+1));
 //assert false;   // Fails
-        AddLea64(inp, inp, 16);
+//        AddLea64(inp, inp, 16);
 // TODO: Problem!
 assert false;   // Passes!?
+/*
         Adc64Wrap(h2, padbit);
 
         ghost var old_h := h2 * (n * n) + h1 * n + h0;
@@ -579,14 +602,15 @@ assert false;   // Passes!?
 //                   modp((hh + pad + nat64_max * mem[kk + 8] + mem[kk]) * r);        // TRUE (with enough rlimit)
 //            assert hh == modp(hp);
         }
+*/
     }
-
-    // TODO: In theory, we shouldn't need this lemma any more
-    //lemma_heap_blocks_preserved(mem, modp(h_in), padbit * n * n, r, ctx, 24*8, old(inp), inp);
-
-    Store64_buffer(ctx, h0, 0, ctx_b, 0);
-    Store64_buffer(ctx, h1, 8, ctx_b, 1);
-    Store64_buffer(ctx, h2, 16, ctx_b, 2);
+//
+//    // TODO: In theory, we shouldn't need this lemma any more
+//    //lemma_heap_blocks_preserved(mem, modp(h_in), padbit * n * n, r, ctx, 24*8, old(inp), inp);
+//
+//    Store64_buffer(ctx, h0, 0, ctx_b, 0);
+//    Store64_buffer(ctx, h1, 8, ctx_b, 1);
+//    Store64_buffer(ctx, h2, 16, ctx_b, 2);
 // TODO: Remove me
 assume false;
 }
@@ -1142,3 +1166,5 @@ let main () : FStar.All.ML unit =
   */
 
 */
+
+TMP1 */
