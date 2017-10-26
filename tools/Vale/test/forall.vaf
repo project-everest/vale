@@ -53,13 +53,13 @@ let va_cmp_le (a:va_register) (b:va_register) : ocmp = OLe a b
 
 let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
 
-let va_require (b0:va_codes) (c:va_code) (s0:va_state) (sN:va_state) : Type =
-    Cons? b0
- /\ Cons?.hd b0 = c
+type va_fuel = int
 
-let va_ensure (b0:va_codes) (b1:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : Type =
-    Cons? b0
- /\ Cons?.tl b0 = b1
+let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
+  b0 = c
+
+let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
+  True
 
 #endverbatim
 
@@ -71,17 +71,19 @@ let eval_ocmp (s:va_state) (c:ocmp) :bool =
   match c with
   | OLe r1 r2 -> s.[r1] <= s.[r2]
 
-assume val va_lemma_block : b0:va_codes -> s0:va_state -> sN:va_state -> Ghost ((s1:va_state) * (c1:va_code) * (b1:va_codes))
+assume val va_lemma_empty_total : s0:va_state -> bN:va_codes -> Ghost ((sM:va_state) * (fM:va_fuel))
   (requires True)
-  (ensures (fun (s1, c1, b1) -> b0 = c1::b1))
+  (ensures (fun (sM, fM) ->
+    s0 == sM
+  ))
 
-assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
-  (requires True)
-  (ensures (fun sM -> s0 == sM /\ sM == sN))
-
-assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s_0:va_state -> sN:va_state -> Ghost (bool * va_state)
-  (requires True)
-  (ensures  (fun (cond, sM) -> cond == eval_ocmp s_0 ifb /\ sM == s_0))
+assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
+  (requires
+    Cons? b0
+  )
+  (ensures (fun fN ->
+    True
+  ))
 
 assume val make_opaque : #a:Type -> a -> a
 assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
@@ -153,11 +155,13 @@ procedure Calls6()
     }
 }
 
+/* TODO
 procedure p()
 {
    assert forall x, y {x + y} {y + x}:: x > 0 && y > 0 ==> x + y > x && y + x > y;
    assert forall x, y {x + y, y + x}:: x > 0 && y > 0 ==> x + y == y + x;
 }
+*/
 
 procedure Double()
 {

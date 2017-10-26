@@ -3,7 +3,7 @@ module Emit_dafny_text
 open Ast
 open Ast_util
 open Transform
-open Emit_common
+open Emit_common_base
 open Microsoft.FSharp.Math
 
 let sid (x:id):string =

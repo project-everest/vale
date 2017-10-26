@@ -3,7 +3,7 @@ module Emit_fstar_text
 open Ast
 open Ast_util
 open Transform
-open Emit_common
+open Emit_common_base
 open Microsoft.FSharp.Math
 
 let sid (x:id):string =
@@ -120,6 +120,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
   in if prec <= ePrec then s else "(" + s + ")"
+and string_of_ret (x:id, t:typ option) = match t with None -> internalErr (sprintf "string_of_ret: %A" x) | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formals (xs:formal list):string = String.concat " " (List.map string_of_formal xs)
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
@@ -171,9 +172,10 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
   | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";")
   | SCalc _ -> err "unsupported feature: 'calc' for F*"
-  | SVar (x, tOpt, _, g, a, eOpt) ->
+  | SVar (x, tOpt, _, g, a, None) -> () // used to forward-declare variables for SLetUpdates
+  | SVar (x, tOpt, _, g, a, Some e) ->
       let sf = string_of_formal (x, tOpt) in
-      let rhs = match eOpt with Some e -> " = " + (string_of_exp e) | None -> err "right-hand side required in variable declaration" in
+      let rhs = " = " + (string_of_exp e) in
       ps.PrintLine ((string_of_var_storage g) + "let " + sf + rhs + " in")
   | SAlias _ -> internalErr "SAlias"
   | SAssign ([], e) -> ps.PrintLine ((string_of_exp e) + ";")
@@ -196,14 +198,14 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("else");
       emit_block ps (match outs with None -> ";" | Some _ -> "") outs ss2
   | SWhile (e, invs, (_, ed), ss) ->
-      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_formal fs) in
+      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_ret fs) in
       let sWhile = sid (Reserved "while") in
       let sParams = match outs with None -> "()" | Some fs -> string_of_formals fs in
       ps.PrintLine ("let rec " + sWhile + " " + sParams + " : Ghost (" + st + ")");
       ps.Indent ();
       let inv = and_of_list (List.map snd invs) in
       ps.PrintLine ("(requires " + (string_of_exp inv) + ")");
-      ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> " + (string_of_exp inv) + "))");
+      ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> (not (" + (string_of_exp e) + ")) /\ " + (string_of_exp inv) + "))");
       let () =
         match (ed, outs) with
         | ([], Some ((x, _)::_)) -> ps.PrintLine ("(decreases " + (sid x) + ")")

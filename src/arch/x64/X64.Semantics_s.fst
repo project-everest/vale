@@ -269,9 +269,9 @@ let eval_ins (ins:ins) : st unit =
     update_operand_preserve_flags dst (eval_operand src s)
 
   | Add64 dst src ->
-    let sum = v (eval_operand dst s) + v (eval_operand src s) in
-    let new_carry = sum >= nat64_max in
     check (valid_operand src);;
+    let sum = v (eval_operand dst s) + v (eval_operand src s) in
+    let new_carry = sum >= nat64_max in    
     update_operand dst ins (eval_operand dst s `add_mod64` eval_operand src s);;
     update_flags (update_cf s.flags new_carry)
 
@@ -281,10 +281,10 @@ let eval_ins (ins:ins) : st unit =
     update_operand_preserve_flags dst (eval_operand src1 s `add_mod64` eval_operand src2 s)
 
   | AddCarry64 dst src ->
+    check (valid_operand src);;
     let old_carry = if cf(s.flags) then 1 else 0 in
     let sum = v (eval_operand dst s) + v (eval_operand src s) + old_carry in
     let new_carry = sum >= nat64_max in
-    check (valid_operand src);;
     update_operand dst ins (uint_to_t (sum % nat64_max));;
     update_flags (update_cf s.flags new_carry)
 
@@ -293,9 +293,9 @@ let eval_ins (ins:ins) : st unit =
     update_operand dst ins (eval_operand dst s `sub_mod64` eval_operand src s)
 
   | Mul64 src ->
+    check (valid_operand src);;
     let hi = eval_reg Rax s `mul_div64` eval_operand src s in
     let lo = eval_reg Rax s `mul_mod64` eval_operand src s in
-    check (valid_operand src);;
     update_reg Rax lo;;
     update_reg Rdx hi;;
     update_flags (havoc s ins)
@@ -317,8 +317,6 @@ let eval_ins (ins:ins) : st unit =
 
   | Shl64 dst amt ->
     update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
-
-  | _ -> fail
 
 (*
  * these functions return an option state

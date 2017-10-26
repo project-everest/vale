@@ -1,4 +1,5 @@
 module StateUpdateTest
+(*
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
@@ -50,3 +51,5 @@ irreducible let va_lemma_state_update_test va_b0 va_s0 va_sN =
   assert ((va_get_reg Rax va_s4) == (va_get_reg Rax va_old_s));
   let va_sM = (va_lemma_empty va_s4 va_sM) in
   (va_bM, va_sM)
+*)
+

@@ -71,6 +71,7 @@ let tOperand xo = TName (Reserved xo)
 let tState = TName (Reserved "state")
 let tCode = TName (Reserved "code")
 let tCodes = TName (Reserved "codes")
+let tFuel = TName (Reserved "fuel")
 
 let exp_abstract (useOld:bool) (e:exp):exp =
   let c e = match e with EOp (Uop UConst, [e]) -> e | _ -> e in

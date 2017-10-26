@@ -56,7 +56,7 @@ let rec regs_match (regs:list reg) (s0:state) (s1:state) =
 
 let all_regs_match (s0:state) (s1:state) =
   let regs = [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp; Rsp; R8; 
-	      R9; R10; R11; R12; R13; R14; R15] in
+              R9; R10; R11; R12; R13; R14; R15] in
   regs_match regs s0 s1
 
 let rec inss_to_codes (inss:list ins) : list va_code =
@@ -85,8 +85,8 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   | (Sub64 (OReg dst) src)::inss -> (va_code_Sub64 (OReg dst) src)::(inss_to_codes inss)
   | _ -> []
 
-let augment (st : state) (post: unit -> Type0) (final_state: state) : Type0 =
- final_state == st ==> post ()
+let augment (c:va_code) (s0:state) (f0:va_fuel) (post:state -> Type0) (sN:state) : Type0 =
+  eval_code c s0 f0 sN ==> post sN
 
 [@"opaque_to_smt"]
 let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
@@ -104,78 +104,74 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
       match hd with
       | (Mov64 (OReg Rsp) _) -> False
       | (Mov64 (OReg dst) src) ->
-	valid_operand_norm src s0 /\
-	(forall x. x == eval_operand_norm src s0 ==>
+	      valid_operand_norm src s0 /\
+	      (forall x. x == eval_operand_norm src s0 ==>
               wp_code inss post (update_reg dst x s0))
       | (Load64_buffer (OReg Rsp) _ _) -> False
       | (Load64_buffer (OReg dst) (OReg src) offset) ->
-	  valid_maddr_norm (MConst (s0.regs src + offset)) s0 /\
-	(forall x. x == eval_mem (s0.regs src + offset) s0 ==>
-                   //load_mem64 (s0.regs src + offset) s0.mem ==>
-                   //Map.sel s0.mem (s0.regs src + offset) ==>
-              wp_code inss post (update_reg dst x s0))
+        valid_maddr_norm (MConst (s0.regs src + offset)) s0 /\
+        (forall x. x == eval_mem (s0.regs src + offset) s0 ==>
+                       //load_mem64 (s0.regs src + offset) s0.mem ==>
+                       //Map.sel s0.mem (s0.regs src + offset) ==>
+                  wp_code inss post (update_reg dst x s0))
       | (Store64_buffer (OReg dst) src offset) ->
-	(valid_operand_norm src s0) /\
-        (valid_mem64 (s0.regs dst + offset) s0.mem) /\
-	//(Map.contains s0.mem (s0.regs dst + offset)) /\
-	(forall x.
-	  //x == Map.upd s0.mem (s0.regs dst + offset) (eval_operand_norm src s0) ==>
-          x == update_mem (s0.regs dst + offset) (eval_operand_norm src s0) s0 ==>
-	  wp_code inss post ({s0 with mem = x.mem}))
+        (valid_operand_norm src s0) /\
+              (valid_mem64 (s0.regs dst + offset) s0.mem) /\
+        //(Map.contains s0.mem (s0.regs dst + offset)) /\
+        (forall x.
+          //x == Map.upd s0.mem (s0.regs dst + offset) (eval_operand_norm src s0) ==>
+                x == update_mem (s0.regs dst + offset) (eval_operand_norm src s0) s0 ==>
+          wp_code inss post ({s0 with mem = x.mem}))
       | (Add64Wrap (OReg Rsp) _) -> False
       | (Add64Wrap (OReg dst) src) ->
-	(valid_operand_norm src s0) /\
-	(forall a x (f:nat64).
-	     a == s0.regs dst + eval_operand_norm src s0 /\
-	     x == (if a < nat64_max then a else a - nat64_max) /\
-		  cf f == (a >= nat64_max) ==>
-	       wp_code inss post ({update_reg dst x s0 with flags = f}))
+          (valid_operand_norm src s0) /\
+          (forall a x (f:nat64).
+            a == s0.regs dst + eval_operand_norm src s0 /\
+            x == (if a < nat64_max then a else a - nat64_max) /\
+            cf f == (a >= nat64_max) ==>
+            wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Adc64Wrap (OReg Rsp) _) -> False
       | (Adc64Wrap (OReg dst) src) ->
-	(valid_operand_norm src s0) /\
-	(forall a x (f:nat64).
-	     a == s0.regs dst + eval_operand_norm src s0 + 
-		  (if cf s0.flags then 1 else 0) /\
-	     x == (if a < nat64_max then a else a - nat64_max) /\
-		   cf f == (a >= nat64_max) ==>
-	       wp_code inss post ({update_reg dst x s0 with flags = f}))
+          (valid_operand_norm src s0) /\
+          (forall a x (f:nat64).
+            a == s0.regs dst + eval_operand_norm src s0 + (if cf s0.flags then 1 else 0) /\
+            x == (if a < nat64_max then a else a - nat64_max) /\ cf f == (a >= nat64_max) ==>
+            wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Mul64Wrap src) ->
-	(valid_operand_norm src s0) /\
-	(forall (rax:nat64) (rdx:nat64) (f:nat64).
-	  nat64_max `op_Multiply` rdx + rax == 
-		    s0.regs Rax `op_Multiply` eval_operand_norm src s0 ==>
-	    wp_code inss post (update_reg Rdx rdx (update_reg Rax rax 
-							      ({s0 with flags = f}))))
+          (valid_operand_norm src s0) /\
+          (forall (rax:nat64) (rdx:nat64) (f:nat64).
+            nat64_max `op_Multiply` rdx + rax == s0.regs Rax `op_Multiply` eval_operand_norm src s0 ==>
+            wp_code inss post (update_reg Rdx rdx (update_reg Rax rax ({s0 with flags = f}))))
       | (IMul64 (OReg Rsp) _) -> False
       | (IMul64 (OReg dst) src) ->
-	let a = s0.regs dst `op_Multiply` eval_operand_norm src s0 in
-	  (valid_operand_norm src s0) /\
-	  (a < nat64_max) /\ //TODO:label this
-	  (forall (x:nat64) (f:nat64).
-	     x == a ==>
-	       wp_code inss post ({update_reg dst x s0 with flags = f}))
+          let a = s0.regs dst `op_Multiply` eval_operand_norm src s0 in
+          (valid_operand_norm src s0) /\
+          (a < nat64_max) /\ //TODO:label this
+          (forall (x:nat64) (f:nat64).
+            x == a ==>
+            wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (And64 (OReg Rsp) _) -> False
       | (And64 (OReg dst) src) ->
-	let a = logand64 (s0.regs dst) (eval_operand_norm src s0) in
-	(valid_operand_norm src s0) /\
-	(forall (x:nat64) (f:nat64).
-	  x == a ==>
-	  wp_code inss post ({update_reg dst x s0 with flags = f}))
+          let a = logand64 (s0.regs dst) (eval_operand_norm src s0) in
+          (valid_operand_norm src s0) /\
+          (forall (x:nat64) (f:nat64).
+            x == a ==>
+            wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Shr64 (OReg Rsp) _) -> False
       | (Shr64 (OReg dst) src) ->
-	let a = shift_right64 (s0.regs dst) (eval_operand_norm src s0) in
-	(valid_operand_norm src s0) /\
-	(forall (x:nat64) (f:nat64).
-	  x == a ==>
-	  wp_code inss post ({update_reg dst x s0 with flags = f}))
+          let a = shift_right64 (s0.regs dst) (eval_operand_norm src s0) in
+          (valid_operand_norm src s0) /\
+          (forall (x:nat64) (f:nat64).
+            x == a ==>
+            wp_code inss post ({update_reg dst x s0 with flags = f}))
       | (Sub64 (OReg Rsp) _) -> False
       | (Sub64 (OReg dst) src) ->
-	       (valid_operand_norm src s0) /\
-	       (0 <= s0.regs dst - eval_operand_norm src s0) /\
-	       (forall a x (f:nat64).
-               a == s0.regs dst - eval_operand_norm src s0 /\
-               x == a ==>
-               wp_code inss post ({update_reg dst x s0 with flags = f}))
+          (valid_operand_norm src s0) /\
+          (0 <= s0.regs dst - eval_operand_norm src s0) /\
+          (forall a x (f:nat64).
+            a == s0.regs dst - eval_operand_norm src s0 /\
+            x == a ==>
+            wp_code inss post ({update_reg dst x s0 with flags = f}))
       | _ -> False
     end
 
@@ -198,19 +194,21 @@ let wp_code_delta = [
 
 
 [@"uninterpreted_by_smt"]
-val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (sN:state) : PURE unit
-  (fun (post:(unit -> Type)) ->
-     forall ok0 regs0 flags0 mem0.
-        ok0 == s0.ok /\
-        regs0 == s0.regs /\
-        flags0 == s0.flags /\
-        mem0 == s0.mem ==>
-        s0.ok /\
-        eval_code (va_Block (normalize_term (inss_to_codes inss))) s0 sN /\
-        Prims.norm [delta_only wp_code_delta; zeta; iota; primops]
-                   (wp_code (normalize_term inss) (augment sN post)
-                     ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
-		     
+val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (f0:va_fuel) : PURE (sN:state)
+  (fun (post:(state -> Type)) ->
+    forall ok0 regs0 flags0 mem0.
+      ok0 == s0.ok /\
+      regs0 == s0.regs /\
+      flags0 == s0.flags /\
+      mem0 == s0.mem ==>
+      s0.ok /\
+      Prims.norm
+        [delta_only wp_code_delta; zeta; iota; primops]
+        (wp_code
+          (normalize_term inss)
+          (augment (va_Block (normalize_term (inss_to_codes inss))) s0 f0 post)
+          ({ok=ok0; regs=regs0; flags=flags0; mem=mem0})))
+
 
 (* #reset-options "--log_queries --debug X64.Vale.StrongPost_i --debug_level print_normalized_terms" *)
 // let test_lemma (s0:state) (sN:state) =
