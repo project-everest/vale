@@ -538,8 +538,13 @@ procedure {:frame false} poly1305_blocks(
         ghost var hq := h;
 
 //        assert {:fast_block} true;
+//        ghost var old_h0 := h0;
         Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
+        lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
+//        assert h0 == add_wrap(old_h0, buffer64_read(inp_b, word_index, old_mem));
+//        assume false;
         Adc64Wrap(h1, Mem(inp, 8, inp_b, word_index+1));
+        lemma_load_mem64(inp_b, word_index + 1, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 
@@ -559,25 +564,23 @@ procedure {:frame false} poly1305_blocks(
             reveal_opaque(modp');
             lemma_poly_demod(p, hp, hq - hp, r);
 
-//            assert h == (n * n) * h2 + n * h1 + h0;  // From poly1305_iteration
-//            assert modp(h) == modp(old_h * r);       // From poly1305_iteration
-//            assert modp(hp) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, old_mem, old(inp), inp - 16);  // From loop invariant
-//            
-//            ghost var pad := padbit * n * n;
-//            assert poly1305_heap_blocks(modp(h_in), pad, r, mem, old(inp), inp) ==
-//                   poly1305_heap_blocks'(modp(h_in), pad, r, mem, old(inp), inp); // From reveal
-//            // Unfolding poly1305_heap_blocks:
-//            ghost var kk := inp - 16;
-//            ghost var hh := poly1305_heap_blocks'(modp(h_in), pad, r, mem, old(inp), kk);
+            assert h == (n * n) * h2 + n * h1 + h0;  // From poly1305_iteration
+            assert modp(h) == modp(old_h * r);       // From poly1305_iteration
+            assert modp(hp) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, old_mem, inp_b, word_index - 2);  // From loop invariant
+            
+            ghost var pad := padbit * n * n;
+            assert poly1305_heap_blocks(modp(h_in), pad, r, mem, inp_b, word_index) ==
+                   poly1305_heap_blocks'(modp(h_in), pad, r, mem, inp_b, word_index); // From reveal
+            // Unfolding poly1305_heap_blocks:
+            ghost var kk := inp - 2;
+            ghost var hh := poly1305_heap_blocks'(modp(h_in), pad, r, mem, inp_b, kk);
 //            assert poly1305_heap_blocks'(modp(h_in), pad, r, mem, old(inp), inp) ==
 //                   //modp((modp(hp) + padbit * n * n + nat64_max * mem[inp - 16 + 8] + mem[inp - 16]) * r);  // FAILS
 //                   //modp((modp(hp) + old_h) * r);    // FAILS
 //                   //modp((hh + padbit * n * n + nat64_max * mem[inp - 16 + 8] + mem[inp - 16]) * r);
-//                   modp((hh + pad + nat64_max * mem[kk + 8] + mem[kk]) * r);        // TRUE (with enough rlimit)
+//                   modp((hh + pad + nat64_max * mem[2*kk + 8] + mem[2*kk]) * r);        // TRUE (with enough rlimit)
 //            assert hh == modp(hp);
         }
-// TODO: Problem!
-assert false;
     }
 
     // TODO: In theory, we shouldn't need this lemma any more
