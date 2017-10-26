@@ -36,37 +36,37 @@ module X64.Poly1305
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
-open X64.Vale.StrongPost_i
-open Poly1305.Spec_s
-open X64.Poly1305.Math_i
-open Opaque_i
+//open X64.Vale.StrongPost_i
+//open Poly1305.Spec_s
+//open X64.Poly1305.Math_i
+//open Opaque_i
 //open FStar.Tactics
 #endverbatim
 
-#verbatim interface
-
-unfold let n = nat64_max
-
-let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
-    (buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
-    len <= buffer_length b /\
-    buffer_addr b == addr
-
-let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
-    modifies_mem (loc_buffer b) h1 h2 /\
-    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
-    (forall (i:nat) . {:pattern (buffer64_read b i h2)}
-                        0 <= i /\ i < buffer_length b 
-                     /\ (i < start || i > last) 
-                    ==> buffer64_read b i h1
-                     == buffer64_read b i h2)
-
-unfold let buffers_disjoint (b1 b2:buffer64) =
-    locs_disjoint [loc_buffer b1; loc_buffer b2]
-
-let readable_words (len:nat) =
-    ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
-#endverbatim
+//#verbatim interface
+//
+//unfold let n = nat64_max
+//
+//let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+//    (buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
+//    len <= buffer_length b /\
+//    buffer_addr b == addr
+//
+//let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
+//    modifies_mem (loc_buffer b) h1 h2 /\
+//    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
+//    (forall (i:nat) . {:pattern (buffer64_read b i h2)}
+//                        0 <= i /\ i < buffer_length b 
+//                     /\ (i < start || i > last) 
+//                    ==> buffer64_read b i h1
+//                     == buffer64_read b i h2)
+//
+//unfold let buffers_disjoint (b1 b2:buffer64) =
+//    locs_disjoint [loc_buffer b1; loc_buffer b2]
+//
+//let readable_words (len:nat) =
+//    ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
+//#endverbatim
 
 procedure {:frame false} test()
     requires/ensures
@@ -74,13 +74,15 @@ procedure {:frame false} test()
     modifies rsi; efl;
     requires
 {
-    while (rsi != 0) 
+    while (rsi < 5) 
         invariant
             ok;
         decreases
-            r15;
+            rsi;
     {
-        Adc64Wrap(rsi, rsi);
+        Adc64Wrap(rsi, 1);
+        //Mul64Wrap(rsi);
+        //Adc64Wrap(rsi, rsi);
 assert false;   // Passes!?
     }
 }
