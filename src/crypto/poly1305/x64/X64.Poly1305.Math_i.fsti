@@ -42,7 +42,7 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) // 
 	//assert (i >= 0 ==> precedes (kk - i) (k-i));
 	//assert (i < 0 ==> precedes (kk - i) (k-i));
 	let hh = poly1305_heap_blocks' h pad r m b kk in
-        modp((hh + pad + nat64_max * (buffer64_read b (2 * kk + 8) m) + (buffer64_read b (2 * kk) m)) * r)
+        modp((hh + pad + nat64_max * (buffer64_read b (kk + 1) m) + (buffer64_read b kk m)) * r)
 
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
         (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : int
