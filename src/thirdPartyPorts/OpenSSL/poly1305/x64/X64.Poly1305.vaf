@@ -457,7 +457,7 @@ procedure {:frame false} poly1305_blocks(
         h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
         //(old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
         //validSrcAddrs64(mem, old(inp), inp_b, old(len)); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
-        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, old(len) / 8); //old(inp), old(inp + len));
+        modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), old(len) / 8); //old(inp), old(inp + len));
 
 {
     h := 0;
@@ -485,10 +485,10 @@ procedure {:frame false} poly1305_blocks(
     Add64(s1, r1); // s1 = r1 + (r1 >> 2)
 
     h := h_in;
-    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0) by //, old(inp), inp) by
+    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), 0) by //, old(inp), inp) by
     {
         reveal_opaque(modp');
-        reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, 0); //old(inp), inp);
+        reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), 0); //old(inp), inp);
     }
 
     ghost var word_index:int := 0;
@@ -525,7 +525,7 @@ procedure {:frame false} poly1305_blocks(
             //validSrcAddrs64(mem, old(inp), inp_b, inp - old(inp));  // Precondition for poly1305_heap_blocks; Not needed in Dafny version
 //            0 <= (inp - old(inp))/16 <= old(len)/8;
 //            (inp - old(inp))/16 % 2 == 0;
-            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index); //(inp - old(inp))/16);
+            modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), word_index); //(inp - old(inp))/16);
             //mem == old(mem)[ctx_id := mem[ctx_id]];
             //memModified(old(mem), mem, old(ctx), 3 * 8);
             mem == old(mem);
@@ -557,10 +557,10 @@ procedure {:frame false} poly1305_blocks(
         Sub64(r15, 1); // len-=16
         word_index := word_index + 2;
 
-        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index) by //(inp - old(inp))/16) by
+        assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), word_index) by //(inp - old(inp))/16) by
         {
-            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index); //(inp - old(inp))/16);
-            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, word_index - 2); //(inp - old(inp) - 16)/16);
+            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), word_index); //(inp - old(inp))/16);
+            reveal_poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), word_index - 2); //(inp - old(inp) - 16)/16);
             reveal_opaque(modp');
             lemma_poly_demod(p, hp, hq - hp, r);
 //
@@ -584,6 +584,8 @@ procedure {:frame false} poly1305_blocks(
         }
     }
     assert buffers_disjoint(ctx_b, inp_b);
+    ghost var post_while_mem := mem;
+    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), old(len) / 8); 
 //    assert 8 * word_index == length;
 //    assert word_index == length / 8;
 
@@ -591,10 +593,15 @@ procedure {:frame false} poly1305_blocks(
     //lemma_heap_blocks_preserved(mem, modp(h_in), padbit * n * n, r, ctx, 24*8, old(inp), inp);
 
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
+
+    assume buffer_length(inp_b) > 0;
+    assert buffer64_as_seq(post_while_mem, inp_b) == buffer64_as_seq(mem, inp_b);
+    assume false;
+    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), old(len) / 8); 
+
+
     Store64_buffer(ctx, h1, 8, ctx_b, 1);
     Store64_buffer(ctx, h2, 16, ctx_b, 2);
-    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, old(len) / 8); 
-    assume false;
 }
 
 /*

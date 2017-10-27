@@ -32,8 +32,8 @@ let heapletTo128 (m:mem) (b:buffer64) (len:nat{ len % 2 == 0 /\ len <= buffer_le
 let applyHeapletTo128 (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) (len:nat{ len == buffer_length b}) (index:int) : nat128 =
   heapletTo128 m b len index 
 
-let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) //  { buffer_length b % 2 == 0 }) 
-        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0})
+let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
+        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0})
         : Tot int (decreases k)
     =
     if k = 0 then h
@@ -41,16 +41,16 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) // 
         let kk = k - 2 in
 	//assert (i >= 0 ==> precedes (kk - i) (k-i));
 	//assert (i < 0 ==> precedes (kk - i) (k-i));
-	let hh = poly1305_heap_blocks' h pad r m b kk in
-        modp((hh + pad + nat64_max * (buffer64_read b (kk + 1) m) + (buffer64_read b kk m)) * r)
+	let hh = poly1305_heap_blocks' h pad r s kk in
+        modp((hh + pad + nat64_max * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
 
-val poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
-        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : int
+val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) 
+        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0}) : int
 
-val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
-        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : Lemma
+val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64)  
+        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0}) : Lemma
   (requires True)
-  (ensures poly1305_heap_blocks h pad r m b k = poly1305_heap_blocks' h pad r m b k)
+  (ensures poly1305_heap_blocks h pad r s k = poly1305_heap_blocks' h pad r s k)
 
 val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
         (len:nat{ len % 2 == 0 /\ len <= buffer_length b})
@@ -60,7 +60,7 @@ val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer
  //           (k - i) % 16 == 0 /\
  //           validSrcAddrs m i  64 ((len + 15) / 16 * 16))
            // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
-  (ensures poly1305_heap_blocks h pad r m b k == poly1305_hash_blocks h pad r (heapletTo128 m b len) k)
+  (ensures poly1305_heap_blocks h pad r (buffer64_as_seq m b) k == poly1305_hash_blocks h pad r (heapletTo128 m b len) k)
           
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)

@@ -24,10 +24,10 @@ lemma_BitwiseMul64()
 
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
-let poly1305_heap_blocks  (h:int) (pad:int) (r:int) (m:mem) (b) (k): int
- = poly1305_heap_blocks' h pad r m b k
+let poly1305_heap_blocks  (h:int) (pad:int) (r:int) (s) (k): int
+ = poly1305_heap_blocks' h pad r s k
 
-let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (m:mem) (b) (k) =
+let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s) (k) =
   ()            
 
 // let rec lemma_poly1305_heap_hash_blocks' (h:int) (pad:int) (r:int) (m:mem) (i:int) (len:nat)
