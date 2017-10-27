@@ -455,8 +455,8 @@ procedure {:frame false} poly1305_blocks(
         let r0_in := buffer64_read(ctx_b, 3, mem);
         let r1_in := buffer64_read(ctx_b, 4, mem);
         h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
-        (old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
-        validSrcAddrs64(mem, old(inp), inp_b, old(len)); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
+        //(old(inp + len) - old(inp)) % 16 == 0; // TODO: Shouldn't need to repeat this
+        //validSrcAddrs64(mem, old(inp), inp_b, old(len)); //forall j :: old(inp) <= j < old(inp + len) && (j - old(inp)) % 8 == 0 ==> in_mem(j, mem);
         modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, old(len) / 8); //old(inp), old(inp + len));
 
 {
@@ -583,6 +583,9 @@ procedure {:frame false} poly1305_blocks(
 ////            assert hh == modp(hp);
         }
     }
+    assert buffers_disjoint(ctx_b, inp_b);
+//    assert 8 * word_index == length;
+//    assert word_index == length / 8;
 
     // TODO: In theory, we shouldn't need this lemma any more
     //lemma_heap_blocks_preserved(mem, modp(h_in), padbit * n * n, r, ctx, 24*8, old(inp), inp);
@@ -590,8 +593,8 @@ procedure {:frame false} poly1305_blocks(
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
     Store64_buffer(ctx, h1, 8, ctx_b, 1);
     Store64_buffer(ctx, h2, 16, ctx_b, 2);
-// TODO: Remove me
-assume false;
+    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, mem, inp_b, old(len) / 8); 
+    assume false;
 }
 
 /*
