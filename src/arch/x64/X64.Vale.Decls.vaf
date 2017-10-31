@@ -41,6 +41,7 @@ unfold let va_register = reg
 unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
 //unfold let buffer_readable = M.buffer_readable
 unfold let buffer_readable (#t:M.typ) (h:mem) (b:M.buffer t) = M.buffer_readable #t h b
+unfold let buffers_readable (h:mem) (l:list buffer64) = M.buffers_readable h l
 //unfold let buffer_length = M.buffer_length
 unfold let buffer_length (#t:M.typ) (b:M.buffer t) = M.buffer_length #t b
 unfold let buffer64_as_seq (m:mem) (b:buffer64) : GTot (Seq.seq nat64) = M.buffer_as_seq m b
@@ -50,7 +51,9 @@ unfold let valid_dst_addr (m:mem) (b:buffer64) (i:int) : Type0 =
   0 <= i /\ i < buffer_length b /\ buffer_readable m b
 unfold let buffer64_read (b:buffer64) (i:int) (m:mem) : nat64 = M.buffer_read b i m
 unfold let buffer64_write (b:buffer64) (i:int) (v:nat64) (m:mem) : mem = M.buffer_write b i v m
-unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
+//unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
+unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = M.modifies_buffers [b] h1 h2
+unfold let modifies_buffers (l:list buffer64) (h1 h2:mem) = M.modifies_buffers l h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
@@ -483,7 +486,7 @@ procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fas
         valid_dst_addr(mem, b, index);
         dst + offset == buffer_addr(b) + 8 * index;
     ensures
-        modifies_mem(loc_buffer(b), old(mem), mem);
+        modifies_buffer(b, old(mem), mem);
         mem == old(buffer64_write(b, index, src, mem));
 {
     lemma_valid_mem64(b, index, old(mem));

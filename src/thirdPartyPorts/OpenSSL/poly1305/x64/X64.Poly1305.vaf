@@ -48,12 +48,13 @@ open Opaque_i
 unfold let n = nat64_max
 
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
-    (buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
+    //(buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
+    buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b == addr
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
-    modifies_mem (loc_buffer b) h1 h2 /\
+    modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (buffer64_read b i h2)}
                         0 <= i /\ i < buffer_length b 
@@ -433,7 +434,7 @@ procedure {:frame false} poly1305_blocks(
         // Replaced the line below with memModified
         //mem == old(mem)[ctx_id := mem[ctx_id]];
         //memModified(old(mem), mem, old(ctx), 3 * 8);
-        //modifies_mem(loc_buffer(ctx_b), old(mem), mem);
+        //modifies_buffer(ctx_b, old(mem), mem);
         modifies_buffer_specific(ctx_b, old(mem), mem, 0, 2);
         h0 == buffer64_read(ctx_b, 0, mem);
         h1 == buffer64_read(ctx_b, 1, mem);
@@ -594,7 +595,8 @@ procedure {:frame false} poly1305_blocks(
 
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
 
-    assume buffer_length(inp_b) > 0;
+    //assume buffer_length(inp_b) > 0;
+    assert buffers_readable(mem, list(ctx_b));
     assert buffer64_as_seq(post_while_mem, inp_b) == buffer64_as_seq(mem, inp_b);
     assume false;
     assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), old(len) / 8); 
@@ -897,7 +899,7 @@ procedure {:frame false} poly1305_impl(
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
         //memModified(old(mem), mem, old(ctx), 9 * 8);
-        modifies_mem(loc_buffer(ctx_b), old(mem), mem);
+        modifies_buffer(ctx_b, old(mem), mem);
         modifies_buffer_specific(ctx_b, old(mem), mem, 0, 8);
 //        forall i :: 9 <= i < 24 ==> buffer64_read(ctx_b, i, mem) == 
 //                                    buffer64_read(ctx_b, i, old(mem));
@@ -1056,7 +1058,7 @@ procedure {:frame false} poly1305(
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
         //memModified(old(mem), mem, ctx_in, 24 * 8);
-        modifies_mem(loc_buffer(ctx_b), old(mem), mem);
+        modifies_buffer(ctx_b, old(mem), mem);
         let h0_out := buffer64_read(ctx_b, 0, mem);
         let h1_out := buffer64_read(ctx_b, 1, mem);
         h == lowerUpper128_opaque(h0_out, h1_out);

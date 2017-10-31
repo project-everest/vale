@@ -56,12 +56,16 @@ let loc_disjoint = M.loc_disjoint
 let loc_includes = M.loc_includes
 let modifies = M.modifies
 
+let modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) = admit()
+
 let modifies_goal_directed s h1 h2 = modifies s h1 h2
 let lemma_modifies_goal_directed s h1 h2 = ()
 
 let buffer_length_buffer_as_seq #t h b = M.buffer_length_buffer_as_seq h b
 
 let modifies_buffer_elim #t1 b p h h' =
+  // TODO: Eliminate once Tahina's relaxed version of modifies_buffer_elim makes it into F* master
+  assume False;
   M.modifies_buffer_elim b p h h';
   assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
   ()

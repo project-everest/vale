@@ -48,6 +48,24 @@ unfold let buffer16 = buffer (TBase TUInt16)
 unfold let buffer32 = buffer (TBase TUInt32)
 unfold let buffer64 = buffer (TBase TUInt64)
 
+let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
+match l with
+| [] -> True
+| b :: l'  -> buffer_readable h b /\ buffers_readable h l'
+
+let rec modifies_buffers (l: list buffer64) (h h' : mem) =
+match l with
+| [] -> True
+| b :: l' -> modifies (loc_buffer b) h h' /\ modifies_buffers l' h h'
+
+val modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) : Lemma
+ (requires (buffers_readable h' l /\ buffer_readable h b /\ modifies_buffers l h h'))
+ (ensures (buffer_readable h' b))
+ [SMTPatOr [
+   [SMTPat (buffer_readable h b); SMTPat (modifies_buffers l h h')];
+   [SMTPat (buffer_readable h' b); SMTPat (modifies_buffers l h h')];
+ ]]
+
 let rec loc_locs_disjoint_rec (l:loc) (ls:list loc) : Type0 =
   match ls with
   | [] -> True
@@ -75,7 +93,8 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   (requires
     loc_disjoint (loc_buffer b) p /\
     buffer_readable h b /\
-    buffer_length b > 0 /\
+    //buffer_length b > 0 /\
+    (buffer_length b == 0 ==> buffer_readable h' b) /\
     modifies p h h'
   )
   (ensures
