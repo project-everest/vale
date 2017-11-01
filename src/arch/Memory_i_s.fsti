@@ -103,8 +103,8 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
     buffer_as_seq h b == buffer_as_seq h' b
   )
   [SMTPatOr [
-    [SMTPatT (modifies p h h'); SMTPat (buffer_readable h' b)];
-    [SMTPatT (modifies p h h'); SMTPatT (buffer_as_seq h' b)]
+    [SMTPat (modifies p h h'); SMTPat (buffer_readable h' b)];
+    [SMTPat (modifies p h h'); SMTPat (buffer_as_seq h' b)]
   ]]
 
 val loc_includes_refl (s:loc) : Lemma
