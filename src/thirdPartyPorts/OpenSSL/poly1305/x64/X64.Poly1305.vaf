@@ -367,7 +367,7 @@ assume false;
 }
 
 #verbatim
-#reset-options "--z3rlimit 160"
+#reset-options "--z3rlimit 160 --max_fuel 2 --initial_fuel 2"
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -854,8 +854,7 @@ let modp_0 () : Lemma
     ()
 let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
-#reset-options "--z3rlimit 200"
-#set-options "--lax" 
+#reset-options "--z3rlimit 200 --max_fuel 2 --initial_fuel 2"
 
 #endverbatim
 
@@ -1007,7 +1006,7 @@ assume false;
 }
 
 #verbatim
-#reset-options "--z3rlimit 200"
+#reset-options "--z3rlimit 200 --max_fuel 2 --initial_fuel 2"
 #endverbatim
 
 // poly1305(ctx, inp, len)
