@@ -53,17 +53,17 @@ match l with
 | [] -> True
 | b :: l'  -> buffer_readable h b /\ buffers_readable h l'
 
-let rec modifies_buffers (l: list buffer64) (h h' : mem) =
-match l with
-| [] -> True
-| b :: l' -> modifies (loc_buffer b) h h' /\ modifies_buffers l' h h'
+let rec loc_buffers (l: list buffer64) : GTot loc =
+  match l with
+  | [] -> loc_none
+  | b :: l' -> loc_union (loc_buffer b) (loc_buffers l')
 
 val modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) : Lemma
- (requires (buffers_readable h' l /\ buffer_readable h b /\ modifies_buffers l h h'))
+ (requires (buffers_readable h' l /\ buffer_readable h b /\ modifies (loc_buffers l) h h'))
  (ensures (buffer_readable h' b))
  [SMTPatOr [
-   [SMTPat (buffer_readable h b); SMTPat (modifies_buffers l h h')];
-   [SMTPat (buffer_readable h' b); SMTPat (modifies_buffers l h h')];
+   [SMTPat (buffer_readable h b); SMTPat (modifies(loc_buffers l) h h')];
+   [SMTPat (buffer_readable h' b); SMTPat (modifies(loc_buffers l) h h')];
  ]]
 
 let rec loc_locs_disjoint_rec (l:loc) (ls:list loc) : Type0 =
