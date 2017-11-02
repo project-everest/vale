@@ -24,13 +24,13 @@ let mod2_128 = make_opaque mod2_128'
 let modp = make_opaque modp'
 
 // Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec
-let heapletTo128 (m:mem) (b:buffer64) (len:nat{ len % 2 == 0 /\ len <= buffer_length b}) : int->nat128 =
+let heapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) : int->nat128 =
   fun index -> if 0 <= index && index < len / 2 then 
-               (buffer64_read b (2*index) m) + 0x10000000000000000 * (buffer64_read b (2*index + 1) m) 
+               (Seq.index s (2*index)) + 0x10000000000000000 * (Seq.index s (2*index + 1)) 
             else 42
 
-let applyHeapletTo128 (m:mem) (b:buffer64 { buffer_length b % 2 == 0 }) (len:nat{ len == buffer_length b}) (index:int) : nat128 =
-  heapletTo128 m b len index 
+let applyHeapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) (index:int) : nat128 =
+  heapletTo128 s len index 
 
 let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
         (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0})
@@ -60,7 +60,7 @@ val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer
  //           (k - i) % 16 == 0 /\
  //           validSrcAddrs m i  64 ((len + 15) / 16 * 16))
            // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
-  (ensures poly1305_heap_blocks h pad r (buffer64_as_seq m b) k == poly1305_hash_blocks h pad r (heapletTo128 m b len) k)
+  (ensures poly1305_heap_blocks h pad r (buffer64_as_seq m b) k == poly1305_hash_blocks h pad r (heapletTo128 (buffer64_as_seq m b) len) k)
           
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
