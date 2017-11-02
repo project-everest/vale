@@ -190,7 +190,7 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
   (b2t b ==> isConstantTimeGivenStates code fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2)))
  (decreases %[fuel; code; 0])
 
-#set-options "--z3rlimit 100"
+#set-options "--z3rlimit 120"
  let rec lemma_code_explicit_leakage_free ts code fuel s1 s2 = match code with
   | Ins ins -> lemma_ins_leakage_free ts fuel ins
   | Block block -> lemma_block_explicit_leakage_free ts block fuel s1 s2

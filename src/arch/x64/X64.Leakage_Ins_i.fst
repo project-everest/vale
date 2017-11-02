@@ -7,7 +7,7 @@ open X64.Leakage_Helpers_i
 
 open FStar.Tactics
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
 
 let merge_taint t1 t2 =
   if Secret? t1 || Secret? t2 then
@@ -39,11 +39,11 @@ val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -
  (requires (operand_does_not_use_secrets dst ts) /\ publicValuesAreSame ts s1 s2)
 (ensures (operand_obs s1 dst) = (operand_obs s2 dst))
 
-#reset-options "--z3rlimit 20"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 20"
 let lemma_operand_obs ts dst s1 s2 = match dst with
   | OConst _ | OReg _ -> ()
   | OMem m -> ()
-#reset-options "--z3rlimit 5"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 5"
   
 let set_taint (dst:operand) ts taint =
   match dst with
@@ -80,10 +80,10 @@ let rec set_taints dsts ts taint = match dsts with
 
 let ins_consumes_fixed_time (ins : tainted_ins) (fuel:nat) (ts:taintState) (res:bool*taintState) =
   let b, ts' = res in
-  ((b2t b) ==> isConstantTime (Ins ins) fuel ts) (*/\ ((b2t b) ==> isLeakageFree (Ins ins) ts ts')*)
+  ((b2t b) ==> isConstantTime (Ins ins) fuel ts)
 
 val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (fuel:nat) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins fuel ts res})
-#reset-options "--z3rlimit 30"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 30"
 
 val lemma_taint_sources: (ins:tainted_ins) -> (ts:taintState) -> Lemma
 (let i, d, s = ins.ops in
@@ -144,6 +144,7 @@ val lemma_mov_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
+#reset-options "--z3cliopt smt.CASE_SPLIT=2 --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60"
 let lemma_mov_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
@@ -155,7 +156,6 @@ val lemma_add_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#set-options "--z3rlimit 60"
 let lemma_add_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
@@ -167,6 +167,7 @@ val lemma_sub_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
+#reset-options "--z3cliopt smt.CASE_SPLIT=3 --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60"
 let lemma_sub_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
@@ -189,6 +190,7 @@ val lemma_and_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
+#reset-options "--smtencoding.elim_box false --smtencoding.l_arith_repr boxwrap --smtencoding.nl_arith_repr boxwrap --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60"
 let lemma_and_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
@@ -196,7 +198,7 @@ let lemma_and_same_public ts fuel ins s1 s2 =
   let r2 = taint_eval_ins ins s2 in
   assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
 
-#set-options "--z3rlimit 80"
+#reset-options "--z3cliopt smt.CASE_SPLIT=2 --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 80"
 val lemma_addlea_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in AddLea64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
@@ -212,7 +214,7 @@ val lemma_addcarry_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_in
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#set-options "--z3rlimit 100"
+#reset-options "--z3cliopt smt.CASE_SPLIT=3 --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 100"
 let lemma_addcarry_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
@@ -263,7 +265,7 @@ let lemma_shl_same_public ts fuel ins s1 s2 =
   let r2 = taint_eval_ins ins s2 in
   assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
 
-#set-options "--z3rlimit 100"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 100"
 val lemma_xor_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Xor64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
@@ -286,9 +288,7 @@ let lemma_xor_same_public ts fuel ins s1 s2 =
     else
     assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
 
-
-
-#set-options "--z3rlimit 20"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 20"
 val lemma_ins_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
