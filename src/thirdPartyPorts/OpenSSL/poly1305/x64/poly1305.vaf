@@ -39,14 +39,14 @@ open Decls
 
 #endverbatim
 procedure poly1305_multiply(
-    inout dst_operand d1:uint64,
-    inout dst_operand d2:uint64,
-    inout dst_operand d3:uint64,
-          operand r0:uint64,
-          operand s1:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
+    inout d1:dst_operanduint64,
+    inout d2:dst_operanduint64,
+    inout d3:dst_operanduint64,
+          r0:operanduint64,
+          s1:operanduint64,
+    inout h0:dst_operanduint64,
+    inout h1:dst_operanduint64,
+    inout h2:dst_operanduint64,
     ghost r1:nat64,
     ghost r:int,
     ghost h:int,
@@ -135,10 +135,10 @@ procedure poly1305_multiply(
 }
 
 procedure poly1305_reduce(
-    inout dst_operand d3:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
+    inout d3:dst_operanduint64,
+    inout h0:dst_operanduint64,
+    inout h1:dst_operanduint64,
+    inout h2:dst_operanduint64,
     ghost hd:int,
     ghost n:int,
     ghost p:int)
@@ -181,14 +181,14 @@ procedure poly1305_reduce(
 
 /*
 procedure poly1305_iteration(
-    inout dst_operand d1:uint64,
-    inout dst_operand d2:uint64,
-    inout dst_operand d3:uint64,
-          operand r0:uint64,
-          operand s1:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
+    inout d1:dst_operanduint64,
+    inout d2:dst_operanduint64,
+    inout d3:dst_operanduint64,
+          r0:operanduint64,
+          s1:operanduint64,
+    inout h0:dst_operanduint64,
+    inout h1:dst_operanduint64,
+    inout h2:dst_operanduint64,
     ghost r1:nat64,
     ghost r:int,
     ghost h:int,
@@ -241,19 +241,19 @@ procedure poly1305_iteration(
 }
 
 procedure{:timeLimitMultiplier 2} poly1305_blocks(
-          operand ctx:uint64,
-    inout dst_operand inp:uint64,
-    inout dst_operand len:uint64,
-          operand padbit:uint64,
-    inout dst_operand d1:uint64,
-    inout dst_operand d2:uint64,
-    inout dst_operand d3:uint64,
-    inout dst_operand r0:uint64,
-    inout dst_operand r1:uint64,
-    inout dst_operand s1:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
+          ctx:operanduint64,
+    inout inp:dst_operanduint64,
+    inout len:dst_operanduint64,
+          padbit:operanduint64,
+    inout d1:dst_operanduint64,
+    inout d2:dst_operanduint64,
+    inout d3:dst_operanduint64,
+    inout r0:dst_operanduint64,
+    inout r1:dst_operanduint64,
+    inout s1:dst_operanduint64,
+    inout h0:dst_operanduint64,
+    inout h1:dst_operanduint64,
+    inout h2:dst_operanduint64,
     ghost r:int,
     ghost h_in:int,
     ghost n:int,
@@ -400,12 +400,12 @@ procedure{:timeLimitMultiplier 2} poly1305_blocks(
 
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:timeLimitMultiplier 2} poly1305_last_block(
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
-          operand r0:uint64,
-          operand s1:uint64,
-          operand nExtra:uint64,
+    inout h0:operanduint64,
+    inout h1:operanduint64,
+    inout h2:operanduint64,
+          r0:operanduint64,
+          s1:operanduint64,
+          nExtra:operanduint64,
     ghost hBlocks:int,
     ghost r1:nat64,
     ghost r:int,
@@ -517,9 +517,9 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
 
 // h := (h % p) % 2^128;
 procedure{:refined}{:bridge} poly1305_reduce_last(
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
+    inout h0:operanduint64,
+    inout h1:operanduint64,
+    inout h2:operanduint64,
     ghost h:int)
     modifies
         r8; r9; r10; rax;
@@ -570,10 +570,10 @@ procedure{:refined}{:bridge} poly1305_reduce_last(
 
 // h := (h + key_s) % 2^128
 procedure{:refined}{:bridge} poly1305_add_key_s(
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-          operand key_s0:uint64,
-          operand key_s1:uint64,
+    inout h0:operanduint64,
+    inout h1:operanduint64,
+          key_s0:operanduint64,
+          key_s1:operanduint64,
     ghost h_in:int,
     ghost key_s:uint128)
     modifies
@@ -604,14 +604,14 @@ procedure{:refined}{:bridge} poly1305_add_key_s(
 }
 
 procedure{:timeLimitMultiplier 2} poly1305_impl(
-          operand ctx:uint64,
-    inout operand inp:uint64,
-    inout operand len:uint64,
-    inout operand r0:uint64,
-    inout operand r1:uint64,
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
+          ctx:operanduint64,
+    inout inp:operanduint64,
+    inout len:operanduint64,
+    inout r0:operanduint64,
+    inout r1:operanduint64,
+    inout h0:operanduint64,
+    inout h1:operanduint64,
+    inout h2:operanduint64,
     ghost key_r:uint128,
     ghost key_s:uint128,
     ghost n:int,
@@ -738,14 +738,14 @@ procedure{:timeLimitMultiplier 2} poly1305_impl(
 // affect the result.
 procedure{:timeLimitMultiplier 2} poly1305(
     inline win:bool,
-    inout operand ctx:uint64,
-    inout operand inp:uint64,
-    inout operand len:uint64,
-    inout operand r0:uint64,
-    inout operand r1:uint64,
-    inout operand h0:uint64,
-    inout operand h1:uint64,
-    inout operand h2:uint64,
+    inout ctx:operanduint64,
+    inout inp:operanduint64,
+    inout len:operanduint64,
+    inout r0:operanduint64,
+    inout r1:operanduint64,
+    inout h0:operanduint64,
+    inout h1:operanduint64,
+    inout h2:operanduint64,
     ghost key_r:uint128,
     ghost key_s:uint128,
     ghost n:int,

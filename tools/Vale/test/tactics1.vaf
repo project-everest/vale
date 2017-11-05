@@ -44,7 +44,7 @@ type va_register = reg
 let va_op_register_reg (r:reg) : Tot va_register = r
 let va_is_src_register_int (r:reg) (s:va_state) = True
 let va_is_dst_register_int (r:reg) (s:va_state) = True
-let va_update_register (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_update_(r:registerreg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
 let va_eval_register_int (s:va_state) (r:va_register) : GTot int = s.[r]
 
 let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
@@ -72,28 +72,28 @@ assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
 
 
 
-procedure{:tactic smt} Imm(out register x:int, inline y:int)
+procedure{:tactic smt} Imm(out x:registerint, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure{:tactic smt} Increment(inout register x:int)
+procedure{:tactic smt} Increment(inout x:registerint)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure{:tactic smt} Add(inout register x:int, register y:int)
+procedure{:tactic smt} Add(inout x:registerint, y:registerint)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure{:tactic smt} AddReg(inout register x:int, register y:int)
+procedure{:tactic smt} AddReg(inout x:registerint, y:registerint)
     ensures
         x == old(x + y);
 {

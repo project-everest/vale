@@ -75,7 +75,7 @@ type mutability = Mutable | Immutable
 type var_storage =
 | XGhost // ghost, no storage space
 | XPhysical // ordinary non-ghost variable (supplies its own storage space)
-| XOperand of string // procedure operand argument (procedure caller determines storage)
+| XOperand of string// procedure operand argument (procedure caller determines storage)
 | XInline // inline procedure argument (procedure caller supplies constant that gets inlined)
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)

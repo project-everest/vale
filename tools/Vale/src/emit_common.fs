@@ -161,7 +161,7 @@ and build_code_block (env:env) (stmts:stmt list):exp =
 let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 
 type proc_arg =
-| ArgOperand of id * string * typ
+| ArgOperand of id * typ
 | ArgState of id * typ
 | ArgExp of exp
 
@@ -282,12 +282,13 @@ Parameters are always listed in the following order:
 // pfIsRet == true ==> pf is output return value
 let area_fun_param (modifies:bool) (pfIsRet:bool) (area:emit_area_fun) (pf:pformal):formal list =
   let (x, t, storage, io, attrs) = pf in
-  let fx = (x, Some t) in
-  let fOld = (old_id x, Some t) in
+  let typ = match storage with XOperand _ -> tOperand (vaValueTyp t) | _ -> t in
+  let fx = (x, Some typ) in
+  let fOld = (old_id x, Some typ) in
   match (area, storage, io, pfIsRet, modifies) with
   | (EmitCode, XInline, _, false, false) -> [fx]
   | (EmitCode, (XGhost | XAlias _), _, _, false) -> []
-  | (EmitCode, XOperand xo, _, _, false) -> [(x, Some (tOperand xo))]
+  | (EmitCode, XOperand _, _, _, false) -> [(x, Some (tOperand (vaOperandTyp t)))]
   | (EmitCode, _, _, _, true) -> []
   | (_, XOperand _, _, _, false) -> []
   | (_, (XInline | XGhost), _, _, true) -> []
@@ -318,7 +319,8 @@ let area_fun_params (area:emit_area_fun) (prets:pformal list) (pargs:pformal lis
 // ret == true ==> generate return values
 let area_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_proc) (pf:pformal):pformal list =
   let (x, t, storage, io, attrs) = pf in
-  let pfOld () = (old_id x, t, storage, io, attrs) in
+  let typ = match storage with XOperand _ -> tOperand (vaValueTyp t) | _ -> t in
+  let pfOld () = (old_id x, typ, storage, io, attrs) in
   let pfOp xo = (x, tOperand xo, XPhysical, In, attrs) in
   match (ret, area, storage, io, pfIsRet, modifies) with
   | (_, (EmitAbstract | EmitConcrete), XGhost, _, _, _) -> []
@@ -330,7 +332,7 @@ let area_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_pr
   | (true, EmitAbstract, XOperand _, _, _, _) -> []
   | (_, (EmitConcrete | EmitLemma), _, _, _, true) -> []
   | (false, (EmitConcrete | EmitLemma), XInline, _, false, false) -> [pf]
-  | (_, (EmitConcrete | EmitLemma), XOperand xo, _, _, false) -> if ret = pfIsRet then [pfOp xo] else []
+  | (_, (EmitConcrete | EmitLemma), XOperand _, _, _, false) -> if ret = pfIsRet then [pfOp (vaOperandTyp t)] else []
   | (_, EmitLemma, XAlias _, _, _, false) -> []
   | (true, _, XInline, _, false, _) -> []
   | (_, (EmitAbstract | EmitConcrete), XAlias _, _, _, _) -> notImplemented "alias arguments not yet supported for {:refined true} procedures"
@@ -368,13 +370,14 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
           let getOpt u = match u with Some u -> u | None -> internalErr "getOpt" in
           let rewrite_mod (cenv_read:connect_env) (cenv_write:connect_env) (io:inout, arg:proc_arg, formal_id:id option):(connect_env * (formal list * proc_arg list * (id * exp) list) * (id * exp) list) =
             match arg with
-            | ArgOperand (x, xo, t) ->
-                let idExp = vaEvalOp xo t c.esc_state (EVar x) in
+            | ArgOperand (x, typ) ->
+                let t = tOperand (vaValueTyp typ) in
+                let idExp = vaEvalOp typ c.esc_state (EVar x) in
                 let x1 = match Map.tryFind x cenv_read.connect_map with None -> old_id x | Some y -> y in
                 match io with
                 | In ->
                   let pairs = [(old_id (getOpt formal_id), EVar x1)] in
-                  (cenv_write, ([], [ArgOperand (x1, xo, t)], []), pairs)
+                  (cenv_write, ([], [ArgOperand (x1, t)], []), pairs)
                 | InOut | Out ->
                   let x2 = new_id x in
                   let cenv_write =
@@ -385,7 +388,7 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
                       connect_subst_ghost = Map.add x (EVar x2) cenv_write.connect_subst_ghost;
                     } in
                   let pairs = [(old_id (getOpt formal_id), EVar x1); (getOpt formal_id, EVar x2)] in
-                  (cenv_write, ([(x2, Some t)], (if io = InOut then [ArgOperand (x1, xo, t); ArgOperand (x2, xo, t)] else [ArgOperand (x2, xo, t)]), [(x2, idExp)]), pairs)
+                  (cenv_write, ([(x2, Some t)], (if io = InOut then [ArgOperand (x1, t); ArgOperand (x2, t)] else [ArgOperand (x2, t)]), [(x2, idExp)]), pairs)
             | ArgState (x, t) ->
                 let idExp = stateGet {env with state = c.esc_state} x in
                 //let x1 = match Map.tryFind x cenv.connect_map with None -> old_id x | Some y -> (match io with In -> old_id x | InOut | Out -> y) in
@@ -470,7 +473,7 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
             } in
           let old_incarnation_exp id =
             match (Map.tryFind id operandMap, Map.tryFind id env.ids) with
-            | (Some (t, XOperand xo), _) -> vaEvalOp xo t (EVar (Reserved "s0")) (EVar id)
+            | (Some (t, XOperand _), _) -> vaEvalOp t (EVar (Reserved "s0")) (EVar id)
             | (_, Some (StateInfo _)) -> stateGet {env with state = EVar (Reserved "s0")} id
             | _ -> internalErr ("old_incarnation: " + (err_id id))
             in
@@ -542,10 +545,10 @@ let specArgEns (inSpec:bool) (s0:id option) (sM:id) (modifies:bool) (x, t, g, io
   match g with
   | XGhost -> if inSpec && not modifies then [EVar x] else []
   | XInline -> if modifies then [] else [EVar x]
-  | XOperand xo ->
+  | XOperand _ ->
     (
       if not modifies then [] else
-      let f s = vaEvalOp xo t (EVar s) (EVar x) in
+      let f s = vaEvalOp t (EVar s) (EVar x) in
       if inSpec then
         match (s0, io) with
         | (None, _) | (Some _, Out) -> [f sM]
@@ -595,7 +598,7 @@ let specMod (env:env) (area:emit_area_mod) (loc:loc, s:spec):formal list =
 
 let argModIo (e:exp) (formal_id, _, _, io:inout, _):(inout * proc_arg * id option) list =
   match skip_loc e with
-  | EOp (OperandArg (x, xo, t), _) -> [(io, ArgOperand (x, xo, t), Some formal_id)]
+  | EOp (OperandArg (x, xo, t), _) -> [(io, ArgOperand (x, t), Some formal_id)]
   | EOp (StateOp (x, prefix, t), es) -> [(io, ArgState (x, t), Some formal_id)]
   | EOp (RefineOp, [EOp (Uop UConst, [c]); _; _]) -> [(io, ArgExp c, Some formal_id)]
   | _ -> []
@@ -989,9 +992,9 @@ let fArg (x, t, g, io, a):exp list =
 //   ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
 let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
   let specModsIo = List.collect (specModIo env EmitModCall) p.pspecs in
-  let frameArg (isRet:bool) e (x, _, storage, io, _) =
+  let frameArg (isRet:bool) e (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand xo, _) | (_, XOperand xo, (InOut | Out)) -> vaApp ("update_" + xo) [EVar x; EVar sM; e]
+    | (true, XOperand _, _) | (_, XOperand _, (InOut | Out)) -> vaApp ("update_" + (vaTyp t)) [EVar x; EVar sM; e]
     | _ -> e
     in
   let frameMod e (io, (x, _)) =
@@ -1053,7 +1056,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
   let spec_of_call c = Reserved ("spec_" + (string_of_id c.esc_proc.pname)) in
   let make_arg arg =
     match arg with
-    | ArgOperand (x, _, _) | ArgState (x, _) -> EVar x
+    | ArgOperand (x, _) | ArgState (x, _) -> EVar x
     | ArgExp e -> e
   let req_of_call aci =
     let rec add_antecedents_aux ants e =
@@ -1185,8 +1188,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   //   requires va_is_dst_int(dummy, s0)
   let reqIsArg (isRet:bool) (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand xo, _) | (false, XOperand xo, (InOut | Out)) -> [vaAppOp ("is_dst_" + xo + "_") t [EVar x; EVar s0]]
-    | (false, XOperand xo, In) -> [vaAppOp ("is_src_" + xo + "_") t [EVar x; EVar s0]]
+    | (true, XOperand _, _) | (false, XOperand _, (InOut | Out)) -> [vaAppOp ("is_dst_") t [EVar x; EVar s0]]
+    | (false, XOperand _, In) -> [vaAppOp ("is_src_") t [EVar x; EVar s0]]
     | _ -> []
     in
   let reqIsExps =

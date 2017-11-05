@@ -1,24 +1,24 @@
 include "common.vad"
 
-procedure{:instruction Ins(InsImm(x, y))} Imm(out register x:int, inline y:int)
+procedure{:instruction Ins(InsImm(x, y))} Imm(out x:registerint, inline y:int)
     ensures
         x == y;
 {
 }
 
-procedure{:instruction Ins(InsIncr(x))} Increment(inout mem_operand x:int)
+procedure{:instruction Ins(InsIncr(x))} Increment(inout x:mem_operandint)
     ensures
         x == old(x) + 1;
 {
 }
 
-procedure{:instruction Ins(InsAdd(x, y))} Add(inout register x:int, operand y:int)
+procedure{:instruction Ins(InsAdd(x, y))} Add(inout x:registerint, y:operandint)
     ensures
         x == old(x + y);
 {
 }
 
-procedure{:operand} Mem_in(register base:int, inline offset:int) returns(mem_operand o:int)
+procedure{:operand} Mem_in(base:registerint, inline offset:int) returns(o:mem_operandint)
     reads
         mem;
 /* not yet needed (currently handled by va_is_src_mem_operand_int, etc.):
@@ -29,7 +29,7 @@ procedure{:operand} Mem_in(register base:int, inline offset:int) returns(mem_ope
 */
     extern;
 
-procedure{:operand} Mem_out(register base:int, inline offset:int, mem_operand o:int)
+procedure{:operand} Mem_out(base:registerint, inline offset:int, o:mem_operandint)
     modifies 
         mem;
 /* not yet needed (currently handled by va_is_dst_mem_operand_int, etc.):
@@ -45,7 +45,7 @@ function method va_opr_code_Mem(base:va_register, offset:int):va_mem_operand { O
 function method va_opr_lemma_Mem(s:va_state, base:va_register, offset:int):va_mem_operand { OMem(base, offset) }
 #endverbatim
 
-procedure AddReg(inout register x:int, register y:int)
+procedure AddReg(inout x:registerint, y:registerint)
     ensures
         x == old(x + y);
 {

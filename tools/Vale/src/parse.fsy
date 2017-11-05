@@ -13,6 +13,18 @@ let makeBop (op:bop) (loc:loc, (isCustom:bool, s:string)) (e1:exp) (e2:exp):exp 
   let op = if isCustom then BCustom s else op in
   ELoc (loc, EOp (Bop op, [e1; e2]))
 
+let hasStorageAttr (a:attrs):bool =
+  let rec r (a:attrs):bool =
+    // TODO: XPhysical need to be annotated, instead of being the default
+    match a with
+    | [] -> false
+    | (Id ("thread_local" | "register"), [e])::a -> true
+    | (Id "local", [e])::a -> true
+    | (Id "state", [e])::a -> true
+    | attr::a -> (r a)
+  in
+  (r a)
+
 let storageAttrs (a:attrs):(var_storage * attrs) =
   let rec r (a:attrs):(var_storage list * attrs) list =
     match a with
@@ -45,7 +57,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
 %token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
-%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
+%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE OPERAND
 %token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
 %token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES
@@ -330,8 +342,7 @@ InOut
   | OUT { Out }
   | INOUT { InOut }
 ProcFormal
-  : InOut Attrs AnyId COLON Type { let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) }
-  | InOut Attrs ID AnyId COLON Type { ($4, $6, XOperand (snd $3), $1, $2) }
+  : InOut Attrs AnyId COLON Type { if hasStorageAttr $2 then let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) else ($3, $5, XOperand ("opnd"), $1, $2) }
   | GHOST Attrs AnyId COLON Type { ($3, $5, XGhost, In, $2) }
   | INLINE Attrs AnyId COLON Type { ($3, $5, XInline, In, $2) }
 ProcFormals1
