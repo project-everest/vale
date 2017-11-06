@@ -15,7 +15,7 @@ let makeBop (op:bop) (loc:loc, (isCustom:bool, s:string)) (e1:exp) (e2:exp):exp 
 
 let hasStorageAttr (a:attrs):bool =
   let rec r (a:attrs):bool =
-    // TODO: XPhysical need to be annotated, instead of being the default
+    // Note: XPhysical Parameters need to be annotated explicitly. instead of being the default
     match a with
     | [] -> false
     | (Id ("thread_local" | "register"), [e])::a -> true
