@@ -160,7 +160,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
           | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
           | XGhost -> GhostLocal (m, t)
           | XInline -> InlineLocal
-          | (XOperand _ | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
+          | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
           in
         let ids = Map.add x info env.ids in
         ({env with ids = ids}, [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
@@ -495,7 +495,7 @@ and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
   let (mrets, margs) = match_proc_args env p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
-    | (x, t, XOperand _, io, _) -> [rewrite_vars_arg NotGhost (Some (vaTyp t)) io env ea]
+    | (x, t, XOperand, io, _) -> [rewrite_vars_arg NotGhost (Some (vaTyp t)) io env ea]
     | (x, t, XInline, io, _) -> [(rewrite_vars_arg Ghost None io env ea)]
     | (x, t, XAlias _, io, _) ->
         let _ = rewrite_vars_arg NotGhost None io env ea in // check argument validity
@@ -506,7 +506,7 @@ and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
     in
   let rewrite_ret (pp, ((xlhs, _) as lhs)) =
     match pp with
-    | (x, t, XOperand _, _, _) -> ([], [rewrite_vars_arg NotGhost (Some (vaOperandTyp t)) Out env (EVar xlhs)])
+    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg NotGhost (Some (vaOperandTyp t)) Out env (EVar xlhs)])
     | (x, t, XAlias _, _, _) ->
         let _ = rewrite_vars_arg NotGhost None Out env (EVar xlhs) in // check argument validity
         ([], []) // drop argument
@@ -769,7 +769,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
         | (XAlias (AliasThread, e)) -> Map.add x (ThreadLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
         | (XAlias (AliasLocal, e)) -> Map.add x (ProcLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
         | XInline -> Map.add x InlineLocal ids
-        | XOperand _ -> Map.add x (OperandLocal (io, t)) ids
+        | XOperand -> Map.add x (OperandLocal (io, t)) ids
         | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
         | XGhost -> Map.add x (GhostLocal ((if isRet then Mutable else Immutable), Some t)) ids
         in

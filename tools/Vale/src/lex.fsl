@@ -175,7 +175,6 @@ and token = parse
 | "in" { IN (curLoc lexbuf) }
 | "out" { OUT (curLoc lexbuf) }
 | "inout" { INOUT (curLoc lexbuf) }
-| "opnd" { OPERAND (curLoc lexbuf) }
 | "var" { VAR (curLoc lexbuf) }
 | "if" { IF (curLoc lexbuf) }
 | "then" { THEN (curLoc lexbuf) }

@@ -57,7 +57,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
 %token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
-%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE OPERAND
+%token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
 %token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES
@@ -342,7 +342,7 @@ InOut
   | OUT { Out }
   | INOUT { InOut }
 ProcFormal
-  : InOut Attrs AnyId COLON Type { if hasStorageAttr $2 then let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) else ($3, $5, XOperand ("opnd"), $1, $2) }
+  : InOut Attrs AnyId COLON Type { if hasStorageAttr $2 then let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) else ($3, $5, XOperand, $1, $2) }
   | GHOST Attrs AnyId COLON Type { ($3, $5, XGhost, In, $2) }
   | INLINE Attrs AnyId COLON Type { ($3, $5, XInline, In, $2) }
 ProcFormals1
