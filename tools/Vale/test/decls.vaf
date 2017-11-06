@@ -118,7 +118,7 @@ procedure{:instruction Ins(And64(dst, src))} And64(inout dst:dst_operanduint64, 
 {
 }
 
-procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst:dst_operanduint64, shift_amt amt:uint64)
+procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst:dst_operanduint64, amt:shift_amtuint64)
     modifies
         efl;
 //    requires
@@ -128,7 +128,7 @@ procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst:dst_operanduint64, 
 {
 }
 
-procedure{:instruction Ins(Shr64(dst, amt))} Shr64(inout dst:dst_operanduint64, shift_amt amt:uint64)
+procedure{:instruction Ins(Shr64(dst, amt))} Shr64(inout dst:dst_operanduint64, amt:shift_amtuint64)
     modifies
         efl;
     ensures
