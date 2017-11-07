@@ -53,6 +53,7 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     len <= buffer_length b /\
     buffer_addr b == addr
 
+// TODO: This is dangerous, as it precludes changes to any other buffer    
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
@@ -895,6 +896,8 @@ procedure {:frame false} poly1305_impl(
 //        // Replaced line below with memModified
 //        //mem == old(mem)[ctx_id := mem[ctx_id]];
         //memModified(old(mem), mem, old(ctx), 9 * 8);
+
+        // TODO: This is implied by the specific version
         modifies_buffer(ctx_b, old(mem), mem);
         modifies_buffer_specific(ctx_b, old(mem), mem, 0, 8);
 //        forall i :: 9 <= i < 24 ==> buffer64_read(ctx_b, i, mem) == 

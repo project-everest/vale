@@ -35,6 +35,88 @@ procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
     Store64_buffer(rdi, rbx, 8, bdst, 1);
 }
 
+#verbatim interface
+let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+    //(buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
+    buffer_readable m b /\
+    len <= buffer_length b /\
+    buffer_addr b == addr
+
+// TODO: This is dangerous, as it precludes changes to any other buffer    
+let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
+    modifies_buffer b h1 h2 /\
+    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
+    (forall (i:nat) . {:pattern (buffer64_read b i h2)}
+                        0 <= i /\ i < buffer_length b 
+                     /\ (i < start || i > last) 
+                    ==> buffer64_read b i h1
+                     == buffer64_read b i h2)
+
+unfold let buffers_disjoint (b1 b2:buffer64) =
+    locs_disjoint [loc_buffer b1; loc_buffer b2]
+#endverbatim
+
+#verbatim
+#reset-options "--max_fuel 2 --initial_fuel 2"
+#endverbatim
+
+// PROBLEM 1:
+procedure ValidityPreservationFail(ghost bsrc:buffer64, ghost bdst:buffer64, ghost len:int)
+    requires/ensures
+        buffers_disjoint(bsrc, bdst);
+        validSrcAddrs64(mem, rsi, bsrc, len);
+        validSrcAddrs64(mem, rdi, bdst, 2);
+    reads
+        rsi; rdi;
+    modifies
+        rax; rbx;
+        mem;
+{
+    Store64_buffer(rdi, rax, 0, bdst, 0);
+    // Without the following, plus extra fuel above, post-condition fails on: validSrcAddrs64(mem, rsi, bsrc, len);
+    assert buffers_readable(mem, list(bdst));   // OBSERVE
+}
+
+// Restore fuel settings to defaults
+#verbatim
+#reset-options 
+#endverbatim
+
+
+procedure Modifier(ghost b:buffer64)
+    requires/ensures 
+        validSrcAddrs64(mem, rdi, b, 10);
+    reads
+        rdi; 
+    modifies
+        mem;
+    ensures
+        modifies_buffer_specific(b, old(mem), mem, 0, 5);
+{
+}
+
+// PROBLEM 2:
+procedure ValuePreservationFail(ghost bsrc:buffer64, ghost bdst:buffer64, ghost len:int)
+    requires
+        buffers_disjoint(bsrc, bdst);
+        //validSrcAddrs64(mem, rsi, bsrc, len);
+        validSrcAddrs64(mem, rdi, bdst, 10);
+    reads
+        rsi; rdi;
+    modifies
+        rax; rbx;
+        mem;
+{
+    Store64_buffer(rdi, rax, 48, bdst, 6);
+    Modifier(bdst);
+    // Without the following, final assertion fails.  
+    // Have to mention modifies_buffer_specific's here, before another Store64_buffer
+    assert buffer64_read(bdst, 6, mem) == rax;        // OBSERVE
+    Store64_buffer(rdi, rax, 0, bdst, 0);
+    Load64_buffer(rbx, rdi, 48, bdst, 6);
+    assert rbx == rax;
+}
+
 /*
 procedure Copy64()
     requires/ensures
