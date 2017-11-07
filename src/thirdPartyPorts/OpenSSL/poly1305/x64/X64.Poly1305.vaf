@@ -32,6 +32,7 @@ include "../../../../arch/x64/X64.Vale.Decls.vaf"
 
 #verbatim interface implementation
 module X64.Poly1305
+module M = Memory_i_s
 #reset-options "--z3rlimit 20"
 open X64.Machine_s
 open X64.Vale.State_i
@@ -77,7 +78,7 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
-    (forall (i:nat) . {:pattern (buffer64_read b i h2)}
+    (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
                         0 <= i /\ i < buffer_length b 
                      /\ (i < start || i > last) 
                     ==> buffer64_read b i h1
@@ -1108,51 +1109,22 @@ procedure {:frame false} poly1305(
     //   64: will hold len / 16 * 16
     //   72, 80, 88, 96, 104, 112, 120, 128: callee-save registers
     //assert {:fast_block} true;
-
-//    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
-//    assert buffers_disjoint(ctx_b, inp_b);
-//    assert locs_disjoint(list(loc_buffer(ctx_b), loc_buffer(inp_b)));
-//    assert buffer_readable(mem, inp_b);
-    ghost var old_h1 := h1;                         // OBSERVE
-    ghost var old_h2 := h2;                         // OBSERVE
-    assert old_h1 == old(h1);                       // OBSERVE
-    assert old_h2 == old(h2);                       // OBSERVE
     Store64_buffer(ctx, h1,  72, ctx_b, 9);
-    assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
-//    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
-
-//    assert buffer_readable(mem, inp_b);
-//    assert readable_words(len) == buffer_length(inp_b);
-//    assert buffer_addr(inp_b) == inp; 
-//
-//    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
     Store64_buffer(ctx, h2,  80, ctx_b, 10);
-    assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
-    assert buffer64_read(ctx_b, 10, mem) == old_h2; // OBSERVE
     Store64_buffer(ctx, rax, 88, ctx_b, 11);
-    assert buffer64_read(ctx_b, 10, mem) == old_h2; // OBSERVE
     Store64_buffer(ctx, r9,  96, ctx_b, 12);
     Store64_buffer(ctx, r1,  104, ctx_b, 13);
     Store64_buffer(ctx, r13, 112, ctx_b, 14);
     Store64_buffer(ctx, h0,  120, ctx_b, 15);
     Store64_buffer(ctx, r15, 128, ctx_b, 16);
-//    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
 
-    ghost var old_inp := rsi;
-    ghost var old_len := rdx;
     h := poly1305_impl(key_r, key_s, ctx_b, inp_b);
-    assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
-    assert buffer64_read(ctx_b, 10, mem) == old_h2; // OBSERVE
-
-    // TODO: In theory, no longer needed
-    //heapletTo128_all_preserved(mem, ctx, 9 * 8, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
 
     //assert {:fast_block} true;
     Store64_buffer(ctx, h0,  0, ctx_b, 0);
     Store64_buffer(ctx, h1,  8, ctx_b, 1);
 
     Load64_buffer(h1,  ctx, 72, ctx_b, 9);
-    assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
     Load64_buffer(h2,  ctx, 80, ctx_b, 10);
     Load64_buffer(rax, ctx, 88, ctx_b, 11);
     Load64_buffer(inp, ctx, 96, ctx_b, 12);
@@ -1161,15 +1133,4 @@ procedure {:frame false} poly1305(
     Load64_buffer(h0,  ctx, 120, ctx_b, 15);
     Load64_buffer(r15, ctx, 128, ctx_b, 16);
     Mov64(ctx, rax);
-    assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
-    assert buffer64_read(ctx_b, 10, mem) == old_h2; // OBSERVE
-
-
-// TODO: Remove these once we solve triggering issues above
-    assume ctx == old(ctx);
-    assume inp == old(inp);
-    assume r1 == old(r1);
-    assume r13 == old(r13);
-    assume h0 == old(h0);
-    assume r15 == old(r15);
 }
