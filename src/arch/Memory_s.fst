@@ -29,8 +29,23 @@ let tuint32 = P.TBase P.TUInt32
 let tuint64 = P.TBase P.TUInt64
 #reset-options
 
+// TODO: loc_readable
+let loc_readable h s = admit ()
+let loc_readable_none h = admit ()
+let loc_readable_union h s1 s2 = admit ()
+let loc_readable_buffer #t h b = admit ()
+
 let buffer_length_buffer_as_seq #t h b = P.buffer_length_buffer_as_seq h b
-let modifies_buffer_elim #t1 b p h h' = P.modifies_buffer_elim b p h h'
+
+let modifies_buffer_elim #t1 b p h h' =
+  P.modifies_buffer_elim b p h h'
+
+let modifies_loc_readable #t b p h h' =
+  // TODO
+  admit ()
+
+let loc_disjoint_none_r s = P.loc_disjoint_none_r s
+let loc_disjoint_union_r s s1 s2 = P.loc_disjoint_union_r s s1 s2
 let loc_includes_refl s = P.loc_includes_refl s
 let loc_includes_trans s1 s2 s3 = P.loc_includes_trans s1 s2 s3
 let loc_includes_union_r s s1 s2 = P.loc_includes_union_r s s1 s2

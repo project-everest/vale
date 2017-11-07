@@ -48,23 +48,21 @@ unfold let buffer16 = buffer (TBase TUInt16)
 unfold let buffer32 = buffer (TBase TUInt32)
 unfold let buffer64 = buffer (TBase TUInt64)
 
-let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
-match l with
-| [] -> True
-| b :: l'  -> buffer_readable h b /\ buffers_readable h l'
+val loc_readable (h:mem) (s:loc) : GTot Type0
 
-let rec loc_buffers (l: list buffer64) : GTot loc =
-  match l with
-  | [] -> loc_none
-  | b :: l' -> loc_union (loc_buffer b) (loc_buffers l')
+val loc_readable_none (h:mem) : Lemma
+  (ensures (loc_readable h loc_none))
+  [SMTPat (loc_readable h loc_none)]
 
-val modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) : Lemma
- (requires (buffers_readable h' l /\ buffer_readable h b /\ modifies (loc_buffers l) h h'))
- (ensures (buffer_readable h' b))
- [SMTPatOr [
-   [SMTPat (buffer_readable h b); SMTPat (modifies(loc_buffers l) h h')];
-   [SMTPat (buffer_readable h' b); SMTPat (modifies(loc_buffers l) h h')];
- ]]
+val loc_readable_union (h:mem) (s1 s2:loc) : Lemma
+  (requires (loc_readable h s1 /\ loc_readable h s2))
+  (ensures (loc_readable h (loc_union s1 s2)))
+  [SMTPat (loc_readable h (loc_union s1 s2))]
+
+val loc_readable_buffer (#t:typ) (h:mem) (b:buffer t) : Lemma
+  (requires (buffer_readable h b))
+  (ensures (loc_readable h (loc_buffer b)))
+  [SMTPat (loc_readable h (loc_buffer b))]
 
 let rec loc_locs_disjoint_rec (l:loc) (ls:list loc) : Type0 =
   match ls with
@@ -92,9 +90,8 @@ val buffer_length_buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : Lemma
 val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   (requires
     loc_disjoint (loc_buffer b) p /\
+    loc_readable h p /\
     buffer_readable h b /\
-    //buffer_length b > 0 /\
-    (buffer_length b == 0 ==> buffer_readable h' b) /\
     modifies p h h'
   )
   (ensures
@@ -106,6 +103,15 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
     [SMTPat (modifies p h h'); SMTPat (buffer_readable h' b)];
     [SMTPat (modifies p h h'); SMTPat (buffer_as_seq h' b)]
   ]]
+
+val loc_disjoint_none_r (s:loc) : Lemma
+  (ensures (loc_disjoint s loc_none))
+  [SMTPat (loc_disjoint s loc_none)]
+
+val loc_disjoint_union_r (s s1 s2:loc) : Lemma
+  (requires (loc_disjoint s s1 /\ loc_disjoint s s2))
+  (ensures (loc_disjoint s (loc_union s1 s2)))
+  [SMTPat (loc_disjoint s (loc_union s1 s2))]
 
 val loc_includes_refl (s:loc) : Lemma
   (loc_includes s s)

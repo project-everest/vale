@@ -56,7 +56,10 @@ let loc_disjoint = M.loc_disjoint
 let loc_includes = M.loc_includes
 let modifies = M.modifies
 
-let modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) = admit()
+let loc_readable = M.loc_readable
+let loc_readable_none = M.loc_readable_none
+let loc_readable_union = M.loc_readable_union
+let loc_readable_buffer #t h b = M.loc_readable_buffer h b
 
 let modifies_goal_directed s h1 h2 = modifies s h1 h2
 let lemma_modifies_goal_directed s h1 h2 = ()
@@ -64,12 +67,21 @@ let lemma_modifies_goal_directed s h1 h2 = ()
 let buffer_length_buffer_as_seq #t h b = M.buffer_length_buffer_as_seq h b
 
 let modifies_buffer_elim #t1 b p h h' =
-  // TODO: Eliminate once Tahina's relaxed version of modifies_buffer_elim makes it into F* master
-  assume False;
-  M.modifies_buffer_elim b p h h';
-  assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
-  ()
+  if buffer_length b > 0 then
+  (
+    M.modifies_buffer_elim b p h h';
+    assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
+    ()
+  )
+  else
+  (
+    M.modifies_loc_readable b p h h';
+    assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
+    ()
+  )
 
+let loc_disjoint_none_r s = M.loc_disjoint_none_r s
+let loc_disjoint_union_r s s1 s2 = M.loc_disjoint_union_r s s1 s2
 let loc_includes_refl s = M.loc_includes_refl s
 let loc_includes_trans s1 s2 s3 = M.loc_includes_trans s1 s2 s3
 let loc_includes_union_r s s1 s2 = M.loc_includes_union_r s s1 s2

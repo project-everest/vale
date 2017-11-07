@@ -26,6 +26,19 @@ val tuint16 : (t:typ{type_of_typ t == UInt16.t})
 val tuint32 : (t:typ{type_of_typ t == UInt32.t})
 val tuint64 : (t:typ{type_of_typ t == UInt64.t})
 
+val loc_readable (h:mem) (s:loc) : GTot Type0
+
+val loc_readable_none (h:mem) : Lemma
+  (ensures (loc_readable h loc_none))
+
+val loc_readable_union (h:mem) (s1 s2:loc) : Lemma
+  (requires (loc_readable h s1 /\ loc_readable h s2))
+  (ensures (loc_readable h (loc_union s1 s2)))
+
+val loc_readable_buffer (#t:typ) (h:mem) (b:buffer t) : Lemma
+  (requires (buffer_readable h b))
+  (ensures (loc_readable h (loc_buffer b)))
+
 //////////////////////////////////////////////////////////////////////////////
 // Lemmas from FStar.Pointer.Base
 // (with some simplifications and fewer SMT patterns)
@@ -48,6 +61,23 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
     buffer_readable h' b /\
     buffer_as_seq h b == buffer_as_seq h' b
   )
+
+val modifies_loc_readable (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
+  (requires
+    loc_readable h p /\
+    buffer_readable h b /\
+    modifies p h h'
+  )
+  (ensures
+    buffer_readable h' b
+  )
+
+val loc_disjoint_none_r (s:loc) : Lemma
+  (ensures (loc_disjoint s loc_none))
+
+val loc_disjoint_union_r (s s1 s2:loc) : Lemma
+  (requires (loc_disjoint s s1 /\ loc_disjoint s s2))
+  (ensures (loc_disjoint s (loc_union s1 s2)))
 
 val loc_includes_refl (s:loc) : Lemma
   (loc_includes s s)

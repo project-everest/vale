@@ -47,6 +47,27 @@ open Opaque_i
 
 unfold let n = nat64_max
 
+let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
+match l with
+| [] -> True
+| b :: l'  -> buffer_readable h b /\ buffers_readable h l'
+
+//let rec loc_buffers (l: list buffer64) : GTot loc =
+//  match l with
+//  | [] -> loc_none
+//  | b :: l' -> loc_union (loc_buffer b) (loc_buffers l')
+
+//val modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) : Lemma
+// (requires (buffers_readable h' l /\ buffer_readable h b /\ modifies (loc_buffers l) h h'))
+// (ensures (buffer_readable h' b))
+// [SMTPatOr [
+//   [SMTPat (buffer_readable h b); SMTPat (modifies(loc_buffers l) h h')];
+//   [SMTPat (buffer_readable h' b); SMTPat (modifies(loc_buffers l) h h')];
+// ]]
+//let modifies_buffers_readable (l: list buffer64) (h h' : mem) (b: buffer64) = admit()
+
+unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     //(buffer_readable m b \/ buffer_length b == 0) /\        // Buffer library's modifies clause treats 0-length buffers specially
     buffer_readable m b /\
@@ -591,7 +612,6 @@ procedure {:frame false} poly1305_blocks(
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
 
     //assert modifies_buffers(list(ctx_b), post_while_mem, mem);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     assert buffer_readable(mem, inp_b);
 
 //    assert buffers_readable(mem, list(ctx_b));
@@ -600,9 +620,7 @@ procedure {:frame false} poly1305_blocks(
 
 
     Store64_buffer(ctx, h1, 8, ctx_b, 1);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, h2, 16, ctx_b, 2);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     assert buffer_readable(mem, inp_b);
     assert validSrcAddrs64(mem, old(inp), inp_b, length/8);
 }
@@ -1100,7 +1118,6 @@ procedure {:frame false} poly1305(
     assert old_h1 == old(h1);                       // OBSERVE
     assert old_h2 == old(h2);                       // OBSERVE
     Store64_buffer(ctx, h1,  72, ctx_b, 9);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
 //    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
 
@@ -1112,20 +1129,13 @@ procedure {:frame false} poly1305(
     Store64_buffer(ctx, h2,  80, ctx_b, 10);
     assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
     assert buffer64_read(ctx_b, 10, mem) == old_h2; // OBSERVE
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, rax, 88, ctx_b, 11);
     assert buffer64_read(ctx_b, 10, mem) == old_h2; // OBSERVE
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, r9,  96, ctx_b, 12);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, r1,  104, ctx_b, 13);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, r13, 112, ctx_b, 14);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, h0,  120, ctx_b, 15);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, r15, 128, ctx_b, 16);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
 //    assert validSrcAddrs64(mem, inp, inp_b, readable_words(len));
 
     ghost var old_inp := rsi;
@@ -1138,11 +1148,8 @@ procedure {:frame false} poly1305(
     //heapletTo128_all_preserved(mem, ctx, 9 * 8, old_inp, old_len);  // Hold onto facts about heapletTo128(mem, old_inp, old_len);
 
     //assert {:fast_block} true;
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, h0,  0, ctx_b, 0);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
     Store64_buffer(ctx, h1,  8, ctx_b, 1);
-    assert buffers_readable(mem, list(ctx_b));      // OBSERVE
 
     Load64_buffer(h1,  ctx, 72, ctx_b, 9);
     assert buffer64_read(ctx_b, 9, mem) == old_h1;  // OBSERVE
