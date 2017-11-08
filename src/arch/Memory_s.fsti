@@ -64,7 +64,7 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
 
 val modifies_loc_readable (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
   (requires
-    loc_readable h p /\
+    loc_readable h' p /\
     buffer_readable h b /\
     modifies p h h'
   )

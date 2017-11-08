@@ -90,7 +90,7 @@ val buffer_length_buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : Lemma
 val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   (requires
     loc_disjoint (loc_buffer b) p /\
-    loc_readable h p /\
+    loc_readable h' p /\
     buffer_readable h b /\
     modifies p h h'
   )
