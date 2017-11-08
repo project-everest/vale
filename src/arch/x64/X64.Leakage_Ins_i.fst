@@ -190,7 +190,7 @@ val lemma_and_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#reset-options "--smtencoding.elim_box false --smtencoding.l_arith_repr boxwrap --smtencoding.nl_arith_repr boxwrap --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60"
 let lemma_and_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
