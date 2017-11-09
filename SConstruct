@@ -858,6 +858,8 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
     if 'Warning:' in line:
       print(line)
       fstar_deps_ok = False
+    if len(line) == 0:
+      pass
     else:
       # lines are of the form:
       #   a1.fst a2.fst ... : b1.fst b2.fst ...
