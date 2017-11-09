@@ -130,6 +130,7 @@ rMOV(out dst:opr32, src:opr32)
 }
 
 procedure {:refined} {:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
+rMOVShift(out dst:opr32, src:opr_snd, inline shift:Shift)
     ensures
         dst == old(EvalShift(old(src), shift));
 {
@@ -157,6 +158,7 @@ rEOR(out dst:opr32, src1:opr32, src2:opr32)
 }
 
 procedure {:refined} {:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))}
+rEORShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
     ensures
         dst == BitwiseXor(old(src1), EvalShift(old(src2), shift));
 {
@@ -218,6 +220,7 @@ rADDWrap(out dst:opr32, src1:opr32, src2:opr32)
 }
 
 procedure {:refined} {:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
+rADDWrapShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
     ensures
         dst == BitwiseAdd32(old(src1), EvalShift(old(src2), shift));
         //WordAligned(old(src1)) && WordAligned(old(EvalShift(old(src2), shift))) ==> WordAligned(dst);
