@@ -20,6 +20,7 @@ let prefix_id (prefix:string) (x:id):id =
 
 let transparent_id (x:id):id = prefix_id "transparent_" x
 let irreducible_id (x:id):id = prefix_id "irreducible_" x
+let internal_id (x:id):id = prefix_id "internal_" x
 
 // non-associative: (n, n+1, n+1)
 // left-associative: (n, n, n+1)
@@ -366,13 +367,15 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
-  let (rs, es) = collect_specs p.pspecs in
-  let (rs, es) = (and_of_list rs, and_of_list es) in
+  let (reqs, enss) = collect_specs p.pspecs in
+  let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
+  let fast_state = attrs_get_bool (Id "fast_state") false p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
+  let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s =
     ps.Indent ();
     let st = String.concat " * " (List.map string_of_pformal p.prets) in
@@ -382,11 +385,23 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
     ps.Unindent ();
     in
-  ( match (tactic, ps.print_interface) with
-    | (Some _, None) -> ()
-    | _ ->
+  ( match (tactic, ps.print_interface, fast_state) with
+    | (Some _, None, _) -> ()
+    | (_, _, false) ->
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
         printPType psi "-> "
+    | (_, _, true) ->
+        psi.PrintLine ("val " + (sid (internal_id p.pname)) + " : " + (val_string_of_formals args));
+        printPType psi "-> "
+        psi.PrintLine ("unfold let " + (sid p.pname) + (let_string_of_formals true args));
+        printPType psi ": ";
+        psi.PrintLine "=";
+        let sArgs = string_of_args (List.map (fun (x, _) -> EVar x) args) in
+        let sRets = "(" + (String.concat ", " (List.map (fun (x, _) -> sid x) rets)) + ")" in
+        let eFrame = attrs_get_exp (Reserved "fast_state_frame_exp") p.pattrs in
+        psi.PrintLine ("let " + sRets + " = " + (sid (internal_id p.pname)) + " " + sArgs + " in");
+        psi.PrintLine ("let va_sM = va_normalize_term (" + (string_of_exp eFrame) + ") in");
+        psi.PrintLine sRets
   );
   ( match p.pbody with
     | None -> ()
@@ -410,7 +425,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
               printPType ps "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
         );
-        ps.PrintLine ("let " + (sid p.pname) + " = " + (sid (irreducible_id p.pname)))
+        ps.PrintLine ("let " + (sid (if fast_state then internal_id p.pname else p.pname)) + " = " + (sid (irreducible_id p.pname)))
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =

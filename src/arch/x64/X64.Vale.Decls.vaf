@@ -20,6 +20,7 @@ unfold let va_make_opaque = Opaque_i.make_opaque
 unfold let va_reveal_opaque = Opaque_i.reveal_opaque
 unfold let va_hd = Cons?.hd
 unfold let va_tl = Cons?.tl
+unfold let va_normalize_term = normalize_term
 
 (* Type aliases *)
 unfold let va_bool = bool

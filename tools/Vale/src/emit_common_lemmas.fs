@@ -22,7 +22,7 @@ type build_env =
     is_framed:bool;
     is_terminating:bool;
     code_name:id;
-    frame_exp:id -> exp;
+    frame_exp:id -> exp * exp;
     gen_fast_block:lhs list -> exp list -> stmt list -> stmt list;
     gen_fast_block_funs:unit -> decls;
   }
@@ -284,7 +284,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
       let sbBody = build_lemma_block { senv with code = codeBody; s0 = s1; sM = sw2; f0 = fw2 } ss in
       let nCond = EOp (Bop BGt, [EVar n1; EInt bigint.Zero]) in
       let bCond = vaApp "evalCond" [codeCond; EVar sw1] in
-      let invFrame = (loc, benv.frame_exp sw1) in
+      let invFrame = (loc, snd (benv.frame_exp sw1)) in
       let invFrames = if benv.is_framed then [invFrame] else [] in
       let invs = List_mapSnd (sub (EVar sw1)) invs in
       let ed =
@@ -427,7 +427,7 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((lhs list -> exp list -> stmt l
 
 // Generate framing postcondition, which limits the variables that may be modified:
 //   ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
-let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
+let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
   let specModsIo = List.collect (specModIo env) p.pspecs in
   let frameArg (isRet:bool) e (x, _, storage, io, _) =
     match (isRet, storage, io) with
@@ -448,7 +448,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
   let e = List.fold (frameArg true) e p.prets in
   let e = List.fold (frameArg false) e p.pargs in
   let e = List.fold frameMod e specModsIo in
-  vaApp "state_eq" [EVar sM; e]
+  (e, vaApp "state_eq" [EVar sM; e])
 
 (* Build function for code for procedure Q
 function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand):va_code
@@ -529,7 +529,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let reqsIs = List.map (fun e -> (loc, require e)) reqIsExps in
 
   let specModsIo = List.collect (specModIo env) p.pspecs in
-  let eFrame = benv.frame_exp sM in
+  let (eFrameExp, eFrame) = benv.frame_exp sM in
 
   (* Generate lemma for procedure p:
     lemma va_lemma_p(va_b0:va_codes, va_s0:va_state, va_sN:va_state)
@@ -576,7 +576,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     prets = prets;
     pspecs = (loc, req)::reqs @ (loc, ens)::(List.concat pspecs) @ ensFrame;
     pbody = Some (sStmts);
-    pattrs = List.filter filter_proc_attr p.pattrs;
+    pattrs = (Reserved "fast_state_frame_exp", [eFrameExp])::(List.filter filter_proc_attr p.pattrs);
   }
 
 let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
