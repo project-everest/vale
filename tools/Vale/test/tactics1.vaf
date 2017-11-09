@@ -72,28 +72,28 @@ assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
 
 
 
-procedure{:tactic smt} Imm(out x:registerint, inline y:int)
+procedure{:tactic smt} Imm(out x:reg, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure{:tactic smt} Increment(inout x:registerint)
+procedure{:tactic smt} Increment(inout x:reg)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure{:tactic smt} Add(inout x:registerint, y:registerint)
+procedure{:tactic smt} Add(inout x:reg, y:reg)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure{:tactic smt} AddReg(inout x:registerint, y:registerint)
+procedure{:tactic smt} AddReg(inout x:reg, y:reg)
     ensures
         x == old(x + y);
 {

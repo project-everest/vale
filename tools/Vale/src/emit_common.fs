@@ -1002,7 +1002,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
     | (InOut | Out) ->
       (
         match Map.tryFind x env.ids with
-        | Some (StateInfo (prefix, es, t)) -> vaApp ("update_" + prefix) (es @ [EVar sM; e])
+        | Some (StateInfo (prefix, es, t)) -> vaApp ("modify_" + prefix) (es @ [EVar sM; e])
         | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
       )
     | _ -> e

@@ -7,14 +7,14 @@ include{:verbatim} "demoX86.dfy"
 function{:opaque} f(i:int):int { i + 1 }
 #endverbatim
 
-procedure{:instruction Ins(Mov(x, y))} mov(out x:registeruint32,
-                                                y:operanduint32)
+procedure{:instruction Ins(Mov(x, y))} mov(out x:reg32,
+                                                y:opr32)
     ensures x == old(y);
 {
 }
 
-procedure{:instruction Ins(Add(x, y))} add(inout x:registeruint32,
-                                                  y:operanduint32)
+procedure{:instruction Ins(Add(x, y))} add(inout x:reg32,
+                                                  y:opr32)
     requires x + y < 0x1_0000_0000;
     ensures  x == old(x + y);
 {

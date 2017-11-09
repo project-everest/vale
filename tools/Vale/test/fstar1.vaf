@@ -62,28 +62,28 @@ assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
 
 
 
-procedure Imm(out x:registerint, inline y:int)
+procedure Imm(out x:reg, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure Increment(inout x:registerint)
+procedure Increment(inout x:reg)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure Add(inout x:registerint, y:registerint)
+procedure Add(inout x:reg, y:reg)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure AddReg(inout x:registerint, y:registerint)
+procedure AddReg(inout x:reg, y:reg)
     ensures
         x == old(x + y);
 {

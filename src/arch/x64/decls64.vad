@@ -13,12 +13,12 @@ import opened x64_decls_i
 import opened operations_i
 #endverbatim
 
-procedure{:operand} Mem_in(base:operandint, inline offset:int, inline taint:taint, ghost id:heaplet_id) returns(o:mem_operandint)
+procedure{:operand} Mem_in(base:opr, inline offset:int, inline taint:taint, ghost id:heaplet_id) returns(o:mem)
     reads
         mem;
     extern;
 
-procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64Wrap(inout dst:operanduint64, src:mem_operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64Wrap(inout dst:opr64, src:mem64)
     modifies
         efl;
     ensures
@@ -37,8 +37,8 @@ procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64Wrap(inout 
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset, taint)))} Load64(
-    out dst:operanduint64,
-        src:operanduint64,
+    out dst:opr64,
+        src:opr64,
         inline offset:int,
         inline taint:taint,
         ghost id:heaplet_id)
@@ -64,8 +64,8 @@ procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset,
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(Mov64(MakeHeapOp(dst, offset, taint), src))} Store64(
-    dst:operanduint64,
-    src:operanduint64,
+    dst:opr64,
+    src:opr64,
     inline offset:int,
     inline taint:taint,
     ghost id:heaplet_id)
@@ -97,7 +97,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Mov64(MakeHeapOp(dst, offset, tain
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:operanduint64, src1:operanduint64, src2:operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:opr64, src1:opr64, src2:opr64)
     requires
         src1 + src2 < 0x1_0000_0000_0000_0000;
     ensures
@@ -109,7 +109,7 @@ procedure{:refined}{:bridge}{:instruction Ins(AddLea64(dst, src1, src2))} AddLea
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:operanduint64, src:operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:opr64, src:opr64)
     requires
         0 <= dst - src;
     modifies 
@@ -123,7 +123,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:operanduint64, src:operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -136,7 +136,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout 
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:operanduint64, src:mem_operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:opr64, src:mem64)
     modifies
         efl;
     ensures
@@ -151,7 +151,7 @@ procedure{:refined}{:bridge}{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(i
     lemma_BitwiseAdd64EquivalentToAddMod2To64(old(dst), old(src));
 }
 
-procedure{:refined}{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:operanduint64, src:operanduint64)
+procedure{:refined}{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -165,7 +165,7 @@ procedure{:refined}{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:ope
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:instruction Ins(Mul64(src))} Mul64Wrap(src:operanduint64)
+procedure{:refined}{:instruction Ins(Mul64(src))} Mul64Wrap(src:opr64)
     modifies
         efl;
         rax;
@@ -182,7 +182,7 @@ procedure{:refined}{:instruction Ins(Mul64(src))} Mul64Wrap(src:operanduint64)
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout dst:operanduint64, src:operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout dst:opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -194,7 +194,7 @@ procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout dst:
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:operanduint64, src:operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:opr64, src:opr64)
     modifies
         efl;
     requires{:refined false}
@@ -210,7 +210,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Shr64(dst, src))} Shr64(inout dst:operanduint64, src:operanduint64)
+procedure{:refined}{:bridge}{:instruction Ins(Shr64(dst, src))} Shr64(inout dst:opr64, src:opr64)
     modifies
         efl;
     requires{:refined false}

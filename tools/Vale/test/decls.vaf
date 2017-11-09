@@ -17,13 +17,13 @@ var{:state reg(Rdx)} rdx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(Mov64(dst,src))} Mov64(inout dst:dst_opr64, src:opr64)
     ensures
         dst == old(src);
 {
 }
 
-procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst:dst_opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -32,7 +32,7 @@ procedure{:instruction Ins(Add64(dst,src))} Add64Wrap(inout dst:dst_operanduint6
 {
 }
 
-procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:dst_operanduint64, src1:operanduint64, src2:operanduint64)
+procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:dst_opr64, src1:opr64, src2:opr64)
     requires
         src1 + src2 < nat64_max;
     ensures
@@ -40,7 +40,7 @@ procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:dst_oper
 {
 }
 
-procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:dst_opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -49,7 +49,7 @@ procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:dst_operan
 {
 }
 
-procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:dst_opr64, src:opr64)
     requires
         0 <= dst - src;
     modifies 
@@ -59,7 +59,7 @@ procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:dst_operanduint64, 
 {
 }
 
-procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:dst_opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -67,7 +67,7 @@ procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:dst_operanduint
 {
 }
 
-procedure{:instruction Ins(Mul64(src))} Mul64Wrap(src:operanduint64)
+procedure{:instruction Ins(Mul64(src))} Mul64Wrap(src:opr64)
     modifies
         efl;
         rax;
@@ -78,7 +78,7 @@ procedure{:instruction Ins(Mul64(src))} Mul64Wrap(src:operanduint64)
 {
 }
 
-procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:dst_opr64, src:opr64)
     modifies
         efl;
     ensures
@@ -102,7 +102,7 @@ let shift_right64 (x:nat64) (amt:nat64) :nat64 =
 
 #endverbatim
 
-procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:dst_opr64, src:opr64)
     modifies 
         efl;
     ensures
@@ -110,7 +110,7 @@ procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:dst_operanduint64, 
 {
 }
 
-procedure{:instruction Ins(And64(dst, src))} And64(inout dst:dst_operanduint64, src:operanduint64)
+procedure{:instruction Ins(And64(dst, src))} And64(inout dst:dst_opr64, src:opr64)
     modifies 
         efl;
     ensures
@@ -118,7 +118,7 @@ procedure{:instruction Ins(And64(dst, src))} And64(inout dst:dst_operanduint64, 
 {
 }
 
-procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst:dst_operanduint64, amt:shift_amtuint64)
+procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst:dst_opr64, amt:shift_amt64)
     modifies
         efl;
 //    requires
@@ -128,7 +128,7 @@ procedure{:instruction Ins(Shl64(dst, amt))} Shl64(inout dst:dst_operanduint64, 
 {
 }
 
-procedure{:instruction Ins(Shr64(dst, amt))} Shr64(inout dst:dst_operanduint64, amt:shift_amtuint64)
+procedure{:instruction Ins(Shr64(dst, amt))} Shr64(inout dst:dst_opr64, amt:shift_amt64)
     modifies
         efl;
     ensures

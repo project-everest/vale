@@ -78,7 +78,7 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
 
 function method fromOperand(o:operand):operand { o }
 function method va_const_operand(n:uint32):operand { OConst(n) }
-function method va_const_operanduint32(n:uint32):operand { OConst(n) }
+function method va_const_opr32(n:uint32):operand { OConst(n) }
 
 function method va_cmp_eq(o1:operand, o2:operand):obool { OCmp(OEq, o1, o2) }
 function method va_cmp_ne(o1:operand, o2:operand):obool { OCmp(ONe, o1, o2) }
@@ -102,17 +102,17 @@ function method va_get_whileBody(c:code):code requires c.While? { c.whileBody }
 // Vale-to-Dafny connections needed for refined mode
 //-----------------------------------------------------------------------------
 function method va_op_operand_osp():operand { OSP }
-function method va_op_operanduint32_osp():operand { OSP }
+function method va_op_opr32_osp():operand { OSP }
 function method va_op_operand_olr():operand { OLR }
-function method va_op_operandreg_olr():operand { OLR }
-function method va_op_operanduint32_olr():operand { OLR }
+function method va_op_opr_reg_olr():operand { OLR }
+function method va_op_opr32_olr():operand { OLR }
 function method va_op_operand_reg(r:ARMReg):operand { OReg(r) }
-function method va_op_operanduint32_reg(r:ARMReg):operand { OReg(r) }
-function method va_op_operandsnd_reg(r:ARMReg):operand { OReg(r) }
-function method va_op_operandreg_reg(r:ARMReg):operand { OReg(r) }
+function method va_op_opr32_reg(r:ARMReg):operand { OReg(r) }
+function method va_op_opr_snd_reg(r:ARMReg):operand { OReg(r) }
+function method va_op_opr_reg_reg(r:ARMReg):operand { OReg(r) }
 function method va_op_cmp_reg(r:ARMReg):operand { OReg(r) }
-function method va_coerce_operanduint32_to_operandreg(o:opr):opr { o }
-function method va_coerce_operanduint32_to_operandsnd(o:opr):opr { o }
+function method va_coerce_opr32_to_opr_reg(o:opr):opr { o }
+function method va_coerce_opr32_to_opr_snd(o:opr):opr { o }
 
 function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:ARMReg, s:va_state):uint32 requires r in s.regs { s.regs[r] }
@@ -129,25 +129,25 @@ function va_get_olr(s:va_state):uint32
     s.regs[LR]
 }
 
-function va_update_ok(sM:va_state, sK:va_state):state { sK.(ok := sM.ok) }
-function va_update_reg(r:ARMReg, sM:va_state, sK:va_state):va_state
+function va_modify_ok(sM:va_state, sK:va_state):state { sK.(ok := sM.ok) }
+function va_modify_reg(r:ARMReg, sM:va_state, sK:va_state):va_state
     requires r in sM.regs
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_update_mem(sM:va_state, sK:va_state):va_state {
+function va_modify_mem(sM:va_state, sK:va_state):va_state {
     sK.(m := sK.m.(addresses := sM.m.addresses))
 }
-function va_update_osp(sM:va_state, sK:va_state):va_state
+function va_modify_osp(sM:va_state, sK:va_state):va_state
     requires SP in sM.regs
 {
-    va_update_reg(SP, sM, sK)
+    va_modify_reg(SP, sM, sK)
 }
-function va_update_olr(sM:va_state, sK:va_state):va_state
+function va_modify_olr(sM:va_state, sK:va_state):va_state
     requires LR in sM.regs
 {
-    va_update_reg(LR, sM, sK)
+    va_modify_reg(LR, sM, sK)
 }
 
-function va_update_operanduint32(o:operand, sM:va_state, sK:va_state):va_state
+function va_update_opr32(o:operand, sM:va_state, sK:va_state):va_state
     requires ValidRegOperand(o);
     requires match o
                 case OReg(r) => r in sM.regs
@@ -165,44 +165,44 @@ function va_update_operand(o:operand, sM:va_state, sK:va_state):va_state
                 case OSP => SP in sM.regs 
 { 
     match o
-        case OReg(r) => va_update_reg(o.r, sM, sK)
-        case OLR => va_update_reg(LR, sM, sK)
-        case OSP => va_update_reg(SP, sM, sK)
+        case OReg(r) => va_modify_reg(o.r, sM, sK)
+        case OLR => va_modify_reg(LR, sM, sK)
+        case OSP => va_modify_reg(SP, sM, sK)
 }
 
 function method GetProbableReg(o:operand) : ARMReg { if o.OReg? then o.r else R0 }
 
-type va_value_operanduint32 = uint32
-type va_operand_operanduint32 = va_operand
-predicate va_is_src_operanduint32(o:operand, s:va_state) { ValidOperand(o) }
-predicate va_is_dst_operanduint32(o:operand, s:va_state) { ValidRegOperand(o) }
+type va_value_opr32 = uint32
+type va_operand_opr32 = va_operand
+predicate va_is_src_opr32(o:operand, s:va_state) { ValidOperand(o) }
+predicate va_is_dst_opr32(o:operand, s:va_state) { ValidRegOperand(o) }
 
 type reg = uint32
-type va_value_operandreg = reg
-type va_operand_operandreg = va_operand
-predicate va_is_src_operandreg(o:operand, s:va_state) { ValidRegOperand(o) }
+type va_value_opr_reg = reg
+type va_operand_opr_reg = va_operand
+predicate va_is_src_opr_reg(o:operand, s:va_state) { ValidRegOperand(o) }
 
 type snd = uint32
-type va_value_operandsnd = snd
-type va_operand_operandsnd = va_operand
-predicate va_is_src_operandsnd(o:operand, s:va_state) { ValidOperand(o) && o.OReg? }
+type va_value_opr_snd = snd
+type va_operand_opr_snd = va_operand
+predicate va_is_src_opr_snd(o:operand, s:va_state) { ValidOperand(o) && o.OReg? }
 
 predicate va_is_src_operandglobal(o:operand, s:va_state) { ValidGlobal(o) }
 
-function va_eval_operanduint32(s:va_state, o:operand):uint32
-    requires va_is_src_operanduint32(o, s);
+function va_eval_opr32(s:va_state, o:operand):uint32
+    requires va_is_src_opr32(o, s);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
-function va_eval_operandreg(s:va_state, o:operand):reg
-    requires va_is_src_operandreg(o, s);
+function va_eval_opr_reg(s:va_state, o:operand):reg
+    requires va_is_src_opr_reg(o, s);
     requires ValidState(s)
 {
     OperandContents(s,o)
 }
-function va_eval_operandsnd(s:va_state, o:operand):snd
-    requires va_is_src_operandsnd(o, s);
+function va_eval_opr_snd(s:va_state, o:operand):snd
+    requires va_is_src_opr_snd(o, s);
     requires ValidState(s)
 {
     OperandContents(s,o)

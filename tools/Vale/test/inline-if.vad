@@ -1,10 +1,10 @@
 include "common.vad"
 
-procedure{:instruction Ins(InsIncr(OOpr(OReg(o))))} incr(inout o:registerint)
+procedure{:instruction Ins(InsIncr(OOpr(OReg(o))))} incr(inout o:reg)
 {
 }
 
-procedure P(ghost g:int, inline k:int, inout r:registerint)
+procedure P(ghost g:int, inline k:int, inout r:reg)
 {
     /*
     if (10 <= r) {

@@ -883,7 +883,7 @@ lemma va_refined_CastBytesToWords(va_b0:va_codes, va_s0:va_state, va_sN:va_state
   requires va_require(va_b0, va_code_CastBytesToWords(num_bytes, taint), va_s0, va_sN)
   ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
   ensures  va_spec_CastBytesToWords(num_bytes, taint, va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(X86Edi, va_s0), va_get_mem(va_s0), va_get_mem(va_sM))
-  ensures  va_state_eq(va_sM, va_update_mem(va_sM, va_update_ok(va_sM, va_s0)))
+  ensures  va_state_eq(va_sM, va_modify_mem(va_sM, va_modify_ok(va_sM, va_s0)))
 {
   reveal_va_code_CastBytesToWords();
   var va_old_s:va_state := va_s0;

@@ -27,7 +27,7 @@ var{:state reg(R12)} r12:uint32;
 
 
 procedure {:refined} {:instruction Ins(LDR(rd, base, ofs, t))}
-rLDR(out rd:operanduint32, base:operanduint32, ofs:operanduint32, inline t:taint)
+rLDR(out rd:opr32, base:opr32, ofs:opr32, inline t:taint)
     requires
         ValidSrcAddr(mem, base + ofs, t);
     reads mem;
@@ -44,7 +44,7 @@ rLDR(out rd:operanduint32, base:operanduint32, ofs:operanduint32, inline t:taint
 }
 
 procedure {:refined} {:instruction Ins(LDR_reloc(rd, OSymbol(g)))}
-rLDRglobaladdr(out rd:operanduint32, inline g:global)
+rLDRglobaladdr(out rd:opr32, inline g:global)
     requires ValidGlobal(OSymbol(g));
     ensures
         rd == AddressOfGlobal(OSymbol(g));
@@ -75,8 +75,8 @@ predicate ValidGlobalsAddr(globals:map<operand, seq<uint32>>, g:global, addr:int
 #endverbatim
 
 procedure {:refined} {:instruction Ins(LDR_global(rd, OSymbol(g), base, ofs))}
-rLDRglobal(out rd:operanduint32, inline g:global,
-          base:operanduint32, ofs:operanduint32)
+rLDRglobal(out rd:opr32, inline g:global,
+          base:opr32, ofs:opr32)
     requires
         ValidGlobalsAddr(globals, g, base + ofs);
     reads
@@ -95,7 +95,7 @@ rLDRglobal(out rd:operanduint32, inline g:global,
 }
 
 procedure {:refined} {:instruction Ins(STR(rd, base, ofs, t))}
-rSTR(rd:operandreg, base:operanduint32, ofs:operanduint32, inline t:taint)
+rSTR(rd:opr_reg, base:opr32, ofs:opr32, inline t:taint)
     requires
         ValidAddr(mem, base + ofs);
     ensures
@@ -116,7 +116,7 @@ rSTR(rd:operandreg, base:operanduint32, ofs:operanduint32, inline t:taint)
 }
 
 procedure {:refined} {:instruction Ins(MOV(dst, src))}
-rMOV(out dst:operanduint32, src:operanduint32)
+rMOV(out dst:opr32, src:opr32)
     ensures
         dst == old(src);
 {
@@ -130,7 +130,6 @@ rMOV(out dst:operanduint32, src:operanduint32)
 }
 
 procedure {:refined} {:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
-rMOVShift(out dst:operanduint32, src:operandsnd, inline shift:Shift)
     ensures
         dst == old(EvalShift(old(src), shift));
 {
@@ -144,7 +143,7 @@ rMOVShift(out dst:operanduint32, src:operandsnd, inline shift:Shift)
 }
 
 procedure {:refined} {:instruction Ins(EOR(dst, src1, src2))}
-rEOR(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
+rEOR(out dst:opr32, src1:opr32, src2:opr32)
     ensures
         dst == BitwiseXor(old(src1), old(src2));
 {
@@ -158,7 +157,6 @@ rEOR(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
 }
 
 procedure {:refined} {:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))}
-rEORShift(out dst:operanduint32, src1:operanduint32, src2:operandsnd, inline shift:Shift)
     ensures
         dst == BitwiseXor(old(src1), EvalShift(old(src2), shift));
 {
@@ -172,7 +170,7 @@ rEORShift(out dst:operanduint32, src1:operanduint32, src2:operandsnd, inline shi
 }
 
 procedure {:refined} {:instruction Ins(ADD(dst, src1, src2))}
-rADD(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
+rADD(out dst:opr32, src1:opr32, src2:opr32)
     requires
         src1 + src2 < 0x1_0000_0000;
     ensures
@@ -188,7 +186,7 @@ rADD(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
 }
 
 procedure {:refined} {:instruction Ins(SUB(dst, src1, src2))}
-rSUB(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
+rSUB(out dst:opr32, src1:opr32, src2:opr32)
     requires
         src1 - src2 >= 0;
     ensures
@@ -204,7 +202,7 @@ rSUB(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
 }
 
 procedure {:refined} {:instruction Ins(ADD(dst, src1, src2))}
-rADDWrap(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
+rADDWrap(out dst:opr32, src1:opr32, src2:opr32)
     ensures
         dst == BitwiseAdd32(old(src1), old(src2));
         //WordAligned(old(src1)) && WordAligned(old(src2)) ==> WordAligned(dst);
@@ -220,7 +218,6 @@ rADDWrap(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
 }
 
 procedure {:refined} {:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
-rADDWrapShift(out dst:operanduint32, src1:operanduint32, src2:operandsnd, inline shift:Shift)
     ensures
         dst == BitwiseAdd32(old(src1), EvalShift(old(src2), shift));
         //WordAligned(old(src1)) && WordAligned(old(EvalShift(old(src2), shift))) ==> WordAligned(dst);
@@ -236,7 +233,7 @@ rADDWrapShift(out dst:operanduint32, src1:operanduint32, src2:operandsnd, inline
 }
 
 procedure {:refined} {:instruction Ins(AND(dst, src1, src2))}
-rAND(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
+rAND(out dst:opr32, src1:opr32, src2:opr32)
     ensures
         dst == old(BitwiseAnd(src1, src2));
 {
@@ -251,7 +248,7 @@ rAND(out dst:operanduint32, src1:operanduint32, src2:operanduint32)
 
 
 procedure {:refined} {:instruction Ins(REV(dst, src))}
-rREV(out dst:operanduint32, src:operandreg)
+rREV(out dst:opr32, src:opr_reg)
     ensures
         dst == old(bswap32(src));
 {

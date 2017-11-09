@@ -39,7 +39,7 @@ function MaybeUpdateOk(s:State, r:State) : State
 #endverbatim
 
 procedure {:refined} {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset, taint))) } 
-          Load(out dst:operanduint32, src:operanduint32, inline offset:int, 
+          Load(out dst:opr32, src:opr32, inline offset:int, 
                inline taint:taint, ghost id:heaplet_id)
     requires/ensures
         ValidSrcAddr(mem, id, src + offset, 32, taint);
@@ -55,7 +55,7 @@ procedure {:refined} {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset, taint)
 }
 
 procedure {:refined} {:instruction Ins(Mov32(MakeHeapOp(dst, offset, taint), src)) } 
-          Store(dst:operanduint32, src:operanduint32, inline offset:int, 
+          Store(dst:opr32, src:opr32, inline offset:int, 
                 inline taint:taint, ghost id:heaplet_id)
     requires/ensures
         ValidDstAddr(mem, id, dst + offset, 32);
@@ -85,7 +85,7 @@ procedure {:refined} {:instruction Ins(Mov32(MakeHeapOp(dst, offset, taint), src
 }
 
 procedure {:refined} {:instruction Ins(Mov32(dst, stack(slot))) } 
-          LoadStack(out dst:operanduint32, inline slot:int)
+          LoadStack(out dst:opr32, inline slot:int)
     requires/ensures
         HasStackSlot(stack, slot);
     reads
@@ -100,7 +100,7 @@ procedure {:refined} {:instruction Ins(Mov32(dst, stack(slot))) }
 }
 
 procedure {:refined} {:instruction Ins(Mov32(stack(slot), src)) } 
-          StoreStack(inline slot:int, src:operanduint32)
+          StoreStack(inline slot:int, src:opr32)
     requires/ensures
         HasStackSlot(stack, slot);
     modifies
@@ -115,7 +115,7 @@ procedure {:refined} {:instruction Ins(Mov32(stack(slot), src)) }
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:refined}{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:operanduint32)
+procedure{:refined}{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
   requires
     0 <= dst <= 1000;
   modifies 
@@ -129,7 +129,7 @@ procedure{:refined}{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:oper
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32(inout dst:operanduint32, src:operanduint32)
+procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
   requires
     src + dst < 0x1_0000_0000;
   modifies 
@@ -144,7 +144,7 @@ procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32(inout dst:operandui
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
-procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:operanduint32, src:operanduint32)
+procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr32)
   modifies 
     efl;
   ensures
@@ -158,7 +158,7 @@ procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opera
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
-procedure{:refined}{:instruction Ins(Mov32(dst, src))} Mov32(inout dst:operanduint32, src:operanduint32)
+procedure{:refined}{:instruction Ins(Mov32(dst, src))} Mov32(inout dst:opr32, src:opr32)
   ensures
     dst == old(src);
 {
@@ -168,7 +168,7 @@ procedure{:refined}{:instruction Ins(Mov32(dst, src))} Mov32(inout dst:operandui
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(BSwap32(dst))} BSwap32(inout dst:operanduint32)
+procedure {:refined} {:instruction Ins(BSwap32(dst))} BSwap32(inout dst:opr32)
   ensures
     dst == bswap32(old(dst));
 {
@@ -178,7 +178,7 @@ procedure {:refined} {:instruction Ins(BSwap32(dst))} BSwap32(inout dst:operandu
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined}  LoadBSwap(out dst:operanduint32, src:operanduint32, inline offset:int, 
+procedure {:refined}  LoadBSwap(out dst:opr32, src:opr32, inline offset:int, 
                                 inline taint:taint, ghost id:heaplet_id)
     requires/ensures
         ValidSrcAddr(mem, id, src + offset, 32, taint);
@@ -193,7 +193,7 @@ procedure {:refined}  LoadBSwap(out dst:operanduint32, src:operanduint32, inline
 
 /*
 
-procedure MovBSwap32(out dst:operandint, src:operandint)
+procedure MovBSwap32(out dst:opr, src:opr)
   requires/ensures
     x86_ValidState(this);
   requires
@@ -208,7 +208,7 @@ procedure MovBSwap32(out dst:operandint, src:operandint)
 }
 */
 
-procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout dst:operanduint32, src:operanduint32)
+procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
   modifies efl;
   ensures
     dst == xor32(old(dst), old(src));
@@ -219,7 +219,7 @@ procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout dst:operand
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(And32(dst, src))} And32(inout dst:operanduint32, src:operanduint32)
+procedure {:refined} {:instruction Ins(And32(dst, src))} And32(inout dst:opr32, src:opr32)
   modifies efl;
   ensures
     dst == and32(old(dst), old(src));
@@ -230,7 +230,7 @@ procedure {:refined} {:instruction Ins(And32(dst, src))} And32(inout dst:operand
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout dst:operanduint32)
+procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
   modifies efl;
   ensures
     dst == not32(old(dst));
@@ -241,7 +241,7 @@ procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout dst:operanduint3
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:operanduint32, inline amount:uint32)
+procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, inline amount:uint32)
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -254,7 +254,7 @@ procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout 
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:operanduint32, inline amount:uint32)
+procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, inline amount:uint32)
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -267,7 +267,7 @@ procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout 
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:operanduint32, inline amount:uint32)
+procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, inline amount:uint32)
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -280,7 +280,7 @@ procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout 
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:operanduint32, inline amount:uint32)
+procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, inline amount:uint32)
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -296,7 +296,7 @@ procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout 
 
 /*
 
-procedure{:instruction Ins(AddCarry(dst, src))} AddCarry(inout dst:operandint, src:operandint)
+procedure{:instruction Ins(AddCarry(dst, src))} AddCarry(inout dst:opr, src:opr)
   requires/ensures
     x86_ValidState(this);
     x86_Valid32BitSourceOperand(this, @dst);
@@ -319,7 +319,7 @@ procedure{:instruction Ins(AddCarry(dst, src))} AddCarry(inout dst:operandint, s
     lemma_HeapletsUpdatedCorrectly32(old(this), this, @dst, v);
 }
 
-procedure{:instruction Ins(GetCf(dst))} GetCf(out dst:operandint)
+procedure{:instruction Ins(GetCf(dst))} GetCf(out dst:opr)
   requires/ensures
     x86_ValidState(this);
     x86_Valid32BitSourceOperand(this, @dst);
@@ -343,7 +343,7 @@ procedure{:instruction Ins(GetCf(dst))} GetCf(out dst:operandint)
 }
 */
 
-procedure {:refined} {:instruction Ins(AESNI_enc(dst, src))} AESNI_enc(inout dst:operandQuadword, src:operandQuadword)
+procedure {:refined} {:instruction Ins(AESNI_enc(dst, src))} AESNI_enc(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(QuadwordXor(MixColumns(SubBytes(ShiftRows(dst))), src));
@@ -354,7 +354,7 @@ procedure {:refined} {:instruction Ins(AESNI_enc(dst, src))} AESNI_enc(inout dst
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(AESNI_enc_last(dst, src))} AESNI_enc_last(inout dst:operandQuadword, src:operandQuadword)
+procedure {:refined} {:instruction Ins(AESNI_enc_last(dst, src))} AESNI_enc_last(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(QuadwordXor(SubBytes(ShiftRows(dst)), src));
@@ -365,7 +365,7 @@ procedure {:refined} {:instruction Ins(AESNI_enc_last(dst, src))} AESNI_enc_last
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(AESNI_dec(dst, src))} AESNI_dec(inout dst:operandQuadword, src:operandQuadword)
+procedure {:refined} {:instruction Ins(AESNI_dec(dst, src))} AESNI_dec(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(QuadwordXor(InvMixColumns(InvSubBytes(InvShiftRows(dst))), src));
@@ -377,7 +377,7 @@ procedure {:refined} {:instruction Ins(AESNI_dec(dst, src))} AESNI_dec(inout dst
 }
 
 procedure {:refined} {:instruction Ins(AESNI_dec_last(dst, src))} 
-          AESNI_dec_last(inout dst:operandQuadword, src:operandQuadword)
+          AESNI_dec_last(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(QuadwordXor(InvSubBytes(InvShiftRows(dst)), src));
@@ -388,7 +388,7 @@ procedure {:refined} {:instruction Ins(AESNI_dec_last(dst, src))}
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(AESNI_imc(dst, src))} AESNI_imc(inout dst:operandQuadword, src:operandQuadword)
+procedure {:refined} {:instruction Ins(AESNI_imc(dst, src))} AESNI_imc(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(InvMixColumns(src));
@@ -400,7 +400,7 @@ procedure {:refined} {:instruction Ins(AESNI_imc(dst, src))} AESNI_imc(inout dst
 }
 
 procedure {:refined} {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} 
-          AESNI_keygen_assist(inout dst:operandQuadword, src:operandQuadword, imm8:operandimm8)
+          AESNI_keygen_assist(inout dst:opr_quad, src:opr_quad, imm8:opr_imm8)
   modifies efl;
   ensures
     dst == old(Quadword(SubWord(src.mid_lo),
@@ -415,7 +415,7 @@ procedure {:refined} {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))}
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout dst:operandQuadword, src:operandQuadword)
+procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(QuadwordXor(dst, src));
@@ -427,7 +427,7 @@ procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout dst:operandQu
 }
 
 procedure {:refined} {:instruction Ins(Pshufd(dst, src, permutation))} 
-          Pshufd(inout dst:operandQuadword, src:operandQuadword, permutation:operandimm8)
+          Pshufd(inout dst:opr_quad, src:opr_quad, permutation:opr_imm8)
   modifies efl;
   ensures
     dst == old(Quadword(select_word(src, byte_to_bits(permutation).lo),
@@ -441,7 +441,7 @@ procedure {:refined} {:instruction Ins(Pshufd(dst, src, permutation))}
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout dst:operandQuadword, src:operandQuadword)
+procedure {:refined} {:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(Quadword(0, src.lo, src.mid_lo, src.mid_hi));
@@ -454,7 +454,7 @@ procedure {:refined} {:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(i
 
 /*
 
-procedure {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} AESNI_keygen_assist(inout dst:operandint, src:operandint, imm8:operandint)
+procedure {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} AESNI_keygen_assist(inout dst:opr, src:opr, imm8:opr)
   requires/ensures
     x86_ValidState(this);
     x86_ValidXmmDestinationOperand(this, @dst);
@@ -483,7 +483,7 @@ procedure {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} AESNI_keygen_a
 }
 
 
-procedure {:instruction Ins(Pshufd(dst, src, permutation))} Pshufd(inout dst:operandint, src:operandint, permutation:operandint)
+procedure {:instruction Ins(Pshufd(dst, src, permutation))} Pshufd(inout dst:opr, src:opr, permutation:opr)
   requires/ensures
     x86_ValidState(this);
     x86_ValidXmmDestinationOperand(this, @dst);
@@ -510,7 +510,7 @@ procedure {:instruction Ins(Pshufd(dst, src, permutation))} Pshufd(inout dst:ope
     lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
 }
 
-procedure {:instruction Ins(VPSLLDQ(dst, src, count))} VPSLLDQ(inout dst:operandint, src:operandint, count:operandint)
+procedure {:instruction Ins(VPSLLDQ(dst, src, count))} VPSLLDQ(inout dst:opr, src:opr, count:opr)
   requires/ensures
     x86_ValidState(this);
     x86_ValidXmmDestinationOperand(this, @dst);
@@ -533,7 +533,7 @@ procedure {:instruction Ins(VPSLLDQ(dst, src, count))} VPSLLDQ(inout dst:operand
     lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
 }
 
-procedure {:instruction Ins(MOVDQU(dst, src))} MOVDQU(inout dst:operandint, src:operandint)
+procedure {:instruction Ins(MOVDQU(dst, src))} MOVDQU(inout dst:opr, src:opr)
   requires/ensures
     x86_ValidState(this);
     x86_Valid128BitDestinationOperand(this, @dst);
@@ -561,7 +561,7 @@ procedure {:instruction Ins(MOVDQU(dst, src))} MOVDQU(inout dst:operandint, src:
 }
 */
 
-procedure{:refined}{:instruction Ins(MOVDQU(dst, src))} Mov128(inout dst:operandQuadword, src:operandQuadword)
+procedure{:refined}{:instruction Ins(MOVDQU(dst, src))} Mov128(inout dst:opr_quad, src:opr_quad)
   modifies
     efl;
   ensures
@@ -574,7 +574,7 @@ procedure{:refined}{:instruction Ins(MOVDQU(dst, src))} Mov128(inout dst:operand
 }
 
 procedure {:refined} {:instruction Ins(MOVDQU(dst, MakeHeapOp(src, offset, taint))) } 
-          Load128(out dst:operandQuadword, src:operanduint32, inline offset:int, 
+          Load128(out dst:opr_quad, src:opr32, inline offset:int, 
                   inline taint:taint, ghost id:heaplet_id)
     requires/ensures
         ValidSrcAddr(mem, id, src + offset, 128, taint);
@@ -591,7 +591,7 @@ procedure {:refined} {:instruction Ins(MOVDQU(dst, MakeHeapOp(src, offset, taint
 
 
 procedure {:refined} {:instruction Ins(MOVDQU(MakeHeapOp(dst, offset, taint), src)) } 
-          Store128(dst:operanduint32, src:operandQuadword, inline offset:int, 
+          Store128(dst:opr32, src:opr_quad, inline offset:int, 
                    inline taint:taint, ghost id:heaplet_id)
     requires/ensures
         ValidDstAddr(mem, id, dst + offset, 128);

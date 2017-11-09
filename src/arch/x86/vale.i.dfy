@@ -25,12 +25,12 @@ type va_state = State
 
 type imm8 = uint8 
 
-type va_operand_operanduint32 = va_operand
-type va_value_operanduint32 = uint32
-type va_operand_operandQuadword = va_operand
-type va_value_operandQuadword = Quadword
-type va_operand_operandimm8 = va_operand
-type va_value_operandimm8 = imm8
+type va_operand_opr32 = va_operand
+type va_value_opr32 = uint32
+type va_operand_opr_quad = va_operand
+type va_value_opr_quad = Quadword
+type va_operand_opr_imm8 = va_operand
+type va_value_opr_imm8 = imm8
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -70,46 +70,46 @@ function va_get_mem(s:va_state):Heaplets { s.heaplets }
 function va_get_memory(s:va_state):heap { s.heap}
 function va_get_stack(s:va_state):Stack { s.stack }
 
-function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
-function va_update_reg(r:x86reg, sM:va_state, sK:va_state):va_state 
+function va_modify_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_modify_reg(r:x86reg, sM:va_state, sK:va_state):va_state 
     requires r in sM.regs 
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_update_Quadword(r:int, sM:va_state, sK:va_state):va_state 
+function va_modify_Quadword(r:int, sM:va_state, sK:va_state):va_state 
     requires r in sM.xmms
 { sK.(xmms := sK.xmms[r := sM.xmms[r]]) }
-function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap, heaplets := sM.heaplets) }
-function va_update_memory(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap) }
-function va_update_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
-function va_update_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
+function va_modify_mem(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap, heaplets := sM.heaplets) }
+function va_modify_memory(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap) }
+function va_modify_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
+function va_modify_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
 
-predicate va_is_src_operandimm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
+predicate va_is_src_opr_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
 
-predicate va_is_src_operanduint32(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
-predicate va_is_dst_operanduint32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
+predicate va_is_src_opr32(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
+predicate va_is_dst_opr32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
 
-predicate va_is_src_operandQuadword(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
-predicate va_is_dst_operandQuadword(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
+predicate va_is_src_opr_quad(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
+predicate va_is_dst_opr_quad(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
 
-function va_eval_operandimm8(s:va_state, o:opr):uint32
-    requires va_is_src_operandimm8(o, s);
+function va_eval_opr_imm8(s:va_state, o:opr):uint32
+    requires va_is_src_opr_imm8(o, s);
 {
     o.n
 }
 
-function va_eval_operanduint32(s:va_state, o:opr):uint32
-    requires va_is_src_operanduint32(o, s);
+function va_eval_opr32(s:va_state, o:opr):uint32
+    requires va_is_src_opr32(o, s);
 {
     eval_op(to_state(s), o)
 }
 
-function va_eval_operandQuadword(s:va_state, o:opr):Quadword
-    requires va_is_src_operandQuadword(o, s);
+function va_eval_opr_quad(s:va_state, o:opr):Quadword
+    requires va_is_src_opr_quad(o, s);
     requires o.r.xmm in s.xmms;
 {
     Eval128BitOperand(to_state(s), o)
 }
 
-function va_update_operanduint32(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_opr32(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?;
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
@@ -117,7 +117,7 @@ function va_update_operanduint32(o:opr, sM:va_state, sK:va_state):va_state
 	va_update_operand(o, sM, sK)
 }
 
-function va_update_operandQuadword(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_opr_quad(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?;
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
@@ -130,7 +130,7 @@ function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
 {
-    if o.r.X86Xmm? then va_update_Quadword(o.r.xmm, sM, sK) else va_update_reg(o.r, sM, sK)
+    if o.r.X86Xmm? then va_modify_Quadword(o.r.xmm, sM, sK) else va_modify_reg(o.r, sM, sK)
 }
 
 predicate va_state_eq(s0:va_state, s1:va_state)
@@ -183,12 +183,12 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
 }
 
 function method va_const_operand(n:uint32):opr { OConst(n) }
-function method va_const_operanduint32(n:uint32):opr { OConst(n) } // convert const to operanduint32
-function method va_const_operandimm8(n:imm8):opr {OConst(n) } // convert const to operandimm8
+function method va_const_opr32(n:uint32):opr { OConst(n) } // convert const to opr32
+function method va_const_opr_imm8(n:imm8):opr {OConst(n) } // convert const to opr_imm8
 function method va_op_operand_reg(r:x86reg):opr { OReg(r) }
-function method va_op_operanduint32_reg(r:x86reg):opr { OReg(r) } // convert reg to operanduint32
+function method va_op_opr32_reg(r:x86reg):opr { OReg(r) } // convert reg to opr32
 function method va_op_operand_Quadword(r:int):opr { OReg(X86Xmm(r)) }
-function method va_op_operandQuadword_Quadword(r:int):opr { OReg(X86Xmm(r)) } // convert Quadword to operandQuadword
+function method va_op_opr_quad_Quadword(r:int):opr { OReg(X86Xmm(r)) } // convert Quadword to opr_quad
 function method va_op_cmp_reg(r:x86reg):opr { OReg(r) }
 
 function method va_cmp_eq(o1:opr, o2:opr):obool { OCmp(OEq, o1, o2) }
@@ -727,8 +727,8 @@ lemma va_lemma_block(b:codes, s0:va_state, r:va_state) returns(r1:va_state, c0:c
 lemma va_lemma_ifElse(ifb:obool, ct:code, cf:code, s:va_state, r:va_state) returns(cond:bool, s':va_state)
     requires !ifb.o1.OHeap? && !ifb.o2.OHeap?;
     requires x86_ValidState(s);
-    requires va_is_src_operanduint32(ifb.o1, s);
-    requires va_is_src_operanduint32(ifb.o2, s);
+    requires va_is_src_opr32(ifb.o1, s);
+    requires va_is_src_opr32(ifb.o2, s);
     requires eval_code(IfElse(ifb, ct, cf), s, r)
     ensures  if s.ok then
                     s'.ok
@@ -760,8 +760,8 @@ predicate va_whileInv(b:obool, c:code, n:int, r1:va_state, r2:va_state)
 }
 
 lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':va_state)
-    requires va_is_src_operanduint32(b.o1, s);
-    requires va_is_src_operanduint32(b.o2, s);
+    requires va_is_src_opr32(b.o1, s);
+    requires va_is_src_opr32(b.o2, s);
     requires x86_ValidState(s);
     requires eval_code(While(b, c), s, r)
     ensures  evalWhileLax(b, c, n, to_state(s), to_state(r))
@@ -782,8 +782,8 @@ lemma va_lemma_while(b:obool, c:code, s:va_state, r:va_state) returns(n:nat, r':
 }
 
 lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns(s':va_state, r':va_state)
-    requires va_is_src_operanduint32(b.o1, s);
-    requires va_is_src_operanduint32(b.o2, s);
+    requires va_is_src_opr32(b.o1, s);
+    requires va_is_src_opr32(b.o2, s);
     requires n > 0
     requires evalWhileLax(b, c, n, to_state(s), to_state(r))
     ensures  x86_ValidState(s) ==> x86_ValidState(s');
@@ -792,7 +792,7 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
     ensures  x86_ValidState(s) ==> if s.ok then x86_branchRelation(s, s', true) else s' == s;
     ensures  if s.ok && x86_ValidState(s) then
                     s'.ok
-                 && va_is_src_operanduint32(b.o1, s)
+                 && va_is_src_opr32(b.o1, s)
                  && evalOBool(to_state(s), b)
                  && (s.heaplets == s'.heaplets == r'.heaplets)
              else
@@ -822,8 +822,8 @@ lemma va_lemma_whileTrue(b:obool, c:code, n:nat, s:va_state, r:va_state) returns
 }
 
 lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va_state)
-    requires va_is_src_operanduint32(b.o1, s);
-    requires va_is_src_operanduint32(b.o2, s);
+    requires va_is_src_opr32(b.o1, s);
+    requires va_is_src_opr32(b.o2, s);
     requires evalWhileLax(b, c, 0, to_state(s), to_state(r))
     ensures  if s.ok then
                 (if x86_ValidState(s) then
