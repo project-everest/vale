@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'do_dafny', 'do_fstar')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
@@ -72,6 +72,9 @@ verify_options = {
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
+
+  # Special treatment for the taint analysis
+  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),

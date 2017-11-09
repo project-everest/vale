@@ -218,6 +218,8 @@ dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 fstar_default_args = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
   + ' --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'\
   + ' --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
+fstar_default_args_nosmtencoding = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
+  + ' --z3cliopt smt.arith.nl=false --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
 
 ####################################################################
 #
@@ -906,7 +908,7 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'do_dafny', 'do_fstar')
+Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')

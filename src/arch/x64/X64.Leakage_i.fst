@@ -8,7 +8,7 @@ open X64.Leakage_Ins_i
 
 open FStar.Tactics
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
 let combine_reg_taints regs1 regs2 =
     fun x -> merge_taint (regs1 x) (regs2 x)
 
