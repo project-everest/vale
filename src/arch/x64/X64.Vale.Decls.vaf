@@ -349,6 +349,9 @@ open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s
 
+#reset-options "--z3cliopt smt.arith.nl=true"
+let lemma_mul_in_bounds (x y:nat64) : Lemma (requires x `op_Multiply` y < nat64_max) (ensures FStar.UInt.mul_mod #64 x y == x `op_Multiply` y) = ()
+
 #reset-options "--z3cliopt smt.arith.nl=true --using_facts_from Prims --using_facts_from FStar.Math"
 let lemma_mul_nat (x:nat) (y:nat) : Lemma (ensures 0 <= (x `op_Multiply` y)) = ()
 #reset-options "--initial_fuel 2 --max_fuel 2"
@@ -390,10 +393,10 @@ let va_lemma_whileFalse_total = Lemmas_i.lemma_whileFalse_total
 let va_lemma_whileMerge_total = Lemmas_i.lemma_whileMerge_total
 
 let logxor64 (x:nat64) (y:nat64) : nat64 =
-  S.logxor x y
+  FStar.UInt.logxor #64 x y
 
 let logand64 (x:nat64) (y:nat64) : nat64 =
-  S.logand x y
+  FStar.UInt.logand #64 x y
 
 let logand128 (x:nat128) (y:nat128) : nat128 =
   FStar.UInt.logand #128 x y
@@ -405,10 +408,10 @@ let logand128 (x:nat128) (y:nat128) : nat128 =
 *)
 
 let shift_left64 (x:nat64) (amt:nat64) : nat64 =
-  S.shift_left x amt
+  FStar.UInt.shift_left #64 x amt
 
 let shift_right64 (x:nat64) (amt:nat64) : nat64 =
-  S.shift_right x amt
+  FStar.UInt.shift_right #64 x amt
 
 let reveal_logand128 (x y:nat128) = ()
 
@@ -545,6 +548,13 @@ procedure{:instruction Ins(S.Sub64(dst, src))} Sub64Wrap(inout dst_operand dst:u
 {
 }
 
+#verbatim
+let lemma_fundamental_div_mod (a b:nat64) :
+  Lemma (nat64_max `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
+  =
+  ()
+#endverbatim
+
 procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(operand src:uint64)
     modifies
         efl;
@@ -553,6 +563,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(operand s
     ensures
         nat64_max * rdx + rax == old(rax * src);
 {
+    lemma_fundamental_div_mod(old(rax), old(src));
 }
 
 procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst_operand dst:uint64, operand src:uint64)
@@ -564,6 +575,7 @@ procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout 
         eq_int(dst, (old(dst * src)));
 {
     lemma_mul_nat(old(dst), old(src));
+    lemma_mul_in_bounds(old(dst), old(src));
 }
 
 procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst_operand dst:uint64, operand src:uint64)

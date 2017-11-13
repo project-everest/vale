@@ -32,46 +32,46 @@ type codes = list code
 
 noeq type state = {
   ok: bool;
-  regs: reg -> uint64;
-  flags: uint64;
+  regs: reg -> nat64;
+  flags: nat64;
   mem: mem;
 }
 
-let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
-assume val havoc : state -> ins -> uint64
+//let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
+//let v (u:uint64) : nat64 = FStar.UInt64.v u
 
-unfold let eval_reg (r:reg) (s:state) : uint64 = s.regs r
-unfold let eval_mem (ptr:int) (s:state) : uint64 = UInt64.uint_to_t (load_mem64 ptr s.mem)
+assume val havoc : state -> ins -> nat64
+
+unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
+unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
 let eval_maddr (m:maddr) (s:state) : int =
-  let open FStar.UInt64 in
   let open FStar.Mul in
     match m with
     | MConst n -> n
-    | MReg reg offset -> v (eval_reg reg s) + offset
-    | MIndex base scale index offset -> v (eval_reg base s) + scale * v (eval_reg index s) + offset
+    | MReg reg offset -> (eval_reg reg s) + offset
+    | MIndex base scale index offset -> (eval_reg base s) + scale * (eval_reg index s) + offset
 
-let eval_operand (o:operand) (s:state) : uint64 =
+let eval_operand (o:operand) (s:state) : nat64 =
   match o with
-  | OConst n -> u (int_to_nat64 n)
+  | OConst n -> int_to_nat64 n
   | OReg r -> eval_reg r s
   | OMem m -> eval_mem (eval_maddr m s) s
 
-open FStar.UInt64
 let eval_ocmp (s:state) (c:ocmp) :bool =
   match c with
   | OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
   | ONe o1 o2 -> eval_operand o1 s <> eval_operand o2 s
-  | OLe o1 o2 -> eval_operand o1 s <=^ eval_operand o2 s
-  | OGe o1 o2 -> eval_operand o1 s >=^ eval_operand o2 s
-  | OLt o1 o2 -> eval_operand o1 s <^ eval_operand o2 s
-  | OGt o1 o2 -> eval_operand o1 s >^ eval_operand o2 s
+  | OLe o1 o2 -> eval_operand o1 s <= eval_operand o2 s
+  | OGe o1 o2 -> eval_operand o1 s >= eval_operand o2 s
+  | OLt o1 o2 -> eval_operand o1 s < eval_operand o2 s
+  | OGt o1 o2 -> eval_operand o1 s > eval_operand o2 s
 
-let update_reg' (r:reg) (v:uint64) (s:state) : state =
+let update_reg' (r:reg) (v:nat64) (s:state) : state =
   { s with regs = fun r' -> if r' = r then v else s.regs r' }
 
-let update_mem (ptr:int) (v:uint64) (s:state) : state =
-  { s with mem = store_mem64 ptr (UInt64.v v) s.mem }
+let update_mem (ptr:int) (v:nat64) (s:state) : state =
+  { s with mem = store_mem64 ptr v s.mem }
 
 let valid_maddr (m:maddr) (s:state) : bool =
   valid_mem64 (eval_maddr m s) s.mem
@@ -82,28 +82,28 @@ let valid_operand (o:operand) (s:state) : bool =
   | OReg r -> true
   | OMem m -> valid_maddr m s
 
-let update_operand_preserve_flags' (o:dst_op) (v:uint64) (s:state) : state =
+let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) : state =
   match o with
   | OReg r -> update_reg' r v s
   | OMem m -> update_mem (eval_maddr m s) v s // see valid_maddr for how eval_maddr connects to b and i
 
 // Default version havocs flags 
-let update_operand' (o:dst_op) (ins:ins) (v:uint64) (s:state) : state =
+let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
-let cf (flags:uint64) : bool =
-  v flags % 2 = 1
+let cf (flags:nat64) : bool =
+  flags % 2 = 1
 
-let update_cf (flags:uint64) (new_cf:bool) : (new_flags:uint64{cf new_flags == new_cf}) =
+let update_cf (flags:nat64) (new_cf:bool) : (new_flags:nat64{cf new_flags == new_cf}) =
   if new_cf then
     if not (cf flags) then
-      flags +^ 1uL
+      flags + 1
     else
       flags
   else
     if (cf flags) then
-      flags -^ 1uL
+      flags - 1
     else
       flags
 
@@ -146,111 +146,28 @@ let run (f:st unit) (s:state) : state = snd (f s)
 
 (* Monadic update operations *)
 unfold
-let update_operand_preserve_flags (dst:dst_op) (v:uint64) :st unit =
+let update_operand_preserve_flags (dst:dst_op) (v:nat64) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand_preserve_flags' dst v s)
 
 // Default version havocs flags
 unfold
-let update_operand (dst:dst_op) (ins:ins) (v:uint64) :st unit =
+let update_operand (dst:dst_op) (ins:ins) (v:nat64) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand' dst ins v s)
 
-let update_reg (r:reg) (v:uint64) :st unit =
+let update_reg (r:reg) (v:nat64) :st unit =
   s <-- get;
   set (update_reg' r v s)
 
-let update_flags (new_flags:uint64) :st unit =
+let update_flags (new_flags:nat64) :st unit =
   s <-- get;
   set ( { s with flags = new_flags } )
-
-(* Lots of wrappers for bitwise operations *)
-abstract
-let logxor (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && FStar.UInt.fits y 64
-  then FStar.UInt.logxor #64 x y
-  else 0
-
-let logxor_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    FStar.UInt.fits y 64) ==>
-                    logxor x y = FStar.UInt.logxor #64 x y)
-          [SMTPat (logxor x y)]
-  = ()          
-
-abstract
-let logand (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && FStar.UInt.fits y 64
-  then FStar.UInt.logand #64 x y
-  else 0
-
-let logand_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    FStar.UInt.fits y 64) ==>
-                    logand x y = FStar.UInt.logand #64 x y)
-          [SMTPat (logand x y)]
-  = ()          
-
-abstract
-let shift_right (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && y >= 0
-  then FStar.UInt.shift_right #64 x y
-  else 0
-
-let shift_right_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    0 <= y /\
-                    y < 64 ==>
-                    shift_right x y = FStar.UInt.shift_right #64 x y))
-          [SMTPat (shift_right x y)]
-  = ()          
-
-abstract
-let shift_left (x:int) (y:int) : nat64 =
-  if FStar.UInt.fits x 64
-  && y >= 0
-  then FStar.UInt.shift_left #64 x y
-  else 0
-
-let shift_left_uint64 (x:int) (y:int)
-  : Lemma (ensures (FStar.UInt.fits x 64 /\
-                    0 <= y /\
-                    y < 64 ==>
-                    shift_left x y = FStar.UInt.shift_left #64 x y))
-          [SMTPat (shift_left x y)]
-  = ()          
-
-(* These wrappers of the operators from FStar.UInt are only present
-   because we discovered that using specs of the form (v a + v b) % pow2 64
-   causes Z3 to require some amount of non-linear arithmetic, 
-   which we prefer to avoid *)
-val add_mod64: a:uint64 -> b:uint64 -> Pure uint64
-  (requires True)
-  (ensures (fun c -> (v a + v b) % nat64_max = v c))
-let add_mod64 a b = a +%^ b
-
-val sub_mod64: a:uint64 -> b:uint64 -> Pure uint64
-  (requires True)
-  (ensures (fun c -> (v a - v b) % nat64_max = v c))
-let sub_mod64 a b = a -%^ b
-
-val mul_mod64: a:uint64 -> b:uint64 -> Pure uint64
-  (requires True)
-  (ensures (fun c -> (v a `op_Multiply` v b) % nat64_max = v c))
-let mul_mod64 a b = a *%^ b
-
-val mul_div64: a:uint64 -> b:uint64 -> Pure uint64
-  (requires True)
-  (ensures (fun c -> v a `op_Multiply` v b >= 0 /\ (v a `op_Multiply` v b) / nat64_max = v c))
-let mul_div64 a b = a */^ b
-
+  
+(* Core definition of instruction semantics *)
 let eval_ins (ins:ins) : st unit =
-  let open FStar.Mul in
   s <-- get;
   match ins with
   | Mov64 dst src ->
@@ -259,61 +176,59 @@ let eval_ins (ins:ins) : st unit =
 
   | Add64 dst src ->
     check (valid_operand src);;
-    let sum = v (eval_operand dst s) + v (eval_operand src s) in
+    let sum = (eval_operand dst s) + (eval_operand src s) in
     let new_carry = sum >= nat64_max in    
-    update_operand dst ins (eval_operand dst s `add_mod64` eval_operand src s);;
+    update_operand dst ins ((eval_operand dst s + eval_operand src s) % nat64_max);;
     update_flags (update_cf s.flags new_carry)
 
   | AddLea64 dst src1 src2 ->
     check (valid_operand src1);;
     check (valid_operand src2);;
-    update_operand_preserve_flags dst (eval_operand src1 s `add_mod64` eval_operand src2 s)
+    update_operand_preserve_flags dst ((eval_operand src1 s + eval_operand src2 s) % nat64_max)
 
   | AddCarry64 dst src ->
     check (valid_operand src);;
     let old_carry = if cf(s.flags) then 1 else 0 in
-    let sum = v (eval_operand dst s) + v (eval_operand src s) + old_carry in
+    let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
     let new_carry = sum >= nat64_max in
-    update_operand dst ins (uint_to_t (sum % nat64_max));;
+    update_operand dst ins (sum % nat64_max);;
     update_flags (update_cf s.flags new_carry)
 
   | Sub64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s `sub_mod64` eval_operand src s)
+    update_operand dst ins ((eval_operand dst s - eval_operand src s) % nat64_max)
 
   | Mul64 src ->
     check (valid_operand src);;
-    let hi = eval_reg Rax s `mul_div64` eval_operand src s in
-    let lo = eval_reg Rax s `mul_mod64` eval_operand src s in
+    let hi = FStar.UInt.mul_div #64 (eval_reg Rax s) (eval_operand src s) in
+    let lo = FStar.UInt.mul_mod #64 (eval_reg Rax s) (eval_operand src s) in
     update_reg Rax lo;;
     update_reg Rdx hi;;
     update_flags (havoc s ins)
-
+ 
   | IMul64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (eval_operand dst s `mul_mod64` eval_operand src s)
-
+    update_operand dst ins (FStar.UInt.mul_mod #64 (eval_operand dst s) (eval_operand src s))
+    
   | Xor64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (u (v (eval_operand dst s) `logxor` v (eval_operand src s)))
+    update_operand dst ins (FStar.UInt.logxor #64 (eval_operand dst s) (eval_operand src s))
 
   | And64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (u (v (eval_operand dst s) `logand` v (eval_operand src s)))
+    update_operand dst ins (FStar.UInt.logand #64 (eval_operand dst s) (eval_operand src s))
 
   | Shr64 dst amt ->
-    update_operand dst ins (u (v (eval_operand dst s) `shift_right` v (eval_operand amt s)))
+    update_operand dst ins (FStar.UInt.shift_right #64 (eval_operand dst s) (eval_operand amt s))
 
   | Shl64 dst amt ->
-    update_operand dst ins (u (v (eval_operand dst s) `shift_left` v (eval_operand amt s)))
+    update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
 
 (*
  * these functions return an option state
  * None case arises when the while loop runs out of fuel
  *)
-
 // TODO: IfElse and While should havoc the flags
-
 val eval_code:  c:code           -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
 val eval_codes: l:codes          -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; l])
 val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])

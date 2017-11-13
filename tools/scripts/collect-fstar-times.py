@@ -88,13 +88,14 @@ def compute_diff(times1, times2):
     return diffs
 
 def display_diffs(times, diffs):
-    tab = PrettyTable(["Filename", "t1 time", "delta", "delta \%","Full Path"])
+    delta_label = "delta: t1 - t2"
+    tab = PrettyTable(["Filename", "t1 time", delta_label, "delta \%","Full Path"])
     tab.align["Filename"] = "l"
     tab.align["t1 time"] = "r"
-    tab.align["delta"] = "r"
+    tab.align[delta_label] = "r"
     tab.align["delta \%"] = "r"
     tab.align["FullPath"] = "l"
-    tab.sortby = "delta"
+    tab.sortby = delta_label
 
     total_time = 0
     total_delta = 0
@@ -105,7 +106,7 @@ def display_diffs(times, diffs):
         delta_percent = "n/a"
         if f in diffs:
             delta = diffs[f]
-            delta_percent = "%0.1f" % (delta / float(times[f]))
+            delta_percent = "%0.1f" % (delta / float(times[f]) * 100)
         tab.add_row([filename, times[f], delta, delta_percent, f])
         if not times[f] is None:
             total_time += times[f]

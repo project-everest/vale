@@ -19,7 +19,7 @@ val lemma_to_ok : s:state -> Lemma
   [SMTPat s.ok]
 
 val lemma_to_flags : s:state -> Lemma
-  (ensures s.flags == UInt64.v (flags' (state_to_S s)))
+  (ensures s.flags == flags' (state_to_S s))
   [SMTPat s.flags]
 
 val lemma_to_mem : s:state -> Lemma
@@ -27,11 +27,11 @@ val lemma_to_mem : s:state -> Lemma
   [SMTPat s.mem]
   
 val lemma_to_reg : s:state -> r:reg -> Lemma
-  (ensures s.regs r == UInt64.v (regs' (state_to_S s) r))
+  (ensures s.regs r == regs' (state_to_S s) r)
   [SMTPat (s.regs r)]
 
 val lemma_to_eval_operand : s:state -> o:operand -> Lemma
-  (ensures eval_operand o s == UInt64.v (S.eval_operand o (state_to_S s)))
+  (ensures eval_operand o s == S.eval_operand o (state_to_S s))
   [SMTPat (eval_operand o s)]
 
 val lemma_to_valid_operand : s:state -> o:operand -> Lemma

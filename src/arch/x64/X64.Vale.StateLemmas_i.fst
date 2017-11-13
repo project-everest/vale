@@ -9,16 +9,16 @@ module M = TransparentMap
 
 let state_to_S (s:state) : S.state = {
   S.ok = s.ok;
-  S.regs = (fun r -> S.u (s.regs r));
-  S.flags = S.u (int_to_nat64 s.flags);
+  S.regs = (fun r -> s.regs r);
+  S.flags = int_to_nat64 s.flags;
   S.mem = s.mem;
 }
 
 let state_of_S (s:S.state) : state =
   let { S.ok = ok; S.regs = regs; S.flags = flags; S.mem = mem } = s in {
     ok = ok;
-    regs = (fun r -> UInt64.v (regs r));
-    flags = UInt64.v flags;
+    regs = (fun r -> regs r);
+    flags = flags;
     mem = mem;
   }
 
