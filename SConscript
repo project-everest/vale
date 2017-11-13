@@ -18,16 +18,6 @@ verify_paths = [
 ]
 Export('verify_paths')
 
-# A few .fst/.fsti files depend on .fsti files generated from .vaf files.
-# Without manually writing the dependencies for these, the dependency
-# analysis will miss them the first time scons runs.
-manual_dependencies = {
-  'obj/arch/x64/X64.Vale.StrongPost_i.vfsti.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
-  'obj/arch/x64/X64.Vale.StrongPost_i.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
-  'obj/Vale/test/StateUpdateTest.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
-}
-Export('manual_dependencies')
-
 #
 # All include paths for FStar should be in this list.
 # All files should use exactly the include paths in this list.
@@ -39,16 +29,13 @@ Export('manual_dependencies')
 # so the include path should contain obj/... for any .vaf files.
 #
 fstar_include_paths = [
-  'tools/Vale/test',
   'obj/Vale/test',
-  'src/test',
   'obj/test',
-  'src/arch/x64/',
   'obj/arch/x64/',
-  'src/lib/collections/',
-  'src/lib/util',
-  'src/crypto/poly1305/',
-  'src/crypto/poly1305/x64/',
+  'obj/lib/collections/',
+  'obj/lib/util',
+  'obj/crypto/poly1305/',
+  'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]
 Export('fstar_include_paths')
@@ -73,8 +60,9 @@ verify_options = {
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
 
-  # Special treatment for the taint analysis
+  # Special treatment for sensitive modules
   'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
+  'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),
@@ -89,7 +77,7 @@ verify_options = {
 
   # Disable verification by adding 'filename': None
 }
-if env['TARGET_ARCH']!='x86':
+if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None
  verify_options['src/test/stack-test.vad'] = None
  
