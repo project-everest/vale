@@ -6,12 +6,6 @@ module M = Memory_i_s
 
 type uint64 = UInt64.t
 
-let map (key:eqtype) (value:Type) = Map.t key value
-
-// syntax for map accesses, m.[key] and m.[key] <- value
-unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
-unfold let op_String_Assignment = Map.upd
-
 type ins =
   | Mov64      : dst:dst_op -> src:operand -> ins
   | Add64      : dst:dst_op -> src:operand -> ins
@@ -35,11 +29,6 @@ type ocmp =
 
 type code = precode ins ocmp
 type codes = list code
-
-(* REVIEW: Do we still need mem_make? *)
-//assume val mem_make (#v:Type0) (mappings:int -> v) (domain:Set.set int) : m:(map int v){
-//  Set.equal (Map.domain m) domain /\
-//  (forall (i:int).{:pattern (Map.sel m i)} Map.sel m i == mappings i)}
 
 noeq type state = {
   ok: bool;
