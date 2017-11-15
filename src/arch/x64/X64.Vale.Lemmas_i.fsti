@@ -10,7 +10,7 @@ unfold let codes = S.codes
 unfold let ocmp = S.ocmp
 unfold let fuel = nat
 
-let cf (flags:int) : bool = S.cf (S.u (int_to_nat64 flags))
+let cf (flags:int) : bool = S.cf (int_to_nat64 flags)
 
 let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : Type0 =
   Some (state_to_S s1) == S.eval_code c f0 (state_to_S s0)

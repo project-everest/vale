@@ -89,7 +89,8 @@ let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
   assert (S.eval_code (While b c) f1 (state_to_S s0) == S.eval_code (While b c) 1 (state_to_S sW));
   assert (eval_code (While b c) s0 f1 sW);
   (sW, f1)
-
+  
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 30"
 let lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) =
   let fN:nat = f0 + fM + 1 in
   let fForall (f:nat) : Lemma

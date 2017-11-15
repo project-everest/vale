@@ -43,6 +43,7 @@ fstar_include_paths = [
   'obj/Vale/test',
   'src/test',
   'obj/test',
+  'src/arch',
   'src/arch/x64/',
   'obj/arch/x64/',
   'src/lib/collections/',
@@ -88,6 +89,10 @@ verify_options = {
   '.vaf': BuildOptions(fstar_default_args),
 
   # Disable verification by adding 'filename': None
+  'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
+  'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
+  'src/test/Test.FastBlock.vaf': None,
+  #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 }
 if env['TARGET_ARCH']!='x86':
  verify_options['src/test/memcpy.vad'] = None
