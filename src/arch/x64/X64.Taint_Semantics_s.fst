@@ -6,6 +6,11 @@ open FStar.List.Tot.Base
 open X64.Machine_s
 open X64.Semantics_s
 
+// syntax for map accesses, m.[key] and m.[key] <- value
+let map (key:eqtype) (value:Type) = Map.t key value
+unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
+unfold let op_String_Assignment = Map.upd
+
 type taint =
   | Public
   | Secret
