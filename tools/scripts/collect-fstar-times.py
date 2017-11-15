@@ -116,12 +116,59 @@ def display_diffs(times, diffs):
     #tab.add_row(["Total", total_time, total_delta, total_delta / float(total_time), ""])
     print(tab)
 
+def analyze_times(time_files):
+    times = {}
+    for tf in time_files:
+        print "Loading times from file %s" % tf
+        times[tf] = load_times(tf)
+
+    avg = {}
+    count = {}
+    stdev = {}
+
+    for run_times in times.values():
+        for f,t in run_times.iteritems():
+            if f in avg:
+                avg[f] += t
+                count[f] = count[f] + 1
+            else:
+                avg[f] = t
+                count[f] = 0
+
+    for f,sum in avg.iteritems():
+        avg[f] = sum / float(count[f])
+
+    for run_times in times.values():
+        for f,t in run_times.iteritems():
+            dev = (t - avg[f])**2
+            if f in stdev:
+                stdev[f] = stdev[f] + dev
+            else:
+                stdev[f] = dev
+    
+    for f,dev in stdev.iteritems():
+        stdev[f] = (dev / count[f])**0.5
+    
+    tab = PrettyTable(["Filename", "Avg", "Stdev", "Percentage"])
+
+    tab.align["Filename"] = "l"
+    tab.align["Avg"] = "r"
+    tab.align["Stdev"] = "r"
+    tab.align["Percentage"] = "r"
+
+    for f in sorted(avg.keys()):
+        per = stdev[f] / avg[f] * 100
+        tab.add_row([os.path.basename(f), "%0.1f" % avg[f], "%0.1f" % stdev[f], "%0.1f" % per])
+        
+    print(tab)
+
 def main():
     parser = argparse.ArgumentParser(description= 'Collect and summarize F* verification times')
     parser.add_argument('--dir', action='append', required=False, help='Collect all results in this folder and its subfolders')
     parser.add_argument('--label', action='store', required=False, help='Label for file containing the results')
     parser.add_argument('--t1', action='store', required=False, help='File of times to compare to t2')
     parser.add_argument('--t2', action='store', required=False, help='File of times to compare to t1')
+    parser.add_argument('--times', action='store', nargs='*', help='Compare many time files')
 
     args = parser.parse_args()
 
@@ -137,6 +184,9 @@ def main():
         diffs = compute_diff(times1, times2)
         display_diffs(times1, diffs)
         sys.exit(0)
+
+    if not args.times is None:
+        analyze_times(args.times)
 
     print("Invalid or insufficient arguments supplied.  Try running with -h")
 
