@@ -17,8 +17,8 @@ type taint =
 
 type observation =
   | BranchPredicate: pred:bool -> observation
-  | MemAccess: addr:uint64 -> observation
-  | MemAccessOffset: base:uint64 -> index:uint64 -> observation
+  | MemAccess: addr:nat64 -> observation
+  | MemAccessOffset: base:nat64 -> index:nat64 -> observation
 
 noeq type traceState = {
   state: state;
