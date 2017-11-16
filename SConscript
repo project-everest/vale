@@ -31,6 +31,7 @@ Export('verify_paths')
 fstar_include_paths = [
   'obj/Vale/test',
   'obj/test',
+  'obj/arch',
   'obj/arch/x64/',
   'obj/lib/collections/',
   'obj/lib/util',
@@ -76,6 +77,18 @@ verify_options = {
   '.vaf': BuildOptions(fstar_default_args),
 
   # Disable verification by adding 'filename': None
+  'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
+  'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
+  'src/test/Test.FastBlock.vaf': None,
+  #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
+  
+  # Turning off leakage analysis until it is adapted to the new version of Semantics
+  'src/arch/x64/X64.Taint_Semantics_s.fst': None,
+  'src/arch/x64/X64.Leakage_s.fst': None,
+  'src/arch/x64/X64.Leakage_i.fst': None,
+  'src/arch/x64/X64.Leakage_Ins_i.fst': None,
+  'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
+  
 }
 if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None

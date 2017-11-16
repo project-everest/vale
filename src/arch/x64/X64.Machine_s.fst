@@ -1,17 +1,14 @@
 module X64.Machine_s
 
-unfold let nat32_max = 0x100000000
-unfold let nat64_max = 0x10000000000000000
-unfold let nat128_max = 0x100000000000000000000000000000000
+module M = Memory_i_s
 
-// Sanity check our constants
-let _ = assert_norm (pow2 32 = nat32_max)
-let _ = assert_norm (pow2 64 = nat64_max)
-let _ = assert_norm (pow2 128 = nat128_max)
+unfold let nat32_max = Types_s.nat32_max
+unfold let nat64_max = Types_s.nat64_max
+unfold let nat128_max = Types_s.nat128_max
 
-type nat64 = x:nat{x < nat64_max}
+unfold let nat64 = Types_s.nat64
 assume val int_to_nat64 : i:int -> n:nat64{0 <= i && i < nat64_max ==> i == n}
-type nat128 = x:nat{x < nat128_max}
+unfold let nat128 = Types_s.nat128
 
 type reg =
   | Rax
@@ -51,4 +48,42 @@ let valid_dst (o:operand) : bool =
   not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
 
 type dst_op = o:operand{valid_dst o}
+
+unfold let buffer8 = M.buffer (M.TBase M.TUInt8)
+unfold let buffer16 = M.buffer (M.TBase M.TUInt16)
+unfold let buffer32 = M.buffer (M.TBase M.TUInt32)
+unfold let buffer64 = M.buffer (M.TBase M.TUInt64)
+assume val buffer_addr : #t:M.typ -> b:M.buffer t -> GTot int
+
+unfold let mem = M.mem
+assume val valid_mem64 : ptr:int -> h:mem -> bool // is there a 64-bit word at address ptr?
+assume val load_mem64 : ptr:int -> h:mem -> nat64 // the 64-bit word at ptr (if valid_mem64 holds)
+assume val store_mem64 : ptr:int -> v:nat64 -> h:mem -> mem
+
+assume val lemma_valid_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma
+  (requires
+    i < Seq.length (M.buffer_as_seq h b) /\
+    M.buffer_readable h b
+  )
+  (ensures
+    valid_mem64 (buffer_addr b + 8 `op_Multiply` i) h
+  )
+
+assume val lemma_load_mem64 : b:buffer64 -> i:int -> h:mem -> Lemma
+  (requires
+    i < Seq.length (M.buffer_as_seq h b) /\
+    M.buffer_readable h b
+  )
+  (ensures
+    load_mem64 (buffer_addr b + 8 `op_Multiply` i) h == M.buffer_read b i h
+  )
+
+assume val lemma_store_mem64 : b:buffer64 -> i:int -> v:nat64 -> h:mem -> Lemma
+  (requires
+    i < Seq.length (M.buffer_as_seq h b) /\
+    M.buffer_readable h b
+  )
+  (ensures
+    store_mem64 (buffer_addr b + 8 `op_Multiply` i) v h == M.buffer_write b i v h
+  )
 
