@@ -64,7 +64,7 @@ let lemma_operands_imply_op ts ops = match ops with
 
 val lemma_operand_obs_list: (ts:taintState) -> (ops:list operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
 (requires (operands_do_not_use_secrets ops ts /\ publicValuesAreSame ts s1 s2))
-(ensures  (operand_obs_list s1 ops) = (operand_obs_list s2 ops))
+(ensures  (operand_obs_list s1 ops) == (operand_obs_list s2 ops))
 
 let rec lemma_operand_obs_list ts ops s1 s2 = match ops with
   | [] -> ()
@@ -93,7 +93,7 @@ let lemma_taint_sources ins ts = ()
 
 val lemma_public_op_are_same: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
 (requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state)
-(ensures eval_operand op s1.state = eval_operand op s2.state)
+(ensures eval_operand op s1.state == eval_operand op s2.state)
 
 let lemma_public_op_are_same ts op s1 s2 = ()
 
@@ -104,9 +104,9 @@ let check_if_ins_consumes_fixed_time ins fuel ts =
   let fixedTime = ftSrcs && ftDsts in
 
   assert_by_tactic (forall s1 s2. {:pattern (publicValuesAreSame ts s1 s2)} (operands_do_not_use_secrets dsts ts /\ publicValuesAreSame ts s1 s2) ==>
-    (operand_obs_list s1 dsts) = (operand_obs_list s2 dsts)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts dsts))); 
+    (operand_obs_list s1 dsts) == (operand_obs_list s2 dsts)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts dsts))); 
 
-  assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets srcs ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 srcs) = (operand_obs_list s2 srcs)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts srcs)));
+  assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets srcs ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 srcs) == (operand_obs_list s2 srcs)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts srcs)));
   assert (fixedTime ==> (isConstantTime (Ins ins) fuel ts));
   let taint = sources_taint srcs ts ins.t in
   let taint = if AddCarry64? i then merge_taint taint ts.flagsTaint else taint in
@@ -144,7 +144,7 @@ val lemma_mov_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 80"
 let lemma_mov_same_public ts fuel ins s1 s2 =
   let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   let i, dsts, srcs = ins.ops in
@@ -441,9 +441,6 @@ let lemma_xor_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = FStar.UInt.logxor #64 v11 v12 in
 	  let v2 = FStar.UInt.logxor #64 v21 v22 in
-	  if src1 = src2 then
-	    FStar.UInt.logxor_self #64 v11;
-	    FStar.UInt.logxor_self #64 v21;
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
