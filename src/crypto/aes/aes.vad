@@ -2,6 +2,7 @@ include "../../arch/x86/decls.vad"
 include{:verbatim} "../../arch/x86/print.s.dfy"
 include{:verbatim} "../../lib/util/dafny_wrappers.i.dfy"
 include{:verbatim} "aes_lemmas.i.dfy"
+include{:verbatim} "aes_helpers.i.dfy"
 
 #verbatim
 module aes_vale {
@@ -334,6 +335,42 @@ procedure {:refined} AES128EncryptFirstStep(
     assert IsValidAES128EncryptionTracePrefix(key, w, old(xmm0), xmm0_trace_out);
 }
 
+procedure {:refined} AESEncryptFirstStep(
+    ghost key:seq(uint32),
+    ghost w:seq(uint32),
+    inline taint:taint,
+    ghost K_id:heaplet_id,
+    ghost alg:Algorithm
+    ) returns (
+    ghost xmm0_trace_out:QuadwordSeq
+    )
+    reads
+        eax; mem; 
+    modifies
+        xmm0; xmm2; efl;
+    requires/ensures
+      SeqLength(key) == Nk(alg);
+      SeqLength(w) == Nb()*(Nr(alg)+1);
+      KeyExpansionPredicate(key, alg, w);
+      ValidSrcAddr(mem, K_id, eax, 128, taint);
+      mem[K_id].quads[eax].v == Quadword(w[0], w[1], w[2], w[3]);
+    ensures
+      SeqLength(xmm0_trace_out) == 1;
+      xmm0_trace_out[0] == xmm0;
+      IsValidAESEncryptionTracePrefix(alg, key, w, old(xmm0), xmm0_trace_out);
+{
+    // ROUND 0 - XOR
+
+    Load128(xmm2, eax, 0, taint, K_id);
+    assert xmm2 == Quadword(w[0], w[1], w[2], w[3]);
+
+    Pxor(xmm0, xmm2);
+
+    xmm0_trace_out := seq(xmm0);
+    assert IsValidAESEncryptionTracePrefix(alg, key, w, old(xmm0), xmm0_trace_out);
+}
+
+
 procedure {:refined} AES128EncryptMiddleStep(
     inline round:int,
     ghost key:seq(uint32),
@@ -376,6 +413,59 @@ procedure {:refined} AES128EncryptMiddleStep(
     lemma_ExtendingAES128EncryptionTracePrefix(key, w, input, round, old_xmm0, new_xmm0, xmm0_trace_in, xmm0_trace_out);
 }
 
+// On entry, eax is the ptr to the expanded key
+//           ecx is the number of rounds
+//           edx is the round number
+// BUGBUG:  xmm0_trace_in must be the second-to-last argument, or else Vale emits a mistmatch between the va_trigger call and implementation
+procedure {:refined} AESEncryptMiddleStep(
+    inline taint:taint,
+    ghost key:seq(uint32),
+    ghost w:seq(uint32),
+    ghost input:Quadword,
+    ghost K_id:heaplet_id,
+    ghost alg:Algorithm,
+    ghost xmm0_trace_in:QuadwordSeq,
+    ghost round:int
+  ) returns (
+    ghost xmm0_trace_out:QuadwordSeq
+  )
+    reads
+        eax; mem;
+    modifies
+        xmm0; xmm2; efl; ecx; edx; esi;
+    requires
+        SeqLength(xmm0_trace_in) == round;
+        1 <= round <= Nr(alg)-1;
+        xmm0_trace_in[round-1] == xmm0;
+        IsValidAESEncryptionTracePrefix(alg, key, w, input, xmm0_trace_in);
+        SeqLength(key) == 4;
+        SeqLength(w) == 4*(Nr(alg)+1);
+        ecx == round;
+        ValidSrcAddr(mem, K_id, eax+16*round, 128, taint);
+        mem[K_id].quads[eax+16*round].v == Quadword(w[4*round], w[4*round+1], w[4*round+2], w[4*round+3]);
+        KeyExpansionPredicate(key, alg, w);
+    ensures
+        SeqLength(xmm0_trace_out) == round + 1;
+        xmm0_trace_out[round] == xmm0;
+        IsValidAESEncryptionTracePrefix(alg, key, w, input, xmm0_trace_out);
+{
+    ghost var old_xmm0 := xmm0;
+    
+    Mov32(esi, edx);    // edx = round
+    Shl32(esi, 4);      // esi = round*16
+    Add32(esi, eax);    // esi = &key[round]  // todo: can this be turned into "lea esi, [edx*2] / load128 xmm2, [eax+esi*8]" ?
+    Load128(xmm2, esi, 0, taint, K_id);
+    assert xmm2 == seq_to_Quadword(SeqRange(w, 4*round, 4*round+4));
+    AESNI_enc(xmm0, xmm2);
+    Add32(edx, 1);      // Increment round number
+    
+    ghost var new_xmm0 := xmm0;
+    xmm0_trace_out := SeqAppendElt(xmm0_trace_in, new_xmm0);
+    
+    lemma_ExtendingAESEncryptionTracePrefix(alg, key, w, input, round, old_xmm0, new_xmm0, xmm0_trace_in, xmm0_trace_out);
+    
+}
+
 procedure {:refined} AES128EncryptLastStep(
     ghost key:seq(uint32),
     ghost w:seq(uint32),
@@ -416,6 +506,8 @@ procedure {:refined} AES128EncryptLastStep(
     lemma_ExtendingAES128EncryptionTracePrefix(key, w, input, 10, old_xmm0, new_xmm0, xmm0_trace_in, xmm0_trace_out);
 }
 
+// on entry, eax = key pointer, xmm0 = value to encrypt
+// on return, xmm0 = encrypted value
 procedure {:refined} AES128EncryptOneBlock(
     ghost key:seq(uint32),
     ghost input:Quadword,
@@ -555,17 +647,196 @@ procedure {:refined} AES128EncryptOneBlockStdcall(
 
 {
     // Load the input
-    LoadStack(eax, 1);
-    Load128(xmm0, eax, 0, Secret, input_id);
+    LoadStack(eax, 1); // eax = input_ptr
+    Load128(xmm0, eax, 0, Secret, input_id); // xmm0 = input data value
 
     // Load a pointer to the expanded key
     LoadStack(eax, 2);
 
     // Do the work
+    //  On entry:  eax = ptr to expanded key, xmm0 = input data value
+    //  On return: xmm0 = encrypted data value
     AES128EncryptOneBlock(key, input, w, Secret, K_id);
 
     // Store the result in the buffer pointed at by the output_ptr on the stack
-    LoadStack(eax, 0);
+    LoadStack(eax, 0);  // eax = output_ptr
+    Store128(eax, xmm0, 0, Secret, output_id);
+}
+
+
+// on entry, eax = expanded key pointer, xmm0 = value to encrypt, ecx = number of rounds, edx = 1 (rounds completed)
+// on return, xmm0 = encrypted value
+procedure {:refined} AESEncryptLoop(
+    inline taint:taint,
+    ghost key:seq(uint32),
+    ghost w:seq(uint32),
+    ghost input:Quadword,
+    ghost K_id:heaplet_id,
+    ghost alg:Algorithm,
+    ghost xmm0_trace_step0:QuadwordSeq
+  ) returns (
+    ghost xmm0_trace_steps:QuadwordSeq
+  )
+    reads
+        mem; eax;
+    modifies
+        xmm0; xmm2; efl; ecx; edx;
+    requires
+        eax % 16 == 0;
+        ecx == Nr(alg);
+        edx == ecx-1;
+        SeqLength(key) == Nk(alg);
+        xmm0 == input;
+        SeqLength(w) == Nb()*(Nr(alg)+1);
+        ValidSrcAddrs(mem, K_id, eax, 128, taint, 16*(Nr(alg)+1));
+        forall j :: 0 <= j <= Nr(alg) ==> mem[K_id].quads[eax + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+        KeyExpansionPredicate(key, alg, w);
+    ensures
+        (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;
+        (Nb() * (Nr(alg) + 1)) % 4 == 0;
+        xmm0 == AES_Encrypt(key, input, alg);
+        edx == 1;
+{
+    ghost var round:int := 1;
+    xmm0_trace_steps := xmm0_trace_step0;
+    while (edx < ecx)
+      invariant
+        old(edx) < edx < ecx;
+        round == edx;
+      decreases
+        ecx - edx;
+    {
+      xmm0_trace_steps := AESEncryptMiddleStep(taint, key, w, input, K_id, alg, xmm0_trace_steps, round);
+      round := round + 1;
+    }
+}
+
+// on entry, eax = expanded key pointer, xmm0 = value to encrypt, ecx = number of rounds
+// on return, xmm0 = encrypted value
+procedure {:refined} AESEncryptOneBlock(
+    ghost key:seq(uint32),
+    ghost input:Quadword,
+    ghost w:seq(uint32),
+    inline taint:taint,
+    ghost K_id:heaplet_id,
+    ghost alg:Algorithm)
+    reads
+        mem; eax; 
+    modifies
+        xmm0; xmm2; efl; ecx; edx;
+    requires
+        eax % 16 == 0;
+        ecx == Nr(alg);
+        SeqLength(key) == Nk(alg);
+        xmm0 == input;
+        SeqLength(w) == Nb()*(Nr(alg)+1);
+        ValidSrcAddrs(mem, K_id, eax, 128, taint, 16*(Nr(alg)+1));
+        forall j :: 0 <= j <= Nr(alg) ==> mem[K_id].quads[eax + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+        KeyExpansionPredicate(key, alg, w);
+    ensures
+        (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;
+        (Nb() * (Nr(alg) + 1)) % 4 == 0;
+        xmm0 == AES_Encrypt(key, input, alg);
+{
+    assert mem[K_id].quads[eax + 16* 0].v == Quadword(w[4* 0], w[4* 0+1], w[4* 0+2], w[4* 0+3]);
+    ghost var xmm0_trace_step0:QuadwordSeq;
+    xmm0_trace_step0 := AESEncryptFirstStep(key, w, taint, K_id, alg);
+    
+    Mov32(edx, 1); // First step is finished
+    Add32Wrap(ecx,0xffffffff); // Stop 1 before the final round, decrement ecx by 1
+    ghost var xmm0_trace_steps:QuadwordSeq;
+    xmm0_trace_steps := AESEncryptLoop(taint, key, w, input, K_id, alg, xmm0_trace_step0);
+
+    //assert mem[K_id].quads[eax + 16*round].v == Quadword(w[4*round], w[4*round+1], w[4*round+2], w[4*round+3]);
+    ghost var xmm0_trace_step_last:QuadwordSeq;
+    xmm0_trace_step_last := AES128EncryptLastStep(key, w, input, xmm0_trace_steps, taint, K_id);
+    
+    lemma_AESEncrypt(alg, key, input, w, xmm0, xmm0_trace_step_last);
+    assert (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;
+    assert (Nb() * (Nr(alg) + 1)) % 4 == 0;
+    assert xmm0 == AES_Encrypt(key, input, alg);
+
+    // Clear secrets out of registers
+    Pxor(xmm2, xmm2);
+}
+procedure {:refined} AESEncryptOneBlockStdcall(
+    ghost key:seq(uint32),
+    ghost input:Quadword,
+    ghost w:seq(uint32),
+    ghost input_id:heaplet_id,
+    ghost output_id:heaplet_id,
+    ghost K_id:heaplet_id)
+    reads
+        stack; 
+    modifies
+        mem; eax; xmm0; xmm2; efl; ecx; edx;
+    requires
+        HasStackSlots(stack, 4);
+
+        // Calling convention
+        let output_ptr       := stack[0][0] in
+        let input_ptr        := stack[0][1] in
+        let expanded_key_ptr := stack[0][2] in
+
+        // Expanded key is readable
+           ValidSrcAddrs(mem, K_id, expanded_key_ptr, 128, Secret, 16*11)
+        && expanded_key_ptr % 16 == 0
+        && SeqLength(key) == 4
+        && SeqLength(w) == 44
+        // And the expanded key in memory matches the abstract version
+        && (forall j :: 0 <= j <= 10 ==> mem[K_id].quads[expanded_key_ptr + 16*j].v
+                                      == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]))
+        && KeyExpansionPredicate(key, AES_128, w)
+
+        // One block of input is readable
+        && ValidSrcAddr(mem, input_id, input_ptr, 128, Secret)
+        // And it matches the ghost input
+        && mem[input_id].quads[input_ptr].v == input
+
+        // One block of output is writeable
+        && ValidDstAddr(mem, output_id, output_ptr, 128);
+
+    ensures
+        (Nb() * (Nr(AES_128) + 1)) / 4 == Nr(AES_128) + 1;
+        (Nb() * (Nr(AES_128) + 1)) % 4 == 0;
+
+        // Calling convention  (all implied by lack of modifies clause)
+//        ebx == old(ebx);  
+//        esi == old(esi);  
+//        edi == old(edi);  
+//        ebp == old(ebp);  
+        
+        // Output is now readable
+        ValidSrcAddr(mem, output_id, old(stack[0][0]), 128, Secret);
+
+        // Stack framing: Nothing changes
+        stack == old(stack);
+
+        // Framing: Only the output was changed
+        mem == old(mem)[output_id := mem[output_id]];
+
+        // Calling convention
+        let output_ptr       := stack[0][0] in
+        // Memory contains the proper output value
+        mem[output_id].quads[output_ptr].v == AES_Encrypt(key, input, AES_128);
+          
+{
+    // Load the input
+    LoadStack(eax, 1); // eax = input_ptr
+    Load128(xmm0, eax, 0, Secret, input_id); // xmm0 = input data value
+
+    // Load a pointer to the expanded key
+    LoadStack(eax, 2);
+    
+    Mov32(edx, 10); // bugbug: convert a concrete alg variable into Nr(alg) at runtime
+
+    // Do the work
+    //  On entry:  eax = ptr to expanded key, xmm0 = input data value
+    //  On return: xmm0 = encrypted data value
+    AES128EncryptOneBlock(key, input, w, Secret, K_id);
+
+    // Store the result in the buffer pointed at by the output_ptr on the stack
+    LoadStack(eax, 0);  // eax = output_ptr
     Store128(eax, xmm0, 0, Secret, output_id);
 }
 

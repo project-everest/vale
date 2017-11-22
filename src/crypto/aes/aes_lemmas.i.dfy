@@ -224,6 +224,19 @@ predicate IsValidAES128EncryptionTracePrefix(key:seq<uint32>, w:seq<uint32>, inp
              else QuadwordXor(SubBytes(ShiftRows(trace[i-1])), ws))
 }
 
+predicate IsValidAESEncryptionTracePrefix(alg:Algorithm, key:seq<uint32>, w:seq<uint32>, input:Quadword, trace:QuadwordSeq)
+{
+       |key| == Nk(alg)
+    && |w| == Nb()*(Nr(alg)+1)
+    && KeyExpansionPredicate(key, alg, w)
+    && |trace| <= Nr(alg)+1
+    && forall i {:trigger w[4*i..4*i+4]} :: 0 <= i < |trace| ==> trace[i] ==
+           var ws := seq_to_Quadword(w[4*i..4*i+4]);
+           (if i == 0 then QuadwordXor(input, ws)
+             else if i < Nr(alg) then QuadwordXor(MixColumns(SubBytes(ShiftRows(trace[i-1]))), ws)
+             else QuadwordXor(SubBytes(ShiftRows(trace[i-1])), ws))
+}
+
 lemma {:timeLimitMultiplier 3} lemma_ExtendingAES128EncryptionTracePrefix(
     key:seq<uint32>,
     w:seq<uint32>,
@@ -245,7 +258,29 @@ lemma {:timeLimitMultiplier 3} lemma_ExtendingAES128EncryptionTracePrefix(
 {
 }
 
-lemma lemma_AES128EncryptRound(xmm:Quadword, inputxmm_start:Quadword, inputxmm_end:Quadword, qw_start:Quadword, qw_end:Quadword, round_keys:seq<Quadword>, index:int)
+lemma {:timeLimitMultiplier 3} lemma_ExtendingAESEncryptionTracePrefix(
+    alg:Algorithm,
+    key:seq<uint32>,
+    w:seq<uint32>,
+    input:Quadword,
+    round:int,
+    old_xmm1:Quadword,
+    new_xmm1:Quadword,
+    trace:QuadwordSeq,
+    trace':QuadwordSeq
+    )
+    requires IsValidAESEncryptionTracePrefix(alg, key, w, input, trace);
+    requires 1 <= round <= Nr(alg);
+    requires |trace| == round;
+    requires last(trace) == old_xmm1;
+    requires trace' == trace + [new_xmm1];
+    requires var ws := seq_to_Quadword(w[4*round..4*round+4]);
+             new_xmm1 == if round < Nr(alg) then QuadwordXor(MixColumns(SubBytes(ShiftRows(trace[round-1]))), ws) else QuadwordXor(SubBytes(ShiftRows(trace[round-1])), ws);
+    ensures  IsValidAESEncryptionTracePrefix(alg, key, w, input, trace');
+{
+}
+
+lemma lemma_AESEncryptRound(xmm:Quadword, inputxmm_start:Quadword, inputxmm_end:Quadword, qw_start:Quadword, qw_end:Quadword, round_keys:seq<Quadword>, index:int)
     requires inputxmm_end == QuadwordXor(MixColumns(SubBytes(ShiftRows(inputxmm_start))), xmm);
     requires qw_start == inputxmm_start;
     requires qw_end == inputxmm_end;
@@ -257,7 +292,10 @@ lemma lemma_AES128EncryptRound(xmm:Quadword, inputxmm_start:Quadword, inputxmm_e
     SubBytesShiftRowsCommutativity(qw_start);
 }
 
-lemma {:timeLimitMultiplier 2} lemma_AES128EncryptRaw(key:seq<uint32>, input:Quadword, alg:Algorithm, w:seq<uint32>, s:Quadword, xmm0:Quadword, xmm1:Quadword, xmm2:Quadword, xmm3:Quadword, xmm4:Quadword, xmm5:Quadword, xmm6:Quadword, xmm7:Quadword, xmm8:Quadword, xmm9:Quadword, xmm10:Quadword, inputxmm_v1:Quadword, inputxmm_v2:Quadword, inputxmm_v3:Quadword, inputxmm_v4:Quadword, inputxmm_v5:Quadword, inputxmm_v6:Quadword, inputxmm_v7:Quadword, inputxmm_v8:Quadword, inputxmm_v9:Quadword, inputxmm_v10:Quadword, inputxmm_v11:Quadword, inputxmm_v12:Quadword)
+lemma {:timeLimitMultiplier 2} lemma_AES128EncryptRaw(key:seq<uint32>, input:Quadword, alg:Algorithm, w:seq<uint32>, s:Quadword, 
+  xmm0:Quadword, xmm1:Quadword, xmm2:Quadword, xmm3:Quadword, xmm4:Quadword, xmm5:Quadword, xmm6:Quadword, xmm7:Quadword, xmm8:Quadword, xmm9:Quadword, xmm10:Quadword, 
+  inputxmm_v1:Quadword, inputxmm_v2:Quadword, inputxmm_v3:Quadword, inputxmm_v4:Quadword, inputxmm_v5:Quadword, inputxmm_v6:Quadword, inputxmm_v7:Quadword, inputxmm_v8:Quadword, inputxmm_v9:Quadword, inputxmm_v10:Quadword, inputxmm_v11:Quadword, inputxmm_v12:Quadword
+  )
     requires alg == AES_128;
     requires |key| == Nk(alg);
     requires (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;   // Easy to prove, but necessary precondition to Cipher
@@ -293,11 +331,11 @@ lemma {:timeLimitMultiplier 2} lemma_AES128EncryptRaw(key:seq<uint32>, input:Qua
     lemma_ExpandKeySatisfiesKeyExpansionPredicate(key, alg, w);
     ghost var round_keys := KeyScheduleWordsToRoundKeys(w);
 
-    lemma_RoundKeys(round_keys, w, xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7, xmm8, xmm9, xmm10);
+    lemma_RoundKeys128(round_keys, w, xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7, xmm8, xmm9, xmm10);
 
     ghost var sub := round_keys[1..10];
 
-    lemma_Subsequence(round_keys, sub);
+    lemma_Subsequence(alg, round_keys, sub);
 
     assert inputxmm_v2 == QuadwordXor(inputxmm_v1, round_keys[0]);
 
@@ -322,9 +360,9 @@ lemma {:timeLimitMultiplier 2} lemma_AES128EncryptRaw(key:seq<uint32>, input:Qua
     SubBytesShiftRowsCommutativity(inputxmm_v9);
     SubBytesShiftRowsCommutativity(inputxmm_v10);
 
-    lemma_AES128EncryptRound(xmm1, inputxmm_v2, inputxmm_v3, inputxmm_v2, inputxmm_v3, round_keys, 1);
+    lemma_AESEncryptRound(xmm1, inputxmm_v2, inputxmm_v3, inputxmm_v2, inputxmm_v3, round_keys, 1);
 
-    lemma_RoundsUnrolling(inputxmm_v2, inputxmm_v3, inputxmm_v4, inputxmm_v5, inputxmm_v6,
+    lemma_RoundsUnrolling128(inputxmm_v2, inputxmm_v3, inputxmm_v4, inputxmm_v5, inputxmm_v6,
                     inputxmm_v7, inputxmm_v8, inputxmm_v9, inputxmm_v10, inputxmm_v11, sub);
 
     ghost var qw5 := ShiftRows(SubBytes(inputxmm_v11));
@@ -339,6 +377,81 @@ lemma {:timeLimitMultiplier 2} lemma_AES128EncryptRaw(key:seq<uint32>, input:Qua
         AddRoundKey(ShiftRows(SubBytes(inputxmm_v11)), round_keys[Nr(alg)]);
         AddRoundKey(ShiftRows(SubBytes(Rounds(inputxmm_v2, round_keys[1..Nr(alg)]))), round_keys[Nr(alg)]);
         AddRoundKey(ShiftRows(SubBytes(Rounds(AddRoundKey(inputxmm_v1, round_keys[0]), round_keys[1..Nr(alg)]))), round_keys[Nr(alg)]);
+        AddRoundKey(ShiftRows(SubBytes(Rounds(AddRoundKey(input, round_keys[0]), round_keys[1..Nr(alg)]))), round_keys[Nr(alg)]);
+    }
+}
+
+// old:  key, input, alg, w, s
+//       xmm0...xmm10, inputxmm_v1...inputxmm_v12
+lemma {:timeLimitMultiplier 2} lemma_AESEncryptRaw(key:seq<uint32>, input:Quadword, alg:Algorithm, w:seq<uint32>, s:Quadword, 
+                                                   xmms:seq<Quadword>, inputxmms:seq<Quadword>)
+    requires |key| == Nk(alg);
+    requires (Nb() * (Nr(alg) + 1)) / 4 == Nr(alg) + 1;   // Easy to prove, but necessary precondition to Cipher
+    requires (Nb() * (Nr(alg) + 1)) % 4 == 0;   // Easy to prove, but necessary precondition to Cipher
+    requires w == ExpandKey(key, alg);
+    requires |w| == (Nr(alg)+1)*4;
+    requires |xmms| == Nr(alg)+1;
+    requires forall i :: 0 <= i < |xmms| ==> xmms[i] == seq_to_Quadword(w[ (4*i) .. (4*(i+1)) ]);
+    requires |inputxmms| == Nr(alg)+2;
+    requires inputxmms[0] == input;
+    requires inputxmms[1]  == QuadwordXor(inputxmms[0], xmms[0]);
+    requires forall i :: 0 <= i < Nr(alg) ==>
+      inputxmms[i+2] == QuadwordXor(MixColumns(SubBytes(ShiftRows(inputxmms[i+1]))),  xmms[i+1]);
+    requires inputxmms[Nr(alg)+1] == QuadwordXor(SubBytes(ShiftRows(inputxmms[Nr(alg)])), xmms[Nr(alg)]);
+    requires s == inputxmms[Nr(alg)+1]; 
+    ensures s == AES_Encrypt(key, input, alg);
+{
+    lemma_ExpandKeySatisfiesKeyExpansionPredicate(key, alg, w);
+    ghost var round_keys := KeyScheduleWordsToRoundKeys(w);
+
+    lemma_RoundKeys(alg, round_keys, w, xmms);
+
+    ghost var sub := round_keys[1..Nr(alg)];
+
+    lemma_Subsequence(alg, round_keys, sub);
+
+    assert inputxmms[1] == QuadwordXor(inputxmms[0], round_keys[0]);
+
+    ghost var temparg := MixColumns(SubBytes(ShiftRows(inputxmms[1])));
+    calc {
+        temparg;
+        MixColumns(SubBytes(ShiftRows(inputxmms[1])));
+            { SubBytesShiftRowsCommutativity(inputxmms[1]); assert SubBytes(ShiftRows(inputxmms[1])) == ShiftRows(SubBytes(inputxmms[1])); }
+        MixColumns(ShiftRows(SubBytes(inputxmms[1])));
+    }
+    ghost var k := 0;
+    assert 0 <= k < |sub|;
+    assert sub != [];
+
+    var i:int;
+    i := 0;
+    while i < Nr(alg) 
+      invariant 0 <= i <= Nr(alg)
+    {
+      SubBytesShiftRowsCommutativity(inputxmms[i]);
+      i := i + 1;
+    }
+
+    lemma_AESEncryptRound(xmms[1], inputxmms[1], inputxmms[2], inputxmms[1], inputxmms[2], round_keys, 1);
+
+    lemma_RoundsUnrolling(
+      alg,
+      inputxmms[1..Nr(alg)],
+      inputxmms[Nr(alg)],
+      sub);
+
+    ghost var qw5 := ShiftRows(SubBytes(inputxmms[10]));
+
+    SubBytesShiftRowsCommutativity(inputxmms[10]);
+
+    ghost var qw6 := AddRoundKey(qw5, round_keys[Nr(alg)]);
+    ghost var temp := round_keys[Nr(alg)];
+    calc {
+        qw6;
+        AddRoundKey(qw5, round_keys[Nr(alg)]);
+        AddRoundKey(ShiftRows(SubBytes(inputxmms[10])), round_keys[Nr(alg)]);
+        AddRoundKey(ShiftRows(SubBytes(Rounds(inputxmms[1], round_keys[1..Nr(alg)]))), round_keys[Nr(alg)]);
+        AddRoundKey(ShiftRows(SubBytes(Rounds(AddRoundKey(inputxmms[0], round_keys[0]), round_keys[1..Nr(alg)]))), round_keys[Nr(alg)]);
         AddRoundKey(ShiftRows(SubBytes(Rounds(AddRoundKey(input, round_keys[0]), round_keys[1..Nr(alg)]))), round_keys[Nr(alg)]);
     }
 }
@@ -358,7 +471,7 @@ lemma {:timeLimitMultiplier 3} lemma_AES128Encrypt(
 {
     lemma_KeyExpansionPredicateImpliesExpandKey(key, AES_128(), w);
     lemma_AES128EncryptRaw(key, input, AES_128(), w, s,
-                           seq_to_Quadword(w[4*0..4*0+4]),
+                           seq_to_Quadword(w[4*0..4*0+4]), // xmm0
                            seq_to_Quadword(w[4*1..4*1+4]),
                            seq_to_Quadword(w[4*2..4*2+4]),
                            seq_to_Quadword(w[4*3..4*3+4]),
@@ -368,9 +481,39 @@ lemma {:timeLimitMultiplier 3} lemma_AES128Encrypt(
                            seq_to_Quadword(w[4*7..4*7+4]),
                            seq_to_Quadword(w[4*8..4*8+4]),
                            seq_to_Quadword(w[4*9..4*9+4]),
-                           seq_to_Quadword(w[4*10..4*10+4]),
-                           input,
+                           seq_to_Quadword(w[4*10..4*10+4]), // xmm10
+                           input, // inputxmm_v1
+                           // inputxmm_v2...inputxmm_v12
                            trace[0], trace[1], trace[2], trace[3], trace[4], trace[5], trace[6], trace[7], trace[8], trace[9], trace[10]);
+}
+
+lemma {:timeLimitMultiplier 3} lemma_AESEncrypt(
+    alg:Algorithm,
+    key:seq<uint32>,
+    input:Quadword,
+    w:seq<uint32>,
+    s:Quadword,
+    trace:QuadwordSeq
+    )
+    requires IsValidAESEncryptionTracePrefix(alg, key, w, input, trace);
+    requires KeyExpansionPredicate(key, alg, w);
+    requires |trace| == Nr(alg)+1;
+    requires s == last(trace);
+    ensures  s == AES_Encrypt(key, input, alg);
+{
+    lemma_KeyExpansionPredicateImpliesExpandKey(key, alg, w);
+    
+    var xmms:seq<Quadword>;
+    var i:int;
+    i := 0;
+    while i <= Nr(alg) {
+      xmms := xmms + [seq_to_Quadword(w[4*i..4*i+4])];
+      i := i+1;
+    }
+    var inputxmms:seq<Quadword>;
+    inputxmms := [input]+trace;
+    
+    lemma_AESEncryptRaw(key, input, alg, w, s, xmms, inputxmms);
 }
 
 ///////////////////////////////
@@ -460,11 +603,11 @@ lemma {:timeLimitMultiplier 2} lemma_AES128DecryptRaw(key:seq<uint32>, input:Qua
     lemma_EqInvExpandKeySatisfiesEqInvKeyExpansionPredicate(key, alg, dw);
     ghost var round_keys := KeyScheduleWordsToRoundKeys(dw);
 
-    lemma_RoundKeys(round_keys, dw, xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7, xmm8, xmm9, xmm10);
+    lemma_RoundKeys128(round_keys, dw, xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7, xmm8, xmm9, xmm10);
 
     ghost var sub := round_keys[1..10];
 
-    lemma_Subsequence(round_keys, sub);
+    lemma_Subsequence(alg, round_keys, sub);
 
     ghost var qw1 := inputxmm_v1;
     ghost var qw2 := inputxmm_v2;

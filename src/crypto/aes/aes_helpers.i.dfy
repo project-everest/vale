@@ -1,3 +1,5 @@
+include "../../arch/x86/vale.i.dfy"
+include "../../lib/util/dafny_wrappers.i.dfy"
 include "aes.s.dfy"
 include "../../lib/util/operations.i.dfy"
 include "../../lib/util/words_and_bytes.i.dfy"
@@ -51,25 +53,25 @@ lemma {:timeLimitMultiplier 4} lemma_SubByteInvertsInvSubByte(b:uint8)
     else { assert false; }
 }
 
-lemma lemma_Subsequence<T>(s:seq<T>, t:seq<T>)
-    requires |s| >= 11;
-    requires t == s[1..10];
+lemma lemma_Subsequence<T>(alg:Algorithm, s:seq<T>, t:seq<T>)
+    requires |s| >= Nr(alg)+1;
+    requires t == s[1..Nr(alg)];
     ensures |t| <= |s|;
-    ensures |t| == 9;
+    ensures |t| == Nr(alg)-1;
     ensures forall i {:trigger t[i]} :: 0 <= i < |t| ==> t[i] == s[i+1];
     ensures s[1] == t[0];
-    ensures s[2] == t[1];
-    ensures s[3] == t[2];
-    ensures s[4] == t[3];
-    ensures s[5] == t[4];
-    ensures s[6] == t[5];
-    ensures s[7] == t[6];
-    ensures s[8] == t[7];
-    ensures s[9] == t[8];
+    //ensures s[2] == t[1]; // bugbug: doesn't the forall above ensure all of this?
+    //ensures s[3] == t[2];
+    //ensures s[4] == t[3];
+    //ensures s[5] == t[4];
+    //ensures s[6] == t[5];
+    //ensures s[7] == t[6];
+    //ensures s[8] == t[7];
+    //ensures s[9] == t[8];
 {
 }
 
-lemma lemma_RoundKeys(round_keys:seq<Quadword>, w:seq<uint32>, xmm0:Quadword, xmm1:Quadword, xmm2:Quadword, xmm3:Quadword, xmm4:Quadword, xmm5:Quadword, xmm6:Quadword,
+lemma lemma_RoundKeys128(round_keys:seq<Quadword>, w:seq<uint32>, xmm0:Quadword, xmm1:Quadword, xmm2:Quadword, xmm3:Quadword, xmm4:Quadword, xmm5:Quadword, xmm6:Quadword,
                       xmm7:Quadword, xmm8:Quadword, xmm9:Quadword, xmm10:Quadword)
     requires |w| == 44;
     requires round_keys == KeyScheduleWordsToRoundKeys(w);
@@ -109,6 +111,16 @@ lemma lemma_RoundKeys(round_keys:seq<Quadword>, w:seq<uint32>, xmm0:Quadword, xm
 {
 }
 
+lemma lemma_RoundKeys(alg:Algorithm, round_keys:seq<Quadword>, w:seq<uint32>, xmms:seq<Quadword>)
+    requires |w| == 4*(Nr(alg)+1);
+    requires round_keys == KeyScheduleWordsToRoundKeys(w);
+    requires |xmms| == Nr(alg)+1;
+    requires forall i:: 0 <= i <= Nr(alg) ==> xmms[i] == seq_to_Quadword(w[(4*i)..(4*(i+1))]);
+    ensures  forall i:: 0 <= i <= Nr(alg) ==> round_keys[i] == seq_to_Quadword(w[(4*i)..(4*(i+1))]);
+    //ensures  forall i:: 0 <= i <= Nr(alg) ==> round_keys[i] == xmms[i];
+{
+}
+
 lemma lemma_SubsequenceEnd<T>(s:seq<T>)
     requires |s| > 0;
     ensures s[|s|..] == [];
@@ -127,7 +139,10 @@ lemma lemma_EqInvRoundsHelper(inp:Quadword, round_keys:seq<Quadword>)
 {
 }
 
-lemma {:fuel Round,10} lemma_RoundsUnrolling(uint32seq2:Quadword, uint32seq2_round1:Quadword, uint32seq2_round2:Quadword, uint32seq2_round3:Quadword, uint32seq2_round4:Quadword, uint32seq2_round5:Quadword, uint32seq2_round6:Quadword, uint32seq2_round7:Quadword, uint32seq2_round8:Quadword, uint32seq3:Quadword, sub:seq<Quadword>)
+lemma {:fuel Round,10} lemma_RoundsUnrolling128( 
+  uint32seq2:Quadword, uint32seq2_round1:Quadword, uint32seq2_round2:Quadword, uint32seq2_round3:Quadword, uint32seq2_round4:Quadword, uint32seq2_round5:Quadword, 
+  uint32seq2_round6:Quadword, uint32seq2_round7:Quadword, uint32seq2_round8:Quadword, uint32seq3:Quadword, 
+  sub:seq<Quadword>)
     requires |sub| == 9;
     requires uint32seq2_round1 == Round(uint32seq2, sub[0]);
     requires uint32seq2_round2 == Round(uint32seq2_round1, sub[1]);
@@ -164,6 +179,20 @@ lemma {:fuel Round,10} lemma_RoundsUnrolling(uint32seq2:Quadword, uint32seq2_rou
             { lemma_RoundsHelper(uint32seq2, sub); }
         Rounds(uint32seq2, sub);
     }
+}
+
+lemma {:fuel Round,10}  {:timeLimitMultiplier 3} lemma_RoundsUnrolling( 
+  alg:Algorithm,
+  uint32seq2:seq<Quadword>, // was uint32seq2/_round1/round2/round3/round4/riound5/round6/round7/round8
+  uint32seq3:Quadword,
+  sub:seq<Quadword>)
+    requires |uint32seq2| == Nr(alg)-1;
+    requires |sub| == Nr(alg)-1;
+    requires forall i:: 0 < i < Nr(alg)-2 ==> uint32seq2[i] == Round(uint32seq2[i-1], sub[i]);
+    requires uint32seq3 == Round(uint32seq2[Nr(alg)-2], sub[Nr(alg)-2]);
+    ensures uint32seq3 == Rounds(uint32seq2[0], sub);
+{
+    assume(false); // bugbug: implement
 }
 
 lemma lemma_AllButLast<T>(s:seq<T>, i:int)
@@ -588,6 +617,11 @@ lemma lemma_EqInvKeyExpansionPredicateImpliesEqInvExpandKey(key:seq<uint32>, alg
         lemma_EqInvKeyExpansionPredicatesMatchAt(key, alg, dw, dw', i);
     }
     assert dw == dw';
+}
+
+predicate AESEncryptLoopInvariant(key:seq<uint32>, w:seq<uint32>, input:Quadword, alg:Algorithm, xmm0_trace_step0:seq<Quadword>, i:nat)
+{
+    |key| > 0
 }
 
 }
