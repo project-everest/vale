@@ -3,8 +3,7 @@ module X64.Vale.State_i
 
 open X64.Machine_s
 open X64.Vale
-
-unfold let mem = Map.t int nat64
+module M = Memory_i_s
 
 noeq type state = {
   ok: bool;
@@ -33,7 +32,7 @@ let reg_to_int (r:reg) : int =
   | R15 -> 15
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
-unfold let eval_mem (ptr:int) (s:state) : nat64 = Map.sel s.mem ptr
+unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
@@ -49,12 +48,11 @@ let eval_operand (o:operand) (s:state) : nat64 =
   | OMem m -> eval_mem (eval_maddr m s) s
 
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = fun r' -> if  r = r' then v else s.regs r' }
+  { s with regs = fun r' -> if r = r' then v else s.regs r' }
 
-let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = Map.upd s.mem ptr v }
+let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem64 ptr v s.mem }
 
-let valid_maddr (m:maddr) (s:state) : Type0 =
-  s.mem `Map.contains` (eval_maddr m s)
+let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.mem
 
 let valid_operand (o:operand) (s:state) : Type0 =
   match o with
@@ -66,7 +64,7 @@ let state_eq (s0:state) (s1:state) : Type0 =
   s0.ok == s1.ok /\
   Regs_i.equal s0.regs s1.regs /\
   s0.flags == s1.flags /\
-  Map.equal s0.mem s1.mem
+  s0.mem == s1.mem
 
 let add_wrap (x:int) (y:int) = if x + y < nat64_max then x + y else x + y - nat64_max
 

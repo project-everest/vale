@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'do_dafny', 'do_fstar')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
@@ -17,16 +17,6 @@ verify_paths = [
   'tools/Vale/test',
 ]
 Export('verify_paths')
-
-# A few .fst/.fsti files depend on .fsti files generated from .vaf files.
-# Without manually writing the dependencies for these, the dependency
-# analysis will miss them the first time scons runs.
-manual_dependencies = {
-  'obj/arch/x64/X64.Vale.StrongPost_i.vfsti.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
-  'obj/arch/x64/X64.Vale.StrongPost_i.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
-  'obj/Vale/test/StateUpdateTest.vfst.tmp': 'obj/arch/x64/X64.Vale.Decls.fsti',
-}
-Export('manual_dependencies')
 
 #
 # All include paths for FStar should be in this list.
@@ -39,16 +29,14 @@ Export('manual_dependencies')
 # so the include path should contain obj/... for any .vaf files.
 #
 fstar_include_paths = [
-  'tools/Vale/test',
   'obj/Vale/test',
-  'src/test',
   'obj/test',
-  'src/arch/x64/',
+  'obj/arch',
   'obj/arch/x64/',
-  'src/lib/collections/',
-  'src/lib/util',
-  'src/crypto/poly1305/',
-  'src/crypto/poly1305/x64/',
+  'obj/lib/collections/',
+  'obj/lib/util',
+  'obj/crypto/poly1305/',
+  'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
 ]
 Export('fstar_include_paths')
@@ -73,6 +61,10 @@ verify_options = {
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
 
+  # Special treatment for sensitive modules
+  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
+  'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
+
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),
   '.fsti': BuildOptions(fstar_default_args),
@@ -85,8 +77,20 @@ verify_options = {
   '.vaf': BuildOptions(fstar_default_args),
 
   # Disable verification by adding 'filename': None
+  'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
+  'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
+  'src/test/Test.FastBlock.vaf': None,
+  #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
+  
+  # Turning off leakage analysis until it is adapted to the new version of Semantics
+  'src/arch/x64/X64.Taint_Semantics_s.fst': None,
+  'src/arch/x64/X64.Leakage_s.fst': None,
+  'src/arch/x64/X64.Leakage_i.fst': None,
+  'src/arch/x64/X64.Leakage_Ins_i.fst': None,
+  'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
+  
 }
-if env['TARGET_ARCH']!='x86':
+if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None
  verify_options['src/test/stack-test.vad'] = None
  

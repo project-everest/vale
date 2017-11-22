@@ -1,0 +1,400 @@
+[
+  "Ì\bÙ\u0019˜#”–µëÂ\u001c\u001d/SV",
+  [
+    [
+      "Nonterm.uu___is_EAX",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "367795174f5d378e7e9c8082091a8e5a"
+    ],
+    [
+      "Nonterm.uu___is_EBX",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "f48ffb5210575527ea775aec9255d4a3"
+    ],
+    [
+      "Nonterm.ins",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Prims.HasEq_int" ],
+      0,
+      "fc905ea7bebea75652f99cd7736f11d6"
+    ],
+    [
+      "Nonterm.__proj__IPlaceholder__item___0",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "34228d2db16f2a0bf366f56c68508ba8"
+    ],
+    [
+      "Nonterm.ocmp",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "7da154d242084d2b565028cc98f5987a"
+    ],
+    [
+      "Nonterm.__proj__OLe__item__o1",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "b2744d595200dfe5404f33b4e1185703"
+    ],
+    [
+      "Nonterm.__proj__OLe__item__o2",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "e169698ed70f025b0c5463f987993d70"
+    ],
+    [
+      "Nonterm.va_code",
+      1,
+      1,
+      0,
+      [
+        "@query", "assumption_Nonterm.ins_haseq",
+        "assumption_Nonterm.ocmp_haseq", "assumption_Prims.list_haseq",
+        "kinding_Nonterm.va_code@tok"
+      ],
+      0,
+      "9d57be84d117b35063af21a94216b392"
+    ],
+    [
+      "Nonterm.uu___is_Ins",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "2ab483480395677f8417e97fd6302b99"
+    ],
+    [
+      "Nonterm.__proj__Ins__item__ins",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.Ins",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_ae836da17a530010c8c5aa19d892a1eb"
+      ],
+      0,
+      "da778608b2a7d0b2414ea14af81760be"
+    ],
+    [
+      "Nonterm.uu___is_Block",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "c3cfc19a3621ff60a4b197bfd7a77e56"
+    ],
+    [
+      "Nonterm.__proj__Block__item__block",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.Block",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_0ee35a266d87bdf532dc06d5f67cc28d"
+      ],
+      0,
+      "db7943d1fa61243b302f673c4a390d35"
+    ],
+    [
+      "Nonterm.uu___is_IfElse",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "7672f1165598796cf3e50ab0de7985bd"
+    ],
+    [
+      "Nonterm.__proj__IfElse__item__ifCond",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.IfElse",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_907aa09561ad1c54675cac4052d6a775"
+      ],
+      0,
+      "9307bf886a3b1cd6bea885288d551861"
+    ],
+    [
+      "Nonterm.__proj__IfElse__item__ifTrue",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.IfElse",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_907aa09561ad1c54675cac4052d6a775"
+      ],
+      0,
+      "0e7d8ac419fac3b35ebb611fb103adec"
+    ],
+    [
+      "Nonterm.__proj__IfElse__item__ifFalse",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.IfElse",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_907aa09561ad1c54675cac4052d6a775"
+      ],
+      0,
+      "f8dcbd515c6102a76153536dbeb31dda"
+    ],
+    [
+      "Nonterm.uu___is_While",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "6a4ba42c6172b7fc4ee22684ad9e4250"
+    ],
+    [
+      "Nonterm.__proj__While__item__whileCond",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.While",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_bbe23c1578cd552f374c21082acaf1fb"
+      ],
+      0,
+      "0a72c648efa9e8d58b7c443fc6eee21d"
+    ],
+    [
+      "Nonterm.__proj__While__item__whileBody",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Nonterm.While",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Nonterm_Tm_refine_bbe23c1578cd552f374c21082acaf1fb"
+      ],
+      0,
+      "2f5fa504442c44423add49d181d695c7"
+    ],
+    [
+      "Nonterm.va_state",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "bfeda7f21cfc6cdaa03baf8568e74e10"
+    ],
+    [
+      "Nonterm.va_get_reg",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "b7ca18005b5f9027e0a03f36e654bfc7"
+    ],
+    [
+      "Nonterm.va_update_reg",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "eeea5c61f0fd65db6edb3130c4e3cf6c"
+    ],
+    [
+      "Nonterm.va_update_reg",
+      2,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "df507272aebb58b37bb57f37fdba9ba4"
+    ],
+    [
+      "Nonterm.va_eval_register_int",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "3db766e75c0fead6f8042fb7e5df2263"
+    ],
+    [
+      "Nonterm.va_state_eq",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Prims.HasEq_int" ],
+      0,
+      "dfbf315e76bc09df2bb639f0943ed139"
+    ],
+    [
+      "Nonterm.va_state_eq",
+      2,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "44c30691674962b6a6bfb22b814534fe"
+    ],
+    [
+      "Nonterm.va_state_eq",
+      3,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "be49f58e51041bd6ac06e594f9f46e43"
+    ],
+    [
+      "Nonterm.va_state_eq",
+      4,
+      1,
+      0,
+      [ "@query", "assumption_Prims.HasEq_int" ],
+      0,
+      "030e2a81a8fd160680a202e548b38050"
+    ],
+    [
+      "Nonterm.va_state_eq",
+      5,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "87899039cc8555e1637f5e4f344968f5"
+    ],
+    [
+      "Nonterm.va_state_eq",
+      6,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.reg_haseq" ],
+      0,
+      "8272a082cc4391dab31f49b1aeb7eacc"
+    ],
+    [
+      "Nonterm.va_require",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Nonterm.va_code_haseq" ],
+      0,
+      "03eb38e18c035c4d0848e28d583397dd"
+    ],
+    [
+      "Nonterm.va_ensure",
+      1,
+      1,
+      0,
+      [
+        "@query", "assumption_Nonterm.va_code_haseq",
+        "assumption_Prims.list_haseq", "kinding_Nonterm.va_code@tok"
+      ],
+      0,
+      "08d2a2e2a271174ab57e9af1d1c0aa15"
+    ],
+    [
+      "Nonterm.va_lemma_Imm",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "13785874ae26b1be1b3fdfe9ce998ec0"
+    ],
+    [
+      "Nonterm.va_lemma_Increment",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "8317f87f5ffc09bc4f415888d1ad7e7d"
+    ],
+    [
+      "Nonterm.va_lemma_Add",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "e1da7a0a2354f89d580c57070519665f"
+    ],
+    [
+      "Nonterm.va_lemma_AddReg",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "d582ddcdc79d70fd097b1469fbdf6bd8"
+    ],
+    [
+      "Nonterm.va_lemma_p",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "3ada9f968b0eb53d4c2a0bef9c2932bd"
+    ],
+    [
+      "Nonterm.va_lemma_Calls",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "0ef03a1e536181018f393c0ec1710347"
+    ],
+    [
+      "Nonterm.va_lemma_WhileTest",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "5767964eaec75fda0d60ecf4b21c367e"
+    ],
+    [
+      "Nonterm.va_lemma_Ghosts",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "445a9dff1bc2121bcd4fb0c432dd4abd"
+    ]
+  ]
+]

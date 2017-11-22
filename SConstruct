@@ -16,8 +16,6 @@ import platform
 
 Import("*")
 
-is_clean = (not os.path.isdir('obj') and not os.path.isdir('bin'))
-
 target_arch='x86'
 target_x='86'
 sha_arch_dir=''
@@ -55,6 +53,16 @@ else:
   fstar_default_path = '#tools/FStar'
 
 # Retrieve tool-specific command overrides passed in by the user
+AddOption('--STAGE1',
+  dest='stage1',
+  default=False,
+  action='store_true',
+  help='F* stage 1 (of 2)')
+AddOption('--STAGE2',
+  dest='stage2',
+  default=False,
+  action='store_true',
+  help='F* stage 2 (of 2)')
 AddOption('--DAFNY',
   dest='do_dafny',
   default=False,
@@ -103,6 +111,11 @@ AddOption('--FSTAR-Z3-MY-VERSION',
   default=False,
   action='store_true',
   help='Use version of Z3 that does not necessarily match .fstar_z3_version')
+AddOption('--GEN-HINTS',
+  dest='gen_hints',
+  default=False,
+  action='store_true',
+  help='Generate new F* .hints files and copy them into the hints directory')
 AddOption('--DARGS',
   dest='dafny_user_args',
   type='string',
@@ -183,8 +196,55 @@ env['OPENSSL_PATH'] = GetOption('openssl_path')
 
 do_dafny = GetOption('do_dafny')
 do_fstar = GetOption('do_fstar')
+stage1 = GetOption('stage1')
+stage2 = GetOption('stage2')
 fstar_my_version = GetOption('fstar_my_version')
 fstar_z3_my_version = GetOption('fstar_z3_my_version')
+gen_hints = GetOption('gen_hints')
+
+####################################################################
+#
+#   Add support for color in the output
+#
+####################################################################
+
+colors = {}
+colors['cyan']   = '\033[96m'
+colors['purple'] = '\033[95m'
+colors['blue']   = '\033[94m'
+colors['green']  = '\033[92m'
+colors['yellow'] = '\033[93m'
+colors['red']    = '\033[91;40;38;5;217m'
+colors['end']    = '\033[0m'
+
+# If the output is not a terminal or user opts out, remove the colors
+if (not sys.stdout.isatty()) or GetOption('nocolor'):
+   for key, value in colors.items():
+      colors[key] = ''
+
+####################################################################
+#
+#   Set up stages and environment
+#
+####################################################################
+
+if do_fstar and not stage1 and not stage2:
+  #
+  # Stage1 builds the Vale tool and compiles vaf files to F* files.
+  # Stage2 runs F*'s dependency analysis on the F* files and verifies F* files.
+  # (F* dependency analysis cannot run until stage1 completes, which is
+  # why we have two stages.)
+  #
+  # Here, we try to run "scons --stage1 ..." and then proceed to stage2.
+  # Unfortunately, this requires running scons recursively, which is
+  # not something that scons is designed for.  If this doesn't work,
+  # the user can always run "scons --STAGE1" and "scons --STAGE2" explicitly.
+  #
+  print("%s*** Running scons --STAGE1 ***%s" % (colors['yellow'], colors['end']))
+  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints')]
+  subprocess.check_call(['python'] + args_stage1 + ['--STAGE1'])
+  print("%s*** Running scons --STAGE2 ***%s" % (colors['yellow'], colors['end']))
+  stage2 = True
 
 # --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
 # the other build flavors do not redundently re-verify the same results.
@@ -215,29 +275,12 @@ env['VALE'] = File('bin/vale.exe')
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
 dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
-fstar_default_args = '--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'\
-  + ' --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'\
-  + ' --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints'
-
-####################################################################
-#
-#   Add support for color in the output
-#
-####################################################################
-
-colors = {}
-colors['cyan']   = '\033[96m'
-colors['purple'] = '\033[95m'
-colors['blue']   = '\033[94m'
-colors['green']  = '\033[92m'
-colors['yellow'] = '\033[93m'
-colors['red']    = '\033[91m'
-colors['end']    = '\033[0m'
-
-# If the output is not a terminal or user opts out, remove the colors
-if (not sys.stdout.isatty()) or GetOption('nocolor'):
-   for key, value in colors.items():
-      colors[key] = ''
+fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1 --initial_ifuel 0' \
+  + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
+  + ' --hint_info --use_hints' \
+  + (' --record_hints' if gen_hints else ' --cache_checked_modules')
+fstar_default_args = fstar_default_args_nosmtencoding \
+  + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
 
 ####################################################################
 #
@@ -254,7 +297,7 @@ def formatExceptionInfo(maxTBlevel=5):
        excArgs = "<no args>"
    excTb = traceback.format_tb(trbk, maxTBlevel)
    return (excName, excArgs, excTb)
-         
+
 def docmd(env, cmd):
   try:
     #print('cmd ' + cmd)
@@ -282,6 +325,39 @@ def make_cygwin_path(path):
 
 def replace_extension(path, new_ext):
   return "%s.%s" % (os.path.splitext(path)[0], new_ext)
+
+####################################################################
+#
+#   General utilities
+#
+####################################################################
+
+# The obj directory structure is based on the src and tools directory structures:
+#   src/... --> obj/...
+#   tools/... --> obj/...
+def to_obj_dir(path):
+  path = os.path.relpath(path)
+  path = path.replace('\\', '/')
+  if path.startswith('obj/'):
+    return path
+  if path.startswith('src/'):
+    return path.replace('src/', 'obj/', 1)
+  if path.startswith('tools/'):
+    return path.replace('tools/', 'obj/', 1)
+  raise Exception('expected src/... or tools/..., found ' + path)
+
+# obj/... -> hints/...
+def to_hints_dir(path):
+  path = os.path.relpath(path)
+  path = path.replace('\\', '/')
+  if path.startswith('obj/'):
+    return path.replace('obj/', 'hints/', 1)
+  raise Exception('expected obj/..., found ' + path)
+
+def has_obj_dir(path):
+  path = os.path.relpath(path)
+  path = path.replace('\\', '/')
+  return path.startswith('obj/') or path.startswith('src/') or path.startswith('tools/')
 
 ####################################################################
 #
@@ -343,13 +419,13 @@ def vale_fstar_file_scan(node, env, path):
     f = os.path.join(dirname, i)
     v_vaf_includes.append(f)
     # if A.vaf includes B.vaf, then manually establish these dependencies:
-    #   A.vfst  depends on B.fsti
-    #   A.vfsti depends on B.fsti
-    # note that A.vfst and A.vfsti may also have other dependencies; we rely on F*'s dependency analysis for these
-    f_fsti = os.path.splitext(to_obj_dir(os.path.normpath(f)))[0] + '.vfsti'
+    #   A.fst.verified  depends on B.fsti
+    #   A.fsti.verified depends on B.fsti
+    # note that A.fst.verified and A.fsti.verified may also have other dependencies; we rely on F*'s dependency analysis for these
+    f_fsti = os.path.splitext(to_obj_dir(os.path.normpath(f)))[0] + '.fsti.verified'
     node_o = to_obj_dir(str(node))
     node_o_base = os.path.splitext(node_o)[0]
-    Depends([node_o_base + '.vfst.tmp', node_o_base + '.vfsti.tmp'], f_fsti)
+    Depends([node_o_base + '.fst.verified.tmp', node_o_base + '.fsti.verified.tmp'], f_fsti)
 
   files = env.File(v_vaf_includes) 
   return files
@@ -363,31 +439,6 @@ if do_dafny:
 if do_fstar:
   env.Append(SCANNERS = vale_fstar_scan)
 
-
-####################################################################
-#
-#   General utilities
-#
-####################################################################
-
-# The obj directory structure is based on the src and tools directory structures:
-#   src/... --> obj/...
-#   tools/... --> obj/...
-def to_obj_dir(path):
-  path = os.path.relpath(path)
-  path = path.replace('\\', '/')
-  if path.startswith('obj/'):
-    return path
-  if path.startswith('src/'):
-    return path.replace('src/', 'obj/', 1)
-  if path.startswith('tools/'):
-    return path.replace('tools/', 'obj/', 1)
-  raise Exception('expected src/... or tools/..., found ' + path)
-
-def has_obj_dir(path):
-  path = os.path.relpath(path)
-  path = path.replace('\\', '/')
-  return path.startswith('obj/') or path.startswith('src/') or path.startswith('tools/')
 
 ####################################################################
 #
@@ -480,11 +531,22 @@ def add_dafny_verifier(env):
   env.AddMethod(verify_dafny, "Dafny")
 
 def verify_fstar(env, targetfile, sourcefile):
-  temptargetfile = targetfile + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
-  return env.CopyAs(source=temptarget, target=targetfile)
+  temptargetfiles = [targetfile + '.tmp']
+  hintsfile = str(sourcefile) + '.hints'
+  hhintsfile = to_hints_dir(hintsfile)
+  outs = []
+  if gen_hints:
+    temptargetfiles.append(hintsfile)
+  temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
+  temptarget = temptargets[0]
+  outs.append(env.CopyAs(source = temptarget, target = targetfile))
+  if gen_hints:
+    outs.append(env.CopyAs(source = temptargets[1], target = hhintsfile))
+  elif os.path.isfile(hhintsfile):
+    Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
+  return outs
 
-# Add env.FStar(), to verify a .fst or .fsti file into a .vfst or .vfsti
+# Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
 def add_fstar_verifier(env):
   env.AddMethod(verify_fstar, "FStar")
 
@@ -670,9 +732,11 @@ def verify_fstar_files(env, files):
   for f in files:
     options = get_build_options(f)
     if options != None and verify:
-      s = os.path.splitext(to_obj_dir(f))
-      target = s[0] + '.v' + s[1].replace('.', '')
-      options.env.FStar(target, f)
+      o = to_obj_dir(f)
+      env.Command(o, f, Copy("$TARGET", "$SOURCE"))
+      if stage2:
+        target = o + '.verified'
+        options.env.FStar(target, o)
 
 # Verify a set of Vale files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -692,14 +756,14 @@ def verify_vale_fstar_files(env, files):
     options = get_build_options(f)
     if options != None:
       fsts = compile_vale_fstar(env, f)
-      if verify == True:
+      if verify == True and stage2:
         fst_str = str(fsts[0]).replace('\\', '/')
         fsti_str = str(fsts[1]).replace('\\', '/')
         fstar_gen_options = get_build_options(fst_str)
         fstari_gen_options = get_build_options(fsti_str)
         s = os.path.splitext(to_obj_dir(f))[0]
-        target = s + '.vfst'
-        targeti = s + '.vfsti'
+        target = s + '.fst.verified'
+        targeti = s + '.fsti.verified'
         fstar_gen_options.env.FStar(target, fsts[0])
         fstari_gen_options.env.FStar(targeti, fsts[1])
 
@@ -795,20 +859,8 @@ def check_fstar_version():
 #
 ####################################################################
 
-fstar_deps_ok = False
-
-# Use F*'s dependency analysis to determine dependencies for .fst/.fsti files,
-# and predict dependencies for .fst/.fsti files generated from .vaf files.
-# Unfortunately, whenever a .vaf file changes its dependencies, we end up
-# verifying twice: once because the .vaf file changed, and again (in the
-# next invocation of scons) because the dependencies changed.  This also
-# happens for the very first build.
-# We could remove this redundancy if we ran scons in two stages: first,
-# to generate the tools and compile the .vaf files, and second to run
-# F*'s dependency analysis and verify the .fst/.fsti files.
 def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths):
   import subprocess
-  global fstar_deps_ok
   # find all .fst, .fsti, and .vaf files in src_directories
   fst_files = []
   vaf_files = []
@@ -822,7 +874,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   for f in fst_files:
     options = get_build_options(f)
     if options != None:
-      files.append(f)
+      files.append(to_obj_dir(f))
   for f in vaf_files:
     options = get_build_options(f)
     if options != None:
@@ -837,48 +889,39 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   fstar = str(env['FSTAR'])
   lines = []
   depsBackupFile = 'obj/fstarDepsBackup.d'
-  try:
-    print('%sF* dependency analysis: starting%s' % (colors['cyan'], colors['end']))
-    args = ["--dep", "make"] + includes + files
-    cmd = [fstar] + args
-    print(" ".join(cmd))
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
-    print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
-    fstar_deps_ok = True
-    lines = o.splitlines()
-  except subprocess.CalledProcessError as e:
-    print(e)
-    print(e.output)
-    print('%sF* dependency analysis: done, but with errors%s' % (colors['red'], colors['end']))
-    if os.path.isfile(depsBackupFile):
-      print('  loading dependencies from ' + depsBackupFile)
-      with open(depsBackupFile, 'r') as myfile:
-        lines = myfile.read().splitlines()
+  print('%sF* dependency analysis: starting%s' % (colors['cyan'], colors['end']))
+  args = ["--dep", "make"] + includes + files
+  cmd = [fstar] + args
+  print(" ".join(cmd))
+  o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
+  print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
+  fstar_deps_ok = True
+  lines = o.splitlines()
   for line in lines:
     if 'Warning:' in line:
       print(line)
       fstar_deps_ok = False
+    if len(line) == 0:
+      pass
     else:
       # lines are of the form:
       #   a1.fst a2.fst ... : b1.fst b2.fst ...
       # we change this to:
-      #   obj\...\a1.vfst obj\...\a2.vfst ... : b1.fst b2.fst ...
+      #   obj\...\a1.fst.verified obj\...\a2.fst.verified ... : b1.fst.verified b2.fst.verified ...
       # we ignore targets that we will not verify (e.g. F* standard libraries)
       targets, sources = line.split(': ', 1) # ': ', not ':', because of Windows drive letters
       sources = sources.split()
       targets = targets.split()
-      targets = [to_obj_dir(re.sub('\.fst$', '.vfst.tmp', re.sub('\.fsti$', '.vfsti.tmp', x))) for x in targets if has_obj_dir(x)]
-      if not fstar_deps_ok:
-        # If dependency analysis failed, remove non-existent sources so that scons can make progress
-        # Otherwise, scons won't recompile the .vaf files, so the dependencies will never get fixed
-        sources = [x for x in sources if os.path.isfile(x)]
+      sources = [to_obj_dir(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x))) for x in sources if has_obj_dir(x)]
+      targets = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
       Depends(targets, sources)
   if fstar_deps_ok:
     # Save results in depsBackupFile
-    # This can be used in case of errors in future invocations of scons
     with open(depsBackupFile, 'w') as myfile:
       for line in lines:
         myfile.write(line + '\n')
+  else:
+    raise Exception('%sF* dependency analysis failed%s' % (colors['red'], colors['end']))
 
 ####################################################################
 #
@@ -904,7 +947,7 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'do_dafny', 'do_fstar')
+Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')
@@ -943,30 +986,19 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
+Import(['verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
 # F* dependencies
-if do_fstar:
+if do_fstar and stage2:
   import distutils.dir_util
   # create obj directory
   distutils.dir_util.mkpath('obj')
   for d in fstar_include_paths:
     if d.startswith('obj/'):
       distutils.dir_util.mkpath(d)
-  found_manual_dependencies = True
-  for target in manual_dependencies:
-    source = manual_dependencies[target]
-    Depends(target, source)
-    if not os.path.isfile(source):
-      found_manual_dependencies = False
-  if found_manual_dependencies:
-    predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
-  else:
-    if is_clean:
-      # clean build: build everything (no dependency analysis needed)
-      fstar_deps_ok = True
+  predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
 
 # Verification
 env.VerifyFilesIn(verify_paths)
@@ -994,9 +1026,13 @@ def report_verification_failures():
           if x is not None:
             filename = bf_to_filename(x)
             if filename.endswith('.tmp') and os.path.isfile(filename):
+              errorfilename = filename[:-len('.tmp')] + '.error'
+              if os.path.isfile(errorfilename):
+                os.remove(errorfilename)
+              os.rename(filename, errorfilename)
               print('##### %sVerification error%s. ' % (colors['red'], colors['end']))
-              print('Printing contents of ' + filename + ' #####')
-              with open (filename, 'r') as myfile:
+              print('Printing contents of ' + errorfilename + ' #####')
+              with open (errorfilename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
                   if "(Error)" in line or "failed" in line:
@@ -1005,9 +1041,6 @@ def report_verification_failures():
 
 def display_build_status():
   report_verification_failures()
-  if do_fstar and not fstar_deps_ok:
-    raise Exception('%sInitial F* dependency analysis failed; you might need to run scons again.%s' % (colors['red'], colors['end']))
-
 
 def print_env_options(options):
   for option in options:
