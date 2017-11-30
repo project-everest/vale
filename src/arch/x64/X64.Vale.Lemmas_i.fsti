@@ -54,6 +54,30 @@ val lemma_cmp_gt : s:state -> o1:operand -> o2:operand -> Lemma
   (ensures eval_ocmp s (S.OGt o1 o2) <==> eval_operand o1 s > eval_operand o2 s)
   [SMTPat (eval_ocmp s (S.OGt o1 o2))]
 
+val lemma_valid_cmp_eq : s:state -> o1:operand -> o2:operand -> Lemma
+  (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.OEq o1 o2) s)
+  [SMTPat (valid_ocmp (S.OEq o1 o2) s)]
+
+val lemma_valid_cmp_ne : s:state -> o1:operand -> o2:operand -> Lemma
+  (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.ONe o1 o2) s)
+  [SMTPat (valid_ocmp (S.ONe o1 o2) s)]
+
+val lemma_valid_cmp_le : s:state -> o1:operand -> o2:operand -> Lemma
+  (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.OLe o1 o2) s)
+  [SMTPat (valid_ocmp (S.OLe o1 o2) s)]
+
+val lemma_valid_cmp_ge : s:state -> o1:operand -> o2:operand -> Lemma
+  (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.OGe o1 o2) s)
+  [SMTPat (valid_ocmp (S.OGe o1 o2) s)]
+
+val lemma_valid_cmp_lt : s:state -> o1:operand -> o2:operand -> Lemma
+  (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.OLt o1 o2) s)
+  [SMTPat (valid_ocmp (S.OLt o1 o2) s)]
+
+val lemma_valid_cmp_gt : s:state -> o1:operand -> o2:operand -> Lemma
+  (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.OGt o1 o2) s)
+  [SMTPat (valid_ocmp (S.OGt o1 o2) s)]
+
 val lemma_merge_total (b0:codes) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) : Ghost (fN:fuel)
   (requires
     Cons? b0 /\
