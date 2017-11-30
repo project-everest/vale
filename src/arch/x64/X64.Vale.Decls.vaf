@@ -102,13 +102,21 @@ function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:
 *)
 
 
+(* Evaluation *)
+unfold let va_eval_operand_uint64     (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
+unfold let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) : nat64 = eval_operand o s
+unfold let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
+unfold let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
+unfold let va_eval_register_uint64    (s:va_state) (r:va_register)    : nat64 = eval_reg r s
+unfold let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
+
 (* Predicates *)
 unfold let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
 let va_is_dst_operand_uint64 (o:operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
 let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
 unfold let va_is_src_register_int (r:reg) (s:va_state) = True
 unfold let va_is_dst_register (r:reg) (s:va_state) = True
-unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = True
+unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt_uint64 s o) < 64
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
 
 (* Getters *)
@@ -141,13 +149,6 @@ unfold
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
-(* Evaluation *)
-unfold let va_eval_operand_uint64     (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
-unfold let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) : nat64 = eval_operand o s
-unfold let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
-unfold let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
-unfold let va_eval_register_uint64    (s:va_state) (r:va_register)    : nat64 = eval_reg r s
-unfold let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
 
 (** Constructors for va_codes *)
 unfold let va_CNil () : va_codes = []
@@ -211,6 +212,8 @@ let va_ensure_total (c0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type
 val eval_ocmp : s:va_state -> c:ocmp -> GTot bool
 unfold let va_evalCond (b:ocmp) (s:va_state) : GTot bool = eval_ocmp s b
 
+val valid_ocmp : c:ocmp -> s:va_state -> GTot bool
+
 val lemma_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_eq o1 o2)) <==> (va_eval_operand_uint64 s o1 == va_eval_operand_uint64 s o2))
@@ -241,6 +244,36 @@ val lemma_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (ensures  (eval_ocmp s (va_cmp_gt o1 o2)) <==> (va_eval_operand_uint64 s o1 > va_eval_operand_uint64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_gt o1 o2))]
 
+val lemma_valid_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures  (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_eq o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_eq o1 o2) s)]
+
+val lemma_valid_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ne o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_ne o1 o2) s)]
+
+val lemma_valid_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_le o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_le o1 o2) s)]
+
+val lemma_valid_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ge o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_ge o1 o2) s)]
+
+val lemma_valid_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_lt o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_lt o1 o2) s)]
+
+val lemma_valid_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+  (requires True)
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_gt o1 o2) s)]
+
 val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) (fM:va_fuel) (sN:va_state) : Ghost (fN:va_fuel)
   (requires
     Cons? b0 /\
@@ -267,6 +300,7 @@ val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : G
 
 val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
+    valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
     eval_code ct s0 f0 sM
   )
@@ -276,6 +310,7 @@ val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state)
 
 val va_lemma_ifElseFalse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
+    valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
     eval_code cf s0 f0 sM
   )
@@ -294,11 +329,12 @@ val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost ((s1:va_stat
   )
 
 val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
-  (requires eval_ocmp sW b)
+  (requires eval_ocmp sW b /\ valid_ocmp b sW)
   (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
 val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
   (requires
+    valid_ocmp b sW /\
     not (eval_ocmp sW b) /\
     eval_while_inv (While b c) s0 fW sW
   )
@@ -311,6 +347,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
   (requires
     While? c /\
     sN.ok /\
+    valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\
     eval_code (While?.whileBody c) sM fM sN
@@ -372,6 +409,7 @@ let va_cmp_gt o1 o2 = S.OGt o1 o2
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv
 let eval_ocmp = Lemmas_i.eval_ocmp
+let valid_ocmp = Lemmas_i.valid_ocmp
 
 unfold let va_eval_ins = Lemmas_i.eval_ins
 
@@ -381,6 +419,13 @@ let lemma_cmp_le s o1 o2 = ()
 let lemma_cmp_ge s o1 o2 = ()
 let lemma_cmp_lt s o1 o2 = ()
 let lemma_cmp_gt s o1 o2 = ()
+
+let lemma_valid_cmp_eq s o1 o2 = ()
+let lemma_valid_cmp_ne s o1 o2 = ()
+let lemma_valid_cmp_le s o1 o2 = ()
+let lemma_valid_cmp_ge s o1 o2 = ()
+let lemma_valid_cmp_lt s o1 o2 = ()
+let lemma_valid_cmp_gt s o1 o2 = ()
 
 let va_lemma_merge_total = Lemmas_i.lemma_merge_total
 let va_lemma_empty_total = Lemmas_i.lemma_empty_total

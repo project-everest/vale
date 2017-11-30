@@ -16,7 +16,7 @@ let publicRegisterValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) 
     ==> (s1.state.regs r = s2.state.regs r)
 
 let publicMemValuesAreSame (s1:traceState) (s2:traceState) =
-  forall x. (Public? (s1.memTaint.[x]) || Public? (s2.memTaint.[x])) ==> (s1.state.mem.[x] = s2.state.mem.[x])
+  forall x. (Public? (s1.memTaint.[x]) || Public? (s2.memTaint.[x])) ==> (valid_mem64 x s1.state.mem /\ valid_mem64 x s2.state.mem) ==> (eval_mem x s1.state == eval_mem x s2.state)
 
 let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
    publicRegisterValuesAreSame ts s1 s2

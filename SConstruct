@@ -284,6 +284,26 @@ fstar_default_args = fstar_default_args_nosmtencoding \
 
 ####################################################################
 #
+#   Add support for color in the output
+#
+####################################################################
+
+colors = {}
+colors['cyan']   = '\033[96m'
+colors['purple'] = '\033[95m'
+colors['blue']   = '\033[94m'
+colors['green']  = '\033[92m'
+colors['yellow'] = '\033[93m'
+colors['red']    = '\033[91m'
+colors['end']    = '\033[0m'
+
+# If the output is not a terminal or user opts out, remove the colors
+if (not sys.stdout.isatty()) or GetOption('nocolor'):
+   for key, value in colors.items():
+      colors[key] = ''
+
+####################################################################
+#
 #   General-purpose utility commands
 #
 ####################################################################
