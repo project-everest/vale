@@ -106,7 +106,7 @@ let get_snd_ocmp (o:ocmp) = match o with
 
 let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
   let t = c.ot in
-  let s = run (check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
+  let s = run (check (valid_ocmp c.o);; check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
     {ts with state = s}, eval_ocmp s c.o
 
 type tainted_code = precode tainted_ins tainted_ocmp

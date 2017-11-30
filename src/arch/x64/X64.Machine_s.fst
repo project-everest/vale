@@ -87,13 +87,14 @@ assume val lemma_store_mem64 : b:buffer64 -> i:int -> v:nat64 -> h:mem -> Lemma
     store_mem64 (buffer_addr b + 8 `op_Multiply` i) v h == M.buffer_write b i v h
   )
 
-assume val lemma_invert_valid_mem64 : ptr:int -> h:mem -> Lemma
- (valid_mem64 ptr h ==> 
-   (exists (b:buffer64) (i:int) . (i < Seq.length (M.buffer_as_seq h b) /\ M.buffer_readable h b /\ ptr == (buffer_addr b + 8 `op_Multiply` i))))
-
 assume val lemma_store_load_mem64 : ptr:int -> v:nat64 -> h:mem -> Lemma
   (load_mem64 ptr (store_mem64 ptr v h) = v)
 
 assume val lemma_frame_store_mem64: i:int -> v:nat64 -> h:mem -> Lemma (
   let h' = store_mem64 i v h in
-  forall i'. i' <> i ==> load_mem64 i' h = load_mem64 i' h')
+  forall i'. i' <> i /\ valid_mem64 i h /\ valid_mem64 i' h ==> load_mem64 i' h = load_mem64 i' h')
+
+assume val lemma_valid_store_mem64: i:int -> v:nat64 -> h:mem -> Lemma (
+  let h' = store_mem64 i v h in
+  forall j. valid_mem64 j h <==> valid_mem64 j h')
+ 

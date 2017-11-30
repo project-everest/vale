@@ -92,7 +92,7 @@ forall src. List.Tot.Base.mem src s /\ Public? (sources_taint s ts ins.t) ==> Pu
 let lemma_taint_sources ins ts = ()
 
 val lemma_public_op_are_same: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
-(requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state)
+(requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
 (ensures eval_operand op s1.state == eval_operand op s2.state)
 
 let lemma_public_op_are_same ts op s1 s2 = ()
@@ -162,6 +162,8 @@ let lemma_mov_same_public ts fuel ins s1 s2 =
 	  let v2 = eval_operand src s2.state in
 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
           assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2) 
@@ -192,6 +194,8 @@ let lemma_add_same_public ts fuel ins s1 s2 =
 	  let v2 = (v21 + v22) % nat64_max in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -221,6 +225,8 @@ let lemma_sub_same_public ts fuel ins s1 s2 =
 	  let v2 = (v21 - v22) % nat64_max in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -250,6 +256,8 @@ let lemma_imul_same_public ts fuel ins s1 s2 =
 	  let v2 = FStar.UInt.mul_mod #64 v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -279,6 +287,8 @@ let lemma_and_same_public ts fuel ins s1 s2 =
 	  let v2 = FStar.UInt.logand #64 v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -308,6 +318,8 @@ match dsts with
 	  let v2 = (v21 + v22) % nat64_max in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -339,6 +351,8 @@ let lemma_addcarry_same_public ts fuel ins s1 s2 =
 	  let v2 = (v21 + v22 + c2) % nat64_max in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -379,6 +393,8 @@ let lemma_shr_same_public ts fuel ins s1 s2 =
 	  let v2 = FStar.UInt.shift_right #64 v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -408,6 +424,8 @@ let lemma_shl_same_public ts fuel ins s1 s2 =
 	  let v2 = FStar.UInt.shift_left #64 v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
@@ -443,6 +461,8 @@ let lemma_xor_same_public ts fuel ins s1 s2 =
 	  let v2 = FStar.UInt.logxor #64 v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
 	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)

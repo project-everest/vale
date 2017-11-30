@@ -82,6 +82,15 @@ let valid_operand (o:operand) (s:state) : bool =
   | OReg r -> true
   | OMem m -> valid_maddr m s
 
+let valid_ocmp (c:ocmp) (s:state) :bool =
+  match c with
+  | OEq o1 o2 -> valid_operand o1 s && valid_operand o2 s
+  | ONe o1 o2 -> valid_operand o1 s && valid_operand o2 s
+  | OLe o1 o2 -> valid_operand o1 s && valid_operand o2 s
+  | OGe o1 o2 -> valid_operand o1 s && valid_operand o2 s
+  | OLt o1 o2 -> valid_operand o1 s && valid_operand o2 s
+  | OGt o1 o2 -> valid_operand o1 s && valid_operand o2 s
+
 let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) : state =
   match o with
   | OReg r -> update_reg' r v s
@@ -219,9 +228,11 @@ let eval_ins (ins:ins) : st unit =
     update_operand dst ins (FStar.UInt.logand #64 (eval_operand dst s) (eval_operand src s))
 
   | Shr64 dst amt ->
+    check (valid_operand amt);;
     update_operand dst ins (FStar.UInt.shift_right #64 (eval_operand dst s) (eval_operand amt s))
 
   | Shl64 dst amt ->
+    check (valid_operand amt);;
     update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
 
 (*
@@ -237,7 +248,8 @@ let rec eval_code c fuel s =
   match c with
   | Ins ins                       -> Some (run (eval_ins ins) s)
   | Block l                       -> eval_codes l fuel s
-  | IfElse ifCond ifTrue ifFalse  -> if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
+  | IfElse ifCond ifTrue ifFalse  -> let s = run (check (valid_ocmp ifCond)) s in
+	   if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
   | While b c                     -> eval_while b c fuel s
 
 and eval_codes l fuel s =
@@ -249,6 +261,7 @@ and eval_codes l fuel s =
 
 and eval_while b c fuel s0 =
   if fuel = 0 then None else
+  let s0 = run (check (valid_ocmp b)) s0 in
   if not (eval_ocmp s0 b) then Some s0
   else
     match eval_code c (fuel - 1) s0 with
