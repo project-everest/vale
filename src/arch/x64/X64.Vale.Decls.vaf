@@ -108,7 +108,7 @@ let va_is_dst_operand_uint64 (o:operand) (s:va_state) = OReg? o && not (Rsp? (OR
 let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
 unfold let va_is_src_register_int (r:reg) (s:va_state) = True
 unfold let va_is_dst_register (r:reg) (s:va_state) = True
-unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = True
+unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_operand o s
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
 
 (* Getters *)
@@ -267,6 +267,7 @@ val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : G
 
 val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
+    valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
     eval_code ct s0 f0 sM
   )
@@ -276,6 +277,7 @@ val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state)
 
 val va_lemma_ifElseFalse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
+    valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
     eval_code cf s0 f0 sM
   )
@@ -294,11 +296,12 @@ val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost ((s1:va_stat
   )
 
 val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
-  (requires eval_ocmp sW b)
+  (requires eval_ocmp sW b /\ valid_ocmp b sW)
   (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
 val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
   (requires
+    valid_ocmp b sW /\
     not (eval_ocmp sW b) /\
     eval_while_inv (While b c) s0 fW sW
   )
@@ -311,6 +314,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
   (requires
     While? c /\
     sN.ok /\
+    valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\
     eval_code (While?.whileBody c) sM fM sN
@@ -372,6 +376,7 @@ let va_cmp_gt o1 o2 = S.OGt o1 o2
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv
 let eval_ocmp = Lemmas_i.eval_ocmp
+let valid_ocmp = Lemmas_i.valid_ocmp
 
 unfold let va_eval_ins = Lemmas_i.eval_ins
 

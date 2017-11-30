@@ -21,8 +21,10 @@ let rec increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
   | Ins ins -> ()
   | Block l -> increase_fuels l s0 f0 sN fN
   | IfElse b t f ->
+      let s0 = ensure_valid_ocmp b s0 in
       if eval_ocmp s0 b then increase_fuel t s0 f0 sN fN else increase_fuel f s0 f0 sN fN
   | While b c ->
+      let s0 = ensure_valid_ocmp b s0 in
       if not (eval_ocmp s0 b) then ()
       else
       (
