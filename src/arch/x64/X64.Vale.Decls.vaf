@@ -102,13 +102,21 @@ function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:
 *)
 
 
+(* Evaluation *)
+unfold let va_eval_operand_uint64     (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
+unfold let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) : nat64 = eval_operand o s
+unfold let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
+unfold let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
+unfold let va_eval_register_uint64    (s:va_state) (r:va_register)    : nat64 = eval_reg r s
+unfold let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
+
 (* Predicates *)
 unfold let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
 let va_is_dst_operand_uint64 (o:operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
 let va_is_dst_dst_operand_uint64 (o:va_dst_operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
 unfold let va_is_src_register_int (r:reg) (s:va_state) = True
 unfold let va_is_dst_register (r:reg) (s:va_state) = True
-unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_operand o s
+unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt_uint64 s o) < 64
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
 
 (* Getters *)
@@ -141,13 +149,6 @@ unfold
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
-(* Evaluation *)
-unfold let va_eval_operand_uint64     (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
-unfold let va_eval_dst_operand_uint64 (s:va_state) (o:va_dst_operand) : nat64 = eval_operand o s
-unfold let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
-unfold let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
-unfold let va_eval_register_uint64    (s:va_state) (r:va_register)    : nat64 = eval_reg r s
-unfold let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
 
 (** Constructors for va_codes *)
 unfold let va_CNil () : va_codes = []

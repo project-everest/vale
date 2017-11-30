@@ -82,6 +82,9 @@ let valid_operand (o:operand) (s:state) : bool =
   | OReg r -> true
   | OMem m -> valid_maddr m s
 
+let valid_shift_operand (o:operand) (s:state) : bool =
+  valid_operand o s && (eval_operand o s) < 64
+  
 let valid_ocmp (c:ocmp) (s:state) :bool =
   match c with
   | OEq o1 o2 -> valid_operand o1 s && valid_operand o2 s
@@ -228,11 +231,11 @@ let eval_ins (ins:ins) : st unit =
     update_operand dst ins (FStar.UInt.logand #64 (eval_operand dst s) (eval_operand src s))
 
   | Shr64 dst amt ->
-    check (valid_operand amt);;
+    check (valid_shift_operand amt);;
     update_operand dst ins (FStar.UInt.shift_right #64 (eval_operand dst s) (eval_operand amt s))
 
   | Shl64 dst amt ->
-    check (valid_operand amt);;
+    check (valid_shift_operand amt);;
     update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
 
 (*
