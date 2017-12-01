@@ -184,9 +184,7 @@ OpToken
   | LTEQEQGT { $1 }
 AnyIdOrOp
   : AnyId { $1 }
-/*
   | OPERATOR LPAREN OpToken RPAREN { let (_, (_, s)) = $3 in Operator s }
-*/
 CalcOp
   : LTEQEQGT { BEquiv }
   | EQEQGT { BImply }

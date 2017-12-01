@@ -40,6 +40,9 @@ let operatorToken (tok:string) (isCustom:bool) (s:string):(loc -> token) option 
 
 }
 
+let op_char = ['!''%''+''-''&''^''|''<''>''=''.''#'':''$''?''`''~''@''\\']
+let op = (op_char | '*' | '/' op_char)+ ('/' | "//" | "/*")?
+
 rule comment = parse
 | "*/" { () }
 | "*)" { () }
@@ -58,6 +61,8 @@ and preprocess_skip deep = parse
 | "\r\n" { next_line lexbuf; preprocess_skip deep lexbuf }
 | ['\n''\r'] { next_line lexbuf; preprocess_skip deep lexbuf }
 | _ { preprocess_skip deep lexbuf }
+and skip_line = parse
+| [^'\n''\r']*  {()}
 and file_name = parse
 | [' ']*[^' ''\n''\r']+[^'\n''\r']* { token lexbuf }
 | [^'\n''\r']* { token lexbuf }
@@ -126,19 +131,27 @@ and token = parse
 | "}" { RBRACE (curLoc lexbuf) }
 | "," { COMMA (curLoc lexbuf) }
 | "/" { SLASH (curLoc lexbuf, (false, "/")) }
-| ['!''%''+''-''*''&''^''|''<''>''=''.''#'':''$''?''`''~''@']+
+| op
   {
     let s = lexeme lexbuf in
     let loc = curLoc lexbuf in
-    match (s, operatorToken s false s, Map.tryFind s !custom_tokens) with
-    | ("@", _, _) -> AT loc
-    | (".", _, _) -> DOT loc
-    | (":", _, _) -> COLON loc
-    | (":|", _, _) -> COLONBAR loc
-    | ("::", _, _) -> COLONCOLON loc
-    | (_, None, None) -> parse_err ("unknown token '" + s + "'")
-    | (_, None, Some f) -> f loc
-    | (_, Some f, _) -> f loc
+    let op_tok s = 
+      match (s, operatorToken s false s, Map.tryFind s !custom_tokens) with
+      | ("@", _, _) -> AT loc
+      | (".", _, _) -> DOT loc
+      | (":", _, _) -> COLON loc
+      | (":|", _, _) -> COLONBAR loc
+      | ("::", _, _) -> COLONCOLON loc
+      | (_, None, None) -> parse_err ("unknown token '" + s + "'")
+      | (_, None, Some f) -> f loc
+      | (_, Some f, _) -> f loc
+    in
+    match s with
+    | s when s.EndsWith("/*") -> 
+      let s = s.Substring(0, s.Length - 2) in comment lexbuf; op_tok s
+    | s when s.EndsWith("//") -> 
+      let s = s.Substring(0, s.Length - 2) in skip_line lexbuf; op_tok s
+    | _ -> op_tok s
   }
 | "type" { TYPE (curLoc lexbuf) }
 | "const" { CONST (curLoc lexbuf) }

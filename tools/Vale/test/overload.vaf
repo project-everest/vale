@@ -1,0 +1,108 @@
+var{:state ok()} ok:bool;
+var{:state reg(EAX)} eax:int;
+var{:state reg(EBX)} ebx:int;
+var{:state flags()} efl:int;
+var{:state mem()} mem:int;
+
+#verbatim interface
+module Overload
+
+open FStar.Map
+let map = Map.t
+let op_String_Access = Map.sel
+let op_String_Assignment = Map.upd
+let contains = Map.contains
+
+type reg = | EAX | EBX
+
+type va_bool = bool
+type va_int = int
+type ins = | IPlaceholder : int -> ins
+type ocmp = | OLe: o1:reg -> o2:reg -> ocmp
+type va_code =
+  | Ins : ins:ins -> va_code
+  | Block : block:va_codes -> va_code
+  | IfElse : ifCond:ocmp -> ifTrue:va_code -> ifFalse:va_code -> va_code
+and va_codes = list va_code
+
+let va_CNil () = []
+let va_CCons x y = x::y
+let va_Block (block:va_codes) : Tot va_code = Block block
+let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
+let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
+let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
+let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
+let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
+
+type va_state = map reg int
+let va_get_ok (s:va_state) : GTot Type = True
+let va_get_reg (r:reg) (s:va_state) : GTot int = s.[r]
+let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
+let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
+
+type va_register = reg
+let va_op_register_reg (r:reg) : Tot va_register = r
+let va_is_src_register_int (r:reg) (s:va_state) = True
+let va_is_dst_register_int (r:reg) (s:va_state) = True
+let va_update_register (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_eval_register_int (s:va_state) (r:va_register) : GTot int = s.[r]
+
+type va_cmp = reg
+let va_op_cmp_reg (r:va_register) : va_cmp = r
+let va_cmp_le (a:va_register) (b:va_register) : ocmp = OLe a b
+
+let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
+
+type va_fuel = int
+
+let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
+  b0 = c
+
+let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
+  True
+
+#endverbatim
+
+
+#verbatim
+module Overload
+
+let eval_ocmp (s:va_state) (c:ocmp) :bool =
+  match c with
+  | OLe r1 r2 -> s.[r1] <= s.[r2]
+
+assume val va_lemma_empty_total : s0:va_state -> bN:va_codes -> Ghost ((sM:va_state) * (fM:va_fuel))
+  (requires True)
+  (ensures (fun (sM, fM) ->
+    s0 == sM
+  ))
+
+assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
+  (requires
+    Cons? b0
+  )
+  (ensures (fun fN ->
+    True
+  ))
+
+assume val make_opaque : #a:Type -> a -> a
+assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
+unfold let va_make_opaque = make_opaque
+unfold let va_reveal_opaque = reveal_opaque
+
+#endverbatim
+
+#token /\ precedence &&
+#token \/ precedence ||
+
+function operator(/\) (x:Type0, y:Type0):int := l_and;
+function operator(\/) (x:Type0, y:Type0):int := l_or;
+
+procedure Calls(register x:int, register y:int)
+{
+    ghost var z:= 0<x \/ y>0;
+    ghost var t:= 0<x /\ y>0;
+    ghost var a:= 1 +/**/3; // make sure that comments are parsed correctly
+    ghost var b:= 1 +// make sure that comments are parsed correct
+                  3;
+}
