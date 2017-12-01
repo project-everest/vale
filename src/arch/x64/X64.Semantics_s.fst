@@ -6,26 +6,70 @@ module M = Memory_i_s
 
 type uint64 = UInt64.t
 
+type op64 = o:operand {not (OXmm? o)}
+type dst_op64 = o:dst_op {not (OXmm? o)}
+
+//type op128 = o:operand {OConst? o || OXmm? o}
+//type dst_op128 = o:op128 {OXmm? o}
+type xmm = o:operand {OXmm? o}
+type mov128_op = o:operand {OXmm? o || OMem? o}
+
+type imm8 = o:operand {OConst? o && 0 <= OConst?.n o && OConst?.n o < 256}
+
+unfold let nat8 = Types_s.nat8
+type twobits = i:int{0 <= i && i < 4}
+type bits_of_byte = | Bits_of_Byte :
+  lo:twobits ->
+  mid_lo:twobits ->  
+  mid_hi:twobits ->
+  hi:twobits ->
+  bits_of_byte
+
+(*
+let bits_to_byte (bits:bits_of_byte) =
+  let open FStar.Mul in
+    64 * bits.hi + 16 * bits.mid_hi + 4 * bits.mid_lo + bits.lo
+*)
+
+let byte_to_twobits (b:nat8) =
+  Bits_of_Byte
+    (b % 4)
+    ((b / 4) % 4)
+    ((b / 16) % 4)
+    ((b / 64) % 4)
+  
+unfold let nat32 = Types_s.nat32
+type quadword = | Quadword:
+  lo:nat32 ->
+  mid_lo:nat32 ->
+  mid_hi:nat32 ->
+  hi:nat32 ->
+  quadword
+
 type ins =
-  | Mov64      : dst:dst_op -> src:operand -> ins
-  | Add64      : dst:dst_op -> src:operand -> ins
-  | AddLea64   : dst:dst_op -> src1:operand -> src2:operand -> ins
-  | AddCarry64 : dst:dst_op -> src:operand -> ins
-  | Sub64      : dst:dst_op -> src:operand -> ins
-  | Mul64      : src:operand -> ins
-  | IMul64     : dst:dst_op -> src:operand -> ins
-  | Xor64      : dst:dst_op -> src:operand -> ins
-  | And64      : dst:dst_op -> src:operand -> ins
-  | Shr64      : dst:dst_op -> amt:operand -> ins
-  | Shl64      : dst:dst_op -> amt:operand -> ins
+  | Mov64      : dst:dst_op64 -> src:op64 -> ins
+  | Add64      : dst:dst_op64 -> src:op64 -> ins
+  | AddLea64   : dst:dst_op64 -> src1:op64 -> src2:op64 -> ins
+  | AddCarry64 : dst:dst_op64 -> src:op64 -> ins
+  | Sub64      : dst:dst_op64 -> src:op64 -> ins
+  | Mul64      : src:op64 -> ins
+  | IMul64     : dst:dst_op64 -> src:op64 -> ins
+  | Xor64      : dst:dst_op64 -> src:op64 -> ins
+  | And64      : dst:dst_op64 -> src:op64 -> ins
+  | Shr64      : dst:dst_op64 -> amt:op64 -> ins
+  | Shl64      : dst:dst_op64 -> amt:op64 -> ins
+  | Pxor       : dst:xmm -> src:xmm -> ins
+  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
+  | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
+  | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
 
 type ocmp =
-  | OEq: o1:operand -> o2:operand -> ocmp
-  | ONe: o1:operand -> o2:operand -> ocmp
-  | OLe: o1:operand -> o2:operand -> ocmp
-  | OGe: o1:operand -> o2:operand -> ocmp
-  | OLt: o1:operand -> o2:operand -> ocmp
-  | OGt: o1:operand -> o2:operand -> ocmp
+  | OEq: o1:op64 -> o2:op64 -> ocmp
+  | ONe: o1:op64 -> o2:op64 -> ocmp
+  | OLe: o1:op64 -> o2:op64 -> ocmp
+  | OGe: o1:op64 -> o2:op64 -> ocmp
+  | OLt: o1:op64 -> o2:op64 -> ocmp
+  | OGt: o1:op64 -> o2:op64 -> ocmp
 
 type code = precode ins ocmp
 type codes = list code
@@ -33,6 +77,7 @@ type codes = list code
 noeq type state = {
   ok: bool;
   regs: reg -> nat64;
+  xmms: int -> quadword;
   flags: nat64;
   mem: mem;
 }
@@ -43,7 +88,12 @@ noeq type state = {
 assume val havoc : state -> ins -> nat64
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
+unfold let eval_xmm (i:int) (s:state) : quadword = s.xmms i
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
+//unfold let eval_mem128 (ptr:int) (s:state) : quadword = load_mem128 ptr s.mem
+assume val eval_mem128 (ptr:int) (s:state) : quadword
+assume val store_mem128 (ptr:int) (v:quadword) (m:mem) : mem
+assume val valid_mem128 (ptr:int) (m:mem) : bool
 
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
@@ -52,11 +102,17 @@ let eval_maddr (m:maddr) (s:state) : int =
     | MReg reg offset -> (eval_reg reg s) + offset
     | MIndex base scale index offset -> (eval_reg base s) + scale * (eval_reg index s) + offset
 
-let eval_operand (o:operand) (s:state) : nat64 =
+let eval_operand (o:operand) (s:state) : (if OXmm? o then quadword else nat64) =
   match o with
   | OConst n -> int_to_nat64 n
   | OReg r -> eval_reg r s
+  | OXmm i -> eval_xmm i s
   | OMem m -> eval_mem (eval_maddr m s) s
+
+let eval_mov128_op (o:mov128_op) (s:state) : quadword =
+  match o with 
+  | OXmm i -> eval_xmm i s
+  | OMem m -> eval_mem128 (eval_maddr m s) s
 
 let eval_ocmp (s:state) (c:ocmp) :bool =
   match c with
@@ -70,21 +126,38 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
 let update_reg' (r:reg) (v:nat64) (s:state) : state =
   { s with regs = fun r' -> if r' = r then v else s.regs r' }
 
+let update_xmm' (i:int) (v:quadword) (s:state) : state =
+  { s with xmms = fun i' -> if i' = i then v else s.xmms i' }
+
 let update_mem (ptr:int) (v:nat64) (s:state) : state =
   { s with mem = store_mem64 ptr v s.mem }
 
+let update_mem128 (ptr:int) (v:quadword) (s:state) : state =
+  { s with mem = store_mem128 ptr v s.mem }
+
 let valid_maddr (m:maddr) (s:state) : bool =
   valid_mem64 (eval_maddr m s) s.mem
+
+let valid_maddr128 (m:maddr) (s:state) : bool =
+  valid_mem128 (eval_maddr m s) s.mem
+
+//let valid_xmm_index (i:int) = 0 <= i && i < 8
 
 let valid_operand (o:operand) (s:state) : bool =
   match o with
   | OConst n -> true
   | OReg r -> true
+  | OXmm i -> true (* We leave it to the printer/assembler to object to invalid XMM indices *)
   | OMem m -> valid_maddr m s
 
+let valid_mov128_op (o:mov128_op) (s:state) : bool =
+  match o with
+  | OXmm i -> true (* We leave it to the printer/assembler to object to invalid XMM indices *)
+  | OMem m -> valid_maddr128 m s
+
 let valid_shift_operand (o:operand) (s:state) : bool =
-  valid_operand o s && (eval_operand o s) < 64
-  
+  valid_operand o s && not (OXmm? o) && (eval_operand o s) < 64
+
 let valid_ocmp (c:ocmp) (s:state) :bool =
   match c with
   | OEq o1 o2 -> valid_operand o1 s && valid_operand o2 s
@@ -94,13 +167,32 @@ let valid_ocmp (c:ocmp) (s:state) :bool =
   | OLt o1 o2 -> valid_operand o1 s && valid_operand o2 s
   | OGt o1 o2 -> valid_operand o1 s && valid_operand o2 s
 
-let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) : state =
+let quadword_xor (x y:quadword) = Quadword
+  (FStar.UInt.logxor #32 x.lo y.lo)
+  (FStar.UInt.logxor #32 x.mid_lo y.mid_lo)
+  (FStar.UInt.logxor #32 x.mid_hi y.mid_hi)
+  (FStar.UInt.logxor #32 x.hi y.hi)   
+
+let select_word (q:quadword) (selector:twobits) =
+  match selector with
+  | 0 -> q.lo
+  | 1 -> q.mid_lo
+  | 2 -> q.mid_hi
+  | 3 -> q.hi
+
+let update_operand_preserve_flags' (o:dst_op) (v:(if OXmm? o then quadword else nat64)) (s:state) : state =
   match o with
   | OReg r -> update_reg' r v s
+  | OXmm i -> update_xmm' i v s
   | OMem m -> update_mem (eval_maddr m s) v s // see valid_maddr for how eval_maddr connects to b and i
 
+let update_mov128_op_preserve_flags' (o:mov128_op) (v:quadword) (s:state) : state =
+  match o with
+  | OXmm i -> update_xmm' i v s
+  | OMem m -> update_mem128 (eval_maddr m s) v s
+
 // Default version havocs flags 
-let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) : state =
+let update_operand' (o:dst_op) (ins:ins) (v:(if OXmm? o then quadword else nat64)) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
@@ -158,14 +250,20 @@ let run (f:st unit) (s:state) : state = snd (f s)
 
 (* Monadic update operations *)
 unfold
-let update_operand_preserve_flags (dst:dst_op) (v:nat64) :st unit =
+let update_operand_preserve_flags (dst:dst_op) (v:(if OXmm? dst then quadword else nat64)) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand_preserve_flags' dst v s)
 
+unfold
+let update_mov128_op_preserve_flags (dst:mov128_op) (v:quadword) :st unit =
+  check (valid_mov128_op dst);;
+  s <-- get;
+  set (update_mov128_op_preserve_flags' dst v s)
+
 // Default version havocs flags
 unfold
-let update_operand (dst:dst_op) (ins:ins) (v:nat64) :st unit =
+let update_operand (dst:dst_op) (ins:ins) (v:(if OXmm? dst then quadword else nat64)) :st unit =
   check (valid_operand dst);;
   s <-- get;
   set (update_operand' dst ins v s)
@@ -237,9 +335,37 @@ let eval_ins (ins:ins) : st unit =
   | Shl64 dst amt ->
     check (valid_shift_operand amt);;
     update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
+    
+  | Pxor dst src ->
+    check (valid_operand src);;
+    update_operand dst ins (quadword_xor (eval_operand dst s) (eval_operand src s))
+
+  | Pshufd dst src permutation ->
+    check (valid_operand src);;
+    check (valid_operand permutation);;
+    let bits:bits_of_byte = byte_to_twobits (eval_operand permutation s) in
+    let permuted_xmm = Quadword
+         (select_word (eval_operand src s) (Bits_of_Byte?.lo bits))
+         (select_word (eval_operand src s) (Bits_of_Byte?.mid_lo bits))
+         (select_word (eval_operand src s) (Bits_of_Byte?.mid_hi bits))
+         (select_word (eval_operand src s) (Bits_of_Byte?.hi bits))
+    in
+    update_operand dst ins permuted_xmm
+    
+  | VPSLLDQ dst src count ->
+    check (valid_operand src);;
+    check (valid_operand count);;
+    check (fun s -> (eval_operand count s) = 4);;  // We only spec the one very special case we need
+    let src_q = eval_operand src s in
+    let shifted_xmm = Quadword 0 src_q.lo src_q.mid_lo src_q.mid_hi in
+    update_operand dst ins shifted_xmm
+
+  | MOVDQU dst src ->
+    check (valid_mov128_op src);; 
+    update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
 (*
- * these functions return an option state
+ * These functions return an option state
  * None case arises when the while loop runs out of fuel
  *)
 // TODO: IfElse and While should havoc the flags

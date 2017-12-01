@@ -36,6 +36,7 @@ type maddr =
 type operand =
   | OConst: n:int -> operand
   | OReg: r:reg -> operand
+  | OXmm: i:int -> operand
   | OMem: m:maddr -> operand
 
 type precode (t_ins:Type0) (t_ocmp:Type0) =
