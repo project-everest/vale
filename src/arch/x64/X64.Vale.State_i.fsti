@@ -1,16 +1,27 @@
 module X64.Vale.State_i
 // This interface should not refer to Semantics_s
 
+open FStar.BaseTypes
+open FStar.List.Tot.Base
+
 open X64.Machine_s
 open X64.Vale
 module M = Memory_i_s
 
-noeq type state = {
+let map (key:eqtype) (value:Type) = Map.t key value
+
+noeq type prestate = {
   ok: bool;
   regs: Regs_i.t;
   flags: nat64;
   mem: mem;
 }
+
+noeq type state = {
+  state: prestate;
+  trace: list observation;
+  memTaint: map int taint;
+}  
 
 let reg_to_int (r:reg) : int =
   match r with
@@ -31,8 +42,8 @@ let reg_to_int (r:reg) : int =
   | R14 -> 14
   | R15 -> 15
 
-unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
-unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
+unfold let eval_reg (r:reg) (s:state) : nat64 = s.state.regs r
+unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.state.mem
 
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
@@ -48,11 +59,11 @@ let eval_operand (o:operand) (s:state) : nat64 =
   | OMem m -> eval_mem (eval_maddr m s) s
 
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = fun r' -> if r = r' then v else s.regs r' }
+  { s with state = {s.state with regs = fun r' -> if r = r' then v else s.state.regs r' } }
+  
+let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with state = {s.state with mem = store_mem64 ptr v s.state.mem } }
 
-let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem64 ptr v s.mem }
-
-let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.mem
+let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.state.mem
 
 let valid_operand (o:operand) (s:state) : Type0 =
   match o with
@@ -61,10 +72,12 @@ let valid_operand (o:operand) (s:state) : Type0 =
   | OMem m -> valid_maddr m s
 
 let state_eq (s0:state) (s1:state) : Type0 = 
-  s0.ok == s1.ok /\
-  Regs_i.equal s0.regs s1.regs /\
-  s0.flags == s1.flags /\
-  s0.mem == s1.mem
+  s0.state.ok == s1.state.ok /\
+  Regs_i.equal s0.state.regs s1.state.regs /\
+  s0.state.flags == s1.state.flags /\
+  s0.state.mem == s1.state.mem /\
+  s0.trace == s1.trace /\
+  s0.memTaint == s1.memTaint
 
 let add_wrap (x:int) (y:int) = if x + y < nat64_max then x + y else x + y - nat64_max
 

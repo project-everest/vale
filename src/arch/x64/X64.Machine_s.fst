@@ -49,6 +49,15 @@ let valid_dst (o:operand) : bool =
 
 type dst_op = o:operand{valid_dst o}
 
+type taint =
+  | Public
+  | Secret
+
+type observation =
+  | BranchPredicate: pred:bool -> observation
+  | MemAccess: addr:nat64 -> observation
+  | MemAccessOffset: base:nat64 -> index:nat64 -> observation
+
 unfold let buffer8 = M.buffer (M.TBase M.TUInt8)
 unfold let buffer16 = M.buffer (M.TBase M.TUInt16)
 unfold let buffer32 = M.buffer (M.TBase M.TUInt32)

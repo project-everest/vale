@@ -4,16 +4,17 @@ open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
 open FStar.UInt
 module S = X64.Semantics_s
+module TS = X64.Taint_Semantics_s
 
-unfold let code = S.code
-unfold let codes = S.codes
-unfold let ocmp = S.ocmp
+unfold let code = TS.tainted_code
+unfold let codes = TS.tainted_codes
+unfold let ocmp = TS.tainted_ocmp
 unfold let fuel = nat
 
 let cf (flags:int) : bool = S.cf (int_to_nat64 flags)
 
 let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : Type0 =
-  Some (state_to_S s1) == S.eval_code c f0 (state_to_S s0)
+  Some (state_to_S s1) == TS.taint_eval_code c f0 (state_to_S s0)
 
 let eval_ins (c:code) (s0:state) : Ghost ((sM:state) * (f0:fuel))
   (requires Ins? c)
