@@ -23,7 +23,13 @@ type ins =
   | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
   | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
-  
+  | AESNI_enc           : dst:xmm -> src:xmm -> ins
+  | AESNI_enc_last      : dst:xmm -> src:xmm -> ins
+  | AESNI_dec           : dst:xmm -> src:xmm -> ins
+  | AESNI_dec_last      : dst:xmm -> src:xmm -> ins
+  | AESNI_imc           : dst:xmm -> src:xmm -> ins
+  | AESNI_keygen_assist : dst:xmm -> src:xmm -> imm8 -> ins
+
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
   | ONe: o1:operand -> o2:operand -> ocmp
@@ -282,13 +288,14 @@ let eval_ins (ins:ins) : st unit =
   | Shl64 dst amt ->
     check (valid_shift_operand amt);;
     update_operand dst ins (FStar.UInt.shift_left #64 (eval_operand dst s) (eval_operand amt s))
-    
+
+// In the XMM-related instructions below, we generally don't need to check for validity of the operands,
+// since all possibilities are valid, thanks to dependent types 
+   
   | Pxor dst src ->
-    // No need for checks as all dst and src possibilities are valid, thanks to dependent types
     update_xmm dst ins (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
-  | Pshufd dst src permutation ->
-    // No need for checks as all dst, src, and permutation possibilities are valid, thanks to dependent types  
+  | Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
     let permuted_xmm = Quad32
@@ -300,7 +307,6 @@ let eval_ins (ins:ins) : st unit =
     update_xmm dst ins permuted_xmm
     
   | VPSLLDQ dst src count ->
-    // No need for checks as all dst and src possibilities are valid, thanks to dependent types
     check (fun s -> count = 4);;  // We only spec the one very special case we need
     let src_q = eval_xmm src s in
     let shifted_xmm = Quad32 0 src_q.lo src_q.mid_lo src_q.mid_hi in
@@ -310,6 +316,34 @@ let eval_ins (ins:ins) : st unit =
     check (valid_mov128_op src);; 
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
+  | AESNI_enc dst src ->
+    let src_q = eval_xmm src s in
+    update_xmm dst ins (quad32_xor (AES_s.mix_columns (AES_s.sub_bytes (AES_s.shift_rows src_q))) src_q)
+    
+   | AESNI_enc_last dst src ->
+    let src_q = eval_xmm src s in
+    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows src_q)) src_q)
+      
+  | AESNI_dec dst src ->
+    let src_q = eval_xmm src s in
+    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns (AES_s.inv_sub_bytes (AES_s.inv_shift_rows src_q))) src_q)
+    
+   | AESNI_dec_last dst src ->
+    let src_q = eval_xmm src s in
+    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows src_q)) src_q)
+
+  | AESNI_imc dst src ->
+    let src_q = eval_xmm src s in
+    update_xmm dst ins (AES_s.inv_mix_columns src_q)
+
+  | AESNI_keygen_assist dst src imm ->
+    let src_q = eval_xmm src s in
+    update_xmm dst ins (Quad32 (AES_s.sub_word src_q.mid_lo) 
+			       (FStar.UInt.logxor #32 (AES_s.rot_word (AES_s.sub_word src_q.mid_lo)) imm)
+			       (AES_s.sub_word src_q.hi)
+			       (FStar.UInt.logxor #32 (AES_s.rot_word (AES_s.sub_word src_q.hi)) imm))
+ 
+ 
 (*
  * These functions return an option state
  * None case arises when the while loop runs out of fuel
