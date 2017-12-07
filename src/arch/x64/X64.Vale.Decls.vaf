@@ -190,6 +190,12 @@ type map (key:eqtype) (value:Type) = Map.t key value
 let op_String_Access     = Map.sel
 let op_String_Assignment = Map.upd
 
+(** Work around syntax mismatches between Vale and F* (and F*'s odd type resolution for destructors) **)
+unfold let get_lo_bits (b:bits_of_byte)     = Bits_of_Byte?.lo     b
+unfold let get_mid_lo_bits (b:bits_of_byte) = Bits_of_Byte?.mid_lo b
+unfold let get_mid_hi_bits (b:bits_of_byte) = Bits_of_Byte?.mid_hi b
+unfold let get_hi_bits (b:bits_of_byte)     = Bits_of_Byte?.hi     b
+
 (** Memory framing **)
 
 (*
@@ -672,5 +678,23 @@ procedure{:instruction Ins(S.Pxor(dst, src))} Pxor(inout xmm dst:quad32, xmm src
   modifies efl;
   ensures
     dst == old(quad32_xor(dst, src));
+{
+}
+
+procedure{:instruction Ins(Pshufd(dst, src, permutation))} 
+          Pshufd(inout xmm dst:quad32, xmm src:quad32, inline permutation:imm8)
+  modifies efl;
+  ensures
+    dst == old(Quad32(select_word(src, get_lo_bits    (byte_to_twobits(permutation))),
+                      select_word(src, get_mid_lo_bits(byte_to_twobits(permutation))),
+                      select_word(src, get_mid_hi_bits(byte_to_twobits(permutation))),
+                      select_word(src, get_hi_bits    (byte_to_twobits(permutation)))));
+{
+}
+
+procedure{:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(Quad32(0, src.lo, src.mid_lo, src.mid_hi));
 {
 }
