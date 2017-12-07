@@ -37,6 +37,7 @@ let va_src_operand = o:operand{OReg? o \/ OConst? o}
 let va_dst_operand = o:dst_op{OReg? o \/ OConst? o}
 let va_shift_amt = o:operand{OReg? o \/ OConst? o}
 let va_cmp = o:operand{OReg? o \/ OConst? o}
+let va_taint = taint
 unfold let va_register = reg
 
 (* Abbreviations *)
@@ -505,16 +506,17 @@ procedure{:operand} Mem_in(operand base:int, inline offset:int, ghost b:buffer64
         mem;
     extern;
 
-procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst,src),list(dst), list(src)), Public))}{:fast_instruction} Mov64(inout dst_operand dst:uint64, src_operand src:uint64)
     ensures
         dst == old(src);
 {
 }
 
-procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64_buffer(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(src), offset))), list(dst), list(OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction} Load64_buffer(
     out dst_operand dst:uint64,
         reg_operand src:uint64,
         inline offset:int,
+        inline t:taint,
         ghost b:buffer64,
         ghost index:int)
     reads
@@ -529,10 +531,11 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fas
     lemma_load_mem64(b, index, mem);
 }
 
-procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store64_buffer(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), offset)), src), list(OMem(MReg(get_reg(dst), offset))), list(src)), t))}{:fast_instruction} Store64_buffer(
         reg_operand dst:uint64,
         operand src:uint64,
         inline offset:int,
+        inline t:taint,
         ghost b:buffer64,
         ghost index:int)
     modifies
@@ -548,7 +551,7 @@ procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fas
     lemma_store_mem64(b, index, old(src), old(mem));
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), Public))} Add64(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies
         efl;
     requires
@@ -558,7 +561,7 @@ procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst_operand dst:uint64
 {
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), t))}{:fast_instruction} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64, inline t:taint)
     modifies
         efl;
     ensures
@@ -567,7 +570,7 @@ procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout
 {
 }
 
-procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst_operand dst:uint64, src_operand src1:uint64, src_operand src2:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddLea64(dst, src1, src2), list(dst), list(dst, src1, src2)), Public))} AddLea64(out dst_operand dst:uint64, src_operand src1:uint64, src_operand src2:uint64)
     requires
         src1 + src2 < nat64_max;
     ensures
@@ -575,7 +578,7 @@ procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst_operan
 {
 }
 
-procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} Adc64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies
         efl;
     ensures
@@ -584,7 +587,7 @@ procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} Sub64(inout dst_operand dst:uint64, operand src:uint64)
     requires
         0 <= dst - src;
     modifies 
@@ -594,7 +597,7 @@ procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout ds
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))} Sub64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(src)), Public))} Sub64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies
         efl;
     ensures
@@ -609,7 +612,7 @@ let lemma_fundamental_div_mod (a b:nat64) :
   ()
 #endverbatim
 
-procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mul64(src), list(OReg(Rax), OReg(Rdx)), list(OReg(Rax), src)), Public))}{:fast_instruction} Mul64Wrap(src_operand src:uint64)
     modifies
         efl;
         rax;
@@ -620,7 +623,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src_opera
     lemma_fundamental_div_mod(old(rax), old(src));
 }
 
-procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.IMul64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} IMul64(inout dst_operand dst:uint64, src_operand src:uint64)
     requires
         dst * src < nat64_max;
     modifies
@@ -632,7 +635,7 @@ procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout 
     lemma_mul_in_bounds(old(dst), old(src));
 }
 
-procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Xor64(dst, src), list(dst), list(dst, src)), Public))} Xor64(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies 
         efl;
     ensures
@@ -640,7 +643,7 @@ procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst_operand dst:uint6
 {
 }
 
-procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.And64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} And64(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies 
         efl;
     ensures
@@ -648,7 +651,7 @@ procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout ds
 {
 }
 
-procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst_operand dst:uint64, shift_amt amt:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Shl64(dst, amt), list(dst), list(dst, amt)), Public))} Shl64(inout dst_operand dst:uint64, shift_amt amt:uint64)
     modifies
         efl;
 //    requires
@@ -658,7 +661,7 @@ procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst_operand dst:uint6
 {
 }
 
-procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Shr64(dst, amt), list(dst), list(dst, amt)), Public))}{:fast_instruction} Shr64(inout dst_operand dst:uint64, shift_amt amt:uint64)
     modifies
         efl;
     ensures
