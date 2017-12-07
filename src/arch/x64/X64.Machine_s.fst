@@ -36,8 +36,14 @@ type maddr =
 type operand =
   | OConst: n:int -> operand
   | OReg: r:reg -> operand
-  | OXmm: i:int -> operand
   | OMem: m:maddr -> operand
+
+type imm8 = i:int { 0 <= i && i < 256}
+type xmm = i:int{ 0 <= i /\ i < 8 }
+
+type mov128_op =   
+  | Mov128Xmm: x:xmm -> mov128_op
+  | Mov128Mem: m:maddr -> mov128_op
 
 type precode (t_ins:Type0) (t_ocmp:Type0) =
   | Ins: ins:t_ins -> precode t_ins t_ocmp
