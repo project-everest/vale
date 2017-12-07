@@ -8,6 +8,7 @@ module M = Memory_i_s
 noeq type state = {
   ok: bool;
   regs: Regs_i.t;
+  xmms: Xmms_i.t;
   flags: nat64;
   mem: mem;
 }
@@ -32,6 +33,7 @@ let reg_to_int (r:reg) : int =
   | R15 -> 15
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
+unfold let eval_xmm (x:xmm) (s:state) : Types_s.quad32 = s.xmms x
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
 let eval_maddr (m:maddr) (s:state) : int =
@@ -49,6 +51,9 @@ let eval_operand (o:operand) (s:state) : nat64 =
 
 let update_reg (r:reg) (v:nat64) (s:state) : state =
   { s with regs = fun r' -> if r = r' then v else s.regs r' }
+
+let update_xmm (x:xmm) (v:Types_s.quad32) (s:state) : state =
+  { s with xmms = fun x' -> if x = x' then v else s.xmms x' }
 
 let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem64 ptr v s.mem }
 

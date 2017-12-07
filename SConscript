@@ -35,6 +35,7 @@ fstar_include_paths = [
   'obj/arch/x64/',
   'obj/lib/collections/',
   'obj/lib/util',
+  'obj/crypto/aes/',
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',

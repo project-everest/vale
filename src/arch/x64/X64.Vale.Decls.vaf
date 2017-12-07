@@ -10,6 +10,9 @@ module M = Memory_i_s
 
 open X64.Machine_s
 open X64.Vale.State_i
+open Types_s
+
+unfold let quad32 = quad32
 
 val cf : (flags:int) -> bool
 
@@ -37,6 +40,7 @@ unfold let va_dst_operand = dst_op
 unfold let va_shift_amt = operand
 unfold let va_cmp = operand
 unfold let va_register = reg
+unfold let va_xmm = xmm
 
 (* Abbreviations *)
 unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
@@ -109,6 +113,7 @@ unfold let va_eval_shift_amt_uint64   (s:va_state) (o:va_shift_amt)   : nat64 = 
 unfold let va_eval_cmp_uint64         (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
 unfold let va_eval_register_uint64    (s:va_state) (r:va_register)    : nat64 = eval_reg r s
 unfold let va_eval_reg_operand_uint64 (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
+unfold let va_eval_xmm_quad32         (s:va_state) (x:xmm)            : quad32 = eval_xmm x s
 
 (* Predicates *)
 unfold let va_is_src_operand_uint64 (o:operand) (s:va_state) = valid_operand o s
@@ -118,11 +123,14 @@ unfold let va_is_src_register_int (r:reg) (s:va_state) = True
 unfold let va_is_dst_register (r:reg) (s:va_state) = True
 unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt_uint64 s o) < 64
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
+unfold let va_is_src_xmm_quad32 (x:xmm) (s:va_state) = True
+unfold let va_is_dst_xmm_quad32 (x:xmm) (s:va_state) = True
 
 (* Getters *)
 unfold let va_get_ok (s:va_state) : bool = s.ok
 unfold let va_get_flags (s:va_state) : int = s.flags
 unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
+unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
 unfold let va_get_mem (s:va_state) : mem = s.mem
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
@@ -149,6 +157,9 @@ unfold
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
+unfold
+let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
+  update_xmm x (eval_xmm x sM) sK
 
 (** Constructors for va_codes *)
 unfold let va_CNil () : va_codes = []
@@ -654,5 +665,12 @@ procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout ds
         efl;
     ensures
         dst == old(shift_right64(dst, amt));
+{
+}
+
+procedure{:instruction Ins(S.Pxor(dst, src))} Pxor(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(quad32_xor(dst, src));
 {
 }
