@@ -82,10 +82,10 @@ unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
 unfold let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base})//:operand{valid_operand base s}) 
                             (offset:int) // Need this if we want to handle OConst as base values: { 0 <= (eval_operand base s) + offset && (eval_operand base s) + offset < nat64_max }) 
                             (b:buffer64) 
-                            (index:int{valid_src_addr s.state.mem b index /\ 
+                            (index:int{valid_src_addr s.mem b index /\ 
                                        (eval_operand base s) + offset == buffer_addr(b) + 8 `op_Multiply` index}) 
                             : (o:operand{valid_operand o s}) =
-  lemma_valid_mem64 b index s.state.mem;
+  lemma_valid_mem64 b index s.mem;
   va_opr_code_Mem base offset
 (*
 function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
@@ -120,20 +120,20 @@ unfold let va_is_src_shift_amt_uint64 (o:operand) (s:va_state) = valid_operand o
 unfold let va_is_src_reg_operand_uint64 (o:operand) (s:va_state) = OReg? o
 
 (* Getters *)
-unfold let va_get_ok (s:va_state) : bool = s.state.ok
-unfold let va_get_flags (s:va_state) : int = s.state.flags
+unfold let va_get_ok (s:va_state) : bool = s.ok
+unfold let va_get_flags (s:va_state) : int = s.flags
 unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
-unfold let va_get_mem (s:va_state) : mem = s.state.mem
+unfold let va_get_mem (s:va_state) : mem = s.mem
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
-unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with state = {sK.state with ok = sM.state.ok } }
-unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with state = {sK.state with flags = sM.state.flags } }
+unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
+unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
 
 unfold
 let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
   update_reg r (eval_reg r sM) sK
 
-unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with state = {sK.state with mem = sM.state.mem } }
+unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
 
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
   match o with
@@ -346,7 +346,7 @@ val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (
 val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) (fM:va_fuel) (sN:va_state) : Ghost (fN:va_fuel)
   (requires
     While? c /\
-    sN.state.ok /\
+    sN.ok /\
     valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\

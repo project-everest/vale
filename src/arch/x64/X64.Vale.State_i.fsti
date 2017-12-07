@@ -9,19 +9,17 @@ open X64.Vale
 module M = Memory_i_s
 
 let map (key:eqtype) (value:Type) = Map.t key value
+unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
+unfold let op_String_Assignment = Map.upd
 
-noeq type prestate = {
+noeq type state = {
   ok: bool;
   regs: Regs_i.t;
   flags: nat64;
   mem: mem;
-}
-
-noeq type state = {
-  state: prestate;
   trace: list observation;
   memTaint: map int taint;
-}  
+}
 
 let reg_to_int (r:reg) : int =
   match r with
@@ -42,8 +40,8 @@ let reg_to_int (r:reg) : int =
   | R14 -> 14
   | R15 -> 15
 
-unfold let eval_reg (r:reg) (s:state) : nat64 = s.state.regs r
-unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.state.mem
+unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
+unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
@@ -59,23 +57,25 @@ let eval_operand (o:operand) (s:state) : nat64 =
   | OMem m -> eval_mem (eval_maddr m s) s
 
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with state = {s.state with regs = fun r' -> if r = r' then v else s.state.regs r' } }
+  { s with regs = fun r' -> if r = r' then v else s.regs r' }
   
-let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with state = {s.state with mem = store_mem64 ptr v s.state.mem } }
+let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem64 ptr v s.mem }
 
-let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.state.mem
+let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.mem
 
-let valid_operand (o:operand) (s:state) : Type0 =
+let valid_operand (o:operand) (s:state) (t:taint) : Type0 =
   match o with
   | OConst n -> 0 <= n /\ n < nat64_max
   | OReg r -> True
-  | OMem m -> valid_maddr m s
+  | OMem m -> valid_maddr m s /\
+      (let ptr = eval_maddr m s in
+      s.memTaint.[ptr] = t)
 
 let state_eq (s0:state) (s1:state) : Type0 = 
-  s0.state.ok == s1.state.ok /\
-  Regs_i.equal s0.state.regs s1.state.regs /\
-  s0.state.flags == s1.state.flags /\
-  s0.state.mem == s1.state.mem /\
+  s0.ok == s1.ok /\
+  Regs_i.equal s0.regs s1.regs /\
+  s0.flags == s1.flags /\
+  s0.mem == s1.mem /\
   s0.trace == s1.trace /\
   s0.memTaint == s1.memTaint
 
