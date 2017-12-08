@@ -63,9 +63,13 @@ val lemma_to_eval_operand : s:state -> o:operand -> Lemma
   (ensures eval_operand o s == S.eval_operand o ((state_to_S s).TS.state))
   [SMTPat (eval_operand o s)]
 
-val lemma_to_valid_operand : s:state -> o:operand -> t:taint -> Lemma
-  (ensures valid_operand o s t ==> S.valid_operand o ((state_to_S s).TS.state) /\ TS.taint_match o t (state_to_S s).TS.memTaint (state_to_S s).TS.state)
-  [SMTPat (valid_operand o s t)]
+val lemma_to_valid_operand : s:state -> o:operand -> Lemma
+  (ensures valid_operand o s ==> S.valid_operand o ((state_to_S s).TS.state))
+  [SMTPat (valid_operand o s)]
+
+val lemma_to_valid_taint : s:state -> o:operand -> t:taint -> Lemma
+  (ensures valid_taint o s t ==> TS.taint_match o t (state_to_S s).TS.memTaint (state_to_S s).TS.state)
+  [SMTPat (valid_taint o s t)]
 
 val lemma_of_to : s:state -> Lemma
   (ensures s == state_of_S (state_to_S s))

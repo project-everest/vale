@@ -306,7 +306,7 @@ val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : G
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
-    sM == s0
+    sM == {s0 with trace = BranchPredicate(cond)::s0.trace}
   ))
 
 val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma

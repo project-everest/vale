@@ -83,7 +83,8 @@ let lemma_empty_total (s0:state) (bN:codes) =
   (s0, 0)
 
 let lemma_ifElse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) =
-  (eval_ocmp s0 ifb, s0, s0, 0)
+  let cond = eval_ocmp s0 ifb in
+  (cond, {s0 with trace = BranchPredicate(cond)::s0.trace}, s0, 0)
 
 let lemma_ifElseTrue_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) (sM:state) =
   assert (feq ((state_to_S ({s0 with trace = BranchPredicate(true)::s0.trace})).TS.state.S.regs)

@@ -15,7 +15,8 @@ let lemma_to_reg s r = ()
 let lemma_to_trace s = ()
 let lemma_to_memTaint s = ()
 let lemma_to_eval_operand s o = ()
-let lemma_to_valid_operand s o t = ()
+let lemma_to_valid_operand s o = ()
+let lemma_to_valid_taint s o t = ()
 
 let lemma_of_to s =
   assert (state_eq s (state_of_S (state_to_S s)));

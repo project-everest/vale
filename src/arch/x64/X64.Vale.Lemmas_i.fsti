@@ -59,27 +59,27 @@ val lemma_cmp_gt : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (S.OGt o1 o2) t))]
 
 val lemma_valid_cmp_eq : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
-  (ensures valid_operand o1 s t /\ valid_operand o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OEq o1 o2) t) s)
+  (ensures valid_operand o1 s /\ valid_operand o2 s /\ valid_taint o1 s t /\ valid_taint o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OEq o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (S.OEq o1 o2) t) s)]
 
 val lemma_valid_cmp_ne : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
-  (ensures valid_operand o1 s t /\ valid_operand o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.ONe o1 o2) t) s)
+  (ensures valid_operand o1 s /\ valid_operand o2 s /\ valid_taint o1 s t /\ valid_taint o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.ONe o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (S.ONe o1 o2) t) s)]
 
 val lemma_valid_cmp_le : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
-  (ensures valid_operand o1 s t /\ valid_operand o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OLe o1 o2) t) s)
+  (ensures valid_operand o1 s /\ valid_operand o2 s /\ valid_taint o1 s t /\ valid_taint o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OLe o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (S.OLe o1 o2) t) s)]
 
 val lemma_valid_cmp_ge : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
-  (ensures valid_operand o1 s t /\ valid_operand o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OGe o1 o2) t) s)
+  (ensures valid_operand o1 s /\ valid_operand o2 s /\ valid_taint o1 s t /\ valid_taint o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OGe o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (S.OGe o1 o2) t) s)]
 
 val lemma_valid_cmp_lt : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
-  (ensures valid_operand o1 s t /\ valid_operand o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OLt o1 o2) t) s)
+  (ensures valid_operand o1 s /\ valid_operand o2 s /\ valid_taint o1 s t /\ valid_taint o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OLt o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (S.OLt o1 o2) t) s)]
 
 val lemma_valid_cmp_gt : s:state -> o1:operand -> o2:operand -> t:taint -> Lemma
-  (ensures valid_operand o1 s t /\ valid_operand o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OGt o1 o2) t) s)
+  (ensures valid_operand o1 s /\ valid_operand o2 s /\ valid_taint o1 s t /\ valid_taint o2 s t ==> valid_ocmp (TS.TaintedOCmp (S.OGt o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (S.OGt o1 o2) t) s)]
 
 val lemma_merge_total (b0:codes) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) : Ghost (fN:fuel)
@@ -103,7 +103,7 @@ val lemma_ifElse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) : Ghost (bool *
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
-    sM == s0
+    sM == {s0 with trace = BranchPredicate(cond)::s0.trace}
   ))
 
 val lemma_ifElseTrue_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) (sM:state) : Lemma
