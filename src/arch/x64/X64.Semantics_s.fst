@@ -92,8 +92,8 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
 let update_reg' (r:reg) (v:nat64) (s:state) : state =
   { s with regs = fun r' -> if r' = r then v else s.regs r' }
 
-let update_xmm' (i:int) (v:quad32) (s:state) : state =
-  { s with xmms = fun i' -> if i' = i then v else s.xmms i' }
+let update_xmm' (x:xmm) (v:quad32) (s:state) : state =
+  { s with xmms = fun x' -> if x' = x then v else s.xmms x' }
 
 let update_mem (ptr:int) (v:nat64) (s:state) : state =
   { s with mem = store_mem64 ptr v s.mem }

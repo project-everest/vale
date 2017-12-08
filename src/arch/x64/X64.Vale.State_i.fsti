@@ -68,6 +68,7 @@ let valid_operand (o:operand) (s:state) : Type0 =
 let state_eq (s0:state) (s1:state) : Type0 = 
   s0.ok == s1.ok /\
   Regs_i.equal s0.regs s1.regs /\
+  Xmms_i.equal s0.xmms s1.xmms /\
   s0.flags == s1.flags /\
   s0.mem == s1.mem
 

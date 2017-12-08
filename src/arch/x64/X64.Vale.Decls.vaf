@@ -681,7 +681,8 @@ procedure{:instruction Ins(S.Pxor(dst, src))} Pxor(inout xmm dst:quad32, xmm src
 {
 }
 
-procedure{:instruction Ins(Pshufd(dst, src, permutation))} 
+/*
+procedure{:instruction Ins(S.Pshufd(dst, src, permutation))} 
           Pshufd(inout xmm dst:quad32, xmm src:quad32, inline permutation:imm8)
   modifies efl;
   ensures
@@ -692,9 +693,10 @@ procedure{:instruction Ins(Pshufd(dst, src, permutation))}
 {
 }
 
-procedure{:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout xmm dst:quad32, xmm src:quad32)
+procedure{:instruction Ins(S.VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout xmm dst:quad32, xmm src:quad32)
   modifies efl;
   ensures
     dst == old(Quad32(0, src.lo, src.mid_lo, src.mid_hi));
 {
 }
+*/

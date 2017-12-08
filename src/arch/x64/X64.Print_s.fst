@@ -79,6 +79,17 @@ let print_small_operand (o:operand) (p:printer) =
   | OReg r -> print_small_reg r p
   | _ -> "!!! INVALID small operand !!! Expected al, bl, cl, or dl."
 
+let print_imm8 (i:imm8) =
+  string_of_int i
+
+let print_xmm (x:xmm) =
+  "xmm" ^ string_of_int x
+
+let print_mov128_op (o:mov128_op) (p:printer) =
+  match o with
+  | Mov128Xmm x -> print_xmm x
+  | Mov128Mem m -> print_maddr m "xmmword" p
+
 assume val print_any: 'a -> string
 
 let print_shift_operand (o:operand) (p:printer) =
@@ -102,15 +113,18 @@ let cmp_not(o:ocmp) : ocmp =
 let _ = assert (forall o . o == cmp_not (cmp_not o))
 
 let print_ins (ins:ins) (p:printer) =
-  let print_pair (dst:operand) (src:operand) (print_dst:operand->printer->string) (print_src:operand->printer-> string) =
-    let first, second = p.op_order (print_dst dst p) (print_src src p) in
+  let print_pair (dst src:string) =
+    let first, second = p.op_order dst src in
       first ^ ", " ^ second ^ "\n"
+  in    
+  let print_op_pair (dst:operand) (src:operand) (print_dst:operand->printer->string) (print_src:operand->printer-> string) =
+    print_pair (print_dst dst p) (print_src src p)
   in
   let print_ops (dst:operand) (src:operand) =
-    print_pair dst src print_operand print_operand
+    print_op_pair dst src print_operand print_operand
   in
   let print_shift (dst:operand) (amount:operand) =
-    print_pair dst amount print_operand print_shift_operand
+    print_op_pair dst amount print_operand print_shift_operand
   in
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst) (print_xmm src) in
@@ -135,14 +149,16 @@ let print_ins (ins:ins) (p:printer) =
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
-  | VPSLLDQ dst src count  -> p.ins_name "vpslldq"
-  | MOVDQU dst src         -> p.ins_name 
-  | AESNI_enc dst src      -> p.ins_name "  aesenc"     ^ print_xmms dst src
-  | AESNI_enc_last dst src -> p.ins_name "  aesenclast" ^ print_xmms dst src
-  | AESNI_dec dst src      -> p.ins_name "  aesdec"     ^ print_xmms dst src
-  | AESNI_dec_last dst src -> p.ins_name "  aesdeclast" ^ print_xmms dst src
-  | AESNI_imc dst src      -> p.ins_name "  aesimc"     ^ print_xmms dst src
-  | AESNI_keygen_assist dst src imm -> p.ins_name "  aeskeygenassist"
+  | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
+  | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count)
+  | VPSLLDQ dst src count  -> "   vpslldq "   ^ print_pair (print_xmms dst src) (print_imm8 count)
+  | MOVDQU dst src         -> "   movdqu "    ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
+  | AESNI_enc dst src      -> "  aesenc "     ^ print_xmms dst src
+  | AESNI_enc_last dst src -> "  aesenclast " ^ print_xmms dst src
+  | AESNI_dec dst src      -> "  aesdec "     ^ print_xmms dst src
+  | AESNI_dec_last dst src -> "  aesdeclast " ^ print_xmms dst src
+  | AESNI_imc dst src      -> "  aesimc "     ^ print_xmms dst src
+  | AESNI_keygen_assist dst src imm -> "  aeskeygenassist" ^ print_pair (print_xmms dst src) (print_imm8 imm)
  
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =
