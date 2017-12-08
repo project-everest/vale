@@ -112,6 +112,10 @@ let print_ins (ins:ins) (p:printer) =
   let print_shift (dst:operand) (amount:operand) =
     print_pair dst amount print_operand print_shift_operand
   in
+  let print_xmms (dst:xmm) (src:xmm) =
+    let first, second = p.op_order (print_xmm dst) (print_xmm src) in
+      first ^ ", " ^ second ^ "\n"
+  in  
   match ins with
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
@@ -131,7 +135,15 @@ let print_ins (ins:ins) (p:printer) =
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
-
+  | VPSLLDQ dst src count  -> p.ins_name "vpslldq"
+  | MOVDQU dst src         -> p.ins_name 
+  | AESNI_enc dst src      -> p.ins_name "  aesenc"     ^ print_xmms dst src
+  | AESNI_enc_last dst src -> p.ins_name "  aesenclast" ^ print_xmms dst src
+  | AESNI_dec dst src      -> p.ins_name "  aesdec"     ^ print_xmms dst src
+  | AESNI_dec_last dst src -> p.ins_name "  aesdeclast" ^ print_xmms dst src
+  | AESNI_imc dst src      -> p.ins_name "  aesimc"     ^ print_xmms dst src
+  | AESNI_keygen_assist dst src imm -> p.ins_name "  aeskeygenassist"
+ 
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =
     let first, second = p.op_order (print_operand o1 p) (print_operand o2 p) in
