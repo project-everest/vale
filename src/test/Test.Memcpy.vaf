@@ -10,7 +10,7 @@ open X64.Vale.Decls
 #set-options "--z3rlimit 20"
 #endverbatim
 
-procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
+procedure Copy16(inline t:taint, ghost bsrc:buffer64, ghost bdst:buffer64)
     requires/ensures
         locs_disjoint(list(loc_buffer(bsrc), loc_buffer(bdst)));
         buffer_readable(mem, bsrc);
@@ -19,6 +19,9 @@ procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
         buffer_length(bdst) == 2;
         rsi == buffer_addr(bsrc);
         rdi == buffer_addr(bdst);
+    requires
+        valid_taint_ptr(rsi, memTaint, t);
+        valid_taint_ptr(rsi + 8, memTaint, t);
     ensures
         forall i :: 0 <= i && i < 2 ==> buffer64_read(bdst, i, mem) == buffer64_read(bsrc, i, mem);
         modifies_mem(loc_buffer(bdst), old(mem), mem);
@@ -26,13 +29,13 @@ procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
         rsi; rdi;
     modifies
         rax; rbx;
-        mem;
+        mem; memTaint; trace;
 {
 //    assert{:fast_block} true;
-    Load64_buffer(rax, rsi, 0, bsrc, 0);
-    Load64_buffer(rbx, rsi, 8, bsrc, 1);
-    Store64_buffer(rdi, rax, 0, bdst, 0);
-    Store64_buffer(rdi, rbx, 8, bdst, 1);
+    Load64_buffer(rax, rsi, 0, t, bsrc, 0);
+    Load64_buffer(rbx, rsi, 8, t, bsrc, 1);
+    Store64_buffer(rdi, rax, 0, t, bdst, 0);
+    Store64_buffer(rdi, rbx, 8, t, bdst, 1);
 }
 
 /*

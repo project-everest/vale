@@ -26,7 +26,7 @@ procedure Calls()
     requires 
         rax < 7;
     modifies
-        rax; rbx; efl;
+        rax; rbx; efl; trace;
     ensures
         rax == old(rax) + 7;
 {
