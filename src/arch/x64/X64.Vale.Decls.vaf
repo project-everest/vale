@@ -61,7 +61,9 @@ unfold let locs_disjoint = M.locs_disjoint
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
 unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
+unfold let va_op_src_operand_reg (r:reg) : va_src_operand = OReg r
 unfold let va_const_operand (n:int) = OConst n
+unfold let va_const_src_operand (n:int) = OConst n
 unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
 unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
 unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
@@ -168,12 +170,12 @@ unfold let va_Block (block:va_codes) : va_code = Block block
 unfold let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
 unfold let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
 
-val va_cmp_eq (o1:va_operand) (o2:va_operand) (t:taint) : ocmp
-val va_cmp_ne (o1:va_operand) (o2:va_operand) (t:taint) : ocmp
-val va_cmp_le (o1:va_operand) (o2:va_operand) (t:taint) : ocmp
-val va_cmp_ge (o1:va_operand) (o2:va_operand) (t:taint) : ocmp
-val va_cmp_lt (o1:va_operand) (o2:va_operand) (t:taint) : ocmp
-val va_cmp_gt (o1:va_operand) (o2:va_operand) (t:taint) : ocmp
+val va_cmp_eq (o1:va_src_operand) (o2:va_src_operand) : ocmp
+val va_cmp_ne (o1:va_src_operand) (o2:va_src_operand) : ocmp
+val va_cmp_le (o1:va_src_operand) (o2:va_src_operand) : ocmp
+val va_cmp_ge (o1:va_src_operand) (o2:va_src_operand) : ocmp
+val va_cmp_lt (o1:va_src_operand) (o2:va_src_operand) : ocmp
+val va_cmp_gt (o1:va_src_operand) (o2:va_src_operand) : ocmp
 
 unfold let va_get_block (c:va_code{Block? c}) : va_codes = Block?.block c
 unfold let va_get_ifCond (c:va_code{IfElse? c}) : ocmp = IfElse?.ifCond c
@@ -223,65 +225,65 @@ unfold let va_evalCond (b:ocmp) (s:va_state) : GTot bool = eval_ocmp s b
 
 val valid_ocmp : c:ocmp -> s:va_state -> GTot bool
 
-val lemma_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_cmp_eq : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (eval_ocmp s (va_cmp_eq o1 o2 t)) <==> (va_eval_operand_uint64 s o1 == va_eval_operand_uint64 s o2))
-  [SMTPat (eval_ocmp s (va_cmp_eq o1 o2 t))]
+  (ensures  (eval_ocmp s (va_cmp_eq o1 o2)) <==> (va_eval_operand_uint64 s o1 == va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_eq o1 o2))]
 
-val lemma_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_cmp_ne : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (eval_ocmp s (va_cmp_ne o1 o2 t)) <==> (va_eval_operand_uint64 s o1 <> va_eval_operand_uint64 s o2))
-  [SMTPat (eval_ocmp s (va_cmp_ne o1 o2 t))]
+  (ensures  (eval_ocmp s (va_cmp_ne o1 o2)) <==> (va_eval_operand_uint64 s o1 <> va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_ne o1 o2))]
 
-val lemma_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_cmp_le : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (eval_ocmp s (va_cmp_le o1 o2 t)) <==> (va_eval_operand_uint64 s o1 <= va_eval_operand_uint64 s o2))
-  [SMTPat (eval_ocmp s (va_cmp_le o1 o2 t))]
+  (ensures  (eval_ocmp s (va_cmp_le o1 o2)) <==> (va_eval_operand_uint64 s o1 <= va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_le o1 o2))]
 
-val lemma_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_cmp_ge : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (eval_ocmp s (va_cmp_ge o1 o2 t)) <==> (va_eval_operand_uint64 s o1 >= va_eval_operand_uint64 s o2))
-  [SMTPat (eval_ocmp s (va_cmp_ge o1 o2 t))]
+  (ensures  (eval_ocmp s (va_cmp_ge o1 o2)) <==> (va_eval_operand_uint64 s o1 >= va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_ge o1 o2))]
 
-val lemma_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_cmp_lt : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (eval_ocmp s (va_cmp_lt o1 o2 t)) <==> (va_eval_operand_uint64 s o1 < va_eval_operand_uint64 s o2))
-  [SMTPat (eval_ocmp s (va_cmp_lt o1 o2 t))]
+  (ensures  (eval_ocmp s (va_cmp_lt o1 o2)) <==> (va_eval_operand_uint64 s o1 < va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_lt o1 o2))]
 
-val lemma_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_cmp_gt : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (eval_ocmp s (va_cmp_gt o1 o2 t)) <==> (va_eval_operand_uint64 s o1 > va_eval_operand_uint64 s o2))
-  [SMTPat (eval_ocmp s (va_cmp_gt o1 o2 t))]
+  (ensures  (eval_ocmp s (va_cmp_gt o1 o2)) <==> (va_eval_operand_uint64 s o1 > va_eval_operand_uint64 s o2))
+  [SMTPat (eval_ocmp s (va_cmp_gt o1 o2))]
 
-val lemma_valid_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_valid_cmp_eq : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures  (valid_operand o1 s /\ valid_taint o1 s t /\ valid_operand o2 s /\ valid_taint o2 s t) ==> (valid_ocmp (va_cmp_eq o1 o2 t) s))
-  [SMTPat (valid_ocmp (va_cmp_eq o1 o2 t) s)]
+  (ensures  (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_eq o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_eq o1 o2) s)]
 
-val lemma_valid_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_valid_cmp_ne : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_taint o1 s t /\ valid_operand o2 s /\ valid_taint o2 s t) ==> (valid_ocmp (va_cmp_ne o1 o2 t) s))
-  [SMTPat (valid_ocmp (va_cmp_ne o1 o2 t) s)]
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ne o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_ne o1 o2) s)]
 
-val lemma_valid_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_valid_cmp_le : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_taint o1 s t /\ valid_operand o2 s /\ valid_taint o2 s t) ==> (valid_ocmp (va_cmp_le o1 o2 t) s))
-  [SMTPat (valid_ocmp (va_cmp_le o1 o2 t) s)]
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_le o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_le o1 o2) s)]
 
-val lemma_valid_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_valid_cmp_ge : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_taint o1 s t /\ valid_operand o2 s /\ valid_taint o2 s t) ==> (valid_ocmp (va_cmp_ge o1 o2 t) s))
-  [SMTPat (valid_ocmp (va_cmp_ge o1 o2 t) s)]
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ge o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_ge o1 o2) s)]
 
-val lemma_valid_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_valid_cmp_lt : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_taint o1 s t /\ valid_operand o2 s /\ valid_taint o2 s t) ==> (valid_ocmp (va_cmp_lt o1 o2 t) s))
-  [SMTPat (valid_ocmp (va_cmp_lt o1 o2 t) s)]
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_lt o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_lt o1 o2) s)]
 
-val lemma_valid_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> t:taint -> Lemma
+val lemma_valid_cmp_gt : s:va_state -> o1:va_src_operand -> o2:va_src_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_taint o1 s t /\ valid_operand o2 s /\ valid_taint o2 s t) ==> (valid_ocmp (va_cmp_gt o1 o2 t) s))
-  [SMTPat (valid_ocmp (va_cmp_gt o1 o2 t) s)]
+  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
+  [SMTPat (valid_ocmp (va_cmp_gt o1 o2) s)]
 
 val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) (fM:va_fuel) (sN:va_state) : Ghost (fN:va_fuel)
   (requires
@@ -411,12 +413,12 @@ type ocmp = TS.tainted_ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
-let va_cmp_eq o1 o2 t = TS.TaintedOCmp (S.OEq o1 o2) t
-let va_cmp_ne o1 o2 t = TS.TaintedOCmp (S.ONe o1 o2) t
-let va_cmp_le o1 o2 t = TS.TaintedOCmp (S.OLe o1 o2) t
-let va_cmp_ge o1 o2 t = TS.TaintedOCmp (S.OGe o1 o2) t
-let va_cmp_lt o1 o2 t = TS.TaintedOCmp (S.OLt o1 o2) t
-let va_cmp_gt o1 o2 t = TS.TaintedOCmp (S.OGt o1 o2) t
+let va_cmp_eq o1 o2 = TS.TaintedOCmp (S.OEq o1 o2) Public
+let va_cmp_ne o1 o2 = TS.TaintedOCmp (S.ONe o1 o2) Public
+let va_cmp_le o1 o2 = TS.TaintedOCmp (S.OLe o1 o2) Public
+let va_cmp_ge o1 o2 = TS.TaintedOCmp (S.OGe o1 o2) Public
+let va_cmp_lt o1 o2 = TS.TaintedOCmp (S.OLt o1 o2) Public
+let va_cmp_gt o1 o2 = TS.TaintedOCmp (S.OGt o1 o2) Public
 
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv
@@ -425,19 +427,19 @@ let valid_ocmp = Lemmas_i.valid_ocmp
 
 unfold let va_eval_ins = Lemmas_i.eval_ins
 
-let lemma_cmp_eq s o1 o2 t = ()
-let lemma_cmp_ne s o1 o2 t = ()
-let lemma_cmp_le s o1 o2 t = ()
-let lemma_cmp_ge s o1 o2 t = ()
-let lemma_cmp_lt s o1 o2 t = ()
-let lemma_cmp_gt s o1 o2 t = ()
+let lemma_cmp_eq s o1 o2 = ()
+let lemma_cmp_ne s o1 o2 = ()
+let lemma_cmp_le s o1 o2 = ()
+let lemma_cmp_ge s o1 o2 = ()
+let lemma_cmp_lt s o1 o2 = ()
+let lemma_cmp_gt s o1 o2 = ()
 
-let lemma_valid_cmp_eq s o1 o2 t = ()
-let lemma_valid_cmp_ne s o1 o2 t = ()
-let lemma_valid_cmp_le s o1 o2 t = ()
-let lemma_valid_cmp_ge s o1 o2 t = ()
-let lemma_valid_cmp_lt s o1 o2 t = ()
-let lemma_valid_cmp_gt s o1 o2 t = ()
+let lemma_valid_cmp_eq s o1 o2 = ()
+let lemma_valid_cmp_ne s o1 o2 = ()
+let lemma_valid_cmp_le s o1 o2 = ()
+let lemma_valid_cmp_ge s o1 o2 = ()
+let lemma_valid_cmp_lt s o1 o2 = ()
+let lemma_valid_cmp_gt s o1 o2 = ()
 
 let va_lemma_merge_total = Lemmas_i.lemma_merge_total
 let va_lemma_empty_total = Lemmas_i.lemma_empty_total
