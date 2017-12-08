@@ -63,13 +63,21 @@ let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem6
 
 let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.mem
 
-let valid_operand (o:operand) (s:state) (t:taint) : Type0 =
+let valid_operand (o:operand) (s:state) : Type0 =
   match o with
   | OConst n -> 0 <= n /\ n < nat64_max
   | OReg r -> True
-  | OMem m -> valid_maddr m s /\
-      (let ptr = eval_maddr m s in
-      s.memTaint.[ptr] = t)
+  | OMem m -> valid_maddr m s
+
+
+let valid_taint (o:operand) (s:state) (t:taint) : Type0 =
+  match o with
+  | OConst _ | OReg _ -> True
+  | OMem m -> let ptr = eval_maddr m s in
+      s.memTaint.[ptr] = t
+
+let valid_taint_ptr (ptr:int) (memTaint:map int taint) (t:taint) : Type0 =
+  memTaint.[ptr] == t
 
 let state_eq (s0:state) (s1:state) : Type0 = 
   s0.ok == s1.ok /\

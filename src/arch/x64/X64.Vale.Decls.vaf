@@ -129,6 +129,8 @@ unfold let va_get_ok (s:va_state) : bool = s.ok
 unfold let va_get_flags (s:va_state) : int = s.flags
 unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
 unfold let va_get_mem (s:va_state) : mem = s.mem
+unfold let va_get_trace (s:va_state) : list observation = s.trace
+unfold let va_get_memTaint (s:va_state) : map int taint = s.memTaint
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
 unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
@@ -154,6 +156,8 @@ unfold
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
+unfold let va_update_trace (sM:va_state) (sK:va_state) : va_state = { sK with trace = sM.trace }
+unfold let va_update_memTaint (sM:va_state) (sK:va_state) : va_state = { sK with memTaint = sM.memTaint }
 
 (** Constructors for va_codes *)
 unfold let va_CNil () : va_codes = []
@@ -478,7 +482,7 @@ let masm = P.masm
 let gcc = P.gcc
 *)
 
-#set-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#set-options "--initial_fuel 4 --max_fuel 4 --z3rlimit 20"
 #endverbatim
 
 var{:state ok()} ok:bool;
@@ -500,6 +504,8 @@ var{:state reg(R14)} r14:int;
 var{:state reg(R15)} r15:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
+var{:state trace()} trace:int;
+var{:state memTaint()} memTaint:int;
 
 procedure{:operand} Mem_in(operand base:int, inline offset:int, ghost b:buffer64, ghost index:int) returns(operand o:int)
     reads
@@ -521,8 +527,12 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
         ghost index:int)
     reads
         mem;
+        memTaint;
+    modifies
+        trace;
     requires
         valid_src_addr(mem, b, index);
+        valid_taint_ptr(src + offset, memTaint, t);
         src + offset == buffer_addr(b) + 8 * index;
     ensures
         dst == buffer64_read(b, index, mem);
@@ -533,13 +543,15 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), offset)), src), list(OMem(MReg(get_reg(dst), offset))), list(src)), t))}{:fast_instruction} Store64_buffer(
         reg_operand dst:uint64,
-        operand src:uint64,
+        src_operand src:uint64,
         inline offset:int,
         inline t:taint,
         ghost b:buffer64,
         ghost index:int)
     modifies
         mem;
+        memTaint;
+        trace;
     requires
         valid_dst_addr(mem, b, index);
         dst + offset == buffer_addr(b) + 8 * index;
@@ -561,7 +573,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list
 {
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), t))}{:fast_instruction} Add64Wrap(inout dst_operand dst:uint64, operand src:uint64, inline t:taint)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), Public))}{:fast_instruction} Add64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies
         efl;
     ensures
@@ -587,7 +599,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst, src), list(dst)
 {
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} Sub64(inout dst_operand dst:uint64, operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} Sub64(inout dst_operand dst:uint64, src_operand src:uint64)
     requires
         0 <= dst - src;
     modifies 
@@ -597,7 +609,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), lis
 {
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(src)), Public))} Sub64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(dst, src)), Public))} Sub64Wrap(inout dst_operand dst:uint64, src_operand src:uint64)
     modifies
         efl;
     ensures
