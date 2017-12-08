@@ -70,13 +70,16 @@ unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
 unfold let va_const_cmp (n:int) : va_cmp = OConst n
 unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
+unfold let va_coerce_operand_to_src_operand (o:va_operand{OReg? o \/ OConst? o}) : va_src_operand = o
 unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
 unfold let va_coerce_operand_to_cmp(o:va_operand{OReg? o \/ OConst? o}) : va_cmp = o
+unfold let va_coerce_src_operand_to_cmp (o:va_src_operand) : va_cmp = o
 unfold let va_op_register (r:reg) : va_register = r
 unfold let va_op_reg_operand_reg (r:reg) : va_reg_operand = OReg r
 unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
 unfold let va_coerce_operand_to_dst_operand (o:va_operand{valid_dst o /\ (OConst? o \/ OReg? o)}) : va_dst_operand = o
 unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
+unfold let va_coerce_dst_operand_to_src_operand (o:va_dst_operand) : va_src_operand = o
 unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
   match o with
   | OConst n -> OConst (n + offset)
@@ -537,6 +540,8 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
         valid_taint_ptr(src + offset, memTaint, t);
         src + offset == buffer_addr(b) + 8 * index;
     ensures
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(old(src) + offset, memTaint, t);
         dst == buffer64_read(b, index, mem);
 {
     lemma_valid_mem64(b, index, mem);
@@ -558,6 +563,8 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
         valid_dst_addr(mem, b, index);
         dst + offset == buffer_addr(b) + 8 * index;
     ensures
+        valid_dst_addr(mem, b, index);
+        valid_taint_ptr(old(dst) + offset, memTaint, t);
         modifies_mem(loc_buffer(b), old(mem), mem);
         mem == old(buffer64_write(b, index, src, mem));
 {
@@ -584,6 +591,31 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list
 {
 }
 
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction} Add64Wrap_Mem(
+    inout dst_operand dst:uint64,
+    reg_operand src:uint64,
+    inline offset:int,
+    inline t:taint,
+    ghost b:buffer64,
+    ghost index:int)
+    reads
+        memTaint; mem;
+    modifies
+        efl; trace;
+    requires
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(src + offset, memTaint, t);
+        src + offset == buffer_addr(b) + 8 * index;
+    ensures
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(old(src) + offset, memTaint, t);
+        dst == old(add_wrap(dst, buffer64_read(b, index, mem)));
+        cf(efl) == old(dst + buffer64_read(b, index, mem) >= nat64_max);
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
+}
+
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddLea64(dst, src1, src2), list(dst), list(dst, src1, src2)), Public))} AddLea64(out dst_operand dst:uint64, src_operand src1:uint64, src_operand src2:uint64)
     requires
         src1 + src2 < nat64_max;
@@ -599,6 +631,31 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst, src), list(dst)
         dst == old(add_wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
         cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max;
 {
+}
+
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction} Adc64Wrap_Mem(
+    inout dst_operand dst:uint64,
+    reg_operand src:uint64,
+    inline offset:int,
+    inline t:taint,
+    ghost b:buffer64,
+    ghost index:int)
+    reads
+        memTaint; mem;
+    modifies
+        efl; trace;
+    requires
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(src + offset, memTaint, t);
+        src + offset == buffer_addr(b) + 8 * index;
+    ensures
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(old(src) + offset, memTaint, t);
+        dst == old(add_wrap(add_wrap(dst, buffer64_read(b, index, mem)), (if cf(efl) then 1 else 0)));
+        cf(efl) == old(dst + buffer64_read(b, index, mem) + (if cf(efl) then 1 else 0)) >= nat64_max;
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Sub64(dst, src), list(dst), list(dst, src)), Public))}{:fast_instruction} Sub64(inout dst_operand dst:uint64, src_operand src:uint64)

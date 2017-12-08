@@ -80,7 +80,7 @@ verify_options = {
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
-  'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
+  #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
   
 }
 if env['TARGET_ARCH'] != 'x86':
