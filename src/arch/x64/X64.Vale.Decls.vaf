@@ -681,7 +681,6 @@ procedure{:instruction Ins(S.Pxor(dst, src))} Pxor(inout xmm dst:quad32, xmm src
 {
 }
 
-/*
 procedure{:instruction Ins(S.Pshufd(dst, src, permutation))} 
           Pshufd(inout xmm dst:quad32, xmm src:quad32, inline permutation:imm8)
   modifies efl;
@@ -693,10 +692,54 @@ procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}
 {
 }
 
-procedure{:instruction Ins(S.VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout xmm dst:quad32, xmm src:quad32)
+procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))} VPSLLDQ4(inout xmm dst:quad32, xmm src:quad32)
   modifies efl;
   ensures
     dst == old(Quad32(0, src.lo, src.mid_lo, src.mid_hi));
 {
+}
+
+procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst),Mov128Xmm(src)))}{:fast_instruction} Mov128(inout xmm dst:quad32, xmm src:quad32)
+    ensures
+        dst == old(src);
+{
+}
+
+/*
+procedure{:instruction Ins(S.MOVDQU(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64_buffer(
+    out xmm dst:quad32,
+        reg_operand src:uint64,
+        inline offset:int,
+        ghost b:buffer64,
+        ghost index:int)
+    reads
+        mem;
+    requires
+        valid_src_addr(mem, b, index);
+        src + offset == buffer_addr(b) + 16 * index;
+    ensures
+        dst == buffer128_read(b, index, mem);
+{
+    lemma_valid_mem128(b, index, mem);
+    lemma_load_mem128(b, index, mem);
+}
+
+procedure{:instruction Ins(S.MOVDQU(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store128_buffer(
+        reg_operand dst:uint64,
+        xmm src:quad32,
+        inline offset:int,
+        ghost b:buffer64,
+        ghost index:int)
+    modifies
+        mem;
+    requires
+        valid_dst_addr(mem, b, index);
+        dst + offset == buffer_addr(b) + 16 * index;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        mem == old(buffer128_write(b, index, src, mem));
+{
+    lemma_valid_mem128(b, index, old(mem));
+    lemma_store_mem128(b, index, old(src), old(mem));
 }
 */
