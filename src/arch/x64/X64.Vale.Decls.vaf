@@ -11,6 +11,7 @@ module M = Memory_i_s
 open X64.Machine_s
 open X64.Vale.State_i
 open Types_s
+open AES_s
 
 unfold let quad32 = quad32
 
@@ -376,6 +377,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
   ))
 
 (* maybe we want these to be transparent*)
+val logxor32 : (x:nat32) -> (y:nat32) -> nat32
 val logxor64 : (x:nat64) -> (y:nat64) -> nat64
 val logand64 : (x:nat64) -> (y:nat64) -> nat64
 val logand128 : (x:nat128) -> (y:nat128) -> nat128
@@ -455,6 +457,9 @@ let va_lemma_while_total = Lemmas_i.lemma_while_total
 let va_lemma_whileTrue_total = Lemmas_i.lemma_whileTrue_total
 let va_lemma_whileFalse_total = Lemmas_i.lemma_whileFalse_total
 let va_lemma_whileMerge_total = Lemmas_i.lemma_whileMerge_total
+
+let logxor32 (x:nat32) (y:nat32) : nat32 =
+  FStar.UInt.logxor #32 x y
 
 let logxor64 (x:nat64) (y:nat64) : nat64 =
   FStar.UInt.logxor #64 x y
@@ -743,3 +748,55 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov12
     lemma_valid_mem128(b, index, old(mem));
     lemma_store_mem128(b, index, old(src), old(mem));
 }
+
+procedure{:instruction Ins(S.AESNI_enc(dst, src))} 
+          AESNI_enc(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(quad32_xor(mix_columns(sub_bytes(shift_rows(src))), src));
+{
+}
+
+procedure{:instruction Ins(S.AESNI_enc_last(dst, src))} 
+          AESNI_enc_last(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(quad32_xor(sub_bytes(shift_rows(src)), src));
+{
+}
+
+procedure{:instruction Ins(S.AESNI_dec(dst, src))} 
+          AESNI_dec(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(quad32_xor(inv_mix_columns(inv_sub_bytes(inv_shift_rows(src))), src));
+{
+}
+
+procedure{:instruction Ins(S.AESNI_dec_last(dst, src))} 
+          AESNI_dec_last(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(quad32_xor(inv_sub_bytes(inv_shift_rows(src)), src));
+{
+}
+
+procedure{:instruction Ins(S.AESNI_imc(dst, src))} 
+          AESNI_imc(inout xmm dst:quad32, xmm src:quad32)
+  modifies efl;
+  ensures
+    dst == old(inv_mix_columns(src));
+{
+}
+
+procedure{:instruction Ins(S.AESNI_keygen_assist(dst, src, imm))} 
+          AESNI__keygen_assist(inout xmm dst:quad32, xmm src:quad32, inline imm:imm8)
+  modifies efl;
+  ensures
+    dst == old(Quad32(sub_word(src.mid_lo), 
+                      logxor32(rot_word(sub_word(src.mid_lo)), imm),
+                      sub_word(src.hi),
+                      logxor32(rot_word(sub_word(src.hi)), imm)));
+{
+}
+
