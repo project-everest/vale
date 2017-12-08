@@ -13,6 +13,7 @@ let m_of_typ (t:typ) : M.typ =
   | TBase TUInt16 -> M.tuint16
   | TBase TUInt32 -> M.tuint32
   | TBase TUInt64 -> M.tuint64
+  | TBase TUInt128 -> M.tuint128
 
 let v_of_typ (t:typ) (v:type_of_typ t) : M.type_of_typ (m_of_typ t) =
   match t with
@@ -20,6 +21,7 @@ let v_of_typ (t:typ) (v:type_of_typ t) : M.type_of_typ (m_of_typ t) =
   | TBase TUInt16 -> coerce (M.type_of_typ (m_of_typ t)) (UInt16.uint_to_t v)
   | TBase TUInt32 -> coerce (M.type_of_typ (m_of_typ t)) (UInt32.uint_to_t v)
   | TBase TUInt64 -> coerce (M.type_of_typ (m_of_typ t)) (UInt64.uint_to_t v)
+  | TBase TUInt128 -> magic() //coerce (M.type_of_typ (m_of_typ t)) (UInt128.uint_to_t v)
 
 let v_to_typ (t:typ) (v:M.type_of_typ (m_of_typ t)) : type_of_typ t =
   match t with
@@ -27,7 +29,8 @@ let v_to_typ (t:typ) (v:M.type_of_typ (m_of_typ t)) : type_of_typ t =
   | TBase TUInt16 -> UInt16.v (coerce UInt16.t v)
   | TBase TUInt32 -> UInt32.v (coerce UInt32.t v)
   | TBase TUInt64 -> UInt64.v (coerce UInt64.t v)
-
+  | TBase TUInt128 -> magic()
+  
 let lemma_v_to_of_typ (t:typ) (v:type_of_typ t) : Lemma
   (ensures v_to_typ t (v_of_typ t v) == v)
   [SMTPat (v_to_typ t (v_of_typ t v))]
@@ -37,6 +40,7 @@ let lemma_v_to_of_typ (t:typ) (v:type_of_typ t) : Lemma
   | TBase TUInt16 -> assert (UInt16.v (UInt16.uint_to_t v) == v)
   | TBase TUInt32 -> assert (UInt32.v (UInt32.uint_to_t v) == v)
   | TBase TUInt64 -> assert (UInt64.v (UInt64.uint_to_t v) == v)
+  | TBase TUInt128 -> admit()
 
 let buffer t = M.buffer (m_of_typ t)
 
@@ -106,6 +110,7 @@ let default_of_typ (t:typ) : type_of_typ t =
   | TBase TUInt16 -> 0
   | TBase TUInt32 -> 0
   | TBase TUInt64 -> 0
+  | TBase TUInt128 -> Types_s.Quad32 0  0 0 0
 
 let buffer_read #t b i h =
   if i < 0 || i >= Types_s.nat32_max then default_of_typ t else

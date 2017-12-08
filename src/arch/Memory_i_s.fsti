@@ -7,6 +7,7 @@ unfold let nat8 = Types_s.nat8
 unfold let nat16 = Types_s.nat16
 unfold let nat32 = Types_s.nat32
 unfold let nat64 = Types_s.nat64
+unfold let quad32 = Types_s.quad32
 
 val heap : Type u#1
 val mem : Type u#1
@@ -16,6 +17,7 @@ type base_typ =
 | TUInt16
 | TUInt32
 | TUInt64
+| TUInt128
 
 type typ =
 | TBase: (b:base_typ) -> typ
@@ -26,6 +28,7 @@ let type_of_base_typ (t:base_typ) : Tot Type0 =
   | TUInt16 -> nat16
   | TUInt32 -> nat32
   | TUInt64 -> nat64
+  | TUInt128 -> quad32
 
 let type_of_typ (t:typ) : Tot Type0 =
   match t with
@@ -47,6 +50,7 @@ unfold let buffer8 = buffer (TBase TUInt8)
 unfold let buffer16 = buffer (TBase TUInt16)
 unfold let buffer32 = buffer (TBase TUInt32)
 unfold let buffer64 = buffer (TBase TUInt64)
+unfold let buffer128 = buffer (TBase TUInt128)
 
 val loc_readable (h:mem) (s:loc) : GTot Type0
 

@@ -27,6 +27,7 @@ let tuint8 = P.TBase P.TUInt8
 let tuint16 = P.TBase P.TUInt16
 let tuint32 = P.TBase P.TUInt32
 let tuint64 = P.TBase P.TUInt64
+let tuint128 = magic()
 #reset-options
 
 // TODO: loc_readable

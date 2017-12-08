@@ -57,10 +57,7 @@ assume val havoc : state -> ins -> nat64
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
-
-assume val eval_mem128 (ptr:int) (s:state) : quad32
-assume val store_mem128 (ptr:int) (v:quad32) (m:mem) : mem
-assume val valid_mem128 (ptr:int) (m:mem) : bool
+unfold let eval_mem128 (ptr:int) (s:state) : quad32 = load_mem128 ptr s.mem
 
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
