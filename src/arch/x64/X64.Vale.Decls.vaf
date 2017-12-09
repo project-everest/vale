@@ -57,6 +57,8 @@ unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
+unfold let modifies_memTaint (addr:int) (m1 m2: map int taint) : GTot Type0 =
+  forall a. a <> addr ==> m1.[a] == m2.[a]
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -569,8 +571,9 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
         dst + offset == buffer_addr(b) + 8 * index;
     ensures
         valid_dst_addr(mem, b, index);
-        valid_taint_ptr(old(dst) + offset, memTaint, t);
+        valid_taint_ptr(dst + offset, memTaint, t);
         modifies_mem(loc_buffer(b), old(mem), mem);
+        modifies_memTaint(dst + offset, old(memTaint), memTaint);
         mem == old(buffer64_write(b, index, src, mem));
 {
     lemma_valid_mem64(b, index, old(mem));
