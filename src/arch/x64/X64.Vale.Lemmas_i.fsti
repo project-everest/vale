@@ -137,7 +137,7 @@ val lemma_while_total (b:ocmp) (c:code) (s0:state) : Ghost ((s1:state) * (f1:fue
 
 val lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Ghost ((s1:state) * (f1:fuel))
   (requires eval_ocmp sW b)
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
+  (ensures fun (s1, f1) -> s1 == {sW with trace = BranchPredicate(true)::sW.trace} /\ f1 == fW)
 
 val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Ghost ((s1:state) * (f1:fuel))
   (requires

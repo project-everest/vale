@@ -108,7 +108,7 @@ let lemma_while_total (b:ocmp) (c:code) (s0:state) =
   (s0, 0)
 
 let lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
-  (sW, fW)
+  ({sW with trace = BranchPredicate(true)::sW.trace}, fW)
 
 let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
   let f1 = fW + 1 in
