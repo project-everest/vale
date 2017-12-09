@@ -157,6 +157,27 @@ and monotone_ok_eval_block block fuel s =
     monotone_ok_eval_block tl fuel (Some?.v s');
     monotone_ok_eval hd fuel s
 
+val monotone_ok_eval_while: (code:tainted_code{While? code}) -> (fuel:nat) -> (s:traceState) -> Lemma 
+  (requires True)
+  (ensures (
+      let While cond body = code in
+      let (s1, b1) = taint_eval_ocmp s cond in
+      let r1 = taint_eval_code code fuel s in
+      Some? r1 /\ (Some?.v r1).state.ok ==> s1.state.ok))
+
+let monotone_ok_eval_while code fuel s =
+  let While cond body = code in
+  let (s1, b) = taint_eval_ocmp s cond in
+  let r1 = taint_eval_while code fuel s in
+  if fuel = 0 then ()
+  else if not b then ()
+  else let s0 = {s1 with trace = BranchPredicate(true)::s1.trace} in
+  let s_opt = taint_eval_code body (fuel - 1) s0 in
+  match s_opt with
+    | None -> ()
+    | Some s -> if not s.state.ok then ()
+      else monotone_ok_eval body (fuel -1) s0; monotone_ok_eval code (fuel - 1) s
+
 val lemma_loop_taintstate_monotone: (ts:taintState) -> (code:tainted_code{While? code}) -> (fuel:nat) -> Lemma 
 (requires True)
 (ensures (let _, ts' = check_if_loop_consumes_fixed_time code fuel ts in
@@ -190,16 +211,17 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
   (b2t b ==> isConstantTimeGivenStates code fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2)))
  (decreases %[fuel; code; 0])
 
-#set-options "--z3rlimit 120"
+#set-options "--z3rlimit 140"
  let rec lemma_code_explicit_leakage_free ts code fuel s1 s2 = match code with
   | Ins ins -> lemma_ins_leakage_free ts fuel ins
   | Block block -> lemma_block_explicit_leakage_free ts block fuel s1 s2
-  | IfElse ifCond ifTrue ifFalse ->     
+  | IfElse ifCond ifTrue ifFalse ->
     let b_fin, ts_fin = check_if_code_consumes_fixed_time code fuel ts in
     let st1, b1 = taint_eval_ocmp s1 ifCond in
     let st1 = {st1 with trace=BranchPredicate(b1)::s1.trace} in
     let st2, b2 = taint_eval_ocmp s2 ifCond in
     let st2 = {st2 with trace=BranchPredicate(b2)::s2.trace} in
+ 
     assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
     monotone_ok_eval ifTrue fuel st1;
     monotone_ok_eval ifTrue fuel st2;
@@ -238,7 +260,15 @@ and lemma_loop_explicit_leakage_free ts code fuel s1 s2 =
   assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
   if not b1 || not b2 then
   (
+  assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> not b1 /\ not b2);
+  assert (not b1 ==> r1 == Some ({st1 with trace = BranchPredicate(false)::st1.trace}));
+  assert (not b2 ==> r2 == Some ({st2 with trace = BranchPredicate(false)::st2.trace}));
+  monotone_ok_eval_while code fuel s1;
+  assert (Some? r1 /\ (Some?.v r1).state.ok ==> st1.state.ok);
+  monotone_ok_eval_while code fuel s2;
+  assert (Some? r2 /\ (Some?.v r2).state.ok ==> st2.state.ok);
   lemma_loop_taintstate_monotone ts code fuel;
+  isExplicit_monotone ts ts ts_fin code fuel s1 s2;
   ()
   )
   else
