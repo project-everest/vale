@@ -99,7 +99,6 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
     let r = env_map_exp f env in
     match e with
     | ELoc (loc, e) -> try ELoc (loc, r e) with err -> raise (LocErr (loc, err))
-    | EVar (Reserved "this") -> env.state
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
     | EBind (b, es, fs, ts, e) ->
         let es = List.map r es in
@@ -113,17 +112,23 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
           in
         let r = env_map_exp f env in
         EBind (b, es, fs, List.map (List.map r) ts, r e)
-    | EOp (Uop UOld, [e]) ->
-        let env = {env with state = EVar (Reserved "old_s"); abstractOld = true} in
-        let r = env_map_exp f env in
-        r e
-    | EOp (Bop BOldAt, [es; e]) ->
-        let env = {env with state = es} in
-        let r = env_map_exp f env in
-        r e
     | EOp (op, es) -> EOp (op, List.map r es)
     | EApply (x, es) -> EApply (x, List.map r es)
   )
+
+let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
+  let f_state (env:env) (e:exp):exp map_modify =
+    match e with
+    | EVar (Reserved "this") -> Replace env.state
+    | EOp (Uop UOld, [e]) ->
+        let env = {env with state = EVar (Reserved "old_s"); abstractOld = true} in
+        Replace (env_map_exp_state f env e)
+    | EOp (Bop BOldAt, [es; e]) ->
+        let env = {env with state = es} in
+        Replace (env_map_exp_state f env e)
+    | _ -> Unchanged
+    in
+  env_map_exp (map_apply_compose2 f f_state) env e
 
 let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (s:stmt):(env * stmt list) =
   map_apply_modify (fs env s) (fun () ->
@@ -498,7 +503,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
     | (Ghost, _) -> Unchanged
     in
   try
-    env_map_exp fe env e
+    env_map_exp_state fe env e
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
 and rewrite_vars_exp (env:env) (e:exp):exp =
   rewrite_vars_arg Ghost None In env e
@@ -650,7 +655,7 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
               )
             | _ -> Unchanged
             in
-          let mods m = List_mapSnd (fun e -> Modifies (m, env_map_exp rewrite env e)) es in
+          let mods m = List_mapSnd (fun e -> Modifies (m, env_map_exp_state rewrite env e)) es in
           Replace (env, mods m)
     )
   | SpecRaw (Lets _) -> PostProcess (fun (env, _) -> (env, []))
