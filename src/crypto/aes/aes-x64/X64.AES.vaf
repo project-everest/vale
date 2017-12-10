@@ -1,0 +1,107 @@
+include "../../../arch/x64/X64.Vale.Decls.vaf"
+
+#verbatim interface implementation
+
+module X64.AES
+
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls
+open Opaque_i
+
+#endverbatims
+
+
+#verbatim
+#reset-options "--z3rlimit 100" 
+#endverbatim
+
+///////////////////////////
+// KEY EXPANSION
+///////////////////////////
+
+procedure KeyExpansionRound(
+    inline round:nat64,
+    inline rcon:imm8,
+//    inline taint:taint,
+    ghost dst:buffer128)
+//    ghost key:seq(uint32),
+//    ghost w_in:seq(uint32)
+//    ) returns (
+//    ghost w_out:seq(uint32)
+//    )
+    requires/ensures
+        validDstAddrs128(mem, rdx, dst, 11);
+    requires
+        0 <= round < 10;
+//        rcon == AES_Rcon()[round];
+//        SeqLength(key) == 4;
+//        SeqLength(w_in) == 44;
+//        KeyExpansionPredicatePartial(key, AES_128, w_in, 4+round*4);
+        rdx % 16 == 0;
+        //validSrcAddrs128(mem, rdx, dst, (round+1));
+//        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_in[4*j], w_in[4*j+1], w_in[4*j+2], w_in[4*j+3]);
+        xmm1 == buffer128_read(dst, round, mem);
+    reads
+        rdx;
+    modifies
+        mem; xmm1; xmm2; xmm3; efl;
+    ensures
+//        //validSrcAddrs128(mem, rdx, dst, round+2);
+        //modifies_buffer(dst, old(mem), mem);
+        modifies_buffer_specific128(dst, old(mem), mem, round+1, round+1);
+        xmm1 == buffer128_read(dst, round + 1, mem);
+//        forall a :: (a < rdx || a >= rdx + 176) && old(mem)[dst_id].quads?[a] ==> mem[dst_id].quads?[a] && mem[dst_id].quads[a] == old(mem)[dst_id].quads[a];
+//        SeqLength(w_out) == 44;
+//        mem[dst_id].quads[rdx + 16*0].v == Quadword(w_out[4*0], w_out[4*0+1], w_out[4*0+2], w_out[4*0+3]);
+//        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
+//        KeyExpansionPredicatePartial(key, AES_128, w_out, 4+(round+1)*4);
+{
+//    ghost var xmm1_v0 := xmm1;
+
+    AESNI_keygen_assist(xmm2, xmm1, rcon);
+//    ghost var xmm2_v1 := xmm2;
+
+    Pshufd(xmm2, xmm2, 255);
+//    ghost var xmm2_v2 := xmm2;
+
+    VPSLLDQ4(xmm3, xmm1);
+//    ghost var xmm3_v3 := xmm3;
+
+    Pxor(xmm1,xmm3);
+//    ghost var xmm1_v4 := xmm1;
+
+    VPSLLDQ4(xmm3, xmm1);
+//    ghost var xmm3_v5 := xmm3;
+
+    Pxor(xmm1,xmm3);
+//    ghost var xmm1_v6 := xmm1;
+
+    VPSLLDQ4(xmm3, xmm1);
+//    ghost var xmm3_v7 := xmm3;
+
+    Pxor(xmm1,xmm3);
+//    ghost var xmm1_v8 := xmm1;
+
+    Pxor(xmm1,xmm2);
+//    ghost var xmm1_v9 := xmm1;
+
+    Store128_buffer(rdx, xmm1, 16*(round+1), dst, round+1);
+
+//    ghost var new_round := round + 1;
+//    w_out := w_in[new_round*4     := xmm1.lo]
+//                 [new_round*4 + 1 := xmm1.mid_lo]
+//                 [new_round*4 + 2 := xmm1.mid_hi]
+//                 [new_round*4 + 3 := xmm1.hi];
+//
+//    forall j :| 0 <= j <= 10 :: mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3])
+//    {
+//        assert j == new_round ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
+//        assert j != new_round ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
+//    }
+//
+//    ghost var alg := AES_128();
+//    lemma_AES128Size(alg);
+//    lemma_KeyExpansionRoundHelper(key, alg, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
+}
+

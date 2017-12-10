@@ -40,30 +40,6 @@ open Opaque_i
 
 unfold let n = nat64_max
 
-let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
-match l with
-| [] -> True
-| b :: l'  -> buffer_readable h b /\ buffers_readable h l'
-
-unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
-
-let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
-    buffer_readable m b /\
-    len <= buffer_length b /\
-    buffer_addr b == addr
-
-let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
-    modifies_buffer b h1 h2 /\
-    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
-    (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
-                        0 <= i /\ i < buffer_length b 
-                     /\ (i < start || i > last) 
-                    ==> buffer64_read b i h1
-                     == buffer64_read b i h2)
-
-unfold let buffers_disjoint (b1 b2:buffer64) =
-    locs_disjoint [loc_buffer b1; loc_buffer b2]
-
 let readable_words (len:nat) =
     ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
 #endverbatim

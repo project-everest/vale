@@ -66,6 +66,7 @@ unfold let locs_disjoint = M.locs_disjoint
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
 unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
+unfold let va_op_xmm_xmm(x:xmm) : va_xmm = x
 unfold let va_const_operand (n:int) = OConst n
 unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
 unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
@@ -215,6 +216,53 @@ let memModified (old_mem:mem) (new_mem:mem) (ptr:int) (num_bytes) =
     (forall (a:int) . {:pattern (new_mem `Map.contains` a)} old_mem `Map.contains` a <==> new_mem `Map.contains` a) /\
     (forall (a:int) . {:pattern (new_mem.[a]) \/ Map.sel new_mem a} a < ptr || a >= ptr + num_bytes ==> old_mem.[a] == new_mem.[a])
 *)   
+
+(** Convenient memory-related functions **)
+let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
+    match l with
+    | [] -> True
+    | b :: l'  -> buffer_readable h b /\ buffers_readable h l'
+
+unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+unfold let modifies_buffer128 (b:buffer128) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+
+let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+    buffer_readable m b /\
+    len <= buffer_length b /\
+    buffer_addr b == addr
+
+let validSrcAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
+    buffer_readable m b /\
+    len <= buffer_length b /\
+    buffer_addr b == addr
+
+let validDstAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
+    buffer_readable m b /\
+    len <= buffer_length b /\
+    buffer_addr b == addr
+
+let modifies_buffer_specific128 (b:buffer128) (h1 h2:mem) (start last:nat) : GTot Type0 =
+    modifies_buffer128 b h1 h2 /\
+    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
+    (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
+                        0 <= i /\ i < buffer_length b 
+                     /\ (i < start || i > last) 
+                    ==> buffer128_read b i h1
+                     == buffer128_read b i h2)
+
+let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
+    modifies_buffer b h1 h2 /\
+    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
+    (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
+                        0 <= i /\ i < buffer_length b 
+                     /\ (i < start || i > last) 
+                    ==> buffer64_read b i h1
+                     == buffer64_read b i h2)
+
+unfold let buffers_disjoint (b1 b2:buffer64) =
+    locs_disjoint [loc_buffer b1; loc_buffer b2]
+
+
 
 val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0
@@ -512,8 +560,16 @@ var{:state reg(R12)} r12:int;
 var{:state reg(R13)} r13:int;
 var{:state reg(R14)} r14:int;
 var{:state reg(R15)} r15:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var{:state flags()}  efl:int;
+var{:state mem()}    mem:int;
+var{:state xmm(0)}   xmm0:int;
+var{:state xmm(1)}   xmm1:int;
+var{:state xmm(2)}   xmm2:int;
+var{:state xmm(3)}   xmm3:int;
+var{:state xmm(4)}   xmm4:int;
+var{:state xmm(5)}   xmm5:int;
+var{:state xmm(6)}   xmm6:int;
+var{:state xmm(7)}   xmm7:int;
 
 procedure{:operand} Mem_in(operand base:int, inline offset:int, ghost b:buffer64, ghost index:int) returns(operand o:int)
     reads
@@ -790,7 +846,7 @@ procedure{:instruction Ins(S.AESNI_imc(dst, src))}
 }
 
 procedure{:instruction Ins(S.AESNI_keygen_assist(dst, src, imm))} 
-          AESNI__keygen_assist(inout xmm dst:quad32, xmm src:quad32, inline imm:imm8)
+          AESNI_keygen_assist(inout xmm dst:quad32, xmm src:quad32, inline imm:imm8)
   modifies efl;
   ensures
     dst == old(Quad32(sub_word(src.mid_lo), 
