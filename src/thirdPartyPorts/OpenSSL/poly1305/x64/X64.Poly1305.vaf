@@ -51,8 +51,8 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:map int 
     buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b == addr /\
-    (forall a. a >= addr && a <= addr + len + 8 && (a - addr) % 8 = 0 ==>
-    memTaint.[a] == t)
+    (forall a. 0 <= a && a <= len ==>
+    memTaint.[addr + 8 `op_Multiply` a] == t)
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
@@ -347,7 +347,7 @@ procedure poly1305_iteration(
 }
 
 #verbatim
-#reset-options "--z3rlimit 250"
+#reset-options "--z3rlimit 200"
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -467,7 +467,6 @@ procedure {:frame false} poly1305_blocks(
             padbit < 2;            // Not needed with Dafny version 
             validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
             validSrcAddrs64(mem, old(inp), inp_b, length/8, memTaint, Public);
-            validSrcAddrs64(mem, inp, inp_b, 0, memTaint, Public);
             ctx == old(ctx); // REVIEW: framing should add this automatically
             rcx == old(rcx); // REVIEW: framing should add this automatically
             (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
