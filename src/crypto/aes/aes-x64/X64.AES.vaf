@@ -330,7 +330,7 @@ procedure AES128EncryptFirstStep(
 //      SeqLength(w) == 44;
 //      KeyExpansionPredicate(key, AES_128, w);
       validSrcAddrs128(mem, r8, k_b, 1);
-//      mem[K_id].quads[r8].v == Quadword(w[0], w[1], w[2], w[3]);
+//      mem[k_b].quads[r8].v == Quadword(w[0], w[1], w[2], w[3]);
     ensures
 //      SeqLength(xmm0_trace_out) == 1;
 //      xmm0_trace_out[0] == xmm0;
@@ -370,7 +370,7 @@ procedure AES128EncryptMiddleStep(
 //        SeqLength(key) == 4;
 //        SeqLength(w) == 44;
         validSrcAddrs128(mem, r8, k_b, 11);
-//        mem[K_id].quads[r8+16*round].v == Quadword(w[4*round], w[4*round+1], w[4*round+2], w[4*round+3]);
+//        mem[k_b].quads[r8+16*round].v == Quadword(w[4*round], w[4*round+1], w[4*round+2], w[4*round+3]);
 //        KeyExpansionPredicate(key, AES_128, w);
     ensures
 //        SeqLength(xmm0_trace_out) == round + 1;
@@ -407,7 +407,7 @@ procedure AES128EncryptLastStep(
 //        SeqLength(key) == 4;
 //        SeqLength(w) == 44;
         validSrcAddrs128(mem, r8, k_b, 11);
-//        mem[K_id].quads[r8+16*10].v == Quadword(w[40], w[41], w[42], w[43]);
+//        mem[k_b].quads[r8+16*10].v == Quadword(w[40], w[41], w[42], w[43]);
 //        KeyExpansionPredicate(key, AES_128, w);
 //        SeqLength(xmm0_trace_in) == 10;
 //        xmm0_trace_in[9] == xmm0;
@@ -445,66 +445,66 @@ procedure AES128EncryptOneBlock(
 //        xmm0 == input;
 //        SeqLength(w) == 44;
         validSrcAddrs128(mem, r8, k_b, 11);
-//        forall j :: 0 <= j <= 10 ==> mem[K_id].quads[r8 + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+//        forall j :: 0 <= j <= 10 ==> mem[k_b].quads[r8 + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
 //        KeyExpansionPredicate(key, AES_128, w);
     ensures
 //        (Nb() * (Nr(AES_128) + 1)) / 4 == Nr(AES_128) + 1;
 //        (Nb() * (Nr(AES_128) + 1)) % 4 == 0;
 //        xmm0 == AES_Encrypt(key, input, AES_128);
 {
-//    assert mem[K_id].quads[r8 + 16* 0].v == Quadword(w[4* 0], w[4* 0+1], w[4* 0+2], w[4* 0+3]);
+//    assert mem[k_b].quads[r8 + 16* 0].v == Quadword(w[4* 0], w[4* 0+1], w[4* 0+2], w[4* 0+3]);
 //    ghost var xmm0_trace_step0:QuadwordSeq;
-//    xmm0_trace_step0 := AES128EncryptFirstStep(key, w, taint, K_id);
+//    xmm0_trace_step0 := AES128EncryptFirstStep(key, w, taint, k_b);
     AES128EncryptFirstStep(k_b);
 
-//    assert mem[K_id].quads[r8 + 16* 1].v == Quadword(w[4* 1], w[4* 1+1], w[4* 1+2], w[4* 1+3]);
+//    assert mem[k_b].quads[r8 + 16* 1].v == Quadword(w[4* 1], w[4* 1+1], w[4* 1+2], w[4* 1+3]);
 //    ghost var xmm0_trace_step1:QuadwordSeq;
-//    xmm0_trace_step1 := AES128EncryptMiddleStep(1, key, w, input, xmm0_trace_step0, taint, K_id);
+//    xmm0_trace_step1 := AES128EncryptMiddleStep(1, key, w, input, xmm0_trace_step0, taint, k_b);
     AES128EncryptMiddleStep(1, k_b);
 
-//    assert mem[K_id].quads[r8 + 16* 2].v == Quadword(w[4* 2], w[4* 2+1], w[4* 2+2], w[4* 2+3]);
+//    assert mem[k_b].quads[r8 + 16* 2].v == Quadword(w[4* 2], w[4* 2+1], w[4* 2+2], w[4* 2+3]);
 //    ghost var xmm0_trace_step2:QuadwordSeq;
-//    xmm0_trace_step2 := AES128EncryptMiddleStep(2, key, w, input, xmm0_trace_step1, taint, K_id);
+//    xmm0_trace_step2 := AES128EncryptMiddleStep(2, key, w, input, xmm0_trace_step1, taint, k_b);
     AES128EncryptMiddleStep(2, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 3].v == Quadword(w[4* 3], w[4* 3+1], w[4* 3+2], w[4* 3+3]);
+//    assert mem[k_b].quads[r8 + 16* 3].v == Quadword(w[4* 3], w[4* 3+1], w[4* 3+2], w[4* 3+3]);
 //    ghost var xmm0_trace_step3:QuadwordSeq;
-//    xmm0_trace_step3 := AES128EncryptMiddleStep(3, key, w, input, xmm0_trace_step2, taint, K_id);
+//    xmm0_trace_step3 := AES128EncryptMiddleStep(3, key, w, input, xmm0_trace_step2, taint, k_b);
     AES128EncryptMiddleStep(3, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 4].v == Quadword(w[4* 4], w[4* 4+1], w[4* 4+2], w[4* 4+3]);
+//    assert mem[k_b].quads[r8 + 16* 4].v == Quadword(w[4* 4], w[4* 4+1], w[4* 4+2], w[4* 4+3]);
 //    ghost var xmm0_trace_step4:QuadwordSeq;
-//    xmm0_trace_step4 := AES128EncryptMiddleStep(4, key, w, input, xmm0_trace_step3, taint, K_id);
+//    xmm0_trace_step4 := AES128EncryptMiddleStep(4, key, w, input, xmm0_trace_step3, taint, k_b);
     AES128EncryptMiddleStep(4, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 5].v == Quadword(w[4* 5], w[4* 5+1], w[4* 5+2], w[4* 5+3]);
+//    assert mem[k_b].quads[r8 + 16* 5].v == Quadword(w[4* 5], w[4* 5+1], w[4* 5+2], w[4* 5+3]);
 //    ghost var xmm0_trace_step5:QuadwordSeq;
-//    xmm0_trace_step5 := AES128EncryptMiddleStep(5, key, w, input, xmm0_trace_step4, taint, K_id);
+//    xmm0_trace_step5 := AES128EncryptMiddleStep(5, key, w, input, xmm0_trace_step4, taint, k_b);
     AES128EncryptMiddleStep(5, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 6].v == Quadword(w[4* 6], w[4* 6+1], w[4* 6+2], w[4* 6+3]);
+//    assert mem[k_b].quads[r8 + 16* 6].v == Quadword(w[4* 6], w[4* 6+1], w[4* 6+2], w[4* 6+3]);
 //    ghost var xmm0_trace_step6:QuadwordSeq;
-//    xmm0_trace_step6 := AES128EncryptMiddleStep(6, key, w, input, xmm0_trace_step5, taint, K_id);
+//    xmm0_trace_step6 := AES128EncryptMiddleStep(6, key, w, input, xmm0_trace_step5, taint, k_b);
     AES128EncryptMiddleStep(6, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 7].v == Quadword(w[4* 7], w[4* 7+1], w[4* 7+2], w[4* 7+3]);
+//    assert mem[k_b].quads[r8 + 16* 7].v == Quadword(w[4* 7], w[4* 7+1], w[4* 7+2], w[4* 7+3]);
 //    ghost var xmm0_trace_step7:QuadwordSeq;
-//    xmm0_trace_step7 := AES128EncryptMiddleStep(7, key, w, input, xmm0_trace_step6, taint, K_id);
+//    xmm0_trace_step7 := AES128EncryptMiddleStep(7, key, w, input, xmm0_trace_step6, taint, k_b);
     AES128EncryptMiddleStep(7, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 8].v == Quadword(w[4* 8], w[4* 8+1], w[4* 8+2], w[4* 8+3]);
+//    assert mem[k_b].quads[r8 + 16* 8].v == Quadword(w[4* 8], w[4* 8+1], w[4* 8+2], w[4* 8+3]);
 //    ghost var xmm0_trace_step8:QuadwordSeq;
-//    xmm0_trace_step8 := AES128EncryptMiddleStep(8, key, w, input, xmm0_trace_step7, taint, K_id);
+//    xmm0_trace_step8 := AES128EncryptMiddleStep(8, key, w, input, xmm0_trace_step7, taint, k_b);
     AES128EncryptMiddleStep(8, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16* 9].v == Quadword(w[4* 9], w[4* 9+1], w[4* 9+2], w[4* 9+3]);
+//    assert mem[k_b].quads[r8 + 16* 9].v == Quadword(w[4* 9], w[4* 9+1], w[4* 9+2], w[4* 9+3]);
 //    ghost var xmm0_trace_step9:QuadwordSeq;
-//    xmm0_trace_step9 := AES128EncryptMiddleStep(9, key, w, input, xmm0_trace_step8, taint, K_id);
+//    xmm0_trace_step9 := AES128EncryptMiddleStep(9, key, w, input, xmm0_trace_step8, taint, k_b);
     AES128EncryptMiddleStep(9, k_b);
 //
-//    assert mem[K_id].quads[r8 + 16*10].v == Quadword(w[4*10], w[4*10+1], w[4*10+2], w[4*10+3]);
+//    assert mem[k_b].quads[r8 + 16*10].v == Quadword(w[4*10], w[4*10+1], w[4*10+2], w[4*10+3]);
 //    ghost var xmm0_trace_step10:QuadwordSeq;
-//    xmm0_trace_step10 := AES128EncryptLastStep(key, w, input, xmm0_trace_step9, taint, K_id);
+//    xmm0_trace_step10 := AES128EncryptLastStep(key, w, input, xmm0_trace_step9, taint, k_b);
     AES128EncryptLastStep(k_b);
 
 //    lemma_AES128Encrypt(key, input, w, xmm0, xmm0_trace_step10);
@@ -542,7 +542,7 @@ procedure AES128EncryptOneBlockStdcall(
 //        SeqLength(w) == 44;
 //        // And the expanded key in memory matches the abstract version
 //        (forall j :: 0 <= j <= 10 ==>
-//            mem[K_id].quads[expanded_key_ptr + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]));
+//            mem[k_b].quads[expanded_key_ptr + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]));
 //        KeyExpansionPredicate(key, AES_128, w);
 
         // One block of input is readable
@@ -593,5 +593,215 @@ procedure AES128EncryptOneBlockStdcall(
     {
         Store128_buffer(rdi, xmm0, 0, output_b, 0);
     }
+}
+
+///////////////////////////
+// KEY INVERSION
+///////////////////////////
+
+procedure KeyInversionRound(
+    inline round:int,
+//    inline taint:taint,
+    ghost k_b:buffer128)
+//    ghost key:seq(uint32),
+//    ghost w:seq(uint32),
+//    ghost dw_in:seq(uint32)
+//    ) returns (
+//    ghost dw_out:seq(uint32)
+//    )
+    requires/ensures
+        validSrcAddrs128(mem, rdx, k_b, 11);
+    requires
+        0 <= round <= 8;
+//        SeqLength(key) == 4;
+//        SeqLength(w) == 44;
+//        SeqLength(dw_in) == 4*(round+1);
+//        KeyExpansionPredicate(key, AES_128, w);
+//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_in, round);
+//        forall j :: 0 <= j <= round ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_in[4*j], dw_in[4*j+1], dw_in[4*j+2], dw_in[4*j+3]);
+//        forall j :: round < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+    reads 
+        rdx;
+    modifies
+        mem; xmm1; efl;
+    ensures
+        modifies_buffer_specific128(k_b, old(mem), mem, round+1, round+1);
+//        forall a :: (a < rdx || a >= rdx + 176) && old(mem)[k_b].quads?[a] ==> mem[k_b].quads?[a] && mem[k_b].quads[a] == old(mem)[k_b].quads[a];
+//        forall j :: round+1 < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+//        SeqLength(dw_out) == 4*(round + 2);
+//        forall j :: 0 <= j <= round+1 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_out[4*j], dw_out[4*j+1], dw_out[4*j+2], dw_out[4*j+3]);
+//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_out, round+1);
+{
+//    assert mem[k_b].quads[rdx + 16*(round+1)].v == Quadword(w[(round+1)*4], w[(round+1)*4 + 1], w[(round+1)*4 + 2], w[(round+1)*4 + 3]);
+
+    Load128_buffer(xmm1, rdx, 16*(round+1), k_b, round+1);
+//    assert xmm1 == Quadword(w[(round+1)*4], w[(round+1)*4 + 1], w[(round+1)*4 + 2], w[(round+1)*4 + 3]);
+//    ghost var ws := SeqRange(w, (round+1)*4, (round+1)*4 + 4);
+//    assert ws[0] == w[(round+1)*4] && ws[1] == w[(round+1)*4+1] && ws[2] == w[(round+1)*4+2] && ws[3] == w[(round+1)*4+3];
+//    assert xmm1 == seq_to_Quadword(ws);
+    AESNI_imc(xmm1, xmm1);
+    Store128_buffer(rdx, xmm1, 16*(round+1), k_b, round+1);
+
+//    dw_out := dw_in + Quadword_to_seq(xmm1);
+//    lemma_KeyInversionRoundHelper(round+1, key, w, dw_in, dw_out);
+//
+//    forall j :| round+1 < j <= 10 :: mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]) {
+//    }
+//
+//    forall j :| 0 <= j <= round + 1 :: mem[k_b].quads[rdx + 16*j].v == Quadword(dw_out[4*j], dw_out[4*j+1], dw_out[4*j+2], dw_out[4*j+3]) {
+//    }
+}
+
+procedure {:recursive} KeyInversionRoundUnrolledRecursive(
+    inline rounds:int,
+//    inline taint:taint,
+    ghost k_b:buffer128)
+//    ghost key:seq(uint32),
+//    ghost w:seq(uint32),
+//    ghost dw_in:seq(uint32)
+//    ) returns (
+//    ghost dw_out:seq(uint32)
+//    )
+    requires/ensures
+        validSrcAddrs128(mem, rdx, k_b, 11);
+    requires
+        0 <= rounds <= 9;
+        rdx % 16 == 0;
+//        SeqLength(key) == 4;
+//        SeqLength(w) == 44;
+//        SeqLength(dw_in) == 4;
+//        KeyExpansionPredicate(key, AES_128, w);
+//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_in, 0);
+//        mem[k_b].quads[rdx+16*0].v == Quadword(dw_in[4*0], dw_in[4*0+1], dw_in[4*0+2], dw_in[4*0+3]);
+//        forall j :: 0 <= j <= 0 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_in[4*j], dw_in[4*j+1], dw_in[4*j+2], dw_in[4*j+3]);
+//        forall j :: 0 < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+    reads 
+        rdx;
+    modifies
+        mem; xmm1; efl;
+    ensures
+        modifies_buffer128(k_b, old(mem), mem);
+//        forall a :: (a < rdx || a >= rdx + 176) && old(mem)[k_b].quads?[a] ==> mem[k_b].quads?[a] && mem[k_b].quads[a] == old(mem)[k_b].quads[a];
+//        SeqLength(dw_out) == 4*(rounds+1);
+//        forall j :: 0 <= j <= rounds ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_out[4*j], dw_out[4*j+1], dw_out[4*j+2], dw_out[4*j+3]);
+//        forall j :: rounds < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_out, rounds);
+{
+//    inline if (0 < rounds <= 9) {
+//        ghost var dw_mid;
+//        dw_mid := KeyInversionRoundUnrolledRecursive(rounds-1, taint, k_b, key, w, dw_in);
+//        dw_out := KeyInversionRound(rounds-1, taint, k_b, key, w, dw_mid);
+//    }
+//    else {
+//        dw_out := dw_in;
+//    }
+}
+
+procedure KeyInversionImpl(
+//    ghost key:seq(uint32),
+//    ghost w:seq(uint32),
+//    inline taint:taint,
+    ghost k_b:buffer128)
+//    ) returns (
+//    ghost dw:seq(uint32)
+//    )
+    requires/ensures
+        validSrcAddrs128(mem, rdx, k_b, 11);
+    requires
+        rdx % 16 == 0;
+//        SeqLength(key) == 4;
+//        SeqLength(w) == 44;
+//        forall j :: 0 <= j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
+//        KeyExpansionPredicate(key, AES_128, w);
+    ensures
+        modifies_buffer128(k_b, old(mem), mem);
+//        forall a :: (a < rdx || a >= rdx + 176) && old(mem)[k_b].quads?[a] ==> mem[k_b].quads?[a] && mem[k_b].quads[a] == old(mem)[k_b].quads[a];
+//        SeqLength(dw) == 44;
+//        EqInvKeyExpansionPredicate(key, AES_128, dw);
+//        forall j :: 0 <= j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw[4*j], dw[4*j+1], dw[4*j+2], dw[4*j+3]);
+    reads
+        rdx;
+    modifies
+        mem; xmm1; efl;
+{
+//    lemma_KeyExpansionPredicateImpliesExpandKey(key, AES_128, w);
+//    ghost var dw1 := seq(w[0], w[1], w[2], w[3]);
+//
+//    ghost var dw2;
+//    dw2 := KeyInversionRoundUnrolledRecursive(9, taint, k_b, key, w, dw1);
+    KeyInversionRoundUnrolledRecursive(9, k_b);
+//
+//    dw := dw2 + seq(w[40], w[41], w[42], w[43]);
+//    assert SeqLength(dw) == 44;
+//    forall j :| 0 <= j <= 10 :: mem[k_b].quads[rdx + 16*j].v == Quadword(dw[4*j], dw[4*j+1], dw[4*j+2], dw[4*j+3])
+//    {
+//    }
+//    assert EqInvKeyExpansionPredicate(key, AES_128, dw);
+}
+
+procedure KeyExpansionAndInversionStdcall(
+//    inline taint:taint,
+    inline win:bool,
+    ghost input_key_b:buffer128,
+    ghost output_key_expansion_b:buffer128)
+//    ) returns (
+//    ghost dw:seq(uint32)
+//    )
+    reads
+        rcx; rsi; rdi;
+    modifies
+        rdx;
+        mem; xmm1; xmm2; xmm3; efl;
+    requires
+//        HasStackSlots(stack, 2);
+        let key_ptr := if win then rcx else rdi;
+        let key_expansion_ptr := if win then rdx else rsi;
+        key_ptr % 16 == 0;
+        key_expansion_ptr % 16 == 0;
+        validSrcAddrs128(mem, key_ptr, input_key_b, 1);
+        validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, 11);
+    ensures
+        let key_ptr := if win then rcx else rdi;
+        let key_expansion_ptr := if win then rdx else rsi;
+//        let key := Quadword_to_seq(old(mem)[input_key_id].quads[key_ptr].v);
+//        SeqLength(dw) == 44;
+//        ValidSrcAddrs(mem, output_key_expansion_id, key_expansion_ptr, 128, taint, 176);
+        validSrcAddrs128(mem, key_expansion_ptr, output_key_expansion_b, 11);
+        modifies_buffer128(output_key_expansion_b, old(mem), mem);
+//        (forall a :: (a < key_expansion_ptr || a >= key_expansion_ptr + 176) && old(mem)[output_key_expansion_id].quads?[a] ==> mem[output_key_expansion_id].quads?[a] && mem[output_key_expansion_id].quads[a] == old(mem)[output_key_expansion_id].quads[a]);
+//        (forall j :: 0 <= j <= 10 ==> mem[output_key_expansion_id].quads[key_expansion_ptr + 16*j].v == Quadword(dw[4*j], dw[4*j+1], dw[4*j+2], dw[4*j+3]));
+//        EqInvKeyExpansionPredicate(key, AES_128, dw);
+{
+    ghost var key_ptr := if win then rcx else rdi;
+    ghost var key_expansion_ptr := if win then rdx else rsi;
+//    ghost var key := Quadword_to_seq(mem[input_key_id].quads[key_ptr].v);
+
+//    LoadStack(eax, 0);                                     // eax := key_ptr (from stack position 0)
+    inline if (win)
+    {
+        Load128_buffer(xmm1, rcx, 0, input_key_b, 0);
+    }
+    else
+    {
+        Load128_buffer(xmm1, rdi, 0, input_key_b, 0);
+        Mov64(rdx, rsi);
+    }
+//    ghost var w;
+//    w := KeyExpansionImpl(key, taint, output_key_expansion_id); // expand key from xmm1 to region pointed to by rdx
+//    dw := KeyInversionImpl(key, w, taint, output_key_expansion_id);
+    KeyExpansionImpl(output_key_expansion_b); // expand key from xmm1 to region pointed to by rdx
+    KeyInversionImpl(output_key_expansion_b);
+
+//    forall j :| 0 <= j <= 10 :: mem[output_key_expansion_id].quads[key_expansion_ptr + 16*j].v == Quadword(dw[4*j], dw[4*j+1], dw[4*j+2], dw[4*j+3])
+//    {
+//        assert mem[output_key_expansion_id].quads[rdx + 16*j].v == Quadword(dw[4*j], dw[4*j+1], dw[4*j+2], dw[4*j+3]);
+//        assert rdx == key_expansion_ptr;
+//    }
+
+    // Clear secrets out of registers
+//    Xor32(eax, eax);
+    Pxor(xmm1, xmm1);
+    Pxor(xmm2, xmm2);
+    Pxor(xmm3, xmm3);
 }
 
