@@ -1,8 +1,7 @@
 module AES_s
 
 open Types_s
-open FStar.Seq
-open FStar.Mul
+open FStar.List
 
 assume val mix_columns (q:quad32) : quad32
 assume val inv_mix_columns (q:quad32) : quad32
@@ -42,50 +41,59 @@ let round (state round_key:quad32) =
   let s = quad32_xor s round_key in
   s
 
-let rec rounds (state:quad32) (round_keys:seq quad32)
-               (start:nat) (last:nat{start <= last /\ last < length round_keys}) : Tot quad32 (decreases %[last - start]) =
-  if start = last then 
-    state
-  else
-    rounds (round state (index round_keys start)) round_keys (start + 1) last
+// TODO: I'm surprised I have to define this
+let rec last (l:list 'a {length l >= 1}) =
+  match l with
+  | x :: [] -> x
+  | x :: tl -> last tl
 
-let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_keys == (nr alg) + 1}) = 
-  let state = quad32_xor input (index round_keys 0) in
-  let state = rounds state round_keys 1 (nr alg) in
+let rec rounds (state:quad32) (round_keys:list quad32 { length round_keys >= 1}) : Tot (quad32*quad32) (decreases %[length round_keys]) =
+  match round_keys with
+  | final_rk :: [] -> state, final_rk
+  | rk :: tl -> rounds (round state rk) tl
+
+let cipher (alg:algorithm) (input:quad32) (round_keys:list quad32{length round_keys == (nr alg) + 1}) = 
+  let state = quad32_xor input (hd round_keys) in
+  let state, final_rk = rounds state (tl round_keys) in
   let state = sub_bytes state in
   let state = shift_rows state in
-  let state = quad32_xor state (index round_keys (nr alg)) in
+  let state = quad32_xor state final_rk in
   state
 
 let nat32_xor (x y:nat32) : nat32 = FStar.UInt.logxor #32 x y
 
-let rec expand_key (alg:algorithm) (key:seq nat32 { length key == nk alg}) (size:nat{size <= (nb * ((nr alg) + 1))})
-  : (ek:seq nat32 {length ek == size}) =
-  if size = 0 then createEmpty
-  else
-    let w = expand_key alg key (size - 1) in
-    let i = size - 1 in
-    if 0 <= i && i < nk alg then
-      append w (create 1 (index key i))
-    else
-      let temp = 
-        if i % (nk alg) = 0 then
-	  nat32_xor (sub_word (rot_word (index w (i-1)))) (aes_rcon ((i / (nk alg)) - 1))
-	else if nk alg > 6 && i % (nk alg) = 4 then
-	  sub_word (index w (i-1))
-	else
-	  index w (i-1)
-      in 
-      append w (create 1 (nat32_xor (index w (i - (nk alg))) temp))
-	 
-let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * rounds}) 
-  : (round_keys:seq quad32 {length round_keys == rounds}) =
-  if rounds = 0 then createEmpty
-  else 
-    let round_keys = key_schedule_to_round_keys (rounds - 1) w in
-    let rk = Quad32 (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in
-    append round_keys (create 1 rk)
 
-let aes_encrypt (alg:algorithm) (key:seq nat32 {length key == nk alg}) (input:quad32) =
-  cipher alg input (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
+// Need more fuel to prove the match is complete based on length of w
+#reset-options "--max_fuel 5 --initial_fuel 5"
+open FStar.Mul
+let rec expand_key (alg:algorithm) (w:list nat32 { length w >= 4}) : Tot (list nat32) (decreases %[nb * ((nr alg) + 1) - length w]) =
+  if length w = 4 then
+    rev w
+  else if length w >= nb * ((nr alg) + 1) then
+    rev w
+  else
+    match w with
+    | last :: _ :: _ :: old :: rest ->  // TODO: This isn't quite right: For AES_192, we look back 6, and for AES_256 we look back 8
+      let i = length w in
+      let temp = 
+	if i % (nk alg) = 0 then
+          nat32_xor (sub_word (rot_word last)) (aes_rcon ((i / (nk alg)) - 1))
+	else if nk alg > 6 && i % (nk alg) = 4 then
+          sub_word last
+	else
+          last
+      in 
+	nat32_xor old temp :: w
+
+// Need more fuel to calculate the length of tl below
+#reset-options "--max_fuel 5 --initial_fuel 5"
+let rec key_schedule_to_round_keys (w:list nat32 {length w % 4 == 0}) =
+  match w with
+  | [] -> []
+  | a :: b :: c :: d :: tl -> 
+    Quad32 a b c d :: key_schedule_to_round_keys tl
+#reset-options ""  
+
+let aes_encrypt (alg:algorithm) (key:list nat32 {length key == nk alg}) (input:quad32) =
+  cipher alg input (key_schedule_to_round_keys (expand_key alg key))
 
