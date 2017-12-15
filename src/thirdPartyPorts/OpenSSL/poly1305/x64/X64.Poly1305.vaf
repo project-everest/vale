@@ -54,6 +54,11 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:map int 
     (forall a. 0 <= a && a <= len ==>
     memTaint.[addr + 8 `op_Multiply` a] == t)
 
+let apply_valid_taint (i:int) (r_value:nat) (mem:mem) (t:taint) (length:nat) (memTaint:map int taint) (ctx_b:buffer64) (inp_b:buffer64) : Lemma
+    (requires validSrcAddrs64 mem r_value inp_b (length `op_Division` 8) memTaint t /\ 0 <= i /\ i <= length `op_Division` 8)
+    (ensures valid_taint_ptr (r_value + 8 `op_Multiply` i) memTaint t)=
+    ()
+
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
@@ -347,7 +352,7 @@ procedure poly1305_iteration(
 }
 
 #verbatim
-#reset-options "--z3rlimit 200"
+#reset-options "--z3rlimit 700 --initial_ifuel 1"
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -485,6 +490,7 @@ procedure {:frame false} poly1305_blocks(
 //        ghost var old_h0 := h0;
         Add64Wrap_Mem(h0, inp, 0, Public, inp_b, word_index); // accumulate input
         lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
+        apply_valid_taint(length / 8 - 2*r15 + 1, old(rsi), mem, Public, length, memTaint, ctx_b, inp_b);
         Adc64Wrap_Mem(h1, inp, 8, Public, inp_b, word_index+1);
         lemma_load_mem64(inp_b, word_index + 1, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
         AddLea64(inp, inp, 16);
@@ -527,6 +533,7 @@ procedure {:frame false} poly1305_blocks(
     }
     Store64_buffer(ctx, h0, 0, Public, ctx_b, 0);
     Store64_buffer(ctx, h1, 8, Public, ctx_b, 1);
+    assert valid_dst_addr(mem, ctx_b, 2);
     Store64_buffer(ctx, h2, 16, Public, ctx_b, 2);
 }
 

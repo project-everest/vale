@@ -17,7 +17,7 @@ unfold let memTaint' = TS.MktraceState?.memTaint
 let state_to_S (s:state) : TS.traceState = {
   TS.state = {
     S.ok = s.ok;
-    S.regs = (fun r -> s.regs r);
+    S.regs = s.regs;
     S.flags = int_to_nat64 s.flags;
     S.mem = s.mem;
   };
@@ -28,7 +28,7 @@ let state_to_S (s:state) : TS.traceState = {
 let state_of_S (s:TS.traceState) : state =
   let { S.ok = ok; S.regs = regs; S.flags = flags; S.mem = mem } = s.TS.state in {
     ok = ok;
-    regs = (fun r -> regs r);
+    regs = regs;
     flags = flags;
     mem = mem;
     trace = s.TS.trace;
