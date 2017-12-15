@@ -4,13 +4,27 @@ include "../../../arch/x64/X64.Vale.Decls.vaf"
 
 module X64.AES
 
+open Types_s
+open FStar.Seq
+open AES_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
+open AES_helpers_i
 open Opaque_i
 
 #endverbatims
 
+#verbatim interface
+
+#reset-options "--max_fuel 5 --initial_fuel 5"
+let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
+  let l = [q.lo; q.mid_lo; q.mid_hi; q.hi] in
+  let s = of_list l in
+  lemma_of_list_length s l; 
+  of_list l
+
+#endverbatim
 
 #verbatim
 #reset-options "--z3rlimit 100" 
@@ -24,20 +38,21 @@ procedure KeyExpansionRound(
     inline round:nat64,
     inline rcon:imm8,
 //    inline taint:taint,
-    ghost dst:buffer128)
-//    ghost key:seq(uint32),
-//    ghost w_in:seq(uint32)
-//    ) returns (
-//    ghost w_out:seq(uint32)
-//    )
+    ghost dst:buffer128,
+    ghost key:seq(nat32),
+    ghost w_in:seq(nat32)
+    ) returns (
+    ghost w_out:seq(nat32)
+    )
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 11);
     requires
         0 <= round < 10;
-//        rcon == AES_Rcon()[round];
-//        SeqLength(key) == 4;
-//        SeqLength(w_in) == 44;
-//        KeyExpansionPredicatePartial(key, AES_128, w_in, 4+round*4);
+        rcon == aes_rcon(round);
+        length(key) == 4;
+        //length(w_in) == 44;
+        length(w_in) == 4 + round*4;
+        key_expansion_partial(AES_128, key, w_in, 4+round*4);
         rdx % 16 == 0;
         //validSrcAddrs128(mem, rdx, dst, (round+1));
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_in[4*j], w_in[4*j+1], w_in[4*j+2], w_in[4*j+3]);
@@ -55,7 +70,7 @@ procedure KeyExpansionRound(
 //        SeqLength(w_out) == 44;
 //        mem[dst_id].quads[rdx + 16*0].v == Quadword(w_out[4*0], w_out[4*0+1], w_out[4*0+2], w_out[4*0+3]);
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
-//        KeyExpansionPredicatePartial(key, AES_128, w_out, 4+(round+1)*4);
+        key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
 {
 //    ghost var xmm1_v0 := xmm1;
 
@@ -88,7 +103,9 @@ procedure KeyExpansionRound(
 
     Store128_buffer(rdx, xmm1, 16*(round+1), dst, round+1);
 
-//    ghost var new_round := round + 1;
+    ghost var new_round := round + 1;
+    w_out := append(w_in, quad32_to_seq(xmm1));
+
 //    w_out := w_in[new_round*4     := xmm1.lo]
 //                 [new_round*4 + 1 := xmm1.mid_lo]
 //                 [new_round*4 + 2 := xmm1.mid_hi]
@@ -105,6 +122,8 @@ procedure KeyExpansionRound(
 //    lemma_KeyExpansionRoundHelper(key, alg, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
 }
 
+/*
+
 #verbatim
 let aes_rcon_case (i:int) =
     //ensures  AES_Rcon_Case(i) == AES_Rcon()[i];
@@ -112,13 +131,13 @@ let aes_rcon_case (i:int) =
 #endverbatim
 
 procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
-//    ghost key:seq(uint32), 
-//    ghost w_in:seq(uint32),
+    ghost key:seq(nat32), 
+//    ghost w_in:seq(nat32),
 //    inline taint:taint,
     ghost dst:buffer128,
     inline n:int)
 //    ) returns (
-//    ghost w_out:seq(uint32)
+//    ghost w_out:seq(nat32)
 //    )
     reads
         rdx;
@@ -129,10 +148,10 @@ procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
         rdx % 16 == 0;
     requires
         0 <= n <= 10;
-//        SeqLength(key) == 4;
-//        xmm1 == seq_to_Quadword(key);
+        length(key) == 4;
+        quad32_to_seq(xmm1) == key;
 //        SeqLength(w_in) == 44;
-//        KeyExpansionPredicatePartial(key, AES_128, w_in, 4);
+//        key_expansion_partial(key, AES_128, w_in, 4);
 //        ValidSrcAddrs(mem, dst_id, rdx, 128, taint, 16);
         validSrcAddrs128(mem, rdx, dst, 11);
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_in[4*j], w_in[4*j+1], w_in[4*j+2], w_in[4*j+3]);
@@ -144,12 +163,12 @@ procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
 //        SeqLength(w_out) == 44;
 //        xmm1 == Quadword(w_out[4*n], w_out[4*n + 1], w_out[4*n + 2], w_out[4*n + 3]);
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
-//        KeyExpansionPredicatePartial(key, AES_128, w_out, 4 + 4*n);
+//        key_expansion_partial(key, AES_128, w_out, 4 + 4*n);
 {
 }
 //{
 //    inline if (0 < n <= 10) {
-//        //ghost var w_mid:seq(uint32);
+//        //ghost var w_mid:seq(nat32);
 //        //w_mid := KeyExpansionRoundUnrolledRecursive(key, w_in, taint, dst_id, n-1);
 //        KeyExpansionRoundUnrolledRecursive(dst, n-1);
 //        //w_out := KeyExpansionRound(n-1, AES_Rcon_Case(n-1), taint, dst_id, key, w_mid);
@@ -165,12 +184,12 @@ procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
 //}
 
 procedure KeyExpansionRoundUnrolled(
-//    ghost key:seq(uint32), 
-//    ghost w_in:seq(uint32),
+    ghost key:seq(nat32), 
+//    ghost w_in:seq(nat32),
 //    inline taint:taint,
     ghost dst:buffer128)
 //    ) returns (
-//    ghost w_out:seq(uint32)
+//    ghost w_out:seq(nat32)
 //    )
     reads
         rdx;
@@ -180,10 +199,10 @@ procedure KeyExpansionRoundUnrolled(
         validDstAddrs128(mem, rdx, dst, 11);
         rdx % 16 == 0;
     requires
-//        SeqLength(key) == 4;
-//        xmm1 == seq_to_Quadword(key);
+        length(key) == 4;
+        key == quad32_to_seq(xmm1);
 //        SeqLength(w_in) == 44;
-//        KeyExpansionPredicatePartial(key, AES_128, w_in, 4);
+//        key_expansion_partial(key, AES_128, w_in, 4);
 //        ValidSrcAddrs(mem, dst_id, rdx, 128, taint, 16);
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_in[4*j], w_in[4*j+1], w_in[4*j+2], w_in[4*j+3]);
     ensures
@@ -199,19 +218,19 @@ procedure KeyExpansionRoundUnrolled(
 }
 
 procedure KeyExpansionImpl(
-//    ghost key:seq(uint32),
+    ghost key:seq(nat32),
 //    inline taint:taint,
     ghost dst:buffer128)
 //    ) returns (
-//    ghost w:seq(uint32)
+//    ghost w:seq(nat32)
 //    )
     reads
         rdx;
     modifies
         mem; xmm1; xmm2; xmm3; efl;
     requires
-//        SeqLength(key) == 4;
-//        xmm1 == seq_to_Quadword(key);
+        length(key) == 4;
+        key == quad32_to_seq(xmm1);
         validDstAddrs128(mem, rdx, dst, 11);
         rdx % 16 == 0;
     ensures
@@ -243,7 +262,7 @@ procedure KeyExpansionImpl(
 //    }
 
 //    w := KeyExpansionRoundUnrolled(key, w_in, taint, dst_id);
-    KeyExpansionRoundUnrolled(dst);
+    KeyExpansionRoundUnrolled(key, dst);
 }
 
 procedure KeyExpansionStdcall(
@@ -252,7 +271,7 @@ procedure KeyExpansionStdcall(
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
 //    ) returns (
-//    ghost w:seq(uint32)
+//    ghost w:seq(nat32)
 //    )
     reads
         rcx; rsi; rdi;
@@ -279,7 +298,8 @@ procedure KeyExpansionStdcall(
 {
     ghost var key_ptr := if win then rcx else rdi;
     ghost var key_expansion_ptr := if win then rdx else rsi;
-//    ghost var key := Quadword_to_seq(mem[input_key_id].quads[key_ptr].v);
+//    ghost var key := quadword_to_seq(buffer128_read(input_key_b, 0, 
+//            mem[input_key_id].quads[key_ptr].v);
 
     inline if (win)
     {
@@ -290,8 +310,10 @@ procedure KeyExpansionStdcall(
         Load128_buffer(xmm1, rdi, 0, input_key_b, 0);
         Mov64(rdx, rsi);
     }
+
+    ghost var key := quad32_to_seq(xmm1);
     //w := KeyExpansionImpl(key, taint, output_key_expansion_id); // expand key from xmm1 to region pointed to by rdx
-    KeyExpansionImpl(output_key_expansion_b); // expand key from xmm1 to region pointed to by rdx
+    KeyExpansionImpl(key, output_key_expansion_b); // expand key from xmm1 to region pointed to by rdx
 
 //    assert SeqLength(w) == 44;
 //    assert forall j :: 0 <= j <= 10 ==> mem[output_key_expansion_id].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
@@ -308,14 +330,17 @@ procedure KeyExpansionStdcall(
     Pxor(xmm2, xmm2);
     Pxor(xmm3, xmm3);
 }
+*/
+
+/*
 
 ///////////////////////////
 // ENCRYPTION
 ///////////////////////////
 
 procedure AES128EncryptFirstStep(
-//    ghost key:seq(uint32),
-//    ghost w:seq(uint32),
+//    ghost key:seq(nat32),
+//    ghost w:seq(nat32),
 //    inline taint:taint,
     ghost k_b:buffer128)
 //    ) returns (
@@ -349,8 +374,8 @@ procedure AES128EncryptFirstStep(
 
 procedure AES128EncryptMiddleStep(
     inline round:int,
-//    ghost key:seq(uint32),
-//    ghost w:seq(uint32),
+//    ghost key:seq(nat32),
+//    ghost w:seq(nat32),
 //    ghost input:Quadword,
 //    ghost xmm0_trace_in:QuadwordSeq,
 //    inline taint:taint,
@@ -390,8 +415,8 @@ procedure AES128EncryptMiddleStep(
 }
 
 procedure AES128EncryptLastStep(
-//    ghost key:seq(uint32),
-//    ghost w:seq(uint32),
+//    ghost key:seq(nat32),
+//    ghost w:seq(nat32),
 //    ghost input:Quadword,
 //    ghost xmm0_trace_in:QuadwordSeq,
 //    inline taint:taint,
@@ -430,9 +455,9 @@ procedure AES128EncryptLastStep(
 }
 
 procedure AES128EncryptOneBlock(
-//    ghost key:seq(uint32),
+//    ghost key:seq(nat32),
 //    ghost input:Quadword,
-//    ghost w:seq(uint32),
+//    ghost w:seq(nat32),
 //    inline taint:taint,
     ghost k_b:buffer128)
     reads
@@ -518,9 +543,9 @@ procedure AES128EncryptOneBlock(
 
 procedure AES128EncryptOneBlockStdcall(
     inline win:bool,
-//    ghost key:seq(uint32),
+//    ghost key:seq(nat32),
 //    ghost input:Quadword,
-//    ghost w:seq(uint32),
+//    ghost w:seq(nat32),
     ghost input_b:buffer128,
     ghost output_b:buffer128,
     ghost k_b:buffer128)
@@ -603,11 +628,11 @@ procedure KeyInversionRound(
     inline round:int,
 //    inline taint:taint,
     ghost k_b:buffer128)
-//    ghost key:seq(uint32),
-//    ghost w:seq(uint32),
-//    ghost dw_in:seq(uint32)
+//    ghost key:seq(nat32),
+//    ghost w:seq(nat32),
+//    ghost dw_in:seq(nat32)
 //    ) returns (
-//    ghost dw_out:seq(uint32)
+//    ghost dw_out:seq(nat32)
 //    )
     requires/ensures
         validSrcAddrs128(mem, rdx, k_b, 11);
@@ -617,7 +642,7 @@ procedure KeyInversionRound(
 //        SeqLength(w) == 44;
 //        SeqLength(dw_in) == 4*(round+1);
 //        KeyExpansionPredicate(key, AES_128, w);
-//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_in, round);
+//        EqInvkey_expansion_partial(key, AES_128, dw_in, round);
 //        forall j :: 0 <= j <= round ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_in[4*j], dw_in[4*j+1], dw_in[4*j+2], dw_in[4*j+3]);
 //        forall j :: round < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
     reads 
@@ -630,7 +655,7 @@ procedure KeyInversionRound(
 //        forall j :: round+1 < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
 //        SeqLength(dw_out) == 4*(round + 2);
 //        forall j :: 0 <= j <= round+1 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_out[4*j], dw_out[4*j+1], dw_out[4*j+2], dw_out[4*j+3]);
-//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_out, round+1);
+//        EqInvkey_expansion_partial(key, AES_128, dw_out, round+1);
 {
 //    assert mem[k_b].quads[rdx + 16*(round+1)].v == Quadword(w[(round+1)*4], w[(round+1)*4 + 1], w[(round+1)*4 + 2], w[(round+1)*4 + 3]);
 
@@ -656,11 +681,11 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
     inline rounds:int,
 //    inline taint:taint,
     ghost k_b:buffer128)
-//    ghost key:seq(uint32),
-//    ghost w:seq(uint32),
-//    ghost dw_in:seq(uint32)
+//    ghost key:seq(nat32),
+//    ghost w:seq(nat32),
+//    ghost dw_in:seq(nat32)
 //    ) returns (
-//    ghost dw_out:seq(uint32)
+//    ghost dw_out:seq(nat32)
 //    )
     requires/ensures
         validSrcAddrs128(mem, rdx, k_b, 11);
@@ -671,7 +696,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
 //        SeqLength(w) == 44;
 //        SeqLength(dw_in) == 4;
 //        KeyExpansionPredicate(key, AES_128, w);
-//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_in, 0);
+//        EqInvkey_expansion_partial(key, AES_128, dw_in, 0);
 //        mem[k_b].quads[rdx+16*0].v == Quadword(dw_in[4*0], dw_in[4*0+1], dw_in[4*0+2], dw_in[4*0+3]);
 //        forall j :: 0 <= j <= 0 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_in[4*j], dw_in[4*j+1], dw_in[4*j+2], dw_in[4*j+3]);
 //        forall j :: 0 < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
@@ -685,7 +710,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
 //        SeqLength(dw_out) == 4*(rounds+1);
 //        forall j :: 0 <= j <= rounds ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_out[4*j], dw_out[4*j+1], dw_out[4*j+2], dw_out[4*j+3]);
 //        forall j :: rounds < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
-//        EqInvKeyExpansionPredicatePartial(key, AES_128, dw_out, rounds);
+//        EqInvkey_expansion_partial(key, AES_128, dw_out, rounds);
 {
 //    inline if (0 < rounds <= 9) {
 //        ghost var dw_mid;
@@ -698,12 +723,12 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
 }
 
 procedure KeyInversionImpl(
-//    ghost key:seq(uint32),
-//    ghost w:seq(uint32),
+//    ghost key:seq(nat32),
+//    ghost w:seq(nat32),
 //    inline taint:taint,
     ghost k_b:buffer128)
 //    ) returns (
-//    ghost dw:seq(uint32)
+//    ghost dw:seq(nat32)
 //    )
     requires/ensures
         validSrcAddrs128(mem, rdx, k_b, 11);
@@ -745,7 +770,7 @@ procedure KeyExpansionAndInversionStdcall(
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
 //    ) returns (
-//    ghost dw:seq(uint32)
+//    ghost dw:seq(nat32)
 //    )
     reads
         rcx; rsi; rdi;
@@ -789,8 +814,8 @@ procedure KeyExpansionAndInversionStdcall(
 //    ghost var w;
 //    w := KeyExpansionImpl(key, taint, output_key_expansion_id); // expand key from xmm1 to region pointed to by rdx
 //    dw := KeyInversionImpl(key, w, taint, output_key_expansion_id);
-    KeyExpansionImpl(output_key_expansion_b); // expand key from xmm1 to region pointed to by rdx
-    KeyInversionImpl(output_key_expansion_b);
+    ghost var key := quad32_to_seq(xmm1);
+    KeyExpansionImpl(key, output_key_expansion_b); // expand key from xmm1 to region pointed to by rdx
 
 //    forall j :| 0 <= j <= 10 :: mem[output_key_expansion_id].quads[key_expansion_ptr + 16*j].v == Quadword(dw[4*j], dw[4*j+1], dw[4*j+2], dw[4*j+3])
 //    {
@@ -804,4 +829,4 @@ procedure KeyExpansionAndInversionStdcall(
     Pxor(xmm2, xmm2);
     Pxor(xmm3, xmm3);
 }
-
+*/

@@ -89,3 +89,11 @@ let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * ro
 let aes_encrypt (alg:algorithm) (key:seq nat32 {length key == nk alg}) (input:quad32) =
   cipher alg input (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
 
+#reset-options "--max_fuel 5 --initial_fuel 5"
+let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
+  let l = [q.lo; q.mid_lo; q.mid_hi; q.hi] in
+  let s = of_list l in
+  //assert (List.length l == 4);
+  lemma_of_list_length s l; 
+  of_list l
+
