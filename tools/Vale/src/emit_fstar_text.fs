@@ -338,35 +338,40 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
   let isOpaqueAttr (x, es) = match (x, es) with (Id "opaque", ([] | [EBool true])) -> true | _ -> false in
   let isOpaque = List.exists isOpaqueAttr f.fattrs in
+  let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
-  let printBody x e =
-    ps.PrintLine ("let " + x + " " + (let_string_of_formals false f.fargs) + " =");
+  let printBody header x e =
+    ps.PrintLine (header + x + " " + (let_string_of_formals false f.fargs) + " =");
     ps.Indent ();
     ps.PrintLine (string_of_exp e);
     ps.Unindent ()
     in
+  let header = if isRecursive then "let rec " else "let "
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)));
+    psi.PrintLine (sVal (sid f.fname));
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody (sid (transparent_id f.fname)) e
+      | Some e -> printBody header (sid (transparent_id f.fname)) e
     );
-    psi.PrintLine (sVal (sid f.fname));
+    
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
-    printBody (sid f.fname) eOpaque
+    let header = if isRecursive then "and " else "let " in
+    printBody header (sid f.fname) eOpaque
   else
   (
     match f.fbody with
     | None -> ()
-    | Some e -> printBody (sid f.fname) e
+    | Some e -> printBody header (sid f.fname) e
   )
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
+  let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let (reqs, enss) = collect_specs p.pspecs in
   let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
@@ -409,7 +414,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         ps.PrintLine ("irreducible val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
         printPType ps "-> "
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        ps.PrintLine ("irreducible let " + (sid (irreducible_id p.pname)) + " " + formals + " =");
+        let header = if isRecursive then "let rec " else "let "
+        ps.PrintLine ("irreducible " + header + (sid (irreducible_id p.pname)) + " " + formals + " =");
 //        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
@@ -425,7 +431,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
               printPType ps "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
         );
-        ps.PrintLine ("let " + (sid (if fast_state then internal_id p.pname else p.pname)) + " = " + (sid (irreducible_id p.pname)))
+        let header = if isRecursive then "and " else "let " in
+        ps.PrintLine (header + (sid (if fast_state then internal_id p.pname else p.pname)) + " = " + (sid (irreducible_id p.pname)))
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
