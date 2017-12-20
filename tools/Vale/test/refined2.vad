@@ -19,9 +19,11 @@ datatype reg = EAX | EBX | ECX | EDX | ESI | EDI | EBP
 
 datatype opr = OReg(r:reg) | OConst(n:uint32)
 type va_operand = opr
-function method va_op_operand_reg(r:reg):va_operand { OReg(r) }
-predicate va_is_src_operand_uint32(o:opr, s:va_state) { true }
-predicate va_is_dst_operand_uint32(o:opr, s:va_state) { o.OReg? }
+type va_operand_opr32 = va_operand
+type va_value_opr32 = uint32
+function method va_op_opr32_reg(r:reg):va_operand { OReg(r) }
+predicate va_is_src_opr32(o:opr, s:va_state) { true }
+predicate va_is_dst_opr32(o:opr, s:va_state) { o.OReg? }
 
 type va_bool = bool
 type va_int = int
@@ -39,16 +41,16 @@ function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:reg, s:va_state):uint32 requires r in s.regs { s.regs[r] }
 function va_get_mem(s:va_state):map<int, uint32> { s.mem }
 
-function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
-function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
+function va_modify_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_modify_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
+function va_modify_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
 
-function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_opr32(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?
     requires o.r in sM.regs
 {
     match o
-        case OReg(r) => va_update_reg(r, sM, sK)
+        case OReg(r) => va_modify_reg(r, sM, sK)
 }
 
 predicate va_state_eq(s0:va_state, s1:va_state)
@@ -61,7 +63,7 @@ predicate va_state_eq(s0:va_state, s1:va_state)
 function va_get_block(c:va_code):va_codes requires c.va_Block? { c.block }
 
 predicate eval_code(c:va_code, s0:state, sN:state)
-function va_eval_operand_uint32(s:state, o:va_operand):uint32
+function va_eval_opr32(s:state, o:va_operand):uint32
     requires o.OReg? ==> o.r in s.regs
 {
     match o
@@ -107,7 +109,7 @@ predicate wordsInMem(ptr:int, size:int, mem:map<int, uint32>)
 #endverbatim
 
 // TODO: memory operands
-procedure{:refined}{:instruction Ins_Load(dst, ptr, offset)} Load(out operand dst:uint32, operand ptr:uint32, inline offset:int)
+procedure{:refined}{:instruction Ins_Load(dst, ptr, offset)} Load(out dst:opr32, ptr:opr32, inline offset:int)
     requires
         inMem(ptr + offset, mem);
     reads
@@ -121,7 +123,7 @@ procedure{:refined}{:instruction Ins_Load(dst, ptr, offset)} Load(out operand ds
   assume !pre ==> va_sM == va_s0.(ok := false);
 }
 
-procedure{:refined}{:instruction Ins_Store(ptr, src, offset)} Store(operand ptr:uint32, operand src:uint32, inline offset:int)
+procedure{:refined}{:instruction Ins_Store(ptr, src, offset)} Store(ptr:opr32, src:opr32, inline offset:int)
     requires
         inMem(ptr + offset, mem);
     modifies
@@ -135,7 +137,7 @@ procedure{:refined}{:instruction Ins_Store(ptr, src, offset)} Store(operand ptr:
   assume !pre ==> va_sM == va_s0.(ok := false);
 }
 
-procedure{:refined} LoadWrapper(out operand dst:uint32, operand ptr:uint32, inline offset:int)
+procedure{:refined} LoadWrapper(out dst:opr32, ptr:opr32, inline offset:int)
     requires
         inMem(ptr + offset, mem);
     reads
@@ -146,7 +148,7 @@ procedure{:refined} LoadWrapper(out operand dst:uint32, operand ptr:uint32, inli
   Load(dst, ptr, offset);
 }
 
-procedure{:refined} StoreWrapper(operand ptr:uint32, operand src:uint32, inline offset:int)
+procedure{:refined} StoreWrapper(ptr:opr32, src:opr32, inline offset:int)
     requires
         inMem(ptr + offset, mem);
     modifies
@@ -204,7 +206,7 @@ procedure{:refined} Copy64()
     Store(edi, eax, 60);
 }
 
-procedure{:refined} Copy8(inout operand tmp1:uint32, inout operand tmp2:uint32)
+procedure{:refined} Copy8(inout tmp1:opr32, inout tmp2:opr32)
     requires{:refined false}
         @tmp1 == OReg(EAX) || @tmp1 == OReg(ECX);
         @tmp2 == OReg(EBX) || @tmp2 == OReg(EDX);

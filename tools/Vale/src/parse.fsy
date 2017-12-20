@@ -13,6 +13,18 @@ let makeBop (op:bop) (loc:loc, (isCustom:bool, s:string)) (e1:exp) (e2:exp):exp 
   let op = if isCustom then BCustom s else op in
   ELoc (loc, EOp (Bop op, [e1; e2]))
 
+let hasStorageAttr (a:attrs):bool =
+  let rec r (a:attrs):bool =
+    // Note: XPhysical Parameters need to be annotated explicitly. instead of being the default
+    match a with
+    | [] -> false
+    | (Id ("thread_local" | "register"), [e])::a -> true
+    | (Id "local", [e])::a -> true
+    | (Id "state", [e])::a -> true
+    | attr::a -> (r a)
+  in
+  (r a)
+
 let storageAttrs (a:attrs):(var_storage * attrs) =
   let rec r (a:attrs):(var_storage list * attrs) list =
     match a with
@@ -335,8 +347,7 @@ InOut
   | OUT { Out }
   | INOUT { InOut }
 ProcFormal
-  : InOut Attrs AnyId COLON Type { let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) }
-  | InOut Attrs ID AnyId COLON Type { ($4, $6, XOperand (snd $3), $1, $2) }
+  : InOut Attrs AnyId COLON Type { if hasStorageAttr $2 then let (s, a) = storageAttrs $2 in ($3, $5, s, $1, a) else ($3, $5, XOperand, $1, $2) }
   | GHOST Attrs AnyId COLON Type { ($3, $5, XGhost, In, $2) }
   | INLINE Attrs AnyId COLON Type { ($3, $5, XInline, In, $2) }
 ProcFormals1
