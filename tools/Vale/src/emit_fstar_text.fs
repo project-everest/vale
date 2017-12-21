@@ -150,11 +150,11 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
-let string_of_decrease (xs:formal list) =
+let string_of_decrease (xs:formal list) n =
   match xs with
   | [] -> ""
-  | _ -> String.concat "; " (List.map (fun (x, t) -> string_of_formal (x, None)) xs)
-
+  | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map (fun (x, t) -> string_of_formal (x, None)) xs)) n
+  
 let string_of_outs_exp (outs:formal list option):string =
   match outs with
   | None -> "()"
@@ -356,8 +356,8 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     in
   let header = if isRecursive then "let rec " else "let " in
   // add custom metrics to convince F* that mutually recursive functions terminates
-  let decreases0 = if isRecursive then "(decreases %[" + (string_of_decrease f.fargs) + " ;0])" else "" in
-  let decreases1 = if isRecursive then "(decreases %[" + (string_of_decrease f.fargs) + " ;1])" else "" in
+  let decreases0 = if isRecursive then string_of_decrease f.fargs 0 else "" in
+  let decreases1 = if isRecursive then string_of_decrease f.fargs 1 else "" in
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
     psi.PrintLine (sVal (sid f.fname) decreases1);
@@ -399,8 +399,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     ps.Unindent ();
     in
   // add custom metrics to convince F* that mutually recursive functions terminates
-  let decreases0 = if isRecursive then "(decreases %[" + (string_of_decrease args) + " ;0])" else "" in
-  let decreases1 = if isRecursive then "(decreases %[" + (string_of_decrease args) + " ;1])" else "" in      
+  let decreases0 = if isRecursive then string_of_decrease args 0 else "" in
+  let decreases1 = if isRecursive then string_of_decrease args 1 else "" in      
   ( match (tactic, ps.print_interface, fast_state) with
     | (Some _, None, _) -> ()
     | (_, _, false) ->
