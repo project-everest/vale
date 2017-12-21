@@ -150,6 +150,11 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
+let string_of_decrease (xs:formal list) =
+  match xs with
+  | [] -> ""
+  | _ -> String.concat "; " (List.map (fun (x, t) -> string_of_formal (x, None)) xs)
+
 let string_of_outs_exp (outs:formal list option):string =
   match outs with
   | None -> "()"
@@ -338,35 +343,43 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
   let isOpaqueAttr (x, es) = match (x, es) with (Id "opaque", ([] | [EBool true])) -> true | _ -> false in
   let isOpaque = List.exists isOpaqueAttr f.fattrs in
+  let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
-  let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
-  let printBody x e =
-    ps.PrintLine ("let " + x + " " + (let_string_of_formals false f.fargs) + " =");
+  let sVal x decreases = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) + decreases in
+  let printBody header x e =
+    ps.PrintLine (header + x + " " + (let_string_of_formals false f.fargs) + " =");
     ps.Indent ();
     ps.PrintLine (string_of_exp e);
     ps.Unindent ()
     in
+  let header = if isRecursive then "let rec " else "let " in
+  // add custom metrics to convince F* that mutually recursive functions terminates
+  let decreases0 = if isRecursive then "(decreases %[" + (string_of_decrease f.fargs) + " ;0])" else "" in
+  let decreases1 = if isRecursive then "(decreases %[" + (string_of_decrease f.fargs) + " ;1])" else "" in
   if isOpaque then
-    ps.PrintLine (sVal (sid (transparent_id f.fname)));
+    ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
+    psi.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody (sid (transparent_id f.fname)) e
+      | Some e -> printBody header (sid (transparent_id f.fname)) e
     );
-    psi.PrintLine (sVal (sid f.fname));
+
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
-    printBody (sid f.fname) eOpaque
+    let header = if isRecursive then "and " else "let " in
+    printBody header (sid f.fname) eOpaque
   else
   (
     match f.fbody with
     | None -> ()
-    | Some e -> printBody (sid f.fname) e
+    | Some e -> printBody header (sid f.fname) e
   )
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
+  let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let (reqs, enss) = collect_specs p.pspecs in
   let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
@@ -376,25 +389,28 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let fast_state = attrs_get_bool (Id "fast_state") false p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
-  let printPType (ps:print_state) s =
+  let printPType (ps:print_state) s decreases =
     ps.Indent ();
     let st = String.concat " * " (List.map string_of_pformal p.prets) in
-    ps.PrintLine (s + "Ghost (" + st + ")");
+    ps.PrintLine (s + "Ghost (" + st + ")" + decreases);
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
     ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
     ps.Unindent ();
     in
+  // add custom metrics to convince F* that mutually recursive functions terminates
+  let decreases0 = if isRecursive then "(decreases %[" + (string_of_decrease args) + " ;0])" else "" in
+  let decreases1 = if isRecursive then "(decreases %[" + (string_of_decrease args) + " ;1])" else "" in      
   ( match (tactic, ps.print_interface, fast_state) with
     | (Some _, None, _) -> ()
     | (_, _, false) ->
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
-        printPType psi "-> "
+        printPType psi "-> " decreases1
     | (_, _, true) ->
         psi.PrintLine ("val " + (sid (internal_id p.pname)) + " : " + (val_string_of_formals args));
-        printPType psi "-> "
+        printPType psi "-> " decreases1
         psi.PrintLine ("unfold let " + (sid p.pname) + (let_string_of_formals true args));
-        printPType psi ": ";
+        printPType psi ": " "";
         psi.PrintLine "=";
         let sArgs = string_of_args (List.map (fun (x, _) -> EVar x) args) in
         let sRets = "(" + (String.concat ", " (List.map (fun (x, _) -> sid x) rets)) + ")" in
@@ -406,10 +422,14 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   ( match p.pbody with
     | None -> ()
     | Some ss ->
-        ps.PrintLine ("irreducible val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
-        printPType ps "-> "
+        // omit the "irreducible" qualifier from recursive procedures until  we no longer 
+        // have to have separate "lemma" and "irreducible_lemma" functions
+        let irreducible = if isRecursive then "" else "irreducible " in
+        ps.PrintLine (irreducible + "val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
+        printPType ps "-> " decreases0
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        ps.PrintLine ("irreducible let " + (sid (irreducible_id p.pname)) + " " + formals + " =");
+        let header = if isRecursive then "let rec " else "let " in
+        ps.PrintLine (irreducible + header + (sid (irreducible_id p.pname)) + " " + formals + " =");
 //        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
@@ -422,10 +442,11 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
           | None -> ()
           | Some e ->
               ps.PrintLine ") <: ("
-              printPType ps "";
+              printPType ps "" "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
         );
-        ps.PrintLine ("let " + (sid (if fast_state then internal_id p.pname else p.pname)) + " = " + (sid (irreducible_id p.pname)))
+        let header = if isRecursive then "and " else "let " in
+        ps.PrintLine (header + (sid (if fast_state then internal_id p.pname else p.pname)) + " " + formals + " = " + (sid (irreducible_id p.pname)) + " " + formals)
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =

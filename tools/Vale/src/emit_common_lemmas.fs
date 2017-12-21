@@ -467,7 +467,7 @@ let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
     fbody =
       if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
       else Some (build_code_block env stmts);
-    fattrs = [(Id "opaque", [])];
+    fattrs = [(Id "opaque", [])] @ p.pattrs;
   }
 
 let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
