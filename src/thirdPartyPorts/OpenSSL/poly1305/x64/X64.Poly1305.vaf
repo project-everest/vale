@@ -352,7 +352,7 @@ procedure poly1305_iteration(
 }
 
 #verbatim
-#reset-options "--z3rlimit 700 --initial_ifuel 1"
+#reset-options "--z3rlimit 800 --initial_ifuel 1"
 #endverbatim
 
 procedure {:frame false} poly1305_blocks(
@@ -875,7 +875,7 @@ assume false;       // Everything slows down here.  Fix with fast_block?
 }
 
 #verbatim
-#reset-options "--z3rlimit 200" 
+#reset-options "--z3rlimit 1500 --initial_ifuel 1"
 #endverbatim
 
 // poly1305(ctx, inp, len)

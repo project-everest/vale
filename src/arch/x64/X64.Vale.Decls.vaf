@@ -57,8 +57,8 @@ unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
-unfold let modifies_memTaint (addr:int) (m1 m2: map int taint) : GTot Type0 =
-  forall a. a <> addr ==> m1.[a] == m2.[a]
+let modifies_memTaint (a:int) (m1 m2: map int taint) : GTot Type0 =
+    m2 == Map.upd m1 a Public \/ m2 == Map.upd m1 a Secret
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
