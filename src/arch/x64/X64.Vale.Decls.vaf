@@ -388,7 +388,6 @@ val reveal_logand128 (x y:nat128) : Lemma
     (requires True)
     (ensures logand128 x y == FStar.UInt.logand #128 x y)
 
-(*
 val printer : Type0
 val print_string : string -> FStar.All.ML unit
 val print_header : printer -> FStar.All.ML unit
@@ -396,7 +395,6 @@ val print_proc : (name:string) -> (code:va_code) -> (label:int) -> (p:printer) -
 val print_footer : printer -> FStar.All.ML unit
 val masm : printer
 val gcc : printer
-*)
 #endverbatim
 
 #verbatim implementation
@@ -484,7 +482,6 @@ let shift_right64 (x:nat64) (amt:nat64) : nat64 =
 
 let reveal_logand128 (x y:nat128) = ()
 
-(*
 let printer = P.printer
 let print_string = FStar.IO.print_string
 let print_header = P.print_header
@@ -492,7 +489,6 @@ let print_proc = P.print_proc
 let print_footer = P.print_footer
 let masm = P.masm
 let gcc = P.gcc
-*)
 
 #set-options "--initial_fuel 4 --max_fuel 4 --z3rlimit 20"
 #endverbatim
