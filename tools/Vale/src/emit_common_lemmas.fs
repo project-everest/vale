@@ -1,7 +1,3 @@
-// Turn high-level AST into low-level lemmas:
-//   - call transform.fs
-//   - then generate lemmas
-
 module Emit_common_lemmas
 
 open Ast
@@ -115,12 +111,17 @@ let make_proc_params (ret:bool) (prets:pformal list) (pargs:pformal list):pforma
   (List.collect (make_proc_param false false ret) pargs) @
   (List.collect (make_proc_param true false ret) pargs)
 
-let specModIo (env:env) (loc:loc, s:spec):(inout * (id * typ)) list =
+let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id * typ)) list =
   match s with
   | Requires _ | Ensures _ -> []
-  | Modifies (readWrite, e) ->
+  | Modifies (m, e) ->
     (
-      let io = if readWrite then InOut else In in
+      let io =
+        match m with
+        | Modify -> InOut
+        | Preserve -> if preserveModifies then InOut else In
+        | Read -> In
+        in
       match skip_loc (exp_abstract false e) with
       | EVar x ->
         (
@@ -365,7 +366,7 @@ let build_lemma_spec (env:env) (s0:id) (sM:exp) (loc:loc, s:spec):((loc * spec) 
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar s0); (Reserved "s", sM)] in
         ([(loc, Ensures (r, subst_reserved_exp m e))], [])
-    | Modifies (readWrite, e) ->
+    | Modifies (m, e) ->
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar s0); (Reserved "s", EVar s0)] in
         ([], [subst_reserved_exp m e])
@@ -425,10 +426,19 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((lhs list -> exp list -> stmt l
   let gen_fast_block_funs () = List.rev !funs in
   (gen_fast_block, gen_fast_block_funs)
 
+// Generate well-formedness for operands:
+//   requires va_is_dst_int(dummy, s0)
+let reqIsArg (s0:id) (isRet:bool) ((x, t, storage, io, _):pformal):exp list =
+  match (isRet, storage, io) with
+  | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp ("is_dst_") t [EVar x; EVar s0]]
+  | (false, XOperand, In) -> [vaAppOp ("is_src_") t [EVar x; EVar s0]]
+  | _ -> []
+  in
+
 // Generate framing postcondition, which limits the variables that may be modified:
 //   ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
 let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
-  let specModsIo = List.collect (specModIo env) p.pspecs in
+  let specModsIo = List.collect (specModIo env true) p.pspecs in
   let frameArg (isRet:bool) e (x, t, storage, io, _) =
     match (isRet, storage, io) with
     | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp ("update_" + (vaOperandTyp t)) [EVar x; EVar sM; e]
@@ -514,21 +524,13 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let eb1 = vaApp "get_block" [EVar (if total then b0 else cM)] in
   let sb1 = SVar (b1, Some tCodes, Immutable, XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);
 
-  // Generate well-formedness for operands:
-  //   requires va_is_dst_int(dummy, s0)
-  let reqIsArg (isRet:bool) (x, t, storage, io, _) =
-    match (isRet, storage, io) with
-    | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp ("is_dst_") t [EVar x; EVar s0]]
-    | (false, XOperand, In) -> [vaAppOp ("is_src_") t [EVar x; EVar s0]]
-    | _ -> []
-    in
   let reqIsExps =
-    (List.collect (reqIsArg true) p.prets) @
-    (List.collect (reqIsArg false) p.pargs)
+    (List.collect (reqIsArg s0 true) p.prets) @
+    (List.collect (reqIsArg s0 false) p.pargs)
     in
   let reqsIs = List.map (fun e -> (loc, require e)) reqIsExps in
 
-  let specModsIo = List.collect (specModIo env) p.pspecs in
+  let specModsIo = List.collect (specModIo env true) p.pspecs in
   let (eFrameExp, eFrame) = benv.frame_exp sM in
 
   (* Generate lemma for procedure p:
@@ -576,7 +578,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     prets = prets;
     pspecs = (loc, req)::reqs @ (loc, ens)::(List.concat pspecs) @ ensFrame;
     pbody = Some (sStmts);
-    pattrs = (Reserved "fast_state_frame_exp", [eFrameExp])::(List.filter filter_proc_attr p.pattrs);
+    pattrs = List.filter filter_proc_attr p.pattrs;
   }
 
 let build_proc (env:env) (loc:loc) (p:proc_decl):decls =

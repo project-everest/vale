@@ -1,0 +1,163 @@
+include "../../../src/arch/x64/X64.Vale.Decls.vaf"
+
+#verbatim interface implementation
+module Quick
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State_i
+open X64.Vale.Decls
+open X64.Vale.Quick_i
+#endverbatim
+
+#verbatim
+
+unfold let normal_steps2 : list string =
+  "X64.Vale.Decls.va_wp_Add64"::
+  "X64.Vale.Decls.va_quick_Add64"::
+  "Quick.codes_bench"::
+  "Quick.wpCodes_bench"::
+  normal_steps
+
+// TODO: this should say "delta_only steps", not "delta_only normal_steps2"
+unfold let normal (steps:list string) (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_only normal_steps2] x
+//unfold let normal (steps:list string) (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta] x
+
+val wp_sound_norm (#a:Type0) (steps:list string) (cs:codes) (fcs:quickCodes a cs) (s0:state) (p:state -> state -> a -> Type0) : Ghost ((sN:state) * (fN:fuel) * (g:a))
+  (requires
+    forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
+      let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
+      s0 == s0' ==> normal steps (wp cs fcs (p s0') s0')
+  )
+  (ensures fun (sN, fN, gN) ->
+    eval (Block cs) s0 fN sN /\
+    p s0 sN gN
+  )
+let wp_sound_norm #a steps cs fcs s0 p =
+  wp_sound #a cs fcs (p s0) s0
+
+[@"opaque_to_smt"]
+let codes_bench : codes = [
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg Rax) (OConst 1);
+
+  ]
+
+//#reset-options "--debug X64.Vale.Quick_i --debug_level SMTQuery"
+
+[@"opaque_to_smt"]
+let wpCodes_bench : quickCodes unit codes_bench =
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+
+  QEmpty ()
+  )))))
+  )))))
+  )))))
+  )))))
+
+//#reset-options "--debug Quick --debug_level SMTQuery"
+
+let lemma_bench1 (s0:state) : Ghost (state * fuel)
+  (requires
+    s0.ok /\
+    s0.regs Rax < 100
+  )
+  (ensures fun (sN, f0) ->
+    eval (Block codes_bench) s0 f0 sN /\
+    sN.ok /\
+    sN.regs Rax == s0.regs Rax + 20 /\
+    va_state_eq sN (va_update_reg Rax sN (va_update_flags sN s0))
+  )
+  =
+  let (sN, f0, ()) = wp_sound_norm [] codes_bench wpCodes_bench s0
+    (fun s0 sN () ->
+      sN.ok /\
+      sN.regs Rax == s0.regs Rax + 20 /\
+      state_match sN (va_update_reg Rax sN (va_update_flags sN s0))
+    )
+    in
+  (sN, f0)
+#endverbatim
+
+procedure{:quick exportOnly} Add64Ghosts(
+        inout dst:dst_opr64,
+        src:opr64,
+        inline i:int,
+        ghost b:buffer64,
+        ghost g1:int,
+        ghost g2:int)
+    returns(
+        ghost h1:int,
+        ghost h2:int)
+    modifies
+        efl;
+    requires
+        i > 2;
+        g1 == src;
+        g2 > 3;
+        src + dst < nat64_max;
+    ensures
+        h1 == g1;
+        h2 > 4;
+        eq_int(dst, old(dst + src));
+{
+    h1 := g1;
+    h2 := g2 + 1;
+    Add64(dst, src);
+}
+
+procedure{:quick exportOnly} Add3()
+    modifies
+        efl;
+        rax;
+    requires
+        rax < 100;
+    ensures
+        rax == old(rax) + 3;
+{
+    Add64(rax, 1);
+    Add64(rax, 1);
+    Add64(rax, 1);
+}

@@ -110,6 +110,7 @@ SRC = [
   'src/transform.fs',
   'src/emit_common_base.fs',
   'src/emit_common_lemmas.fs',
+  'src/emit_common_quick_export.fs',
   'src/emit_common_refine.fs',
   'src/emit_common_top.fs',
   'src/emit_dafny_text.fs',

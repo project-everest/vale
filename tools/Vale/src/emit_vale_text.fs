@@ -211,8 +211,9 @@ let string_of_raw_spec_kind (r:raw_spec_kind) =
   | RRequires r -> "requires" + (string_of_is_refined r)
   | REnsures r -> "ensures" + (string_of_is_refined r)
   | RRequiresEnsures -> "requires/ensures"
-  | RModifies false -> "reads"
-  | RModifies true -> "modifies"
+  | RModifies Read -> "reads"
+  | RModifies Modify -> "modifies"
+  | RModifies Preserve -> "preserves"
 
 let emit_spec_exp (ps:print_state) (loc:loc, s:spec_exp):unit =
   match s with
@@ -243,8 +244,9 @@ let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
         ps.PrintLine ("requires" + (string_of_is_refined r) + " " + (string_of_exp e) + ";")
     | Ensures (r, e) ->
         ps.PrintLine ("ensures" + (string_of_is_refined r) + "  " + (string_of_exp e) + ";")
-    | Modifies (false, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
-    | Modifies (true, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | Modifies (Read, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
+    | Modifies (Modify, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | Modifies (Preserve, e) -> ps.PrintLine ("preserves " + (string_of_exp e) + ";")
     | SpecRaw (RawSpec ((RModifies _) as r, es)) ->
         ps.PrintLine (string_of_raw_spec_kind r);
         ps.Indent ();

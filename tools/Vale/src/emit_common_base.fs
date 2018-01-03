@@ -96,7 +96,7 @@ let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 
 let filter_proc_attr (x, es) =
   match x with
-  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "fast_state") -> true
+  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick") -> true
   | _ -> false
   in
 
@@ -155,4 +155,17 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
   | SExists (xs, ts, e) ->
       let scope = List.fold (fun scope (x, t) -> add_unique x t scope) scope xs in
       (scope, updates, s)
+
+let collect_spec (loc:loc, s:spec):(exp list * exp list) =
+  try
+    match s with
+    | Requires (_, e) -> ([e], [])
+    | Ensures (_, e) -> ([], [e])
+    | Modifies _ -> ([], [])
+    | SpecRaw _ -> internalErr "SpecRaw"
+  with err -> raise (LocErr (loc, err))
+
+let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
+  let (rs, es) = List.unzip (List.map collect_spec ss) in
+  (List.concat rs, List.concat es)
 

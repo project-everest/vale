@@ -103,11 +103,12 @@ type stmt =
 and calcContents = {calc_exp:exp; calc_op:bop option; calc_hints:stmt list list}
 
 type is_refined = Refined | Unrefined
+type mod_kind = Read | Modify | Preserve
 type raw_spec_kind =
 | RRequires of is_refined
 | REnsures of is_refined
 | RRequiresEnsures
-| RModifies of bool // false => reads, true => modifies
+| RModifies of mod_kind
 
 type lets =
 | LetsVar of id * typ option * exp
@@ -124,7 +125,7 @@ type spec_raw = // spec before desugaring
 type spec =
 | Requires of is_refined * exp
 | Ensures of is_refined * exp
-| Modifies of bool * exp // false => reads, true => modifies
+| Modifies of mod_kind * exp
 | SpecRaw of spec_raw
 
 type inline_kind = Outline | Inline

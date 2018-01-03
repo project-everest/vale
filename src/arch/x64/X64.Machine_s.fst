@@ -47,8 +47,6 @@ type precode (t_ins:Type0) (t_ocmp:Type0) =
 let valid_dst (o:operand) : bool =
   not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
 
-type dst_op = o:operand{valid_dst o}
-
 unfold let buffer8 = M.buffer (M.TBase M.TUInt8)
 unfold let buffer16 = M.buffer (M.TBase M.TUInt16)
 unfold let buffer32 = M.buffer (M.TBase M.TUInt32)

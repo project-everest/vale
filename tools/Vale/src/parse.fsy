@@ -60,7 +60,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
 %token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
-%token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES
+%token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS LAMBDA
 %token <loc> INCLUDE
 %token <loc * string> STRING
@@ -390,8 +390,9 @@ SpecRaw
       (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
       ($1, RawSpec (REnsures Unrefined, $6))
     }
-  | READS SemiExps { ($1, RawSpec (RModifies false, $2)) }
-  | MODIFIES SemiExps { ($1, RawSpec (RModifies true, $2)) }
+  | READS SemiExps { ($1, RawSpec (RModifies Read, $2)) }
+  | MODIFIES SemiExps { ($1, RawSpec (RModifies Modify, $2)) }
+  | PRESERVES SemiExps { ($1, RawSpec (RModifies Preserve, $2)) }
 Specs
   : { [] }
   | SpecRaw Specs { let (loc, s) = $1 in (loc, SpecRaw s)::$2 }

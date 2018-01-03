@@ -209,7 +209,7 @@ let env_map_spec (fe:env -> exp -> exp) (fs:env -> loc * spec -> (env * (loc * s
     match s with
     | Requires (r, e) -> (env, [(loc, Requires (r, fee e))])
     | Ensures (r, e) -> (env, [(loc, Ensures (r, fee e))])
-    | Modifies (b, e) -> (env, [(loc, Modifies (b, fee e))])
+    | Modifies (m, e) -> (env, [(loc, Modifies (m, fee e))])
     | SpecRaw (RawSpec _) -> internalErr "SpecRaw"
     | SpecRaw (Lets ls) ->
         let map_let env (loc, l) =
@@ -382,9 +382,9 @@ let check_mods (env:env) (p:proc_decl):unit =
         | EVar x ->
           (
             match (m, Map.tryFind x env.mods) with
-            | (false, None) -> err ("variable " + (err_id x) + " must be declared in reads clause or modifies clause")
-            | (true, (None | Some false)) -> err ("variable " + (err_id x) + " must be declared in modifies clause")
-            | (_, Some true) | (false, Some false) -> ()
+            | (Read, None) -> err ("variable " + (err_id x) + " must be declared in reads clause or modifies clause")
+            | ((Modify | Preserve), (None | Some false)) -> err ("variable " + (err_id x) + " must be declared in modifies clause")
+            | (_, Some true) | (Read, Some false) -> ()
           )
         | _ -> ()
       )
@@ -843,11 +843,23 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
       let isFrame = attrs_get_bool (Id "frame") true p.pattrs in
       let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
       let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
+      let preserveSpecs =
+        List.collect
+          (fun spec ->
+            match spec with
+            | (_, SpecRaw (RawSpec (RModifies Preserve, es))) ->
+                let es = List.collect (fun (loc, e) -> match e with SpecExp e -> [(loc, e)] | SpecLet _ -> []) es in
+                List_mapSnd (fun e -> SpecExp (EOp (Bop BEq, [e; EOp (Uop UOld, [e])]))) es
+            | _ -> []
+          )
+          p.pspecs
+        in
       let ok = EVar (Id "ok") in
-      let okMod = SpecRaw (RawSpec (RModifies true, [(loc, SpecExp ok)])) in
+      let okMod = SpecRaw (RawSpec (RModifies Preserve, [(loc, SpecExp ok)])) in
       let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
       let okSpecs = [(loc, okMod); (loc, okReqEns)] in
       let pspecs = if isRefined || isFrame then okSpecs @ p.pspecs else p.pspecs in
+      let pspecs = match preserveSpecs with [] -> pspecs | _ -> pspecs @ [(loc, SpecRaw (RawSpec (REnsures Unrefined, preserveSpecs)))] in
       let addParam isRet ids (x, t, g, io, a) =
         match g with
         | (XAlias (AliasThread, e)) -> Map.add x (ThreadLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
@@ -857,7 +869,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
         | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
         | XGhost -> Map.add x (GhostLocal ((if isRet then Mutable else Immutable), Some t)) ids
         in
-      let mod_id (env:env) (loc, modifies, e) =
+      let mod_id (env:env) (loc, m, e) =
         let mod_err () = err "expression in modifies clause must be a variable declared as var{:state f(...)} x:t;"
         loc_apply loc e (fun e ->
           match e with
@@ -865,7 +877,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             (
               match Map.tryFind x env.ids with
               | None -> err ("cannot find variable " + (err_id x))
-              | Some (StateInfo _) -> (x, modifies)
+              | Some (StateInfo _) -> (x, (match m with Read -> false | (Modify | Preserve) -> true))
               | Some _ -> mod_err ()
             )
           | _ -> mod_err ())

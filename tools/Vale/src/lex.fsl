@@ -167,6 +167,7 @@ and token = parse
 | "ensures" { ENSURES (curLoc lexbuf) }
 | "reads" { READS (curLoc lexbuf) }
 | "modifies" { MODIFIES (curLoc lexbuf) }
+| "preserves" { PRESERVES (curLoc lexbuf) }
 | "decreases" { DECREASES (curLoc lexbuf) }
 | "invariant" { INVARIANT (curLoc lexbuf) }
 | "assert" { ASSERT (curLoc lexbuf) }

@@ -913,7 +913,11 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   args = ["--dep", "make"] + includes + files
   cmd = [fstar] + args
   print(" ".join(cmd))
-  o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
+  try:
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
+  except subprocess.CalledProcessError, e:
+    print('%sF* dependency analysis: error: %s %s' % (colors['red'], e.output, colors['end']))
+    raise e
   print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
   fstar_deps_ok = True
   lines = o.splitlines()
@@ -1037,6 +1041,7 @@ def bf_to_filename(bf):
     return '(unknown failure)'
 
 def report_verification_failures():
+    import time
     from SCons.Script import GetBuildFailures
     bf = GetBuildFailures()
     if bf:
@@ -1049,15 +1054,16 @@ def report_verification_failures():
               errorfilename = filename[:-len('.tmp')] + '.error'
               if os.path.isfile(errorfilename):
                 os.remove(errorfilename)
-              os.rename(filename, errorfilename)
               print('##### %sVerification error%s. ' % (colors['red'], colors['end']))
-              print('Printing contents of ' + errorfilename + ' #####')
-              with open (errorfilename, 'r') as myfile:
+              print('Printing contents of ' + filename + ' #####')
+              with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
                 for line in lines:
                   if "(Error)" in line or "failed" in line:
                     line = "%s%s%s" % (colors['red'], line, colors['end'])
                   print(line)
+              time.sleep(1)
+              os.rename(filename, errorfilename)
 
 def display_build_status():
   report_verification_failures()

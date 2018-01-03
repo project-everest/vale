@@ -58,9 +58,16 @@ let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
       | DProc ({pattrs = [(Reserved "alias", _)]} as p) -> (add_proc env p, [])
       | DProc p ->
           let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
+          let isQuick = List_mem_assoc (Id "quick") p.pattrs in
           let envp = add_proc env p in
-          let build_proc = if !fstar then Emit_common_lemmas.build_proc else Emit_common_refine.build_proc in
-          (envp, if verify then build_proc (if isRecursive then envp else env) loc p else [])
+          if verify then
+            let build_proc = if !fstar then Emit_common_lemmas.build_proc else Emit_common_refine.build_proc in
+            let envr = if isRecursive then envp else env in
+            let ds_p = build_proc envr loc p in
+            let ds_q = if isQuick then Emit_common_quick_export.build_proc envr loc p else [] in
+            (envp, ds_p @ ds_q)
+          else
+            (envp, [])
       | _ -> (env, if verify then [(loc, d2)] else [])
       in
     (match (verify, !reprint_file) with (true, Some _) -> add_reprint_decl env loc dReprint | _ -> ());

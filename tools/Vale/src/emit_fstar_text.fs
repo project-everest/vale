@@ -61,10 +61,13 @@ let string_of_bop (op:bop):string =
 let string_of_ghost (g:ghost) = ""
 let string_of_var_storage (g:var_storage) = ""
 
+
 let rec string_of_typ (t:typ):string =
   match t with
   | TName x -> sid x
   | TApp (TName (Id "tuple"), ts) -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
+  | TApp (TName (Id "fun"), ts) -> "(" + (String.concat " -> " (List.map string_of_typ ts)) + ")"
+  | TApp (t, []) -> "(" + (string_of_typ t) + " ())"
   | TApp (t, ts) -> "(" + (string_of_typ t) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
 
 let rec string_of_exp_prec prec e =
@@ -138,6 +141,9 @@ and string_of_exps (es:exp list):string = String.concat " " (List.map string_of_
 and string_of_exps_tail (es:exp list):string = String.concat "" (List.map (fun e -> " " + string_of_exp e) es)
 and string_of_args (es:exp list):string = match es with [] -> "()" | _ -> string_of_exps es
 
+let name_of_formal (x:id, t:typ option) = sid x
+let type_of_formal (x:id, t:typ option) = match t with None -> "_" | Some t -> (string_of_typ t)
+
 let string_of_lhs_formal ((x, tOpt):lhs):string = match tOpt with Some (t, _) -> string_of_formal (x, t) | _ -> sid x
 
 let val_string_of_formals (xs:formal list) =
@@ -150,21 +156,22 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
-let string_of_outs_exp (outs:formal list option):string =
+let string_of_outs_exp (outs:(bool * formal list) option):string =
   match outs with
   | None -> "()"
-  | Some fs -> string_of_exp_prec 0 (EApply (Id "tuple", List.map (fun (x, _) -> EVar x) fs))
+  | Some (dep, fs) ->
+      let sDep = if dep then "|" else "" in
+      "(" + sDep + (String.concat ", " (List.map name_of_formal fs)) + sDep + ")"
 
-let name_of_formal (x:id, t:typ option) = sid x
-let type_of_formal (x:id, t:typ option) = match t with None -> "_" | Some t -> (string_of_typ t)
-
-let string_of_outs_formals (outs:formal list option):string =
+let string_of_outs_formals (outs:(bool * formal list) option):string =
   match outs with
   | None -> "()"
-  //| Some fs -> "(" + (String.concat ", " (List.map string_of_formal fs)) + ")"
-  | Some fs -> "(" + (String.concat ", " (List.map name_of_formal fs)) + "):(" + (String.concat " * " (List.map type_of_formal fs)) + ")"
+  | Some (dep, fs) ->
+      let sDep = if dep then "|" else "" in
+      "(" + sDep + (String.concat ", " (List.map name_of_formal fs)) + sDep + "):(" +
+      (String.concat (if dep then " & " else " * ") (List.map string_of_ret fs)) + ")"
 
-let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
+let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):unit =
   match s with
   | SLoc (loc, s) -> try emit_stmt ps outs s with err -> raise (LocErr (loc, err))
   | SLabel _ -> err "unsupported feature: labels (unstructured code)"
@@ -188,7 +195,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_formal outs)) + ") =");
       ps.PrintLine "(";
       ps.Indent ();
-      emit_stmt ps (Some outs) s;
+      emit_stmt ps (Some (false, outs)) s;
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
@@ -199,9 +206,9 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("else");
       emit_block ps (match outs with None -> ";" | Some _ -> "") outs ss2
   | SWhile (e, invs, (_, ed), ss) ->
-      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_ret fs) in
+      let st = match outs with None -> "()" | Some (dep, fs) -> String.concat (if dep then " & " else " * ") (List.map string_of_ret fs) in
       let sWhile = sid (Reserved "while") in
-      let sParams = match outs with None -> "()" | Some fs -> string_of_formals fs in
+      let sParams = match outs with None -> "()" | Some (_, fs) -> string_of_formals fs in
       ps.PrintLine ("let rec " + sWhile + " " + sParams + " : Ghost (" + st + ")");
       ps.Indent ();
       let inv = and_of_list (List.map snd invs) in
@@ -209,7 +216,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> (not (" + (string_of_exp e) + ")) /\ " + (string_of_exp inv) + "))");
       let () =
         match (ed, outs) with
-        | ([], Some ((x, _)::_)) -> ps.PrintLine ("(decreases " + (sid x) + ")")
+        | ([], Some (_, ((x, _)::_))) -> ps.PrintLine ("(decreases " + (sid x) + ")")
         | (_::_, _) -> ps.PrintLine ("(decreases (" + (String.concat ", " (List.map string_of_exp ed)) + "))")
         | ([], _) -> ()
         in
@@ -218,7 +225,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.Indent ();
       ps.PrintLine ("let " + (string_of_outs_formals outs) + " =");
       emit_block ps "" outs ss;
-      let args = match outs with None -> "()" | Some fs -> String.concat " " (List.map (fun (x, _) -> sid x) fs) in
+      let args = match outs with None -> "()" | Some (_, fs) -> String.concat " " (List.map (fun (x, _) -> sid x) fs) in
       ps.PrintLine ("in " + sWhile + " " + args);
       ps.Unindent ();
       ps.PrintLine ("else " + (string_of_outs_exp outs));
@@ -311,39 +318,30 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
         ps.PrintLine(l + "();");
     )
   | SExists (xs, ts, e) -> notImplemented "exists statements"
-and emit_stmts (ps:print_state) (outs:formal list option) (stmts:stmt list) =
+and emit_stmts (ps:print_state) (outs:(bool * formal list) option) (stmts:stmt list) =
   List.iter (emit_stmt ps None) stmts;
   ps.PrintLine (string_of_outs_exp outs)
-and emit_block (ps:print_state) (suffix:string) (outs:formal list option) (stmts:stmt list) =
+and emit_block (ps:print_state) (suffix:string) (outs:(bool * formal list) option) (stmts:stmt list) =
   ps.PrintLine "(";
   ps.Indent ();
   emit_stmts ps outs stmts;
   ps.Unindent ();
   ps.PrintLine (")" + suffix)
 
-let collect_spec (loc:loc, s:spec):(exp list * exp list) =
-  try
-    match s with
-    | Requires (_, e) -> ([e], [])
-    | Ensures (_, e) -> ([], [e])
-    | Modifies _ -> ([], [])
-    | SpecRaw _ -> internalErr "SpecRaw"
-  with err -> raise (LocErr (loc, err))
-
-let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
-  let (rs, es) = List.unzip (List.map collect_spec ss) in
-  (List.concat rs, List.concat es)
-
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
-  let isOpaqueAttr (x, es) = match (x, es) with (Id "opaque", ([] | [EBool true])) -> true | _ -> false in
-  let isOpaque = List.exists isOpaqueAttr f.fattrs in
+  let isOpaqueToSmt = attrs_get_bool (Id "opaque_to_smt") false f.fattrs in
+  let isOpaque = attrs_get_bool (Id "opaque") false f.fattrs in
+  let isPublic = attrs_get_bool (Id "public") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
+  let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
-  let printBody x e =
-    ps.PrintLine ("let " + x + " " + (let_string_of_formals false f.fargs) + " =");
+  let printBody hasDecl x e =
+    (if not hasDecl && isOpaqueToSmt then ps.PrintLine "[@\"opaque_to_smt\"]");
+    let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
+    ps.PrintLine ("let " + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();
     ps.PrintLine (string_of_exp e);
     ps.Unindent ()
@@ -352,17 +350,17 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     ps.PrintLine (sVal (sid (transparent_id f.fname)));
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody (sid (transparent_id f.fname)) e
+      | Some e -> printBody true (sid (transparent_id f.fname)) e
     );
     psi.PrintLine (sVal (sid f.fname));
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
-    printBody (sid f.fname) eOpaque
+    printBody true (sid f.fname) eOpaque
   else
   (
     match f.fbody with
     | None -> ()
-    | Some e -> printBody (sid f.fname) e
+    | Some e -> printBody false (sid f.fname) e
   )
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
@@ -373,35 +371,24 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
-  let fast_state = attrs_get_bool (Id "fast_state") false p.pattrs in
+  let isDependent = attrs_get_bool (Id "dependent") false p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s =
     ps.Indent ();
-    let st = String.concat " * " (List.map string_of_pformal p.prets) in
+    let st = String.concat (if isDependent then " & " else " * ") (List.map string_of_pformal p.prets) in
     ps.PrintLine (s + "Ghost (" + st + ")");
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
-    let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
-    ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
+    let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
+    let sDep = if isDependent then "|" else "" in
+    ps.PrintLine ("(ensures (fun (" + sDep + sprets + sDep + ") -> " + (string_of_exp es) + "))");
     ps.Unindent ();
     in
-  ( match (tactic, ps.print_interface, fast_state) with
-    | (Some _, None, _) -> ()
-    | (_, _, false) ->
+  ( match (tactic, ps.print_interface) with
+    | (Some _, None) -> ()
+    | (_, _) ->
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
         printPType psi "-> "
-    | (_, _, true) ->
-        psi.PrintLine ("val " + (sid (internal_id p.pname)) + " : " + (val_string_of_formals args));
-        printPType psi "-> "
-        psi.PrintLine ("unfold let " + (sid p.pname) + (let_string_of_formals true args));
-        printPType psi ": ";
-        psi.PrintLine "=";
-        let sArgs = string_of_args (List.map (fun (x, _) -> EVar x) args) in
-        let sRets = "(" + (String.concat ", " (List.map (fun (x, _) -> sid x) rets)) + ")" in
-        let eFrame = attrs_get_exp (Reserved "fast_state_frame_exp") p.pattrs in
-        psi.PrintLine ("let " + sRets + " = " + (sid (internal_id p.pname)) + " " + sArgs + " in");
-        psi.PrintLine ("let va_sM = va_normalize_term (" + (string_of_exp eFrame) + ") in");
-        psi.PrintLine sRets
   );
   ( match p.pbody with
     | None -> ()
@@ -416,7 +403,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
         let (_, ss) = let_updates_stmts mutable_scope ss in
         let outs = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
-        emit_stmts ps (Some outs) ss;
+        emit_stmts ps (Some (isDependent, outs)) ss;
         ps.Unindent ();
         ( match tactic with
           | None -> ()
@@ -425,7 +412,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
               printPType ps "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
         );
-        ps.PrintLine ("let " + (sid (if fast_state then internal_id p.pname else p.pname)) + " = " + (sid (irreducible_id p.pname)))
+        ps.PrintLine ("let " + (sid p.pname) + " = " + (sid (irreducible_id p.pname)))
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =

@@ -1,7 +1,3 @@
-// Turn high-level AST into low-level lemmas:
-//   - call transform.fs
-//   - then generate lemmas
-
 module Emit_common_refine
 
 open Ast
@@ -492,8 +488,9 @@ let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * (id * ty
     in
   match s with
   | Requires _ | Ensures _ -> []
-  | Modifies (readWrite, e) ->
+  | Modifies (m, e) ->
     (
+      let readWrite = match m with (Modify | Preserve) -> true | Read -> false in
       let io = if readWrite then InOut else In in
       match skip_loc (exp_abstract false e) with
       | EVar x ->
@@ -884,7 +881,7 @@ let build_lemma_spec (env:env) (src:id) (res:exp) (loc:loc, s:spec):((loc * spec
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", res)] in
         ([(loc, Ensures (r, subst_reserved_exp m e))], [])
-    | Modifies (readWrite, e) ->
+    | Modifies (m, e) ->
         let e = exp_refined e in
         let m = Map.ofList [(Reserved "old_s", EVar src); (Reserved "s", EVar src)] in
         ([], [subst_reserved_exp m e])
