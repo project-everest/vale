@@ -16,6 +16,33 @@ let combine_reg_taints_monotone regs1 regs2: Lemma
 (forall r. Public? ((combine_reg_taints regs1 regs2) r) ==> Public? (regs1 r) /\ Public? (regs2 r))
 = ()
 
+val eq_registers: (regs1: (reg -> taint)) -> (regs2: (reg -> taint)) -> (b:bool{b <==> (regs1 == regs2)})
+
+let eq_registers regs1 regs2 =
+  let b = regs1 Rax = regs2 Rax &&
+  regs1 Rbx = regs2 Rbx &&
+  regs1 Rcx = regs2 Rcx &&
+  regs1 Rdx = regs2 Rdx &&
+  regs1 Rsi = regs2 Rsi &&
+  regs1 Rdi = regs2 Rdi &&
+  regs1 Rbp = regs2 Rbp &&
+  regs1 Rsp = regs2 Rsp &&
+  regs1 R8 = regs2 R8 &&
+  regs1 R9 = regs2 R9 &&
+  regs1 R10 = regs2 R10 &&
+  regs1 R11 = regs2 R11 &&
+  regs1 R12 = regs2 R12 &&
+  regs1 R13 = regs2 R13 &&
+  regs1 R14 = regs2 R14 &&
+  regs1 R15 = regs2 R15 in
+  assert (FStar.FunctionalExtensionality.feq regs1 regs2 <==> b);
+  b
+
+val eq_taintStates: (ts1:taintState) -> (ts2:taintState) -> (b:bool{b <==> ts1 == ts2})
+
+let eq_taintStates ts1 ts2 =
+    eq_registers ts1.regTaint ts2.regTaint && ts1.flagsTaint = ts2.flagsTaint
+
 let taintstate_monotone ts ts' = ( forall r. Public? (ts'.regTaint r) ==> Public? (ts.regTaint r)) /\ (Public? (ts'.flagsTaint) ==> Public? (ts.flagsTaint))
 
 val taintstate_monotone_trans: (ts1:taintState) -> (ts2:taintState) -> (ts3:taintState) ->
@@ -42,25 +69,62 @@ val combine_taint_states: (ts1:taintState) -> (ts2:taintState) -> (ts:taintState
 let combine_taint_states (ts1:taintState) (ts2:taintState) =
   TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) (merge_taint ts1.flagsTaint ts2.flagsTaint)
 
-val check_if_block_consumes_fixed_time: (block:tainted_codes) -> (fuel:nat) -> (ts:taintState) -> Tot (bool * taintState)
-(decreases %[fuel; block])
-val check_if_code_consumes_fixed_time: (code:tainted_code) -> (fuel:nat) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[fuel; code; 1])
-val check_if_loop_consumes_fixed_time: (code:tainted_code{While? code}) -> (fuel:nat) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[fuel; code; 0])
+let count_public_register regs r = if Public? (regs r) then 1 else 0
 
+let count_public_registers regs =
+  count_public_register regs Rax +
+  count_public_register regs Rbx +
+  count_public_register regs Rcx +
+  count_public_register regs Rdx +
+  count_public_register regs Rsi +
+  count_public_register regs Rdi +
+  count_public_register regs Rbp +
+  count_public_register regs Rsp +
+  count_public_register regs R8 +
+  count_public_register regs R9 +
+  count_public_register regs R10 +
+  count_public_register regs R11 +
+  count_public_register regs R12 +
+  count_public_register regs R13 +
+  count_public_register regs R14 +
+  count_public_register regs R15
 
-let rec check_if_block_consumes_fixed_time (block:tainted_codes) (fuel:nat) (ts:taintState) : bool * taintState =
+let count_flagTaint ts = if Public? ts.flagsTaint then 1 else 0
+
+let count_publics ts =
+  count_public_registers ts.regTaint +
+  count_flagTaint ts
+
+val monotone_decreases_count: (ts:taintState) -> (ts':taintState) -> Lemma
+  (requires taintstate_monotone ts ts' /\ not (eq_taintStates ts ts'))
+  (ensures count_publics ts' < count_publics ts)
+
+#set-options "--z3rlimit 50"
+let monotone_decreases_count ts ts' =
+  assert (forall r. count_public_register ts'.regTaint r <= count_public_register ts.regTaint r);
+  if ts.flagsTaint <> ts'.flagsTaint then ()
+  else
+  assert (exists r. ts.regTaint r <> ts'.regTaint r);
+  ()
+
+val check_if_block_consumes_fixed_time: (block:tainted_codes) -> (ts:taintState) -> Tot (bool * taintState)
+(decreases %[block])
+val check_if_code_consumes_fixed_time: (code:tainted_code) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[code; count_publics ts; 1])
+val check_if_loop_consumes_fixed_time: (code:tainted_code{While? code}) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[code; count_publics ts; 0])
+
+let rec check_if_block_consumes_fixed_time (block:tainted_codes) (ts:taintState) : bool * taintState =
   match block with
   | [] -> true, ts
-  | hd::tl -> let fixedTime, ts_int = check_if_code_consumes_fixed_time hd fuel ts in
+  | hd::tl -> let fixedTime, ts_int = check_if_code_consumes_fixed_time hd ts in
     if (not fixedTime) then fixedTime, ts_int
-    else check_if_block_consumes_fixed_time tl fuel ts_int
+    else check_if_block_consumes_fixed_time tl ts_int
     
 
-and check_if_code_consumes_fixed_time (code:tainted_code) (fuel:nat) (ts:taintState) : bool * taintState =
+and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool * taintState =
   match code with
-  | Ins ins -> check_if_ins_consumes_fixed_time ins fuel ts
+  | Ins ins -> check_if_ins_consumes_fixed_time ins ts
   
-  | Block block -> check_if_block_consumes_fixed_time block fuel ts
+  | Block block -> check_if_block_consumes_fixed_time block ts
 
   | IfElse ifCond ifTrue ifFalse ->
     let cond_taint = ifCond.ot in
@@ -75,18 +139,17 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (fuel:nat) (ts:taintSt
       let o2Public = operand_does_not_use_secrets (get_snd_ocmp ifCond.o) ts in
       if (not o2Public) then (false, ts)
       else
-      let validIfTrue, tsIfTrue = check_if_code_consumes_fixed_time ifTrue fuel ts in
+      let validIfTrue, tsIfTrue = check_if_code_consumes_fixed_time ifTrue ts in
       if (not validIfTrue) then (false, ts)
       else
-      let validIfFalse, tsIfFalse = check_if_code_consumes_fixed_time ifFalse fuel ts in
+      let validIfFalse, tsIfFalse = check_if_code_consumes_fixed_time ifFalse ts in
       if (not validIfFalse) then (false, ts)
       else
       (true, combine_taint_states tsIfTrue tsIfFalse)   
 
-  | While cond body -> check_if_loop_consumes_fixed_time code fuel ts 
+  | While cond body -> check_if_loop_consumes_fixed_time code ts
   
-and check_if_loop_consumes_fixed_time c (fuel:nat) (ts:taintState) : bool * taintState =
-  if fuel = 0 then true, ts else
+and check_if_loop_consumes_fixed_time c (ts:taintState) : bool * taintState =
   let While pred body = c in
   let cond_taint = pred.ot in
   let o1 = operand_taint (get_fst_ocmp pred.o) ts in
@@ -101,22 +164,28 @@ and check_if_loop_consumes_fixed_time c (fuel:nat) (ts:taintState) : bool * tain
     let o2Public = operand_does_not_use_secrets (get_snd_ocmp pred.o) ts in
     if (not o2Public) then (false, ts)
     else
-    let fixedTime, next_ts = check_if_code_consumes_fixed_time body (fuel - 1) ts in
+    let fixedTime, next_ts = check_if_code_consumes_fixed_time body ts in
     if (not fixedTime) then (false, ts)
     else
     let combined_ts = combine_taint_states ts next_ts in
-    check_if_loop_consumes_fixed_time c (fuel - 1) combined_ts
+    assert (taintstate_monotone ts combined_ts);    
+    if eq_taintStates combined_ts ts then
+      true, combined_ts
+    else (
+      monotone_decreases_count ts combined_ts;
+      check_if_loop_consumes_fixed_time c combined_ts
+    )
 
-val lemma_equal_eval_isConstant_aux: (code1: tainted_code) -> (code2:tainted_code) -> (fuel:nat) -> (ts:taintState) -> (ts':taintState) -> (s1 : traceState) -> (s2:traceState) -> Lemma ((forall s. taint_eval_code code1 fuel s == taint_eval_code code2 fuel s) ==> 
+val lemma_equal_eval_isConstant_aux: (code1: tainted_code) -> (code2:tainted_code) -> (ts:taintState) -> (ts':taintState) -> (s1 : traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma ((forall s. taint_eval_code code1 fuel s == taint_eval_code code2 fuel s) ==> 
   isConstantTimeGivenStates code1 fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code1 fuel ts ts' s1 s2 ==> isConstantTimeGivenStates code2 fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code2 fuel ts ts' s1 s2)
   
-let lemma_equal_eval_isConstant_aux code1 code2 fuel ts ts' s1 s2 = ()
+let lemma_equal_eval_isConstant_aux code1 code2 ts ts' s1 s2 fuel = ()
 
-val lemma_equal_eval_isConstant: (code1: tainted_code) -> (code2:tainted_code) -> (fuel:nat) -> (ts:taintState) -> (ts':taintState) -> Lemma ((forall s. taint_eval_code code1 s == taint_eval_code code2 s) ==> 
-  isConstantTime code1 fuel ts /\ isLeakageFree code1 fuel ts ts' ==> isConstantTime code2 fuel ts /\ isLeakageFree code2 fuel ts ts')
+val lemma_equal_eval_isConstant: (code1: tainted_code) -> (code2:tainted_code) -> (ts:taintState) -> (ts':taintState) -> Lemma ((forall s. taint_eval_code code1 s == taint_eval_code code2 s) ==> 
+  isConstantTime code1 ts /\ isLeakageFree code1 ts ts' ==> isConstantTime code2 ts /\ isLeakageFree code2 ts ts')
 
 #set-options "--z3rlimit 20"
-let lemma_equal_eval_isConstant code1 code2 fuel ts ts' = FStar.Classical.forall_intro_2 (lemma_equal_eval_isConstant_aux code1 code2 fuel ts ts')
+let lemma_equal_eval_isConstant code1 code2 ts ts' = FStar.Classical.forall_intro_3 (lemma_equal_eval_isConstant_aux code1 code2 ts ts')
 
 val monotone_ok_eval: (code:tainted_code) -> (fuel:nat) -> (s:traceState) -> Lemma
  (requires True)
@@ -178,45 +247,49 @@ let monotone_ok_eval_while code fuel s =
     | Some s -> if not s.state.ok then ()
       else monotone_ok_eval body (fuel -1) s0; monotone_ok_eval code (fuel - 1) s
 
-val lemma_loop_taintstate_monotone: (ts:taintState) -> (code:tainted_code{While? code}) -> (fuel:nat) -> Lemma 
+val lemma_loop_taintstate_monotone: (ts:taintState) -> (code:tainted_code{While? code}) -> Lemma 
 (requires True)
-(ensures (let _, ts' = check_if_loop_consumes_fixed_time code fuel ts in
+(ensures (let _, ts' = check_if_loop_consumes_fixed_time code ts in
   taintstate_monotone ts ts'))
-(decreases %[fuel; code])
+(decreases %[count_publics ts; code])
 
-#set-options "--z3rlimit 40"
-let rec lemma_loop_taintstate_monotone ts code fuel =
-  if fuel = 0 then ()
-  else
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60 --z3cliopt smt.CASE_SPLIT=2"
+let rec lemma_loop_taintstate_monotone ts code =
   let While pred body = code in
-  let b, ts' = check_if_code_consumes_fixed_time body (fuel-1) ts in
+  let b, ts' = check_if_code_consumes_fixed_time body ts in
   let combined_ts = combine_taint_states ts ts' in
-  lemma_loop_taintstate_monotone combined_ts code (fuel-1)
-
-val lemma_code_explicit_leakage_free: (ts:taintState) -> (code:tainted_code) -> (fuel:nat) -> (s1:traceState) -> (s2:traceState) -> Lemma
+  if eq_taintStates combined_ts ts then ()
+  else (
+    monotone_decreases_count ts combined_ts;
+    let _, ts_fin = check_if_loop_consumes_fixed_time code combined_ts in
+    lemma_loop_taintstate_monotone combined_ts code;
+    taintstate_monotone_trans ts combined_ts ts_fin
+  )
+  
+val lemma_code_explicit_leakage_free: (ts:taintState) -> (code:tainted_code) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
  (requires True)
- (ensures (let b, ts' = check_if_code_consumes_fixed_time code fuel ts in
+ (ensures (let b, ts' = check_if_code_consumes_fixed_time code ts in
   (b2t b ==> isConstantTimeGivenStates code fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2)))
  (decreases %[fuel; code; 1])
 
-val lemma_block_explicit_leakage_free: (ts:taintState) -> (codes:tainted_codes) -> (fuel:nat) -> (s1:traceState) -> (s2:traceState) -> Lemma
+val lemma_block_explicit_leakage_free: (ts:taintState) -> (codes:tainted_codes) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
  (requires True)
- (ensures (let b, ts' = check_if_block_consumes_fixed_time codes fuel ts in
+ (ensures (let b, ts' = check_if_block_consumes_fixed_time codes ts in
   (b2t b ==> isConstantTimeGivenStates (Block codes) fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates (Block codes) fuel ts ts' s1 s2)))
  (decreases %[fuel; codes; 2])
 
-val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{While? code}) -> (fuel:nat) -> (s1:traceState) -> (s2:traceState) -> Lemma  
+val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{While? code}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma  
  (requires True)
- (ensures (let b, ts' = check_if_loop_consumes_fixed_time code fuel ts in
+ (ensures (let b, ts' = check_if_loop_consumes_fixed_time code ts in
   (b2t b ==> isConstantTimeGivenStates code fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2)))
  (decreases %[fuel; code; 0])
 
-#set-options "--z3rlimit 140"
- let rec lemma_code_explicit_leakage_free ts code fuel s1 s2 = match code with
-  | Ins ins -> lemma_ins_leakage_free ts fuel ins
-  | Block block -> lemma_block_explicit_leakage_free ts block fuel s1 s2
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 150 --z3cliopt smt.CASE_SPLIT=3"
+ let rec lemma_code_explicit_leakage_free ts code s1 s2 fuel = match code with
+  | Ins ins -> lemma_ins_leakage_free ts ins
+  | Block block -> lemma_block_explicit_leakage_free ts block s1 s2 fuel
   | IfElse ifCond ifTrue ifFalse ->
-    let b_fin, ts_fin = check_if_code_consumes_fixed_time code fuel ts in
+    let b_fin, ts_fin = check_if_code_consumes_fixed_time code ts in
     let st1, b1 = taint_eval_ocmp s1 ifCond in
     let st1 = {st1 with trace=BranchPredicate(b1)::s1.trace} in
     let st2, b2 = taint_eval_ocmp s2 ifCond in
@@ -225,32 +298,32 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
     assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
     monotone_ok_eval ifTrue fuel st1;
     monotone_ok_eval ifTrue fuel st2;
-    lemma_code_explicit_leakage_free ts ifTrue fuel st1 st2;
+    lemma_code_explicit_leakage_free ts ifTrue st1 st2 fuel;
     monotone_ok_eval ifFalse fuel st1;
     monotone_ok_eval ifFalse fuel st2;
-    lemma_code_explicit_leakage_free ts ifFalse fuel st1 st2;
+    lemma_code_explicit_leakage_free ts ifFalse st1 st2 fuel;
     ()
-  | While _ _ -> lemma_loop_explicit_leakage_free ts code fuel s1 s2
+  | While _ _ -> lemma_loop_explicit_leakage_free ts code s1 s2 fuel
 
-and lemma_block_explicit_leakage_free ts block fuel s1 s2 = match block with
+and lemma_block_explicit_leakage_free ts block s1 s2 fuel = match block with
   | [] -> ()
   | hd :: tl ->
-    let b, ts' = check_if_code_consumes_fixed_time hd fuel ts in
-    lemma_code_explicit_leakage_free ts hd fuel s1 s2;
+    let b, ts' = check_if_code_consumes_fixed_time hd ts in
+    lemma_code_explicit_leakage_free ts hd s1 s2 fuel;
     let s'1 = taint_eval_code hd fuel s1 in
     let s'2 = taint_eval_code hd fuel s2 in
     if None? s'1 || None? s'2 then ()
     else
     let s'1 = Some?.v s'1 in
     let s'2 = Some?.v s'2 in
-    lemma_block_explicit_leakage_free ts' tl fuel s'1 s'2;
+    lemma_block_explicit_leakage_free ts' tl s'1 s'2 fuel;
     monotone_ok_eval (Block tl) fuel s'1;
     monotone_ok_eval (Block tl) fuel s'2
 
-and lemma_loop_explicit_leakage_free ts code fuel s1 s2 =
+and lemma_loop_explicit_leakage_free ts code s1 s2 fuel =
   if fuel = 0 then ()
   else
-  let b_fin, ts_fin = check_if_code_consumes_fixed_time code fuel ts in
+  let b_fin, ts_fin = check_if_code_consumes_fixed_time code ts in
   let r1 = taint_eval_code code fuel s1 in
   let r2 = taint_eval_code code fuel s2 in
   let While cond body = code in
@@ -267,7 +340,7 @@ and lemma_loop_explicit_leakage_free ts code fuel s1 s2 =
   assert (Some? r1 /\ (Some?.v r1).state.ok ==> st1.state.ok);
   monotone_ok_eval_while code fuel s2;
   assert (Some? r2 /\ (Some?.v r2).state.ok ==> st2.state.ok);
-  lemma_loop_taintstate_monotone ts code fuel;
+  lemma_loop_taintstate_monotone ts code;
   isExplicit_monotone ts ts ts_fin code fuel s1 s2;
   ()
   )
@@ -275,8 +348,8 @@ and lemma_loop_explicit_leakage_free ts code fuel s1 s2 =
   let st'1 = ({st1 with trace = BranchPredicate(true)::st1.trace}) in
   let st'2 = ({st2 with trace = BranchPredicate(true)::st2.trace}) in
   assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st'1.state.ok /\ st'2.state.ok ==> constTimeInvariant ts st'1 st'2);
-  let b', ts' = check_if_code_consumes_fixed_time body (fuel-1) ts in
-  lemma_code_explicit_leakage_free ts body (fuel-1) st'1 st'2;
+  let b', ts' = check_if_code_consumes_fixed_time body ts in
+  lemma_code_explicit_leakage_free ts body st'1 st'2 (fuel-1);
   monotone_ok_eval body (fuel-1) st'1;
   monotone_ok_eval body (fuel-1) st'2;
   let st1 = taint_eval_code body (fuel - 1) st'1 in
@@ -290,25 +363,25 @@ and lemma_loop_explicit_leakage_free ts code fuel s1 s2 =
   if not st1.state.ok || not st2.state.ok then ()
   else
   let combined_ts = combine_taint_states ts ts' in
-  let b_aux, ts_aux = check_if_loop_consumes_fixed_time code (fuel-1) combined_ts in
-  lemma_loop_explicit_leakage_free combined_ts code (fuel-1) st1 st2;
+  let b_aux, ts_aux = check_if_loop_consumes_fixed_time code combined_ts in
+  lemma_loop_explicit_leakage_free combined_ts code st1 st2 (fuel-1);
   isConstant_monotone ts combined_ts code (fuel-1) st1 st2;
   isExplicit_monotone2 ts_aux ts combined_ts code (fuel-1) st1 st2;
   assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts' st1 st2);
   ()
   
-val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> (fuel:nat) -> Lemma
- (let b, ts' = check_if_code_consumes_fixed_time code fuel ts in
-  (b2t b ==> isConstantTime code fuel ts /\ isLeakageFree code fuel ts ts'))
+val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> Lemma
+ (let b, ts' = check_if_code_consumes_fixed_time code ts in
+  (b2t b ==> isConstantTime code ts /\ isLeakageFree code ts ts'))
 
-let lemma_code_leakage_free ts code fuel = FStar.Classical.forall_intro_2 (lemma_code_explicit_leakage_free ts code fuel)
+let lemma_code_leakage_free ts code = FStar.Classical.forall_intro_3 (lemma_code_explicit_leakage_free ts code)
 
 #set-options "--z3rlimit 20"
-val check_if_code_is_leakage_free: (code:tainted_code) -> (fuel:nat) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code fuel ts tsExpected
-	 /\ b ==> isConstantTime code fuel ts})
+val check_if_code_is_leakage_free: (code:tainted_code) -> (ts:taintState) -> (tsExpected:taintState) -> (b:bool{b ==> isLeakageFree code ts tsExpected
+	 /\ b ==> isConstantTime code ts})
 
-let check_if_code_is_leakage_free code fuel ts tsExpected = 
-  let b, ts' = check_if_code_consumes_fixed_time code fuel ts in
+let check_if_code_is_leakage_free code ts tsExpected = 
+  let b, ts' = check_if_code_consumes_fixed_time code ts in
   if b then
     publicTaintsAreAsExpected ts' tsExpected
   else

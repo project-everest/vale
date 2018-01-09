@@ -37,8 +37,8 @@ let isConstantTimeGivenStates (code:tainted_code) (fuel:nat) (ts:taintState) (s1
    /\ constTimeInvariant ts s1 s2
   ) ==> (Some?.v r1).trace = (Some?.v r2).trace
 
-let isConstantTime (code:tainted_code) (fuel:nat) (ts:taintState) =
-  forall s1 s2.
+let isConstantTime (code:tainted_code) (ts:taintState) =
+  forall s1 s2 fuel.
       isConstantTimeGivenStates code fuel ts s1 s2
 
 let isExplicitLeakageFreeGivenStates (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) (s1:traceState) (s2:traceState) =
@@ -50,10 +50,10 @@ let isExplicitLeakageFreeGivenStates (code:tainted_code) (fuel:nat) (ts:taintSta
   /\ constTimeInvariant ts s1 s2
  ) ==> publicValuesAreSame ts' (Some?.v r1) (Some?.v r2)
 
-let isExplicitLeakageFree (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) =
-  forall s1 s2.
+let isExplicitLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
+  forall s1 s2 fuel.
     isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2
 
-let isLeakageFree (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) =
-    isConstantTime code fuel ts
-  /\ isExplicitLeakageFree code fuel ts ts'
+let isLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
+    isConstantTime code ts
+  /\ isExplicitLeakageFree code ts ts'
