@@ -294,6 +294,8 @@ val lemma_valid_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_gt o1 o2) s)]
 
+val va_compute_merge_total (f0:va_fuel) (fM:va_fuel) : va_fuel
+
 val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) (fM:va_fuel) (sN:va_state) : Ghost (fN:va_fuel)
   (requires
     Cons? b0 /\
@@ -301,6 +303,7 @@ val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) 
     eval_code (va_Block (Cons?.tl b0)) sM fM sN
   )
   (ensures (fun fN ->
+    fN == va_compute_merge_total f0 fM /\
     eval_code (va_Block b0) s0 fN sN
   ))
 
@@ -377,7 +380,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
   ))
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
-// '{:quick} procedures
+// '{:quick}' procedures
 unfold let va_value_opr64 = nat64
 unfold let va_value_dst_opr64 = nat64
 unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
@@ -396,22 +399,36 @@ let va_lemma_upd_update (sM:state) : Lemma
 
 let quickProc_wp (a:Type0) : Type u#1 = (s0:state) -> (wp_continue:state -> a -> Type0) -> Type0
 
-let quickProc_q (aN:Type0) (q:state * va_fuel * aN -> Type0) (r:Type0) (a:Type) : Type =
-  a -> Ghost ((sN:state) * (fN:va_fuel) * (gN:aN))
-    (requires r)
-    (ensures q)
+let k_true (#a:Type0) (_:state) (_:a) = True
 
-let quickProc_proof (#a1:Type0) (c:va_code) (wp:quickProc_wp a1) : Type =
-  aN:Type0 -> qs:(state -> state * va_fuel * aN -> Type0) -> s0:state -> wp_continue:(state -> a1 -> Type0) ->
-    Ghost (sM:state & f0:va_fuel & g:a1 & quickProc_q aN (qs sM) True (quickProc_q aN (qs sM) (wp_continue sM g) unit))
-    (requires wp s0 wp_continue)
-    (ensures fun (|sM, f0, _, _|) -> eval_code c s0 f0 sM)
+let t_monotone (#a:Type0) (c:va_code) (wp:quickProc_wp a) : Type =
+  s0:state -> k1:(state -> a -> Type0) -> k2:(state -> a -> Type0) -> Lemma
+    (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
+    (ensures wp s0 k1 ==> wp s0 k2)
+
+let t_compute (#a:Type0) (c:va_code) (wp:quickProc_wp a) : Type =
+  s0:state -> Ghost (state * va_fuel * a)
+    (requires wp s0 k_true)
+    (ensures fun _ -> True)
+
+let t_ensure (#a:Type0) (c:va_code) (wp:quickProc_wp a) (monotone:t_monotone c wp) (compute:t_compute c wp) (s0:state) (k:(state -> a -> Type0){wp s0 k}) =
+  monotone s0 k k_true; let (sM, f0, g) = compute s0 in eval_code c s0 f0 sM /\ k sM g
+
+let t_proof (#a:Type0) (c:va_code) (wp:quickProc_wp a) (monotone:t_monotone c wp) (compute:t_compute c wp) : Type =
+  s0:state -> k:(state -> a -> Type0) -> Lemma
+    (requires wp s0 k)
+    (ensures t_ensure c wp monotone compute s0 k)
 
 // Code that returns a ghost value of type a
 noeq type quickCode (a:Type0) : va_code -> Type =
-| QProc: c:va_code -> wp:quickProc_wp a -> proof:quickProc_proof c wp -> quickCode a c
+| QProc:
+    c:va_code ->
+    wp:quickProc_wp a ->
+    monotone:t_monotone c wp ->
+    compute:t_compute c wp ->
+    proof:t_proof c wp monotone compute ->
+    quickCode a c
 
-unfold let va_quickProc_q = quickProc_q
 unfold let va_quickCode = quickCode
 unfold let va_QProc = QProc
 //
@@ -488,7 +505,8 @@ let lemma_valid_cmp_ge s o1 o2 = ()
 let lemma_valid_cmp_lt s o1 o2 = ()
 let lemma_valid_cmp_gt s o1 o2 = ()
 
-let va_lemma_merge_total = Lemmas_i.lemma_merge_total
+let va_compute_merge_total = Lemmas_i.compute_merge_total
+let va_lemma_merge_total b0 s0 f0 sM fM sN = Lemmas_i.lemma_merge_total b0 s0 f0 sM fM sN; Lemmas_i.compute_merge_total f0 fM
 let va_lemma_empty_total = Lemmas_i.lemma_empty_total
 let va_lemma_ifElse_total = Lemmas_i.lemma_ifElse_total
 let va_lemma_ifElseTrue_total = Lemmas_i.lemma_ifElseTrue_total

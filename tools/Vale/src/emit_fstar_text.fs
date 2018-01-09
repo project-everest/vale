@@ -120,6 +120,7 @@ let rec string_of_exp_prec prec e =
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
     | EBind (Lambda, [], xs, ts, e) -> qbind "fun" " -> " xs ts e
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " = " + (r 5 ex) + " in " + (r 5 e), 6)
+    | EBind (BindLet, [ex], xs, [], e) -> ("let (" + String.concat ", " (List.map string_of_formal xs) + ") = " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
@@ -333,6 +334,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isOpaqueToSmt = attrs_get_bool (Id "opaque_to_smt") false f.fattrs in
   let isOpaque = attrs_get_bool (Id "opaque") false f.fattrs in
   let isPublic = attrs_get_bool (Id "public") false f.fattrs in
+  let isPublicDecl = attrs_get_bool (Id "public_decl") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
@@ -356,6 +358,12 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
     printBody true (sid f.fname) eOpaque
+  else if isPublicDecl then
+    psi.PrintLine (sVal (sid f.fname));
+    ( match f.fbody with
+      | None -> ()
+      | Some e -> printBody true (sid f.fname) e
+    )
   else
   (
     match f.fbody with
@@ -372,16 +380,17 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let isDependent = attrs_get_bool (Id "dependent") false p.pattrs in
+  let isReducible = attrs_get_bool (Id "reducible") false p.pattrs in
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s =
     ps.Indent ();
     let st = String.concat (if isDependent then " & " else " * ") (List.map string_of_pformal p.prets) in
-    ps.PrintLine (s + "Ghost (" + st + ")");
+    ps.PrintLine (s + (match p.prets with [] -> "Lemma" | _ -> "Ghost (" + st + ")"));
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
     let sDep = if isDependent then "|" else "" in
-    ps.PrintLine ("(ensures (fun (" + sDep + sprets + sDep + ") -> " + (string_of_exp es) + "))");
+    ps.PrintLine ("(ensures (" + (match p.prets with [] -> "" | _ -> "fun (" + sDep + sprets + sDep + ") -> ") + (string_of_exp es) + "))");
     ps.Unindent ();
     in
   ( match (tactic, ps.print_interface) with
@@ -393,11 +402,13 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   ( match p.pbody with
     | None -> ()
     | Some ss ->
-        ps.PrintLine ("irreducible val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
-        printPType ps "-> "
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        ps.PrintLine ("irreducible let " + (sid (irreducible_id p.pname)) + " " + formals + " =");
-//        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
+        (if isReducible then
+          ps.PrintLine ("let " + (sid p.pname) + " " + formals + " =")
+        else
+          ps.PrintLine ("irreducible val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
+          printPType ps "-> ";
+          ps.PrintLine ("irreducible let " + (sid (irreducible_id p.pname)) + " " + formals + " ="))
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
@@ -412,7 +423,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
               printPType ps "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
         );
-        ps.PrintLine ("let " + (sid p.pname) + " = " + (sid (irreducible_id p.pname)))
+        (if not isReducible then
+          ps.PrintLine ("let " + (sid p.pname) + " = " + (sid (irreducible_id p.pname))))
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =

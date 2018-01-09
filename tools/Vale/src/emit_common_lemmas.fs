@@ -14,6 +14,7 @@ type build_env =
     proc:proc_decl;
     loc:loc;
     is_instruction:bool;
+    is_quick:bool;
     is_operand:bool;
     is_framed:bool;
     is_terminating:bool;
@@ -477,7 +478,7 @@ let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
     fbody =
       if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
       else Some (build_code_block env stmts);
-    fattrs = [(Id "opaque", [])];
+    fattrs = if benv.is_quick then [(Id "opaque_to_smt", []); (Id "public_decl", [])] else [(Id "opaque", [])];
   }
 
 let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
@@ -553,6 +554,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let pargs = argB::pargs in
   let prets = (if total then [retS; retF] else [retB; retS]) @ prets in
   let reqs = if benv.is_framed then reqsIs else [] in
+  let ensFrame = if benv.is_framed then [(loc, ensure eFrame)] else [] in
+  let (pspecs, pmods) = List.unzip (List.map (build_lemma_spec env s0 (EVar sM)) p.pspecs) in
   let sStmts =
     if benv.is_instruction then
       // Body of instruction lemma
@@ -561,6 +564,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let senv = { env = env; benv = benv; b1 = dummy; bM = dummy; code = EVar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
       let ss = build_lemma_ghost_stmts senv stmts in
       [sReveal; sOldS] @ sBlock @ listIf total [sState] @ ss
+    else if benv.is_quick then
+      let eFrame = vaApp "state_match" [EVar sM; eFrameExp] in
+      let (_, enss) = collect_specs (List.concat pspecs) in
+      let enss = enss @ [vaApp "state_match" [EVar sM; eFrameExp]] in
+      Emit_common_quick_code.build_proc_body env loc p (EApply (codeName, fArgs)) (and_of_list enss)
     else if benv.is_operand then
       err "operand procedures must be declared extern"
     else
@@ -568,8 +576,6 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let ss = stmts_refined bstmts in
       [sReveal; sOldS] @ sBlock @ [sb1] @ ss
     in
-  let ensFrame = if benv.is_framed then [(loc, ensure eFrame)] else [] in
-  let (pspecs, pmods) = List.unzip (List.map (build_lemma_spec env s0 (EVar sM)) p.pspecs) in
   {
     pname = Reserved ("lemma_" + (string_of_id p.pname));
     pghost = Ghost;
@@ -586,6 +592,13 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName = Reserved ("code_" + (string_of_id p.pname)) in
+  let isQuick =
+    if List_mem_assoc (Id "quick") p.pattrs then
+      match List_assoc (Id "quick") p.pattrs with
+      | [e] -> (match skip_loc e with EVar (Id "exportOnly") -> false | _ -> true)
+      | _ -> true
+    else false
+    in
   let reqs =
     List.collect (fun (loc, s) ->
         match s with
@@ -616,6 +629,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             proc = p;
             loc = loc;
             is_instruction = isInstruction;
+            is_quick = isQuick;
             is_operand = isOperand;
             is_framed = attrs_get_bool (Id "frame") true p.pattrs;
             is_terminating = attrs_get_bool (Id "terminates") true p.pattrs;
@@ -631,6 +645,10 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
         let senv = { env = env; benv = benv; b1 = b1; bM = dummy; code = EVar dummy; s0 = s0; f0 = fM; sM = sM; fM = fM; sN = dummy; loc = loc;} in
         let bstmts = build_lemma_stmts senv stmts in
         let pLemma = build_lemma env benv b1 rstmts bstmts in
-        [(loc, DFun fCode)] @ (gen_fast_block_funs ()) @ [(loc, DProc pLemma)]
+        let quickDecls =
+          if isQuick then
+            Emit_common_quick_code.build_qcode env loc p
+          else []
+        [(loc, DFun fCode)] @ quickDecls @ (gen_fast_block_funs ()) @ [(loc, DProc pLemma)]
     in
   bodyDecls //@ blockLemmaDecls

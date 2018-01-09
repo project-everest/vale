@@ -78,15 +78,15 @@ val lemma_valid_cmp_gt : s:state -> o1:operand -> o2:operand -> Lemma
   (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (S.OGt o1 o2) s)
   [SMTPat (valid_ocmp (S.OGt o1 o2) s)]
 
-val lemma_merge_total (b0:codes) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) : Ghost (fN:fuel)
+val compute_merge_total (f0:fuel) (fM:fuel) : fuel
+
+val lemma_merge_total (b0:codes) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) : Lemma
   (requires
     Cons? b0 /\
     eval_code (Cons?.hd b0) s0 f0 sM /\
     eval_code (Block (Cons?.tl b0)) sM fM sN
   )
-  (ensures (fun fN ->
-    eval_code (Block b0) s0 fN sN
-  ))
+  (ensures eval_code (Block b0) s0 (compute_merge_total f0 fM) sN)
 
 val lemma_empty_total (s0:state) (bN:codes) : Ghost ((sM:state) * (fM:fuel))
   (requires True)

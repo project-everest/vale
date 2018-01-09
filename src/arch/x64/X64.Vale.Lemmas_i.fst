@@ -61,11 +61,13 @@ let lemma_valid_cmp_ge s o1 o2 = ()
 let lemma_valid_cmp_lt s o1 o2 = ()
 let lemma_valid_cmp_gt s o1 o2 = ()
 
+let compute_merge_total (f0:fuel) (fM:fuel) =
+  if f0 > fM then f0 else fM
+
 let lemma_merge_total (b0:codes) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) =
   let f = if f0 > fM then f0 else fM in
   increase_fuel (Cons?.hd b0) s0 f0 sM f;
-  increase_fuel (Block (Cons?.tl b0)) sM fM sN f;
-  f
+  increase_fuel (Block (Cons?.tl b0)) sM fM sN f
 
 let lemma_empty_total (s0:state) (bN:codes) =
   (s0, 0)
