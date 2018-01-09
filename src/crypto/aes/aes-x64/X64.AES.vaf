@@ -70,7 +70,7 @@ procedure KeyExpansionRound(
 //        SeqLength(w_out) == 44;
 //        mem[dst_id].quads[rdx + 16*0].v == Quadword(w_out[4*0], w_out[4*0+1], w_out[4*0+2], w_out[4*0+3]);
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
-        key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
+//        key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
 {
 //    ghost var xmm1_v0 := xmm1;
 

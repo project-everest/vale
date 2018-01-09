@@ -26,8 +26,8 @@ let key_expansion_partial (alg:algorithm) (key:seq nat32 { length key == nk alg}
 
 let lemma_selector255 (selector:nat8) (bits:bits_of_byte) : Lemma
   (requires selector == 255 /\ bits == byte_to_twobits selector)
-  (ensures Bits_of_Byte?.lo bits == 3 /\ Bits_of_Byte?.mid_lo == 3 /\
-           Bits_of_Byte?.mid_hi == 3 /\ Bits_of_Byte?.hi == 3)
+  (ensures Bits_of_Byte?.lo bits == 3 /\ Bits_of_Byte?.mid_lo bits == 3 /\
+           Bits_of_Byte?.mid_hi bits == 3 /\ Bits_of_Byte?.hi bits == 3)
   =
   ()
   
