@@ -105,7 +105,7 @@ and string_of_var_storage (g:var_storage) =
   match g with
   | XGhost -> "ghost "
   | XPhysical -> ""
-  | XOperand x -> x + " "
+  | XOperand -> ""
   | XInline -> "inline "
   | XAlias _ -> "{:alias}" // TODO
   | XState e -> "{:state" + (string_of_exp_prec 5 e) + "}"

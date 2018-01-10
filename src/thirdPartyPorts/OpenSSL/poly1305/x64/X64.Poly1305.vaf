@@ -133,10 +133,10 @@ procedure poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
 }
 
 procedure poly1305_reduce(
-    inout dst_operand d3:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
+    inout d3:dst_opr64,
+    inout h0:dst_opr64,
+    inout h1:dst_opr64,
+    inout h2:dst_opr64,
     ghost hd:int,
    //ghost n:int,
     ghost p:int)
@@ -258,14 +258,14 @@ procedure poly1305_reduce_regs_fast_block(
 */
 
 procedure poly1305_iteration(
-    inout dst_operand d1:uint64,
-    inout dst_operand d2:uint64,
-    inout dst_operand d3:uint64,
-          operand r0:uint64,
-          operand s1:uint64,
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
+    inout d1:dst_opr64,
+    inout d2:dst_opr64,
+    inout d3:dst_opr64,
+          r0:opr64,
+          s1:opr64,
+    inout h0:dst_opr64,
+    inout h1:dst_opr64,
+    inout h2:dst_opr64,
     ghost r1:nat64
     )
     returns(ghost hh:int)
@@ -511,12 +511,12 @@ procedure {:frame false} poly1305_blocks(
 
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:timeLimitMultiplier 2} poly1305_last_block(
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout dst_operand h2:uint64,
-          operand r0:uint64,
-          operand s1:uint64,
-          operand nExtra:uint64,
+    inout h0:dst_opr64,
+    inout h1:dst_opr64,
+    inout h2:dst_opr64,
+          r0:opr64,
+          s1:opr64,
+          nExtra:opr64,
     ghost hBlocks:int,
     ghost r1:nat64,
     ghost r:int,
@@ -628,9 +628,9 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
 
 // h := (h % p) % 2^128;
 procedure poly1305_reduce_last(
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-    inout operand h2:uint64,
+    inout h0:dst_opr64,
+    inout h1:dst_opr64,
+    inout h2:opr64,
     ghost h:int)
     modifies
         r8; r9; r10; rax;
@@ -679,10 +679,10 @@ procedure poly1305_reduce_last(
 
 // h := (h + key_s) % 2^128
 procedure poly1305_add_key_s(
-    inout dst_operand h0:uint64,
-    inout dst_operand h1:uint64,
-          operand key_s0:uint64,
-          operand key_s1:uint64,
+    inout h0:dst_opr64,
+    inout h1:dst_opr64,
+          key_s0:opr64,
+          key_s1:opr64,
     ghost h_in:int,
     ghost key_s:nat128)
     modifies

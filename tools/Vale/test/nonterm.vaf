@@ -45,11 +45,13 @@ let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
 let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
 
 type va_register = reg
-let va_op_register_reg (r:reg) : Tot va_register = r
-let va_is_src_register_int (r:reg) (s:va_state) = True
-let va_is_dst_register_int (r:reg) (s:va_state) = True
+type va_operand_reg = reg
+let va_op_reg_reg (r:reg) : Tot va_register = r
+let va_is_src_reg (r:reg) (s:va_state) = True
+let va_is_dst_reg (r:reg) (s:va_state) = True
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
-let va_eval_register_int (s:va_state) (r:va_register) : GTot int = s.[r]
+let va_update_operand_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_eval_reg (s:va_state) (r:va_register) : GTot int = s.[r]
 
 type va_cmp = reg
 let va_op_cmp_reg (r:va_register) : va_cmp = r
@@ -134,28 +136,28 @@ let opaque_double = make_opaque double
 
 
 
-procedure{:terminates false} Imm(out register x:int, inline y:int)
+procedure{:terminates false} Imm(out x:reg, inline y:int)
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure{:terminates false} Increment(inout register x:int)
+procedure{:terminates false} Increment(inout x:reg)
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure{:terminates false} Add(inout register x:int, register y:int)
+procedure{:terminates false} Add(inout x:reg, y:reg)
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure{:terminates false} AddReg(inout register x:int, register y:int)
+procedure{:terminates false} AddReg(inout x:reg, y:reg)
     ensures
         x == old(x + y);
 {

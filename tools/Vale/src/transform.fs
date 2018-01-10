@@ -20,7 +20,7 @@ type id_info =
 | ProcLocal of id_local
 | ThreadLocal of id_local
 | InlineLocal
-| OperandLocal of inout * string * typ
+| OperandLocal of inout * typ
 | StateInfo of string * exp list * typ
 | OperandAlias of id * id_info
 
@@ -57,9 +57,24 @@ let vaAppOp (prefix:string) (t:typ) (es:exp list):exp =
   | TName (Id x) -> vaApp (qprefix prefix x) es
   | _ -> err "operands must have simple named types"
 
-let vaEvalOp (xo:string) (t:typ) (state:exp) (e:exp):exp =
+let vaEvalOp (t:typ) (state:exp) (e:exp):exp =
   match t with
-  | TName (Id x) -> vaApp (qprefix ("eval_" + xo + "_") x) [state; e]
+  | TName (Id x) -> vaApp (qprefix ("eval_") x) [state; e]
+  | _ -> err "operands must have simple named types"
+
+let vaOperandTyp (t:typ) : string =
+  match t with
+  | TName (Id x) -> "operand_" + x
+  | _ -> err "operands must have simple named types"
+
+let vaValueTyp (t:typ) : string =
+  match t with
+  | TName (Id x) -> "value_" + x
+  | _ -> err "operands must have simple named types"
+
+let vaTyp (t:typ) : string =
+  match t with
+  | TName (Id x) -> x
   | _ -> err "operands must have simple named types"
 
 let old_id (x:id) = Reserved ("old_" + (string_of_id x))
@@ -99,7 +114,6 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
     let r = env_map_exp f env in
     match e with
     | ELoc (loc, e) -> try ELoc (loc, r e) with err -> raise (LocErr (loc, err))
-    | EVar (Reserved "this") -> env.state
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
     | EBind (b, es, fs, ts, e) ->
         let es = List.map r es in
@@ -113,17 +127,23 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
           in
         let r = env_map_exp f env in
         EBind (b, es, fs, List.map (List.map r) ts, r e)
-    | EOp (Uop UOld, [e]) ->
-        let env = {env with state = EVar (Reserved "old_s"); abstractOld = true} in
-        let r = env_map_exp f env in
-        r e
-    | EOp (Bop BOldAt, [es; e]) ->
-        let env = {env with state = es} in
-        let r = env_map_exp f env in
-        r e
     | EOp (op, es) -> EOp (op, List.map r es)
     | EApply (x, es) -> EApply (x, List.map r es)
   )
+
+let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
+  let f_state (env:env) (e:exp):exp map_modify =
+    match e with
+    | EVar (Reserved "this") -> Replace env.state
+    | EOp (Uop UOld, [e]) ->
+        let env = {env with state = EVar (Reserved "old_s"); abstractOld = true} in
+        Replace (env_map_exp_state f env e)
+    | EOp (Bop BOldAt, [es; e]) ->
+        let env = {env with state = es} in
+        Replace (env_map_exp_state f env e)
+    | _ -> Unchanged
+    in
+  env_map_exp (map_apply_compose2 f f_state) env e
 
 let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (s:stmt):(env * stmt list) =
   map_apply_modify (fs env s) (fun () ->
@@ -146,7 +166,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
           | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
           | XGhost -> GhostLocal (m, t)
           | XInline -> InlineLocal
-          | (XOperand _ | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
+          | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
           in
         let ids = Map.add x info env.ids in
         ({env with ids = ids}, [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
@@ -217,6 +237,31 @@ let match_proc_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):((pf
   if nap <> nac then err ("in call to " + (err_id p.pname) + ", expected " + (string nap) + " argument(s), found " + (string nac) + " argument(s)") else
   if nrp <> nrc then err ("procedure " + (err_id p.pname) + " returns " + (string nrp) + " value(s), call expects " + (string nrc) + " return value(s)") else
   (List.zip p.prets rets, List.zip p.pargs args)
+
+///////////////////////////////////////////////////////////////////////////////
+// Resolve overloading
+let resolve_overload_expr (env:env) (e:exp):exp =
+   let rec fe (env:env) (e:exp):exp map_modify =
+     match e with
+     | EOp (Uop (UCustom op), l) ->
+       match Map.tryFind (Operator op) env.funs with
+       | Some {fargs = [_]; fattrs = attrs} ->
+          Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
+       | _ -> err ("operator '" + op + "' must be overloaded to use as a postfix operator")
+     | EOp (Bop (BCustom op), l) ->
+       match Map.tryFind (Operator op) env.funs with
+       | Some {fargs = [_; _]; fattrs = attrs} ->
+          Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
+       | _ -> err ("operator '" + op + "' must be overloaded to use as a infix operator")
+     | _ -> Unchanged
+    in
+    env_map_exp fe env e
+
+let resolve_overload_stmt (env:env) (s:stmt):(env * stmt list) =
+  env_map_stmt resolve_overload_expr (fun _ s -> Unchanged) env s
+
+let resolve_overload_stmts (env:env) (ss:stmt list):stmt list =
+  List.concat (snd (List_mapFoldFlip resolve_overload_stmt env ss))
 
 ///////////////////////////////////////////////////////////////////////////////
 // Propagate variables through state via assumes (if requested)
@@ -374,11 +419,12 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           // TODO: check for incorrect uses of old
           | GhostLocal _ -> Unchanged
           | InlineLocal -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
-          | OperandLocal (opIo, xo, t) ->
+          | OperandLocal (opIo, t) ->
             (
+              let xo = vaTyp t in
               if env.checkMods then (match (opIo, io) with (_, In) | ((InOut | Out), _) -> () | (In, (InOut | Out)) -> err ("cannot pass 'in' operand as 'out'/'inout'"));
               match g with
-              | Ghost -> Replace (refineOp env opIo x (vaEvalOp xo t env.state e))
+              | Ghost -> Replace (refineOp env opIo x (vaEvalOp t env.state e))
               | NotGhost ->
                 (
                   match asOperand with
@@ -396,7 +442,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
                   | Ghost ->
                       let getType t = match t with Some t -> t | None -> err ((err_id x) + " must have type annotation") in
                       let es = if inParam then EVar (Reserved "old_s") else env.state in
-                      vaEvalOp "op" (getType t) es e)
+                      vaEvalOp (getType t) es e)
           | StateInfo (prefix, es, t) ->
             (
               match (g, asOperand) with
@@ -473,7 +519,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
     | (Ghost, _) -> Unchanged
     in
   try
-    env_map_exp fe env e
+    env_map_exp_state fe env e
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
 and rewrite_vars_exp (env:env) (e:exp):exp =
   rewrite_vars_arg Ghost None In env e
@@ -481,7 +527,7 @@ and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
   let (mrets, margs) = match_proc_args env p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
-    | (x, t, XOperand xo, io, _) -> [rewrite_vars_arg NotGhost (Some xo) io env ea]
+    | (x, t, XOperand, io, _) -> [rewrite_vars_arg NotGhost (Some (vaTyp t)) io env ea]
     | (x, t, XInline, io, _) -> [(rewrite_vars_arg Ghost None io env ea)]
     | (x, t, XAlias _, io, _) ->
         let _ = rewrite_vars_arg NotGhost None io env ea in // check argument validity
@@ -492,7 +538,7 @@ and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
     in
   let rewrite_ret (pp, ((xlhs, _) as lhs)) =
     match pp with
-    | (x, t, XOperand xo, _, _) -> ([], [rewrite_vars_arg NotGhost (Some xo) Out env (EVar xlhs)])
+    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg NotGhost (Some (vaOperandTyp t)) Out env (EVar xlhs)])
     | (x, t, XAlias _, _, _) ->
         let _ = rewrite_vars_arg NotGhost None Out env (EVar xlhs) in // check argument validity
         ([], []) // drop argument
@@ -625,7 +671,7 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
               )
             | _ -> Unchanged
             in
-          let mods m = List_mapSnd (fun e -> Modifies (m, env_map_exp rewrite env e)) es in
+          let mods m = List_mapSnd (fun e -> Modifies (m, env_map_exp_state rewrite env e)) es in
           Replace (env, mods m)
     )
   | SpecRaw (Lets _) -> PostProcess (fun (env, _) -> (env, []))
@@ -807,7 +853,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
         | (XAlias (AliasThread, e)) -> Map.add x (ThreadLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
         | (XAlias (AliasLocal, e)) -> Map.add x (ProcLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
         | XInline -> Map.add x InlineLocal ids
-        | XOperand xo -> Map.add x (OperandLocal (io, xo, t)) ids
+        | XOperand -> Map.add x (OperandLocal (io, t)) ids
         | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
         | XGhost -> Map.add x (GhostLocal ((if isRet then Mutable else Immutable), Some t)) ids
         in
@@ -883,6 +929,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
               in
             let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
             let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
+            let ss = resolve_overload_stmts envp ss in
             //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
             let ss = rewrite_vars_stmts envp ss in
             let ss = add_fast_blocks_stmts envp ss in

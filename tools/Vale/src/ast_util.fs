@@ -71,6 +71,30 @@ let map_apply_modify (m:'a map_modify) (g:unit -> 'a):'a =
   | Replace e -> e
   | PostProcess p -> p (g ())
 
+let map_apply_compose (f1:'a -> 'b map_modify) (f2:'a -> 'b map_modify) (x:'a):'b map_modify =
+  match f1 x with
+  | Unchanged -> f2 x
+  | Replace y -> Replace y
+  | PostProcess p1 ->
+    (
+      match f2 x with
+      | Unchanged -> PostProcess p1
+      | Replace y -> Replace (p1 y)
+      | PostProcess p2 -> PostProcess (fun y -> p1 (p2 y))
+    )
+
+let map_apply_compose2 (f1:'a -> 'b -> 'c map_modify) (f2:'a -> 'b -> 'c map_modify) (x1:'a) (x2:'b):'c map_modify =
+  match f1 x1 x2 with
+  | Unchanged -> f2 x1 x2
+  | Replace y -> Replace y
+  | PostProcess p1 ->
+    (
+      match f2 x1 x2 with
+      | Unchanged -> PostProcess p1
+      | Replace y -> Replace (p1 y)
+      | PostProcess p2 -> PostProcess (fun y -> p1 (p2 y))
+    )
+
 let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
   map_apply_modify (f e) (fun () ->
     let r = map_exp f in

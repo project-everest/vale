@@ -14,13 +14,13 @@ predicate{:opaque} OpaqueTruth(x:int)
 }
 #endverbatim
 
-procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout register x:int)
+procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
     ensures
         x == old(x) + 1;
 {
 }
 
-procedure P(inout register o:int, inline k:int, ghost g:int)
+procedure P(inout o:reg, inline k:int, ghost g:int)
     requires
         @o != EAX;
         g >= 1;

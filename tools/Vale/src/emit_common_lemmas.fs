@@ -78,7 +78,7 @@ let make_fun_param (modifies:bool) (pfIsRet:bool) (pf:pformal):formal list =
   match (storage, pfIsRet, modifies) with
   | (XInline, false, false) -> [fx]
   | ((XGhost | XAlias _), _, false) -> []
-  | (XOperand xo, _, false) -> [(x, Some (tOperand xo))]
+  | (XOperand, _, false) -> [(x, Some (tOperand (vaOperandTyp t)))]
   | (_, _, true) -> []
   | (XInline, true, _) -> internalErr "XInline"
   | (XState _, _, _) -> internalErr "XState"
@@ -102,7 +102,7 @@ let make_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (pf:pformal):pform
   | (_, XGhost, _, false) -> if ret = pfIsRet then [pf] else []
   | (_, _, _, true) -> []
   | (false, XInline, false, false) -> [pf]
-  | (_, XOperand xo, _, false) -> if ret = pfIsRet then [pfOp xo] else []
+  | (_, XOperand, _, false) -> if ret = pfIsRet then [pfOp (vaOperandTyp t)] else []
   | (_, XAlias _, _, false) -> []
   | (true, XInline, false, _) -> []
   | (_, XInline, true, _) -> internalErr "XInline"
@@ -174,7 +174,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
     | EApply (x, es) when Map.containsKey x env.procs ->
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
-        let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand _ -> true | _ -> false) p.prets in
+        let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
         let pretsArgs = pretsOp @ pargs in
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> sub_s0 e | _ -> e) es in
         let es = List.map (fun e -> match e with EOp (CodeLemmaOp, [_; e]) -> sub_s0 e | _ -> e) es in
@@ -201,7 +201,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
   | SCalc (oop, contents) ->
       let ccs = List.map (build_lemma_calcContents senv sub_s0) contents in
       (Ghost, false, [SCalc (oop, ccs)])
-  | SVar (_, _, _, (XPhysical | XOperand _ | XInline | XAlias _), _, _) -> (Ghost, false, [])
+  | SVar (_, _, _, (XPhysical | XOperand | XInline | XAlias _), _, _) -> (Ghost, false, [])
   | SVar (x, t, m, g, a, eOpt) -> (Ghost, false, [SVar (x, t, m, g, a, mapOpt sub_s0 eOpt)])
   | SAlias _ -> (Ghost, false, [])
   | SLetUpdates _ -> internalErr "SLetUpdates"
@@ -375,8 +375,8 @@ let build_lemma_spec (env:env) (s0:id) (sM:exp) (loc:loc, s:spec):((loc * spec) 
 let fArg (x, t, g, io, a):exp list =
   match g with
   | XInline -> [EVar x]
-  | XOperand _ -> [EVar x]
-//  | XOperand _ -> [vaApp "op" [EVar x]]
+  | XOperand -> [EVar x]
+//  | XOperand -> [vaApp "op" [EVar x]]
   | _ -> []
   in
 
@@ -429,9 +429,9 @@ let make_gen_fast_block (loc:loc) (p:proc_decl):((lhs list -> exp list -> stmt l
 //   ensures  va_state_eq(va_sM, va_update_reg(EBX, va_sM, va_update_reg(EAX, va_sM, va_update_ok(va_sM, va_update(dummy2, va_sM, va_update(dummy, va_sM, va_s0))))))
 let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
   let specModsIo = List.collect (specModIo env) p.pspecs in
-  let frameArg (isRet:bool) e (x, _, storage, io, _) =
+  let frameArg (isRet:bool) e (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand xo, _) | (_, XOperand xo, (InOut | Out)) -> vaApp ("update_" + xo) [EVar x; EVar sM; e]
+    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp ("update_" + (vaOperandTyp t)) [EVar x; EVar sM; e]
     | _ -> e
     in
   let frameMod e (io, (x, _)) =
@@ -467,7 +467,7 @@ let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
     fbody =
       if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
       else Some (build_code_block env stmts);
-    fattrs = [(Id "opaque", [])];
+    fattrs = [(Id "opaque", [])] @ p.pattrs;
   }
 
 let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
@@ -518,8 +518,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   //   requires va_is_dst_int(dummy, s0)
   let reqIsArg (isRet:bool) (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand xo, _) | (false, XOperand xo, (InOut | Out)) -> [vaAppOp ("is_dst_" + xo + "_") t [EVar x; EVar s0]]
-    | (false, XOperand xo, In) -> [vaAppOp ("is_src_" + xo + "_") t [EVar x; EVar s0]]
+    | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp ("is_dst_") t [EVar x; EVar s0]]
+    | (false, XOperand, In) -> [vaAppOp ("is_src_") t [EVar x; EVar s0]]
     | _ -> []
     in
   let reqIsExps =
