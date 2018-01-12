@@ -84,8 +84,7 @@ procedure poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
         efl;
     requires
         r1 % 4 == 0;
-        eq_int(s1, r1 + r1 /4);
-        //s1 == r1 + r1 / 4;
+        s1 == r1 + r1 / 4;
         h2 * r0 < 7 * (n / 16);
         h0 * r1 < n * (n / 16);
         h1 * r0 < n * (n / 16);
@@ -341,7 +340,7 @@ procedure poly1305_iteration(
     (ghost var hd) := poly1305_multiply(r1);
     hh := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
     reveal_opaque(modp');
-    assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
+    assert hh == (n * n) * h2 + n * h1 + h0 /\ (h * r) % p == hh % p;
 }
 
 #verbatim
@@ -567,7 +566,7 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
         r1 % 4 == 0;
         s1 == r1 + r1 / 4;
         inpLast == lowerUpper128_opaque(r8, r9);
-        1 <= nExtra && nExtra < 16;
+        1 <= nExtra /\ nExtra < 16;
     ensures
         h2 < 5;
         let padLast := pow2(nExtra * 8);

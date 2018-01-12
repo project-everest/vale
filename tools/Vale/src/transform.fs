@@ -683,6 +683,13 @@ let rewrite_vars_spec (envIn:env) (envOut:env) (s:spec):spec =
   | Modifies (m, e) -> Modifies (m, rewrite_vars_exp envOut e)
   | SpecRaw _ -> internalErr "rewrite_vars_spec"
 
+let resolve_overload_spec (envIn:env) (envOut:env) (s:spec):spec =
+  match s with
+  | Requires (r, e) -> Requires (r, resolve_overload_expr envIn e)
+  | Ensures (r, e) -> Ensures (r, resolve_overload_expr envOut e)
+  | Modifies (m, e) -> Modifies (m, resolve_overload_expr envOut e)
+  | SpecRaw _ -> internalErr "resolve_overload_spec"
+
 ///////////////////////////////////////////////////////////////////////////////
 // Add extra asserts for p's ensures clauses and for called procedures' requires clauses,
 // to produce better error messages.
@@ -912,6 +919,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
       let envp = {envp with checkMods = isRefined || isFrame} in
       let envp = {envp with abstractOld = false} in
       let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
+      let specs = List_mapSnd (resolve_overload_spec envpIn envp) specs in 
       let envp = if isRecursive then {envp with procs = Map.add p.pname {p with pspecs = specs} envp.procs} else envp in
       let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
       // Process body

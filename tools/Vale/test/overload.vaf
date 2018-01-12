@@ -93,12 +93,6 @@ unfold let va_reveal_opaque = reveal_opaque
 
 #endverbatim
 
-#token /\ precedence &&
-#token \/ precedence ||
-
-function operator(/\) (x:Type0, y:Type0):int := l_and;
-function operator(\/) (x:Type0, y:Type0):int := l_or;
-
 procedure Calls(x:reg, y:reg)
 {
     ghost var z:= 0<x \/ y>0;

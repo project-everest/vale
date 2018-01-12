@@ -1,0 +1,6 @@
+
+#token /\ precedence &&
+#token \/ precedence ||
+
+function operator(/\) (x:Type0, y:Type0):int := l_and;
+function operator(\/) (x:Type0, y:Type0):int := l_or;
