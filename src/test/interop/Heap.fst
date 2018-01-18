@@ -1,4 +1,4 @@
-module Memory
+module Heap
 
 open FStar.Preorder
 open FStar.Classical

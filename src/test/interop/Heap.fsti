@@ -1,4 +1,4 @@
-module Memory
+module Heap
 
 module S  = FStar.Set
 module TS = FStar.TSet
