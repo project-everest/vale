@@ -139,9 +139,46 @@ val wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:stat
     (wp_sound_code_pre qc s0 k)
     (wp_sound_code_post qc s0 k)
 
+// For efficiency, absorb the state components from the (potentially large) normalized
+// final state sN into an alternate final state sN' (related to sN via 'update' and 'post':
+// update describes which components changed, post describes what they changed to).
+let wp_final_k (#a:Type0) (update:state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (sN:state) (g:a) : Type0 =
+  va_state_match sN (update sN) /\ post sN sN /\
+    (forall (ok':bool) (regs':Regs_i.t) (flags':nat64) (mem':mem).
+      let sN' = {ok = ok'; regs = regs'; flags = flags'; mem = mem'} in
+      post sN sN' ==> k sN' g)
+
+// For efficiency, introduce shorter names (e.g. ok, mem) for components of initial state s0.
+let wp_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
+  forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
+    let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
+    s0 == s0' ==> wp cs qcs (wp_final_k (update s0') post k) s0'
+
+let wp_wrap_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
+  forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
+    let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
+    s0 == s0' ==> QProc?.wp qc s0' (wp_final_k (update s0') post k)
+
+unfold let wp_GHOST (#a:Type0) (c:code) (s0:state) (update:state -> state -> state) (fk:(state -> a -> Type0) -> Type0) (p:state * fuel * a -> Type0) : Type0 =
+  forall (k:state -> a -> Type0).
+    (forall (sN:state) (gN:a).{:pattern (k sN gN)}
+      (forall (fN:fuel). eval c s0 fN sN /\ sN == update s0 sN ==> p (sN, fN, gN)) ==>
+      k sN gN
+    ) ==>
+    fk k
+
+// Use raw GHOST effect to integrate soundness proof into F*'s own weakest precondition generation.
+val wp_run (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
+  GHOST (state * fuel * a) (wp_GHOST (Block cs) s0 update (fun k -> wp_wrap cs qcs update post k s0))
+
+val wp_run_code (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
+  GHOST (state * fuel * a) (wp_GHOST c s0 update (fun k -> wp_wrap_code c qc update post k s0))
+
 unfold let normal_steps : list string =
   [
     "X64.Vale.Quick_i.wp";
+    "X64.Vale.Quick_i.wp_wrap";
+    "X64.Vale.Quick_i.wp_wrap_code";
     "X64.Vale.Quick_i.wp_proc";
     "X64.Vale.Quick_i.wp_Seq";
     "X64.Vale.Quick_i.wp_Bind";
@@ -153,6 +190,8 @@ unfold let normal_steps : list string =
     "X64.Vale.Quick_i.va_state_match";
     "X64.Vale.Quick_i.wp_sound_pre";
     "X64.Vale.Quick_i.wp_sound_code_pre";
+    "X64.Vale.Quick_i.wp_final_k";
+//    "X64.Vale.Quick_i.norm_all_regs_match";
 
     "X64.Machine_s.__proj__OReg__item__r";
     "X64.Machine_s.uu___is_OReg";

@@ -12,19 +12,30 @@ open X64.Vale.Quick_i
 #verbatim
 
 unfold let normal_steps2 : list string =
-  "X64.Vale.Decls.va_wp_Add64"::
-  "X64.Vale.Decls.va_quick_Add64"::
-  "Quick.codes_bench"::
-  "Quick.wpCodes_bench"::
+  "X64.Vale.Decls.va_wp_Add64"::"X64.Vale.Decls.va_quick_Add64"::
+  "Quick.codes_bench"::"Quick.wpCodes_bench"::
+  "Quick.va_code_Bump3"::"Quick.va_qcode_Bump3"::
+  "Quick.va_code_1_Incr3"::"Quick.va_qcode_1_Incr3"::
   normal_steps
 
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_only normal_steps2] x
 
-val wp_sound_norm (#a:Type0) (cs:codes) (fcs:quickCodes a cs) (s0:state) (p:state -> state -> a -> Type0) :
+val wp_sound_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) :
   Ghost (state * fuel * a)
-    (normal (wp_sound_pre fcs s0 p))
-    (wp_sound_post fcs s0 p)
+    (normal (wp_sound_pre qcs s0 k))
+    (wp_sound_post qcs s0 k)
 let wp_sound_norm = wp_sound_wrap
+
+val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) :
+  Ghost (state * fuel * a)
+    (normal (wp_sound_code_pre qc s0 k))
+    (wp_sound_code_post qc s0 k)
+let wp_sound_code_norm = wp_sound_code_wrap
+
+val wp_run_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
+  GHOST (state * fuel * a) (wp_GHOST (Block cs) s0 update (fun k -> normal (wp_wrap cs qcs update post k s0)))
+let wp_run_norm =
+  wp_run
 
 [@"opaque_to_smt"]
 let codes_bench : codes = [
@@ -51,7 +62,6 @@ let codes_bench : codes = [
   va_code_Add64 (OReg Rax) (OConst 1);
   va_code_Add64 (OReg Rax) (OConst 1);
   va_code_Add64 (OReg Rax) (OConst 1);
-
   ]
 
 [@"opaque_to_smt"]
@@ -100,6 +110,7 @@ let lemma_bench1 (s0:state) : Ghost (state * fuel)
     va_state_eq sN (va_update_reg Rax sN (va_update_flags sN s0))
   )
   =
+(*
   let (sN, f0, ()) = wp_sound_norm codes_bench wpCodes_bench s0
     (fun s0 sN () ->
       sN.ok /\
@@ -107,8 +118,15 @@ let lemma_bench1 (s0:state) : Ghost (state * fuel)
       va_state_match sN (va_update_reg Rax sN (va_update_flags sN s0))
     )
     in
+*)
+  let (sN, f0, ()) = wp_run_norm codes_bench wpCodes_bench s0
+    (fun (s0:state) (sN:state) -> va_update_reg Rax sN (va_update_flags sN s0))
+    (fun (sN:state) (sN':state) -> eval_reg Rax sN == eval_reg Rax sN' /\ sN.flags == sN'.flags)
+    in
+//  let (sN, f0, ()) = wp_run_norm codes_bench wpCodes_bench s0 in
   (sN, f0)
 //#reset-options ""
+
 #endverbatim
 
 procedure{:quick exportOnly} Add64Ghosts(
@@ -138,38 +156,7 @@ procedure{:quick exportOnly} Add64Ghosts(
     Add64(dst, src);
 }
 
-(*
-#verbatim
-unfold let va_normal_Add3 (x:Type0) : Type0 =
-  norm [
-    iota; zeta; simplify; primops;
-    delta_only (
-      "X64.Vale.Decls.va_wp_Add64"::
-      "X64.Vale.Decls.va_quick_Add64"::
-      "Quick.va_code_Add3"::
-      "Quick.va_qcode_Add3"::
-      normal_steps
-    )
-  ]
-  x
-
-val va_wpSound_Add3 (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (p:state -> state -> a -> Type0) :
-  Ghost ((sN:state) * (fN:fuel) * (g:a))
-    (va_normal_Add3 (wp_sound_code_pre qc s0 p))
-    (wp_sound_code_post qc s0 p)
-let va_wpSound_Add3 = wp_sound_code_wrap
-
-[@"opaque_to_smt"]
-let va_qcode_Add3 () : quickCode unit (va_code_Add3 ()) = qblock (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QEmpty ()
-  )))
-)
-#endverbatim
-
-procedure{:quick} Add3()
+procedure{:quick} Bump3()
     modifies
         efl;
         rax;
@@ -182,5 +169,19 @@ procedure{:quick} Add3()
     Add64(rax, 1);
     Add64(rax, 1);
 }
-*)
+
+procedure Incr3()
+    modifies
+        efl;
+        rax;
+    requires
+        rax < 100;
+    ensures
+        rax == old(rax) + 3;
+{
+    assert{:quick_start} true;
+    Add64(rax, 1);
+    Add64(rax, 1);
+    Add64(rax, 1);
+}
 

@@ -23,7 +23,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
         let fs (s:stmt):stmt list map_modify =
           let modGhost = if !reprint_ghost_stmts then Unchanged else Replace [] in
           match s with
-          | SLoc _ | SLabel _ | SGoto _ | SReturn | SAlias _ | SLetUpdates _ | SBlock _ | SFastBlock _ -> Unchanged
+          | SLoc _ | SLabel _ | SGoto _ | SReturn | SAlias _ | SLetUpdates _ | SBlock _ | SQuickBlock _ -> Unchanged
           | SIfElse ((SmInline | SmPlain), _, _, _) -> Unchanged
           | SWhile _ when !reprint_loop_invs -> Unchanged
           | SWhile (e, _, (l, _), s) -> Replace [SWhile (e, [], (l, []), s)]

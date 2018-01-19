@@ -142,9 +142,9 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
   | SBlock b ->
       let (u, b) = let_updates_stmts scope b in
       (scope, Set.union updates u, make_let u (SBlock b))
-  | SFastBlock b ->
+  | SQuickBlock (x, b) ->
       let (u, b) = let_updates_stmts scope b in
-      (scope, Set.union updates u, make_let u (SFastBlock b))
+      (scope, Set.union updates u, make_let u (SQuickBlock (x, b)))
   | SIfElse (g, e, b1, b2) ->
       let (u1, b1) = let_updates_stmts scope b1 in
       let (u2, b2) = let_updates_stmts scope b2 in
@@ -168,4 +168,33 @@ let collect_spec (loc:loc, s:spec):(exp list * exp list) =
 let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
   let (rs, es) = List.unzip (List.map collect_spec ss) in
   (List.concat rs, List.concat es)
+
+// compute function parameters
+// pfIsRet == false ==> pf is input parameter
+// pfIsRet == true ==> pf is output return value
+let make_fun_param (modifies:bool) (pfIsRet:bool) (pf:pformal):formal list =
+  let (x, t, storage, io, attrs) = pf in
+  let fx = (x, Some t) in
+  match (storage, pfIsRet, modifies) with
+  | (XInline, false, false) -> [fx]
+  | ((XGhost | XAlias _), _, false) -> []
+  | (XOperand, _, false) -> [(x, Some (tOperand (vaOperandTyp t)))]
+  | (_, _, true) -> []
+  | (XInline, true, _) -> internalErr "XInline"
+  | (XState _, _, _) -> internalErr "XState"
+  | (XPhysical, _, _) -> internalErr "XPhysical"
+
+let make_fun_params (prets:pformal list) (pargs:pformal list):formal list =
+  (List.collect (make_fun_param false true) prets) @
+  (List.collect (make_fun_param true true) prets) @
+  (List.collect (make_fun_param false false) pargs) @
+  (List.collect (make_fun_param true false) pargs)
+
+let fArg (x, t, g, io, a):exp list =
+  match g with
+  | XInline -> [EVar x]
+  | XOperand -> [EVar x]
+//  | XOperand -> [vaApp "op" [EVar x]]
+  | _ -> []
+  in
 

@@ -18,10 +18,11 @@ type build_env =
     is_operand:bool;
     is_framed:bool;
     is_terminating:bool;
-    code_name:id;
+    code_name:string -> id;
     frame_exp:id -> exp * exp;
-    gen_fast_block:lhs list -> exp list -> stmt list -> stmt list;
-    gen_fast_block_funs:unit -> decls;
+    gen_quick_block:env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list;
+    gen_quick_block_funs:unit -> decls;
+    quick_code_funs:fun_decl list ref;
   }
 
 (* Build code value for body of procedure Q:
@@ -30,7 +31,8 @@ function method{:opaque} va_code_Q(...):va_code
   va_Block(va_CCons(va_code_P(va_op_reg(EBX), 10), va_CCons(va_code_P(va_op_reg(EBX), 20), va_CCons(va_code_P(va_op_reg(EBX), 30), va_CNil()))))
 }
 *)
-let rec build_code_stmt (env:env) (s:stmt):exp list =
+let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
+  let rs = build_code_block env benv in
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
@@ -43,49 +45,50 @@ let rec build_code_stmt (env:env) (s:stmt):exp list =
     in
   match s with
   | SLoc (loc, s) ->
-      try List.map (fun e -> ELoc (loc, e)) (build_code_stmt env s) with err -> raise (LocErr (loc, err))
-  | SBlock b -> [build_code_block env b]
-  | SFastBlock b -> [build_code_block env b]
+      try List.map (fun e -> ELoc (loc, e)) (build_code_stmt env benv s) with err -> raise (LocErr (loc, err))
+  | SBlock b -> [rs b]
+  | SQuickBlock (info, b) ->
+      // REVIEW: would be more consistent to generate a value of type "code" rather than "codes",
+      // but the normalization doesn't seem to work as well for "code".
+      let p = benv.proc in
+      let fParams = make_fun_params p.prets p.pargs in
+      let name = benv.code_name (info.qsym + "_") in
+      let f =
+        {
+          fname = name;
+          fghost = NotGhost;
+          fargs = fParams;
+//          fret = tCode;
+          fret = tCodes;
+//          fbody = Some (rs b);
+          fbody = Some (build_code_stmts env benv b);
+          fattrs = [(Id "opaque_to_smt", [])];
+        }
+        in
+      benv.quick_code_funs := f::!(benv.quick_code_funs);
+      let e = EApply (name, List.map (fun (x, _) -> EVar x) fParams) in
+//      [e]
+      [vaApp "Block" [e]]
   | SIfElse (SmPlain, cmp, ss1, ss2) ->
-      let e1 = build_code_block env ss1 in
-      let e2 = build_code_block env ss2 in
+      let e1 = rs ss1 in
+      let e2 = rs ss2 in
       [vaApp "IfElse" [map_exp stateToOp cmp; e1; e2]]
   | SIfElse (SmInline, cmp, ss1, ss2) ->
-      let e1 = build_code_block env ss1 in
-      let e2 = build_code_block env ss2 in
+      let e1 = rs ss1 in
+      let e2 = rs ss2 in
       [EOp (Cond, [map_exp stateToOp cmp; e1; e2])]
   | SWhile (cmp, ed, invs, ss) ->
-      let ess = build_code_block env ss in
+      let ess = rs ss in
       [vaApp "While" [map_exp stateToOp cmp; ess]]
   | SAssign (_, e) -> assign e
   | _ -> []
-and build_code_block (env:env) (stmts:stmt list):exp =
+and build_code_stmts (env:env) (benv:build_env) (stmts:stmt list):exp =
   let empty = vaApp "CNil" [] in
   let cons el e = vaApp "CCons" [e; el] in
-  let slist = List.collect (build_code_stmt env) stmts in
-  let elist = List.fold cons empty (List.rev slist) in
-  vaApp "Block" [elist]
-
-// compute function parameters
-// pfIsRet == false ==> pf is input parameter
-// pfIsRet == true ==> pf is output return value
-let make_fun_param (modifies:bool) (pfIsRet:bool) (pf:pformal):formal list =
-  let (x, t, storage, io, attrs) = pf in
-  let fx = (x, Some t) in
-  match (storage, pfIsRet, modifies) with
-  | (XInline, false, false) -> [fx]
-  | ((XGhost | XAlias _), _, false) -> []
-  | (XOperand, _, false) -> [(x, Some (tOperand (vaOperandTyp t)))]
-  | (_, _, true) -> []
-  | (XInline, true, _) -> internalErr "XInline"
-  | (XState _, _, _) -> internalErr "XState"
-  | (XPhysical, _, _) -> internalErr "XPhysical"
-
-let make_fun_params (prets:pformal list) (pargs:pformal list):formal list =
-  (List.collect (make_fun_param false true) prets) @
-  (List.collect (make_fun_param true true) prets) @
-  (List.collect (make_fun_param false false) pargs) @
-  (List.collect (make_fun_param true false) pargs)
+  let slist = List.collect (build_code_stmt env benv) stmts in
+  List.fold cons empty (List.rev slist)
+and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
+  vaApp "Block" [build_code_stmts env benv stmts]
 
 // compute parameters/returns for procedures (abstract/concrete/lemma) 
 // pfIsRet == false ==> pf is input parameter
@@ -208,10 +211,12 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
   | SAlias _ -> (Ghost, false, [])
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> (NotGhost, true, build_lemma_block senv b)
-  | SFastBlock b ->
-      let sFuel = SAssign ([(senv.fM, Some (Some tFuel, Ghost))], vaApp "fuel_default" []) in
-      let ss = benv.gen_fast_block [(sM, Some (Some tState, Ghost))] [EVar s0; EVar senv.fM] b in
-      (NotGhost, true, sFuel::ss)
+  | SQuickBlock (info, b) ->
+      let outS = (sM, Some (Some tState, Ghost)) in
+      let outF = (senv.fM, Some (Some tFuel, Ghost)) in
+      let outG = (Reserved "g", None) in
+      let ss = benv.gen_quick_block env info [outS; outF; outG] [EVar s0] b in
+      (NotGhost, true, ss)
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_s0 e in
       let ss1 = build_lemma_ghost_stmts senv ss1 in
@@ -374,59 +379,6 @@ let build_lemma_spec (env:env) (s0:id) (sM:exp) (loc:loc, s:spec):((loc * spec) 
     | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
 
-let fArg (x, t, g, io, a):exp list =
-  match g with
-  | XInline -> [EVar x]
-  | XOperand -> [EVar x]
-//  | XOperand -> [vaApp "op" [EVar x]]
-  | _ -> []
-  in
-
-let make_gen_fast_block (loc:loc) (p:proc_decl):((lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
-  let next_sym = ref 0 in
-  let funs = ref ([]:decls) in
-  let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
-  let fParams = make_fun_params p.prets p.pargs in
-  let fIns (s:stmt):exp =
-    let err () = internalErr "make_gen_fast_block" in
-    match skip_loc_stmt s with
-    | SAssign ([], e) ->
-      (
-        match skip_loc e with
-        | EApply(Id x, es) ->
-            let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
-            let es = List.map get_code_exp es in
-            let es = List.map (map_exp stateToOp) es in
-            let es = List.map exp_refined es in
-            vaApp ("fast_ins_" + x) es
-        | _ -> err ()
-      )
-    | _ -> err ()
-    in
-  let gen_fast_block outs args ss =
-    incr next_sym;
-    let id = Reserved ("ins_" + (string !next_sym) + "_" + (string_of_id p.pname)) in
-    let inss = List.map fIns ss in
-    let fBody = EApply (Id "list", inss) in
-    let fCode =
-      {
-        fname = id;
-        fghost = Ghost;
-        fargs = fParams;
-        fret = TName (Reserved "inss");
-        fbody = Some fBody;
-        fattrs = [];
-      }
-      in
-    let dFun = DFun fCode in
-    funs := (loc, dFun)::!funs;
-    let eIns = EApply (id, fArgs) in
-    let sLemma = SAssign (outs, EApply (Reserved "lemma_weakest_pre_norm", eIns::args)) in
-    [sLemma]
-    in
-  let gen_fast_block_funs () = List.rev !funs in
-  (gen_fast_block, gen_fast_block_funs)
-
 // Generate well-formedness for operands:
 //   requires va_is_dst_int(dummy, s0)
 let reqIsArg (s0:id) (isRet:bool) ((x, t, storage, io, _):pformal):exp list =
@@ -467,25 +419,28 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand)
   va_Block(...)
 }
 *)
-let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
+let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
   let fParams = make_fun_params p.prets p.pargs in
-  {
-    fname = benv.code_name;
-    fghost = NotGhost;
-    fargs = fParams;
-    fret = tCode;
-    fbody =
-      if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
-      else Some (build_code_block env stmts);
-    fattrs = if benv.is_quick then [(Id "opaque_to_smt", []); (Id "public_decl", [])] else [(Id "opaque", [])];
-  }
+  let f =
+    {
+      fname = benv.code_name "";
+      fghost = NotGhost;
+      fargs = fParams;
+      fret = tCode;
+      fbody =
+        if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
+        else Some (build_code_block env benv stmts);
+      fattrs = if benv.is_quick then [(Id "opaque_to_smt", []); (Id "public_decl", [])] else [(Id "opaque", [])];
+    }
+    in
+  List.map (fun f -> (loc, DFun f)) (List.rev (f::!(benv.quick_code_funs)))
 
 let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
   // generate va_lemma_Q
   let p = benv.proc in
   let loc = benv.loc in
-  let codeName = benv.code_name in
+  let codeName = benv.code_name "" in
   let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
 
   (* Generate lemma prologue and boilerplate requires/ensures
@@ -591,7 +546,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   gen_lemma_sym_count := 0;
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
-  let codeName = Reserved ("code_" + (string_of_id p.pname)) in
+  let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in
   let isQuick =
     if List_mem_assoc (Id "quick") p.pattrs then
       match List_assoc (Id "quick") p.pattrs with
@@ -623,7 +578,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
           | SVar (x, _, _, XGhost, _, _) -> x::(List.concat xss)
           | _ -> List.concat xss
           in
-        let (gen_fast_block, gen_fast_block_funs) = make_gen_fast_block loc p in
+        let (gen_quick_block, gen_quick_block_funs) = Emit_common_quick_code.make_gen_quick_block loc p in
         let benv =
           {
             proc = p;
@@ -635,20 +590,21 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
             is_terminating = attrs_get_bool (Id "terminates") true p.pattrs;
             code_name = codeName;
             frame_exp = makeFrame env p s0;
-            gen_fast_block = gen_fast_block;
-            gen_fast_block_funs = gen_fast_block_funs;
+            gen_quick_block = gen_quick_block;
+            gen_quick_block_funs = gen_quick_block_funs;
+            quick_code_funs = ref [];
           }
           in
         let rstmts = stmts_refined stmts in
-        let fCode = build_code env benv rstmts in
+        let fCodes = build_code loc env benv rstmts in
         let dummy = Reserved "dummy" in
         let senv = { env = env; benv = benv; b1 = b1; bM = dummy; code = EVar dummy; s0 = s0; f0 = fM; sM = sM; fM = fM; sN = dummy; loc = loc;} in
         let bstmts = build_lemma_stmts senv stmts in
         let pLemma = build_lemma env benv b1 rstmts bstmts in
         let quickDecls =
           if isQuick then
-            Emit_common_quick_code.build_qcode env loc p
+            Emit_common_quick_code.build_qcode env loc p stmts
           else []
-        [(loc, DFun fCode)] @ quickDecls @ (gen_fast_block_funs ()) @ [(loc, DProc pLemma)]
+        fCodes @ quickDecls @ (gen_quick_block_funs ()) @ [(loc, DProc pLemma)]
     in
   bodyDecls //@ blockLemmaDecls

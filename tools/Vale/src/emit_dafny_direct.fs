@@ -554,7 +554,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         stmts
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock ss -> notImplemented "block"
-    | SFastBlock ss -> internalErr "fast_block"
+    | SQuickBlock _ -> internalErr "quick_block"
     | SIfElse (_, e, ss1, ss2) ->
         let tok = create_token loc "if" in
         let guard = create_expression built_ins loc e in

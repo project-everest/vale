@@ -296,7 +296,8 @@ Stmt
         match ($3, snd $5) with
         | (_, false) -> parse_err "expected 'assert{...} true'"
         | (Id "split_here", true) -> {assert_attrs_default with is_split = true}
-        | (Id "fast_block", true) -> {assert_attrs_default with is_fastblock = true}
+        | (Id "quick_start", true) -> {assert_attrs_default with is_quickstart = true}
+        | (Id "quick_end", true) -> {assert_attrs_default with is_quickend = true}
         | _ -> parse_err ("unknown attribute: " + (err_id $3))
         in
       stmtAt $1 (SAssert (attrs, EBool true))

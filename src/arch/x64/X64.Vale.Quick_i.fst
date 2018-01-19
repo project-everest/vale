@@ -125,3 +125,94 @@ let wp_sound_code #a c qc k s0 =
 let wp_sound_wrap #a cs qcs s0 k = wp_sound cs qcs (k s0) s0; wp_monotone cs qcs (k s0) k_true s0; wp_compute cs qcs s0
 let wp_sound_code_wrap #a c qc s0 k = wp_sound_code c qc (k s0) s0
 
+irreducible
+val wp_wrap_monotone (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k1:state -> a -> Type0) (k2:state -> a -> Type0) (s0:state) : Lemma
+  (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
+  (ensures wp_wrap cs qcs update post k1 s0 ==> wp_wrap cs qcs update post k2 s0)
+let wp_wrap_monotone #a cs qcs update post k1 k2 s0 =
+  wp_monotone cs qcs (wp_final_k (update s0) post k1) (wp_final_k (update s0) post k2) s0
+
+let wp_wrap_compute (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (s0:state) :
+  Ghost ((sN:state) * (fN:fuel) * (g:a))
+  (requires wp_wrap cs qcs update post k_true s0)
+  (ensures fun _ -> True) =
+  wp_monotone cs qcs (wp_final_k (update s0) post k_true) k_true s0;
+  wp_compute cs qcs s0
+
+irreducible
+val wp_wrap_sound (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Lemma
+  (requires wp_wrap cs qcs update post k s0)
+  (ensures (
+    wp_wrap_monotone cs qcs update post k k_true s0;
+    let (sN, fN, gN) = wp_wrap_compute cs qcs update post s0 in
+    eval (Block cs) s0 fN sN /\ sN == update s0 sN /\ k sN gN
+  ))
+let wp_wrap_sound #a cs qcs update post k s0 =
+  wp_monotone cs qcs (wp_final_k (update s0) post k) k s0;
+  wp_wrap_monotone cs qcs update post k k_true s0;
+  wp_sound cs qcs k s0;
+  wp_sound cs qcs (wp_final_k (update s0) post k_true) s0;
+  ()
+
+let wp_run #a cs qcs s0 update post =
+  assert (wp_wrap cs qcs update post k_true s0);
+  let f (k:state -> a -> Type0) : Lemma (wp_wrap cs qcs update post k s0 ==> wp_wrap cs qcs update post k_true s0) =
+    wp_wrap_monotone cs qcs update post k k_true s0
+    in
+  FStar.Classical.forall_intro f;
+  let (sN, fN, gN) = wp_wrap_compute cs qcs update post s0 in
+  let f (p:state * fuel * a -> Type) (_:squash (wp_GHOST (Block cs) s0 update (fun k -> wp_wrap cs qcs update post k s0) p)) :
+    Lemma (p (sN, fN, gN)) =
+    let k sN gN = (forall (fN:fuel). eval (Block cs) s0 fN sN /\ sN == update s0 sN ==> p (sN, fN, gN)) in
+    wp_wrap_sound cs qcs update post k s0
+    in
+  FStar.Classical.forall_impl_intro f;
+  (sN, fN, gN)
+
+irreducible
+val wp_wrap_monotone_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (k1:state -> a -> Type0) (k2:state -> a -> Type0) (s0:state) : Lemma
+  (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
+  (ensures wp_wrap_code c qc update post k1 s0 ==> wp_wrap_code c qc update post k2 s0)
+let wp_wrap_monotone_code #a c qc update post k1 k2 s0 =
+  let QProc _ wp monotone compute proof = qc in
+  monotone s0 (wp_final_k (update s0) post k1) (wp_final_k (update s0) post k2)
+
+let wp_wrap_compute_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (s0:state) :
+  Ghost ((sN:state) * (fN:fuel) * (g:a))
+  (requires wp_wrap_code c qc update post k_true s0)
+  (ensures fun _ -> True) =
+  let QProc _ wp monotone compute proof = qc in
+  monotone s0 (wp_final_k (update s0) post k_true) k_true;
+  compute s0
+
+irreducible
+val wp_wrap_sound_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Lemma
+  (requires wp_wrap_code c qc update post k s0)
+  (ensures (
+    wp_wrap_monotone_code c qc update post k k_true s0;
+    let (sN, fN, gN) = wp_wrap_compute_code c qc update post s0 in
+    eval c s0 fN sN /\ sN == update s0 sN /\ k sN gN
+  ))
+let wp_wrap_sound_code #a c qc update post k s0 =
+  let QProc _ wp monotone compute proof = qc in
+  monotone s0 (wp_final_k (update s0) post k) k;
+  wp_wrap_monotone_code c qc update post k k_true s0;
+  proof s0 k;
+  proof s0 (wp_final_k (update s0) post k_true);
+  ()
+
+let wp_run_code #a c qc s0 update post =
+  let QProc _ wp monotone compute proof = qc in
+  assert (wp_wrap_code c qc update post k_true s0);
+  let f (k:state -> a -> Type0) : Lemma (wp_wrap_code c qc update post k s0 ==> wp_wrap_code c qc update post k_true s0) =
+    wp_wrap_monotone_code c qc update post k k_true s0
+    in
+  FStar.Classical.forall_intro f;
+  let (sN, fN, gN) = wp_wrap_compute_code c qc update post s0 in
+  let f (p:state * fuel * a -> Type) (_:squash (wp_GHOST c s0 update (fun k -> wp_wrap_code c qc update post k s0) p)) :
+    Lemma (p (sN, fN, gN)) =
+    let k sN gN = (forall (fN:fuel). eval c s0 fN sN /\ sN == update s0 sN ==> p (sN, fN, gN)) in
+    wp_wrap_sound_code c qc update post k s0
+    in
+  FStar.Classical.forall_impl_intro f;
+  (sN, fN, gN)

@@ -200,7 +200,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
-  | SFastBlock ss -> internalErr "fast_block"
+  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp e) + " then");
       emit_block ps "" outs ss1;
@@ -341,7 +341,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
   let printBody hasDecl x e =
-    (if not hasDecl && isOpaqueToSmt then ps.PrintLine "[@\"opaque_to_smt\"]");
+    (if isOpaqueToSmt then ps.PrintLine "[@\"opaque_to_smt\"]");
     let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
     ps.PrintLine ("let " + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();

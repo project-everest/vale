@@ -50,7 +50,7 @@ let rec build_code_stmt (env:env) (s:stmt):exp list =
   | SLoc (loc, s) ->
       try List.map (fun e -> ELoc (loc, e)) (build_code_stmt env s) with err -> raise (LocErr (loc, err))
   | SBlock b -> [build_code_block env b]
-  | SFastBlock b -> [build_code_block env b]
+  | SQuickBlock (_, b) -> [build_code_block env b]
   | SIfElse (SmPlain, cmp, ss1, ss2) ->
       let e1 = build_code_block env ss1 in
       let e2 = build_code_block env ss2 in
@@ -677,7 +677,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
   | SAlias _ -> (Ghost, false, [])
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> (NotGhost, true, build_lemma_block env benv (EVar code) src res loc b)
-  | SFastBlock b -> internalErr "SFastBlock"
+  | SQuickBlock _ -> internalErr "SQuickBlock"
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_src e in
       let ss1 = build_lemma_ghost_stmts env benv src res loc ss1 in

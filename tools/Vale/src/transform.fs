@@ -179,7 +179,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
         ({env with ids = ids}, [SAssign (xs, fee e)])
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> (env, [SBlock (rs b)])
-    | SFastBlock b -> (env, [SFastBlock (rs b)])
+    | SQuickBlock (x, b) -> (env, [SQuickBlock (x, rs b)])
     | SIfElse (g, e, b1, b2) -> (env, [SIfElse (g, fee e, rs b1, rs b2)])
     | SWhile (e, invs, ed, b) ->
         (env, [SWhile (fee e, List_mapSnd fee invs, mapSnd (List.map fee) ed, rs b)])
@@ -372,6 +372,19 @@ let check_state_info_mod (env:env) (x:id) (io:inout):unit =
 let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
   let readWrite = check_state_info env x in
   refineOp env (if readWrite then InOut else In) x (stateGet env x)
+
+let collect_mods (p:proc_decl):id list =
+  let spec_mods (_, s) =
+    match s with
+    | Modifies (Modify, e) ->
+      (
+        match skip_loc (exp_abstract false e) with
+        | EVar x -> [x]
+        | _ -> []
+      )
+    | _ -> []
+    in
+  List.collect spec_mods p.pspecs
 
 let check_mods (env:env) (p:proc_decl):unit =
   let check_spec (_, s) =
@@ -772,9 +785,9 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
 
 ///////////////////////////////////////////////////////////////////////////////
 
-let is_assert_fast_block (s:stmt):bool =
+let is_assert_quick_start (s:stmt):bool =
   match skip_loc_stmt s with
-  | SAssert ({is_fastblock = true}, e) ->
+  | SAssert ({is_quickstart = true}, e) ->
     (
       match skip_loc e with
       | EBool true -> true
@@ -782,45 +795,74 @@ let is_assert_fast_block (s:stmt):bool =
     )
   | _ -> false
 
-let is_fast_call (env:env) (s:stmt):bool =
+let is_assert_quick_end (s:stmt):bool =
   match skip_loc_stmt s with
-  | SAssign ([], e) ->
+  | SAssert ({is_quickend = true}, e) ->
     (
       match skip_loc e with
-      | EApply(x, _) ->
-        (
-          match Map.tryFind x env.procs with
-          | Some p when attrs_get_bool (Id "fast_instruction") false p.pattrs -> true
-          | _ -> false
-        )
+      | EBool true -> true
       | _ -> false
     )
   | _ -> false
 
-let rec add_fast_blocks_stmt (env:env) (s:stmt):stmt =
-  let r = add_fast_blocks_stmt env in
-  let rs = add_fast_blocks_stmts env in
+let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
+  match e with
+  | ELoc (loc, e) ->
+      try collect_mods_assign env lhss e
+      with err -> raise (LocErr (loc, err))
+  | EApply(x, es) ->
+    (
+      match Map.tryFind x env.procs with
+      | None -> []
+      | Some p ->
+          let fArg e =
+            match skip_loc e with
+            | EOp (StateOp (x, _, _), _) -> [x]
+            | _ -> []
+            in
+          let xsOut = List.collect fArg es in
+          xsOut @ (collect_mods p)
+    )
+  | _ -> []
+
+let collect_mods_stmts (env:env) (ss:stmt list):id list =
+  let fe (e:exp) (mods:id list list):id list = List.concat mods in
+  let fs (s:stmt) (mods:id list list):id list =
+    match s with
+    | SAssign (lhss, e) -> List.concat ((collect_mods_assign env lhss e)::mods)
+    | _ -> List.concat mods
+    in
+  let mods = gather_stmts fs fe ss in
+  Set.toList (Set.ofList (List.concat mods))
+
+let rec add_quick_blocks_stmt (env:env) (next_sym:int ref) (s:stmt):stmt =
+  let r = add_quick_blocks_stmt env next_sym in
+  let rs = add_quick_blocks_stmts env next_sym in
   match s with
   | SLoc (loc, s) -> SLoc (loc, r s)
   | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SAssign _ | SCalc _ | SVar _ | SAlias _ | SForall _ | SExists _-> s
   | SLetUpdates _ -> internalErr "SLetUpdates"
-  | SFastBlock b -> internalErr "SFastBlock"
+  | SQuickBlock _ -> internalErr "SQuickBlock"
   | SBlock b -> SBlock (rs b)
   | SIfElse (g, e, b1, b2) -> SIfElse (g, e, rs b1, rs b2)
   | SWhile (e, invs, ed, b) -> SWhile (e, invs, ed, rs b)
-and collect_fast_blocks_stmts (env:env) (ss:stmt list):(stmt list * stmt list) =
+and collect_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):(stmt list * stmt list) =
   match ss with
-  | s::ss when is_fast_call env s ->
-      let (ss1, ss2) = collect_fast_blocks_stmts env ss in
+  | [] -> ([], [])
+  | s::ss when is_assert_quick_end s -> ([], ss)
+  | s::ss ->
+      let (ss1, ss2) = collect_quick_blocks_stmts env next_sym ss in
       (s::ss1, ss2)
-  | _ -> ([], ss)
-and add_fast_blocks_stmts (env:env) (ss:stmt list):stmt list =
+and add_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):stmt list =
   match ss with
   | [] -> []
-  | s::ss when is_assert_fast_block s ->
-      let (ss1, ss2) = collect_fast_blocks_stmts env ss in
-      (SFastBlock ss1)::(add_fast_blocks_stmts env ss2)
-  | s::ss -> (add_fast_blocks_stmt env s)::(add_fast_blocks_stmts env ss)
+  | s::ss when is_assert_quick_start s ->
+      incr next_sym;
+      let sym = string !next_sym in
+      let (ss1, ss2) = collect_quick_blocks_stmts env next_sym ss in
+      let info = {qsym = sym; qmods = collect_mods_stmts env ss1} in
+      (SQuickBlock (info, ss1))::(add_quick_blocks_stmts env next_sym ss2)
+  | s::ss -> (add_quick_blocks_stmt env next_sym s)::(add_quick_blocks_stmts env next_sym ss)
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -944,7 +986,7 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             let ss = resolve_overload_stmts envp ss in
             //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
             let ss = rewrite_vars_stmts envp ss in
-            let ss = add_fast_blocks_stmts envp ss in
+            let ss = add_quick_blocks_stmts envp (ref 0) ss in
             Some ss
         in
       (env, DProc pReprint, DProc {p with pbody = body; pspecs = specs})
