@@ -650,7 +650,7 @@ procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst: dst_opr64, src: o
     requires
         src + dst < nat64_max;
     ensures
-        eq_int(dst, old(dst + src));
+        dst == old(dst + src);
 {
 }
 
@@ -667,7 +667,7 @@ procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst: dst_o
     requires
         src1 + src2 < nat64_max;
     ensures
-        eq_int(dst, old(src1) + old(src2));
+        dst == old(src1) + old(src2);
 {
 }
 
@@ -686,7 +686,7 @@ procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout ds
     modifies 
         efl;
     ensures
-        eq_int(dst, old(dst) - old(src));
+        dst == old(dst) - old(src);
 {
 }
 
@@ -722,7 +722,7 @@ procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout 
     modifies
         efl;
     ensures
-        eq_int(dst, (old(dst * src)));
+        dst == old(dst * src);
 {
     lemma_mul_nat(old(dst), old(src));
     lemma_mul_in_bounds(old(dst), old(src));

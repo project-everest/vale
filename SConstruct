@@ -270,6 +270,7 @@ if 'KREMLIN_HOME' in os.environ:
   kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
+env['VALE_INCLUDE'] = File('src\lib\util\operator.vaf')
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
@@ -397,7 +398,7 @@ def add_vale_builders(env):
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
                             emitter = vale_tool_dependency_Emitter)
-  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_USER_ARGS",
+  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText -include $VALE_INCLUDE -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_USER_ARGS",
                             src_suffix = '.vaf',
                             emitter = vale_tool_dependency_Emitter)
   env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})

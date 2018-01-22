@@ -16,7 +16,7 @@ let sid (x:id):string =
 let prec_of_bop (op:bop):(int * int * int) =
   match op with
   | BEquiv | BImply | BExply -> (10, 11, 11)
-  | BAnd | BOr -> (15, 16, 16) // TODO
+  | BAnd | BOr | BLand | BLor -> (15, 16, 16) // TODO
   | BLe | BGe | BLt | BGt | BIn -> (20, 20, 20)
   | BEq | BNe -> (25, 25, 26)
   | BAdd | BSub -> (30, 30, 31)
@@ -28,8 +28,8 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> "<=="
-  | BAnd -> "&&"
-  | BOr -> "||"
+  | BAnd | BLand -> "&&"
+  | BOr | BLor -> "||"
   | BEq -> "=="
   | BNe -> "!="
   | BLt -> "<"

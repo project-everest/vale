@@ -87,6 +87,7 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Ins_i.fst': None,
   'src/arch/x64/X64.Leakage_i.fst': None,
   'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
+  'src/lib/util/operator.vaf': None,
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
   
 }
