@@ -80,6 +80,7 @@ let vaTyp (t:typ) : string =
 let old_id (x:id) = Reserved ("old_" + (string_of_id x))
 let prev_id (x:id) = Reserved ("prev_" + (string_of_id x))
 
+let tUnit = TName (Id "unit")
 let tBool = TName (Reserved "bool")
 let tInt = TName (Reserved "int")
 let tOperand xo = TName (Reserved xo)

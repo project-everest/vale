@@ -14,7 +14,7 @@ let if_codes (b:bool) (cs1:codes) (cs2:codes) : codes = if b then cs1 else cs2
 noeq type quickCodes (a:Type0) : codes -> Type =
 | QEmpty: a -> quickCodes a []
 | QSeq: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
-| QBind: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> (b -> quickCodes a cs) -> quickCodes a (c::cs)
+| QBind: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> (state -> b -> quickCodes a cs) -> quickCodes a (c::cs)
 | QGetState: #cs:codes -> (state -> quickCodes a cs) -> quickCodes a ((Block [])::cs)
 | QLemma: #cs:codes -> pre:Type0 -> post:Type0 -> (unit -> Lemma (requires pre) (ensures post)) -> quickCodes a cs -> quickCodes a cs
 
@@ -47,10 +47,10 @@ and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b 
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
   =
   let f s0 _ = wp cs qcs k s0 in f
-and wp_Bind (#a:Type0) (#b:Type0) (cs:codes) (qcs:a -> quickCodes b cs) (k:state -> b -> Type0) :
+and wp_Bind (#a:Type0) (#b:Type0) (cs:codes) (qcs:state -> a -> quickCodes b cs) (k:state -> b -> Type0) :
   Tot (wp_Bind_t a) (decreases %[cs; 1; qcs])
   =
-  let f s0 g = wp cs (qcs g) k s0 in f
+  let f s0 g = wp cs (qcs s0 g) k s0 in f
 
 val wp_monotone (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k1:state -> a -> Type0) (k2:state -> a -> Type0) (s0:state) : Lemma
   (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
@@ -67,23 +67,23 @@ val wp_sound (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0)
 
 unfold let block = va_Block
 
-let wp_block (#a:Type) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Type0 =
-  wp cs qcs k s0
+let wp_block (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Type0 =
+  wp cs (qcs s0) k s0
 
-val qblock_monotone (#a:Type) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
+val qblock_monotone (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
   (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
   (ensures wp_block qcs s0 k1 ==> wp_block qcs s0 k2)
 
-val qblock_compute (#a:Type) (#cs:codes) (qcs:quickCodes a cs) (s0:state) : Ghost (state * fuel * a)
+val qblock_compute (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) : Ghost (state * fuel * a)
   (requires wp_block qcs s0 k_true)
   (ensures fun _ -> True)
 
-val qblock_proof (#a:Type) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Lemma
+val qblock_proof (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Lemma
   (requires wp_block qcs s0 k)
   (ensures (qblock_monotone qcs s0 k k_true; let (sM, f0, g) = qblock_compute qcs s0 in eval_code (block cs) s0 f0 sM /\ k sM g))
 
 [@"opaque_to_smt"]
-let qblock (#a:Type) (#cs:codes) (qcs:quickCodes a cs) : quickCode a (block cs) =
+let qblock (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) : quickCode a (block cs) =
   QProc (block cs) (wp_block qcs) (qblock_monotone qcs) (qblock_compute qcs) (qblock_proof qcs)
 
 val wp_sound_code (#a:Type0) (c:code) (qc:quickCode a c) (k:state -> a -> Type0) (s0:state) :

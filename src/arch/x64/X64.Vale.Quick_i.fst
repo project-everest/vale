@@ -20,7 +20,7 @@ let rec wp_monotone #a cs qcs k1 k2 s0 =
       let k1' = wp_Bind cs qcs k1 in
       let k2' = wp_Bind cs qcs k2 in
       let f s g : Lemma (k1' s g ==> k2' s g) =
-        wp_monotone cs (qcs g) k1 k2 s
+        wp_monotone cs (qcs s g) k1 k2 s
         in
       FStar.Classical.forall_intro_2 f;
       monotone s0 k1' k2'
@@ -51,7 +51,7 @@ let rec wp_compute #a cs qcs s0 =
       monotone s0 k' k_true;
       let (sM, fM, gM) = compute s0 in
       proof s0 k';
-      let (sN, fN, gN) = wp_compute cs (qcs gM) sM in
+      let (sN, fN, gN) = wp_compute cs (qcs sM gM) sM in
       let fN' = va_compute_merge_total fM fN in
       (sN, fN', gN)
   | QGetState f ->
@@ -87,9 +87,9 @@ let rec wp_sound #a cs qcs k s0 =
       monotone s0 k' k_true;
       let (sM, fM, gM) = compute s0 in
       proof s0 k';
-      wp_monotone cs (qcs gM) k k_true sM;
-      let (sN, fN, gN) = wp_compute cs (qcs gM) sM in
-      wp_sound cs (qcs gM) k sM;
+      wp_monotone cs (qcs sM gM) k k_true sM;
+      let (sN, fN, gN) = wp_compute cs (qcs sM gM) sM in
+      wp_sound cs (qcs sM gM) k sM;
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       ()
   | QGetState f ->
@@ -105,15 +105,15 @@ let rec wp_sound #a cs qcs k s0 =
       wp_sound cs qcs' k s0
 
 let qblock_monotone #a #cs qcs s0 k1 k2 =
-  wp_monotone cs qcs k1 k2 s0
+  wp_monotone cs (qcs s0) k1 k2 s0
 
 let qblock_compute #a #cs qcs s0 =
-  wp_compute cs qcs s0
+  wp_compute cs (qcs s0) s0
 
 let qblock_proof #a #cs qcs s0 k =
-  wp_monotone cs qcs k k_true s0;
-  let (sM, f0, g) = wp_compute cs qcs s0 in
-  wp_sound cs qcs k s0
+  wp_monotone cs (qcs s0) k k_true s0;
+  let (sM, f0, g) = wp_compute cs (qcs s0) s0 in
+  wp_sound cs (qcs s0) k s0
 
 let wp_sound_code #a c qc k s0 =
   let QProc c wp monotone compute proof = qc in

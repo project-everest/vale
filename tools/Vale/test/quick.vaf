@@ -126,7 +126,21 @@ let lemma_bench1 (s0:state) : Ghost (state * fuel)
 //  let (sN, f0, ()) = wp_run_norm codes_bench wpCodes_bench s0 in
   (sN, f0)
 //#reset-options ""
+#endverbatim
 
+#verbatim interface
+let rec self_int (i:int) : int = if i <= 0 then i else 1 + self_int (i - 1)
+#endverbatim
+
+#verbatim
+let rec lemma_self_int (i:int) : Lemma
+  (requires 0 <= i)
+  (ensures self_int i == i)
+  =
+  if 0 < i then lemma_self_int (i - 1)
+
+let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
+let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
 #endverbatim
 
 procedure{:quick exportOnly} Add64Ghosts(
@@ -149,7 +163,7 @@ procedure{:quick exportOnly} Add64Ghosts(
     ensures
         h1 == g1;
         h2 > 4;
-        eq_int(dst, old(dst + src));
+        dst == old(dst + src);
 {
     h1 := g1;
     h2 := g2 + 1;
@@ -163,10 +177,14 @@ procedure{:quick} Bump3()
     requires
         rax < 100;
     ensures
-        rax == old(rax) + 3;
+        rax == old(rax) + self_int(3);
 {
     Add64(rax, 1);
     Add64(rax, 1);
+    lemma_self_int(3);
+    lemma_self_int(3);
+    lemma_self_int(old(rax));
+    assert rax == old(rax) + 2;
     Add64(rax, 1);
 }
 
