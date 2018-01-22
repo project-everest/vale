@@ -122,7 +122,6 @@ procedure KeyExpansionRound(
 //    lemma_KeyExpansionRoundHelper(key, alg, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
 }
 
-/*
 
 #verbatim
 let aes_rcon_case (i:int) =
@@ -132,13 +131,13 @@ let aes_rcon_case (i:int) =
 
 procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
     ghost key:seq(nat32), 
-//    ghost w_in:seq(nat32),
+    ghost w_in:seq(nat32),
 //    inline taint:taint,
     ghost dst:buffer128,
-    inline n:int)
-//    ) returns (
-//    ghost w_out:seq(nat32)
-//    )
+    inline n:int
+    ) returns (
+    ghost w_out:seq(nat32)
+    )
     reads
         rdx;
     modifies
@@ -165,24 +164,21 @@ procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
 //        key_expansion_partial(key, AES_128, w_out, 4 + 4*n);
 {
+    inline if (0 < n <= 10) {
+        ghost var w_mid:seq(nat32);
+        w_mid := KeyExpansionRoundUnrolledRecursive(key, w_in, dst, n-1);
+        w_out := KeyExpansionRound(n-1, aes_rcon_case(n-1), dst, key, w_mid);
+    }
+    else {
+//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 0);
+//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 1);
+//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 2);
+//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 3);
+        w_out := w_in;
+    }
 }
-//{
-//    inline if (0 < n <= 10) {
-//        //ghost var w_mid:seq(nat32);
-//        //w_mid := KeyExpansionRoundUnrolledRecursive(key, w_in, taint, dst_id, n-1);
-//        KeyExpansionRoundUnrolledRecursive(dst, n-1);
-//        //w_out := KeyExpansionRound(n-1, AES_Rcon_Case(n-1), taint, dst_id, key, w_mid);
-//        KeyExpansionRound(n-1, aes_rcon_case(n-1), dst);
-//    }
-//    else {
-////        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 0);
-////        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 1);
-////        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 2);
-////        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 3);
-////        w_out := w_in;
-//    }
-//}
 
+/*
 procedure KeyExpansionRoundUnrolled(
     ghost key:seq(nat32), 
 //    ghost w_in:seq(nat32),
