@@ -12,10 +12,13 @@ let is_it_win b =
 *)
 let parse_cmdline :
   string -> (Prims.bool -> 
-    (X64_Vale_Decls.ins,X64_Vale_Decls.ocmp) X64_Machine_s.precode) -> unit
+    (X64_Vale_Decls.ins,X64_Vale_Decls.ocmp) X64_Machine_s.precode) ->
+    X64_Leakage_s.taintState -> X64_Leakage_s.taintState -> unit
   = 
   fun name ->
   fun code ->
+  fun ts ->
+  fun tsExpected ->
   let argc = Array.length Sys.argv in
   if argc < 3
   then
@@ -47,6 +50,10 @@ let parse_cmdline :
       | MASM -> X64_Vale_Decls.masm
     in
     let windows = platform_choice = Win in
+    if X64_Leakage_i.check_if_code_is_leakage_free (code windows) ts tsExpected then
+    begin
     X64_Vale_Decls.print_header printer;
     X64_Vale_Decls.print_proc name (code windows) (Prims.parse_int "0") printer;
     X64_Vale_Decls.print_footer printer
+    end
+    else failwith "The analysis couldn't prove the code to be leakage free"

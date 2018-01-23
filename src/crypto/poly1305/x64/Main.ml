@@ -1,1 +1,1 @@
-let _ = CmdlineParser.parse_cmdline "poly1305" X64_Poly1305.va_code_poly1305
+let _ = CmdlineParser.parse_cmdline "poly1305" X64_Poly1305.va_code_poly1305 (X64_Leakage_s.TaintState ((fun _ -> X64_Machine_s.Public), X64_Machine_s.Public)) (X64_Leakage_s.TaintState ((fun _ -> X64_Machine_s.Public), X64_Machine_s.Public))
