@@ -97,7 +97,7 @@ procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := nat64_max;
-        p:pos := n * n * 4 - 5;
+        p := n * n * 4 - 5;
         r := r1 * n + r0;
         h := h2 * (n * n) + h1 * n + h0;
     reads
