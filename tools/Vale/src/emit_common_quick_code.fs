@@ -12,8 +12,9 @@ open Microsoft.FSharp.Math
 open System.Numerics
 
 let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
-  let err () = internalErr "make_gen_quick_block" in
+  let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
   match skip_loc_stmt s with
+  | SAlias _ -> (needsState, eTail)
   | SAssign ([], e) ->
     (
       match skip_loc e with
@@ -36,6 +37,20 @@ let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bo
           (true, EApply (Id "wpLemma", [fApp; eTail]))
       | _ -> err ()
     )
+  | SAssign ([(x, None)], e) ->
+    (
+      let e = get_lemma_exp e in
+      let e = map_exp stateToOp e in
+      let e = exp_refined e in
+      (true, EBind (BindLet, [e], [(x, None)], [], eTail))
+    )
+  | (SAssign ([(x, Some (tOpt, _))], e) | SVar (x, tOpt, _, XGhost, _, Some e)) ->
+    (
+      let e = get_lemma_exp e in
+      let e = map_exp stateToOp e in
+      let e = exp_refined e in
+      (true, EBind (BindLet, [e], [(x, tOpt)], [], eTail))
+    )
   | SAssume e ->
       let sAssign = SAssign ([], EApply (Reserved "assume", [e])) in
       build_qcode_stmt env sAssign (needsState, eTail)
@@ -43,13 +58,14 @@ let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bo
       let sAssign = SAssign ([], EApply (Reserved "assert", [e])) in
       build_qcode_stmt env sAssign (needsState, eTail)
   | _ -> err ()
-and build_qcode_stmts (env:env) (ss:stmt list):exp =
-  let empty = EApply (Id "QEmpty", []) in
+and build_qcode_stmts (env:env) (outs:id list) (ss:stmt list):exp =
+  let outTuple = EApply (Id "tuple", List.map EVar outs) in
+  let empty = EApply (Id "QEmpty", [outTuple]) in
   let (needsState, e) = List.foldBack (build_qcode_stmt env) ss (false, empty) in
   e
-and build_qcode_block (add_old:bool) (env:env) (ss:stmt list):exp =
+and build_qcode_block (add_old:bool) (env:env) (outs:id list) (ss:stmt list):exp =
   let s = Reserved "s" in
-  let eStmts = build_qcode_stmts env ss in
+  let eStmts = build_qcode_stmts env outs ss in
   let eLet = if add_old then EBind (BindLet, [EVar s], [(Reserved "old_s", Some tState)], [], eStmts) else eStmts in
   let fApp = EBind (Lambda, [], [(s, Some tState)], [], eLet) in
   EApply (Id "qblock", [fApp])
@@ -63,8 +79,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     let cid = Reserved ("code_" + info.qsym + "_" + (string_of_id p.pname)) in
     let tArgs = List.map (fun (x, _) -> TName x) fParams in
     let tCodeApp = TApp (TName cid, tArgs) in
-//    let fBody = build_qcode_block false env ss in
-    let fBody = build_qcode_stmts env ss in
+//    let fBody = build_qcode_block false env [] ss in
+    let fBody = build_qcode_stmts env [] ss in
     let fCode =
       {
         fname = id;
@@ -120,17 +136,23 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
     )))
   )
   *)
-  let fParams = [] in
+  let cParams = make_fun_params p.prets p.pargs in
+  let makeParam (x, t, storage, io, attrs) = (x, Some t) in
+  let qParams = List.map makeParam p.pargs in
+  let makeRet (x, t, storage, io, attrs) = match storage with XGhost -> [(x, t)] | _ -> [] in
+  let prets = List.collect makeRet p.prets in
+  let tRet = TApp (TName (Id "tuple"), List.map snd prets) in
   let cid = Reserved ("code_" + (string_of_id p.pname)) in
-  let tArgs = List.map (fun (x, _) -> TName x) fParams in
+  let tArgs = List.map (fun (x, _) -> TName x) cParams in
   let tCodeApp = TApp (TName cid, tArgs) in
-  let tRetQuick = TApp (TName (Id "quickCode"), [tUnit; tCodeApp]) in
-  let eQuick = build_qcode_block true env ss in
+  let tRetQuick = TApp (TName (Id "quickCode"), [tRet; tCodeApp]) in
+  let outs = List.map fst prets in
+  let eQuick = build_qcode_block true env outs ss in
   let fCodes =
     {
       fname = Reserved ("qcode_" + (string_of_id p.pname));
       fghost = NotGhost;
-      fargs = fParams;
+      fargs = qParams;
       fret = tRetQuick;
       fbody = Some eQuick;
       fattrs = [(Id "opaque_to_smt", [])];

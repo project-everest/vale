@@ -170,21 +170,26 @@ procedure{:quick exportOnly} Add64Ghosts(
     Add64(dst, src);
 }
 
-procedure{:quick} Bump3()
+procedure{:quick} Bump3(ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;
     requires
         rax < 100;
+        g1 == rax;
     ensures
         rax == old(rax) + self_int(3);
+        g2 == old(rax);
 {
     Add64(rax, 1);
     Add64(rax, 1);
     lemma_self_int(3);
     lemma_self_int(3);
+    lemma_self_int(g1 + 1);
     lemma_self_int(old(rax));
     assert rax == old(rax) + 2;
+    ghost var gtmp := g1 + rax;
+    g2 := gtmp - rax;
     Add64(rax, 1);
 }
 

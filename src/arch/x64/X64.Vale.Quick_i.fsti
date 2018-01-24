@@ -225,12 +225,13 @@ unfold let normal_steps : list string =
     "X64.Vale.Decls.va_update_mem";
     "X64.Vale.Decls.va_update_reg";
     "X64.Vale.Decls.va_upd_ok";
+    "X64.Vale.Decls.va_upd_reg";
     "X64.Vale.Decls.va_upd_flags";
     "X64.Vale.Decls.va_upd_mem";
     "X64.Vale.Decls.va_upd_operand_dst_opr64";
     "X64.Vale.Decls.va_CCons";
     "X64.Vale.Decls.va_CNil";
+    "X64.Vale.Decls.va_op_opr64_reg";
     "X64.Vale.Decls.va_op_dst_opr64_reg";
     "X64.Vale.Decls.va_const_opr64";
   ]
-

@@ -65,6 +65,7 @@ let string_of_var_storage (g:var_storage) = ""
 let rec string_of_typ (t:typ):string =
   match t with
   | TName x -> sid x
+  | TApp (TName (Id "tuple"), []) -> "unit"
   | TApp (TName (Id "tuple"), ts) -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
   | TApp (TName (Id "fun"), ts) -> "(" + (String.concat " -> " (List.map string_of_typ ts)) + ")"
   | TApp (t, []) -> "(" + (string_of_typ t) + " ())"
