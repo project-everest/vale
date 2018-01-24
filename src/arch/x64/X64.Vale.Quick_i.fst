@@ -27,8 +27,15 @@ let rec wp_monotone #a cs qcs k1 k2 s0 =
   | QGetState f ->
       let c::cs = cs in
       wp_monotone cs (f s0) k1 k2 s0
-  | QLemma pre post l qcs' ->
+  | QLemma pre l qcs' ->
       wp_monotone cs qcs' k1 k2 s0
+
+let call_QLemma (#a:Type0) (#cs:codes) (pre:((unit -> GTot Type0) -> GTot Type0)) (l:unit -> PURE unit pre) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
+  Lemma
+  (requires (forall (p:unit -> GTot Type0). (wp cs qcs k s0 ==> p ()) ==> pre p))
+  (ensures (wp cs qcs k s0))
+  =
+  l ()
 
 let rec wp_compute #a cs qcs s0 =
   match qcs with
@@ -60,8 +67,8 @@ let rec wp_compute #a cs qcs s0 =
       let (sN, fN, gN) = wp_compute cs (f sM) sM in
       let fN' = va_compute_merge_total fM fN in
       (sN, fN', gN)
-  | QLemma pre post l qcs' ->
-      l ();
+  | QLemma pre l qcs' ->
+      call_QLemma pre l qcs' k_true s0;
       wp_compute cs qcs' s0
 
 let rec wp_sound #a cs qcs k s0 =
@@ -100,9 +107,12 @@ let rec wp_sound #a cs qcs k s0 =
       let (sN, fN, gN) = wp_compute cs (f sM) sM in
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       ()
-  | QLemma pre post l qcs' ->
-      l ();
-      wp_sound cs qcs' k s0
+  | QLemma pre l qcs' ->
+      wp_monotone cs qcs k k_true s0;
+      call_QLemma pre l qcs' k_true s0;
+      call_QLemma pre l qcs' k s0;
+      wp_sound cs qcs' k s0;
+      ()
 
 let qblock_monotone #a #cs qcs s0 k1 k2 =
   wp_monotone cs (qcs s0) k1 k2 s0

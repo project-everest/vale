@@ -16,10 +16,10 @@ noeq type quickCodes (a:Type0) : codes -> Type =
 | QSeq: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
 | QBind: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> (state -> b -> quickCodes a cs) -> quickCodes a (c::cs)
 | QGetState: #cs:codes -> (state -> quickCodes a cs) -> quickCodes a ((Block [])::cs)
-| QLemma: #cs:codes -> pre:Type0 -> post:Type0 -> (unit -> Lemma (requires pre) (ensures post)) -> quickCodes a cs -> quickCodes a cs
+| QLemma: #cs:codes -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
 
-let wpLemma (#cs:codes) (#pre:Type0) (#post:Type0) (#a:Type0) ($l:unit -> Lemma (requires pre) (ensures post)) (qcs:quickCodes a cs) : quickCodes a cs =
-  QLemma pre post l qcs
+let wpLemma (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
+  QLemma pre l qcs
 
 let wp_proc (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> a -> Type0) : Type0 =
   match qc with
@@ -41,7 +41,8 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
   | QGetState f ->
       let c::cs = cs in
       wp cs (f s0) k s0
-  | QLemma pre post l qcs -> pre /\ (post ==> wp cs qcs k s0)
+  | QLemma pre l qcs ->
+      forall (p:unit -> GTot Type0). (forall (u:unit). wp cs qcs k s0 ==> p u) ==> pre p
 // Hoist lambdas out of main definition to avoid issues with function equality 
 and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b -> Type0) :
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
