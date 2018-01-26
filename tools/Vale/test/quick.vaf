@@ -15,6 +15,8 @@ unfold let normal_steps2 : list string =
   "X64.Vale.Decls.va_wp_Add64"::"X64.Vale.Decls.va_quick_Add64"::
   "Quick.codes_bench"::"Quick.wpCodes_bench"::
   "Quick.va_code_Bump3"::"Quick.va_qcode_Bump3"::
+  "Quick.va_wp_Bump3"::"Quick.va_quick_Bump3"::
+  "Quick.va_code_CallBump3"::"Quick.va_qcode_CallBump3"::
   "Quick.va_code_1_Incr3"::"Quick.va_qcode_1_Incr3"::
   normal_steps
 
@@ -183,14 +185,28 @@ procedure{:quick} Bump3(ghost g1:int) returns(ghost g2:int)
 {
     Add64(rax, 1);
     Add64(rax, 1);
-    lemma_self_int(3);
-    lemma_self_int(3);
+    assert self_int(3) == 3 by { lemma_self_int(3); }
     lemma_self_int(g1 + 1);
     lemma_self_int(old(rax));
     assert rax == old(rax) + 2;
     ghost var gtmp := g1 + rax;
     g2 := gtmp - rax;
     Add64(rax, 1);
+}
+
+procedure{:quick} CallBump3(ghost g1:int) returns(ghost g2:int)
+    modifies
+        efl;
+        rax;
+    requires
+        rax < 100;
+        g1 == rax;
+    ensures
+        rax == old(rax) + self_int(3);
+        g2 == old(rax);
+{
+    Add64(rax, 0);
+    g2 := Bump3(if rax < 7 then rax else g1 + 0);
 }
 
 procedure Incr3()

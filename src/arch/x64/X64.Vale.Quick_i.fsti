@@ -66,6 +66,8 @@ val wp_sound (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0)
   (requires wp cs qcs k s0)
   (ensures (wp_monotone cs qcs k k_true s0; let (sN, fN, gN) = wp_compute cs qcs s0 in eval (Block cs) s0 fN sN /\ k sN gN))
 
+///// Block
+
 unfold let block = va_Block
 
 let wp_block (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Type0 =
@@ -86,6 +88,14 @@ val qblock_proof (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state)
 [@"opaque_to_smt"]
 let qblock (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) : quickCode a (block cs) =
   QProc (block cs) (wp_block qcs) (qblock_monotone qcs) (qblock_compute qcs) (qblock_proof qcs)
+
+///// AssertBy
+
+val qAssertBy (#a:Type) (p:Type0) (qcs:quickCodes a []) (s0:state) : Lemma
+  (requires wp [] qcs (fun _ _ -> p) s0)
+  (ensures p)
+
+///// Code
 
 val wp_sound_code (#a:Type0) (c:code) (qc:quickCode a c) (k:state -> a -> Type0) (s0:state) :
   Ghost ((sN:state) * (fN:fuel) * (g:a))

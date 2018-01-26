@@ -125,6 +125,9 @@ let qblock_proof #a #cs qcs s0 k =
   let (sM, f0, g) = wp_compute cs (qcs s0) s0 in
   wp_sound cs (qcs s0) k s0
 
+let qAssertBy #a p qcs s0 =
+  wp_sound [] qcs (fun _ _ -> p) s0
+
 let wp_sound_code #a c qc k s0 =
   let QProc c wp monotone compute proof = qc in
   monotone s0 k k_true;

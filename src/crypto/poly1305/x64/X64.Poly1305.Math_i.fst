@@ -131,7 +131,18 @@ let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:in
       	((h2*n + h1)*(r1/4)) p;
       assert ((h*r) % p == hh % p)
 
-let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) =
+let lemma_poly_reduce_nat (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) : Lemma
+  (requires
+    p > 0 /\
+    n * n > 0 /\
+    h2 >= 0 /\  // TODO: Shouldn't need to add this
+    4 * (n * n) == p + 5 /\
+    h2 == h / (n * n) /\
+    h10 == h % (n * n) /\
+    c == (h2 / 4) + (h2 / 4) * 4 /\
+    hh == h10 + c + (h2 % 4) * (n * n))
+  (ensures h % p == hh % p)
+  =
   lemma_div_mod h (n*n);
   assert (h == (n*n)*h2 + h10);
   calc(
@@ -152,13 +163,15 @@ let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int
   lemma_mod_lt h (n*n);
   assert (hh >= 0); 
   lemma_mod_plus hh (h2/4) p
+let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
+  lemma_poly_reduce_nat n p h h2 h10 c hh
 
 (* Provable, when we merge the UInt branch and use the lemmas 
    from Poly1305_Bitvectors *)
 let lemma_poly_bits64 =
   admit()
 
-let lemma_mul_strict_upper_bound (x:nat) (x_bound:int) (y:nat) (y_bound:int) =
+let lemma_mul_strict_upper_bound (x:int) (x_bound:int) (y:int) (y_bound:int) =
   lemma_mult_lt_right y x x_bound;
   if x_bound = 0 || y_bound = 0 then ()
   else 

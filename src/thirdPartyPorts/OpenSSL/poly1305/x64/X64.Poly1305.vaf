@@ -75,9 +75,17 @@ unfold let normal_steps2 : list string =
   "X64.Vale.Decls.va_wp_Add64"::"X64.Vale.Decls.va_quick_Add64"::
   "X64.Vale.Decls.va_wp_Add64Wrap"::"X64.Vale.Decls.va_quick_Add64Wrap"::
   "X64.Vale.Decls.va_wp_Adc64Wrap"::"X64.Vale.Decls.va_quick_Adc64Wrap"::
+  "X64.Vale.Decls.va_wp_Sub64Wrap"::"X64.Vale.Decls.va_quick_Sub64Wrap"::
   "X64.Vale.Decls.va_wp_IMul64"::"X64.Vale.Decls.va_quick_IMul64"::
   "X64.Vale.Decls.va_wp_Mul64Wrap"::"X64.Vale.Decls.va_quick_Mul64Wrap"::
+  "X64.Vale.Decls.va_wp_And64"::"X64.Vale.Decls.va_quick_And64"::
+  "X64.Vale.Decls.va_wp_Shr64"::"X64.Vale.Decls.va_quick_Shr64"::
   "X64.Poly1305.va_code_poly1305_multiply"::"X64.Poly1305.va_qcode_poly1305_multiply"::
+  "X64.Poly1305.va_wp_poly1305_multiply"::"X64.Poly1305.va_quick_poly1305_multiply"::
+  "X64.Poly1305.va_code_poly1305_reduce"::"X64.Poly1305.va_qcode_poly1305_reduce"::
+  "X64.Poly1305.va_wp_poly1305_reduce"::"X64.Poly1305.va_quick_poly1305_reduce"::
+  "X64.Poly1305.va_code_poly1305_iteration"::"X64.Poly1305.va_qcode_poly1305_iteration"::
+  "X64.Poly1305.va_code_poly1305_reduce_last"::"X64.Poly1305.va_qcode_poly1305_reduce_last"::
   normal_steps
 
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_only normal_steps2] x
@@ -176,30 +184,18 @@ procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lemma_poly_multiply(n, p, r, h, r0, r1, old(h0), old(h1), old(h2), s1, gd0, gd1, gd2, hh);
 }
 
-procedure poly1305_reduce(
-    inout d3:dst_opr64,
-    inout h0:dst_opr64,
-    inout h1:dst_opr64,
-    inout h2:dst_opr64,
-    ghost hd:int,
-   //ghost n:int,
-    ghost p:int)
-    returns(ghost hh:int)
+procedure{:quick} poly1305_reduce() returns(ghost hh:int)
+    lets
+        d3 @= r10; h0 @= r14; h1 @= rbx; h2 @= rbp;
+        n := 0x1_0000_0000_0000_0000;
+        p := n * n * 4 - 5;
+        hd := (n * n) * d3 + n * h1 + h0;
     modifies
-        rax;
-        efl;
+        rax; d3; h0; h1; h2; efl;
     requires
-        @d3 == OReg(R10);
-        @h0 == OReg(R14);
-        @h1 == OReg(Rbx);
-        @h2 == OReg(Rbp);
-    requires
-        p == n * n * 4 - 5;
-        hd == (n * n) * d3 + n * h1 + h0;
-        d3 / 4 * 4 + d3 / 4 < 0x1_0000_0000_0000_0000;
+        d3 / 4 * 4 + d3 / 4 < n;
         rax == 0xffff_ffff_ffff_fffc;
     ensures
-        p > 0;  // TODO: Shouldn't need this!
         hh == (n * n) * h2 + n * h1 + h0;
         hd % p == hh % p;
         h2 < 5;
@@ -220,118 +216,17 @@ procedure poly1305_reduce(
     lemma_poly_reduce(n, p, hd, old(d3), h10, rax, hh);
 }
 
-procedure poly1305_reduce_regs(
-    ghost hd:int,
-    //ghost n:int,
-    ghost p:int)
-    returns(ghost hh:int)
-    modifies
-        rax;
-        efl;
-        r10;
-        r14;
-        rbx;
-        rbp;
-    requires
-        p == n * n * 4 - 5;
-        hd == (n * n) * r10 + n * rbx + r14;
-        r10 / 4 * 4 + r10 / 4 < 0x1_0000_0000_0000_0000;
-        rax == 0xffff_ffff_ffff_fffc;
-    ensures
-        p > 0;  // TODO: Shouldn't need this!
-        hh == (n * n) * rbp + n * rbx + r14;
-        hd % p == hh % p;
-        rbp < 5;
-{
-    lemma_poly_bits64();
-
-    And64(rax, r10);
-    Mov64(rbp, r10);
-    Shr64(r10, 2);
-    And64(rbp, 3);
-    Add64Wrap(rax, r10);
-    Add64Wrap(r14, rax);
-    Adc64Wrap(rbx, 0);
-    Adc64Wrap(rbp, 0);
-
-    ghost var rbx0 := n * old(rbx) + old(r14);
-    hh := rbx0 + rax + (old(r10) % 4) * (n * n);
-    lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
-}
-
-/*
-procedure poly1305_reduce_regs_fast_block(
-    ghost hd:int,
-    //ghost n:int,
-    ghost p:int)
-    returns(ghost hh:int)
-    modifies
-        rax;
-        efl;
-        r10;
-        r14;
-        rbx;
-        rbp;
-    requires
-        p == n * n * 4 - 5;
-        hd == (n * n) * r10 + n * rbx + r14;
-        r10 / 4 * 4 + r10 / 4 < 0x1_0000_0000_0000_0000;
-        rax == 0xffff_ffff_ffff_fffc;
-    ensures
-        p > 0;  // TODO: Shouldn't need this!
-        hh == (n * n) * rbp + n * rbx + r14;
-        hd % p == hh % p;
-        rbp < 5;
-{
-    lemma_poly_bits64();
-
-    assert{:fast_block} true;
-    And64(rax, r10);
-    Mov64(rbp, r10);
-    Shr64(r10, 2);
-    And64(rbp, 3);
-    Add64Wrap(rax, r10);
-    Add64Wrap(r14, rax);
-    Adc64Wrap(rbx, 0);
-    Adc64Wrap(rbp, 0);
-
-    ghost var rbx0 := n * old(rbx) + old(r14);
-    hh := rbx0 + rax + (old(r10) % 4) * (n * n);
-    lemma_poly_reduce(n, p, hd, old(r10), rbx0, rax, hh);
-}
-*/
-
-procedure poly1305_iteration(
-    inout d1:dst_opr64,
-    inout d2:dst_opr64,
-    inout d3:dst_opr64,
-          r0:opr64,
-          s1:opr64,
-    inout h0:dst_opr64,
-    inout h1:dst_opr64,
-    inout h2:dst_opr64,
-    ghost r1:nat64
-    )
-    returns(ghost hh:int)
-    lets 
-        p := n * n * 4 - 5;
+procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
+    lets
+        d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
+        n:nat := 0x1_0000_0000_0000_0000;
+        p:pos := n * n * 4 - 5;
         r := r1 * n + r0;
         h := h2 * (n * n) + h1 * n + h0;
     reads
-        r11; r13;
+        r0; s1;
     modifies
-        r8; r9; r10; r14; rbx; rbp;
-        rax; rdx;
-        efl;
-    requires
-        @d1 == OReg(R8);
-        @d2 == OReg(R9);
-        @d3 == OReg(R10);
-        @r0 == OReg(R11);
-        @s1 == OReg(R13);
-        @h0 == OReg(R14);
-        @h1 == OReg(Rbx);
-        @h2 == OReg(Rbp);
+        rax; rdx; d1; d2; d3; h0; h1; h2; efl;
     requires
         r0 < n / 16;
         r1 < n / 16;
@@ -340,7 +235,6 @@ procedure poly1305_iteration(
         h2 < 7;
         rax == r1;
     ensures
-        p > 0;      // TODO: Shouldn't need this!
         hh == (n * n) * h2 + n * h1 + h0;
         modp(h * r) == modp(hh); 
         h2 < 5;
@@ -362,7 +256,7 @@ procedure poly1305_iteration(
     lemma_mul_strict_upper_bound(h2, 7, s1, 5 * n / 64);
 
     (ghost var hd) := poly1305_multiply(r1);
-    hh := poly1305_reduce(d3, h0, h1, h2, hd, /* n, */ p);
+    hh := poly1305_reduce();
     reveal_opaque(modp');
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
@@ -512,7 +406,7 @@ procedure {:frame false} poly1305_blocks(
         ghost var old_h := h2 * (n * n) + h1 * n + h0;
         assert old_h == hq;
 
-        h := poly1305_iteration(d1, d2, d3, r0, s1, h0, h1, h2, r1);
+        h := poly1305_iteration(r1);
 
         Mov64(rax, r1);
         Sub64(r15, 1); // len-=16
@@ -660,7 +554,7 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
     ghost var h := hBlocks + (inpLast % padLast) + padLast;
     assert h == h2 * (n * n) + h1 * n + h0 by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
     assert r == r1 * n + r0 by { reveal_opaque(lowerUpper128); }
-    (ghost var hLast) := poly1305_iteration(r8, r9, r10, r0, s1, h0, h1, h2, r1);
+    (ghost var hLast) := poly1305_iteration(r1);
     assert hLast == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2) by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
     lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
     assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal_opaque(modp'); }
@@ -671,21 +565,14 @@ procedure{:timeLimitMultiplier 2} poly1305_last_block(
 #endverbatim
 
 // h := (h % p) % 2^128;
-procedure poly1305_reduce_last(
-    inout h0:dst_opr64,
-    inout h1:dst_opr64,
-    inout h2:opr64,
-    ghost h:int)
+procedure{:quick} poly1305_reduce_last()
+    lets
+        h0 @= r14; h1 @= rbx; h2 @= rbp;
+        h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
     modifies
-        r8; r9; r10; rax;
-        efl;
-    requires
-        @h0 == OReg(R14);
-        @h1 == OReg(Rbx);
-        @h2 == OReg(Rbp);
+        r8; r9; r10; rax; h0; h1; h2; efl;
     requires
         h2 < 5;
-        h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
     ensures
         lowerUpper128_opaque(h0, h1) == mod2_128(modp(h));
 {
@@ -874,7 +761,7 @@ assume false;       // Everything slows down here.  Fix with fast_block?
     }
 
     lemma_add_mod128(modp(h), key_s);
-    poly1305_reduce_last(h0, h1, h2, h);
+    poly1305_reduce_last();
     h := lowerUpper128_opaque(h0, h1);
 
     Load64_buffer(rax, ctx, 40, ctx_b, 5);

@@ -11,52 +11,83 @@ open Emit_common_base
 open Microsoft.FSharp.Math
 open System.Numerics
 
+let qlemma_exp (e:exp):exp =
+  let e = get_lemma_exp e in
+  let e = map_exp stateToOp e in
+  let e = exp_refined e in
+  e
+
 let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
   let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
+  let uses_state (e:exp):bool =
+    let f (e:exp) (bs:bool list):bool =
+      match e with
+      | EVar (Reserved "s") -> true
+      | _ -> List.fold (||) false bs
+      in
+    gather_exp f e
+    in
+  let inline_call (x:string) (rets:formal list) (es:exp list):(bool * exp) =
+    let es = List.map qlemma_exp es in
+    let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> e | _ -> e) es in
+    let e = vaApp ("quick_" + x) es in
+    let f g eTail =
+      let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); g], [], eTail) in
+      (uses_state e, EApply (Id "QBind", [e; fTail]))
+      in
+    match (needsState, rets) with
+    | (false, []) -> (uses_state e, EApply (Id "QSeq", [e; eTail]))
+    | (true, []) -> f (Id "_", None) eTail
+    | (_, [g]) -> f g eTail
+    | _ ->
+        let g = Reserved "g" in
+        let eTail = EBind (BindLet, [EVar g], rets, [], eTail) in
+        f (g, None) eTail
+    in
+  let lemma_call (x:id) (rets:formal list) (es:exp list):(bool * exp) =
+    let es = List.map qlemma_exp es in
+    let eApp = EApply (x, es) in
+    let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
+    (true, EApply (Id "wpLemma", [fApp; eTail]))
+    in
+  let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
+    match skip_loc e with
+    | EApply (Id xp, es) when Map.containsKey (Id xp) env.procs ->
+        inline_call xp [(x, tOpt)] es
+    | EApply (xp, es) when allowLemma ->
+        lemma_call xp [(x, tOpt)] es
+    | _ ->
+        let e = qlemma_exp e in
+        (true, EBind (BindLet, [e], [(x, tOpt)], [], eTail))
+    in
   match skip_loc_stmt s with
   | SAlias _ -> (needsState, eTail)
   | SAssign ([], e) ->
     (
       match skip_loc e with
       | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
-          let es = List.map get_lemma_exp es in
-          let es = List.map (map_exp stateToOp) es in
-          let es = List.map exp_refined es in
-          let e = vaApp ("quick_" + x) es in
-          if needsState then
-            let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); (Id "_", None)], [], eTail) in
-            (false, EApply (Id "QBind", [e; fTail]))
-          else
-            (false, EApply (Id "QSeq", [e; eTail]))
+          inline_call x [] es
       | EApply (x, es) ->
-          let es = List.map get_lemma_exp es in
-          let es = List.map (map_exp stateToOp) es in
-          let es = List.map exp_refined es in
-          let eApp = EApply (x, es) in
-          let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
-          (true, EApply (Id "wpLemma", [fApp; eTail]))
+          lemma_call x [] es
       | _ -> err ()
     )
-  | SAssign ([(x, None)], e) ->
-    (
-      let e = get_lemma_exp e in
-      let e = map_exp stateToOp e in
-      let e = exp_refined e in
-      (true, EBind (BindLet, [e], [(x, None)], [], eTail))
-    )
-  | (SAssign ([(x, Some (tOpt, _))], e) | SVar (x, tOpt, _, XGhost, _, Some e)) ->
-    (
-      let e = get_lemma_exp e in
-      let e = map_exp stateToOp e in
-      let e = exp_refined e in
-      (true, EBind (BindLet, [e], [(x, tOpt)], [], eTail))
-    )
+  | SAssign ([(x, None)], e) -> assign_or_var true x None e
+  | SAssign ([(x, Some (tOpt, _))], e) -> assign_or_var true x tOpt e
+  | SVar (x, tOpt, _, XGhost, _, Some e) -> assign_or_var false x tOpt e
   | SAssume e ->
       let sAssign = SAssign ([], EApply (Reserved "assume", [e])) in
       build_qcode_stmt env sAssign (needsState, eTail)
   | SAssert (_, e) ->
       let sAssign = SAssign ([], EApply (Reserved "assert", [e])) in
       build_qcode_stmt env sAssign (needsState, eTail)
+  | SForall ([], [], EBool true, ep, ss) ->
+      let ep = qlemma_exp ep in
+      let eQcs = build_qcode_stmts env [] ss in
+      let s = Reserved "s" in
+      let eApp = EApply (Id "qAssertBy", [ep; eQcs; EVar s]) in
+      let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
+      let eLemma = EApply (Id "wpLemma", [fApp; eTail]) in
+      (true, eLemma)
   | _ -> err ()
 and build_qcode_stmts (env:env) (outs:id list) (ss:stmt list):exp =
   let outTuple = EApply (Id "tuple", List.map EVar outs) in
