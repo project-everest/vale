@@ -19,7 +19,7 @@ unfold let va_update = Map.upd
 unfold let va_make_opaque = Opaque_i.make_opaque
 unfold let va_reveal_opaque = Opaque_i.reveal_opaque
 unfold let va_hd = Cons?.hd
-unfold let va_tl = Cons?.tl
+//unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
 unfold let va_normalize_term = normalize_term
 
 (* Type aliases *)
@@ -29,6 +29,7 @@ val ins : Type0
 val ocmp : Type0
 unfold let va_code = precode ins ocmp
 unfold let va_codes = list va_code
+let va_tl (cs:va_codes) : Ghost va_codes (requires Cons? cs) (ensures fun tl -> tl == Cons?.tl cs) = Cons?.tl cs
 unfold let va_state = state
 val va_fuel : Type0
 unfold let va_operand = operand
