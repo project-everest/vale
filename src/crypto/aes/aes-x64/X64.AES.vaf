@@ -72,34 +72,34 @@ procedure KeyExpansionRound(
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
         key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
 {
-//    ghost var xmm1_v0 := xmm1;
+    ghost var xmm1_v0 := xmm1;
 
     AESNI_keygen_assist(xmm2, xmm1, rcon);
-//    ghost var xmm2_v1 := xmm2;
+    ghost var xmm2_v1 := xmm2;
 
     Pshufd(xmm2, xmm2, 255);
-//    ghost var xmm2_v2 := xmm2;
+    ghost var xmm2_v2 := xmm2;
 
     VPSLLDQ4(xmm3, xmm1);
-//    ghost var xmm3_v3 := xmm3;
+    ghost var xmm3_v3 := xmm3;
 
     Pxor(xmm1,xmm3);
-//    ghost var xmm1_v4 := xmm1;
+    ghost var xmm1_v4 := xmm1;
 
     VPSLLDQ4(xmm3, xmm1);
-//    ghost var xmm3_v5 := xmm3;
+    ghost var xmm3_v5 := xmm3;
 
     Pxor(xmm1,xmm3);
-//    ghost var xmm1_v6 := xmm1;
+    ghost var xmm1_v6 := xmm1;
 
     VPSLLDQ4(xmm3, xmm1);
-//    ghost var xmm3_v7 := xmm3;
+    ghost var xmm3_v7 := xmm3;
 
     Pxor(xmm1,xmm3);
-//    ghost var xmm1_v8 := xmm1;
+    ghost var xmm1_v8 := xmm1;
 
     Pxor(xmm1,xmm2);
-//    ghost var xmm1_v9 := xmm1;
+    ghost var xmm1_v9 := xmm1;
 
     Store128_buffer(rdx, xmm1, 16*(round+1), dst, round+1);
 
@@ -121,9 +121,9 @@ procedure KeyExpansionRound(
 //        assert j != new_round ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
 //    }
 //
-//    ghost var alg := AES_128();
+    ghost var alg := AES_128(); 
 //    lemma_AES128Size(alg);
-//    lemma_KeyExpansionRoundHelper(key, alg, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
+    lemma_KeyExpansionRoundHelper(alg, key, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
     
     assume key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
 }
@@ -135,6 +135,7 @@ procedure KeyExpansionRound(
 //    if i = 0 then 0x01 else if i = 1 then 0x02 else if i = 2 then 0x04 else if i = 3 then 0x08 else if i = 4 then 0x10 else if i = 5 then 0x20 else if i = 6 then 0x40 else if i = 7 then 0x80 else if i = 8 then 0x1b else 0x36
 //#endverbatim
 
+/*
 procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
     ghost key:seq(nat32), 
     ghost w_in:seq(nat32),
@@ -161,7 +162,7 @@ procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
 //        key_expansion_partial(key, AES_128, w_in, 4);
 //        ValidSrcAddrs(mem, dst_id, rdx, 128, taint, 16);
         validSrcAddrs128(mem, rdx, dst, 11);
-//        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_in[4*j], w_in[4*j+1], w_in[4*j+2], w_in[4*j+3]);
+//        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_in[4*j], w_in[4*j+1], w_in[4*j+2], w_in[4*j+3])
     ensures
 //        ValidSrcAddrs(mem, dst_id, rdx, 128, taint, 16*(n+1));
         modifies_buffer128(dst, old(mem), mem);
@@ -187,6 +188,7 @@ procedure {:recursive} KeyExpansionRoundUnrolledRecursive(
         w_out := w_in;
     }
 }
+*/
 
 
 /*
