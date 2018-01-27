@@ -80,7 +80,7 @@ unfold let va_reveal_opaque = reveal_opaque
 
 #endverbatim
 
-procedure {:recursive} KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)   
+procedure {:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)   
 {
   inline if (0 < n) {
     w_out := KeyExpansionRoundUnrolledRecursive(w_in, n-1);

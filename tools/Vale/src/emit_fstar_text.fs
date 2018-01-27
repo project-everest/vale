@@ -168,10 +168,10 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
-let string_of_decrease (xs:formal list) n =
-  match xs with
+let string_of_decrease (es:exp list) n =
+  match es with
   | [] -> ""
-  | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map (fun (x, t) -> string_of_formal (x, None)) xs)) n
+  | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map string_of_exp es)) n
   
 let string_of_outs_exp (outs:(bool * formal list) option):string =
   match outs with
@@ -387,8 +387,9 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     in
   let header = if isRecursive then "let rec " else "let " in
   // add custom metrics to convince F* that mutually recursive functions terminate
-  let decreases0 = if isRecursive then string_of_decrease f.fargs 0 else "" in
-  let decreases1 = if isRecursive then string_of_decrease f.fargs 1 else "" in
+  let dArgs = List.map (fun (x, _) -> EVar x) f.fargs in
+  let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
+  let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
     psi.PrintLine (sVal (sid f.fname) decreases1);
@@ -422,6 +423,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
+  let decreaseExps = attrs_get_exps_opt (Id "decrease") p.pattrs in
   let isAdmit = attrs_get_bool (Id "admit") false p.pattrs in
   let isDependent = attrs_get_bool (Id "dependent") false p.pattrs in
   let isReducible = attrs_get_bool (Id "reducible") false p.pattrs in
@@ -441,7 +443,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     ps.Unindent ();
     in
   // add custom metrics to convince F* that mutually recursive functions terminate
-  let decreases0 = if isRecursive then string_of_decrease args 0 else "" in
+  let dArgs = match decreaseExps with Some es -> es | None -> List.map (fun (x, _) -> EVar x) args in
+  let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
     | (_, _) ->
