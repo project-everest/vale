@@ -96,7 +96,7 @@ let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 
 let filter_proc_attr (x, es) =
   match x with
-  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "fast_state" | "recursive") -> true
+  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "fast_state" | "recursive" | "decrease") -> true
   | _ -> false
   in
 

@@ -297,6 +297,9 @@ let attrs_get_bool (x:id) (defaultVal:bool) (a:attrs):bool =
     | _ -> fErr ()
   else defaultVal
 
+let attrs_get_exps_opt (x:id) (a:attrs):exp list option =
+  if List_mem_assoc x a then Some (List_assoc x a) else None
+
 let attrs_get_exp_opt (x:id) (a:attrs):exp option =
   if List_mem_assoc x a then
     match List_assoc x a with
