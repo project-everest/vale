@@ -90,10 +90,18 @@ let aes_encrypt (alg:algorithm) (key:seq nat32 {length key == nk alg}) (input:qu
   cipher alg input (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
 
 #reset-options "--max_fuel 5 --initial_fuel 5"
-let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
+abstract let quad32_to_seq (q:quad32) : 
+  Tot (s:seq nat32 { length s == 4 /\ 
+                     (let q' = Quad32 (index s 0) (index s 1) (index s 2) (index s 3) in
+                      q == q')           
+                   }) =
   let l = [q.lo; q.mid_lo; q.mid_hi; q.hi] in
   let s = of_list l in
   //assert (List.length l == 4);
   lemma_of_list_length s l; 
+  lemma_of_list s l 0;
+  lemma_of_list s l 1;
+  lemma_of_list s l 2;
+  lemma_of_list s l 3;  
   of_list l
 

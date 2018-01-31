@@ -12,7 +12,6 @@ let op_String_Access (#a:Type) (s:seq a) (i:nat{ i < length s}) : Tot a = index 
 unfold
 let op_String_Assignment = Seq.upd
 
-let foo (x:int) = x
 
 let rec key_expansion_specific (alg:algorithm) (key:seq nat32 { length key == nk alg})
                                (w:seq nat32) (i:nat{i < length w}) =
