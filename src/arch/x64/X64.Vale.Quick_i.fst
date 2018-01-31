@@ -229,3 +229,7 @@ let wp_run_code #a c qc s0 update post =
     in
   FStar.Classical.forall_impl_intro f;
   (sN, fN, gN)
+
+let wp_sound_norm = wp_sound_wrap
+let wp_sound_code_norm = wp_sound_code_wrap
+let wp_run_norm = wp_run

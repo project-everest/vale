@@ -163,7 +163,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       fargs = fParams @ [(s0, Some tState); argContinue];
       fret = tType0;
       fbody = Some wpBody;
-      fattrs = [(Id "public", [])];
+      fattrs = [(Id "public", []); (Id "qattr", [])];
     }
     in
 
@@ -252,7 +252,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       fargs = fParams;
       fret = tRetQuick;
       fbody = Some eQuick;
-      fattrs = [(Id "public", []); (Id "opaque_to_smt", [])];
+      fattrs = [(Id "public", []); (Id "opaque_to_smt", []); (Id "qattr", [])];
     }
     in
   [(loc, DFun fWp); (loc, DProc pMonotone); (loc, DProc pCompute); (loc, DProc pProof); (loc, DFun fQuick)]

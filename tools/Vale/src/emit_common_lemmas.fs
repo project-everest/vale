@@ -62,7 +62,7 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
           fret = tCodes;
 //          fbody = Some (rs b);
           fbody = Some (build_code_stmts env benv b);
-          fattrs = [(Id "opaque_to_smt", [])];
+          fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])];
         }
         in
       benv.quick_code_funs := f::!(benv.quick_code_funs);
@@ -431,7 +431,7 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
       fbody =
         if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
         else Some (build_code_block env benv stmts);
-      fattrs = if benv.is_quick then [(Id "opaque_to_smt", []); (Id "public_decl", [])] else [(Id "opaque", [])];
+      fattrs = if benv.is_quick then [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] else [(Id "opaque", [])];
     }
     in
   List.map (fun f -> (loc, DFun f)) (List.rev (f::!(benv.quick_code_funs)))

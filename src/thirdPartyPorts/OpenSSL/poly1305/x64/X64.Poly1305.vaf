@@ -69,38 +69,6 @@ let readable_words (len:nat) =
     ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
 #endverbatim
 
-#verbatim
-unfold let normal_steps2 : list string =
-  "X64.Vale.Decls.va_wp_Mov64"::"X64.Vale.Decls.va_quick_Mov64"::
-  "X64.Vale.Decls.va_wp_Add64"::"X64.Vale.Decls.va_quick_Add64"::
-  "X64.Vale.Decls.va_wp_Add64Wrap"::"X64.Vale.Decls.va_quick_Add64Wrap"::
-  "X64.Vale.Decls.va_wp_Adc64Wrap"::"X64.Vale.Decls.va_quick_Adc64Wrap"::
-  "X64.Vale.Decls.va_wp_Sub64Wrap"::"X64.Vale.Decls.va_quick_Sub64Wrap"::
-  "X64.Vale.Decls.va_wp_IMul64"::"X64.Vale.Decls.va_quick_IMul64"::
-  "X64.Vale.Decls.va_wp_Mul64Wrap"::"X64.Vale.Decls.va_quick_Mul64Wrap"::
-  "X64.Vale.Decls.va_wp_And64"::"X64.Vale.Decls.va_quick_And64"::
-  "X64.Vale.Decls.va_wp_Shr64"::"X64.Vale.Decls.va_quick_Shr64"::
-  "X64.Poly1305.va_code_poly1305_multiply"::"X64.Poly1305.va_qcode_poly1305_multiply"::
-  "X64.Poly1305.va_wp_poly1305_multiply"::"X64.Poly1305.va_quick_poly1305_multiply"::
-  "X64.Poly1305.va_code_poly1305_reduce"::"X64.Poly1305.va_qcode_poly1305_reduce"::
-  "X64.Poly1305.va_wp_poly1305_reduce"::"X64.Poly1305.va_quick_poly1305_reduce"::
-  "X64.Poly1305.va_code_poly1305_iteration"::"X64.Poly1305.va_qcode_poly1305_iteration"::
-  "X64.Poly1305.va_code_poly1305_reduce_last"::"X64.Poly1305.va_qcode_poly1305_reduce_last"::
-  normal_steps
-
-unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_only normal_steps2] x
-
-val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) :
-  Ghost (state * fuel * a)
-    (normal (wp_sound_code_pre qc s0 k))
-    (wp_sound_code_post qc s0 k)
-let wp_sound_code_norm = wp_sound_code_wrap
-
-let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
-let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
-#endverbatim
-
-
 procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
     lets
         d1 @= r8; d2 @= r9; d3 @= r10; r0 @= r11; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;

@@ -431,6 +431,7 @@ noeq type quickCode (a:Type0) : va_code -> Type =
 
 unfold let va_quickCode = quickCode
 unfold let va_QProc = QProc
+irreducible let va_qattr = ()
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////
 

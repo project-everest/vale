@@ -336,13 +336,14 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isOpaque = attrs_get_bool (Id "opaque") false f.fattrs in
   let isPublic = attrs_get_bool (Id "public") false f.fattrs in
   let isPublicDecl = attrs_get_bool (Id "public_decl") false f.fattrs in
+  let isQAttr = attrs_get_bool (Id "qattr") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
   let printBody hasDecl x e =
-    (if isOpaqueToSmt then ps.PrintLine "[@\"opaque_to_smt\"]");
+    (if isOpaqueToSmt || isQAttr then ps.PrintLine ("[@" + (if isOpaqueToSmt then " \"opaque_to_smt\"" else "") + (if isQAttr then " va_qattr" else "") + "]"));
     let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
     ps.PrintLine ("let " + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();

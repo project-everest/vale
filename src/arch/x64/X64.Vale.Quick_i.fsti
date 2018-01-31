@@ -246,3 +246,21 @@ unfold let normal_steps : list string =
     "X64.Vale.Decls.va_op_dst_opr64_reg";
     "X64.Vale.Decls.va_const_opr64";
   ]
+
+unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr; delta_only normal_steps] x
+
+val wp_sound_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) :
+  Ghost (state * fuel * a)
+    (normal (wp_sound_pre qcs s0 k))
+    (wp_sound_post qcs s0 k)
+
+val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) :
+  Ghost (state * fuel * a)
+    (normal (wp_sound_code_pre qc s0 k))
+    (wp_sound_code_post qc s0 k)
+
+val wp_run_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
+  GHOST (state * fuel * a) (wp_GHOST (Block cs) s0 update (fun k -> normal (wp_wrap cs qcs update post k s0)))
+
+let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
+let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p

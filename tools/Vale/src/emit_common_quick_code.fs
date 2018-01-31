@@ -120,7 +120,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
 //        fret = TApp (TName (Reserved "quickCode"), [tUnit; tCodeApp]);
         fret = TApp (TName (Id "quickCodes"), [tUnit; tCodeApp]);
         fbody = Some fBody;
-        fattrs = [(Id "opaque_to_smt", [])];
+        fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])];
       }
       in
     let dFun = DFun fCode in
@@ -186,7 +186,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
       fargs = qParams;
       fret = tRetQuick;
       fbody = Some eQuick;
-      fattrs = [(Id "opaque_to_smt", [])];
+      fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])];
     }
     in
   [(loc, DFun fCodes)]
