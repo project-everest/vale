@@ -125,6 +125,58 @@ let qblock_proof #a #cs qcs s0 k =
   let (sM, f0, g) = wp_compute cs (qcs s0) s0 in
   wp_sound cs (qcs s0) k s0
 
+let qInlineIf_monotone #a #c1 #c2 b qc1 qc2 s0 k1 k2 =
+  if b then
+    QProc?.monotone qc1 s0 k1 k2
+  else
+    QProc?.monotone qc2 s0 k1 k2
+
+let qInlineIf_compute #a #c1 #c2 b qc1 qc2 s0 =
+  if b then
+    QProc?.compute qc1 s0
+  else
+    QProc?.compute qc2 s0
+
+let qInlineIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
+  if b then
+    QProc?.proof qc1 s0 k
+  else
+    QProc?.proof qc2 s0 k
+
+let qIf_monotone #a #c1 #c2 b qc1 qc2 s0 k1 k2 =
+  if eval_cmp s0 b then
+    QProc?.monotone qc1 s0 k1 k2
+  else
+    QProc?.monotone qc2 s0 k1 k2
+
+let qIf_compute #a #c1 #c2 b qc1 qc2 s0 =
+  if eval_cmp s0 b then
+    QProc?.compute qc1 s0
+  else
+    QProc?.compute qc2 s0
+
+let qIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
+  ( match b with
+    | Cmp_eq o1 o2 -> lemma_valid_cmp_eq s0 o1 o2; lemma_cmp_eq s0 o1 o2
+    | Cmp_ne o1 o2 -> lemma_valid_cmp_ne s0 o1 o2; lemma_cmp_ne s0 o1 o2
+    | Cmp_le o1 o2 -> lemma_valid_cmp_le s0 o1 o2; lemma_cmp_le s0 o1 o2
+    | Cmp_ge o1 o2 -> lemma_valid_cmp_ge s0 o1 o2; lemma_cmp_ge s0 o1 o2
+    | Cmp_lt o1 o2 -> lemma_valid_cmp_lt s0 o1 o2; lemma_cmp_lt s0 o1 o2
+    | Cmp_gt o1 o2 -> lemma_valid_cmp_gt s0 o1 o2; lemma_cmp_gt s0 o1 o2
+  );
+  qIf_monotone b qc1 qc2 s0 k k_true;
+  let (sM, f0, g) = qIf_compute b qc1 qc2 s0 in
+  if eval_cmp s0 b then
+  (
+    QProc?.proof qc1 s0 k;
+    va_lemma_ifElseTrue_total (cmp_to_ocmp b) c1 c2 s0 f0 sM
+  )
+  else
+  (
+    QProc?.proof qc2 s0 k;
+    va_lemma_ifElseFalse_total (cmp_to_ocmp b) c1 c2 s0 f0 sM
+  )
+
 let qAssertBy #a p qcs s0 =
   wp_sound [] qcs (fun _ _ -> p) s0
 

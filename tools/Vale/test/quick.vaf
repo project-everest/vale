@@ -143,7 +143,10 @@ procedure{:quick exportOnly} Add64Ghosts(
     Add64(dst, src);
 }
 
-procedure{:quick} Bump3(ghost g1:int) returns(ghost g2:int)
+#verbatim
+#reset-options "--debug Quick --debug_level SMTQuery"
+#endverbatim
+procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;
@@ -154,18 +157,37 @@ procedure{:quick} Bump3(ghost g1:int) returns(ghost g2:int)
         rax == old(rax) + self_int(3);
         g2 == old(rax);
 {
-    Add64(rax, 1);
-    Add64(rax, 1);
+    inline if (b)
+    {
+        Add64(rax, 1);
+        Add64(rax, 1);
+    }
+    else
+    {
+        Add64(rax, 2);
+    }
     assert self_int(3) == 3 by { lemma_self_int(3); }
     lemma_self_int(g1 + 1);
     lemma_self_int(old(rax));
     assert rax == old(rax) + 2;
     ghost var gtmp := g1 + rax;
     g2 := gtmp - rax;
-    Add64(rax, 1);
+    if (rax < 7)
+    {
+        Add64(rax, 1);
+        Add64(rax, 0);
+    }
+    else
+    {
+        Add64(rax, 0);
+        Add64(rax, 1);
+    }
 }
+#verbatim
+#reset-options
+#endverbatim
 
-procedure{:quick} CallBump3(ghost g1:int) returns(ghost g2:int)
+procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;
@@ -177,7 +199,7 @@ procedure{:quick} CallBump3(ghost g1:int) returns(ghost g2:int)
         g2 == old(rax);
 {
     Add64(rax, 0);
-    g2 := Bump3(if rax < 7 then rax else g1 + 0);
+    g2 := Bump3(b, if rax < 7 then rax else g1 + 0);
 }
 
 procedure Incr3()

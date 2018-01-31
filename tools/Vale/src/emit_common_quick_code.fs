@@ -80,6 +80,30 @@ let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bo
   | SAssert (_, e) ->
       let sAssign = SAssign ([], EApply (Reserved "assert", [e])) in
       build_qcode_stmt env sAssign (needsState, eTail)
+  | SIfElse (((SmInline | SmPlain) as sm), eb, ss1, ss2) ->
+      let eb_alt () =
+        // HACK
+        match eb with
+        | EApply (Reserved "cmp_eq", args) -> EApply (Id "Cmp_eq", args)
+        | EApply (Reserved "cmp_ne", args) -> EApply (Id "Cmp_ne", args)
+        | EApply (Reserved "cmp_le", args) -> EApply (Id "Cmp_le", args)
+        | EApply (Reserved "cmp_ge", args) -> EApply (Id "Cmp_ge", args)
+        | EApply (Reserved "cmp_lt", args) -> EApply (Id "Cmp_lt", args)
+        | EApply (Reserved "cmp_gt", args) -> EApply (Id "Cmp_gt", args)
+        | _ -> internalErr "SIfElse"
+        in
+      let eb = qlemma_exp eb in
+      let outs = [] in // TODO
+      let eqc1 = build_qcode_block false env outs ss1 in
+      let eqc2 = build_qcode_block false env outs ss2 in
+      let (sq, eCmp) =
+        match sm with
+        | SmInline -> ("qInlineIf", eb)
+        | _ -> ("qIf", qlemma_exp (eb_alt ()))
+        in
+      let eIf = EApply (Id sq, [eCmp; eqc1; eqc2]) in
+      let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); (Id "_", None)], [], eTail) in
+      (true, EApply (Id "QBind", [eIf; fTail]))
   | SForall ([], [], EBool true, ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] ss in

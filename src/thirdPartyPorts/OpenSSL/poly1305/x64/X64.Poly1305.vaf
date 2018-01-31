@@ -416,43 +416,26 @@ procedure {:frame false} poly1305_blocks(
 #endverbatim
 
 // last 1..15 bytes, in case len is not a multiple of 16
-procedure{:timeLimitMultiplier 2} poly1305_last_block(
-    inout h0:dst_opr64,
-    inout h1:dst_opr64,
-    inout h2:dst_opr64,
-          r0:opr64,
-          s1:opr64,
-          nExtra:opr64,
-    ghost hBlocks:int,
-    ghost r1:nat64,
-    ghost r:int,
-    ghost inpLast:nat128,
-    ghost p:int)
+procedure{:quick} poly1305_last_block()
+    lets
+        h0 @= r14; h1 @= rbx; h2 @= rbp; r0 @= r11; s1 @= r13; nExtra @= r15;
+        n:nat := 0x1_0000_0000_0000_0000;
+        p:pos := n * n * 4 - 5;
+        r1 := rax;
+        r:nat := lowerUpper128_opaque(r0, r1);
+        hBlocks := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
+        inpLast := lowerUpper128_opaque(r8, r9);
     reads
-        r11; r13;
+        r0; s1; nExtra;
     modifies
-        r8; r9; r10; r14; rbx; rbp;
-        rax; rcx; rdx; r9; 
-        efl;
+        rax; rcx; rdx; r8; r9; r10; h0; h1; h2; efl;
     requires
-        @h0 == OReg(R14);
-        @h1 == OReg(Rbx);
-        @h2 == OReg(Rbp);
-        @r0 == OReg(R11);
-        @s1 == OReg(R13);
-        @nExtra == OReg(R15);
-    requires
-        p == n * n * 4 - 5;
         h2 < 5;
-        hBlocks == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
-        r == lowerUpper128_opaque(r0, r1);
-        rax == r1;
         r0 < n / 16;
         r1 < n / 16;
         r1 % 4 == 0;
         s1 == r1 + r1 / 4;
-        inpLast == lowerUpper128_opaque(r8, r9);
-        1 <= nExtra && nExtra < 16;
+        1 <= nExtra < 16;
     ensures
         h2 < 5;
         let padLast := pow2(nExtra * 8);
@@ -617,7 +600,7 @@ let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffff
 #endverbatim
 
 // TODO: Procedure was consistently sending Z3 into the woods when frame was true
-procedure {:frame false} poly1305_impl(
+procedure {:quick exportOnly} poly1305_impl(
     ghost key_r:nat128,
     ghost key_s:nat128,
     ghost ctx_b:buffer64,
@@ -656,6 +639,7 @@ procedure {:frame false} poly1305_impl(
 //        // Framing
         ctx == old(ctx);
 {
+assume false;
     ghost var inp_in := inp;
     ghost var len_in := len;
     ghost var key_r0 := buffer64_read(ctx_b, 3, mem);
@@ -724,7 +708,7 @@ assume false;       // Everything slows down here.  Fix with fast_block?
         ghost var a := applyHeapletTo128(buffer64_as_seq(mem, inp_b), (len + 15) / 16 * 16, inp);
         assert lowerUpper128_opaque(r8, r9) == a
             by { /* reveal heapletTo128; */ reveal_opaque(lowerUpper128); }
-        poly1305_last_block(h0, h1, h2, r0, r13, r15, h, r1, r, lowerUpper128_opaque(r8, r9), /*n,*/ p);
+        poly1305_last_block();
         h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
     }
 
@@ -750,7 +734,7 @@ assume false;       // Everything slows down here.  Fix with fast_block?
 // Note that this reads 16-byte chunks directly from the input buffer,
 // so (len + 15) / 16 * 16 bytes must be readable, even though only len bytes
 // affect the result.
-procedure {:frame false} poly1305(
+procedure {:quick} poly1305(
     inline win:bool,
     ghost key_r:nat128,
     ghost key_s:nat128,
@@ -766,10 +750,7 @@ procedure {:frame false} poly1305(
     requires/ensures
         ok;
     modifies
-        rax; rcx; rdx; r8; r9; r10; r13; r15;
-        rdi; rsi; rbx; rbp; r12; r14;
-        efl;
-        mem;
+        rax; rcx; rdx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem;
     requires
         ctx_in == (if win then rcx else ctx);
         inp_in == (if win then rdx else inp);
