@@ -18,15 +18,19 @@ noeq type quickCodes (a:Type0) : codes -> Type =
 | QGetState: #cs:codes -> (state -> quickCodes a cs) -> quickCodes a ((Block [])::cs)
 | QLemma: #cs:codes -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
 
+[@va_qattr]
 let wpLemma (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
   QLemma pre l qcs
 
+[@va_qattr]
 let wp_proc (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> a -> Type0) : Type0 =
   match qc with
   | QProc _ wp _ _ _ -> wp s0 k
 
 let wp_Seq_t (a:Type0) = state -> a -> Type0
 let wp_Bind_t (a:Type0) = state -> a -> Type0
+
+[@va_qattr]
 let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
   Tot Type0 (decreases %[cs; 0; qcs])
   =
@@ -70,6 +74,7 @@ val wp_sound (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0)
 
 unfold let block = va_Block
 
+[@va_qattr]
 let wp_block (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Type0 =
   wp cs (qcs s0) k s0
 
@@ -85,7 +90,7 @@ val qblock_proof (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state)
   (requires wp_block qcs s0 k)
   (ensures (qblock_monotone qcs s0 k k_true; let (sM, f0, g) = qblock_compute qcs s0 in eval_code (block cs) s0 f0 sM /\ k sM g))
 
-[@"opaque_to_smt"]
+[@"opaque_to_smt" va_qattr]
 let qblock (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) : quickCode a (block cs) =
   QProc (block cs) (wp_block qcs) (qblock_monotone qcs) (qblock_compute qcs) (qblock_proof qcs)
 
@@ -102,16 +107,19 @@ val wp_sound_code (#a:Type0) (c:code) (qc:quickCode a c) (k:state -> a -> Type0)
   (requires QProc?.wp qc s0 k)
   (ensures fun (sN, fN, gN) -> eval_code c s0 fN sN /\ k sN gN)
 
+[@va_qattr]
 let rec regs_match (regs:list reg) (r0:Regs_i.t) (r1:Regs_i.t) : Type0 =
   match regs with
   | [] -> True
   | r::regs -> r0 r == r1 r /\ regs_match regs r0 r1
 
+[@va_qattr]
 let all_regs_match (r0:Regs_i.t) (r1:Regs_i.t) : Type0
   =
   let regs = [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp; Rsp; R8; R9; R10; R11; R12; R13; R14; R15] in
   regs_match regs r0 r1
 
+[@va_qattr]
 let va_state_match (s0:state) (s1:state) : Pure Type0
   (requires True)
   (ensures fun b -> b ==> state_eq s0 s1)
@@ -153,6 +161,7 @@ val wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:stat
 // For efficiency, absorb the state components from the (potentially large) normalized
 // final state sN into an alternate final state sN' (related to sN via 'update' and 'post':
 // update describes which components changed, post describes what they changed to).
+[@va_qattr]
 let wp_final_k (#a:Type0) (update:state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (sN:state) (g:a) : Type0 =
   va_state_match sN (update sN) /\ post sN sN /\
     (forall (ok':bool) (regs':Regs_i.t) (flags':nat64) (mem':mem).
@@ -160,11 +169,13 @@ let wp_final_k (#a:Type0) (update:state -> state) (post:state -> state -> Type0)
       post sN sN' ==> k sN' g)
 
 // For efficiency, introduce shorter names (e.g. ok, mem) for components of initial state s0.
+[@va_qattr]
 let wp_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
   forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
     let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
     s0 == s0' ==> wp cs qcs (wp_final_k (update s0') post k) s0'
 
+[@va_qattr]
 let wp_wrap_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
   forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
     let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
@@ -185,69 +196,7 @@ val wp_run (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (update:state 
 val wp_run_code (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
   GHOST (state * fuel * a) (wp_GHOST c s0 update (fun k -> wp_wrap_code c qc update post k s0))
 
-unfold let normal_steps : list string =
-  [
-    "X64.Vale.Quick_i.wp";
-    "X64.Vale.Quick_i.wp_wrap";
-    "X64.Vale.Quick_i.wp_wrap_code";
-    "X64.Vale.Quick_i.wp_proc";
-    "X64.Vale.Quick_i.wp_Seq";
-    "X64.Vale.Quick_i.wp_Bind";
-    "X64.Vale.Quick_i.wp_block";
-    "X64.Vale.Quick_i.qblock";
-    "X64.Vale.Quick_i.wpLemma";
-    "X64.Vale.Quick_i.regs_match";
-    "X64.Vale.Quick_i.all_regs_match";
-    "X64.Vale.Quick_i.va_state_match";
-    "X64.Vale.Quick_i.wp_sound_pre";
-    "X64.Vale.Quick_i.wp_sound_code_pre";
-    "X64.Vale.Quick_i.wp_final_k";
-//    "X64.Vale.Quick_i.norm_all_regs_match";
-
-    "X64.Machine_s.__proj__OReg__item__r";
-    "X64.Machine_s.uu___is_OReg";
-
-    "X64.Vale.State_i.__proj__Mkstate__item__ok";
-    "X64.Vale.State_i.__proj__Mkstate__item__regs";
-    "X64.Vale.State_i.__proj__Mkstate__item__flags";
-    "X64.Vale.State_i.__proj__Mkstate__item__mem";
-    "X64.Vale.State_i.to_nat64";
-    "X64.Vale.State_i.eval_operand";
-    "X64.Vale.State_i.valid_operand";
-    "X64.Vale.State_i.eval_reg";
-    "X64.Vale.State_i.update_reg";
-    "X64.Vale.State_i.update_operand";
-    "X64.Vale.State_i.state_eq";
-
-    "X64.Vale.Decls.va_QProc";
-    "X64.Vale.Decls.__proj__QProc__item__wp";
-    "X64.Vale.Decls.va_eval_dst_opr64";
-    "X64.Vale.Decls.va_eval_opr64";
-    "X64.Vale.Decls.va_is_dst_opr64";
-    "X64.Vale.Decls.va_is_dst_dst_opr64";
-    "X64.Vale.Decls.va_is_src_opr64";
-    "X64.Vale.Decls.va_state_eq";
-    "X64.Vale.Decls.va_get_ok";
-    "X64.Vale.Decls.va_get_flags";
-    "X64.Vale.Decls.va_get_mem";
-    "X64.Vale.Decls.va_get_reg";
-    "X64.Vale.Decls.va_update_ok";
-    "X64.Vale.Decls.va_update_flags";
-    "X64.Vale.Decls.va_update_mem";
-    "X64.Vale.Decls.va_update_reg";
-    "X64.Vale.Decls.va_upd_ok";
-    "X64.Vale.Decls.va_upd_reg";
-    "X64.Vale.Decls.va_upd_flags";
-    "X64.Vale.Decls.va_upd_mem";
-    "X64.Vale.Decls.va_upd_operand_dst_opr64";
-    "X64.Vale.Decls.va_CCons";
-    "X64.Vale.Decls.va_CNil";
-    "X64.Vale.Decls.va_op_opr64_reg";
-    "X64.Vale.Decls.va_op_dst_opr64_reg";
-    "X64.Vale.Decls.va_const_opr64";
-  ]
-
-unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr; delta_only normal_steps] x
+unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr] x
 
 val wp_sound_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) :
   Ghost (state * fuel * a)

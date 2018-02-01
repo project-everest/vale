@@ -124,6 +124,7 @@ unfold let va_eval_reg_opr64    (s:va_state) (o:va_reg_operand) : nat64 = eval_r
 
 (* Predicates *)
 unfold let va_is_src_opr64 (o:operand) (s:va_state) = valid_operand o s
+[@va_qattr]
 let va_is_dst_opr64 (o:operand) (s:va_state) = match o with OReg Rsp -> false | OReg _ -> true | _ -> false
 unfold let va_is_dst_dst_opr64 (o:va_dst_operand) (s:va_state) = va_is_dst_opr64 o s
 unfold let va_is_src_reg (r:reg) (s:va_state) = True
@@ -221,6 +222,7 @@ val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0
 
 (* ok for now but no need to actually expose the definition.
    instead expose lemmas about it *)
+[@va_qattr]
 let va_state_eq (s0:va_state) (s1:va_state) : Type0 = state_eq s0 s1
 
 let va_require_total (c0:va_code) (c1:va_code) (s0:va_state) : Type0 =
@@ -388,6 +390,7 @@ unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags
 unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
 unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
 
+[@va_qattr]
 let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
   match o with
   | OConst n -> s
@@ -431,7 +434,7 @@ noeq type quickCode (a:Type0) : va_code -> Type =
 
 unfold let va_quickCode = quickCode
 unfold let va_QProc = QProc
-irreducible let va_qattr = ()
+
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -2,6 +2,7 @@ module X64.Machine_s
 
 module M = Memory_i_s
 
+irreducible let va_qattr = ()
 unfold let nat32_max = Types_s.nat32_max
 unfold let nat64_max = Types_s.nat64_max
 unfold let nat128_max = Types_s.nat128_max
@@ -33,6 +34,7 @@ type maddr =
   | MReg: r:reg -> offset:int -> maddr
   | MIndex: base:reg -> scale:int -> index:reg -> offset:int -> maddr
 
+[@va_qattr]
 type operand =
   | OConst: n:int -> operand
   | OReg: r:reg -> operand
