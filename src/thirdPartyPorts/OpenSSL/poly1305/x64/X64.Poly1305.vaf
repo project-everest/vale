@@ -233,7 +233,7 @@ procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
 #reset-options "--z3rlimit 160"
 #endverbatim
 
-procedure {:frame false} poly1305_blocks(
+procedure{:quick exportOnly} poly1305_blocks(
     ghost r:int,
     ghost h_in:int,
     ghost ctx_b:buffer64,
@@ -293,8 +293,8 @@ procedure {:frame false} poly1305_blocks(
         let r1_in := buffer64_read(ctx_b, 4, mem);
         h == h2 * (nat64_max * nat64_max) + h1 * nat64_max + h0;
         modp(h) == poly1305_heap_blocks(modp(h_in), padbit * n * n, r, buffer64_as_seq(mem, inp_b), old(len) / 8);
-
 {
+assume false;
     h := 0;
     lemma_poly_bits64();
 
@@ -327,6 +327,7 @@ procedure {:frame false} poly1305_blocks(
 
     ghost var word_index:int := 0;
 
+/*
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
             ok;
@@ -409,6 +410,7 @@ procedure {:frame false} poly1305_blocks(
     Store64_buffer(ctx, h0, 0, ctx_b, 0);
     Store64_buffer(ctx, h1, 8, ctx_b, 1);
     Store64_buffer(ctx, h2, 16, ctx_b, 2);
+*/
 }
 
 #verbatim
@@ -560,23 +562,15 @@ procedure{:quick} poly1305_reduce_last()
 }
 
 // h := (h + key_s) % 2^128
-procedure poly1305_add_key_s(
-    inout h0:dst_opr64,
-    inout h1:dst_opr64,
-          key_s0:opr64,
-          key_s1:opr64,
-    ghost h_in:int,
-    ghost key_s:nat128)
+procedure{:quick} poly1305_add_key_s()
+    lets
+        h0 @= r14; h1 @= rbx; key_s0 @= rax; key_s1 @= rdx;
+        h_in := lowerUpper128_opaque(h0, h1);
+        key_s := lowerUpper128_opaque(key_s0, key_s1);
+    reads
+        key_s0; key_s1;
     modifies
-        efl;
-    requires
-        @h0 == OReg(R14);
-        @h1 == OReg(Rbx);
-        @key_s0 == OReg(Rax);
-        @key_s1 == OReg(Rdx);
-    requires
-        h_in == lowerUpper128_opaque(h0, h1);
-        key_s == lowerUpper128_opaque(key_s0, key_s1);
+        h0; h1; efl;
     ensures
         lowerUpper128_opaque(h0, h1) == mod2_128(h_in + key_s);
 {
@@ -585,6 +579,18 @@ procedure poly1305_add_key_s(
 
     lemma_add_key(old(h0), old(h1), h_in, key_s0, key_s1, key_s, h0, h1);
 }
+
+#verbatim interface
+type t_seqTo128 = int -> nat128
+let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
+  let f (i:int) : nat128 =
+    let open FStar.Mul in
+    if 0 <= i && i < Seq.length s / 2 then
+      (Seq.index s (2 * i)) + 0x10000000000000000 * (Seq.index s (2 * i + 1))
+    else
+      42
+  in f
+#endverbatim
 
 #verbatim
 let modp_0 () : Lemma
@@ -595,12 +601,17 @@ let modp_0 () : Lemma
     ()
 let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
+let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
+  (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b) /\ ((n + n) % 2) == 0)
+  (ensures
+    poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
+    poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
+  =
+  assume False
 #reset-options "--z3rlimit 200"
-
 #endverbatim
 
-// TODO: Procedure was consistently sending Z3 into the woods when frame was true
-procedure {:quick exportOnly} poly1305_impl(
+procedure{:quick} poly1305_impl(
     ghost key_r:nat128,
     ghost key_s:nat128,
     ghost ctx_b:buffer64,
@@ -609,7 +620,6 @@ procedure {:quick exportOnly} poly1305_impl(
     lets
         ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := nat64_max;
-        p := n * n * 4 - 5;
     requires/ensures
         ok;
     modifies
@@ -634,12 +644,11 @@ procedure {:quick exportOnly} poly1305_impl(
         modifies_buffer(ctx_b, old(mem), mem);
         modifies_buffer_specific(ctx_b, old(mem), mem, 0, 8);
         h == lowerUpper128_opaque(h0, h1);
-        let inp_mem := heapletTo128(buffer64_as_seq(mem, inp_b), readable_words(old(len)));
+        let inp_mem := seqTo128(buffer64_as_seq(mem, inp_b));
         h == poly1305_hash(key_r, key_s, inp_mem, old(len));
 //        // Framing
         ctx == old(ctx);
 {
-assume false;
     ghost var inp_in := inp;
     ghost var len_in := len;
     ghost var key_r0 := buffer64_read(ctx_b, 3, mem);
@@ -661,18 +670,17 @@ assume false;
     Store64_buffer(ctx, r0, 24, ctx_b, 3);
     Store64_buffer(ctx, r1, 32, ctx_b, 4);
 
-    ghost var r:nat128 := lowerUpper128_opaque(r0, r1);
+    ghost var r:nat128 := ghost lowerUpper128_opaque(r0, r1);
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
 
-    assert r == logand128(key_r, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff) by
+    let mask:nat128 := 0x0ffffffc_0ffffffc_0ffffffc_0fffffff; // REVIEW: why do we need to put this constant in a variable?
+    assert r == logand128(key_r, mask) by
     {
         reveal_opaque(lowerUpper128);
-        lemma_lowerUpper128_and(key_r, key_r0, key_r1, 0x0ffffffc_0ffffffc_0ffffffc_0fffffff,
+        lemma_lowerUpper128_and(key_r, key_r0, key_r1, mask,
             0x0fff_fffc_0fff_ffff, 0x0fff_fffc_0fff_fffc, r, r0, r1);
     }
 
-assume false;       // Everything slows down here.  Fix with fast_block?
-    //assert{:fast_block} true;
     Mov64(rax, len);
     And64(rax, 15);
     Sub64(len, rax);
@@ -690,7 +698,7 @@ assume false;       // Everything slows down here.  Fix with fast_block?
 //        assert_by_tactic(modp(0) == 0, retain_only_modp());
     }
 
-    lemma_poly1305_heap_hash_blocks(0, n * n, r, mem, inp_b, inp_in + len_in / 16 * 16, len_in);
+    lemma_poly1305_heap_hash_blocks_alt(0, n * n, r, mem, inp_b, old(len) / 16);
 
     reveal_logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
     assert r == bare_r(key_r);
@@ -698,30 +706,30 @@ assume false;       // Everything slows down here.  Fix with fast_block?
         by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
 
     Load64_buffer(r15, ctx, 56, ctx_b, 7); 
-    assert r15 == len_in % 16;        
+    // assert r15 == len_in % 16;
     if (r15 != 0)
     {
         //assert{:fast_block} true;
         Load64_buffer(rax, ctx, 32, ctx_b, 4);
-        Load64_buffer(r8, inp, 0, inp_b, 0);
-        Load64_buffer(r9, inp, 8, inp_b, 1);
-        ghost var a := applyHeapletTo128(buffer64_as_seq(mem, inp_b), (len + 15) / 16 * 16, inp);
+        Load64_buffer(r8, inp, 0, inp_b, (len_in / 16) * 2);
+        Load64_buffer(r9, inp, 8, inp_b, (len_in / 16) * 2 + 1);
+        ghost var a := ghost seqTo128(buffer64_as_seq(mem, inp_b), len_in / 16);
         assert lowerUpper128_opaque(r8, r9) == a
             by { /* reveal heapletTo128; */ reveal_opaque(lowerUpper128); }
         poly1305_last_block();
-        h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
+        h := ghost lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
     }
 
     lemma_add_mod128(modp(h), key_s);
     poly1305_reduce_last();
-    h := lowerUpper128_opaque(h0, h1);
+    h := ghost lowerUpper128_opaque(h0, h1);
 
     Load64_buffer(rax, ctx, 40, ctx_b, 5);
     Load64_buffer(rdx, ctx, 48, ctx_b, 6);
-    poly1305_add_key_s(h0, h1, rax, rdx, h, key_s);
-    h := lowerUpper128_opaque(h0, h1);
+    poly1305_add_key_s();
+    h := ghost lowerUpper128_opaque(h0, h1);
 
-    assert h == poly1305_hash(key_r, key_s, heapletTo128(buffer64_as_seq(mem, inp_b), len_in), len_in)
+    assert h == poly1305_hash(key_r, key_s, seqTo128(buffer64_as_seq(mem, inp_b)), len_in)
         by { reveal_opaque(mod2_128'); reveal_opaque(modp'); }
 }
 
@@ -734,7 +742,7 @@ assume false;       // Everything slows down here.  Fix with fast_block?
 // Note that this reads 16-byte chunks directly from the input buffer,
 // so (len + 15) / 16 * 16 bytes must be readable, even though only len bytes
 // affect the result.
-procedure {:quick} poly1305(
+procedure{:quick} poly1305(
     inline win:bool,
     ghost key_r:nat128,
     ghost key_s:nat128,
@@ -773,7 +781,7 @@ procedure {:quick} poly1305(
         let h0_out := buffer64_read(ctx_b, 0, mem);
         let h1_out := buffer64_read(ctx_b, 1, mem);
         h == lowerUpper128_opaque(h0_out, h1_out);
-        let inp_mem := heapletTo128(buffer64_as_seq(mem, inp_b), readable_words(len_in));
+        let inp_mem := seqTo128(buffer64_as_seq(mem, inp_b));
         h == poly1305_hash(key_r, key_s, inp_mem, len_in);
         h1 == old(h1);
         h2 == old(h2);

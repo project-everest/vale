@@ -146,6 +146,35 @@ let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp
     in
   env_map_exp (map_apply_compose2 f f_state) env e
 
+let rec env_stmt (env:env) (s:stmt):env =
+  match s with
+  | SLoc (loc, s) -> env_stmt env s
+  | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SCalc _ -> env
+  | SVar (x, t, m, g, a, eOpt) ->
+    (
+      let info =
+        match g with
+        | XAlias (AliasThread, e) -> ThreadLocal {local_in_param = false; local_exp = e; local_typ = t}
+        | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
+        | XGhost -> GhostLocal (m, t)
+        | XInline -> InlineLocal
+        | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
+        in
+      let ids = Map.add x info env.ids in
+      {env with ids = ids}
+    )
+  | SAlias (x, y) ->
+      let ids = Map.add x (make_operand_alias y env) env.ids in
+      {env with ids = ids}
+  | SAssign (xs, e) ->
+      let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal (Mutable, t)) ids) env.ids xs in
+      {env with ids = ids}
+  | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> env
+  | SForall (xs, ts, ex, e, b) ->
+      {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}
+  | SExists (xs, ts, e) ->
+      {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}
+
 let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (s:stmt):(env * stmt list) =
   map_apply_modify (fs env s) (fun () ->
     let fee = fe env in
@@ -160,24 +189,9 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SAssert (attrs, e) -> (env, [SAssert (attrs, fee e)])
     | SCalc (oop, contents) -> (env, [SCalc (oop, List.map (env_map_calc_contents fe fs env) contents)])
     | SVar (x, t, m, g, a, eOpt) ->
-      (
-        let info =
-          match g with
-          | XAlias (AliasThread, e) -> ThreadLocal {local_in_param = false; local_exp = e; local_typ = t}
-          | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
-          | XGhost -> GhostLocal (m, t)
-          | XInline -> InlineLocal
-          | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
-          in
-        let ids = Map.add x info env.ids in
-        ({env with ids = ids}, [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
-      )
-    | SAlias (x, y) ->
-        let ids = Map.add x (make_operand_alias y env) env.ids in
-        ({env with ids = ids}, [SAlias (x, y)])
-    | SAssign (xs, e) ->
-        let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal (Mutable, t)) ids) env.ids xs in
-        ({env with ids = ids}, [SAssign (xs, fee e)])
+        (env_stmt env s, [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
+    | SAlias (x, y) -> (env_stmt env s, [SAlias (x, y)])
+    | SAssign (xs, e) -> (env_stmt env s, [SAssign (xs, fee e)])
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> (env, [SBlock (rs b)])
     | SQuickBlock (x, b) -> (env, [SQuickBlock (x, rs b)])
@@ -185,12 +199,12 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SWhile (e, invs, ed, b) ->
         (env, [SWhile (fee e, List_mapSnd fee invs, mapSnd (List.map fee) ed, rs b)])
     | SForall (xs, ts, ex, e, b) ->
-        let env = {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs} in
+        let env = env_stmt env s in
         let fee = fe env in
         let rs = env_map_stmts fe fs env in
         (env, [SForall (xs, List.map (List.map fee) ts, fee ex, fee e, rs b)])
     | SExists (xs, ts, e) ->
-        let env = {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs} in
+        let env = env_stmt env s in
         let fee = fe env in
         (env, [SExists (xs, List.map (List.map fee) ts, fee e)])
   )
@@ -867,17 +881,21 @@ and add_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):stmt list
 
 ///////////////////////////////////////////////////////////////////////////////
 
-let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
+// returns:
+//   - env for procedure body (for procedures)
+//   - env for subsequent declarations
+//   - transformed declaration
+let transform_decl (env:env) (loc:loc) (d:decl):(env * env * decl) =
   match d with
   | DVar (x, t, XAlias (AliasThread, e), _) ->
       let env = {env with ids = Map.add x (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t}) env.ids} in
-      (env, d, d)
+      (env, env, d)
   | DVar (x, t, XState e, _) ->
     (
       match skip_loc e with
       | EApply (Id id, es) ->
           let env = {env with ids = Map.add x (StateInfo (id, es, t)) env.ids} in
-          (env, d, d)
+          (env, env, d)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )
   | DProc p ->
@@ -990,8 +1008,8 @@ let transform_decl (env:env) (loc:loc) (d:decl):(env * decl * decl) =
             let ss = add_quick_blocks_stmts envp (ref 0) ss in
             Some ss
         in
-      (env, DProc pReprint, DProc {p with pbody = body; pspecs = specs})
+      (envp, env, DProc {p with pbody = body; pspecs = specs})
     )
-  | _ -> (env, d, d)
+  | _ -> (env, env, d)
 
 

@@ -542,7 +542,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     pattrs = List.filter filter_proc_attr p.pattrs;
   }
 
-let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
+let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   gen_lemma_sym_count := 0;
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
@@ -603,7 +603,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
         let pLemma = build_lemma env benv b1 rstmts bstmts in
         let quickDecls =
           if isQuick then
-            Emit_common_quick_code.build_qcode env loc p stmts
+            Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
         fCodes @ quickDecls @ (gen_quick_block_funs ()) @ [(loc, DProc pLemma)]
     in
