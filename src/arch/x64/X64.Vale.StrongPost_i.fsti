@@ -181,6 +181,13 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
       | _ -> False
     end
 
+let wp_code_delta = [
+  "X64.Vale.State_i.__proj__Mkstate__item__regs";
+  "X64.Vale.State_i.__proj__Mkstate__item__ok" ;
+  "X64.Vale.State_i.__proj__Mkstate__item__flags";
+  "X64.Vale.State_i.__proj__Mkstate__item__mem";
+  ]
+
 [@"uninterpreted_by_smt"]
 val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (f0:va_fuel) : PURE (sN:state)
   (fun (post:(state -> Type)) ->
@@ -191,7 +198,7 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (f0:va_fuel) : PURE (sN
       mem0 == s0.mem ==>
       s0.ok /\
       Prims.norm
-        [delta_attr va_qattr; zeta; iota; primops]
+        [delta_only wp_code_delta; delta_attr va_qattr; zeta; iota; primops]
         (wp_code
           (normalize_term inss)
           (augment (va_Block (normalize_term (inss_to_codes inss))) s0 f0 post)

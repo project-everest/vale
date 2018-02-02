@@ -30,7 +30,6 @@ type ocmp =
 type code = precode ins ocmp
 type codes = list code
 
-[@va_qattr]
 noeq type state = {
   ok: bool;
   regs: reg -> nat64;

@@ -5,7 +5,6 @@ open X64.Machine_s
 open X64.Vale
 module M = Memory_i_s
 
-[@va_qattr]
 noeq type state = {
   ok: bool;
   regs: Regs_i.t;
@@ -32,6 +31,7 @@ let reg_to_int (r:reg) : int =
   | R14 -> 14
   | R15 -> 15
 
+[@va_qattr]
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 

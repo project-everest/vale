@@ -130,6 +130,7 @@ let va_state_match (s0:state) (s1:state) : Pure Type0
   s0.flags == s1.flags /\
   s0.mem == s1.mem
 
+[@va_qattr]
 unfold let wp_sound_pre (#a:Type0) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
   forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
     let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
@@ -144,6 +145,7 @@ val wp_sound_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:stat
     (wp_sound_pre qcs s0 k)
     (wp_sound_post qcs s0 k)
 
+[@va_qattr]
 unfold let wp_sound_code_pre (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
   forall (ok:bool) (regs:Regs_i.t) (flags:nat64) (mem:mem).
     let s0' = {ok = ok; regs = regs; flags = flags; mem = mem} in
@@ -196,7 +198,17 @@ val wp_run (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (update:state 
 val wp_run_code (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
   GHOST (state * fuel * a) (wp_GHOST c s0 update (fun k -> wp_wrap_code c qc update post k s0))
 
-unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr] x
+unfold let normal_steps : list string =
+  [
+    "X64.Vale.State_i.__proj__Mkstate__item__ok";
+    "X64.Vale.State_i.__proj__Mkstate__item__regs";
+    "X64.Vale.State_i.__proj__Mkstate__item__flags";
+    "X64.Vale.State_i.__proj__Mkstate__item__mem";
+
+    "X64.Vale.Decls.__proj__QProc__item__wp";
+  ]
+
+unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr; delta_only normal_steps] x
 
 val wp_sound_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) :
   Ghost (state * fuel * a)
