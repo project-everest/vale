@@ -1,6 +1,8 @@
 
 include "../arch/x64/X64.Vale.Decls.vaf"
 
+module Test.FastBlock
+
 #verbatim
 (* To compile this file do:
    -- vale.exe -fstarText -in Test.FastBlock.vaf -out Test.FastBlock.fst -outi Test.FastBlock.fsti
@@ -9,14 +11,14 @@ include "../arch/x64/X64.Vale.Decls.vaf"
 *)
 #endverbatim
 
-#verbatim interface implementation
-module Test.FastBlock
+#verbatim{:interface}{:implementation}
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 open X64.Vale.StrongPost_i
-#set-options "--z3rlimit 20"
 #endverbatim
+
+#reset-options "--z3rlimit 20"
 
 procedure Copy64()
     requires/ensures

@@ -163,6 +163,12 @@ AddOption('--NOVERIFY',
   default=False,
   action='store_true',
   help='Verify and compile, or compile only')
+AddOption('--ONE',
+  dest='single_vaf',
+  type='string',
+  default=None,
+  action='store',
+  help='Only verify one specified .vaf file, and in that file, only verify procedures or verbatim blocks marked as {:verify}.')
 AddOption('--NOCOLOR',
   dest='nocolor',
   default=False,
@@ -201,6 +207,9 @@ stage2 = GetOption('stage2')
 fstar_my_version = GetOption('fstar_my_version')
 fstar_z3_my_version = GetOption('fstar_z3_my_version')
 gen_hints = GetOption('gen_hints')
+single_vaf = GetOption('single_vaf')
+is_single_vaf = not (single_vaf is None)
+env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else ''
 
 ####################################################################
 #
@@ -275,9 +284,11 @@ env['VALE'] = File('bin/vale.exe')
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
 dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
-fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1 --initial_ifuel 0' \
+fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1' \
+  + (' --initial_ifuel 1' if is_single_vaf else ' --initial_ifuel 0') \
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
-  + ' --hint_info --use_hints' \
+  + ' --hint_info' \
+  + ('' if is_single_vaf else ' --use_hints') \
   + (' --record_hints' if gen_hints else ' --cache_checked_modules')
 fstar_default_args = fstar_default_args_nosmtencoding \
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
@@ -397,7 +408,7 @@ def add_vale_builders(env):
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
                             emitter = vale_tool_dependency_Emitter)
-  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_USER_ARGS",
+  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_SCONS_ARGS $VALE_USER_ARGS",
                             src_suffix = '.vaf',
                             emitter = vale_tool_dependency_Emitter)
   env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})
@@ -456,7 +467,7 @@ vale_fstar_scan = Scanner(function = vale_fstar_file_scan,
                      skeys = ['.vaf'])
 if do_dafny:
   env.Append(SCANNERS = vale_dafny_scan)
-if do_fstar:
+if do_fstar and not is_single_vaf:
   env.Append(SCANNERS = vale_fstar_scan)
 
 
@@ -811,12 +822,16 @@ def verify_files_in(env, directories):
       files = recursive_glob(env, d+'/*.vad', strings=True)
       verify_vale_dafny_files(env, files)
     if do_fstar:
-      files = recursive_glob(env, d+'/*.fst', strings=True)
-      verify_fstar_files(env, files)
-      files = recursive_glob(env, d+'/*.fsti', strings=True)
-      verify_fstar_files(env, files)
-      files = recursive_glob(env, d+'/*.vaf', strings=True)
-      verify_vale_fstar_files(env, files)
+      if is_single_vaf:
+        files = [single_vaf]
+        verify_vale_fstar_files(env, files)
+      else:
+        files = recursive_glob(env, d+'/*.fst', strings=True)
+        verify_fstar_files(env, files)
+        files = recursive_glob(env, d+'/*.fsti', strings=True)
+        verify_fstar_files(env, files)
+        files = recursive_glob(env, d+'/*.vaf', strings=True)
+        verify_vale_fstar_files(env, files)
     
 def check_fstar_z3_version(fstar_z3):
   import subprocess
@@ -1015,7 +1030,7 @@ Import(['verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_sui
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
 # F* dependencies
-if do_fstar and stage2:
+if do_fstar and stage2 and not is_single_vaf:
   import distutils.dir_util
   # create obj directory
   distutils.dir_util.mkpath('obj')

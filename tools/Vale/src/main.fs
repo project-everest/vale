@@ -119,6 +119,8 @@ let main (argv) =
         | "-reprintLoopInvs=false" :: l -> reprint_loop_invs := false; match_args l
         | "-reprintBlankLines=false" :: l -> reprint_blank_lines := false; match_args l
         | "-conciseLemmas=false" :: l -> concise_lemmas := false; match_args l
+        | "-disableVerify" :: l -> disable_verify := true; match_args l
+        | "-omitUnverified" :: l -> omit_unverified := true; match_args l
         | f :: l ->
           if f.[0] = '-' then
             failwith ("Unrecognized argument: " + f + "\n")
@@ -142,7 +144,8 @@ let main (argv) =
       let lexbuf = LexBuffer<byte>.FromBinaryReader parse_in in
       setInitialPos lexbuf name
       lexbufOpt := Some lexbuf;
-      let p = Parse.start Lex.token lexbuf in
+      Lex.init_lex ();
+      let p = Parse.start Lex.lextoken lexbuf in
       lexbufOpt := None;
       parse_in.Close ()
       stream_in.Close ()

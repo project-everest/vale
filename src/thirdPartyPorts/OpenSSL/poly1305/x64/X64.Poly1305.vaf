@@ -23,10 +23,12 @@
 
 include "../../../../arch/x64/X64.Vale.Decls.vaf"
 
-#verbatim interface implementation
 module X64.Poly1305
+
+#reset-options "--z3rlimit 30"
+
+#verbatim{:interface}{:implementation}
 module M = Memory_i_s
-#reset-options "--z3rlimit 20"
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
@@ -37,10 +39,7 @@ open X64.Poly1305.Math_i
 open Opaque_i
 #endverbatim
 
-#verbatim interface
-
-unfold let n = nat64_max
-
+#verbatim{:interface}
 let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
 match l with
 | [] -> True
@@ -229,10 +228,6 @@ procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
     assert hh == (n * n) * h2 + n * h1 + h0 && (h * r) % p == hh % p;
 }
 
-#verbatim
-#reset-options "--z3rlimit 160"
-#endverbatim
-
 procedure{:quick exportOnly} poly1305_blocks(
     ghost r:int,
     ghost h_in:int,
@@ -242,9 +237,8 @@ procedure{:quick exportOnly} poly1305_blocks(
     lets 
         ctx @= rdi; inp @= rsi; len @= rdx; padbit @= rcx; d1 @= r8; d2 @= r9; d3 @= r10;
         r0 @= r11; r1 @= r12; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
+        n := nat64_max;
         p := n * n * 4 - 5;
-    requires/ensures
-        ok;
     reads
         ctx; padbit; r11; r13;
     modifies
@@ -413,10 +407,6 @@ assume false;
 */
 }
 
-#verbatim
-#reset-options "--z3rlimit 200"
-#endverbatim
-
 // last 1..15 bytes, in case len is not a multiple of 16
 procedure{:quick} poly1305_last_block()
     lets
@@ -424,7 +414,7 @@ procedure{:quick} poly1305_last_block()
         n:nat := 0x1_0000_0000_0000_0000;
         p:pos := n * n * 4 - 5;
         r1 := rax;
-        r:nat := lowerUpper128_opaque(r0, r1);
+        r := lowerUpper128_opaque(r0, r1);
         hBlocks := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
         inpLast := lowerUpper128_opaque(r8, r9);
     reads
@@ -444,7 +434,7 @@ procedure{:quick} poly1305_last_block()
         let hLast := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
         modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r);
 {
-    ghost var padLast := pow2(nExtra * 8);
+    let padLast := pow2(nExtra * 8);
 
     if (nExtra < 8) {
         lemma_bytes_shift_power2(nExtra);
@@ -513,10 +503,6 @@ procedure{:quick} poly1305_last_block()
     assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal_opaque(modp'); }
 }
 
-#verbatim
-#reset-options "--z3rlimit 20"
-#endverbatim
-
 // h := (h % p) % 2^128;
 procedure{:quick} poly1305_reduce_last()
     lets
@@ -580,7 +566,7 @@ procedure{:quick} poly1305_add_key_s()
     lemma_add_key(old(h0), old(h1), h_in, key_s0, key_s1, key_s, h0, h1);
 }
 
-#verbatim interface
+#verbatim{:interface}
 type t_seqTo128 = int -> nat128
 let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
   let f (i:int) : nat128 =
@@ -602,13 +588,13 @@ let modp_0 () : Lemma
 let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
 let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
-  (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b) /\ ((n + n) % 2) == 0)
+  (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
   (ensures
+    ((n + n) % 2) == 0 /\ // REVIEW
     poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
     poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
   =
   assume False
-#reset-options "--z3rlimit 200"
 #endverbatim
 
 procedure{:quick} poly1305_impl(
@@ -620,8 +606,6 @@ procedure{:quick} poly1305_impl(
     lets
         ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := nat64_max;
-    requires/ensures
-        ok;
     modifies
         rax; rcx; rdx; r8; r9; r10; r13; r15;
         rdi; rsi; rdx; r11; r12; r14; rbx; rbp;
@@ -649,7 +633,6 @@ procedure{:quick} poly1305_impl(
 //        // Framing
         ctx == old(ctx);
 {
-assume false;
     ghost var inp_in := inp;
     ghost var len_in := len;
     ghost var key_r0 := buffer64_read(ctx_b, 3, mem);
@@ -698,7 +681,6 @@ assume false;
 //        reveal_opaque(modp');
 //        assert_by_tactic(modp(0) == 0, retain_only_modp());
     }
-
     lemma_poly1305_heap_hash_blocks_alt(0, n * n, r, mem, inp_b, old(len) / 16);
 
     reveal_logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
@@ -734,10 +716,6 @@ assume false;
         by { reveal_opaque(mod2_128'); reveal_opaque(modp'); }
 }
 
-#verbatim
-#reset-options "--z3rlimit 200" 
-#endverbatim
-
 // poly1305(ctx, inp, len)
 //
 // Note that this reads 16-byte chunks directly from the input buffer,
@@ -747,24 +725,19 @@ procedure{:quick} poly1305(
     inline win:bool,
     ghost key_r:nat128,
     ghost key_s:nat128,
-    //ghost n:int,
-    ghost p:int,
-    ghost ctx_in:nat64,
-    ghost inp_in:nat64,
-    ghost len_in:nat64,
     ghost ctx_b:buffer64,
     ghost inp_b:buffer64)
     returns(ghost h:int)
-    lets ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
-    requires/ensures
-        ok;
+    lets
+        ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
+        ctx_in := (if win then rcx else ctx);
+        inp_in := (if win then rdx else inp);
+        len_in := (if win then r8 else len);
+        n := 0x1_0000_0000_0000_0000;
+        p := n * n * 4 - 5;
     modifies
         rax; rcx; rdx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem;
     requires
-        ctx_in == (if win then rcx else ctx);
-        inp_in == (if win then rdx else inp);
-        len_in == (if win then r8 else len);
-        p == n * n * 4 - 5;
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx_in, ctx_b, 24);
         validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in));

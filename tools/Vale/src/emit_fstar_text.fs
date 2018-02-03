@@ -6,6 +6,10 @@ open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
 
+let resetOptions = ref ""
+let prevResetOptionsPs = ref ""
+let prevResetOptionsPsi = ref ""
+
 let sid (x:id):string =
   match x with
   | Id s -> s
@@ -331,6 +335,21 @@ and emit_block (ps:print_state) (suffix:string) (outs:(bool * formal list) optio
   ps.Unindent ();
   ps.PrintLine (")" + suffix)
 
+let emit_laxness (ps:print_state) (a:attrs):unit =
+  if !disable_verify then
+    let isAdmit = attrs_get_bool (Id "admit") false a in
+    let isLax = attrs_get_bool (Id "lax") false a in
+    let emit (ps:print_state) (prev:string ref) (opts:string):unit =
+      let s = if isAdmit || isLax then "\"--lax\"" else opts in
+      if !prev <> s then
+       (
+        prev := s;
+        ps.PrintLine ("#reset-options " + s)
+       )
+      in
+    emit ps prevResetOptionsPs !resetOptions;
+    match ps.print_interface with None -> () | Some psi -> emit psi prevResetOptionsPsi ""
+
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
   let isOpaqueToSmt = attrs_get_bool (Id "opaque_to_smt") false f.fattrs in
@@ -338,9 +357,13 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isPublic = attrs_get_bool (Id "public") false f.fattrs in
   let isPublicDecl = attrs_get_bool (Id "public_decl") false f.fattrs in
   let isQAttr = attrs_get_bool (Id "qattr") false f.fattrs in
+  let isAdmit = attrs_get_bool (Id "admit") false f.fattrs in
+  let isPublicDecl = isPublicDecl || (isOpaque && isAdmit) in
+  let isOpaque = isOpaque && not isAdmit in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
+  emit_laxness ps f.fattrs;
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
   let printBody hasDecl x e =
@@ -348,7 +371,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
     ps.PrintLine ("let " + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();
-    ps.PrintLine (string_of_exp e);
+    ps.PrintLine (if isAdmit then "admit ()" else string_of_exp e);
     ps.Unindent ()
     in
   if isOpaque then
@@ -382,8 +405,12 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
+  let isAdmit = attrs_get_bool (Id "admit") false p.pattrs in
   let isDependent = attrs_get_bool (Id "dependent") false p.pattrs in
   let isReducible = attrs_get_bool (Id "reducible") false p.pattrs in
+  let isReducible = isReducible || isAdmit || (p.prets = []) in
+  let tactic = if isAdmit then None else tactic in
+  emit_laxness ps p.pattrs;
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s =
@@ -406,18 +433,17 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     | None -> ()
     | Some ss ->
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        (if isReducible then
-          ps.PrintLine ("let " + (sid p.pname) + " " + formals + " =")
-        else
-          ps.PrintLine ("irreducible val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
-          printPType ps "-> ";
-          ps.PrintLine ("irreducible let " + (sid (irreducible_id p.pname)) + " " + formals + " ="))
+        (if not isReducible then ps.PrintLine "[@\"opaque_to_smt\"]");
+        ps.PrintLine ("let " + (sid p.pname) + " " + formals + " =")
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
         let (_, ss) = let_updates_stmts mutable_scope ss in
         let outs = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
-        emit_stmts ps (Some (isDependent, outs)) ss;
+        if isAdmit then
+          ps.PrintLine "admit ()"
+        else
+          emit_stmts ps (Some (isDependent, outs)) ss;
         ps.Unindent ();
         ( match tactic with
           | None -> ()
@@ -425,27 +451,31 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
               ps.PrintLine ") <: ("
               printPType ps "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
-        );
-        (if not isReducible then
-          ps.PrintLine ("let " + (sid p.pname) + " = " + (sid (irreducible_id p.pname))))
+        )
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim (args, lines) ->
+    | DVerbatim (attrs, lines) ->
       (
-        (match args with
-          | [] | ["interface"] | ["implementation"] | ["interface"; "implementation"] -> ()
-          | _ -> err ("unexpected arguments to #verbatim: " + (String.concat "," (List.map (fun x -> "'" + x + "'") args)))
-        );
-        match (args, ps.print_interface) with
-        | (["interface"], Some psi) -> List.iter psi.PrintUnbrokenLine lines
-        | (["interface"; "implementation"], Some psi) ->
+        emit_laxness ps attrs;
+        let isInterface = attrs_get_bool (Id "interface") false attrs in
+        let isImplementation = attrs_get_bool (Id "implementation") false attrs in
+        match (isInterface, isImplementation, ps.print_interface) with
+        | (true, false, Some psi) -> List.iter psi.PrintUnbrokenLine lines
+        | (true, true, Some psi) ->
             List.iter psi.PrintUnbrokenLine lines;
             List.iter ps.PrintUnbrokenLine lines
         | _ -> List.iter ps.PrintUnbrokenLine lines
       )
+    | DPragma (ModuleName s) ->
+        ps.PrintLine ("module " + s);
+        match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("module " + s)
+    | DPragma (ResetOptions s) ->
+        resetOptions := s;
+        prevResetOptionsPs := s;
+        ps.PrintLine ("#reset-options " + s)
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

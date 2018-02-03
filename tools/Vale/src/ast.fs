@@ -158,11 +158,16 @@ type proc_decl =
     pattrs:attrs;
   }
 
+type prag =
+| ModuleName of string
+| ResetOptions of string
+
 type decl =
 | DVar of id * typ * var_storage * attrs
 | DFun of fun_decl
 | DProc of proc_decl
-| DVerbatim of string list * string list
+| DVerbatim of attrs * string list
+| DPragma of prag
 
 type decls = (loc * decl) list
 

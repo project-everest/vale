@@ -1,4 +1,4 @@
-#verbatim interface
+#verbatim{:interface}
 module X64.Vale.Decls
 module M = Memory_i_s
 
@@ -459,7 +459,7 @@ val masm : printer
 val gcc : printer
 #endverbatim
 
-#verbatim implementation
+#verbatim{:implementation}
 module X64.Vale.Decls
 open X64.Machine_s
 open X64.Vale
@@ -551,9 +551,9 @@ let print_proc = P.print_proc
 let print_footer = P.print_footer
 let masm = P.masm
 let gcc = P.gcc
-
-#set-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
+
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
 var{:state ok()} ok:bool;
 var{:state reg(Rax)} rax:nat64;

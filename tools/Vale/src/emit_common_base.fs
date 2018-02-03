@@ -19,6 +19,8 @@ let concise_lemmas = ref true;
 let precise_opaque = ref false;
 let fstar = ref false;
 let reprint_decls_rev = ref ([]:decls)
+let disable_verify = ref false
+let omit_unverified = ref false
 
 type print_state =
   {
@@ -99,6 +101,11 @@ let filter_proc_attr (x, es) =
   | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick") -> true
   | _ -> false
   in
+
+let attr_no_verify (s:string) (a:attrs):attrs =
+  let verify = attrs_get_bool (Id "verify") false a in
+  if !disable_verify && not verify then [(Id s, [])]
+  else []
 
 // convert imperative updates to functional let assignments
 let rec let_updates_stmts (scope:Map<id, typ option>) (ss:stmt list):(Set<id> * stmt list)=

@@ -1,7 +1,8 @@
 include "../../../src/arch/x64/X64.Vale.Decls.vaf"
 
-#verbatim interface implementation
 module Quick
+
+#verbatim{:interface}{:implementation}
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State_i
@@ -101,7 +102,7 @@ let lemma_bench1 (s0:state) : Ghost (state * fuel)
 //#reset-options ""
 #endverbatim
 
-#verbatim interface
+#verbatim{:interface}
 let rec self_int (i:int) : int = if i <= 0 then i else 1 + self_int (i - 1)
 #endverbatim
 
@@ -144,9 +145,9 @@ procedure{:quick exportOnly} Add64Ghosts(
 }
 
 #verbatim
-#reset-options "--debug Quick --debug_level SMTQuery"
 let ghostId (x:int) : GTot int = x
 #endverbatim
+#reset-options "--debug Quick --debug_level SMTQuery"
 procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
@@ -190,9 +191,7 @@ procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     assert gtmp == g1 + rax;
     assert g2 == old(rax);
 }
-#verbatim
 #reset-options
-#endverbatim
 
 procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies

@@ -228,6 +228,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
     | DVerbatim (_, lines) -> List.iter ps.PrintUnbrokenLine lines
+    | DPragma _ -> ()
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

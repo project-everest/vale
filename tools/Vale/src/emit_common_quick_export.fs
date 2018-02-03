@@ -163,7 +163,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       fargs = fParams @ [(s0, Some tState); argContinue];
       fret = tType0;
       fbody = Some wpBody;
-      fattrs = [(Id "public", []); (Id "qattr", [])];
+      fattrs = [(Id "public", []); (Id "qattr", [])] @ attr_no_verify "lax" p.pattrs;
     }
     in
 
@@ -191,7 +191,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       prets = [];
       pspecs = [(loc, specReq); (loc, specEns)];
       pbody = Some [];
-      pattrs = [];
+      pattrs = attr_no_verify "admit" p.pattrs;
     }
     in
 
@@ -214,7 +214,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       prets = [rSM; rF0; rG];
       pspecs = [(loc, specReq); (loc, specEns)];
       pbody = Some [sCallLemma; sAssignG];
-      pattrs = [(Id "reducible", [])];
+      pattrs = [(Id "reducible", [])] @ attr_no_verify "admit" p.pattrs;
     }
     in
 
@@ -236,7 +236,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       prets = [];
       pspecs = [(loc, specReq); (loc, specEns)];
       pbody = Some [sCallLemma; sLemmaUpd; sAssertEq];
-      pattrs = [];
+      pattrs = attr_no_verify "admit" p.pattrs;
     }
     in
 
@@ -252,7 +252,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       fargs = fParams;
       fret = tRetQuick;
       fbody = Some eQuick;
-      fattrs = [(Id "public", []); (Id "opaque_to_smt", []); (Id "qattr", [])];
+      fattrs = [(Id "public", []); (Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "lax" p.pattrs;
     }
     in
   [(loc, DFun fWp); (loc, DProc pMonotone); (loc, DProc pCompute); (loc, DProc pProof); (loc, DFun fQuick)]

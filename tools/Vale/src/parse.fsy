@@ -58,13 +58,15 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
-%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
+%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
 %token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS LAMBDA
 %token <loc> INCLUDE
 %token <loc * string> STRING
-%token <loc * string list> VERBATIM_BLOCK
+%token <loc> VERBATIM
+%token <string list> VERBATIM_BLOCK
+%token <loc * string> RESET_OPTIONS
 
 %token EOF
 
@@ -415,17 +417,12 @@ ProcRet
   : { [] }
   | RETURNS LPAREN ProcFormals RPAREN { $3 }
 Decl
-  : VERBATIM_BLOCK
+  : VERBATIM Attrs VERBATIM_BLOCK
     {
-      match snd $1 with
-      | [] -> parse_err "incomplete verbatim block"
-      | h::_ when h.Length > 0 && not (h.StartsWith(" ")) -> parse_err "expected space after #verbatim"
-      | h::t ->
-          let hs = h.Trim().Split(' ') in
-          let hs = Array.toList hs in
-          let hs = List.filter (fun x -> x <> "") hs in
-          (fst $1, DVerbatim (hs, t))
+      ($1, DVerbatim ($2, $3))
     }
+  | MODULE AnyQualifiedId { ($1, DPragma (ModuleName (string_of_id $2))) }
+  | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId SEMI
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = (Reserved "alias", [EVar $10])::$2}) }
