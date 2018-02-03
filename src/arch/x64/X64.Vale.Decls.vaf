@@ -72,7 +72,9 @@ unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
 unfold let va_const_shift_amt64 (n:int) : va_shift_amt = OConst n
 unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
 unfold let va_op_shift_amt64_reg (r:reg) : va_shift_amt = OReg r
+[@va_qattr]
 unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
+[@va_qattr]
 unfold let va_const_cmp (n:int) : va_cmp = OConst n
 unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o

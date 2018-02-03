@@ -14,10 +14,13 @@ type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
 type formal = id * typ option
 
+type exp_call = CallGhost | CallLemma | CallInline | CallOutline
+
 type uop = 
 | UNot | UNeg | UOld | UIs of id
 | UConst
 | UReveal | UGhostOnly | UToOperand
+| UCall of exp_call
 | UCustom of string | UCustomAssign of string
 
 type bop =

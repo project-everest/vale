@@ -9,13 +9,15 @@ unfold let code = va_code
 unfold let codes = va_codes
 unfold let fuel = va_fuel
 unfold let eval = eval_code
-let if_codes (b:bool) (cs1:codes) (cs2:codes) : codes = if b then cs1 else cs2
+
+[@va_qattr]
+let if_code (b:bool) (c1:code) (c2:code) : code = if b then c1 else c2
 
 noeq type quickCodes (a:Type0) : codes -> Type =
 | QEmpty: a -> quickCodes a []
 | QSeq: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
-| QBind: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> (state -> b -> quickCodes a cs) -> quickCodes a (c::cs)
-| QGetState: #cs:codes -> (state -> quickCodes a cs) -> quickCodes a ((Block [])::cs)
+| QBind: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a (c::cs)
+| QGetState: #cs:codes -> (state -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
 | QLemma: #cs:codes -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
 
 [@va_qattr]
@@ -52,7 +54,7 @@ and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b 
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
   =
   let f s0 _ = wp cs qcs k s0 in f
-and wp_Bind (#a:Type0) (#b:Type0) (cs:codes) (qcs:state -> a -> quickCodes b cs) (k:state -> b -> Type0) :
+and wp_Bind (#a:Type0) (#b:Type0) (cs:codes) (qcs:state -> a -> GTot (quickCodes b cs)) (k:state -> b -> Type0) :
   Tot (wp_Bind_t a) (decreases %[cs; 1; qcs])
   =
   let f s0 g = wp cs (qcs s0 g) k s0 in f
@@ -75,24 +77,106 @@ val wp_sound (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0)
 unfold let block = va_Block
 
 [@va_qattr]
-let wp_block (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Type0 =
+let wp_block (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) (s0:state) (k:state -> a -> Type0) : Type0 =
   wp cs (qcs s0) k s0
 
-val qblock_monotone (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
+val qblock_monotone (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
   (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
   (ensures wp_block qcs s0 k1 ==> wp_block qcs s0 k2)
 
-val qblock_compute (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) : Ghost (state * fuel * a)
+val qblock_compute (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) (s0:state) : Ghost (state * fuel * a)
   (requires wp_block qcs s0 k_true)
   (ensures fun _ -> True)
 
-val qblock_proof (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) (s0:state) (k:state -> a -> Type0) : Lemma
+val qblock_proof (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) (s0:state) (k:state -> a -> Type0) : Lemma
   (requires wp_block qcs s0 k)
   (ensures (qblock_monotone qcs s0 k k_true; let (sM, f0, g) = qblock_compute qcs s0 in eval_code (block cs) s0 f0 sM /\ k sM g))
 
 [@"opaque_to_smt" va_qattr]
-let qblock (#a:Type) (#cs:codes) (qcs:state -> quickCodes a cs) : quickCode a (block cs) =
+let qblock (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) : quickCode a (block cs) =
   QProc (block cs) (wp_block qcs) (qblock_monotone qcs) (qblock_compute qcs) (qblock_proof qcs)
+
+///// If, InlineIf
+
+[@va_qattr]
+let wp_InlineIf (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k:state -> a -> Type0) : Type0 =
+  // REVIEW: this duplicates k
+  (b ==> QProc?.wp qc1 s0 k) /\ (not b ==> QProc?.wp qc2 s0 k)
+
+val qInlineIf_monotone (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
+  (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
+  (ensures wp_InlineIf b qc1 qc2 s0 k1 ==> wp_InlineIf b qc1 qc2 s0 k2)
+
+val qInlineIf_compute (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) : Ghost (state * fuel * a)
+  (requires wp_InlineIf b qc1 qc2 s0 k_true)
+  (ensures fun _ -> True)
+
+val qInlineIf_proof (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k:state -> a -> Type0) : Lemma
+  (requires wp_InlineIf b qc1 qc2 s0 k)
+  (ensures (qInlineIf_monotone b qc1 qc2 s0 k k_true; let (sM, f0, g) = qInlineIf_compute b qc1 qc2 s0 in eval_code (if_code b c1 c2) s0 f0 sM /\ k sM g))
+
+[@"opaque_to_smt" va_qattr]
+let qInlineIf (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) : quickCode a (if_code b c1 c2) =
+  QProc (if_code b c1 c2) (wp_InlineIf b qc1 qc2) (qInlineIf_monotone b qc1 qc2) (qInlineIf_compute b qc1 qc2) (qInlineIf_proof b qc1 qc2)
+
+type cmp =
+| Cmp_eq : operand -> operand -> cmp
+| Cmp_ne : operand -> operand -> cmp
+| Cmp_le : operand -> operand -> cmp
+| Cmp_ge : operand -> operand -> cmp
+| Cmp_lt : operand -> operand -> cmp
+| Cmp_gt : operand -> operand -> cmp
+
+[@va_qattr]
+let cmp_to_ocmp (c:cmp) : ocmp =
+  match c with
+  | Cmp_eq o1 o2 -> va_cmp_eq o1 o2
+  | Cmp_ne o1 o2 -> va_cmp_ne o1 o2
+  | Cmp_le o1 o2 -> va_cmp_le o1 o2
+  | Cmp_ge o1 o2 -> va_cmp_ge o1 o2
+  | Cmp_lt o1 o2 -> va_cmp_lt o1 o2
+  | Cmp_gt o1 o2 -> va_cmp_gt o1 o2
+
+[@va_qattr]
+let valid_cmp (c:cmp) (s:state) : Type0 =
+  match c with
+  | Cmp_eq o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
+  | Cmp_ne o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
+  | Cmp_le o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
+  | Cmp_ge o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
+  | Cmp_lt o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
+  | Cmp_gt o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
+
+[@va_qattr]
+let eval_cmp (s:state) (c:cmp) : bool =
+  match c with
+  | Cmp_eq o1 o2 -> va_eval_opr64 s o1 =  va_eval_opr64 s o2
+  | Cmp_ne o1 o2 -> va_eval_opr64 s o1 <> va_eval_opr64 s o2
+  | Cmp_le o1 o2 -> va_eval_opr64 s o1 <= va_eval_opr64 s o2
+  | Cmp_ge o1 o2 -> va_eval_opr64 s o1 >= va_eval_opr64 s o2
+  | Cmp_lt o1 o2 -> va_eval_opr64 s o1 <  va_eval_opr64 s o2
+  | Cmp_gt o1 o2 -> va_eval_opr64 s o1 >  va_eval_opr64 s o2
+
+[@va_qattr]
+let wp_If (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k:state -> a -> Type0) : Type0 =
+  // REVIEW: this duplicates k
+  valid_cmp b s0 /\ (eval_cmp s0 b ==> QProc?.wp qc1 s0 k) /\ (not (eval_cmp s0 b) ==> QProc?.wp qc2 s0 k)
+
+val qIf_monotone (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
+  (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
+  (ensures wp_If b qc1 qc2 s0 k1 ==> wp_If b qc1 qc2 s0 k2)
+
+val qIf_compute (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) : Ghost (state * fuel * a)
+  (requires wp_If b qc1 qc2 s0 k_true)
+  (ensures fun _ -> True)
+
+val qIf_proof (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k:state -> a -> Type0) : Lemma
+  (requires wp_If b qc1 qc2 s0 k)
+  (ensures (qIf_monotone b qc1 qc2 s0 k k_true; let (sM, f0, g) = qIf_compute b qc1 qc2 s0 in eval_code (IfElse (cmp_to_ocmp b) c1 c2) s0 f0 sM /\ k sM g))
+
+[@"opaque_to_smt" va_qattr]
+let qIf (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) : quickCode a (IfElse (cmp_to_ocmp b) c1 c2) =
+  QProc (IfElse (cmp_to_ocmp b) c1 c2) (wp_If b qc1 qc2) (qIf_monotone b qc1 qc2) (qIf_compute b qc1 qc2) (qIf_proof b qc1 qc2)
 
 ///// AssertBy
 

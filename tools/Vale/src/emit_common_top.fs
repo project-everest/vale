@@ -49,7 +49,8 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
 
 let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
   try
-    let (env, dReprint, d2) = transform_decl env loc d1 in
+    let dReprint = d1 in
+    let (envBody, env, d2) = transform_decl env loc d1 in
     let add_fun env f = {env with funs = Map.add f.fname f env.funs}
     let add_proc env p = {env with procs = Map.add p.pname p env.procs}
     let (env, decl) =
@@ -61,7 +62,7 @@ let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
           let isQuick = List_mem_assoc (Id "quick") p.pattrs in
           let envp = add_proc env p in
           if verify then
-            let build_proc = if !fstar then Emit_common_lemmas.build_proc else Emit_common_refine.build_proc in
+            let build_proc = if !fstar then Emit_common_lemmas.build_proc envBody else Emit_common_refine.build_proc in
             let envr = if isRecursive then envp else env in
             let ds_p = build_proc envr loc p in
             let ds_q = if isQuick then Emit_common_quick_export.build_proc envr loc p else [] in

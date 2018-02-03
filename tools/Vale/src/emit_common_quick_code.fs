@@ -17,8 +17,10 @@ let qlemma_exp (e:exp):exp =
   let e = exp_refined e in
   e
 
-let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
+let rec build_qcode_stmt (env:env) (outs:id list) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
   let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
+  let env0 = env in
+  let env = env_stmt env s in
   let uses_state (e:exp):bool =
     let f (e:exp) (bs:bool list):bool =
       match e with
@@ -71,15 +73,51 @@ let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bo
           lemma_call x [] es
       | _ -> err ()
     )
-  | SAssign ([(x, None)], e) -> assign_or_var true x None e
+  | SAssign ([(x, None)], e) ->
+      let tOpt =
+        match Map.tryFind x env0.ids with
+        | Some (GhostLocal (Mutable, tOpt)) -> tOpt
+        | _ -> None
+        in
+      assign_or_var true x tOpt e
   | SAssign ([(x, Some (tOpt, _))], e) -> assign_or_var true x tOpt e
   | SVar (x, tOpt, _, XGhost, _, Some e) -> assign_or_var false x tOpt e
+  | SLetUpdates ([], s) -> build_qcode_stmt env [] s (needsState, eTail)
+  | SLetUpdates (xs, s) ->
+      // eTailLet = (let (...gs...) = g in eTail)
+      // pass eTailLet as tail to s
+      let eTailLet = EBind (BindLet, [EVar (Reserved "g")], xs, [], eTail) in
+      let outs = List.map fst xs in
+      build_qcode_stmt env outs s (needsState, eTailLet)
   | SAssume e ->
       let sAssign = SAssign ([], EApply (Reserved "assume", [e])) in
-      build_qcode_stmt env sAssign (needsState, eTail)
+      build_qcode_stmt env outs sAssign (needsState, eTail)
   | SAssert (_, e) ->
       let sAssign = SAssign ([], EApply (Reserved "assert", [e])) in
-      build_qcode_stmt env sAssign (needsState, eTail)
+      build_qcode_stmt env outs sAssign (needsState, eTail)
+  | SIfElse (((SmInline | SmPlain) as sm), eb, ss1, ss2) ->
+      let eb_alt () =
+        // HACK
+        match eb with
+        | EApply (Reserved "cmp_eq", args) -> EApply (Id "Cmp_eq", args)
+        | EApply (Reserved "cmp_ne", args) -> EApply (Id "Cmp_ne", args)
+        | EApply (Reserved "cmp_le", args) -> EApply (Id "Cmp_le", args)
+        | EApply (Reserved "cmp_ge", args) -> EApply (Id "Cmp_ge", args)
+        | EApply (Reserved "cmp_lt", args) -> EApply (Id "Cmp_lt", args)
+        | EApply (Reserved "cmp_gt", args) -> EApply (Id "Cmp_gt", args)
+        | _ -> internalErr "SIfElse"
+        in
+      let eb = qlemma_exp eb in
+      let eqc1 = build_qcode_block false env outs ss1 in
+      let eqc2 = build_qcode_block false env outs ss2 in
+      let (sq, eCmp) =
+        match sm with
+        | SmInline -> ("qInlineIf", eb)
+        | _ -> ("qIf", qlemma_exp (eb_alt ()))
+        in
+      let eIf = EApply (Id sq, [eCmp; eqc1; eqc2]) in
+      let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); (Reserved "g", None)], [], eTail) in
+      (true, EApply (Id "QBind", [eIf; fTail]))
   | SForall ([], [], EBool true, ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] ss in
@@ -92,7 +130,7 @@ let rec build_qcode_stmt (env:env) (s:stmt) ((needsState:bool), (eTail:exp)):(bo
 and build_qcode_stmts (env:env) (outs:id list) (ss:stmt list):exp =
   let outTuple = EApply (Id "tuple", List.map EVar outs) in
   let empty = EApply (Id "QEmpty", [outTuple]) in
-  let (needsState, e) = List.foldBack (build_qcode_stmt env) ss (false, empty) in
+  let (needsState, e) = List.foldBack (build_qcode_stmt env outs) ss (false, empty) in
   e
 and build_qcode_block (add_old:bool) (env:env) (outs:id list) (ss:stmt list):exp =
   let s = Reserved "s" in
@@ -177,6 +215,8 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   let tArgs = List.map (fun (x, _) -> TName x) cParams in
   let tCodeApp = TApp (TName cid, tArgs) in
   let tRetQuick = TApp (TName (Id "quickCode"), [tRet; tCodeApp]) in
+  let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
+  let (_, ss) = let_updates_stmts mutable_scope ss in
   let outs = List.map fst prets in
   let eQuick = build_qcode_block true env outs ss in
   let fCodes =

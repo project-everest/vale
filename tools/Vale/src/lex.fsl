@@ -176,6 +176,7 @@ and token = parse
 | "calc" { CALC (curLoc lexbuf) }
 | "havoc" { HAVOC (curLoc lexbuf)}
 | "goto" { GOTO (curLoc lexbuf) }
+| "lemma" { LEMMA (curLoc lexbuf) }
 | "call" { CALL (curLoc lexbuf) }
 | "forall" { FORALL (curLoc lexbuf) }
 | "exists" { EXISTS (curLoc lexbuf) }
