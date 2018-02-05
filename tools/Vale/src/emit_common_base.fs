@@ -37,15 +37,35 @@ type print_state =
     let breakCol = 100 in
     let s = s.TrimEnd() in
     let (sBreak1, sBreak2Opt) =
-      if (!this.cur_indent + s).Length > breakCol && s.Contains(" ") && not (s.Contains("\"")) then
-        // try to find last space in s[0 .. breakCol-indentsize]
-        // if that fails, find first space in s
-        let s1 = s.Substring(0, breakCol - (!this.cur_indent).Length) in
-        let breakAt = if s1.Contains(" ") then s1.LastIndexOf(" ") else s.IndexOf(" ") in
-        let sBreak1 = s.Substring(0, breakAt) in
-        let sBreak2 = s.Substring(breakAt).Trim() in
-        if sBreak1.Contains("//") then (s, None) else // don't break up a "//" comment
-        (sBreak1, Some sBreak2)
+      if (!this.cur_indent + s).Length > breakCol then
+        let space0 = s.IndexOf(" ") in
+        let quote0 = s.IndexOf("\"") in
+        let width = breakCol - (!this.cur_indent).Length in
+        if space0 >= 0 && (quote0 < 0 || quote0 >= width) then
+          // try to find last space in s[0 .. breakCol-indentsize]
+          // if that fails, find first space in s
+          let s1 = s.Substring(0, width) in
+          let breakAt = if s1.Contains(" ") then s1.LastIndexOf(" ") else s.IndexOf(" ") in
+          let sBreak1 = s.Substring(0, breakAt) in
+          let sBreak2 = s.Substring(breakAt).Trim() in
+          if sBreak1.Contains("//") then (s, None) else // don't break up a "//" comment
+          (sBreak1, Some sBreak2)
+        else if s.Contains("\"") && not (s.Contains("\\\"")) then
+          // put strings on their own line
+          let i1 = s.IndexOf("\"") in
+          let i2 = s.IndexOf("\"", i1 + 1) + 1 in
+          if i2 > 0 && (i2 - i1) < s.Length then
+            if i1 = 0 then
+              let s1 = s.Substring(0, i2) in
+              let s2 = s.Substring(i2).Trim() in
+              (s1, Some s2)
+            else
+              let s1 = s.Substring(0, i1).Trim() in
+              let s2 = s.Substring(i1) in
+              if s1.Contains("//") then (s, None) else
+              (s1, Some s2)
+          else (s, None)
+        else (s, None)
       else (s, None)
       in
     this.PrintUnbrokenLine sBreak1;
@@ -163,17 +183,24 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
       let scope = List.fold (fun scope (x, t) -> add_unique x t scope) scope xs in
       (scope, updates, s)
 
-let collect_spec (loc:loc, s:spec):(exp list * exp list) =
+let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
   try
+    let addLabel e =
+      if addLabels then
+        let range = EVar (Id "range1") in
+        let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
+        EApply (Id "label", [range; msg; e])
+      else e
+      in
     match s with
-    | Requires (_, e) -> ([e], [])
-    | Ensures (_, e) -> ([], [e])
+    | Requires (_, e) -> ([addLabel e], [])
+    | Ensures (_, e) -> ([], [addLabel e])
     | Modifies _ -> ([], [])
     | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
 
-let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
-  let (rs, es) = List.unzip (List.map collect_spec ss) in
+let collect_specs (addLabels:bool) (ss:(loc * spec) list):(exp list * exp list) =
+  let (rs, es) = List.unzip (List.map (collect_spec addLabels) ss) in
   (List.concat rs, List.concat es)
 
 // compute function parameters

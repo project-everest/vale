@@ -1073,8 +1073,10 @@ def report_verification_failures():
               print('Printing contents of ' + filename + ' #####')
               with open (filename, 'r') as myfile:
                 lines = myfile.read().splitlines()
+                valeErrors = [line for line in lines if ("*****" in line)]
+                lastValeErrors = valeErrors[-1:]
                 for line in lines:
-                  if "(Error)" in line or "failed" in line:
+                  if "(Error)" in line or "failed" in line or line in lastValeErrors:
                     line = "%s%s%s" % (colors['red'], line, colors['end'])
                   print(line)
               time.sleep(1)

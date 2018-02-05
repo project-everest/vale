@@ -10,19 +10,29 @@ unfold let codes = va_codes
 unfold let fuel = va_fuel
 unfold let eval = eval_code
 
+[@va_qattr "opaque_to_smt"]
+let labeled_wrap (r:range) (msg:string) (p:Type0) = labeled r msg p
+
+// REVIEW: when used inside a function definition, 'labeled' can show up in an SMT query
+// as an uninterpreted function.  Make a wrapper around labeled that is interpreted:
+[@va_qattr "opaque_to_smt"]
+let label (r:range) (msg:string) (p:Type0) : Pure Type (requires True) (ensures fun q -> q <==> p) =
+  assert_norm (labeled_wrap r msg p <==> p);
+  labeled_wrap r msg p
+
 [@va_qattr]
 let if_code (b:bool) (c1:code) (c2:code) : code = if b then c1 else c2
 
 noeq type quickCodes (a:Type0) : codes -> Type =
 | QEmpty: a -> quickCodes a []
-| QSeq: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
-| QBind: #b:Type -> #c:code -> #cs:codes -> quickCode b c -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a (c::cs)
+| QSeq: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
+| QBind: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string -> quickCode b c -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a (c::cs)
 | QGetState: #cs:codes -> (state -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
-| QLemma: #cs:codes -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
+| QLemma: #cs:codes -> r:range -> msg:string -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
 
 [@va_qattr]
-let wpLemma (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
-  QLemma pre l qcs
+let qLemma (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) (r:range) (msg:string) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
+  QLemma r msg pre l qcs
 
 [@va_qattr]
 let wp_proc (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> a -> Type0) : Type0 =
@@ -33,22 +43,32 @@ let wp_Seq_t (a:Type0) = state -> a -> Type0
 let wp_Bind_t (a:Type0) = state -> a -> Type0
 
 [@va_qattr]
+let range1 = mk_range "" 0 0 0 0
+
+[@va_qattr]
 let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
   Tot Type0 (decreases %[cs; 0; qcs])
   =
   match qcs with
   | QEmpty g -> k s0 g
-  | QSeq qc qcs ->
+  | QSeq r msg qc qcs ->
       let c::cs = cs in
-      wp_proc c qc s0 (wp_Seq cs qcs k)
-  | QBind qc qcs ->
+      label r msg (wp_proc c qc s0 (wp_Seq cs qcs k))
+  | QBind r msg qc qcs ->
       let c::cs = cs in
-      wp_proc c qc s0 (wp_Bind cs qcs k)
+      label r msg (wp_proc c qc s0 (wp_Bind cs qcs k))
   | QGetState f ->
       let c::cs = cs in
       wp cs (f s0) k s0
-  | QLemma pre l qcs ->
-      forall (p:unit -> GTot Type0). (forall (u:unit). wp cs qcs k s0 ==> p u) ==> pre p
+  | QLemma r msg pre l qcs ->
+      // REVIEW: rather than just applying 'pre' directly to k,
+      // we define this in a roundabout way so that:
+      // - it works even if 'pre' isn't known to be monotonic
+      // - F*'s error reporting uses 'guard_free' and 'False <===>' to process labels inside (wp cs qcs k s0)
+      (forall (p:unit -> GTot Type0).//{:pattern (pre p)}
+        (forall (u:unit).{:pattern (guard_free (p u))} False <==> (wp cs qcs k s0) /\ ~(p ()))
+        ==>
+        label r msg (pre p))
 // Hoist lambdas out of main definition to avoid issues with function equality 
 and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b -> Type0) :
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])

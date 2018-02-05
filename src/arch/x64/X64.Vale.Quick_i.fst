@@ -1,9 +1,11 @@
 module X64.Vale.Quick_i
 
+#reset-options "--initial_ifuel 1 --z3rlimit 1000"
+
 let rec wp_monotone #a cs qcs k1 k2 s0 =
   match qcs with
   | QEmpty g -> ()
-  | QSeq qc qcs ->
+  | QSeq _ _ qc qcs ->
       let QProc _ wp1' monotone _ _ = qc in
       let c::cs = cs in
       let k1' = wp_Seq cs qcs k1 in
@@ -14,7 +16,7 @@ let rec wp_monotone #a cs qcs k1 k2 s0 =
       FStar.Classical.forall_intro_2 f;
       assert (forall s g. k1' s g ==> k2' s g);
       monotone s0 k1' k2'
-  | QBind qc qcs ->
+  | QBind _ _ qc qcs ->
       let QProc c' wp1' monotone _ _ = qc in
       let c::cs = cs in
       let k1' = wp_Bind cs qcs k1 in
@@ -27,12 +29,12 @@ let rec wp_monotone #a cs qcs k1 k2 s0 =
   | QGetState f ->
       let c::cs = cs in
       wp_monotone cs (f s0) k1 k2 s0
-  | QLemma pre l qcs' ->
+  | QLemma _ _ pre l qcs' ->
       wp_monotone cs qcs' k1 k2 s0
 
-let call_QLemma (#a:Type0) (#cs:codes) (pre:((unit -> GTot Type0) -> GTot Type0)) (l:unit -> PURE unit pre) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
+let call_QLemma (#a:Type0) (#cs:codes) (r:range) (msg:string) (pre:((unit -> GTot Type0) -> GTot Type0)) (l:unit -> PURE unit pre) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
   Lemma
-  (requires (forall (p:unit -> GTot Type0). (wp cs qcs k s0 ==> p ()) ==> pre p))
+  (requires (forall (p:unit -> GTot Type0). (wp cs qcs k s0 ==> p ()) ==> label r msg (pre p)))
   (ensures (wp cs qcs k s0))
   =
   l ()
@@ -41,7 +43,7 @@ let rec wp_compute #a cs qcs s0 =
   match qcs with
   | QEmpty g ->
       let (sN, fN) = va_lemma_empty_total s0 [] in (sN, fN, g)
-  | QSeq qc qcs ->
+  | QSeq _ _ qc qcs ->
       let QProc _ wp1' monotone compute proof = qc in
       let c::cs = cs in
       let k' = wp_Seq cs qcs k_true in
@@ -51,7 +53,7 @@ let rec wp_compute #a cs qcs s0 =
       let (sN, fN, gN) = wp_compute cs qcs sM in
       let fN' = va_compute_merge_total fM fN in
       (sN, fN', gN)
-  | QBind qc qcs ->
+  | QBind _ _ qc qcs ->
       let QProc c' wp1' monotone compute proof = qc in
       let c::cs = cs in
       let k' = wp_Bind cs qcs k_true in
@@ -67,15 +69,16 @@ let rec wp_compute #a cs qcs s0 =
       let (sN, fN, gN) = wp_compute cs (f sM) sM in
       let fN' = va_compute_merge_total fM fN in
       (sN, fN', gN)
-  | QLemma pre l qcs' ->
-      call_QLemma pre l qcs' k_true s0;
+  | QLemma r msg pre l qcs' ->
+      assert (wp cs qcs k_true s0);
+      call_QLemma r msg pre l qcs' k_true s0;
       wp_compute cs qcs' s0
 
 let rec wp_sound #a cs qcs k s0 =
   match qcs with
   | QEmpty g ->
       let (sN, fN) = va_lemma_empty_total s0 [] in ()
-  | QSeq qc qcs ->
+  | QSeq _ _ qc qcs ->
       let QProc _ wp1' monotone compute proof = qc in
       let c::cs = cs in
       let k' = wp_Seq cs qcs k in
@@ -87,7 +90,7 @@ let rec wp_sound #a cs qcs k s0 =
       wp_sound cs qcs k sM;
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       ()
-  | QBind qc qcs ->
+  | QBind _ _ qc qcs ->
       let QProc c' wp1' monotone compute proof = qc in
       let c::cs = cs in
       let k' = wp_Bind cs qcs k in
@@ -107,10 +110,10 @@ let rec wp_sound #a cs qcs k s0 =
       let (sN, fN, gN) = wp_compute cs (f sM) sM in
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       ()
-  | QLemma pre l qcs' ->
+  | QLemma r msg pre l qcs' ->
       wp_monotone cs qcs k k_true s0;
-      call_QLemma pre l qcs' k_true s0;
-      call_QLemma pre l qcs' k s0;
+      call_QLemma r msg pre l qcs' k_true s0;
+      call_QLemma r msg pre l qcs' k s0;
       wp_sound cs qcs' k s0;
       ()
 

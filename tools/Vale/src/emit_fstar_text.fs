@@ -87,7 +87,7 @@ let rec string_of_exp_prec prec e =
     | EBitVector (n, i) -> ("bv" + (string n) + "(" + (string i) + ")", 99)
     | EBool true -> ("true", 99)
     | EBool false -> ("false", 99)
-    | EString s -> ("\"" + s + "\"", 99)
+    | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
     | EOp (Uop UReveal, [EApply (x, es)]) -> (r prec (vaApp "reveal_opaque" [EApply (transparent_id x, es)]), prec)
     | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
@@ -344,7 +344,7 @@ let emit_laxness (ps:print_state) (a:attrs):unit =
       if !prev <> s then
        (
         prev := s;
-        ps.PrintLine ("#reset-options " + s)
+        ps.PrintUnbrokenLine ("#reset-options " + s)
        )
       in
     emit ps prevResetOptionsPs !resetOptions;
@@ -399,7 +399,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
-  let (reqs, enss) = collect_specs p.pspecs in
+  let (reqs, enss) = collect_specs false p.pspecs in
   let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
@@ -475,7 +475,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | DPragma (ResetOptions s) ->
         resetOptions := s;
         prevResetOptionsPs := s;
-        ps.PrintLine ("#reset-options " + s)
+        ps.PrintUnbrokenLine ("#reset-options " + s)
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

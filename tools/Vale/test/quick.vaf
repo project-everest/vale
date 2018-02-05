@@ -10,6 +10,7 @@ open X64.Vale.Decls
 open X64.Vale.Quick_i
 #endverbatim
 
+/*
 #verbatim
 [@"opaque_to_smt" va_qattr]
 let codes_bench : codes = [
@@ -101,6 +102,7 @@ let lemma_bench1 (s0:state) : Ghost (state * fuel)
   (sN, f0)
 //#reset-options ""
 #endverbatim
+*/
 
 #verbatim{:interface}
 let rec self_int (i:int) : int = if i <= 0 then i else 1 + self_int (i - 1)
