@@ -32,7 +32,7 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BExply -> notImplemented "<=="
   | BOr | BLor -> (16, 16, 17)
   | BAnd | BLand -> (18, 18, 19)
-  | BLe | BGe | BLt | BGt | BEq | BNe -> (20, 20, 21)
+  | BLe | BGe | BLt | BGt | BEq | BSeq | BNe -> (20, 20, 21)
   | BAdd -> (30, 30, 31)
   | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
@@ -48,6 +48,7 @@ let string_of_bop (op:bop):string =
   | BAnd -> "&&"
   | BLand -> "/\\"
   | BEq -> "=="
+  | BSeq -> "="
   | BNe -> "=!="
   | BLt -> "<"
   | BGt -> ">"

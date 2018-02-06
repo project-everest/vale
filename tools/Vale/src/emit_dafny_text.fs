@@ -18,7 +18,7 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BEquiv | BImply | BExply -> (10, 11, 11)
   | BAnd | BOr | BLand | BLor -> (15, 16, 16) // TODO
   | BLe | BGe | BLt | BGt | BIn -> (20, 20, 20)
-  | BEq | BNe -> (25, 25, 26)
+  | BEq | BSeq | BNe -> (25, 25, 26)
   | BAdd | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
   | BOldAt | BCustom _ -> internalErr ("binary operator " + (sprintf "%A" op))
@@ -30,7 +30,7 @@ let string_of_bop (op:bop):string =
   | BExply -> "<=="
   | BAnd | BLand -> "&&"
   | BOr | BLor -> "||"
-  | BEq -> "=="
+  | BEq | BSeq -> "=="
   | BNe -> "!="
   | BLt -> "<"
   | BGt -> ">"

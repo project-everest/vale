@@ -24,7 +24,7 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BExply -> (14, 14, 15)
   | BOr | BLor -> (16, 16, 17)
   | BAnd | BLand -> (18, 18, 19)
-  | BEq | BNe -> (20, 20, 21)
+  | BEq | BSeq | BNe -> (20, 20, 21)
   | BLe | BGe | BLt | BGt -> (25, 25, 25)
   | BAdd | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
@@ -37,7 +37,7 @@ let string_of_bop (op:bop):string =
   | BExply -> "<=="
   | BAnd | BLand -> "&&"
   | BOr | BLor -> "||"
-  | BEq -> "=="
+  | BEq | BSeq -> "=="
   | BNe -> "!="
   | BLt -> "<"
   | BGt -> ">"

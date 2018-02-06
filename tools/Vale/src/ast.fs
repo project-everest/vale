@@ -23,6 +23,7 @@ type uop =
 type bop =
 | BEquiv | BImply | BExply | BAnd | BOr
 | BLand | BLor // logical and, logical or
+| BSeq   // structural equality
 | BEq | BNe | BLt | BGt | BLe | BGe | BIn
 | BAdd | BSub | BMul | BDiv | BMod
 | BOldAt
