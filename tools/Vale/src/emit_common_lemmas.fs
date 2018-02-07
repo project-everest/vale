@@ -557,13 +557,7 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in
-  let isQuick =
-    if List_mem_assoc (Id "quick") p.pattrs then
-      match List_assoc (Id "quick") p.pattrs with
-      | [e] -> (match skip_loc e with EVar (Id "exportOnly") -> false | _ -> true)
-      | _ -> true
-    else false
-    in
+  let isQuick = is_quick_body p.pattrs in
   let reqs =
     List.collect (fun (loc, s) ->
         match s with

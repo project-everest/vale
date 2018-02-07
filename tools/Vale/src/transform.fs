@@ -19,7 +19,7 @@ type id_info =
 | GhostLocal of mutability * typ option
 | ProcLocal of id_local
 | ThreadLocal of id_local
-| InlineLocal
+| InlineLocal of typ option
 | OperandLocal of inout * typ
 | StateInfo of string * exp list * typ
 | OperandAlias of id * id_info
@@ -77,8 +77,11 @@ let vaTyp (t:typ) : string =
   | TName (Id x) -> x
   | _ -> err "operands must have simple named types"
 
+let in_id (x:id) = Reserved ("in_" + (string_of_id x))
 let old_id (x:id) = Reserved ("old_" + (string_of_id x))
 let prev_id (x:id) = Reserved ("prev_" + (string_of_id x))
+let body_id (x:id) = Id ((string_of_id x) + "_body")
+let while_id (x:id) = Id ((string_of_id x) + "_while")
 
 let tUnit = TName (Id "unit")
 let tBool = TName (Reserved "bool")
@@ -88,6 +91,13 @@ let tState = TName (Reserved "state")
 let tCode = TName (Reserved "code")
 let tCodes = TName (Reserved "codes")
 let tFuel = TName (Reserved "fuel")
+
+let is_quick_body (a:attrs):bool =
+  if List_mem_assoc (Id "quick") a then
+    match List_assoc (Id "quick") a with
+    | [e] -> (match skip_loc e with EVar (Id "exportOnly") -> false | _ -> true)
+    | _ -> true
+  else false
 
 let exp_abstract (useOld:bool) (e:exp):exp =
   let c e = match e with EOp (Uop UConst, [e]) -> e | _ -> e in
@@ -146,10 +156,10 @@ let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp
     in
   env_map_exp (map_apply_compose2 f f_state) env e
 
-let rec env_stmt (env:env) (s:stmt):env =
+let rec env_stmt (env:env) (s:stmt):(env * env) =
   match s with
   | SLoc (loc, s) -> env_stmt env s
-  | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SCalc _ -> env
+  | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SCalc _ -> (env, env)
   | SVar (x, t, m, g, a, eOpt) ->
     (
       let info =
@@ -157,23 +167,23 @@ let rec env_stmt (env:env) (s:stmt):env =
         | XAlias (AliasThread, e) -> ThreadLocal {local_in_param = false; local_exp = e; local_typ = t}
         | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
         | XGhost -> GhostLocal (m, t)
-        | XInline -> InlineLocal
+        | XInline -> InlineLocal t
         | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
         in
       let ids = Map.add x info env.ids in
-      {env with ids = ids}
+      (env, {env with ids = ids})
     )
   | SAlias (x, y) ->
       let ids = Map.add x (make_operand_alias y env) env.ids in
-      {env with ids = ids}
+      (env, {env with ids = ids})
   | SAssign (xs, e) ->
       let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal (Mutable, t)) ids) env.ids xs in
-      {env with ids = ids}
-  | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> env
+      (env, {env with ids = ids})
+  | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> (env, env)
   | SForall (xs, ts, ex, e, b) ->
-      {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}
+      ({env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}, env)
   | SExists (xs, ts, e) ->
-      {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}
+      (env, {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs})
 
 let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (s:stmt):(env * stmt list) =
   map_apply_modify (fs env s) (fun () ->
@@ -189,9 +199,9 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SAssert (attrs, e) -> (env, [SAssert (attrs, fee e)])
     | SCalc (oop, contents) -> (env, [SCalc (oop, List.map (env_map_calc_contents fe fs env) contents)])
     | SVar (x, t, m, g, a, eOpt) ->
-        (env_stmt env s, [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
-    | SAlias (x, y) -> (env_stmt env s, [SAlias (x, y)])
-    | SAssign (xs, e) -> (env_stmt env s, [SAssign (xs, fee e)])
+        (snd (env_stmt env s), [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
+    | SAlias (x, y) -> (snd (env_stmt env s), [SAlias (x, y)])
+    | SAssign (xs, e) -> (snd (env_stmt env s), [SAssign (xs, fee e)])
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> (env, [SBlock (rs b)])
     | SQuickBlock (x, b) -> (env, [SQuickBlock (x, rs b)])
@@ -199,12 +209,12 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SWhile (e, invs, ed, b) ->
         (env, [SWhile (fee e, List_mapSnd fee invs, mapSnd (List.map fee) ed, rs b)])
     | SForall (xs, ts, ex, e, b) ->
-        let env = env_stmt env s in
-        let fee = fe env in
-        let rs = env_map_stmts fe fs env in
+        let env1 = fst (env_stmt env s) in
+        let fee = fe env1 in
+        let rs = env_map_stmts fe fs env1 in
         (env, [SForall (xs, List.map (List.map fee) ts, fee ex, fee e, rs b)])
     | SExists (xs, ts, e) ->
-        let env = env_stmt env s in
+        let env = snd (env_stmt env s) in
         let fee = fe env in
         (env, [SExists (xs, List.map (List.map fee) ts, fee e)])
   )
@@ -246,12 +256,155 @@ let env_map_specs (fe:env -> exp -> exp) (fs:env -> loc * spec -> (env * (loc * 
   let (env, specs) = List_mapFoldFlip (env_map_spec fe fs) env specs in
   (env, List.concat specs)
 
-let match_proc_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):((pformal * lhs) list * (pformal * exp) list) =
+let match_proc_args (p:proc_decl) (rets:lhs list) (args:exp list):((pformal * lhs) list * (pformal * exp) list) =
   let (nap, nac) = (List.length p.pargs, List.length args) in
   let (nrp, nrc) = (List.length p.prets, List.length rets) in
   if nap <> nac then err ("in call to " + (err_id p.pname) + ", expected " + (string nap) + " argument(s), found " + (string nac) + " argument(s)") else
   if nrp <> nrc then err ("procedure " + (err_id p.pname) + " returns " + (string nrp) + " value(s), call expects " + (string nrc) + " return value(s)") else
   (List.zip p.prets rets, List.zip p.pargs args)
+
+let operandProc (xa:id) (io:inout):id =
+  let xa = string_of_id xa in
+  match io with
+  | In | InOut -> Id (xa + "_in")
+  | Out -> Id (xa + "_out")
+
+///////////////////////////////////////////////////////////////////////////////
+// Read/modify analysis
+
+let rec resolve_alias (env:env) (x:id):id =
+  match Map.tryFind x env.ids with
+  | Some (OperandAlias (y, _)) -> resolve_alias env y
+  | _ -> x
+
+// Compute (reads, reads as old, mods) to variables in env0 (not env1).  The complete environment is env0 + env1.
+let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * Set<id> * Set<id>) =
+  let rs = compute_read_mods_stmts env0 env1 in
+  let filter_ids (xs:Set<id>) =
+    let xs = Set.map (resolve_alias env1) xs in
+    Set.filter (fun x -> Map.containsKey x env0.ids && not (Map.containsKey x env1.ids)) xs
+    in
+  let env1 = snd (env_stmt env1 s) in
+  let compute_exps (es:exp list) =
+    let reads = Set.unionMany (List.map free_vars_exp es) in
+    let fOld (e:exp) (xss:Set<id> list):Set<id> =
+      match e with
+      | EOp (Uop UOld, [e]) -> free_vars_exp e
+      | _ -> Set.unionMany xss
+      in
+    let readsOld = Set.unionMany (List.map (gather_exp fOld) es) in
+    (env1, filter_ids reads, filter_ids readsOld, Set.empty)
+    in
+  let rec compute_call (p:proc_decl) (lhss:lhs list) (es:exp list):(Set<id> * Set<id>) =
+    let collect_p_mods (_, s):(mod_kind * id) list =
+      match s with
+      | Modifies (m, e) ->
+        (
+          match skip_loc (exp_abstract false e) with
+          | EVar x -> [(m, x)]
+          | _ -> []
+        )
+      | _ -> []
+      in
+    let p_rmods = List.collect collect_p_mods p.pspecs in
+    // TODO: process mrets
+    let collect_operand (pp, ea):(mod_kind * id) list =
+      match pp with
+      | (_, _, XOperand, io, _) ->
+        (
+          match skip_loc ea with
+          | EVar x ->
+            (
+              let x = resolve_alias env1 x in
+              [((match io with In -> Read | InOut | Out -> Modify), x)]
+            )
+          | EOp (Uop UConst, _) | EInt _ -> []
+          | EApply (xa, args) when Map.containsKey (operandProc xa io) env0.procs ->
+            (
+              let xa_in = operandProc xa In in
+              let xa_out = operandProc xa Out in
+              let process_io io =
+                let (rs, ms) =
+                  match io with
+                  | In | InOut ->
+                      if (not (Map.containsKey xa_in env0.procs)) then err ("could not find procedure " + (err_id xa_in)) else
+                      let p_in = Map.find xa_in env0.procs in
+                      let p_in = {p_in with prets = []} in
+                      compute_call p_in [] args
+                  | Out ->
+                      if (not (Map.containsKey xa_out env0.procs)) then err ("could not find procedure " + (err_id xa_out)) else
+                      let p_out = Map.find xa_out env0.procs in
+                      let p_out = {p_out with pargs = List.take (List.length p_out.pargs - 1) p_out.pargs} in
+                      compute_call p_out [] args
+                  in
+                List.map (fun x -> (Read, x)) (Set.toList rs) @ List.map (fun x -> (Modify, x)) (Set.toList ms)
+                in
+              match io with
+              | In -> process_io In
+              | Out -> process_io Out
+              | InOut -> process_io In @ process_io Out
+            )
+          | _ -> []
+        )
+      | _ -> []
+      in
+    let (mrets, margs) = match_proc_args p lhss es in // TODO: mrets
+    let p_rmods = List.collect collect_operand margs @ p_rmods in
+    // REVIEW: right now, Preserve is (conservatively) treated as Modify
+    let (p_reads, p_mods) = List.partition (fun (m, _) -> match m with Read -> true | Modify | Preserve -> false) p_rmods in
+    let p_reads = Set.ofList (List.map snd p_reads) in
+    let p_mods = Set.ofList (List.map snd p_mods) in
+    (p_reads, p_mods)
+    in
+  match s with
+  | SLoc (loc, s) -> compute_read_mods_stmt env0 env1 s
+  | SLabel x -> compute_exps []
+  | SGoto x -> compute_exps []
+  | SReturn -> compute_exps []
+  | SAssume e -> compute_exps [e]
+  | SAssert (attrs, e) -> compute_exps [e]
+  | SCalc (oop, contents) -> err "unsupported feature: 'calc' for F*"
+  | SVar (x, t, m, g, a, eOpt) -> compute_exps (match eOpt with None -> [] | Some e -> [e])
+  | SAlias (x, y) -> compute_exps []
+  | SAssign (lhss, e) ->
+      let (rs0, mods0) =
+        match skip_loc e with
+        | EApply (x, es) when Map.containsKey x env0.procs ->
+            let p = Map.find x env0.procs in
+            compute_call p lhss es
+        | _ -> (Set.empty, Set.empty)
+        in
+      let (_, reads, readsOld, _) = compute_exps [e] in
+      let xs_update = List.collect (fun lhs -> match lhs with (x, None) -> [x] | _ -> []) lhss in
+      let mods = filter_ids (Set.ofList xs_update) in
+      (env1, Set.union rs0 reads, readsOld, Set.union mods0 mods)
+  | SLetUpdates _ -> internalErr "SLetUpdates"
+  | SBlock b -> rs b
+  | SQuickBlock (_, b) -> rs b
+  | SIfElse (g, e, b1, b2) ->
+      let (_, rs0, rso0, _) = compute_exps [e] in
+      let (_, rs1, rso1, mods1) = rs b1 in
+      let (_, rs2, rso2, mods2) = rs b2 in
+      (env1, Set.unionMany [rs0; rs1; rs2], Set.unionMany [rso0; rso1; rso2], Set.union mods1 mods2)
+  | SWhile (e, invs, (_, ed), b) ->
+      let (_, rs0, rso0, _) = compute_exps (e::ed @ (List.map snd invs)) in
+      let (_, rs1, rso1, mods1) = rs b in
+      (env1, Set.union rs0 rs1, Set.union rso0 rso1, mods1)
+  | SForall (xs, ts, ex, e, b) ->
+      let env2 = fst (env_stmt env1 s) in
+      let ee = EBind (Forall, [], xs, ts, EOp (Bop BImply, [ex; e])) in
+      let (_, rs0, rso0, _) = compute_exps [ee] in
+      let (_, rs1, rso1, _) = compute_read_mods_stmts env0 env2 b in
+      (env1, Set.union rs0 rs1, Set.union rso0 rso1, Set.empty)
+  | SExists (xs, ts, e) ->
+      let ee = EBind (Exists, [], xs, ts, e) in
+      compute_exps [ee]
+and compute_read_mods_stmts (env0:env) (env1:env) (ss:stmt list):(env * Set<id> * Set<id> * Set<id>) =
+  let f (env1, rs0, rso0, mods0) s =
+    let (env1, rs1, rso1, mods1) = compute_read_mods_stmt env0 env1 s in
+    (env1, Set.union rs0 rs1, Set.union rso0 rso1, Set.union mods0 mods1)
+    in
+  List.fold f (env1, Set.empty, Set.empty, Set.empty) ss
 
 ///////////////////////////////////////////////////////////////////////////////
 // Resolve overloading
@@ -297,7 +450,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
   let genAssume (env:env) (prev:Map<id, int>) (x:id):stmt list =
     match Map.tryFind x env.ids with
     | None | Some (GhostLocal _) -> []
-    | Some (OperandLocal _ | ThreadLocal _ | ProcLocal _ | InlineLocal | StateInfo _) ->
+    | Some (OperandLocal _ | ThreadLocal _ | ProcLocal _ | InlineLocal _ | StateInfo _) ->
         let old_state = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar (Reserved "this")]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar (Reserved "this")]) in
 //        let old_x = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar x]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar x]) in
         let eq = EApply (Reserved "eq_ops", [old_state; EVar (Reserved "this"); (EOp (Uop UToOperand, [EVar x]))]) in
@@ -321,7 +474,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
           | EApply (x, es) when Map.containsKey x env.procs ->
               let xfs = Set.toList (free_vars_stmt s) in
               let ssAssume = List.collect (genAssume env prev) xfs in
-              let (mrets, margs) = match_proc_args env (Map.find x env.procs) lhss es in
+              let (mrets, margs) = match_proc_args (Map.find x env.procs) lhss es in
               let xrets = List.map (fun ((_, _, g, _, _), (x, _)) -> (EVar x, Out, g)) mrets in
               let xargs = List.map (fun ((_, _, g, io, _), e) -> (skip_loc e, io, g)) margs in
               let fx e_io_g =
@@ -433,12 +586,6 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
       | None -> ec
       | Some xo -> codeLemma (EOp (RefineOp, [ec; ec; vaApp ("const_" + xo) [e]]))
       in
-    let operandProc xa io =
-      let xa = string_of_id xa in
-      match io with
-      | In | InOut -> Id (xa + "_in")
-      | Out -> Id (xa + "_out")
-      in
     match (g, skip_loc e) with
     | (_, EVar x) when Map.containsKey x env.ids ->
       (
@@ -446,7 +593,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           match info with
           // TODO: check for incorrect uses of old
           | GhostLocal _ -> Unchanged
-          | InlineLocal -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
+          | InlineLocal _ -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
           | OperandLocal (opIo, t) ->
             (
               let xo = vaTyp t in
@@ -552,7 +699,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
 and rewrite_vars_exp (env:env) (e:exp):exp =
   rewrite_vars_arg Ghost None In env e
 and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
-  let (mrets, margs) = match_proc_args env p rets args in
+  let (mrets, margs) = match_proc_args p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
     | (x, t, XOperand, io, _) -> [rewrite_vars_arg NotGhost (Some (vaTyp t)) io env ea]
@@ -799,6 +946,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
   ss @ ensStmts
 
 ///////////////////////////////////////////////////////////////////////////////
+// Add quick blocks for assert{:quick_start}...assert{:quick_end}
 
 let is_assert_quick_start (s:stmt):bool =
   match skip_loc_stmt s with
@@ -880,136 +1028,326 @@ and add_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):stmt list
   | s::ss -> (add_quick_blocks_stmt env next_sym s)::(add_quick_blocks_stmts env next_sym ss)
 
 ///////////////////////////////////////////////////////////////////////////////
+// Hoist while loops into top-level procedures
+
+let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
+  let hoisted = ref ([]:decl list) in
+  let hoist_while env s =
+    match s with
+    | SWhile _ ->
+      (*
+        procedure{:quick true} body_p(ins_in) returns(outs)
+          lets L
+          reads R modifies M
+          requires invs(ins_in)
+          ensures invs(ins_in,outs)
+          requires e(ins_in)
+          ensures ed(ins_in,outs) << old(ed(ins_in))
+          { ins := ins_in; b }
+        procedure{:quick false} while_p(ins_in) returns(outs)
+          lets L
+          reads R modifies M
+          requires invs(ins_in)
+          ensures invs(ins_in,outs)
+          ensures !e(ins_in,outs)
+          { ins := ins_in; while(e) invs ed { outs := body_p(ins); } }
+        procedure{:quick true} p(...) ...
+        {
+          ... outs := while_p(ins); ...
+        }
+      *)
+        let xp_body = body_id p.pname in
+        let xp_while = while_id p.pname in
+        let (_, raw_reads, raw_readsOld, raw_mods) = compute_read_mods_stmt env empty_env s in
+        let mods = Set.map (resolve_alias env) raw_mods in
+        let reads = Set.map (resolve_alias env) raw_reads in
+        let readsOld = Set.map (resolve_alias env) raw_readsOld in
+        // each read/mod is one of: (ghost/inline), state
+        // move (ghost/inline) readsOld into reads, keep state in readsOld
+        let find_var (x:id):id_info =
+          match Map.tryFind x env.ids with
+          | None -> err ("could not find variable " + (err_id x))
+          | Some info -> info
+          in
+        let resolve_find_var (x:id):id_info = find_var (resolve_alias env x) in
+        let is_state (x:id):bool = match resolve_find_var x with StateInfo _ -> true | _ -> false in
+        let is_alias (x:id):bool = match find_var x with OperandAlias _ -> true | _ -> false in
+        let (readsOld, reads2) = Set.partition is_state readsOld in
+        let reads = Set.union reads reads2 in
+        let reads = Set.difference reads mods in
+        //   L = reads state via alias + mods state via alias
+        //   R = reads state
+        //   M = mods state
+        //   ins = reads (ghost/inline) + mods (ghost/inline) + readsOld
+        //   outs = mods (ghost/inline)
+        let (p_reads, in_reads) = List.partition is_state (Set.toList reads) in
+        let (p_mods, outs) = List.partition is_state (Set.toList mods) in
+        let aliases = List.filter is_alias (Set.toList (Set.union raw_reads raw_mods)) in
+        let ins = in_reads @ outs in
+        let ins_in = List.map in_id ins in
+        let s_old = Reserved "old" in
+        let rec replace_old (e:exp):exp map_modify =
+          match e with
+          | EOp (Uop UOld, [e]) -> Replace (EOp (Bop BOldAt, [EVar s_old; map_exp replace_old e]))
+          | _ -> Unchanged
+          in
+        let s = map_stmt (map_exp replace_old) (fun _ -> Unchanged) s in
+        let (eCond, invs, ed, b) =
+          match s with
+          | [SWhile (e, invs, ed, b)] -> (e, invs, ed, b)
+          | _ -> internalErr "hoist_while_loops"
+          in
+        let getType (x:id):typ =
+          match resolve_find_var x with
+          | GhostLocal (_, None) | InlineLocal None -> err ("variable " + (err_id x) + " needs explicit type annotation to use inside while loop")
+          | GhostLocal (_, Some t) | InlineLocal (Some t) -> t
+          | StateInfo (_, _, t) -> t
+          | _ -> err ("variables in while loops must be ghost, inline, or state component: " + (err_id x))
+          in
+        let to_pformal (x:id):pformal = (x, getType x, XGhost, In, []) in
+        let to_pformal_in (x:id):pformal = (in_id x, getType x, XGhost, In, []) in
+        let pf_state = (s_old, tState, XGhost, In, []) in
+        let p_ins_in = List.map to_pformal_in ins in
+        let p_outs = List.map to_pformal outs in
+        let subst_ins (ins:id list) (e:exp) =
+          let m = Map.ofList (List.map (fun x -> (x, EVar (in_id x))) ins) in
+          subst_reserved_exp m e
+          in
+        let alias_to_spec (x:id) =
+          match find_var x with
+          | OperandAlias (y, _) -> (loc, SpecRaw (Lets [(loc, LetsAlias (x, y))]))
+          | _ -> internalErr "alias_to_spec"
+          in
+        let inv_to_spec (ins:id list) (k:raw_spec_kind) ((l:loc), (e:exp)) =
+          let e = subst_ins ins e in
+          (l, SpecRaw (RawSpec (k, [(l, SpecExp e)])))
+          in
+        let mod_to_spec (m:mod_kind) (x:id) =
+          (loc, SpecRaw (RawSpec (RModifies m, [(loc, SpecExp (EVar x))])))
+          in
+        let reqs = List.map (inv_to_spec ins (RRequires Unrefined)) invs in
+        let enss = List.map (inv_to_spec in_reads (REnsures Unrefined)) invs in
+        let spec_aliases = List.map alias_to_spec aliases in
+        let spec_reads = List.map (mod_to_spec Read) p_reads in
+        let spec_mods = List.map (mod_to_spec Modify) p_mods in
+        let specs = spec_aliases @ spec_reads @ spec_mods @ reqs @ enss in
+        let e_exit = EOp (Uop UNot, [eCond]) in
+        let spec_exit = inv_to_spec in_reads (REnsures Unrefined) (loc, e_exit) in
+        let spec_enter_body = inv_to_spec ins (RRequires Unrefined) (loc, eCond) in
+        // ed << old(ed)
+        // precedes(ed, old(ed))
+        let lexList (es:exp list) = List.foldBack (fun e ls -> EApply (Id "LexCons", [e; ls])) es (EVar (Id "LexTop")) in
+        let (lEd, eds) = ed in
+        let edIn = EOp (Uop UOld, [subst_ins ins (lexList eds)]) in
+        let edOut = subst_ins in_reads (lexList eds) in
+        let precedes = EApply (Id "precedes", [edOut; edIn]) in
+        let spec_precedes = inv_to_spec [] (REnsures Unrefined) (lEd, precedes) in
+        let sInitIn (x:id) = SVar (x, Some (getType x), Mutable, XGhost, [], Some (EVar (in_id x))) in
+        let sInitOut (x:id) = SAssign ([(x, None)], (EVar (in_id x))) in
+        let sInits = List.map sInitIn in_reads @ List.map sInitOut outs in
+        // while(e) invs ed { outs := body_p(ins); }
+        let lhss = List.map (fun x -> (x, None)) outs in
+        let args = (List.map EVar ins) in
+        let oldThis = EOp (Uop UOld, [EVar (Reserved "this")]) in
+        let callBody = SAssign (lhss, EApply (xp_body, (EVar s_old)::args)) in
+        let callWhile = SAssign (lhss, EApply (xp_while, oldThis::args)) in
+        let sWhile = SWhile (eCond, invs, ed, [callBody]) in
+        let p_body =
+          {
+            pname = xp_body;
+            pghost = NotGhost;
+            pinline = Inline;
+            pargs = pf_state::p_ins_in;
+            prets = p_outs;
+            pspecs = specs @ [spec_enter_body; spec_precedes];
+            pbody = Some (sInits @ b);
+            pattrs = p.pattrs;
+          }
+          in
+        let p_while =
+          {
+            pname = xp_while;
+            pghost = NotGhost;
+            pinline = Inline;
+            pargs = pf_state::p_ins_in;
+            prets = p_outs;
+            pspecs = specs @ [spec_exit];
+            pbody = Some (sInits @ [sWhile]);
+            pattrs = [(Id "quick", [EVar (Id "exportOnly")])];
+          }
+          in
+        hoisted := (DProc p_while)::(DProc p_body)::!hoisted;
+        Replace (env, [callWhile])
+    | _ -> Unchanged
+    in
+  let body =
+    match p.pbody with
+    | None -> None
+    | Some ss -> Some (env_map_stmts (fun env e -> e) hoist_while env ss)
+    in
+  if !hoisted = [] then
+    []
+  else
+    let ds = List.rev (DProc {p with pbody = body}::!hoisted) in
+    //Emit_vale_text.emit_decls (debug_print_state ()) (List.map (fun d -> (loc, d)) ds);
+    ds
+
+///////////////////////////////////////////////////////////////////////////////
+
+type transformed =
+| TransformedDone of (env * env * proc_decl) * env
+| TransformedRetry of decl list
+
+// Either transform p, or return a list of decls that then must be transformed
+let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
+  let isRefined = attrs_get_bool (Id "refined") false p.pattrs in
+  let isFrame = attrs_get_bool (Id "frame") true p.pattrs in
+  let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
+  let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
+  let isQuick = is_quick_body p.pattrs in
+  let preserveSpecs =
+    List.collect
+      (fun spec ->
+        match spec with
+        | (_, SpecRaw (RawSpec (RModifies Preserve, es))) ->
+            let es = List.collect (fun (loc, e) -> match e with SpecExp e -> [(loc, e)] | SpecLet _ -> []) es in
+            List_mapSnd (fun e -> SpecExp (EOp (Bop BEq, [e; EOp (Uop UOld, [e])]))) es
+        | _ -> []
+      )
+      p.pspecs
+    in
+  let ok = EVar (Id "ok") in
+  let okMod = SpecRaw (RawSpec (RModifies Preserve, [(loc, SpecExp ok)])) in
+  let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
+  let okSpecs = [(loc, okMod); (loc, okReqEns)] in
+  let pspecs = if isRefined || isFrame then okSpecs @ p.pspecs else p.pspecs in
+  let pspecs = match preserveSpecs with [] -> pspecs | _ -> pspecs @ [(loc, SpecRaw (RawSpec (REnsures Unrefined, preserveSpecs)))] in
+  let addParam isRet ids (x, t, g, io, a) =
+    match g with
+    | (XAlias (AliasThread, e)) -> Map.add x (ThreadLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
+    | (XAlias (AliasLocal, e)) -> Map.add x (ProcLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
+    | XInline -> Map.add x (InlineLocal (Some t)) ids
+    | XOperand -> Map.add x (OperandLocal (io, t)) ids
+    | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
+    | XGhost -> Map.add x (GhostLocal ((if isRet then Mutable else Immutable), Some t)) ids
+    in
+  let mod_id (env:env) (loc, m, e) =
+    let mod_err () = err "expression in modifies clause must be a variable declared as var{:state f(...)} x:t;"
+    loc_apply loc e (fun e ->
+      match e with
+      | EVar x ->
+        (
+          match Map.tryFind x env.ids with
+          | None -> err ("cannot find variable " + (err_id x))
+          | Some (StateInfo _) -> (x, (match m with Read -> false | (Modify | Preserve) -> true))
+          | Some _ -> mod_err ()
+        )
+      | _ -> mod_err ())
+    in
+  // parameters, return values, lets must all be unique
+  let xArgsRets = List.map (fun (x, _, _, _, _) -> x) (p.pargs @ p.prets) in
+  let specs = List.collect (fun (loc, s) -> match s with SpecRaw s -> [(loc, s)] | _ -> internalErr "!SpecRaw") pspecs in
+  let lets = List.collect (fun (_, s) -> match s with (Lets ls) -> ls | _ -> []) specs in
+  let xLets = List.map (fun (_, s) -> match s with LetsVar (x, _, _) | LetsAlias (x, _) -> x) lets in
+  let rec checkUnique xs xset =
+    match xs with
+    | [] -> ()
+    | x::xs ->
+        if Set.contains x xset then err ("'" + (err_id x) + "' declared twice") else
+        checkUnique xs (Set.add x xset)
+    in
+  checkUnique (xArgsRets @ xLets) (Set.empty);
+  let envpIn = env in
+  // Add parameters to env for both requires and ensures.
+  // For ensures, add return values to env.
+  // For requires, remove return values from env -- for each return value named x, remove any
+  // globals named x, so that requires and ensures don't see two different x variables.
+  // This makes it sane to share "lets" declarations between requires and ensures.
+  let envpIn = {envpIn with ids = List.fold (addParam false) envpIn.ids p.pargs} in
+  let envpIn = {envpIn with ids = List.fold (fun ids (x, _, _, _, _) -> Map.remove x ids) envpIn.ids p.prets} in
+  // Desugar specs and update p so other procedures see desugared version
+  let (envDesugar, pspecs) = env_map_specs (fun _ e -> e) desugar_spec envpIn pspecs in
+  let lets = List.rev envDesugar.lets in
+  let bodyLet (loc:loc, l:lets) =
+    match l with
+    | LetsVar (x, t, e) -> SLoc (loc, SVar (x, t, Immutable, XGhost, [], Some e))
+    | LetsAlias (x, y) -> SLoc (loc, SAlias (x, y))
+    in
+  let bodyLets = List.map bodyLet lets in
+  let body = mapOpt (fun ss -> bodyLets @ ss) p.pbody in
+  let pOrig = p in
+  let p = {p with pbody = body; pspecs = pspecs} in
+  // Compute mods list and final environment for body
+  let mods = List.collect (fun (loc, s) -> match s with Modifies (m, e) -> [(loc, m, e)] | _ -> []) pspecs in
+  let envpIn = {envpIn with mods = Map.ofList (List.map (mod_id envpIn) mods)} in
+  let envpIn = {envpIn with abstractOld = true} in
+  let envp = envpIn in
+  let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
+  let envp = {envp with checkMods = isRefined || isFrame} in
+  let envp = {envp with abstractOld = false} in
+  let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
+  let envp = if isRecursive then {envp with procs = Map.add p.pname {p with pspecs = specs} envp.procs} else envp in
+  let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
+  // Hoist while loops
+  let envpOrig = List.fold (fun env s -> snd (env_stmt env s)) envp bodyLets in
+  let hoisted = if isQuick then hoist_while_loops envpOrig loc pOrig else [] in
+  if hoisted <> [] then TransformedRetry hoisted else
+  // Process body
+  let body =
+    match p.pbody with
+    | None -> None
+    | Some ss ->
+        let rec add_while_ok s =
+          match s with
+          | SWhile (e, invs, ed, b) ->
+              let invs = (loc, EVar (Id "ok"))::invs in
+              Replace [SWhile (e, invs, ed, map_stmts (fun e -> e) add_while_ok b)]
+          | _ -> Unchanged
+          in
+        let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
+        let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
+        let ss = resolve_overload_stmts envp ss in
+        //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
+        let ss = rewrite_vars_stmts envp ss in
+        let ss = add_quick_blocks_stmts envp (ref 0) ss in
+        Some ss
+    in
+  let pNew = {p with pbody = body; pspecs = specs} in
+  let envBody = envp in
+  let envProc = {env with procs = Map.add p.pname pNew env.procs} in
+  let envRec = if isRecursive then envProc else env in
+  TransformedDone ((envRec, envBody, pNew), envProc)
 
 // returns:
-//   - env for procedure body (for procedures)
+//   - list of:
+//     - minimal env for procedure body (for procedures)
+//     - expanded env for procedure body (for procedures)
+//     - transformed declaration
 //   - env for subsequent declarations
-//   - transformed declaration
-let transform_decl (env:env) (loc:loc) (d:decl):(env * env * decl) =
+let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * env) =
   match d with
   | DVar (x, t, XAlias (AliasThread, e), _) ->
       let env = {env with ids = Map.add x (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t}) env.ids} in
-      (env, env, d)
+      ([(env, env, d)], env)
   | DVar (x, t, XState e, _) ->
     (
       match skip_loc e with
       | EApply (Id id, es) ->
           let env = {env with ids = Map.add x (StateInfo (id, es, t)) env.ids} in
-          (env, env, d)
+          ([(env, env, d)], env)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )
+  | DFun ({fbody = None} as f) ->
+      ([], {env with funs = Map.add f.fname f env.funs})
   | DProc p ->
     (
-      let isRefined = attrs_get_bool (Id "refined") false p.pattrs in
-      let isFrame = attrs_get_bool (Id "frame") true p.pattrs in
-      let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
-      let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
-      let preserveSpecs =
-        List.collect
-          (fun spec ->
-            match spec with
-            | (_, SpecRaw (RawSpec (RModifies Preserve, es))) ->
-                let es = List.collect (fun (loc, e) -> match e with SpecExp e -> [(loc, e)] | SpecLet _ -> []) es in
-                List_mapSnd (fun e -> SpecExp (EOp (Bop BEq, [e; EOp (Uop UOld, [e])]))) es
-            | _ -> []
-          )
-          p.pspecs
-        in
-      let ok = EVar (Id "ok") in
-      let okMod = SpecRaw (RawSpec (RModifies Preserve, [(loc, SpecExp ok)])) in
-      let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
-      let okSpecs = [(loc, okMod); (loc, okReqEns)] in
-      let pspecs = if isRefined || isFrame then okSpecs @ p.pspecs else p.pspecs in
-      let pspecs = match preserveSpecs with [] -> pspecs | _ -> pspecs @ [(loc, SpecRaw (RawSpec (REnsures Unrefined, preserveSpecs)))] in
-      let addParam isRet ids (x, t, g, io, a) =
-        match g with
-        | (XAlias (AliasThread, e)) -> Map.add x (ThreadLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
-        | (XAlias (AliasLocal, e)) -> Map.add x (ProcLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}) ids
-        | XInline -> Map.add x InlineLocal ids
-        | XOperand -> Map.add x (OperandLocal (io, t)) ids
-        | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
-        | XGhost -> Map.add x (GhostLocal ((if isRet then Mutable else Immutable), Some t)) ids
-        in
-      let mod_id (env:env) (loc, m, e) =
-        let mod_err () = err "expression in modifies clause must be a variable declared as var{:state f(...)} x:t;"
-        loc_apply loc e (fun e ->
-          match e with
-          | EVar x ->
-            (
-              match Map.tryFind x env.ids with
-              | None -> err ("cannot find variable " + (err_id x))
-              | Some (StateInfo _) -> (x, (match m with Read -> false | (Modify | Preserve) -> true))
-              | Some _ -> mod_err ()
-            )
-          | _ -> mod_err ())
-        in
-      // parameters, return values, lets must all be unique
-      let xArgsRets = List.map (fun (x, _, _, _, _) -> x) (p.pargs @ p.prets) in
-      let specs = List.collect (fun (loc, s) -> match s with SpecRaw s -> [(loc, s)] | _ -> internalErr "!SpecRaw") pspecs in
-      let lets = List.collect (fun (_, s) -> match s with (Lets ls) -> ls | _ -> []) specs in
-      let xLets = List.map (fun (_, s) -> match s with LetsVar (x, _, _) | LetsAlias (x, _) -> x) lets in
-      let rec checkUnique xs xset =
-        match xs with
-        | [] -> ()
-        | x::xs ->
-            if Set.contains x xset then err ("'" + (err_id x) + "' declared twice") else
-            checkUnique xs (Set.add x xset)
-        in
-      checkUnique (xArgsRets @ xLets) (Set.empty);
-      let envpIn = env in
-      // Add parameters to env for both requires and ensures.
-      // For ensures, add return values to env.
-      // For requires, remove return values from env -- for each return value named x, remove any
-      // globals named x, so that requires and ensures don't see two different x variables.
-      // This makes it sane to share "lets" declarations between requires and ensures.
-      let envpIn = {envpIn with ids = List.fold (addParam false) envpIn.ids p.pargs} in
-      let envpIn = {envpIn with ids = List.fold (fun ids (x, _, _, _, _) -> Map.remove x ids) envpIn.ids p.prets} in
-      // Desugar specs and update p so other procedures see desugared version
-      let (envDesugar, pspecs) = env_map_specs (fun _ e -> e) desugar_spec envpIn pspecs in
-      let lets = List.rev envDesugar.lets in
-      let bodyLet (loc:loc, l:lets) =
-        match l with
-        | LetsVar (x, t, e) -> SLoc (loc, SVar (x, t, Immutable, XGhost, [], Some e))
-        | LetsAlias (x, y) -> SLoc (loc, SAlias (x, y))
-        in
-      let bodyLets = List.map bodyLet lets in
-      let body = mapOpt (fun ss -> bodyLets @ ss) p.pbody in
-      let pReprint = p in
-      let p = {p with pbody = body; pspecs = pspecs} in
-      // Compute mods list and final environment for body
-      let mods = List.collect (fun (loc, s) -> match s with Modifies (m, e) -> [(loc, m, e)] | _ -> []) pspecs in
-      let envpIn = {envpIn with mods = Map.ofList (List.map (mod_id envpIn) mods)} in
-      let envpIn = {envpIn with abstractOld = true} in
-      let envp = envpIn in
-      let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
-      let envp = {envp with checkMods = isRefined || isFrame} in
-      let envp = {envp with abstractOld = false} in
-      let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
-      let envp = if isRecursive then {envp with procs = Map.add p.pname {p with pspecs = specs} envp.procs} else envp in
-      let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
-      // Process body
-      let resolveBody = p.pbody in
-      let body =
-        match p.pbody with
-        | None -> None
-        | Some ss ->
-            let rec add_while_ok s =
-              match s with
-              | SWhile (e, invs, ed, b) ->
-                  let invs = (loc, EVar (Id "ok"))::invs in
-                  Replace [SWhile (e, invs, ed, map_stmts (fun e -> e) add_while_ok b)]
-              | _ -> Unchanged
-              in
-            let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
-            let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
-            let ss = resolve_overload_stmts envp ss in
-            //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
-            let ss = rewrite_vars_stmts envp ss in
-            let ss = add_quick_blocks_stmts envp (ref 0) ss in
-            Some ss
-        in
-      (envp, env, DProc {p with pbody = body; pspecs = specs})
+      match transform_proc env loc p with
+      | TransformedDone ((envRec, envBody, pNew), envProc) -> ([envRec, envBody, DProc pNew], envProc)
+      | TransformedRetry ds ->
+          let f env d = let (eds, env) = transform_decl env loc d in (env, eds) in
+          let (env, eds) = List_mapFoldFlip f env ds in
+          (List.concat eds, env)
     )
-  | _ -> (env, env, d)
+  | _ -> ([(env, env, d)], env)
 
 

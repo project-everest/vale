@@ -122,6 +122,7 @@ let rec string_of_exp_prec prec e =
     | EOp (FieldUpdate x, [e1; e2]) -> ("{" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "}", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
     | EApply (x, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
+    | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
     | EBind (Lambda, [], xs, ts, e) -> qbind "fun" " -> " xs ts e

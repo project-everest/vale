@@ -20,7 +20,7 @@ let qlemma_exp (e:exp):exp =
 let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
   let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
   let env0 = env in
-  let env = env_stmt env s in
+  let env = snd (env_stmt env s) in
   let range = EVar (Id "range1") in
   let msg = EString ("***** PRECONDITION NOT MET AT " + string_of_loc loc + " *****") in
   let uses_state (e:exp):bool =
@@ -53,6 +53,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     let eApp = EApply (x, es) in
     let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
     (true, EApply (Id "qLemma", [range; msg; fApp; eTail]))
+    // TODO: return values from lemmas
 //    (true, EApply (Id "qLemma", [fApp; eTail]))
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
@@ -68,15 +69,6 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
   match s with
   | SLoc (loc, s) -> build_qcode_stmt env outs loc s (needsState, eTail)
   | SAlias _ -> (needsState, eTail)
-  | SAssign ([], e) ->
-    (
-      match skip_loc e with
-      | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
-          inline_call x [] es
-      | EApply (x, es) ->
-          lemma_call x [] es
-      | _ -> err ()
-    )
   | SAssign ([(x, None)], e) ->
       let tOpt =
         match Map.tryFind x env0.ids with
@@ -85,6 +77,21 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         in
       assign_or_var true x tOpt e
   | SAssign ([(x, Some (tOpt, _))], e) -> assign_or_var true x tOpt e
+  | SAssign (xs, e) ->
+    (
+      let formal_of_lhs ((x:id), typGhostOpt):formal =
+        match typGhostOpt with
+        | Some (Some t, _) -> (x, Some t)
+        | _ -> (x, None)
+        in
+      let xs = List.map formal_of_lhs xs in
+      match skip_loc e with
+      | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+          inline_call x xs es
+      | EApply (x, es) ->
+          lemma_call x xs es
+      | _ -> err ()
+    )
   | SVar (x, tOpt, _, XGhost, _, Some e) -> assign_or_var false x tOpt e
   | SLetUpdates ([], s) -> build_qcode_stmt env [] loc s (needsState, eTail)
   | SLetUpdates (xs, s) ->

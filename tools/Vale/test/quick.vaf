@@ -149,7 +149,7 @@ procedure{:quick exportOnly} Add64Ghosts(
 #verbatim
 let ghostId (x:int) : GTot int = x
 #endverbatim
-#reset-options "--debug Quick --debug_level SMTQuery"
+//#reset-options "--debug Quick --debug_level SMTQuery"
 procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
@@ -225,3 +225,32 @@ procedure Incr3()
     Add64(rax, 1);
 }
 
+procedure{:quick} While(ghost g1:int) returns(ghost go:int)
+    modifies
+        efl;
+        rax; rbx;
+    requires
+        rax < 200;
+        rbx < 100;
+{
+    Add64(rax, 0);
+    let gc := g1;
+    ghost var g2:int := rax;
+    while (rax < rbx)
+        invariant
+            rax <= 200;
+            rbx <= 100;
+            g2 == rax;
+            g2 >= old(g2);
+            rax >= old(rax);
+            g1 == old(g1);
+        decreases
+            (200 - rax);
+    {
+        Add64(rax, 1);
+        g2 := g2 + 1;
+    }
+    assert g2 == rax;
+    Add64(rax, 3);
+    go := g2 + gc;
+}

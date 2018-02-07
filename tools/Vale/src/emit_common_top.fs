@@ -48,35 +48,32 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
     in
   reprint_decls_rev := (List.map (fun d -> (loc, d)) new_decls) @ (!reprint_decls_rev)
 
+let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls =
+  try
+    match d with
+    | DProc p ->
+        let isQuick = List_mem_assoc (Id "quick") p.pattrs in
+        if verify then
+          let build_proc = if !fstar then Emit_common_lemmas.build_proc envBody else Emit_common_refine.build_proc in
+          let ds_p = build_proc envr loc p in
+          let ds_q = if isQuick then Emit_common_quick_export.build_proc envr loc p else [] in
+          ds_p @ ds_q
+        else
+          []
+    | DVerbatim (attrs, lines) ->
+        let attrs = attrs @ attr_no_verify "lax" attrs in
+        if verify then [(loc, DVerbatim (attrs, lines))] else []
+    | _ ->
+        if verify then [(loc, d)] else []
+  with err -> raise (LocErr (loc, err))
+
 let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
   try
     let dReprint = d1 in
-    let (envBody, env, d2) = transform_decl env loc d1 in
-    let add_fun env f = {env with funs = Map.add f.fname f env.funs}
-    let add_proc env p = {env with procs = Map.add p.pname p env.procs}
-    let (env, decl) =
-      match d2 with
-      | DFun ({fbody = None} as f) -> (add_fun env f, [])
-      | DProc ({pattrs = [(Reserved "alias", _)]} as p) -> (add_proc env p, [])
-      | DProc p ->
-          let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
-          let isQuick = List_mem_assoc (Id "quick") p.pattrs in
-          let envp = add_proc env p in
-          if verify then
-            let build_proc = if !fstar then Emit_common_lemmas.build_proc envBody else Emit_common_refine.build_proc in
-            let envr = if isRecursive then envp else env in
-            let ds_p = build_proc envr loc p in
-            let ds_q = if isQuick then Emit_common_quick_export.build_proc envr loc p else [] in
-            (envp, ds_p @ ds_q)
-          else
-            (envp, [])
-      | DVerbatim (attrs, lines) ->
-          let attrs = attrs @ attr_no_verify "lax" attrs in
-          (env, if verify then [(loc, DVerbatim (attrs, lines))] else [])
-      | _ -> (env, if verify then [(loc, d2)] else [])
-      in
+    let (envBodyDs, env) = transform_decl env loc d1 in
+    let ds = List.collect (build_one_decl verify loc) envBodyDs in
     (match (verify, !reprint_file) with (true, Some _) -> add_reprint_decl env loc dReprint | _ -> ());
-    (env, decl)
+    (env, ds)
   with err -> raise (LocErr (loc, err))
 
 let build_decls (env:env) (ds:((loc * decl) * bool) list):decls =

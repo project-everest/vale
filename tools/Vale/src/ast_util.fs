@@ -42,8 +42,8 @@ let rec List_mem_assoc (a:'a) (l:('a * 'b) list):bool =
 let rec List_assoc (a:'a) (l:('a * 'b) list):'b =
   match l with [] -> internalErr "List_assoc" | (ha, hb)::t -> if ha = a then hb else List_assoc a t
 
-let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr "string_of_id"
-let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr "reserved_id"
+let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr (Printf.sprintf "string_of_id: %A" x)
+let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr (Printf.sprintf "reserved_id: %A" x)
 let err_id (x:id):string = match x with Id s -> s | Reserved s -> s | Operator s -> "operator(" + s + ")"
 
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
@@ -321,3 +321,80 @@ let attrs_get_id (x:id) (a:attrs):id =
   | _ -> err ("argument to attribute '" + (err_id x) + "' must be an identifier")
 
 let qprefix (s:string) (t:string):string = s + (t.Replace(".", "__"))
+
+type print_state =
+  {
+    print_out:System.IO.TextWriter;
+    print_interface:print_state option;
+    cur_loc:loc ref;
+    cur_indent:string ref;
+  }
+  member this.PrintUnbrokenLine (s:string) =
+    let {loc_file = f; loc_line = i} = !this.cur_loc in (this.cur_loc := {loc_file = f; loc_line = i + 1; loc_col = 1; loc_pos = 0});
+    this.print_out.WriteLine (!this.cur_indent + s);
+  member this.PrintLine (s:string) = this.PrintBreakLine true s
+  member this.PrintBreakLine (isFirst:bool) (s:string) =
+    let breakCol = 100 in
+    let s = s.TrimEnd() in
+    let (sBreak1, sBreak2Opt) =
+      if (!this.cur_indent + s).Length > breakCol then
+        let space0 = s.IndexOf(" ") in
+        let quote0 = s.IndexOf("\"") in
+        let width = breakCol - (!this.cur_indent).Length in
+        if space0 >= 0 && (quote0 < 0 || quote0 >= width) then
+          // try to find last space in s[0 .. breakCol-indentsize]
+          // if that fails, find first space in s
+          let s1 = s.Substring(0, width) in
+          let breakAt = if s1.Contains(" ") then s1.LastIndexOf(" ") else s.IndexOf(" ") in
+          let sBreak1 = s.Substring(0, breakAt) in
+          let sBreak2 = s.Substring(breakAt).Trim() in
+          if sBreak1.Contains("//") then (s, None) else // don't break up a "//" comment
+          (sBreak1, Some sBreak2)
+        else if s.Contains("\"") && not (s.Contains("\\\"")) then
+          // put strings on their own line
+          let i1 = s.IndexOf("\"") in
+          let i2 = s.IndexOf("\"", i1 + 1) + 1 in
+          if i2 > 0 && (i2 - i1) < s.Length then
+            if i1 = 0 then
+              let s1 = s.Substring(0, i2) in
+              let s2 = s.Substring(i2).Trim() in
+              (s1, Some s2)
+            else
+              let s1 = s.Substring(0, i1).Trim() in
+              let s2 = s.Substring(i1) in
+              if s1.Contains("//") then (s, None) else
+              (s1, Some s2)
+          else (s, None)
+        else (s, None)
+      else (s, None)
+      in
+    this.PrintUnbrokenLine sBreak1;
+    match (sBreak2Opt, isFirst) with
+    | (None, _) -> ()
+    | (Some s, false) -> this.PrintBreakLine false s
+    | (Some s, true) -> this.Indent (); this.PrintBreakLine false s; this.Unindent ()
+  member this.Indent () = this.cur_indent := "  " + !this.cur_indent
+  member this.Unindent () = this.cur_indent := (!this.cur_indent).Substring(2)
+  member this.SetLoc (({loc_file = f; loc_line = i} as l):loc) =
+    let {loc_file = cf; loc_line = ci} as cl = !this.cur_loc in
+    if l = cl then ()
+    else if f <> cf || i < ci || i > ci + 8 then this.cur_loc := l; this.print_out.WriteLine ("#line " + (string i) + " " + f)
+    else this.PrintLine ""; this.SetLoc l
+
+let debug_print_state ():print_state =
+  {
+    print_out = System.Console.Out;
+    print_interface = None;
+    cur_loc = ref {loc_file = "<stdout>"; loc_line = 0; loc_col = 0; loc_pos = 0};
+    cur_indent = ref "";
+  }
+
+let reprint_file = ref (None:string option);
+let reprint_verbatims = ref true;
+let reprint_ghost_decls = ref true;
+let reprint_specs = ref true;
+let reprint_ghost_stmts = ref true;
+let reprint_loop_invs = ref true;
+let reprint_blank_lines = ref true;
+let gen_lemma_sym_count = ref 0
+let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count

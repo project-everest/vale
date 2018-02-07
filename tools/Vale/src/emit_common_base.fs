@@ -8,13 +8,6 @@ open Transform
 open Microsoft.FSharp.Math
 open System.Numerics
 
-let reprint_file = ref (None:string option);
-let reprint_verbatims = ref true;
-let reprint_ghost_decls = ref true;
-let reprint_specs = ref true;
-let reprint_ghost_stmts = ref true;
-let reprint_loop_invs = ref true;
-let reprint_blank_lines = ref true;
 let concise_lemmas = ref true;
 let precise_opaque = ref false;
 let fstar = ref false;
@@ -22,70 +15,8 @@ let reprint_decls_rev = ref ([]:decls)
 let disable_verify = ref false
 let omit_unverified = ref false
 
-type print_state =
-  {
-    print_out:System.IO.TextWriter;
-    print_interface:print_state option;
-    cur_loc:loc ref;
-    cur_indent:string ref;
-  }
-  member this.PrintUnbrokenLine (s:string) =
-    let {loc_file = f; loc_line = i} = !this.cur_loc in (this.cur_loc := {loc_file = f; loc_line = i + 1; loc_col = 1; loc_pos = 0});
-    this.print_out.WriteLine (!this.cur_indent + s);
-  member this.PrintLine (s:string) = this.PrintBreakLine true s
-  member this.PrintBreakLine (isFirst:bool) (s:string) =
-    let breakCol = 100 in
-    let s = s.TrimEnd() in
-    let (sBreak1, sBreak2Opt) =
-      if (!this.cur_indent + s).Length > breakCol then
-        let space0 = s.IndexOf(" ") in
-        let quote0 = s.IndexOf("\"") in
-        let width = breakCol - (!this.cur_indent).Length in
-        if space0 >= 0 && (quote0 < 0 || quote0 >= width) then
-          // try to find last space in s[0 .. breakCol-indentsize]
-          // if that fails, find first space in s
-          let s1 = s.Substring(0, width) in
-          let breakAt = if s1.Contains(" ") then s1.LastIndexOf(" ") else s.IndexOf(" ") in
-          let sBreak1 = s.Substring(0, breakAt) in
-          let sBreak2 = s.Substring(breakAt).Trim() in
-          if sBreak1.Contains("//") then (s, None) else // don't break up a "//" comment
-          (sBreak1, Some sBreak2)
-        else if s.Contains("\"") && not (s.Contains("\\\"")) then
-          // put strings on their own line
-          let i1 = s.IndexOf("\"") in
-          let i2 = s.IndexOf("\"", i1 + 1) + 1 in
-          if i2 > 0 && (i2 - i1) < s.Length then
-            if i1 = 0 then
-              let s1 = s.Substring(0, i2) in
-              let s2 = s.Substring(i2).Trim() in
-              (s1, Some s2)
-            else
-              let s1 = s.Substring(0, i1).Trim() in
-              let s2 = s.Substring(i1) in
-              if s1.Contains("//") then (s, None) else
-              (s1, Some s2)
-          else (s, None)
-        else (s, None)
-      else (s, None)
-      in
-    this.PrintUnbrokenLine sBreak1;
-    match (sBreak2Opt, isFirst) with
-    | (None, _) -> ()
-    | (Some s, false) -> this.PrintBreakLine false s
-    | (Some s, true) -> this.Indent (); this.PrintBreakLine false s; this.Unindent ()
-  member this.Indent () = this.cur_indent := "  " + !this.cur_indent
-  member this.Unindent () = this.cur_indent := (!this.cur_indent).Substring(2)
-  member this.SetLoc (({loc_file = f; loc_line = i} as l):loc) =
-    let {loc_file = cf; loc_line = ci} as cl = !this.cur_loc in
-    if l = cl then ()
-    else if f <> cf || i < ci || i > ci + 8 then this.cur_loc := l; this.print_out.WriteLine ("#line " + (string i) + " " + f)
-    else this.PrintLine ""; this.SetLoc l
-
 let require e = Requires (Refined, e)
 let ensure e = Ensures (Refined, e)
-
-let gen_lemma_sym_count = ref 0
-let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count
 
 let get_code_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace ec | _ -> Unchanged) e
 let get_lemma_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace el | _ -> Unchanged) e
@@ -193,7 +124,7 @@ let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
       else e
       in
     match s with
-    | Requires (_, e) -> ([addLabel e], [])
+    | Requires (_, e) -> ([e], [])
     | Ensures (_, e) -> ([], [addLabel e])
     | Modifies _ -> ([], [])
     | SpecRaw _ -> internalErr "SpecRaw"

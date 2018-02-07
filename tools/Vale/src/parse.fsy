@@ -429,10 +429,6 @@ Decl
 /*
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ AnyId SEMI
-    {
-      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $11])::$2})
-    }
 */
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
     {
