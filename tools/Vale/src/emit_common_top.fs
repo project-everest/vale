@@ -52,8 +52,10 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
   try
     match d with
     | DProc p ->
+        let isVerify = List_mem_assoc (Id "verify") p.pattrs in
         let isQuick = List_mem_assoc (Id "quick") p.pattrs in
         if verify then
+          if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
           let build_proc = if !fstar then Emit_common_lemmas.build_proc envBody else Emit_common_refine.build_proc in
           let ds_p = build_proc envr loc p in
           let ds_q = if isQuick then Emit_common_quick_export.build_proc envr loc p else [] in

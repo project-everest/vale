@@ -24,8 +24,11 @@ lemma_BitwiseMul64()
 
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
-let poly1305_heap_blocks  (h:int) (pad:int) (r:int) (s) (k): int
- = poly1305_heap_blocks' h pad r s k
+let poly1305_heap_blocks h pad r s k =
+  if 0 <= k && k <= Seq.length s && k % 2 = 0 then
+    poly1305_heap_blocks' h pad r s k
+  else
+    0
 
 let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s) (k) =
   ()            

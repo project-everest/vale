@@ -44,12 +44,10 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
 	let hh = poly1305_heap_blocks' h pad r s kk in
         modp((hh + pad + nat64_max * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
 
-val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) 
-        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0}) : int
+val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : int
 
-val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64)  
-        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0}) : Lemma
-  (requires True)
+val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : Lemma
+  (requires 0 <= k /\ k <= Seq.length s /\ k % 2 == 0)
   (ensures poly1305_heap_blocks h pad r s k = poly1305_heap_blocks' h pad r s k)
 
 val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 

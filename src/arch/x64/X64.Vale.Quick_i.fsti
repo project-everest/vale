@@ -28,11 +28,12 @@ noeq type quickCodes (a:Type0) : codes -> Type =
 | QSeq: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
 | QBind: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string -> quickCode b c -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a (c::cs)
 | QGetState: #cs:codes -> (state -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
-| QLemma: #cs:codes -> r:range -> msg:string -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
+| QPURE: #cs:codes -> r:range -> msg:string -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
+| QLemma: #cs:codes -> r:range -> msg:string -> pre:Type0 -> post:Type0 -> (unit -> Lemma (requires pre) (ensures post)) -> quickCodes a cs -> quickCodes a cs
 
 [@va_qattr]
-let qLemma (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) (r:range) (msg:string) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
-  QLemma r msg pre l qcs
+let qPURE (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) (r:range) (msg:string) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
+  QPURE r msg pre l qcs
 
 [@va_qattr]
 let wp_proc (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> a -> Type0) : Type0 =
@@ -60,7 +61,7 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
   | QGetState f ->
       let c::cs = cs in
       wp cs (f s0) k s0
-  | QLemma r msg pre l qcs ->
+  | QPURE r msg pre l qcs ->
       // REVIEW: rather than just applying 'pre' directly to k,
       // we define this in a roundabout way so that:
       // - it works even if 'pre' isn't known to be monotonic
@@ -69,6 +70,8 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
         (forall (u:unit).{:pattern (guard_free (p u))} False <==> (wp cs qcs k s0) /\ ~(p ()))
         ==>
         label r msg (pre p))
+  | QLemma r msg pre post l qcs ->
+      label r msg pre /\ (post ==> wp cs qcs k s0)
 // Hoist lambdas out of main definition to avoid issues with function equality 
 and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b -> Type0) :
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
@@ -198,11 +201,29 @@ val qIf_proof (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:
 let qIf (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) : quickCode a (IfElse (cmp_to_ocmp b) c1 c2) =
   QProc (IfElse (cmp_to_ocmp b) c1 c2) (wp_If b qc1 qc2) (qIf_monotone b qc1 qc2) (qIf_compute b qc1 qc2) (qIf_proof b qc1 qc2)
 
-///// AssertBy
+///// Assert, Assume, AssertBy
 
-val qAssertBy (#a:Type) (p:Type0) (qcs:quickCodes a []) (s0:state) : Lemma
-  (requires wp [] qcs (fun _ _ -> p) s0)
-  (ensures p)
+let tAssertLemma (p:Type0) = unit -> Lemma (requires p) (ensures p)
+val qAssertLemma (p:Type0) : tAssertLemma p
+
+[@va_qattr]
+let qAssert (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
+  QLemma r msg e e (qAssertLemma e) qcs
+
+let tAssumeLemma (p:Type0) = unit -> Lemma (requires True) (ensures p)
+val qAssumeLemma (p:Type0) : tAssumeLemma p
+
+[@va_qattr]
+let qAssume (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
+  QLemma r msg True e (qAssumeLemma e) qcs
+
+let tAssertByLemma (#a:Type) (p:Type0) (qcs:quickCodes a []) (s0:state) =
+  unit -> Lemma (requires wp [] qcs (fun _ _ -> p) s0) (ensures p)
+val qAssertByLemma (#a:Type) (p:Type0) (qcs:quickCodes a []) (s0:state) : tAssertByLemma p qcs s0
+
+[@va_qattr]
+let qAssertBy (#a:Type) (#cs:codes) (r:range) (msg:string) (p:Type0) (qcsBy:quickCodes unit []) (s0:state) (qcsTail:quickCodes a cs) : quickCodes a cs =
+  QLemma r msg (wp [] qcsBy (fun _ _ -> p) s0) p (qAssertByLemma p qcsBy s0) qcsTail
 
 ///// Code
 
@@ -327,5 +348,3 @@ val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:stat
 val wp_run_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (update:state -> state -> state) (post:state -> state -> Type0) :
   GHOST (state * fuel * a) (wp_GHOST (Block cs) s0 update (fun k -> normal (wp_wrap cs qcs update post k s0)))
 
-let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
-let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p

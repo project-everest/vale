@@ -52,9 +52,9 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     let es = List.map qlemma_exp es in
     let eApp = EApply (x, es) in
     let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
-    (true, EApply (Id "qLemma", [range; msg; fApp; eTail]))
+    (true, EApply (Id "qPURE", [range; msg; fApp; eTail]))
     // TODO: return values from lemmas
-//    (true, EApply (Id "qLemma", [fApp; eTail]))
+//    (true, EApply (Id "qPURE", [fApp; eTail]))
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with
@@ -101,11 +101,11 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let outs = List.map fst xs in
       build_qcode_stmt env outs loc s (needsState, eTailLet)
   | SAssume e ->
-      let sAssign = SAssign ([], EApply (Reserved "assume", [e])) in
-      build_qcode_stmt env outs loc sAssign (needsState, eTail)
+      let e = qlemma_exp e in
+      (true, EApply (Id "qAssume", [range; msg; e; eTail]))
   | SAssert (_, e) ->
-      let sAssign = SAssign ([], EApply (Reserved "assert", [e])) in
-      build_qcode_stmt env outs loc sAssign (needsState, eTail)
+      let e = qlemma_exp e in
+      (true, EApply (Id "qAssert", [range; msg; e; eTail]))
   | SIfElse (((SmInline | SmPlain) as sm), eb, ss1, ss2) ->
       let eb_alt () =
         // HACK
@@ -133,11 +133,8 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
       let s = Reserved "s" in
-      let eApp = EApply (Id "qAssertBy", [ep; eQcs; EVar s]) in
-      let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
-      let eLemma = EApply (Id "qLemma", [range; msg; fApp; eTail]) in
-//      let eLemma = EApply (Id "qLemma", [fApp; eTail]) in
-      (true, eLemma)
+      let eAssertBy = EApply (Id "qAssertBy", [range; msg; ep; eQcs; EVar s; eTail]) in
+      (true, eAssertBy)
   | _ -> err ()
 and build_qcode_stmts (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
   let outTuple = EApply (Id "tuple", List.map EVar outs) in

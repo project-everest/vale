@@ -29,7 +29,9 @@ let rec wp_monotone #a cs qcs k1 k2 s0 =
   | QGetState f ->
       let c::cs = cs in
       wp_monotone cs (f s0) k1 k2 s0
-  | QLemma _ _ pre l qcs' ->
+  | QPURE _ _ pre l qcs' ->
+      wp_monotone cs qcs' k1 k2 s0
+  | QLemma _ _ pre post l qcs' ->
       wp_monotone cs qcs' k1 k2 s0
 
 let call_QLemma (#a:Type0) (#cs:codes) (r:range) (msg:string) (pre:((unit -> GTot Type0) -> GTot Type0)) (l:unit -> PURE unit pre) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
@@ -69,9 +71,12 @@ let rec wp_compute #a cs qcs s0 =
       let (sN, fN, gN) = wp_compute cs (f sM) sM in
       let fN' = va_compute_merge_total fM fN in
       (sN, fN', gN)
-  | QLemma r msg pre l qcs' ->
+  | QPURE r msg pre l qcs' ->
       assert (wp cs qcs k_true s0);
       call_QLemma r msg pre l qcs' k_true s0;
+      wp_compute cs qcs' s0
+  | QLemma _ _ pre post l qcs' ->
+      l ();
       wp_compute cs qcs' s0
 
 let rec wp_sound #a cs qcs k s0 =
@@ -110,10 +115,15 @@ let rec wp_sound #a cs qcs k s0 =
       let (sN, fN, gN) = wp_compute cs (f sM) sM in
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       ()
-  | QLemma r msg pre l qcs' ->
+  | QPURE r msg pre l qcs' ->
       wp_monotone cs qcs k k_true s0;
       call_QLemma r msg pre l qcs' k_true s0;
       call_QLemma r msg pre l qcs' k s0;
+      wp_sound cs qcs' k s0;
+      ()
+  | QLemma _ _ pre post l qcs' ->
+      wp_monotone cs qcs k k_true s0;
+      l ();
       wp_sound cs qcs' k s0;
       ()
 
@@ -180,8 +190,11 @@ let qIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
     va_lemma_ifElseFalse_total (cmp_to_ocmp b) c1 c2 s0 f0 sM
   )
 
-let qAssertBy #a p qcs s0 =
-  wp_sound [] qcs (fun _ _ -> p) s0
+let qAssertLemma p = fun () -> ()
+let qAssumeLemma p = fun () -> assume p
+
+let qAssertByLemma #a p qcs s0 =
+  fun () -> wp_sound [] qcs (fun _ _ -> p) s0
 
 let wp_sound_code #a c qc k s0 =
   let QProc c wp monotone compute proof = qc in
