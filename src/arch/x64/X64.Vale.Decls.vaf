@@ -92,29 +92,15 @@ unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
   | OReg r -> OMem (MReg r offset)
   | _ -> OConst 42
 
-[@va_qattr]
-unfold let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base})//:operand{valid_operand base s}) 
-                            (offset:int) // Need this if we want to handle OConst as base values: { 0 <= (eval_operand base s) + offset && (eval_operand base s) + offset < nat64_max }) 
-                            (b:buffer64) 
-                            (index:int{valid_src_addr s.mem b index /\ 
-                                       (eval_operand base s) + offset == buffer_addr(b) + 8 `op_Multiply` index}) 
-                            : (o:operand{valid_operand o s}) =
-  lemma_valid_mem64 b index s.mem;
-  va_opr_code_Mem base offset
-(*
-function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
-    requires x86_ValidState(s)
-    requires base.OReg?
-    requires ValidMemAddr(MReg(base.r, offset))
-    requires ValidSrcAddr(s.heaplets, id, va_get_reg64(base.r, s) + offset, 64, taint)
-    ensures  Valid64BitSourceOperand(to_state(s), OHeap(MReg(base.r, offset), taint))
-    ensures  eval_op64(to_state(s), OHeap(MReg(base.r, offset), taint)) == s.heaplets[id].mem64[va_get_reg64(base.r, s) + offset].v
-{
-    reveal_x86_ValidState();
-    va_opr_code_Mem(base, offset, taint)
-}
-*)
-
+let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buffer64) (index:int) : Lemma
+  (requires
+    valid_src_addr s.mem b index /\
+    eval_operand base s + offset == buffer_addr b + 8 `op_Multiply` index
+  )
+  (ensures valid_operand (va_opr_code_Mem base offset) s)
+  =
+  lemma_valid_mem64 b index s.mem
+  
 
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : nat64 = eval_operand o s

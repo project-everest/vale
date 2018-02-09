@@ -12,6 +12,7 @@ open Ast_util
 open Parse
 open Microsoft.FSharp.Math
 
+let fstar = ref false;
 let assumeUpdates = ref 0
 
 type id_local = {local_in_param:bool; local_exp:exp; local_typ:typ option} // In parameters are read-only and refer to old(state)
@@ -573,7 +574,10 @@ let check_mods (env:env) (p:proc_decl):unit =
     in
   if env.checkMods then List.iter check_spec p.pspecs
 
-let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env) (e:exp):exp =
+type rewrite_context = { extra_lemma_calls:stmt list ref }
+type rewrite_ctx = rewrite_context option
+
+let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) (io:inout) (env:env) (e:exp):exp =
   let rec fe (env:env) (e:exp):exp map_modify =
     let codeLemma e = e
 //      match asOperand with
@@ -586,6 +590,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
       | None -> ec
       | Some xo -> codeLemma (EOp (RefineOp, [ec; ec; vaApp ("const_" + xo) [e]]))
       in
+    let locs = locs_of_exp e in
     match (g, skip_loc e) with
     | (_, EVar x) when Map.containsKey x env.ids ->
       (
@@ -631,8 +636,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           in
         f x (Map.find x env.ids)
       )
-    | (NotGhost, ELoc _) -> Unchanged
-    | (NotGhost, EOp (Uop UConst, [ec])) -> Replace (constOp (rewrite_vars_exp env ec))
+    | (NotGhost, EOp (Uop UConst, [ec])) -> Replace (constOp (rewrite_vars_exp rctx env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
     | (NotGhost, EApply (xa, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
       (
@@ -659,12 +663,23 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
           | InOut -> let _ = get_p Out in get_p In
           | Out -> get_p Out
           in
-        let (lhss, es) = rewrite_vars_args env p [] args in
+        let (lhss, es) = rewrite_vars_args rctx env p [] args in
         let ecs = List.collect (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> [] | _ -> [e]) es in
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> e | _ -> e) es in
         let xa_fc = Reserved ("opr_code_" + (string_of_id xa)) in
         let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
-        Replace (EOp (CodeLemmaOp, [EApply (xa_fc, ecs); EApply (xa_fl, env.state::es)]))
+        let eCode = EApply (xa_fc, ecs) in
+        let eLemma = EApply (xa_fl, env.state::es) in
+        if !fstar then
+          let sLemma = SAssign ([], eLemma) in
+          let sLemma = match locs with [] -> sLemma | loc::_ -> SLoc (loc, sLemma) in
+          match rctx with
+          | None -> err "complex operand not supported here"
+          | Some { extra_lemma_calls = calls } ->
+              calls := sLemma::!calls;
+              Replace (EOp (CodeLemmaOp, [eCode; eCode]))
+        else
+          Replace (EOp (CodeLemmaOp, [eCode; eLemma]))
       )
 (*
     | (NotGhost, EOp (Subscript, [ea; ei])) ->
@@ -676,8 +691,8 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
         match (skip_loc ea, skip_loc ei) with
         | (EVar xa, EOp (Bop BAdd, [eb; eo])) ->
             let ta = match Map.tryFind xa env.ids with Some (GhostLocal (Some (TName (Id ta)))) -> ta | _ -> err ("memory operand " + (err_id xa) + " must be a local ghost variable declared with a simple, named type") in
-            let eb = rewrite_vars_arg NotGhost None In env eb in
-            let eo = rewrite_vars_arg NotGhost None In env eo in
+            let eb = rewrite_vars_arg rctx NotGhost None In env eb in
+            let eo = rewrite_vars_arg rctx NotGhost None In env eo in
             let eCode = vaApp ("mem_code_" + ta) [eb; eo] in
             let eLemma = vaApp ("mem_lemma_" + ta) [ea; eb; eo] in
             Replace (EOp (CodeLemmaOp, [eCode; eLemma]))
@@ -687,7 +702,7 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
     | (NotGhost, _) ->
         err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)'; if the expression is intended as a non-const operand, try declaring operand procedures)"
         // Replace (codeLemma e)
-    | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg NotGhost None io env e)
+    | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg rctx NotGhost None io env e)
 // TODO: this is a real error message, it should be uncommented
 //    | (_, EApply (x, _)) when Map.containsKey x env.procs ->
 //        err ("cannot call a procedure from inside an expression or variable declaration")
@@ -696,26 +711,26 @@ let rec rewrite_vars_arg (g:ghost) (asOperand:string option) (io:inout) (env:env
   try
     env_map_exp_state fe env e
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
-and rewrite_vars_exp (env:env) (e:exp):exp =
-  rewrite_vars_arg Ghost None In env e
-and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
+and rewrite_vars_exp (rctx:rewrite_ctx) (env:env) (e:exp):exp =
+  rewrite_vars_arg rctx Ghost None In env e
+and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(lhs list * exp list) =
   let (mrets, margs) = match_proc_args p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
-    | (x, t, XOperand, io, _) -> [rewrite_vars_arg NotGhost (Some (vaTyp t)) io env ea]
-    | (x, t, XInline, io, _) -> [(rewrite_vars_arg Ghost None io env ea)]
+    | (x, t, XOperand, io, _) -> [rewrite_vars_arg rctx NotGhost (Some (vaTyp t)) io env ea]
+    | (x, t, XInline, io, _) -> [(rewrite_vars_arg rctx Ghost None io env ea)]
     | (x, t, XAlias _, io, _) ->
-        let _ = rewrite_vars_arg NotGhost None io env ea in // check argument validity
+        let _ = rewrite_vars_arg rctx NotGhost None io env ea in // check argument validity
         [] // drop argument
-    | (x, t, XGhost, In, []) -> [EOp (Uop UGhostOnly, [rewrite_vars_exp env ea])]
+    | (x, t, XGhost, In, []) -> [EOp (Uop UGhostOnly, [rewrite_vars_exp rctx env ea])]
     | (x, t, XGhost, _, []) -> err ("out/inout ghost parameters are not supported")
     | (x, _, _, _, _) -> err ("unexpected argument for parameter " + (err_id x) + " in call to " + (err_id p.pname))
     in
   let rewrite_ret (pp, ((xlhs, _) as lhs)) =
     match pp with
-    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg NotGhost (Some (vaOperandTyp t)) Out env (EVar xlhs)])
+    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg rctx NotGhost (Some (vaOperandTyp t)) Out env (EVar xlhs)])
     | (x, t, XAlias _, _, _) ->
-        let _ = rewrite_vars_arg NotGhost None Out env (EVar xlhs) in // check argument validity
+        let _ = rewrite_vars_arg rctx NotGhost None Out env (EVar xlhs) in // check argument validity
         ([], []) // drop argument
     | (x, t, XGhost, _, []) -> ([lhs], [])
     | (x, _, _, _, _) -> err ("unexpected variable for return value " + (err_id x) + " in call to " + (err_id p.pname))
@@ -733,7 +748,7 @@ and rewrite_vars_args (env:env) (p:proc_decl) (rets:lhs list) (args:exp list):(l
 // into
 //   va_cmp_f(var_ecx(), va_const_operand(10), ...)
 let rewrite_cond_exp (env:env) (e:exp):exp =
-  let r = rewrite_vars_arg NotGhost (Some "cmp") In env in
+  let r = rewrite_vars_arg None NotGhost (Some "cmp") In env in
   match skip_loc e with
   | (EApply (Id xf, es)) -> vaApp ("cmp_" + xf) (List.map r es)
   | (EOp (op, es)) ->
@@ -749,21 +764,21 @@ let rewrite_cond_exp (env:env) (e:exp):exp =
     )
   | _ -> err ("conditional expression must be a comparison operation or function call")
 
-let rec rewrite_vars_assign (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
+let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp):(lhs list * exp) =
   match (lhss, e) with
   | (_, ELoc (loc, e)) ->
-      try let (lhss, e) = rewrite_vars_assign env lhss e in (lhss, ELoc (loc, e))
+      try let (lhss, e) = rewrite_vars_assign rctx env lhss e in (lhss, ELoc (loc, e))
       with err -> raise (LocErr (loc, err))
   | (_, EApply(x, es)) ->
     (
       match Map.tryFind x env.procs with
-      | None -> (lhss, rewrite_vars_exp env e)
+      | None -> (lhss, rewrite_vars_exp rctx env e)
       | Some p ->
           check_mods env p;
-          let (lhss, args) = rewrite_vars_args env p lhss es in
+          let (lhss, args) = rewrite_vars_args rctx env p lhss es in
           (lhss, EApply(x, args))
     )
-  | _ -> (lhss, rewrite_vars_exp env e)
+  | _ -> (lhss, rewrite_vars_exp rctx env e)
 
 let check_lhs (env:env) (x:id, dOpt):unit =
   match (x, dOpt) with
@@ -783,20 +798,21 @@ let rewrite_vars_stmt (env:env) (s:stmt):(env * stmt list) =
     | SAssign (lhss, e) ->
         List.iter (check_lhs env) lhss;
         let lhss = List.map (fun xd -> match xd with (Reserved "this", None) -> (Reserved "s", None) | _ -> xd) lhss in
-        let (lhss, e) = rewrite_vars_assign env lhss e in
-        Replace (env, [SAssign (lhss, e)])
+        let rctx = { extra_lemma_calls = ref [] } in
+        let (lhss, e) = rewrite_vars_assign (Some rctx) env lhss e in
+        Replace (env, (List.rev !rctx.extra_lemma_calls) @ [SAssign (lhss, e)])
     | SIfElse (SmPlain, e, b1, b2) ->
-        let b1 = env_map_stmts rewrite_vars_exp fs env b1 in
-        let b2 = env_map_stmts rewrite_vars_exp fs env b2 in
+        let b1 = env_map_stmts (rewrite_vars_exp None) fs env b1 in
+        let b2 = env_map_stmts (rewrite_vars_exp None) fs env b2 in
         Replace (env, [SIfElse (SmPlain, rewrite_cond_exp env e, b1, b2)])
     | SWhile (e, invs, ed, b) ->
-        let invs = List_mapSnd (rewrite_vars_exp env) invs in
-        let ed = mapSnd (List.map (rewrite_vars_exp env)) ed in
-        let b = env_map_stmts rewrite_vars_exp fs env b in
+        let invs = List_mapSnd (rewrite_vars_exp None env) invs in
+        let ed = mapSnd (List.map (rewrite_vars_exp None env)) ed in
+        let b = env_map_stmts (rewrite_vars_exp None) fs env b in
         Replace (env, [SWhile (rewrite_cond_exp env e, invs, ed, b)])
     | _ -> Unchanged
     in
-  env_map_stmt rewrite_vars_exp fs env s
+  env_map_stmt (rewrite_vars_exp None) fs env s
 let rewrite_vars_stmts (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip rewrite_vars_stmt env ss))
 
@@ -853,9 +869,9 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
   
 let rewrite_vars_spec (envIn:env) (envOut:env) (s:spec):spec =
   match s with
-  | Requires (r, e) -> Requires (r, rewrite_vars_exp envIn e)
-  | Ensures (r, e) -> Ensures (r, rewrite_vars_exp envOut e)
-  | Modifies (m, e) -> Modifies (m, rewrite_vars_exp envOut e)
+  | Requires (r, e) -> Requires (r, rewrite_vars_exp None envIn e)
+  | Ensures (r, e) -> Ensures (r, rewrite_vars_exp None envOut e)
+  | Modifies (m, e) -> Modifies (m, rewrite_vars_exp None envOut e)
   | SpecRaw _ -> internalErr "rewrite_vars_spec"
 
 ///////////////////////////////////////////////////////////////////////////////

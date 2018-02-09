@@ -179,3 +179,31 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
 val lemma_add_mod128 (x y :int) : Lemma
   (requires True)
   (ensures mod2_128 ((mod2_128 x) + y) == mod2_128 (x + y))
+
+type t_seqTo128 = int -> nat128
+let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
+  let f (i:int) : nat128 =
+    let open FStar.Mul in
+    if 0 <= i && i < Seq.length s / 2 then
+      (Seq.index s (2 * i)) + 0x10000000000000000 * (Seq.index s (2 * i + 1))
+    else
+      42
+  in f
+
+let modp_0 () : Lemma
+  (requires True)
+  (ensures modp 0 == 0)
+    =
+    reveal_opaque modp';
+    ()
+let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
+
+let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
+  (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
+  (ensures
+    ((n + n) % 2) == 0 /\ // REVIEW
+    poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
+    poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
+  =
+  assume False
+

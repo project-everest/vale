@@ -10,7 +10,6 @@ open System.Numerics
 
 let concise_lemmas = ref true;
 let precise_opaque = ref false;
-let fstar = ref false;
 let reprint_decls_rev = ref ([]:decls)
 let disable_verify = ref false
 let omit_unverified = ref false
