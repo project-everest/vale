@@ -34,8 +34,8 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BEquiv -> (10, 11, 11)
   | BImply -> (12, 13, 13)
   | BExply -> notImplemented "<=="
-  | BOr -> (16, 16, 17)
-  | BAnd -> (18, 18, 19)
+  | BOr | BLor -> (16, 16, 17)
+  | BAnd | BLand -> (18, 18, 19)
   | BLe | BGe | BLt | BGt | BEq | BNe -> (20, 20, 21)
   | BAdd -> (30, 30, 31)
   | BSub -> (30, 30, 31)
@@ -47,8 +47,10 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> notImplemented "<=="
-  | BOr -> "\\/"
-  | BAnd -> "/\\"
+  | BOr -> "||"
+  | BLor -> "\\/"
+  | BAnd -> "&&"
+  | BLand -> "/\\"
   | BEq -> "=="
   | BNe -> "=!="
   | BLt -> "<"
@@ -104,9 +106,9 @@ let rec string_of_exp_prec prec e =
           in
         match (op, skip_loc e1) with
         | (op, EOp (Bop op1, [e11; e12])) when isChainOp op && isChainOp op1 ->
-            // Convert (a <= b) < c into (a <= b) && (b < c)
+            // Convert (a <= b) < c into (a <= b) /\ (b < c)
             let e2 = EOp (Bop op, [e12; e2]) in
-            (r prec (EOp (Bop BAnd, [e1; e2])), 0)
+            (r prec (EOp (Bop BLand, [e1; e2])), 0)
         | _ ->
             let (pe, p1, p2) = prec_of_bop op in
             ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
@@ -164,6 +166,11 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
+let string_of_decrease (xs:formal list) n =
+  match xs with
+  | [] -> ""
+  | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map (fun (x, t) -> string_of_formal (x, None)) xs)) n
+  
 let string_of_outs_exp (outs:(bool * formal list) option):string =
   match outs with
   | None -> "()"
@@ -361,41 +368,47 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isAdmit = attrs_get_bool (Id "admit") false f.fattrs in
   let isPublicDecl = isPublicDecl || (isOpaque && isAdmit) in
   let isOpaque = isOpaque && not isAdmit in
+  let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   emit_laxness ps f.fattrs;
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
-  let sVal x = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) in
-  let printBody hasDecl x e =
+  let sVal x decreases = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) + decreases in
+  let printBody header hasDecl x e =
     (if isOpaqueToSmt || isQAttr then ps.PrintLine ("[@" + (if isOpaqueToSmt then " \"opaque_to_smt\"" else "") + (if isQAttr then " va_qattr" else "") + "]"));
     let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
-    ps.PrintLine ("let " + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
+    ps.PrintLine (header + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();
     ps.PrintLine (if isAdmit then "admit ()" else string_of_exp e);
     ps.Unindent ()
     in
+  let header = if isRecursive then "let rec " else "let " in
+  // add custom metrics to convince F* that mutually recursive functions terminate
+  let decreases0 = if isRecursive then string_of_decrease f.fargs 0 else "" in
+  let decreases1 = if isRecursive then string_of_decrease f.fargs 1 else "" in
   if isOpaque then
-    ps.PrintLine (sVal (sid (transparent_id f.fname)));
+    ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
+    psi.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody true (sid (transparent_id f.fname)) e
+      | Some e -> printBody header true (sid (transparent_id f.fname)) e
     );
-    psi.PrintLine (sVal (sid f.fname));
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
-    printBody true (sid f.fname) eOpaque
+    let header = if isRecursive then "and " else "let " in
+    printBody header true (sid f.fname) eOpaque
   else if isPublicDecl then
-    psi.PrintLine (sVal (sid f.fname));
+    psi.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody true (sid f.fname) e
+      | Some e -> printBody header true (sid f.fname) e
     )
   else
   (
     match f.fbody with
     | None -> ()
-    | Some e -> printBody false (sid f.fname) e
+    | Some e -> printBody header false (sid f.fname) e
   )
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
@@ -406,6 +419,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
+  let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let isAdmit = attrs_get_bool (Id "admit") false p.pattrs in
   let isDependent = attrs_get_bool (Id "dependent") false p.pattrs in
   let isReducible = attrs_get_bool (Id "reducible") false p.pattrs in
@@ -414,28 +428,31 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   emit_laxness ps p.pattrs;
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
-  let printPType (ps:print_state) s =
+  let printPType (ps:print_state) s decreases =
     ps.Indent ();
     let st = String.concat (if isDependent then " & " else " * ") (List.map string_of_pformal p.prets) in
-    ps.PrintLine (s + (match p.prets with [] -> "Lemma" | _ -> "Ghost (" + st + ")"));
+    ps.PrintLine (s + (match p.prets with [] -> "Lemma" | _ -> "Ghost (" + st + ")" + decreases));
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
     let sDep = if isDependent then "|" else "" in
     ps.PrintLine ("(ensures (" + (match p.prets with [] -> "" | _ -> "fun (" + sDep + sprets + sDep + ") -> ") + (string_of_exp es) + "))");
     ps.Unindent ();
     in
+  // add custom metrics to convince F* that mutually recursive functions terminate
+  let decreases0 = if isRecursive then string_of_decrease args 0 else "" in
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
     | (_, _) ->
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
-        printPType psi "-> "
+        printPType psi "-> " decreases0
   );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
         (if not isReducible then ps.PrintLine "[@\"opaque_to_smt\"]");
-        ps.PrintLine ("let " + (sid p.pname) + " " + formals + " =")
+        let header = if isRecursive then "let rec " else "let " in
+        ps.PrintLine (header + (sid p.pname) + " " + formals + " =")
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
@@ -450,7 +467,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
           | None -> ()
           | Some e ->
               ps.PrintLine ") <: ("
-              printPType ps "";
+              printPType ps "" "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
         )
   )

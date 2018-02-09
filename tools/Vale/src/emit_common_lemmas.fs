@@ -433,9 +433,9 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
         else Some (build_code_block env benv stmts);
       fattrs =
         if benv.is_quick then
-          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attr_no_verify "admit" benv.proc.pattrs
+          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ p.pattrs @ attr_no_verify "admit" benv.proc.pattrs
         else
-          [(Id "opaque", [])] @ attr_no_verify "admit" benv.proc.pattrs;
+          [(Id "opaque", [])] @ p.pattrs @ attr_no_verify "admit" benv.proc.pattrs;
     }
     in
   List.map (fun f -> (loc, DFun f)) (List.rev (f::!(benv.quick_code_funs)))

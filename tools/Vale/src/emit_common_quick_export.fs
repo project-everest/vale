@@ -155,7 +155,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let ensContinue = EOp (Bop BImply, [wpEns; continueM]) in
   let letEnsContinue = EBind (BindLet, [updatesX], [(sM, None)], [], ensContinue) in
   let wpForall = EBind (Forall, [], wpFormals @ ghostRetFormals, [], letEnsContinue) in
-  let wpBody = EOp (Bop BAnd, [wpReq; wpForall]) in
+  let wpBody = EOp (Bop BLand, [wpReq; wpForall]) in
   let fWp =
     {
       fname = wp_X;

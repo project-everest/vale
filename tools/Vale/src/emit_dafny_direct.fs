@@ -37,8 +37,8 @@ let bop2opcode (op:bop):BinaryExpr.Opcode =
   | BEquiv -> BinaryExpr.Opcode.Iff
   | BImply -> BinaryExpr.Opcode.Imp
   | BExply -> BinaryExpr.Opcode.Exp
-  | BAnd -> BinaryExpr.Opcode.And
-  | BOr -> BinaryExpr.Opcode.Or
+  | BAnd | BLand -> BinaryExpr.Opcode.And
+  | BOr | BLor -> BinaryExpr.Opcode.Or
   | BEq -> BinaryExpr.Opcode.Eq
   | BNe -> BinaryExpr.Opcode.Neq
   | BLt -> BinaryExpr.Opcode.Lt
