@@ -1159,11 +1159,11 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let spec_enter_body = inv_to_spec ins (RRequires Unrefined) (loc, eCond) in
         // ed << old(ed)
         // precedes(ed, old(ed))
-        let lexList (es:exp list) = List.foldBack (fun e ls -> EApply (Id "LexCons", [e; ls])) es (EVar (Id "LexTop")) in
+        let lexList (es:exp list) = List.foldBack (fun e ls -> EApply (Id "lexCons", [e; ls])) es (EVar (Id "LexTop")) in
         let (lEd, eds) = ed in
         let edIn = EOp (Uop UOld, [subst_ins ins (lexList eds)]) in
         let edOut = subst_ins in_reads (lexList eds) in
-        let precedes = EApply (Id "precedes", [edOut; edIn]) in
+        let precedes = EApply (Id "precedes_wrap", [edOut; edIn]) in
         let spec_precedes = inv_to_spec [] (REnsures Unrefined) (lEd, precedes) in
         let sInitIn (x:id) = SVar (x, Some (getType x), Mutable, XGhost, [], Some (EVar (in_id x))) in
         let sInitOut (x:id) = SAssign ([(x, None)], (EVar (in_id x))) in

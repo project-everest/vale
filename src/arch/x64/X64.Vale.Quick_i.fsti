@@ -20,6 +20,15 @@ let label (r:range) (msg:string) (p:Type0) : Pure Type (requires True) (ensures 
   assert_norm (labeled_wrap r msg p <==> p);
   labeled_wrap r msg p
 
+val lemma_label_bool (r:range) (msg:string) (b:bool) : Lemma
+  (requires label r msg b)
+  (ensures b)
+  [SMTPat (label r msg b)]
+
+// wrap "precedes" and LexCons to avoid issues with label (precedes ...)
+let precedes_wrap (a:lex_t) (b:lex_t) = precedes a b
+let lexCons (#a:Type) (h:a) (t:lex_t) : lex_t = LexCons h t
+
 [@va_qattr]
 let if_code (b:bool) (c1:code) (c2:code) : code = if b then c1 else c2
 

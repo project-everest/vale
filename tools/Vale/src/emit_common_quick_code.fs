@@ -240,7 +240,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
     in
   [(loc, DFun fCodes)]
 
-let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp) (extraEquivs:exp list):stmt list =
+let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt list =
   let makeArg (x, t, storage, io, attrs) = EVar x
   let args = List.map makeArg p.pargs in
   // let (sM, fM, g) = wpSound_X code (qCodes_X ARGS) s0 (fun s0 sM gs -> let (g1, ..., gn) = g in ENS) in
@@ -264,5 +264,4 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp) (extr
     | [] -> []
     | _ -> [SAssign (gAssigns, EVar g)]
     in
-  let sExtraAsserts = List.map (fun e -> SAssert (assert_attrs_default, e)) extraEquivs in // REVIEW: why is this needed?
-  [sWpSound] @ sAssignGs @ sExtraAsserts
+  [sWpSound] @ sAssignGs

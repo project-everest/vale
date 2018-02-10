@@ -529,11 +529,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let eFrameX = vaApp "state_match" [EVar sM; eFrameExp] in
       let eFrameL = EApply (Id "label", [range; msg; eFrameX]) in
       let (_, enssL) = collect_specs true (List.concat pspecs) in
-      let (_, enssX) = collect_specs false (List.concat pspecs) in
       let enssL = enssL @ [eFrameL] in
-      let enssX = enssX @ [eFrameX] in
-      let extraEquivs = List.map2 (fun e1 e2 -> EOp (Bop BEquiv, [e1; e2])) enssX enssL in
-      Emit_common_quick_code.build_proc_body env loc p (EApply (codeName, fArgs)) (and_of_list enssL) extraEquivs
+      Emit_common_quick_code.build_proc_body env loc p (EApply (codeName, fArgs)) (and_of_list enssL)
     else if benv.is_operand then
       err "operand procedures must be declared extern"
     else

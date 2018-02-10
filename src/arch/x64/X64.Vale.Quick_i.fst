@@ -2,6 +2,12 @@ module X64.Vale.Quick_i
 
 #reset-options "--initial_ifuel 1 --z3rlimit 1000"
 
+let lemma_label_Type0 (r:range) (msg:string) (p:Type0) : Lemma
+  (requires True) (ensures label r msg p ==> p)
+  = ()
+
+let lemma_label_bool r msg b = lemma_label_Type0 r msg b
+
 let rec wp_monotone #a cs qcs k1 k2 s0 =
   match qcs with
   | QEmpty g -> ()
