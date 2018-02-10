@@ -109,7 +109,7 @@ let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buf
 [@va_qattr] unfold let va_eval_shift_amt64  (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
 [@va_qattr] unfold let va_eval_cmp_uint64   (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
 [@va_qattr] unfold let va_eval_reg64        (s:va_state) (r:va_register)    : nat64 = eval_reg r s
-[@va_qattr] unfold let va_eval_reg_opr64    (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
+[@va_qattr] unfold let va_eval_reg_opr64    (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
 
 (* Predicates *)
 [@va_qattr] unfold let va_is_src_opr64 (o:operand) (s:va_state) = valid_operand o s

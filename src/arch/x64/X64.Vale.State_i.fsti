@@ -33,8 +33,10 @@ let reg_to_int (r:reg) : int =
 
 [@va_qattr]
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
+[@va_qattr]
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
+[@va_qattr]
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
     match m with
@@ -67,6 +69,7 @@ let update_operand (o:operand) (v:nat64) (sM:state) : state =
   | OReg r -> update_reg r v sM
   | OMem m -> update_mem (eval_maddr m sM) v sM
 
+[@va_qattr]
 let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.mem
 
 [@va_qattr]
