@@ -669,8 +669,13 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         let xa_fc = Reserved ("opr_code_" + (string_of_id xa)) in
         let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
         let eCode = EApply (xa_fc, ecs) in
-        let eLemma = EApply (xa_fl, env.state::es) in
         if !fstar then
+          let ofStateOp (e:exp):exp =
+            match e with
+            | EOp (StateOp (x, prefix, t), es) -> vaApp ("op_" + prefix) es
+            | _ -> e
+            in
+          let eLemma = EApply (xa_fl, env.state::(List.map ofStateOp es)) in
           let sLemma = SAssign ([], eLemma) in
           let sLemma = match locs with [] -> sLemma | loc::_ -> SLoc (loc, sLemma) in
           match rctx with
@@ -679,6 +684,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
               calls := sLemma::!calls;
               Replace (EOp (CodeLemmaOp, [eCode; eCode]))
         else
+          let eLemma = EApply (xa_fl, env.state::es) in
           Replace (EOp (CodeLemmaOp, [eCode; eLemma]))
       )
 (*
