@@ -279,7 +279,7 @@ if 'KREMLIN_HOME' in os.environ:
   kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
-env['VALE_INCLUDE'] = File('src/lib/util/operator.vaf')
+env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
@@ -409,7 +409,7 @@ def add_vale_builders(env):
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
                             emitter = vale_tool_dependency_Emitter)
-  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText -include $VALE_INCLUDE -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_SCONS_ARGS $VALE_USER_ARGS",
+  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText $VALE_INCLUDE -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_SCONS_ARGS $VALE_USER_ARGS",
                             src_suffix = '.vaf',
                             emitter = vale_tool_dependency_Emitter)
   env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})
@@ -745,10 +745,13 @@ def add_extract_code(env):
   env.AddMethod(build_test, "BuildTest")
 
 # Helper class used by the src/SConscript file, to specify per-file
-# Dafny command-line options for verification.  
+# command-line options for verification.
 class BuildOptions:
-  def __init__(self, args):
+  # First argument is mandatory (verification options); all others are optional named arguments
+  def __init__(self, args, valeIncludes = None):
     self.env = env.Clone(VERIFIER_FLAGS=args)
+    if valeIncludes != None:
+      self.env = self.env.Clone(VALE_INCLUDE=valeIncludes)
 
 # Verify a set of Dafny files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -787,7 +790,7 @@ def verify_vale_fstar_files(env, files):
   for f in files:
     options = get_build_options(f)
     if options != None:
-      fsts = compile_vale_fstar(env, f)
+      fsts = compile_vale_fstar(options.env, f)
       if verify == True and stage2:
         fst_str = str(fsts[0]).replace('\\', '/')
         fsti_str = str(fsts[1]).replace('\\', '/')

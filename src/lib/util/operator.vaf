@@ -1,3 +1,4 @@
+module Operator
 
 /*
 Logical operators returning bool or Type0:
