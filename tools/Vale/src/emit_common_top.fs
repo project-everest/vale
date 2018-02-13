@@ -32,7 +32,6 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
             (
               match skip_loc e with
               | EApply(x, _) when Map.containsKey x env.procs -> Unchanged
-              | EOp (Uop (UCustomAssign s), [e]) -> Unchanged
               | _ -> modGhost
             )
           | SAssume _ | SAssert _ | SCalc _ | SVar _ -> modGhost

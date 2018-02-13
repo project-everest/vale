@@ -35,7 +35,8 @@ let string_of_bop (op:bop):string =
   | BExply -> "<=="
   | BAnd | BLand -> "&&"
   | BOr | BLor -> "||"
-  | BEq | BSeq -> "=="
+  | BEq -> "=="
+  | BSeq -> "="
   | BNe -> "!="
   | BLt -> "<"
   | BGt -> ">"
@@ -73,7 +74,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UToOperand, [e]) -> ("@" + (r 99 e), 90)
     | EOp (Uop UOld, [e]) -> ("old(" + (r 99 e) + ")", 90)
     | EOp (Uop UConst, [e]) -> ("const(" + (r 99 e) + ")", 90)
-    | EOp (Uop (UReveal | UGhostOnly | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator:%A" e)
+    | EOp (Uop (UReveal | UGhostOnly | UCustom _), [_]) -> internalErr (sprintf "unary operator:%A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
     | EOp (Bop BIn, [e1; e2]) ->
         ((r 90 e1) + "?[" + (r 5 e2) + "]", 90)
@@ -154,10 +155,6 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ((string_of_var_storage g) + "var " + (sid x) + st + rhs + ";")
   | SAlias (x, y) ->
       ps.PrintLine ("let " + (sid x) + " @= " + (sid y) + ";")
-  | SAssign ([], EOp (Uop (UCustomAssign s), [e])) ->
-      ps.PrintLine ((string_of_exp e) + " " + s + ";")
-  | SAssign (lhss, EOp (Uop (UCustomAssign s), [e])) ->
-      ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " " + s + " " + (string_of_exp e) + ";")
   | SAssign ([], e) -> ps.PrintLine ((string_of_exp e) + ";")
   | SAssign (lhss, e) ->
       ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")

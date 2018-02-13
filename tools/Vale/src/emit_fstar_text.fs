@@ -46,7 +46,7 @@ let string_of_bop (op:bop):string =
   match op with
   | BEquiv -> "<==>"
   | BImply -> "==>"
-  | BExply -> notImplemented "<=="
+  | BExply -> internalErr "<=="
   | BOr -> "||"
   | BLor -> "\\/"
   | BAnd -> "&&"
@@ -96,8 +96,9 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Bop BExply, [e1; e2]) -> (r prec (EOp (Bop BImply, [e2; e1])), prec)
     | EOp (Bop op, [e1; e2]) ->
       (
         let isChainOp (op:bop):bool =
@@ -107,9 +108,9 @@ let rec string_of_exp_prec prec e =
           in
         match (op, skip_loc e1) with
         | (op, EOp (Bop op1, [e11; e12])) when isChainOp op && isChainOp op1 ->
-            // Convert (a <= b) < c into (a <= b) /\ (b < c)
+            // Convert (a <= b) < c into (a <= b) && (b < c)
             let e2 = EOp (Bop op, [e12; e2]) in
-            (r prec (EOp (Bop BLand, [e1; e2])), 0)
+            (r prec (EOp (Bop BAnd, [e1; e2])), 0)
         | _ ->
             let (pe, p1, p2) = prec_of_bop op in
             ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)

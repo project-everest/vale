@@ -70,7 +70,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("!" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr ("unary operator " + (sprintf "%A" e))
     | EOp (Bop op, [e1; e2]) ->
         let (pe, p1, p2) = prec_of_bop op in

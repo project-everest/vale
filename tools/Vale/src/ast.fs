@@ -21,7 +21,7 @@ type uop =
 | UConst
 | UReveal | UGhostOnly | UToOperand
 | UCall of exp_call
-| UCustom of string | UCustomAssign of string
+| UCustom of string
 
 type bop =
 | BEquiv | BImply | BExply | BAnd | BOr

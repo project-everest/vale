@@ -416,7 +416,7 @@ let resolve_overload_expr (env:env) (e:exp):exp =
        match Map.tryFind (Operator op) env.funs with
        | Some {fargs = [_]; fattrs = attrs} ->
           Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
-       | _ -> err ("operator '" + op + "' must be overloaded to use as a postfix operator")
+       | _ -> err ("operator '" + op + "' must be overloaded to use as a prefix operator")
      | EOp (Bop (BCustom op), l) ->
        match Map.tryFind (Operator op) env.funs with
        | Some {fargs = [_; _]; fattrs = attrs} ->

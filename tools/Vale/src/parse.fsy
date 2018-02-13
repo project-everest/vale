@@ -257,17 +257,10 @@ Decreases
   | DECREASES STAR SEMI { ($1, []) }
   | DECREASES Exps1 SEMI { ($1, $2) }
 ExpAssign
-  : AnyId BANG
+  : Lhss1 COLONEQ ExpCall Exp
     {
-      let (loc, (isCustom, s)) = $2 in
-      if not isCustom then parse_err "unexpected postfix operator" else
-      stmtAt loc (SAssign ([], EOp (Uop (UCustomAssign s), [EVar $1])))
-    }
-  | Lhss1 COLONEQ ExpCall Exp
-    {
-      let (loc, (isCustom, s)) = $2 in
-      if isCustom then stmtAt loc (SAssign ($1, EOp (Uop (UCustomAssign s), [$3 $4])))
-      else stmtAt loc (SAssign ($1, $3 $4))
+      let (loc, (_, s)) = $2 in
+      stmtAt loc (SAssign ($1, $3 $4))
     }
 ExpAssigns1
   : ExpAssign { $1 }
