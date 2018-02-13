@@ -7,17 +7,17 @@ module M = Memory_i_s
 type uint64 = UInt64.t
 
 type ins =
-  | Mov64      : dst:dst_op -> src:operand -> ins
-  | Add64      : dst:dst_op -> src:operand -> ins
-  | AddLea64   : dst:dst_op -> src1:operand -> src2:operand -> ins
-  | AddCarry64 : dst:dst_op -> src:operand -> ins
-  | Sub64      : dst:dst_op -> src:operand -> ins
+  | Mov64      : dst:operand -> src:operand -> ins
+  | Add64      : dst:operand -> src:operand -> ins
+  | AddLea64   : dst:operand -> src1:operand -> src2:operand -> ins
+  | AddCarry64 : dst:operand -> src:operand -> ins
+  | Sub64      : dst:operand -> src:operand -> ins
   | Mul64      : src:operand -> ins
-  | IMul64     : dst:dst_op -> src:operand -> ins
-  | Xor64      : dst:dst_op -> src:operand -> ins
-  | And64      : dst:dst_op -> src:operand -> ins
-  | Shr64      : dst:dst_op -> amt:operand -> ins
-  | Shl64      : dst:dst_op -> amt:operand -> ins
+  | IMul64     : dst:operand -> src:operand -> ins
+  | Xor64      : dst:operand -> src:operand -> ins
+  | And64      : dst:operand -> src:operand -> ins
+  | Shr64      : dst:operand -> amt:operand -> ins
+  | Shl64      : dst:operand -> amt:operand -> ins
 
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
@@ -45,6 +45,7 @@ assume val havoc : state -> ins -> nat64
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
+[@va_qattr]
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
     match m with
@@ -94,13 +95,17 @@ let valid_ocmp (c:ocmp) (s:state) :bool =
   | OLt o1 o2 -> valid_operand o1 s && valid_operand o2 s
   | OGt o1 o2 -> valid_operand o1 s && valid_operand o2 s
 
-let update_operand_preserve_flags' (o:dst_op) (v:nat64) (s:state) : state =
+let valid_dst_operand (o:operand) (s:state) : bool =
+  valid_operand o s && valid_dst o
+
+let update_operand_preserve_flags' (o:operand) (v:nat64) (s:state) : state =
   match o with
+  | OConst _ -> {s with ok = false}
   | OReg r -> update_reg' r v s
   | OMem m -> update_mem (eval_maddr m s) v s // see valid_maddr for how eval_maddr connects to b and i
 
 // Default version havocs flags 
-let update_operand' (o:dst_op) (ins:ins) (v:nat64) (s:state) : state =
+let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
 (* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
@@ -158,15 +163,15 @@ let run (f:st unit) (s:state) : state = snd (f s)
 
 (* Monadic update operations *)
 unfold
-let update_operand_preserve_flags (dst:dst_op) (v:nat64) :st unit =
-  check (valid_operand dst);;
+let update_operand_preserve_flags (dst:operand) (v:nat64) :st unit =
+  check (valid_dst_operand dst);;
   s <-- get;
   set (update_operand_preserve_flags' dst v s)
 
 // Default version havocs flags
 unfold
-let update_operand (dst:dst_op) (ins:ins) (v:nat64) :st unit =
-  check (valid_operand dst);;
+let update_operand (dst:operand) (ins:ins) (v:nat64) :st unit =
+  check (valid_dst_operand dst);;
   s <-- get;
   set (update_operand' dst ins v s)
 

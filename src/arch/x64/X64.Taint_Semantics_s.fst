@@ -57,8 +57,6 @@ let rec operand_obs_list (s:traceState) (o:list operand) : list observation =
   | [] -> []
   | hd :: tl -> operand_obs s hd @ (operand_obs_list s tl)
 
-let dst_to_op (x:dst_op) : operand = x
-
 let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
   let (i, dsts, srcs) = ins.ops in
   (operand_obs_list s dsts @ operand_obs_list s srcs)

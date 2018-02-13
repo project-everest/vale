@@ -107,15 +107,17 @@ SRC = [
   'src/parse_util.fs',
   '../../obj/Vale/parse.fs',
   '../../obj/Vale/lex.fs',
+  'src/emit_vale_text.fs',
   'src/transform.fs',
   'src/emit_common_base.fs',
+  'src/emit_common_quick_code.fs',
   'src/emit_common_lemmas.fs',
+  'src/emit_common_quick_export.fs',
   'src/emit_common_refine.fs',
   'src/emit_common_top.fs',
   'src/emit_dafny_text.fs',
   'src/emit_dafny_direct.fs',
   'src/emit_fstar_text.fs',
-  'src/emit_vale_text.fs',
   'src/main.fs'
   ]
 

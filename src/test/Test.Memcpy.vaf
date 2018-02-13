@@ -1,14 +1,16 @@
 include "../arch/x64/X64.Vale.Decls.vaf"
 
-#verbatim interface implementation
 module Test.Memcpy
+
+#verbatim{:interface}{:implementation}
 module M = Memory_i_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls
 //open X64.Vale.StrongPost_i
-#set-options "--z3rlimit 20"
 #endverbatim
+
+#reset-options "--z3rlimit 20"
 
 procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
     requires/ensures

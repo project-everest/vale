@@ -6,8 +6,9 @@ var{:state reg(EBX)} ebx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-#verbatim
 module Tactics1
+
+#verbatim
 open FStar.Tactics
 
 (*

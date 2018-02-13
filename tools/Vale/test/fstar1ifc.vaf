@@ -4,9 +4,9 @@ var{:state reg(EBX)} ebx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-#verbatim interface
 module Fstar1ifc
 
+#verbatim{:interface}
 module Map=FStar.Map
 let map = Map.t
 let op_String_Access = Map.sel
@@ -75,8 +75,6 @@ let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type
 #endverbatim
 
 #verbatim
-module Fstar1ifc
-
 assume val eval_code_assume (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 let eval_code = eval_code_assume
 

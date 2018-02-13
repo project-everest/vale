@@ -1,4 +1,4 @@
-#verbatim interface
+#verbatim{:interface}
 module X64.Vale.Decls
 module M = Memory_i_s
 
@@ -20,7 +20,6 @@ unfold let va_make_opaque = Opaque_i.make_opaque
 unfold let va_reveal_opaque = Opaque_i.reveal_opaque
 unfold let va_hd = Cons?.hd
 //unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
-unfold let va_normalize_term = normalize_term
 
 (* Type aliases *)
 unfold let va_bool = bool
@@ -36,8 +35,8 @@ unfold let va_operand = operand
 unfold let va_operand_opr64 = operand
 let va_reg_operand = o:operand{OReg? o}
 let va_operand_reg_opr64 = o:operand{OReg? o}
-unfold let va_dst_operand = dst_op
-unfold let va_operand_dst_opr64 = dst_op
+unfold let va_dst_operand = operand
+unfold let va_operand_dst_opr64 = operand
 unfold let va_shift_amt = operand
 unfold let va_operand_shift_amt64 = operand
 unfold let va_cmp = operand
@@ -63,118 +62,104 @@ unfold let locs_disjoint = M.locs_disjoint
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
-unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
-unfold let va_op_opr_reg (r:reg) : va_operand = OReg r
-unfold let va_op_opr64_reg (r:reg) : va_operand = OReg r
-unfold let va_const_operand (n:int) = OConst n
-unfold let va_const_opr64 (n:int) = OConst n
-unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
-unfold let va_const_shift_amt64 (n:int) : va_shift_amt = OConst n
-unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
-unfold let va_op_shift_amt64_reg (r:reg) : va_shift_amt = OReg r
-unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
-unfold let va_const_cmp (n:int) : va_cmp = OConst n
-unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
-unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
-unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
-unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
-unfold let va_coerce_opr64_to_cmp (o:va_operand) : va_cmp = o
-unfold let va_op_register (r:reg) : va_register = r
-unfold let va_op_reg_oprerand_reg (r:reg) : va_reg_operand = OReg r
-unfold let va_op_reg_opr64_reg (r:reg) : va_reg_operand = OReg r
-unfold let va_op_dst_operand_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
-unfold let va_op_dst_opr64_reg (r:reg{not (Rsp? r)}) : va_dst_operand = OReg r
-unfold let va_coerce_operand_to_dst_operand (o:va_operand{valid_dst o}) : va_dst_operand = o
-unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
-unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
+[@va_qattr] unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
+[@va_qattr] unfold let va_op_opr_reg (r:reg) : va_operand = OReg r
+[@va_qattr] unfold let va_op_opr64_reg (r:reg) : va_operand = OReg r
+[@va_qattr] unfold let va_const_operand (n:int) = OConst n
+[@va_qattr] unfold let va_const_opr64 (n:int) = OConst n
+[@va_qattr] unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
+[@va_qattr] unfold let va_const_shift_amt64 (n:int) : va_shift_amt = OConst n
+[@va_qattr] unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
+[@va_qattr] unfold let va_op_shift_amt64_reg (r:reg) : va_shift_amt = OReg r
+[@va_qattr] unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
+[@va_qattr] unfold let va_const_cmp (n:int) : va_cmp = OConst n
+[@va_qattr] unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
+[@va_qattr] unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
+[@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
+[@va_qattr] unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
+[@va_qattr] unfold let va_coerce_opr64_to_cmp (o:va_operand) : va_cmp = o
+[@va_qattr] unfold let va_op_register (r:reg) : va_register = r
+[@va_qattr] unfold let va_op_reg_oprerand_reg (r:reg) : va_reg_operand = OReg r
+[@va_qattr] unfold let va_op_reg_opr64_reg (r:reg) : va_reg_operand = OReg r
+[@va_qattr] unfold let va_op_dst_operand_reg (r:reg) : va_dst_operand = OReg r
+[@va_qattr] unfold let va_op_dst_opr64_reg (r:reg) : va_dst_operand = OReg r
+[@va_qattr] unfold let va_coerce_operand_to_dst_operand (o:va_operand) : va_dst_operand = o
+[@va_qattr] unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
+[@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
+[@va_qattr]
 unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
   match o with
   | OConst n -> OConst (n + offset)
   | OReg r -> OMem (MReg r offset)
   | _ -> OConst 42
 
-unfold let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base})//:operand{valid_operand base s}) 
-                            (offset:int) // Need this if we want to handle OConst as base values: { 0 <= (eval_operand base s) + offset && (eval_operand base s) + offset < nat64_max }) 
-                            (b:buffer64) 
-                            (index:int{valid_src_addr s.mem b index /\ 
-                                       (eval_operand base s) + offset == buffer_addr(b) + 8 `op_Multiply` index}) 
-                            : (o:operand{valid_operand o s}) =
-  lemma_valid_mem64 b index s.mem;
-  va_opr_code_Mem base offset
-(*
-function method va_opr_lemma_Mem(s:va_state, base:va_operand, offset:int, taint:taint, id:heaplet_id):va_mem_operand
-    requires x86_ValidState(s)
-    requires base.OReg?
-    requires ValidMemAddr(MReg(base.r, offset))
-    requires ValidSrcAddr(s.heaplets, id, va_get_reg64(base.r, s) + offset, 64, taint)
-    ensures  Valid64BitSourceOperand(to_state(s), OHeap(MReg(base.r, offset), taint))
-    ensures  eval_op64(to_state(s), OHeap(MReg(base.r, offset), taint)) == s.heaplets[id].mem64[va_get_reg64(base.r, s) + offset].v
-{
-    reveal_x86_ValidState();
-    va_opr_code_Mem(base, offset, taint)
-}
-*)
-
+let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buffer64) (index:int) : Lemma
+  (requires
+    valid_src_addr s.mem b index /\
+    eval_operand base s + offset == buffer_addr b + 8 `op_Multiply` index
+  )
+  (ensures valid_operand (va_opr_code_Mem base offset) s)
+  =
+  lemma_valid_mem64 b index s.mem
+  
 
 (* Evaluation *)
-unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
-unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : nat64 = eval_operand o s
-unfold let va_eval_shift_amt64  (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
-unfold let va_eval_cmp_uint64   (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
-unfold let va_eval_reg64        (s:va_state) (r:va_register)    : nat64 = eval_reg r s
-unfold let va_eval_reg_opr64    (s:va_state) (o:va_reg_operand) : nat64 = eval_reg (OReg?.r o) s
+[@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_shift_amt64  (s:va_state) (o:va_shift_amt)   : nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_cmp_uint64   (s:va_state) (r:va_cmp)         : nat64 = eval_operand r s
+[@va_qattr] unfold let va_eval_reg64        (s:va_state) (r:va_register)    : nat64 = eval_reg r s
+[@va_qattr] unfold let va_eval_reg_opr64    (s:va_state) (o:va_operand)     : nat64 = eval_operand o s
 
 (* Predicates *)
-unfold let va_is_src_opr64 (o:operand) (s:va_state) = valid_operand o s
-let va_is_dst_opr64 (o:operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
-let va_is_dst_dst_opr64 (o:va_dst_operand) (s:va_state) = OReg? o && not (Rsp? (OReg?.r o))
-unfold let va_is_src_reg (r:reg) (s:va_state) = True
-unfold let va_is_dst_reg (r:reg) (s:va_state) = True
-unfold let va_is_src_shift_amt64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
-unfold let va_is_src_reg_opr64 (o:operand) (s:va_state) = OReg? o
+[@va_qattr] unfold let va_is_src_opr64 (o:operand) (s:va_state) = valid_operand o s
+[@va_qattr] let va_is_dst_opr64 (o:operand) (s:va_state) = match o with OReg Rsp -> false | OReg _ -> true | _ -> false
+[@va_qattr] unfold let va_is_dst_dst_opr64 (o:va_dst_operand) (s:va_state) = va_is_dst_opr64 o s
+[@va_qattr] unfold let va_is_src_reg (r:reg) (s:va_state) = True
+[@va_qattr] unfold let va_is_dst_reg (r:reg) (s:va_state) = True
+[@va_qattr] unfold let va_is_src_shift_amt64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
+[@va_qattr] unfold let va_is_src_reg_opr64 (o:operand) (s:va_state) = OReg? o
 
 (* Getters *)
-unfold let va_get_ok (s:va_state) : bool = s.ok
-unfold let va_get_flags (s:va_state) : int = s.flags
-unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
-unfold let va_get_mem (s:va_state) : mem = s.mem
+[@va_qattr] unfold let va_get_ok (s:va_state) : bool = s.ok
+[@va_qattr] unfold let va_get_flags (s:va_state) : int = s.flags
+[@va_qattr] unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
+[@va_qattr] unfold let va_get_mem (s:va_state) : mem = s.mem
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
-unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
-unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
-
-unfold
-let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
+[@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
+[@va_qattr] unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
+[@va_qattr] unfold let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
   update_reg r (eval_reg r sM) sK
+[@va_qattr] unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
 
-unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
-
+[@va_qattr]
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
   match o with
   | OConst n -> sK
   | OReg r -> va_update_reg r sM sK
   | OMem m -> va_update_mem sM sK 
 
-unfold
-let va_update_dst_operand (o:dst_op) (sM:va_state) (sK:va_state) : va_state =
+[@va_qattr] unfold
+let va_update_dst_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
   va_update_operand o sM sK   
 
-unfold
-let va_update_operand_dst_opr64 (o:dst_op) (sM:va_state) (sK:va_state) : va_state =
+[@va_qattr] unfold
+let va_update_operand_dst_opr64 (o:operand) (sM:va_state) (sK:va_state) : va_state =
   va_update_dst_operand o sM sK
 
-unfold
-let va_update_operand_opr64 (o:dst_op) (sM:va_state) (sK:va_state) : va_state =
+[@va_qattr] unfold
+let va_update_operand_opr64 (o:operand) (sM:va_state) (sK:va_state) : va_state =
   va_update_dst_operand o sM sK
 
-unfold
+[@va_qattr] unfold
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
 
 (** Constructors for va_codes *)
-unfold let va_CNil () : va_codes = []
-unfold let va_CCons (hd:va_code) (tl:va_codes) : va_codes = hd::tl
+[@va_qattr] unfold let va_CNil () : va_codes = []
+[@va_qattr] unfold let va_CCons (hd:va_code) (tl:va_codes) : va_codes = hd::tl
 
 (** Constructors for va_code *)
 unfold let va_Block (block:va_codes) : va_code = Block block
@@ -223,6 +208,7 @@ val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0
 
 (* ok for now but no need to actually expose the definition.
    instead expose lemmas about it *)
+[@va_qattr]
 let va_state_eq (s0:va_state) (s1:va_state) : Type0 = state_eq s0 s1
 
 let va_require_total (c0:va_code) (c1:va_code) (s0:va_state) : Type0 =
@@ -296,6 +282,8 @@ val lemma_valid_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_gt o1 o2) s)]
 
+val va_compute_merge_total (f0:va_fuel) (fM:va_fuel) : va_fuel
+
 val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) (fM:va_fuel) (sN:va_state) : Ghost (fN:va_fuel)
   (requires
     Cons? b0 /\
@@ -303,6 +291,7 @@ val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) 
     eval_code (va_Block (Cons?.tl b0)) sM fM sN
   )
   (ensures (fun fN ->
+    fN == va_compute_merge_total f0 fM /\
     eval_code (va_Block b0) s0 fN sN
   ))
 
@@ -378,6 +367,65 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
     eval_while_inv c s0 fN sN
   ))
 
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// '{:quick}' procedures
+unfold let va_value_opr64 = nat64
+unfold let va_value_dst_opr64 = nat64
+[@va_qattr] unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
+[@va_qattr] unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
+[@va_qattr] unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
+[@va_qattr] unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
+
+[@va_qattr]
+let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
+  match o with
+  | OConst n -> s
+  | OReg r -> update_reg r v s
+  | OMem m -> s // TODO: support destination memory operands
+let va_lemma_upd_update (sM:state) : Lemma
+  (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK)
+  = ()
+
+let quickProc_wp (a:Type0) : Type u#1 = (s0:state) -> (wp_continue:state -> a -> Type0) -> Type0
+
+let k_true (#a:Type0) (_:state) (_:a) = True
+
+let t_monotone (#a:Type0) (c:va_code) (wp:quickProc_wp a) : Type =
+  s0:state -> k1:(state -> a -> Type0) -> k2:(state -> a -> Type0) -> Lemma
+    (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
+    (ensures wp s0 k1 ==> wp s0 k2)
+
+let t_compute (#a:Type0) (c:va_code) (wp:quickProc_wp a) : Type =
+  s0:state -> Ghost (state * va_fuel * a)
+    (requires wp s0 k_true)
+    (ensures fun _ -> True)
+
+let t_ensure (#a:Type0) (c:va_code) (wp:quickProc_wp a) (monotone:t_monotone c wp) (compute:t_compute c wp) (s0:state) (k:(state -> a -> Type0){wp s0 k}) =
+  monotone s0 k k_true; let (sM, f0, g) = compute s0 in eval_code c s0 f0 sM /\ k sM g
+
+let t_proof (#a:Type0) (c:va_code) (wp:quickProc_wp a) (monotone:t_monotone c wp) (compute:t_compute c wp) : Type =
+  s0:state -> k:(state -> a -> Type0) -> Lemma
+    (requires wp s0 k)
+    (ensures t_ensure c wp monotone compute s0 k)
+
+// Code that returns a ghost value of type a
+[@va_qattr]
+noeq type quickCode (a:Type0) : va_code -> Type =
+| QProc:
+    c:va_code ->
+    wp:quickProc_wp a ->
+    monotone:t_monotone c wp ->
+    compute:t_compute c wp ->
+    proof:t_proof c wp monotone compute ->
+    quickCode a c
+
+unfold let va_quickCode = quickCode
+[@va_qattr]
+unfold let va_QProc = QProc
+
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
 (* maybe we want these to be transparent*)
 val logxor64 : (x:nat64) -> (y:nat64) -> nat64
 val logand64 : (x:nat64) -> (y:nat64) -> nat64
@@ -398,7 +446,7 @@ val masm : printer
 val gcc : printer
 #endverbatim
 
-#verbatim implementation
+#verbatim{:implementation}
 module X64.Vale.Decls
 open X64.Machine_s
 open X64.Vale
@@ -449,7 +497,8 @@ let lemma_valid_cmp_ge s o1 o2 = ()
 let lemma_valid_cmp_lt s o1 o2 = ()
 let lemma_valid_cmp_gt s o1 o2 = ()
 
-let va_lemma_merge_total = Lemmas_i.lemma_merge_total
+let va_compute_merge_total = Lemmas_i.compute_merge_total
+let va_lemma_merge_total b0 s0 f0 sM fM sN = Lemmas_i.lemma_merge_total b0 s0 f0 sM fM sN; Lemmas_i.compute_merge_total f0 fM
 let va_lemma_empty_total = Lemmas_i.lemma_empty_total
 let va_lemma_ifElse_total = Lemmas_i.lemma_ifElse_total
 let va_lemma_ifElseTrue_total = Lemmas_i.lemma_ifElseTrue_total
@@ -489,42 +538,42 @@ let print_proc = P.print_proc
 let print_footer = P.print_footer
 let masm = P.masm
 let gcc = P.gcc
-
-#set-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
 
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+
 var{:state ok()} ok:bool;
-var{:state reg(Rax)} rax:int;
-var{:state reg(Rbx)} rbx:int;
-var{:state reg(Rcx)} rcx:int;
-var{:state reg(Rdx)} rdx:int;
-var{:state reg(Rsi)} rsi:int;
-var{:state reg(Rdi)} rdi:int;
-var{:state reg(Rbp)} rbp:int;
-var{:state reg(Rsp)} rsp:int;
-var{:state reg(R8)}  r8:int;
-var{:state reg(R9)}  r9:int;
-var{:state reg(R10)} r10:int;
-var{:state reg(R11)} r11:int;
-var{:state reg(R12)} r12:int;
-var{:state reg(R13)} r13:int;
-var{:state reg(R14)} r14:int;
-var{:state reg(R15)} r15:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var{:state reg(Rax)} rax:nat64;
+var{:state reg(Rbx)} rbx:nat64;
+var{:state reg(Rcx)} rcx:nat64;
+var{:state reg(Rdx)} rdx:nat64;
+var{:state reg(Rsi)} rsi:nat64;
+var{:state reg(Rdi)} rdi:nat64;
+var{:state reg(Rbp)} rbp:nat64;
+var{:state reg(Rsp)} rsp:nat64;
+var{:state reg(R8)}  r8:nat64;
+var{:state reg(R9)}  r9:nat64;
+var{:state reg(R10)} r10:nat64;
+var{:state reg(R11)} r11:nat64;
+var{:state reg(R12)} r12:nat64;
+var{:state reg(R13)} r13:nat64;
+var{:state reg(R14)} r14:nat64;
+var{:state reg(R15)} r15:nat64;
+var{:state flags()} efl:nat64;
+var{:state mem()} mem:mem;
 
 procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int) returns(o:opr)
     reads
         mem;
     extern;
 
-procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction}{:quick exportOnly} Mov64(inout dst: dst_opr64, src: opr64)
     ensures
         dst == old(src);
 {
 }
 
-procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64_buffer(
+procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
     out dst: dst_opr64,
         src:reg_opr64,
         inline offset:int,
@@ -542,7 +591,7 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fas
     lemma_load_mem64(b, index, mem);
 }
 
-procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store64_buffer(
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction}{:quick exportOnly} Store64_buffer(
         dst:reg_opr64,
         src: opr64,
         inline offset:int,
@@ -561,7 +610,7 @@ procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fas
     lemma_store_mem64(b, index, old(src), old(mem));
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Add64(dst,src))}{:quick exportOnly} Add64(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     requires
@@ -571,7 +620,7 @@ procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst: dst_opr64, src: o
 {
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction}{:quick exportOnly} Add64Wrap(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     ensures
@@ -580,7 +629,7 @@ procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout
 {
 }
 
-procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
+procedure{:instruction Ins(S.AddLea64(dst, src1, src2))}{:quick exportOnly} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
     requires
         src1 + src2 < nat64_max;
     ensures
@@ -588,7 +637,7 @@ procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst: dst_o
 {
 }
 
-procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction}{:quick exportOnly} Adc64Wrap(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     ensures
@@ -597,7 +646,7 @@ procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction}{:quick exportOnly} Sub64(inout dst: dst_opr64, src: opr64)
     requires
         0 <= dst - src;
     modifies 
@@ -607,7 +656,7 @@ procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout ds
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))} Sub64Wrap(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64Wrap(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     ensures
@@ -622,7 +671,7 @@ let lemma_fundamental_div_mod (a b:nat64) :
   ()
 #endverbatim
 
-procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src: opr64)
+procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} Mul64Wrap(src: opr64)
     modifies
         efl;
         rax;
@@ -633,7 +682,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src: opr6
     lemma_fundamental_div_mod(old(rax), old(src));
 }
 
-procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction}{:quick exportOnly} IMul64(inout dst: dst_opr64, src: opr64)
     requires
         dst * src < nat64_max;
     modifies
@@ -645,7 +694,7 @@ procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout 
     lemma_mul_in_bounds(old(dst), old(src));
 }
 
-procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Xor64(dst, src))}{:quick exportOnly} Xor64(inout dst: dst_opr64, src: opr64)
     modifies 
         efl;
     ensures
@@ -653,7 +702,7 @@ procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst: dst_opr64, src: 
 {
 }
 
-procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction}{:quick exportOnly} And64(inout dst: dst_opr64, src: opr64)
     modifies 
         efl;
     ensures
@@ -661,7 +710,7 @@ procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout ds
 {
 }
 
-procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst: dst_opr64, amt: shift_amt64)
+procedure{:instruction Ins(S.Shl64(dst, amt))}{:quick exportOnly} Shl64(inout dst: dst_opr64, amt: shift_amt64)
     modifies
         efl;
 //    requires
@@ -671,7 +720,7 @@ procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst: dst_opr64, amt: 
 {
 }
 
-procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout dst: dst_opr64, amt: shift_amt64)
+procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction}{:quick exportOnly} Shr64(inout dst: dst_opr64, amt: shift_amt64)
     modifies
         efl;
     ensures

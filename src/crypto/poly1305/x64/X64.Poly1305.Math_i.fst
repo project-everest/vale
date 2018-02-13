@@ -24,8 +24,11 @@ lemma_BitwiseMul64()
 
 (* Getting a weird error otherwise, will file an issue 
    when this gets merged in fstar branch *)
-let poly1305_heap_blocks  (h:int) (pad:int) (r:int) (s) (k): int
- = poly1305_heap_blocks' h pad r s k
+let poly1305_heap_blocks h pad r s k =
+  if 0 <= k && k <= Seq.length s && k % 2 = 0 then
+    poly1305_heap_blocks' h pad r s k
+  else
+    0
 
 let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s) (k) =
   ()            
@@ -82,8 +85,9 @@ let swap_add a b c = ()
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
 
-let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:int) (h1:int) 
+let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:int) (h1:int) 
 			(h2:int) (s1:int) (d0:int) (d1:int) (d2:int) (hh:int) =
+  let r1:nat = r1 in
   let helper_lemma (x:nat) (y:int) : Lemma 
     (ensures ((h2*n + h1)*((p+5)*x) + y + (h1*r0 + h0*r1)*n + h0*r0 ==
      	      y + (h0*r1 + h1*r0 + h2*(5*x))* n + 
@@ -130,7 +134,18 @@ let lemma_poly_multiply (n:int) (p:pos) (r:int) (h:int) (r0:int) (r1:nat) (h0:in
       	((h2*n + h1)*(r1/4)) p;
       assert ((h*r) % p == hh % p)
 
-let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) =
+let lemma_poly_reduce_nat (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) : Lemma
+  (requires
+    p > 0 /\
+    n * n > 0 /\
+    h2 >= 0 /\  // TODO: Shouldn't need to add this
+    4 * (n * n) == p + 5 /\
+    h2 == h / (n * n) /\
+    h10 == h % (n * n) /\
+    c == (h2 / 4) + (h2 / 4) * 4 /\
+    hh == h10 + c + (h2 % 4) * (n * n))
+  (ensures h % p == hh % p)
+  =
   lemma_div_mod h (n*n);
   assert (h == (n*n)*h2 + h10);
   calc(
@@ -151,13 +166,15 @@ let lemma_poly_reduce (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int
   lemma_mod_lt h (n*n);
   assert (hh >= 0); 
   lemma_mod_plus hh (h2/4) p
+let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
+  lemma_poly_reduce_nat n p h h2 h10 c hh
 
 (* Provable, when we merge the UInt branch and use the lemmas 
    from Poly1305_Bitvectors *)
 let lemma_poly_bits64 =
   admit()
 
-let lemma_mul_strict_upper_bound (x:nat) (x_bound:int) (y:nat) (y_bound:int) =
+let lemma_mul_strict_upper_bound (x:int) (x_bound:int) (y:int) (y_bound:int) =
   lemma_mult_lt_right y x x_bound;
   if x_bound = 0 || y_bound = 0 then ()
   else 

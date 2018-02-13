@@ -140,7 +140,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssign _ -> emit_stmts ps (eliminate_assign_lhss s)
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> notImplemented "block"
-  | SFastBlock ss -> internalErr "fast_block"
+  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, []) ->
       ps.PrintLine ("if (" + (string_of_exp e) + ")");
       emit_block ps ss1
@@ -228,6 +228,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
     | DVerbatim (_, lines) -> List.iter ps.PrintUnbrokenLine lines
+    | DPragma _ -> ()
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

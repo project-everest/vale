@@ -3,8 +3,6 @@ module Emit_vale_text
 open Ast
 open Ast_util
 open Parse_util
-open Transform
-open Emit_common_base
 open Microsoft.FSharp.Math
 
 let sid (x:id):string =
@@ -165,9 +163,10 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> emit_block ps ss
-  | SFastBlock ss ->
-      emit_stmt ps (SAssert ({assert_attrs_default with is_fastblock = true}, EBool true));
-      emit_stmts ps ss
+  | SQuickBlock (_, ss) ->
+      emit_stmt ps (SAssert ({assert_attrs_default with is_quickstart = true}, EBool true));
+      emit_stmts ps ss;
+      emit_stmt ps (SAssert ({assert_attrs_default with is_quickend = true}, EBool true))
   | SIfElse (sm, e, ss1, []) ->
       ps.PrintLine ((string_of_stmt_modifier sm) + "if (" + (string_of_exp e) + ")");
       emit_block ps ss1
@@ -211,8 +210,9 @@ let string_of_raw_spec_kind (r:raw_spec_kind) =
   | RRequires r -> "requires" + (string_of_is_refined r)
   | REnsures r -> "ensures" + (string_of_is_refined r)
   | RRequiresEnsures -> "requires/ensures"
-  | RModifies false -> "reads"
-  | RModifies true -> "modifies"
+  | RModifies Read -> "reads"
+  | RModifies Modify -> "modifies"
+  | RModifies Preserve -> "preserves"
 
 let emit_spec_exp (ps:print_state) (loc:loc, s:spec_exp):unit =
   match s with
@@ -243,8 +243,9 @@ let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
         ps.PrintLine ("requires" + (string_of_is_refined r) + " " + (string_of_exp e) + ";")
     | Ensures (r, e) ->
         ps.PrintLine ("ensures" + (string_of_is_refined r) + "  " + (string_of_exp e) + ";")
-    | Modifies (false, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
-    | Modifies (true, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | Modifies (Read, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
+    | Modifies (Modify, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | Modifies (Preserve, e) -> ps.PrintLine ("preserves " + (string_of_exp e) + ";")
     | SpecRaw (RawSpec ((RModifies _) as r, es)) ->
         ps.PrintLine (string_of_raw_spec_kind r);
         ps.Indent ();
@@ -305,8 +306,12 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim (args, lines) ->
-        ps.PrintLine("#verbatim" + (String.concat "" (List.map (fun a -> " " + a) args)));
+    | DPragma (ModuleName s) ->
+        ps.PrintLine ("module " + s);
+    | DPragma (ResetOptions s) ->
+        ps.PrintLine ("#reset-options " + s)
+    | DVerbatim (attrs, lines) ->
+        ps.PrintLine("#verbatim" + (string_of_attrs attrs));
         List.iter ps.PrintUnbrokenLine lines;
         ps.PrintLine("#endverbatim")
     | DVar (x, t, XState e, attrs) ->

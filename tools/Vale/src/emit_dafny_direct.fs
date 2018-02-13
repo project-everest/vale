@@ -555,7 +555,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         stmts
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock ss -> notImplemented "block"
-    | SFastBlock ss -> internalErr "fast_block"
+    | SQuickBlock _ -> internalErr "quick_block"
     | SIfElse (_, e, ss1, ss2) ->
         let tok = create_token loc "if" in
         let guard = create_expression built_ins loc e in
@@ -683,6 +683,7 @@ let create_dafny_decl (mdl:LiteralModuleDecl) (built_ins:BuiltIns) (loc:loc, d:d
         let s = String.concat "" (List.map (fun s -> s + System.Environment.NewLine) lines) in
         let errCount = DafnyDriver.Parse_Verbatim_Block(s, loc.loc_file, loc.loc_line, mdl, built_ins) in
         if errCount > 0 then internalErr (sprintf "%i parse errors detected within verbatim block in %s at (%i,%i)/n" errCount loc.loc_file loc.loc_line loc.loc_col)
+    | DPragma _ -> ()
     | DVar _ -> ()
     | DFun f -> default_class.Members.Add(build_fun built_ins loc f)
     | DProc p ->

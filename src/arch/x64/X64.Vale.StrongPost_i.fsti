@@ -32,16 +32,19 @@ unfold let va_fast_ins_Sub64 = Sub64
 
 unfold let va_inss = list ins
 
+[@va_qattr]
 let valid_maddr_norm (addr:maddr) (s:state) : bool =
   //Map.contains s.mem (eval_maddr addr s)
   valid_mem64 (eval_maddr addr s) s.mem
 
+[@va_qattr]
 let valid_operand_norm (o:operand) (s:state) : bool =
     match o with
     | OConst n -> 0 <= n && n < nat64_max
     | OReg r -> true
     | OMem m -> valid_maddr_norm m s
 
+[@va_qattr]
 let eval_operand_norm (o:operand) (s:state) : nat64 =
   match o with
   | OConst n -> if 0 <= n && n < nat64_max then n else 0
@@ -49,11 +52,13 @@ let eval_operand_norm (o:operand) (s:state) : nat64 =
   | OMem m -> load_mem64 (eval_maddr m s) s.mem
              //Map.sel s.mem (eval_maddr m s)
 
+[@va_qattr]
 let rec regs_match (regs:list reg) (s0:state) (s1:state) =
   match regs with
   | [] -> True
   | r::regs -> s0.regs r == s1.regs r /\ regs_match regs s0 s1
 
+[@va_qattr]
 let all_regs_match (s0:state) (s1:state) =
   let regs = [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp; Rsp; R8; 
               R9; R10; R11; R12; R13; R14; R15] in
@@ -85,10 +90,11 @@ let rec inss_to_codes (inss:list ins) : list va_code =
   | (Sub64 (OReg dst) src)::inss -> (va_code_Sub64 (OReg dst) src)::(inss_to_codes inss)
   | _ -> []
 
+[@va_qattr]
 let augment (c:va_code) (s0:state) (f0:va_fuel) (post:state -> Type0) (sN:state) : Type0 =
   eval_code c s0 f0 sN ==> post sN
 
-[@"opaque_to_smt"]
+[@"opaque_to_smt" va_qattr]
 let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
   match inss with
   | [] ->
@@ -176,22 +182,11 @@ let rec wp_code (inss : list ins) (post: state -> Type0) (s0:state) : Type0 =
     end
 
 let wp_code_delta = [
-  "X64.Vale.StrongPost_i.wp_code";
-  "X64.Vale.StrongPost_i.all_regs_match";
-  "X64.Vale.StrongPost_i.regs_match";
-  "X64.Vale.StrongPost_i.eval_operand_norm";
-  "X64.Vale.State_i.update_reg";
-  "X64.Vale.State_i.update_mem";
-  "X64.Semantics_s.eval_maddr";
   "X64.Vale.State_i.__proj__Mkstate__item__regs";
   "X64.Vale.State_i.__proj__Mkstate__item__ok" ;
   "X64.Vale.State_i.__proj__Mkstate__item__flags";
   "X64.Vale.State_i.__proj__Mkstate__item__mem";
-  "X64.Vale.StrongPost_i.valid_operand_norm";
-  "X64.Vale.StrongPost_i.valid_maddr_norm";
-  "X64.Vale.StrongPost_i.augment"
   ]
-
 
 [@"uninterpreted_by_smt"]
 val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (f0:va_fuel) : PURE (sN:state)
@@ -203,7 +198,7 @@ val va_lemma_weakest_pre_norm (inss:list ins) (s0:state) (f0:va_fuel) : PURE (sN
       mem0 == s0.mem ==>
       s0.ok /\
       Prims.norm
-        [delta_only wp_code_delta; zeta; iota; primops]
+        [delta_only wp_code_delta; delta_attr va_qattr; zeta; iota; primops]
         (wp_code
           (normalize_term inss)
           (augment (va_Block (normalize_term (inss_to_codes inss))) s0 f0 post)

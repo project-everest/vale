@@ -44,12 +44,10 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
 	let hh = poly1305_heap_blocks' h pad r s kk in
         modp((hh + pad + nat64_max * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
 
-val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) 
-        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0}) : int
+val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : int
 
-val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64)  
-        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0}) : Lemma
-  (requires True)
+val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : Lemma
+  (requires 0 <= k /\ k <= Seq.length s /\ k % 2 == 0)
   (ensures poly1305_heap_blocks h pad r s k = poly1305_heap_blocks' h pad r s k)
 
 val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
@@ -65,8 +63,9 @@ val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
-val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -> h0:int -> h1:int -> h2:int -> s1:int -> d0:int -> d1:int -> d2:int -> hh:int -> Lemma
-  (requires 
+val lemma_poly_multiply : n:int -> p:int -> r:int -> h:int -> r0:int -> r1:int -> h0:int -> h1:int -> h2:int -> s1:int -> d0:int -> d1:int -> d2:int -> hh:int -> Lemma
+  (requires
+    p > 0 /\
     r1 >= 0 /\
     n > 0 /\
     4 * (n * n) == p + 5 /\
@@ -81,10 +80,11 @@ val lemma_poly_multiply : n:int -> p:pos -> r:int -> h:int -> r0:int -> r1:nat -
 	(ensures (h * r) % p == hh % p)
 
 // p used to be a refinement to p > 0 and h a nat.
-val lemma_poly_reduce : n:int -> p:pos -> h:nat -> h2:nat -> h10:int -> c:int -> hh:int -> Lemma
+val lemma_poly_reduce : n:int -> p:int -> h:int -> h2:int -> h10:int -> c:int -> hh:int -> Lemma
   (requires
+    p > 0 /\
     n * n > 0 /\
-    h2 >= 0 /\  // TODO: Shouldn't need to add this
+    h >= 0 /\ h2 >= 0 /\  // TODO: Shouldn't need to add this
     4 * (n * n) == p + 5 /\
     h2 == h / (n * n) /\
     h10 == h % (n * n) /\
@@ -107,12 +107,12 @@ val lemma_poly_bits64 : u:unit -> Lemma
     (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0ffffffc)} (logand64 x 0x0ffffffc0ffffffc) % 4 == 0) /\
     (forall (x:nat64)  (y:nat64) . (logand64 x y) == (logand64 y x)))
 
-val lemma_mul_strict_upper_bound : x:nat -> x_bound:int -> y:nat -> y_bound:int -> Lemma
+val lemma_mul_strict_upper_bound : x:int -> x_bound:int -> y:int -> y_bound:int -> Lemma
   (requires 
-    x < x_bound /\
-    y < y_bound)
+    0 <= x /\ x < x_bound /\
+    0 <= y /\ y < y_bound)
   (ensures x * y < x_bound * y_bound)
-    
+
 val lemma_bytes_shift_power2 : y:nat64 -> Lemma
   (requires y < 8)
   (ensures 
@@ -179,3 +179,31 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
 val lemma_add_mod128 (x y :int) : Lemma
   (requires True)
   (ensures mod2_128 ((mod2_128 x) + y) == mod2_128 (x + y))
+
+type t_seqTo128 = int -> nat128
+let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
+  let f (i:int) : nat128 =
+    let open FStar.Mul in
+    if 0 <= i && i < Seq.length s / 2 then
+      (Seq.index s (2 * i)) + 0x10000000000000000 * (Seq.index s (2 * i + 1))
+    else
+      42
+  in f
+
+let modp_0 () : Lemma
+  (requires True)
+  (ensures modp 0 == 0)
+    =
+    reveal_opaque modp';
+    ()
+let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
+
+let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
+  (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
+  (ensures
+    ((n + n) % 2) == 0 /\ // REVIEW
+    poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
+    poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
+  =
+  assume False
+
