@@ -10,6 +10,7 @@ module List = FStar.List.Tot.Base
 
 module HS = FStar.Monotonic.HyperStack
 module P = FStar.Pointer.Base
+open Machine
 
 open Vale_Sem
 
@@ -55,9 +56,9 @@ let reconstruct_buf buf mem heap =
 
 (* Takes a Low* Hyperstack, and a list of live buffers, and returns a low-level Vale heap
 containing these buffers *)
-val down: HS.mem -> list P.(buffer (TBase TUInt8)) -> GTot Vale_Sem.heap
+val down_mem: HS.mem -> list P.(buffer (TBase TUInt8)) -> GTot Vale_Sem.heap
 
-let down mem buffers =
+let down_mem mem buffers =
   (* Create a dummy heap *)
   let heap : heap = FStar.Map.const (UInt8.uint_to_t 0) in
   let heap = heap.[0] <- (UInt8.uint_to_t 1) in
@@ -67,11 +68,22 @@ let down mem buffers =
   in aux buffers heap
   
 (* Takes a low-level Vale Heap and the initial Hyperstack, and reconstructs the buffers in the HyperStack *)
-val up: Vale_Sem.heap -> list P.(buffer (TBase TUInt8)) -> HS.mem -> GTot HS.mem
+val up_mem: Vale_Sem.heap -> list P.(buffer (TBase TUInt8)) -> HS.mem -> GTot HS.mem
 
-let up heap buffers mem =
+let up_mem heap buffers mem =
   let rec aux bufs accu_mem heap : GTot HS.mem = match bufs with
     | [] -> accu_mem
     | a :: q -> aux q (reconstruct_buf a accu_mem heap) heap
   in aux buffers mem heap
-  
+
+
+(* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale state *)
+val down: HS.mem -> P.(buffer (TBase TUInt8)) -> P.(buffer (TBase TUInt8)) -> GTot Vale_Sem.state
+
+let down mem ptr1 ptr2 =
+  let addr1 = P.buffer_as_addr ptr1 in
+  let addr2 = P.buffer_as_addr ptr2 in
+  assume (addr1 < nat64_max);
+  assume (addr2 < nat64_max);
+  Vale_Sem.Mkstate true (fun x -> if x = Rax then addr1 else if x = Rbx then addr2 else 0) (down_mem mem [ptr1; ptr2]) 
+

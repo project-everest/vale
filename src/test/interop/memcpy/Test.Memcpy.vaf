@@ -1,0 +1,37 @@
+include "../arch/x64/X64.Vale.Decls.vaf"
+
+#verbatim interface implementation
+module Test.Memcpy
+module M = Memory_i_s
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls
+//open X64.Vale.StrongPost_i
+#set-options "--z3rlimit 20"
+#endverbatim
+
+procedure Copy8(inline t:taint, ghost bsrc:buffer64, ghost bdst:buffer64)
+    requires/ensures
+        locs_disjoint(list(loc_buffer(bsrc), loc_buffer(bdst)));
+        buffer_readable(mem, bsrc);
+        buffer_readable(mem, bdst);
+        buffer_length(bsrc) == 1;
+        buffer_length(bdst) == 1;
+        rsi == buffer_addr(bsrc);
+        rdi == buffer_addr(bdst);
+    requires
+        valid_taint_ptr(rsi, memTaint, t);
+        valid_taint_ptr(rsi + 8, memTaint, t);
+    ensures
+        forall i :: 0 <= i && i < 2 ==> buffer64_read(bdst, i, mem) == buffer64_read(bsrc, i, mem);
+        modifies_mem(loc_buffer(bdst), old(mem), mem);
+    reads
+        rsi; rdi;
+    modifies
+        rax;
+        mem; memTaint; trace;
+{
+//    assert{:fast_block} true;
+    Load64_buffer(rax, rsi, 0, t, bsrc, 0);
+    Store64_buffer(rdi, rax, 0, t, bdst, 0);
+}
