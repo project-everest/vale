@@ -23,6 +23,13 @@ See the [CODE](./CODE.md) file for more details on the various files in the repo
 
 See the [Vale documentation](./doc/index.html) for a description of the Vale language and Vale tool.
 
+You can also see our academic paper describing Vale:
+
+> [Vale: Verifying High-Performance Cryptographic Assembly Code](https://project-everest.github.io/assets/vale2017.pdf)  
+> Barry Bond, Chris Hawblitzel, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch, Bryan Parno, Ashay Rane, Srinath Setty, Laure Thompson.  
+> In Proceedings of the USENIX Security Symposium, 2017.  
+> Distinguished Paper Award
+
 # License
 
 Vale is licensed under the Apache license in the [LICENSE](./LICENSE) file.
