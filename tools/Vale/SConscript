@@ -32,7 +32,7 @@ def fsyaccEmitter(target, source, env):
 def add_fslexyacc(env):
   # probe for fslexyacc to ensure it is installed ahead of trying to use it to build
   fslexfile = File(FSLEX)
-  if not os.path.isfile(str(fslexfile)):
+  if not os.path.isfile(str(fslexfile)) and not GetOption('clean'):
     raise EnvironmentError('FsLexYacc missing.  Please install to: "%s"'%str(fslexfile))
     
   env['FSLEX'] = fslexfile
