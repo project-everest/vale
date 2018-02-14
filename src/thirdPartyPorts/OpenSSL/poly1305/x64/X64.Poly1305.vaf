@@ -21,7 +21,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-include "../../../../arch/x64/X64.Vale.Decls.vaf"
+include "../../../../arch/x64/X64.Vale.InsBasic.vaf"
+include "../../../../arch/x64/X64.Vale.InsMem.vaf"
 
 module X64.Poly1305
 
@@ -31,8 +32,11 @@ module X64.Poly1305
 module M = Memory_i_s
 open X64.Machine_s
 open X64.Vale.State_i
-open X64.Vale.Decls
-open X64.Vale.Quick_i
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+open X64.Vale.QuickCode_i
+open X64.Vale.QuickCodes_i
 //open X64.Vale.StrongPost_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i

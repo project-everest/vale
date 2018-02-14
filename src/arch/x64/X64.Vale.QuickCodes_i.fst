@@ -1,4 +1,4 @@
-module X64.Vale.Quick_i
+module X64.Vale.QuickCodes_i
 
 #reset-options "--initial_ifuel 1 --z3rlimit 1000"
 

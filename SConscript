@@ -18,6 +18,12 @@ verify_paths = [
 ]
 Export('verify_paths')
 
+manual_dependencies = {
+  'obj/arch/x64/X64.Vale.InsBasic.fst.verified.tmp': 'src/arch/x64/X64.Vale.Decls_i.fst',
+  'obj/arch/x64/X64.Vale.InsMem.fst.verified.tmp': 'src/arch/x64/X64.Vale.Decls_i.fst',
+}
+Export('manual_dependencies')
+
 #
 # All include paths for FStar should be in this list.
 # All files should use exactly the include paths in this list.
@@ -57,6 +63,11 @@ verify_options = {
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
+  'src/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
+
+  # Any use of expose_interfaces requires adding to manual_dependencies
+  'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Vale.Decls_i.fst'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
@@ -69,9 +80,6 @@ verify_options = {
   '.fst': BuildOptions(fstar_default_args),
   '.fsti': BuildOptions(fstar_default_args),
 
-  'tools/Vale/test/vale-debug.vad': None,
-  'tools/Vale/test/tactics1.vaf': None,
-
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_larith),
   '.vaf': BuildOptions(fstar_default_args),
@@ -80,7 +88,8 @@ verify_options = {
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
-  'src/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
+  'tools/Vale/test/vale-debug.vad': None,
+  'tools/Vale/test/tactics1.vaf': None,
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
   
 }

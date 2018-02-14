@@ -1,10 +1,11 @@
-include "../../../src/arch/x64/X64.Vale.Decls.vaf"
+include "../../../src/arch/x64/X64.Vale.InsBasic.vaf"
 
 module Test
 
 #verbatim{:interface}{:implementation}
 open X64.Machine_s
-open X64.Vale.Decls
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
 #endverbatim
 
 procedure p()

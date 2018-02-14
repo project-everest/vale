@@ -1,4 +1,5 @@
-include "../arch/x64/X64.Vale.Decls.vaf"
+include "../arch/x64/X64.Vale.InsBasic.vaf"
+include "../arch/x64/X64.Vale.InsMem.vaf"
 
 module Test.Memcpy
 
@@ -6,7 +7,9 @@ module Test.Memcpy
 module M = Memory_i_s
 open X64.Machine_s
 open X64.Vale.State_i
-open X64.Vale.Decls
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
 //open X64.Vale.StrongPost_i
 #endverbatim
 

@@ -1,5 +1,4 @@
-#verbatim{:interface}
-module X64.Vale.Decls
+module X64.Vale.Decls_i
 module M = Memory_i_s
 
 // This interface should hide all of Semantics_s.
@@ -156,6 +155,22 @@ let va_update_operand_opr64 (o:operand) (sM:va_state) (sK:va_state) : va_state =
 let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
+unfold let va_value_opr64 = nat64
+unfold let va_value_dst_opr64 = nat64
+[@va_qattr] unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
+[@va_qattr] unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
+[@va_qattr] unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
+[@va_qattr] unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
+
+[@va_qattr]
+let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
+  match o with
+  | OConst n -> s
+  | OReg r -> update_reg r v s
+  | OMem m -> s // TODO: support destination memory operands
+let va_lemma_upd_update (sM:state) : Lemma
+  (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK)
+  = ()
 
 (** Constructors for va_codes *)
 [@va_qattr] unfold let va_CNil () : va_codes = []
@@ -367,65 +382,6 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
     eval_while_inv c s0 fN sN
   ))
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
-// '{:quick}' procedures
-unfold let va_value_opr64 = nat64
-unfold let va_value_dst_opr64 = nat64
-[@va_qattr] unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
-[@va_qattr] unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
-[@va_qattr] unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
-[@va_qattr] unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
-
-[@va_qattr]
-let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
-  match o with
-  | OConst n -> s
-  | OReg r -> update_reg r v s
-  | OMem m -> s // TODO: support destination memory operands
-let va_lemma_upd_update (sM:state) : Lemma
-  (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK)
-  = ()
-
-let quickProc_wp (a:Type0) : Type u#1 = (s0:state) -> (wp_continue:state -> a -> Type0) -> Type0
-
-let k_true (#a:Type0) (_:state) (_:a) = True
-
-let t_monotone (#a:Type0) (c:va_code) (wp:quickProc_wp a) : Type =
-  s0:state -> k1:(state -> a -> Type0) -> k2:(state -> a -> Type0) -> Lemma
-    (requires (forall (s:state) (g:a). k1 s g ==> k2 s g))
-    (ensures wp s0 k1 ==> wp s0 k2)
-
-let t_compute (#a:Type0) (c:va_code) (wp:quickProc_wp a) : Type =
-  s0:state -> Ghost (state * va_fuel * a)
-    (requires wp s0 k_true)
-    (ensures fun _ -> True)
-
-let t_ensure (#a:Type0) (c:va_code) (wp:quickProc_wp a) (monotone:t_monotone c wp) (compute:t_compute c wp) (s0:state) (k:(state -> a -> Type0){wp s0 k}) =
-  monotone s0 k k_true; let (sM, f0, g) = compute s0 in eval_code c s0 f0 sM /\ k sM g
-
-let t_proof (#a:Type0) (c:va_code) (wp:quickProc_wp a) (monotone:t_monotone c wp) (compute:t_compute c wp) : Type =
-  s0:state -> k:(state -> a -> Type0) -> Lemma
-    (requires wp s0 k)
-    (ensures t_ensure c wp monotone compute s0 k)
-
-// Code that returns a ghost value of type a
-[@va_qattr]
-noeq type quickCode (a:Type0) : va_code -> Type =
-| QProc:
-    c:va_code ->
-    wp:quickProc_wp a ->
-    monotone:t_monotone c wp ->
-    compute:t_compute c wp ->
-    proof:t_proof c wp monotone compute ->
-    quickCode a c
-
-unfold let va_quickCode = quickCode
-[@va_qattr]
-unfold let va_QProc = QProc
-
-//
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
 (* maybe we want these to be transparent*)
 val logxor64 : (x:nat64) -> (y:nat64) -> nat64
 val logand64 : (x:nat64) -> (y:nat64) -> nat64
@@ -444,286 +400,3 @@ val print_proc : (name:string) -> (code:va_code) -> (label:int) -> (p:printer) -
 val print_footer : printer -> FStar.All.ML unit
 val masm : printer
 val gcc : printer
-#endverbatim
-
-#verbatim{:implementation}
-module X64.Vale.Decls
-open X64.Machine_s
-open X64.Vale
-open X64.Vale.State_i
-open X64.Vale.StateLemmas_i
-open FStar.UInt
-module S = X64.Semantics_s
-module P = X64.Print_s
-
-#reset-options "--z3cliopt smt.arith.nl=true"
-let lemma_mul_in_bounds (x y:nat64) : Lemma (requires x `op_Multiply` y < nat64_max) (ensures FStar.UInt.mul_mod #64 x y == x `op_Multiply` y) = ()
-
-#reset-options "--z3cliopt smt.arith.nl=true --using_facts_from Prims --using_facts_from FStar.Math"
-let lemma_mul_nat (x:nat) (y:nat) : Lemma (ensures 0 <= (x `op_Multiply` y)) = ()
-#reset-options "--initial_fuel 2 --max_fuel 2"
-
-let cf = Lemmas_i.cf
-let ins = S.ins
-type ocmp = S.ocmp
-type va_fuel = nat
-let va_fuel_default () = 0
-
-let va_cmp_eq o1 o2 = S.OEq o1 o2
-let va_cmp_ne o1 o2 = S.ONe o1 o2
-let va_cmp_le o1 o2 = S.OLe o1 o2
-let va_cmp_ge o1 o2 = S.OGe o1 o2
-let va_cmp_lt o1 o2 = S.OLt o1 o2
-let va_cmp_gt o1 o2 = S.OGt o1 o2
-
-let eval_code = Lemmas_i.eval_code
-let eval_while_inv = Lemmas_i.eval_while_inv
-let eval_ocmp = Lemmas_i.eval_ocmp
-let valid_ocmp = Lemmas_i.valid_ocmp
-
-unfold let va_eval_ins = Lemmas_i.eval_ins
-
-let lemma_cmp_eq s o1 o2 = ()
-let lemma_cmp_ne s o1 o2 = ()
-let lemma_cmp_le s o1 o2 = ()
-let lemma_cmp_ge s o1 o2 = ()
-let lemma_cmp_lt s o1 o2 = ()
-let lemma_cmp_gt s o1 o2 = ()
-
-let lemma_valid_cmp_eq s o1 o2 = ()
-let lemma_valid_cmp_ne s o1 o2 = ()
-let lemma_valid_cmp_le s o1 o2 = ()
-let lemma_valid_cmp_ge s o1 o2 = ()
-let lemma_valid_cmp_lt s o1 o2 = ()
-let lemma_valid_cmp_gt s o1 o2 = ()
-
-let va_compute_merge_total = Lemmas_i.compute_merge_total
-let va_lemma_merge_total b0 s0 f0 sM fM sN = Lemmas_i.lemma_merge_total b0 s0 f0 sM fM sN; Lemmas_i.compute_merge_total f0 fM
-let va_lemma_empty_total = Lemmas_i.lemma_empty_total
-let va_lemma_ifElse_total = Lemmas_i.lemma_ifElse_total
-let va_lemma_ifElseTrue_total = Lemmas_i.lemma_ifElseTrue_total
-let va_lemma_ifElseFalse_total = Lemmas_i.lemma_ifElseFalse_total
-let va_lemma_while_total = Lemmas_i.lemma_while_total
-let va_lemma_whileTrue_total = Lemmas_i.lemma_whileTrue_total
-let va_lemma_whileFalse_total = Lemmas_i.lemma_whileFalse_total
-let va_lemma_whileMerge_total = Lemmas_i.lemma_whileMerge_total
-
-let logxor64 (x:nat64) (y:nat64) : nat64 =
-  FStar.UInt.logxor #64 x y
-
-let logand64 (x:nat64) (y:nat64) : nat64 =
-  FStar.UInt.logand #64 x y
-
-let logand128 (x:nat128) (y:nat128) : nat128 =
-  FStar.UInt.logand #128 x y
-(*
-  if FStar.UInt.fits x 64
-  && FStar.UInt.fits y 64
-  then FStar.UInt.logand #64 x y
-  else 0
-*)
-
-let shift_left64 (x:nat64) (amt:nat64) : nat64 =
-  FStar.UInt.shift_left #64 x amt
-
-let shift_right64 (x:nat64) (amt:nat64) : nat64 =
-  FStar.UInt.shift_right #64 x amt
-
-let reveal_logand128 (x y:nat128) = ()
-
-let printer = P.printer
-let print_string = FStar.IO.print_string
-let print_header = P.print_header
-let print_proc = P.print_proc
-let print_footer = P.print_footer
-let masm = P.masm
-let gcc = P.gcc
-#endverbatim
-
-#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
-
-var{:state ok()} ok:bool;
-var{:state reg(Rax)} rax:nat64;
-var{:state reg(Rbx)} rbx:nat64;
-var{:state reg(Rcx)} rcx:nat64;
-var{:state reg(Rdx)} rdx:nat64;
-var{:state reg(Rsi)} rsi:nat64;
-var{:state reg(Rdi)} rdi:nat64;
-var{:state reg(Rbp)} rbp:nat64;
-var{:state reg(Rsp)} rsp:nat64;
-var{:state reg(R8)}  r8:nat64;
-var{:state reg(R9)}  r9:nat64;
-var{:state reg(R10)} r10:nat64;
-var{:state reg(R11)} r11:nat64;
-var{:state reg(R12)} r12:nat64;
-var{:state reg(R13)} r13:nat64;
-var{:state reg(R14)} r14:nat64;
-var{:state reg(R15)} r15:nat64;
-var{:state flags()} efl:nat64;
-var{:state mem()} mem:mem;
-
-procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int) returns(o:opr)
-    reads
-        mem;
-    extern;
-
-procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction}{:quick exportOnly} Mov64(inout dst: dst_opr64, src: opr64)
-    ensures
-        dst == old(src);
-{
-}
-
-procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
-    out dst: dst_opr64,
-        src:reg_opr64,
-        inline offset:int,
-        ghost b:buffer64,
-        ghost index:int)
-    reads
-        mem;
-    requires
-        valid_src_addr(mem, b, index);
-        src + offset == buffer_addr(b) + 8 * index;
-    ensures
-        dst == buffer64_read(b, index, mem);
-{
-    lemma_valid_mem64(b, index, mem);
-    lemma_load_mem64(b, index, mem);
-}
-
-procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction}{:quick exportOnly} Store64_buffer(
-        dst:reg_opr64,
-        src: opr64,
-        inline offset:int,
-        ghost b:buffer64,
-        ghost index:int)
-    modifies
-        mem;
-    requires
-        valid_dst_addr(mem, b, index);
-        dst + offset == buffer_addr(b) + 8 * index;
-    ensures
-        modifies_mem(loc_buffer(b), old(mem), mem);
-        mem == old(buffer64_write(b, index, src, mem));
-{
-    lemma_valid_mem64(b, index, old(mem));
-    lemma_store_mem64(b, index, old(src), old(mem));
-}
-
-procedure{:instruction Ins(S.Add64(dst,src))}{:quick exportOnly} Add64(inout dst: dst_opr64, src: opr64)
-    modifies
-        efl;
-    requires
-        src + dst < nat64_max;
-    ensures
-        dst == old(dst + src);
-{
-}
-
-procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction}{:quick exportOnly} Add64Wrap(inout dst: dst_opr64, src: opr64)
-    modifies
-        efl;
-    ensures
-        dst == old(add_wrap(dst, src));
-        cf(efl) == old(dst + src >= nat64_max);
-{
-}
-
-procedure{:instruction Ins(S.AddLea64(dst, src1, src2))}{:quick exportOnly} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
-    requires
-        src1 + src2 < nat64_max;
-    ensures
-        dst == old(src1) + old(src2);
-{
-}
-
-procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction}{:quick exportOnly} Adc64Wrap(inout dst: dst_opr64, src: opr64)
-    modifies
-        efl;
-    ensures
-        dst == old(add_wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
-        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max;
-{
-}
-
-procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction}{:quick exportOnly} Sub64(inout dst: dst_opr64, src: opr64)
-    requires
-        0 <= dst - src;
-    modifies 
-        efl;
-    ensures
-        dst == old(dst) - old(src);
-{
-}
-
-procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64Wrap(inout dst: dst_opr64, src: opr64)
-    modifies
-        efl;
-    ensures
-        dst == old(dst - src) % nat64_max;
-{
-}
-
-#verbatim
-let lemma_fundamental_div_mod (a b:nat64) :
-  Lemma (nat64_max `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
-  =
-  ()
-#endverbatim
-
-procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} Mul64Wrap(src: opr64)
-    modifies
-        efl;
-        rax;
-        rdx;
-    ensures
-        nat64_max * rdx + rax == old(rax * src);
-{
-    lemma_fundamental_div_mod(old(rax), old(src));
-}
-
-procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction}{:quick exportOnly} IMul64(inout dst: dst_opr64, src: opr64)
-    requires
-        dst * src < nat64_max;
-    modifies
-        efl;
-    ensures
-        dst == old(dst * src);
-{
-    lemma_mul_nat(old(dst), old(src));
-    lemma_mul_in_bounds(old(dst), old(src));
-}
-
-procedure{:instruction Ins(S.Xor64(dst, src))}{:quick exportOnly} Xor64(inout dst: dst_opr64, src: opr64)
-    modifies 
-        efl;
-    ensures
-        dst == old(logxor64(dst,src));
-{
-}
-
-procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction}{:quick exportOnly} And64(inout dst: dst_opr64, src: opr64)
-    modifies 
-        efl;
-    ensures
-        dst == old(logand64(dst,src));
-{
-}
-
-procedure{:instruction Ins(S.Shl64(dst, amt))}{:quick exportOnly} Shl64(inout dst: dst_opr64, amt: shift_amt64)
-    modifies
-        efl;
-//    requires
-//        0 <= src < 64;
-    ensures
-        dst == old(shift_left64(dst, amt));
-{
-}
-
-procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction}{:quick exportOnly} Shr64(inout dst: dst_opr64, amt: shift_amt64)
-    modifies
-        efl;
-    ensures
-        dst == old(shift_right64(dst, amt));
-{
-}

@@ -1,9 +1,10 @@
 // Optimized weakest precondition generation for 'quick' procedures
 
-module X64.Vale.Quick_i
+module X64.Vale.QuickCodes_i
 open X64.Machine_s
 open X64.Vale.State_i
-open X64.Vale.Decls
+open X64.Vale.Decls_i
+open X64.Vale.QuickCode_i
 
 unfold let code = va_code
 unfold let codes = va_codes
@@ -339,7 +340,7 @@ unfold let normal_steps : list string =
     "X64.Vale.State_i.__proj__Mkstate__item__flags";
     "X64.Vale.State_i.__proj__Mkstate__item__mem";
 
-    "X64.Vale.Decls.__proj__QProc__item__wp";
+    "X64.Vale.QuickCode_i.__proj__QProc__item__wp";
   ]
 
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr; delta_only normal_steps] x
