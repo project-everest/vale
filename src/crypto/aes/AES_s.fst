@@ -15,7 +15,7 @@ assume val sub_word (w:nat32) : nat32
 
 type algorithm = | AES_128 | AES_192 | AES_256
 
-let aes_rcon (i:int) =
+let aes_rcon (i:int) : nat32 =
     if i = 0 then 0x01 else if i = 1 then 0x02 else if i = 2 then 0x04 else if i = 3 then 0x08 else if i = 4 then 0x10 else if i = 5 then 0x20 else if i = 6 then 0x40 else if i = 7 then 0x80 else if i = 8 then 0x1b else 0x36
 
 // AES fixes Rijndael's block size at 4 32-bit words

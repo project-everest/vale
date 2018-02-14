@@ -40,6 +40,16 @@ let lemma_selector255 (selector:nat8) (bits:bits_of_byte) : Lemma
   =
   ()
 
+assume val lemma_BitwiseXorCommutative (x y:nat32) : Lemma (nat32_xor x y == nat32_xor y x) 
+assume val lemma_BitwiseXorWithZero (n:nat32) : Lemma (nat32_xor n 0 == nat32_xor 0 n /\ nat32_xor 0 n == n)
+assume val lemma_double_xor_negates (x y z:nat32) : 
+  Lemma(
+    nat32_xor (nat32_xor x y) x == y /\
+    nat32_xor (nat32_xor x y) y == x /\
+    nat32_xor (nat32_xor x y) (nat32_xor x z) == nat32_xor y z)
+
+#reset-options "--z3rlimit 50"
+
 let lemma_KeyExpansionRoundHelper (alg:algorithm) (key:seq nat32 { length key == nk alg})
                                   (w_init w_final:seq nat32) (completed_bytes:int)
                                   (xmm1_v0 xmm2_v1 xmm2_v2 xmm3_v3 xmm1_v4 xmm3_v5 xmm1_v6 xmm3_v7 xmm1_v8 xmm1_v9 : quad32) 
@@ -78,9 +88,21 @@ let lemma_KeyExpansionRoundHelper (alg:algorithm) (key:seq nat32 { length key ==
                          let w =      w.[completed_bytes + 3] <- xmm1_v9.hi in
                          w)))
   (ensures (key_expansion_partial alg key w_final (completed_bytes + 4)))
-  =                               
-  admit();
-  ()
+  = 
+  let transformed_w_init_val:nat32 = rot_word (sub_word (index w_init (completed_bytes - 1))) in
+  let rcon_index:int = (completed_bytes / (nk alg)) - 1 in 
+  let aes_rcon_val:nat32 = aes_rcon rcon_index in
+  let important_value = nat32_xor transformed_w_init_val aes_rcon_val in
+  let bits = byte_to_twobits 255 in
+  lemma_selector255 255 bits;
+  assert (xmm2_v2.mid_lo == important_value); 
+  assert (xmm2_v2.mid_hi == important_value); 
+  lemma_BitwiseXorWithZero w_init.[completed_bytes-4];
+  lemma_BitwiseXorCommutative w_init.[completed_bytes-3] w_init.[completed_bytes-4];
+  lemma_double_xor_negates w_init.[completed_bytes-4] w_init.[completed_bytes-3] 0;
+  lemma_BitwiseXorCommutative w_init.[completed_bytes-2] w_init.[completed_bytes-3];
+  lemma_double_xor_negates w_init.[completed_bytes-3] w_init.[completed_bytes-2] w_init.[completed_bytes-4];
+  admit()
 
 (*
 {
