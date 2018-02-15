@@ -189,7 +189,6 @@ procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
         key_expansion_partial(AES_128, key, w_out, 4 + n*4);
 {
-assume false;
     inline if (0 < n <= 10) {
         ghost var w_mid:seq(nat32);
         w_mid := KeyExpansionRoundUnrolledRecursive(key, w_in, dst, n-1);
@@ -206,6 +205,7 @@ assume false;
 //        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 2);
 //        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 3);
         w_out := w_in;
+assume xmm1 == buffer128_read(dst, n, mem);
     }
 }
 
