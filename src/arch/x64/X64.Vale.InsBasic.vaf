@@ -1,0 +1,164 @@
+#verbatim interface
+module X64.Vale.InsBasic
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+#endverbatim
+
+#verbatim
+module X64.Vale.InsBasic
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State_i
+open X64.Vale.StateLemmas_i
+open X64.Vale.Decls_i
+open FStar.UInt
+module S = X64.Semantics_s
+module P = X64.Print_s
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
+
+var{:state ok()} ok:bool;
+var{:state reg(Rax)} rax:int;
+var{:state reg(Rbx)} rbx:int;
+var{:state reg(Rcx)} rcx:int;
+var{:state reg(Rdx)} rdx:int;
+var{:state reg(Rsi)} rsi:int;
+var{:state reg(Rdi)} rdi:int;
+var{:state reg(Rbp)} rbp:int;
+var{:state reg(Rsp)} rsp:int;
+var{:state reg(R8)}  r8:int;
+var{:state reg(R9)}  r9:int;
+var{:state reg(R10)} r10:int;
+var{:state reg(R11)} r11:int;
+var{:state reg(R12)} r12:int;
+var{:state reg(R13)} r13:int;
+var{:state reg(R14)} r14:int;
+var{:state reg(R15)} r15:int;
+var{:state flags()}  efl:int;
+var{:state mem()}    mem:int;
+
+procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst: dst_opr64, src: opr64)
+    ensures
+        dst == old(src);
+{
+}
+
+procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    requires
+        src + dst < nat64_max;
+    ensures
+        dst == old(dst + src);
+{
+}
+
+procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap(dst, src));
+        cf(efl) == old(dst + src >= nat64_max);
+{
+}
+
+procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
+    requires
+        src1 + src2 < nat64_max;
+    ensures
+        dst == old(src1) + old(src2);
+{
+}
+
+procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
+        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max;
+{
+}
+
+procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout dst: dst_opr64, src: opr64)
+    requires
+        0 <= dst - src;
+    modifies 
+        efl;
+    ensures
+        dst == old(dst) - old(src);
+{
+}
+
+procedure{:instruction Ins(S.Sub64(dst, src))} Sub64Wrap(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst - src) % nat64_max;
+{
+}
+
+#verbatim
+let lemma_fundamental_div_mod (a b:nat64) :
+  Lemma (nat64_max `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
+  =
+  ()
+#endverbatim
+
+procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src: opr64)
+    modifies
+        efl;
+        rax;
+        rdx;
+    ensures
+        nat64_max * rdx + rax == old(rax * src);
+{
+    lemma_fundamental_div_mod(old(rax), old(src));
+}
+
+procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst: dst_opr64, src: opr64)
+    requires
+        dst * src < nat64_max;
+    modifies
+        efl;
+    ensures
+        dst == old(dst * src);
+{
+    lemma_mul_nat(old(dst), old(src));
+    lemma_mul_in_bounds(old(dst), old(src));
+}
+
+procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst: dst_opr64, src: opr64)
+    modifies 
+        efl;
+    ensures
+        dst == old(logxor64(dst,src));
+{
+}
+
+procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout dst: dst_opr64, src: opr64)
+    modifies 
+        efl;
+    ensures
+        dst == old(logand64(dst,src));
+{
+}
+
+procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst: dst_opr64, amt: shift_amt64)
+    modifies
+        efl;
+//    requires
+//        0 <= src < 64;
+    ensures
+        dst == old(shift_left64(dst, amt));
+{
+}
+
+procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout dst: dst_opr64, amt: shift_amt64)
+    modifies
+        efl;
+    ensures
+        dst == old(shift_right64(dst, amt));
+{
+}
+

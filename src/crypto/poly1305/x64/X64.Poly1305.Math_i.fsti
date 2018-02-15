@@ -2,7 +2,7 @@ module X64.Poly1305.Math_i
 
 open FStar.Mul
 open X64.Machine_s   // needed for nat64
-open X64.Vale.Decls  // needed for shift_right64, logand64
+open X64.Vale.Decls_i  // needed for shift_right64, logand64
 open Poly1305.Spec_s // for modp
 open X64.Vale.State_i // for add_wrap
 open Opaque_i
@@ -125,7 +125,7 @@ val lemma_bytes_and_mod : x:nat64 -> y:nat64 -> Lemma
   (ensures 
     shift_left64 y 3 < 64 /\
     (let z = shift_left64 1 (shift_left64 y 3) in
-     z <> 0 /\ X64.Vale.Decls.logand64 x (z-1) == x % z))
+     z <> 0 /\ X64.Vale.Decls_i.logand64 x (z-1) == x % z))
 
 val lemma_mod_power2_lo : x0:nat64 -> x1:nat64 -> y:int -> z:int -> Lemma
   (requires 

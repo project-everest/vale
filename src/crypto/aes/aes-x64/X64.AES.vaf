@@ -1,4 +1,7 @@
-include "../../../arch/x64/X64.Vale.Decls.vaf"
+include "../../../arch/x64/X64.Vale.InsBasic.vaf"
+include "../../../arch/x64/X64.Vale.InsMem.vaf"
+include "../../../arch/x64/X64.Vale.InsVector.vaf"
+include "../../../arch/x64/X64.Vale.InsAes.vaf"
 
 #verbatim interface implementation
 
@@ -9,7 +12,11 @@ open FStar.Seq
 open AES_s
 open X64.Machine_s
 open X64.Vale.State_i
-open X64.Vale.Decls
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+open X64.Vale.InsVector
+open X64.Vale.InsAes
 open AES_helpers_i
 open Opaque_i
 
@@ -185,6 +192,7 @@ procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
 //        forall j :: 0 <= j <= 10 ==> mem[dst_id].quads[rdx + 16*j].v == Quadword(w_out[4*j], w_out[4*j+1], w_out[4*j+2], w_out[4*j+3]);
         key_expansion_partial(AES_128, key, w_out, 4 + n*4);
 {
+assume false;
     inline if (0 < n <= 10) {
         ghost var w_mid:seq(nat32);
         w_mid := KeyExpansionRoundUnrolledRecursive(key, w_in, dst, n-1);

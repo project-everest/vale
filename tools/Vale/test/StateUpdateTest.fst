@@ -2,7 +2,8 @@ module StateUpdateTest
 (*
 open X64.Machine_s
 open X64.Vale.State_i
-open X64.Vale.Decls
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
 open FStar.Tactics
 
 val va_code_state_update_test : va_dummy:unit -> Tot va_code

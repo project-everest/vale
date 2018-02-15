@@ -1007,7 +1007,7 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
@@ -1019,6 +1019,9 @@ if do_fstar and stage2:
   for d in fstar_include_paths:
     if d.startswith('obj/'):
       distutils.dir_util.mkpath(d)
+  for target in manual_dependencies:
+    source = manual_dependencies[target]
+    Depends(target, source)
   predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
 
 # Verification

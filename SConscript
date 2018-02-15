@@ -18,6 +18,12 @@ verify_paths = [
 ]
 Export('verify_paths')
 
+manual_dependencies = {
+  'obj/arch/x64/X64.Vale.InsBasic.fst.verified.tmp': 'src/arch/x64/X64.Vale.Decls_i.fst',
+  'obj/arch/x64/X64.Vale.InsMem.fst.verified.tmp': 'src/arch/x64/X64.Vale.Decls_i.fst',
+}
+Export('manual_dependencies')
+
 #
 # All include paths for FStar should be in this list.
 # All files should use exactly the include paths in this list.
@@ -59,6 +65,12 @@ verify_options = {
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
+
+  # Any use of expose_interfaces requires adding to manual_dependencies
+  'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsAes.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Vale.Decls_i.fst'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),

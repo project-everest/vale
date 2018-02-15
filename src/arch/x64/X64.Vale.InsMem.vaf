@@ -1,0 +1,64 @@
+include "X64.Vale.InsBasic.vaf"
+
+#verbatim interface
+module X64.Vale.InsMem
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+#endverbatim
+
+#verbatim
+module X64.Vale.InsMem
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State_i
+open X64.Vale.StateLemmas_i
+open X64.Vale.Decls_i
+open FStar.UInt
+module S = X64.Semantics_s
+module P = X64.Print_s
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
+
+procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int) returns(o:opr)
+    reads
+        mem;
+    extern;
+
+procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64_buffer(
+    out dst: dst_opr64,
+        src:reg_opr64,
+        inline offset:int,
+        ghost b:buffer64,
+        ghost index:int)
+    reads
+        mem;
+    requires
+        valid_src_addr(mem, b, index);
+        src + offset == buffer_addr(b) + 8 * index;
+    ensures
+        dst == buffer64_read(b, index, mem);
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
+}
+
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store64_buffer(
+        dst:reg_opr64,
+        src: opr64,
+        inline offset:int,
+        ghost b:buffer64,
+        ghost index:int)
+    modifies
+        mem;
+    requires
+        valid_dst_addr(mem, b, index);
+        dst + offset == buffer_addr(b) + 8 * index;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        mem == old(buffer64_write(b, index, src, mem));
+{
+    lemma_valid_mem64(b, index, old(mem));
+    lemma_store_mem64(b, index, old(src), old(mem));
+}
+
