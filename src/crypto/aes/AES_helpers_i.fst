@@ -52,6 +52,8 @@ assume val lemma_BitwiseXorAssociative (x y z:nat32) :
   Lemma(nat32_xor x (nat32_xor y z) == nat32_xor (nat32_xor x y) z)
 assume val lemma_BitwiseXorAssociative2 (x y z p:nat32) :
   Lemma(nat32_xor (nat32_xor x y) (nat32_xor z p) == nat32_xor (nat32_xor x z) (nat32_xor y p))
+assume val lemma_RotWordSubWordCommutativity (x:nat32) :
+  Lemma(rot_word (sub_word x) == sub_word (rot_word x))
 
 #reset-options "--z3rlimit 50"
 
@@ -80,8 +82,81 @@ let lemma_KeyExpansionRoundHelperHelper (alg:algorithm) (key:seq nat32 { length 
                          w)))
   (ensures (key_expansion_partial alg key w_final (completed_bytes + 4)))
 =
- admit()
+    lemma_RotWordSubWordCommutativity w_final.[completed_bytes-1];
+    //assert SubWord(RotWord(w_final.[completed_bytes-1])) == RotWord(SubWord(w_final.[completed_bytes-1]));
 
+    (*
+    calc {
+        w_final.[completed_bytes];
+        xmm1_v9.lo;
+        nat32_xor(w_final.[completed_bytes-4], important_value);
+        nat32_xor(w_final.[completed_bytes-4], nat32_xor(SubWord(RotWord(w_final.[completed_bytes-1])), AES_Rcon()[ (completed_bytes / Nk(alg))-1 ]));
+    }
+    *)
+
+    //calc {
+    //    w_final.[completed_bytes+1];
+    //    xmm1_v9.mid_lo;
+    //    nat32_xor(nat32_xor(w_final.[completed_bytes-4], w_final.[completed_bytes-3]), important_value);
+    lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3];
+    //    nat32_xor(nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes-4]), important_value);
+    lemma_BitwiseXorAssociative w_final.[completed_bytes-3] w_final.[completed_bytes-4] important_value;
+    //    nat32_xor(w_final.[completed_bytes-3], nat32_xor(w_final.[completed_bytes-4], important_value));
+    //    nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes]);
+    //}
+
+    //calc {
+       // w_final.[completed_bytes+2];
+        //nat32_xor(nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-4], w_final.[completed_bytes-3])), important_value);
+            lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3]; 
+       // nat32_xor(nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes-4])), 32important_value);
+            lemma_BitwiseXorAssociative w_final.[completed_bytes-2] (nat32_xor w_final.[completed_bytes-3] w_final.[completed_bytes-4]) important_value;
+        //nat32_xor(w_final.[completed_bytes-2], nat32_xor(nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes-4]), important_value));
+            lemma_BitwiseXorAssociative w_final.[completed_bytes-3] w_final.[completed_bytes-4] important_value;
+        //nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-3], nat32_xor(w_final.[completed_bytes-4], important_value)));
+        //nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes]));
+        //nat32_xor(w_final.[completed_bytes-2], w_final.[completed_bytes+1]);
+    //}
+
+    //calc {
+    //    w_final.[completed_bytes+3];
+    //    nat32_xor(nat32_xor(w_final.[completed_bytes-1], nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-4], w_final.[completed_bytes-3]))), important_value);
+    lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3];
+   //     nat32_xor(nat32_xor(w_final.[completed_bytes-1], nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes-4]))), important_value);
+   lemma_BitwiseXorAssociative w_final.[completed_bytes-1] (nat32_xor w_final.[completed_bytes-2] (nat32_xor w_final.[completed_bytes-3] w_final.[completed_bytes-4])) important_value;
+    //    nat32_xor(w_final.[completed_bytes-1], nat32_xor(nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes-4])), important_value));
+   lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3];
+    //    nat32_xor(w_final.[completed_bytes-1], nat32_xor(nat32_xor(w_final.[completed_bytes-2], nat32_xor(w_final.[completed_bytes-4], w_final.[completed_bytes-3])), important_value));
+    //    nat32_xor(w_final.[completed_bytes-1], w_final.[completed_bytes+2]);
+    //}
+   //let key_expansion_specific_restricted (i:int) = 0 <= i /\ i < completed_bytes ==> key_expansion_specific alg key w_final i in
+   (*
+   let lemma_KeyExpansionPredicateSpecific (i:int) : Lemma (ensures key_expansion_specific_restricted i) =
+     assert(0 <= i /\ i < completed_bytes ==> key_expansion_specific alg key w_init i)
+   in
+   Classical.forall_intro lemma_KeyExpansionPredicateSpecific;
+   assert(key_expansion_partial alg key w_final completed_bytes);
+   *)
+assume (key_expansion_partial alg key w_final completed_bytes);         //////////////////////////////////// TODO!
+
+(*
+    forall i | 0 <= i < completed_bytes
+        ensures KeyExpansionPredicateSpecific(key, alg, w, i);
+    {
+        assert KeyExpansionPredicateSpecific(key, alg, w_init, i);
+    }
+    assert KeyExpansionPredicatePartial(key, alg, w, completed_bytes);
+*)
+    //lemma_mod_auto(4);
+    (*
+    assert (completed_bytes+1)%4 == 1;
+    assert (completed_bytes+2)%4 == 2;
+    assert (completed_bytes+3)%4 == 3;
+    assert KeyExpansionPredicatePartial(key, alg, w, completed_bytes+4);
+  *)
+  admit()
+
+(*
 #reset-options "--z3rlimit 500"
 let lemma_KeyExpansionRoundHelper (alg:algorithm) (key:seq nat32 { length key == nk alg})
                                   (w_init w_final:seq nat32) (completed_bytes:int)
@@ -163,7 +238,7 @@ let lemma_KeyExpansionRoundHelper (alg:algorithm) (key:seq nat32 { length key ==
 
   lemma_KeyExpansionRoundHelperHelper alg key w_init w_final completed_bytes xmm1_v9 important_value;
   ()
-
+*)
 
 (*
 {
