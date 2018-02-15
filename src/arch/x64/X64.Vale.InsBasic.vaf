@@ -1,12 +1,13 @@
-#verbatim interface
 module X64.Vale.InsBasic
+
+#verbatim{:interface}
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
+open X64.Vale.QuickCode_i
 #endverbatim
 
 #verbatim
-module X64.Vale.InsBasic
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State_i
@@ -15,36 +16,37 @@ open X64.Vale.Decls_i
 open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s
-#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
 
-var{:state ok()} ok:bool;
-var{:state reg(Rax)} rax:int;
-var{:state reg(Rbx)} rbx:int;
-var{:state reg(Rcx)} rcx:int;
-var{:state reg(Rdx)} rdx:int;
-var{:state reg(Rsi)} rsi:int;
-var{:state reg(Rdi)} rdi:int;
-var{:state reg(Rbp)} rbp:int;
-var{:state reg(Rsp)} rsp:int;
-var{:state reg(R8)}  r8:int;
-var{:state reg(R9)}  r9:int;
-var{:state reg(R10)} r10:int;
-var{:state reg(R11)} r11:int;
-var{:state reg(R12)} r12:int;
-var{:state reg(R13)} r13:int;
-var{:state reg(R14)} r14:int;
-var{:state reg(R15)} r15:int;
-var{:state flags()}  efl:int;
-var{:state mem()}    mem:int;
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
-procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction} Mov64(inout dst: dst_opr64, src: opr64)
+var{:state ok()} ok:bool;
+var{:state reg(Rax)} rax:nat64;
+var{:state reg(Rbx)} rbx:nat64;
+var{:state reg(Rcx)} rcx:nat64;
+var{:state reg(Rdx)} rdx:nat64;
+var{:state reg(Rsi)} rsi:nat64;
+var{:state reg(Rdi)} rdi:nat64;
+var{:state reg(Rbp)} rbp:nat64;
+var{:state reg(Rsp)} rsp:nat64;
+var{:state reg(R8)}  r8:nat64;
+var{:state reg(R9)}  r9:nat64;
+var{:state reg(R10)} r10:nat64;
+var{:state reg(R11)} r11:nat64;
+var{:state reg(R12)} r12:nat64;
+var{:state reg(R13)} r13:nat64;
+var{:state reg(R14)} r14:nat64;
+var{:state reg(R15)} r15:nat64;
+var{:state flags()} efl:nat64;
+var{:state mem()} mem:mem;
+
+procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction}{:quick exportOnly} Mov64(inout dst: dst_opr64, src: opr64)
     ensures
         dst == old(src);
 {
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Add64(dst,src))}{:quick exportOnly} Add64(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     requires
@@ -54,7 +56,7 @@ procedure{:instruction Ins(S.Add64(dst,src))} Add64(inout dst: dst_opr64, src: o
 {
 }
 
-procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction}{:quick exportOnly} Add64Wrap(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     ensures
@@ -63,7 +65,7 @@ procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction} Add64Wrap(inout
 {
 }
 
-procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
+procedure{:instruction Ins(S.AddLea64(dst, src1, src2))}{:quick exportOnly} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
     requires
         src1 + src2 < nat64_max;
     ensures
@@ -71,7 +73,7 @@ procedure{:instruction Ins(S.AddLea64(dst, src1, src2))} AddLea64(out dst: dst_o
 {
 }
 
-procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction}{:quick exportOnly} Adc64Wrap(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     ensures
@@ -80,7 +82,7 @@ procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction} Adc64Wrap
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction}{:quick exportOnly} Sub64(inout dst: dst_opr64, src: opr64)
     requires
         0 <= dst - src;
     modifies 
@@ -90,7 +92,7 @@ procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction} Sub64(inout ds
 {
 }
 
-procedure{:instruction Ins(S.Sub64(dst, src))} Sub64Wrap(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64Wrap(inout dst: dst_opr64, src: opr64)
     modifies
         efl;
     ensures
@@ -105,7 +107,7 @@ let lemma_fundamental_div_mod (a b:nat64) :
   ()
 #endverbatim
 
-procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src: opr64)
+procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} Mul64Wrap(src: opr64)
     modifies
         efl;
         rax;
@@ -116,7 +118,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction} Mul64Wrap(src: opr6
     lemma_fundamental_div_mod(old(rax), old(src));
 }
 
-procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction}{:quick exportOnly} IMul64(inout dst: dst_opr64, src: opr64)
     requires
         dst * src < nat64_max;
     modifies
@@ -128,7 +130,7 @@ procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction} IMul64(inout 
     lemma_mul_in_bounds(old(dst), old(src));
 }
 
-procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.Xor64(dst, src))}{:quick exportOnly} Xor64(inout dst: dst_opr64, src: opr64)
     modifies 
         efl;
     ensures
@@ -136,7 +138,7 @@ procedure{:instruction Ins(S.Xor64(dst, src))} Xor64(inout dst: dst_opr64, src: 
 {
 }
 
-procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout dst: dst_opr64, src: opr64)
+procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction}{:quick exportOnly} And64(inout dst: dst_opr64, src: opr64)
     modifies 
         efl;
     ensures
@@ -144,7 +146,7 @@ procedure{:instruction Ins(S.And64(dst, src))}{:fast_instruction} And64(inout ds
 {
 }
 
-procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst: dst_opr64, amt: shift_amt64)
+procedure{:instruction Ins(S.Shl64(dst, amt))}{:quick exportOnly} Shl64(inout dst: dst_opr64, amt: shift_amt64)
     modifies
         efl;
 //    requires
@@ -154,7 +156,7 @@ procedure{:instruction Ins(S.Shl64(dst, amt))} Shl64(inout dst: dst_opr64, amt: 
 {
 }
 
-procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction} Shr64(inout dst: dst_opr64, amt: shift_amt64)
+procedure{:instruction Ins(S.Shr64(dst, amt))}{:fast_instruction}{:quick exportOnly} Shr64(inout dst: dst_opr64, amt: shift_amt64)
     modifies
         efl;
     ensures

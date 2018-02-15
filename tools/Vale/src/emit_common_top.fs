@@ -18,12 +18,13 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
     match d with
     | DVar _ | DFun _ -> if !reprint_ghost_decls then [d] else []
     | DVerbatim _ -> if !reprint_verbatims then [d] else []
+    | DPragma _ -> [d]
     | DProc p ->
         let p = if !reprint_specs then p else {p with pspecs = []} in
         let fs (s:stmt):stmt list map_modify =
           let modGhost = if !reprint_ghost_stmts then Unchanged else Replace [] in
           match s with
-          | SLoc _ | SLabel _ | SGoto _ | SReturn | SAlias _ | SLetUpdates _ | SBlock _ | SFastBlock _ -> Unchanged
+          | SLoc _ | SLabel _ | SGoto _ | SReturn | SAlias _ | SLetUpdates _ | SBlock _ | SQuickBlock _ -> Unchanged
           | SIfElse ((SmInline | SmPlain), _, _, _) -> Unchanged
           | SWhile _ when !reprint_loop_invs -> Unchanged
           | SWhile (e, _, (l, _), s) -> Replace [SWhile (e, [], (l, []), s)]
@@ -31,7 +32,6 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
             (
               match skip_loc e with
               | EApply(x, _) when Map.containsKey x env.procs -> Unchanged
-              | EOp (Uop (UCustomAssign s), [e]) -> Unchanged
               | _ -> modGhost
             )
           | SAssume _ | SAssert _ | SCalc _ | SVar _ -> modGhost
@@ -47,27 +47,67 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
     in
   reprint_decls_rev := (List.map (fun d -> (loc, d)) new_decls) @ (!reprint_decls_rev)
 
+let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls =
+  try
+    match d with
+    | DProc p ->
+        let isVerify = List_mem_assoc (Id "verify") p.pattrs in
+        let isQuick = List_mem_assoc (Id "quick") p.pattrs in
+        if verify then
+          if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
+          let build_proc = if !fstar then Emit_common_lemmas.build_proc envBody else Emit_common_refine.build_proc in
+          let ds_p = build_proc envr loc p in
+          let ds_q = if isQuick then Emit_common_quick_export.build_proc envr loc p else [] in
+          ds_p @ ds_q
+        else
+          []
+    | DVerbatim (attrs, lines) ->
+        let attrs = attrs @ attr_no_verify "lax" attrs in
+        if verify then [(loc, DVerbatim (attrs, lines))] else []
+    | _ ->
+        if verify then [(loc, d)] else []
+  with err -> raise (LocErr (loc, err))
+
 let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
   try
-    let (env, dReprint, d2) = transform_decl env loc d1 in
-    let add_fun env f = {env with funs = Map.add f.fname f env.funs}
-    let add_proc env p = {env with procs = Map.add p.pname p env.procs}
-    let (env, decl) =
-      match d2 with
-      | DFun ({fbody = None} as f) -> (add_fun env f, [])
-      | DProc ({pattrs = [(Reserved "alias", _)]} as p) -> (add_proc env p, [])
-      | DProc p ->
-          let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
-          let envp = add_proc env p in
-          let build_proc = if !fstar then Emit_common_lemmas.build_proc else Emit_common_refine.build_proc in
-          (envp, if verify then build_proc (if isRecursive then envp else env) loc p else [])
-      | _ -> (env, if verify then [(loc, d2)] else [])
-      in
+    let dReprint = d1 in
+    let (envBodyDs, env) = transform_decl env loc d1 in
+    let ds = List.collect (build_one_decl verify loc) envBodyDs in
     (match (verify, !reprint_file) with (true, Some _) -> add_reprint_decl env loc dReprint | _ -> ());
-    (env, decl)
+    (env, ds)
   with err -> raise (LocErr (loc, err))
 
 let build_decls (env:env) (ds:((loc * decl) * bool) list):decls =
+  let ds =
+    if !disable_verify && !omit_unverified then
+      // omit any declarations not verified and not referenced by verified declaration
+      let verifyDecls = List.map fst (List.filter snd ds) in
+      let verifiedProcRefs ((l:loc), (d:decl)):Set<id> =
+        match d with
+        | DProc {pname = x; pbody = Some ss; pattrs = attrs} when attrs_get_bool (Id "verify") false attrs ->
+            let fs (s:stmt) (xs:Set<id> list):Set<id> =
+              match s with
+              | SAssign (_, e) ->
+                (
+                  match skip_loc e with
+                  | EApply (x, _) -> Set.singleton x
+                  | _ -> Set.empty
+                )
+              | _ -> Set.unionMany xs
+              in
+            let fe (e:exp) (xs:Set<id> list):Set<id> = Set.empty in
+            let xs = Set.unionMany (gather_stmts fs fe ss)
+            Set.add x xs
+        | _ -> Set.empty
+        in
+      let verifyRefs = Set.unionMany (List.map verifiedProcRefs verifyDecls) in
+      let omitUnverified (((l:loc), (d:decl)), (verify:bool)) =
+        match (verify, d) with
+        | (true, DProc p) -> ((l, d), Set.contains p.pname verifyRefs)
+        | _ -> ((l, d), verify)
+        in
+      List.map omitUnverified ds
+    else ds
   let (env, dss) = List_mapFoldFlip build_decl env ds in
   List.concat dss
 

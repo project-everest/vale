@@ -2,6 +2,7 @@ module X64.Machine_s
 
 module M = Memory_i_s
 
+irreducible let va_qattr = ()
 unfold let nat32_max = Types_s.nat32_max
 unfold let nat64_max = Types_s.nat64_max
 unfold let nat128_max = Types_s.nat128_max
@@ -34,6 +35,7 @@ type maddr =
   | MReg: r:reg -> offset:int -> maddr
   | MIndex: base:reg -> scale:int -> index:reg -> offset:int -> maddr
 
+[@va_qattr]
 type operand =
   | OConst: n:int -> operand
   | OReg: r:reg -> operand
@@ -54,8 +56,6 @@ type precode (t_ins:Type0) (t_ocmp:Type0) =
 
 let valid_dst (o:operand) : bool =
   not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
-
-type dst_op = o:operand{valid_dst o}
 
 unfold let buffer8 = M.buffer (M.TBase M.TUInt8)
 unfold let buffer16 = M.buffer (M.TBase M.TUInt16)

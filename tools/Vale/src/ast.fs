@@ -14,15 +14,19 @@ type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
 type formal = id * typ option
 
+type exp_call = CallGhost | CallLemma | CallInline | CallOutline
+
 type uop = 
 | UNot | UNeg | UOld | UIs of id
 | UConst
 | UReveal | UGhostOnly | UToOperand
-| UCustom of string | UCustomAssign of string
+| UCall of exp_call
+| UCustom of string
 
 type bop =
 | BEquiv | BImply | BExply | BAnd | BOr
 | BLand | BLor // logical and, logical or
+| BSeq   // structural equality
 | BEq | BNe | BLt | BGt | BLe | BGe | BIn
 | BAdd | BSub | BMul | BDiv | BMod
 | BOldAt
@@ -81,7 +85,8 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_fastblock:bool}
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool}
+type quick_info = {qsym:string; qmods:id list}
 type lhs = id * (typ option * ghost) option
 type stmt =
 | SLoc of loc * stmt
@@ -96,7 +101,7 @@ type stmt =
 | SAssign of lhs list * exp
 | SLetUpdates of formal list * stmt // used to turn imperative updates into functional 'let' assignments
 | SBlock of stmt list
-| SFastBlock of stmt list // optimized proof for statements in block
+| SQuickBlock of quick_info * stmt list // optimized proof for statements in block
 | SIfElse of stmt_modifier * exp * stmt list * stmt list
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list
@@ -104,11 +109,12 @@ type stmt =
 and calcContents = {calc_exp:exp; calc_op:bop option; calc_hints:stmt list list}
 
 type is_refined = Refined | Unrefined
+type mod_kind = Read | Modify | Preserve
 type raw_spec_kind =
 | RRequires of is_refined
 | REnsures of is_refined
 | RRequiresEnsures
-| RModifies of bool // false => reads, true => modifies
+| RModifies of mod_kind
 
 type lets =
 | LetsVar of id * typ option * exp
@@ -125,7 +131,7 @@ type spec_raw = // spec before desugaring
 type spec =
 | Requires of is_refined * exp
 | Ensures of is_refined * exp
-| Modifies of bool * exp // false => reads, true => modifies
+| Modifies of mod_kind * exp
 | SpecRaw of spec_raw
 
 type inline_kind = Outline | Inline
@@ -154,11 +160,16 @@ type proc_decl =
     pattrs:attrs;
   }
 
+type prag =
+| ModuleName of string
+| ResetOptions of string
+
 type decl =
 | DVar of id * typ * var_storage * attrs
 | DFun of fun_decl
 | DProc of proc_decl
-| DVerbatim of string list * string list
+| DVerbatim of attrs * string list
+| DPragma of prag
 
 type decls = (loc * decl) list
 

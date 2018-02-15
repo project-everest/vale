@@ -1,8 +1,9 @@
 include "X64.Vale.InsBasic.vaf"
 include "X64.Vale.InsVector.vaf"
 
-#verbatim interface
 module X64.Vale.InsAes
+
+#verbatim{:interface}
 open Types_s
 open AES_s
 open X64.Machine_s
@@ -11,7 +12,6 @@ open X64.Vale.Decls_i
 #endverbatim
 
 #verbatim
-module X64.Vale.InsAes
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State_i

@@ -1,14 +1,15 @@
 include "X64.Vale.InsBasic.vaf"
 
-#verbatim interface
 module X64.Vale.InsMem
+
+#verbatim{:interface}
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
+open X64.Vale.QuickCode_i
 #endverbatim
 
 #verbatim
-module X64.Vale.InsMem
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State_i
@@ -17,15 +18,16 @@ open X64.Vale.Decls_i
 open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s
-#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
+
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
 procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int) returns(o:opr)
     reads
         mem;
     extern;
 
-procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction} Load64_buffer(
+procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
     out dst: dst_opr64,
         src:reg_opr64,
         inline offset:int,
@@ -43,7 +45,7 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:fas
     lemma_load_mem64(b, index, mem);
 }
 
-procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction} Store64_buffer(
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fast_instruction}{:quick exportOnly} Store64_buffer(
         dst:reg_opr64,
         src: opr64,
         inline offset:int,

@@ -3,8 +3,6 @@ module Emit_vale_text
 open Ast
 open Ast_util
 open Parse_util
-open Transform
-open Emit_common_base
 open Microsoft.FSharp.Math
 
 let sid (x:id):string =
@@ -24,7 +22,7 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BExply -> (14, 14, 15)
   | BOr | BLor -> (16, 16, 17)
   | BAnd | BLand -> (18, 18, 19)
-  | BEq | BNe -> (20, 20, 21)
+  | BEq | BSeq | BNe -> (20, 20, 21)
   | BLe | BGe | BLt | BGt -> (25, 25, 25)
   | BAdd | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
@@ -38,6 +36,7 @@ let string_of_bop (op:bop):string =
   | BAnd | BLand -> "&&"
   | BOr | BLor -> "||"
   | BEq -> "=="
+  | BSeq -> "="
   | BNe -> "!="
   | BLt -> "<"
   | BGt -> ">"
@@ -75,7 +74,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UToOperand, [e]) -> ("@" + (r 99 e), 90)
     | EOp (Uop UOld, [e]) -> ("old(" + (r 99 e) + ")", 90)
     | EOp (Uop UConst, [e]) -> ("const(" + (r 99 e) + ")", 90)
-    | EOp (Uop (UReveal | UGhostOnly | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator:%A" e)
+    | EOp (Uop (UReveal | UGhostOnly | UCustom _), [_]) -> internalErr (sprintf "unary operator:%A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
     | EOp (Bop BIn, [e1; e2]) ->
         ((r 90 e1) + "?[" + (r 5 e2) + "]", 90)
@@ -156,18 +155,15 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ((string_of_var_storage g) + "var " + (sid x) + st + rhs + ";")
   | SAlias (x, y) ->
       ps.PrintLine ("let " + (sid x) + " @= " + (sid y) + ";")
-  | SAssign ([], EOp (Uop (UCustomAssign s), [e])) ->
-      ps.PrintLine ((string_of_exp e) + " " + s + ";")
-  | SAssign (lhss, EOp (Uop (UCustomAssign s), [e])) ->
-      ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " " + s + " " + (string_of_exp e) + ";")
   | SAssign ([], e) -> ps.PrintLine ((string_of_exp e) + ";")
   | SAssign (lhss, e) ->
       ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> emit_block ps ss
-  | SFastBlock ss ->
-      emit_stmt ps (SAssert ({assert_attrs_default with is_fastblock = true}, EBool true));
-      emit_stmts ps ss
+  | SQuickBlock (_, ss) ->
+      emit_stmt ps (SAssert ({assert_attrs_default with is_quickstart = true}, EBool true));
+      emit_stmts ps ss;
+      emit_stmt ps (SAssert ({assert_attrs_default with is_quickend = true}, EBool true))
   | SIfElse (sm, e, ss1, []) ->
       ps.PrintLine ((string_of_stmt_modifier sm) + "if (" + (string_of_exp e) + ")");
       emit_block ps ss1
@@ -211,8 +207,9 @@ let string_of_raw_spec_kind (r:raw_spec_kind) =
   | RRequires r -> "requires" + (string_of_is_refined r)
   | REnsures r -> "ensures" + (string_of_is_refined r)
   | RRequiresEnsures -> "requires/ensures"
-  | RModifies false -> "reads"
-  | RModifies true -> "modifies"
+  | RModifies Read -> "reads"
+  | RModifies Modify -> "modifies"
+  | RModifies Preserve -> "preserves"
 
 let emit_spec_exp (ps:print_state) (loc:loc, s:spec_exp):unit =
   match s with
@@ -243,8 +240,9 @@ let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
         ps.PrintLine ("requires" + (string_of_is_refined r) + " " + (string_of_exp e) + ";")
     | Ensures (r, e) ->
         ps.PrintLine ("ensures" + (string_of_is_refined r) + "  " + (string_of_exp e) + ";")
-    | Modifies (false, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
-    | Modifies (true, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | Modifies (Read, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
+    | Modifies (Modify, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    | Modifies (Preserve, e) -> ps.PrintLine ("preserves " + (string_of_exp e) + ";")
     | SpecRaw (RawSpec ((RModifies _) as r, es)) ->
         ps.PrintLine (string_of_raw_spec_kind r);
         ps.Indent ();
@@ -305,8 +303,12 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim (args, lines) ->
-        ps.PrintLine("#verbatim" + (String.concat "" (List.map (fun a -> " " + a) args)));
+    | DPragma (ModuleName s) ->
+        ps.PrintLine ("module " + s);
+    | DPragma (ResetOptions s) ->
+        ps.PrintLine ("#reset-options " + s)
+    | DVerbatim (attrs, lines) ->
+        ps.PrintLine("#verbatim" + (string_of_attrs attrs));
         List.iter ps.PrintUnbrokenLine lines;
         ps.PrintLine("#endverbatim")
     | DVar (x, t, XState e, attrs) ->

@@ -6,6 +6,10 @@ open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
 
+let resetOptions = ref ""
+let prevResetOptionsPs = ref ""
+let prevResetOptionsPsi = ref ""
+
 let sid (x:id):string =
   match x with
   | Id s -> s
@@ -32,7 +36,7 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BExply -> notImplemented "<=="
   | BOr | BLor -> (16, 16, 17)
   | BAnd | BLand -> (18, 18, 19)
-  | BLe | BGe | BLt | BGt | BEq | BNe -> (20, 20, 21)
+  | BLe | BGe | BLt | BGt | BEq | BSeq | BNe -> (20, 20, 21)
   | BAdd -> (30, 30, 31)
   | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
@@ -42,12 +46,13 @@ let string_of_bop (op:bop):string =
   match op with
   | BEquiv -> "<==>"
   | BImply -> "==>"
-  | BExply -> notImplemented "<=="
+  | BExply -> internalErr "<=="
   | BOr -> "||"
   | BLor -> "\\/"
   | BAnd -> "&&"
   | BLand -> "/\\"
   | BEq -> "=="
+  | BSeq -> "="
   | BNe -> "=!="
   | BLt -> "<"
   | BGt -> ">"
@@ -63,10 +68,14 @@ let string_of_bop (op:bop):string =
 let string_of_ghost (g:ghost) = ""
 let string_of_var_storage (g:var_storage) = ""
 
+
 let rec string_of_typ (t:typ):string =
   match t with
   | TName x -> sid x
+  | TApp (TName (Id "tuple"), []) -> "unit"
   | TApp (TName (Id "tuple"), ts) -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
+  | TApp (TName (Id "fun"), ts) -> "(" + (String.concat " -> " (List.map string_of_typ ts)) + ")"
+  | TApp (t, []) -> "(" + (string_of_typ t) + " ())"
   | TApp (t, ts) -> "(" + (string_of_typ t) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
 
 let rec string_of_exp_prec prec e =
@@ -79,15 +88,17 @@ let rec string_of_exp_prec prec e =
     | EInt i -> (string i, 99)
     | EReal r -> (r, 99)
     | EBitVector (n, i) -> ("bv" + (string n) + "(" + (string i) + ")", 99)
-    | EBool true -> ("True", 99)
-    | EBool false -> ("False", 99)
-    | EString s -> ("\"" + s + "\"", 99)
+    | EBool true -> ("true", 99)
+    | EBool false -> ("false", 99)
+    | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
+    | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
     | EOp (Uop UReveal, [EApply (x, es)]) -> (r prec (vaApp "reveal_opaque" [EApply (transparent_id x, es)]), prec)
     | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Bop BExply, [e1; e2]) -> (r prec (EOp (Bop BImply, [e2; e1])), prec)
     | EOp (Bop op, [e1; e2]) ->
       (
         let isChainOp (op:bop):bool =
@@ -115,10 +126,12 @@ let rec string_of_exp_prec prec e =
     | EOp (FieldUpdate x, [e1; e2]) -> ("{" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "}", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
     | EApply (x, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
+    | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
     | EBind (Lambda, [], xs, ts, e) -> qbind "fun" " -> " xs ts e
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " = " + (r 5 ex) + " in " + (r 5 e), 6)
+    | EBind (BindLet, [ex], xs, [], e) -> ("let (" + String.concat ", " (List.map string_of_formal xs) + ") = " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
@@ -140,6 +153,9 @@ and string_of_exps (es:exp list):string = String.concat " " (List.map string_of_
 and string_of_exps_tail (es:exp list):string = String.concat "" (List.map (fun e -> " " + string_of_exp e) es)
 and string_of_args (es:exp list):string = match es with [] -> "()" | _ -> string_of_exps es
 
+let name_of_formal (x:id, t:typ option) = sid x
+let type_of_formal (x:id, t:typ option) = match t with None -> "_" | Some t -> (string_of_typ t)
+
 let string_of_lhs_formal ((x, tOpt):lhs):string = match tOpt with Some (t, _) -> string_of_formal (x, t) | _ -> sid x
 
 let val_string_of_formals (xs:formal list) =
@@ -157,21 +173,22 @@ let string_of_decrease (es:exp list) n =
   | [] -> ""
   | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map string_of_exp es)) n
   
-let string_of_outs_exp (outs:formal list option):string =
+let string_of_outs_exp (outs:(bool * formal list) option):string =
   match outs with
   | None -> "()"
-  | Some fs -> string_of_exp_prec 0 (EApply (Id "tuple", List.map (fun (x, _) -> EVar x) fs))
+  | Some (dep, fs) ->
+      let sDep = if dep then "|" else "" in
+      "(" + sDep + (String.concat ", " (List.map name_of_formal fs)) + sDep + ")"
 
-let name_of_formal (x:id, t:typ option) = sid x
-let type_of_formal (x:id, t:typ option) = match t with None -> "_" | Some t -> (string_of_typ t)
-
-let string_of_outs_formals (outs:formal list option):string =
+let string_of_outs_formals (outs:(bool * formal list) option):string =
   match outs with
   | None -> "()"
-  //| Some fs -> "(" + (String.concat ", " (List.map string_of_formal fs)) + ")"
-  | Some fs -> "(" + (String.concat ", " (List.map name_of_formal fs)) + "):(" + (String.concat " * " (List.map type_of_formal fs)) + ")"
+  | Some (dep, fs) ->
+      let sDep = if dep then "|" else "" in
+      "(" + sDep + (String.concat ", " (List.map name_of_formal fs)) + sDep + "):(" +
+      (String.concat (if dep then " & " else " * ") (List.map string_of_ret fs)) + ")"
 
-let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
+let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):unit =
   match s with
   | SLoc (loc, s) -> try emit_stmt ps outs s with err -> raise (LocErr (loc, err))
   | SLabel _ -> err "unsupported feature: labels (unstructured code)"
@@ -195,20 +212,20 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_formal outs)) + ") =");
       ps.PrintLine "(";
       ps.Indent ();
-      emit_stmt ps (Some outs) s;
+      emit_stmt ps (Some (false, outs)) s;
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
-  | SFastBlock ss -> internalErr "fast_block"
+  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp e) + " then");
       emit_block ps "" outs ss1;
       ps.PrintLine ("else");
       emit_block ps (match outs with None -> ";" | Some _ -> "") outs ss2
   | SWhile (e, invs, (_, ed), ss) ->
-      let st = match outs with None -> "()" | Some fs -> String.concat " * " (List.map string_of_ret fs) in
+      let st = match outs with None -> "()" | Some (dep, fs) -> String.concat (if dep then " & " else " * ") (List.map string_of_ret fs) in
       let sWhile = sid (Reserved "while") in
-      let sParams = match outs with None -> "()" | Some fs -> string_of_formals fs in
+      let sParams = match outs with None -> "()" | Some (_, fs) -> string_of_formals fs in
       ps.PrintLine ("let rec " + sWhile + " " + sParams + " : Ghost (" + st + ")");
       ps.Indent ();
       let inv = and_of_list (List.map snd invs) in
@@ -216,7 +233,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.PrintLine ("(ensures (fun " + string_of_outs_exp outs + " -> (not (" + (string_of_exp e) + ")) /\ " + (string_of_exp inv) + "))");
       let () =
         match (ed, outs) with
-        | ([], Some ((x, _)::_)) -> ps.PrintLine ("(decreases " + (sid x) + ")")
+        | ([], Some (_, ((x, _)::_))) -> ps.PrintLine ("(decreases " + (sid x) + ")")
         | (_::_, _) -> ps.PrintLine ("(decreases (" + (String.concat ", " (List.map string_of_exp ed)) + "))")
         | ([], _) -> ()
         in
@@ -225,7 +242,7 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
       ps.Indent ();
       ps.PrintLine ("let " + (string_of_outs_formals outs) + " =");
       emit_block ps "" outs ss;
-      let args = match outs with None -> "()" | Some fs -> String.concat " " (List.map (fun (x, _) -> sid x) fs) in
+      let args = match outs with None -> "()" | Some (_, fs) -> String.concat " " (List.map (fun (x, _) -> sid x) fs) in
       ps.PrintLine ("in " + sWhile + " " + args);
       ps.Unindent ();
       ps.PrintLine ("else " + (string_of_outs_exp outs));
@@ -318,46 +335,58 @@ let rec emit_stmt (ps:print_state) (outs:formal list option) (s:stmt):unit =
         ps.PrintLine(l + "();");
     )
   | SExists (xs, ts, e) -> notImplemented "exists statements"
-and emit_stmts (ps:print_state) (outs:formal list option) (stmts:stmt list) =
+and emit_stmts (ps:print_state) (outs:(bool * formal list) option) (stmts:stmt list) =
   List.iter (emit_stmt ps None) stmts;
   ps.PrintLine (string_of_outs_exp outs)
-and emit_block (ps:print_state) (suffix:string) (outs:formal list option) (stmts:stmt list) =
+and emit_block (ps:print_state) (suffix:string) (outs:(bool * formal list) option) (stmts:stmt list) =
   ps.PrintLine "(";
   ps.Indent ();
   emit_stmts ps outs stmts;
   ps.Unindent ();
   ps.PrintLine (")" + suffix)
 
-let collect_spec (loc:loc, s:spec):(exp list * exp list) =
-  try
-    match s with
-    | Requires (_, e) -> ([e], [])
-    | Ensures (_, e) -> ([], [e])
-    | Modifies _ -> ([], [])
-    | SpecRaw _ -> internalErr "SpecRaw"
-  with err -> raise (LocErr (loc, err))
-
-let collect_specs (ss:(loc * spec) list):(exp list * exp list) =
-  let (rs, es) = List.unzip (List.map collect_spec ss) in
-  (List.concat rs, List.concat es)
+let emit_laxness (ps:print_state) (a:attrs):unit =
+  if !disable_verify then
+    let isAdmit = attrs_get_bool (Id "admit") false a in
+    let isLax = attrs_get_bool (Id "lax") false a in
+    let emit (ps:print_state) (prev:string ref) (opts:string):unit =
+      let s = if isAdmit || isLax then "\"--lax\"" else opts in
+      if !prev <> s then
+       (
+        prev := s;
+        ps.PrintUnbrokenLine ("#reset-options " + s)
+       )
+      in
+    emit ps prevResetOptionsPs !resetOptions;
+    match ps.print_interface with None -> () | Some psi -> emit psi prevResetOptionsPsi ""
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
-  let isOpaqueAttr (x, es) = match (x, es) with (Id "opaque", ([] | [EBool true])) -> true | _ -> false in
-  let isOpaque = List.exists isOpaqueAttr f.fattrs in
+  let isOpaqueToSmt = attrs_get_bool (Id "opaque_to_smt") false f.fattrs in
+  let isOpaque = attrs_get_bool (Id "opaque") false f.fattrs in
+  let isPublic = attrs_get_bool (Id "public") false f.fattrs in
+  let isPublicDecl = attrs_get_bool (Id "public_decl") false f.fattrs in
+  let isQAttr = attrs_get_bool (Id "qattr") false f.fattrs in
+  let isAdmit = attrs_get_bool (Id "admit") false f.fattrs in
+  let isPublicDecl = isPublicDecl || (isOpaque && isAdmit) in
+  let isOpaque = isOpaque && not isAdmit in
   let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
+  let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
+  emit_laxness ps f.fattrs;
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x decreases = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) + decreases in
-  let printBody header x e =
-    ps.PrintLine (header + x + " " + (let_string_of_formals false f.fargs) + " =");
+  let printBody header hasDecl x e =
+    (if isOpaqueToSmt || isQAttr then ps.PrintLine ("[@" + (if isOpaqueToSmt then " \"opaque_to_smt\"" else "") + (if isQAttr then " va_qattr" else "") + "]"));
+    let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
+    ps.PrintLine (header + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();
-    ps.PrintLine (string_of_exp e);
+    ps.PrintLine (if isAdmit then "admit ()" else string_of_exp e);
     ps.Unindent ()
     in
   let header = if isRecursive then "let rec " else "let " in
-  // add custom metrics to convince F* that mutually recursive functions terminates
+  // add custom metrics to convince F* that mutually recursive functions terminate
   let dArgs = List.map (fun (x, _) -> EVar x) f.fargs in
   let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
   let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
@@ -366,82 +395,77 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     psi.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody header (sid (transparent_id f.fname)) e
+      | Some e -> printBody header true (sid (transparent_id f.fname)) e
     );
-
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
     let header = if isRecursive then "and " else "let " in
-    printBody header (sid f.fname) eOpaque
+    printBody header true (sid f.fname) eOpaque
+  else if isPublicDecl then
+    psi.PrintLine (sVal (sid f.fname) decreases1);
+    ( match f.fbody with
+      | None -> ()
+      | Some e -> printBody header true (sid f.fname) e
+    )
   else
   (
     match f.fbody with
     | None -> ()
-    | Some e -> printBody header (sid f.fname) e
+    | Some e -> printBody header false (sid f.fname) e
   )
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
-  let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
-  let decreaseExps = attrs_get_exps_opt (Id "decrease") p.pattrs in
-  let (reqs, enss) = collect_specs p.pspecs in
+  let (reqs, enss) = collect_specs false p.pspecs in
   let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
-  let fast_state = attrs_get_bool (Id "fast_state") false p.pattrs in
+  let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
+  let decreaseExps = attrs_get_exps_opt (Id "decrease") p.pattrs in
+  let isAdmit = attrs_get_bool (Id "admit") false p.pattrs in
+  let isDependent = attrs_get_bool (Id "dependent") false p.pattrs in
+  let isReducible = attrs_get_bool (Id "reducible") false p.pattrs in
+  let isReducible = isReducible || isAdmit || (p.prets = []) in
+  let tactic = if isAdmit then None else tactic in
+  emit_laxness ps p.pattrs;
   let args = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s decreases =
     ps.Indent ();
-    let st = String.concat " * " (List.map string_of_pformal p.prets) in
-    ps.PrintLine (s + "Ghost (" + st + ")" + decreases);
+    let st = String.concat (if isDependent then " & " else " * ") (List.map string_of_pformal p.prets) in
+    ps.PrintLine (s + (match p.prets with [] -> "Lemma" | _ -> "Ghost (" + st + ")" + decreases));
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
-    let sprets = String.concat ", " (List.map string_of_pformal p.prets) in
-    ps.PrintLine ("(ensures (fun (" + sprets + ") -> " + (string_of_exp es) + "))");
+    let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
+    let sDep = if isDependent then "|" else "" in
+    ps.PrintLine ("(ensures (" + (match p.prets with [] -> "" | _ -> "fun (" + sDep + sprets + sDep + ") -> ") + (string_of_exp es) + "))");
     ps.Unindent ();
     in
-  // add custom metrics to convince F* that mutually recursive functions terminates
   let dArgs = match decreaseExps with Some es -> es | None -> List.map (fun (x, _) -> EVar x) args in
   let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
-  let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
-  ( match (tactic, ps.print_interface, fast_state) with
-    | (Some _, None, _) -> ()
-    | (_, _, false) ->
+  ( match (tactic, ps.print_interface) with
+    | (Some _, None) -> ()
+    | (_, _) ->
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
-        printPType psi "-> " decreases1
-    | (_, _, true) ->
-        psi.PrintLine ("val " + (sid (internal_id p.pname)) + " : " + (val_string_of_formals args));
-        printPType psi "-> " decreases1
-        psi.PrintLine ("unfold let " + (sid p.pname) + (let_string_of_formals true args));
-        printPType psi ": " "";
-        psi.PrintLine "=";
-        let sArgs = string_of_args (List.map (fun (x, _) -> EVar x) args) in
-        let sRets = "(" + (String.concat ", " (List.map (fun (x, _) -> sid x) rets)) + ")" in
-        let eFrame = attrs_get_exp (Reserved "fast_state_frame_exp") p.pattrs in
-        psi.PrintLine ("let " + sRets + " = " + (sid (internal_id p.pname)) + " " + sArgs + " in");
-        psi.PrintLine ("let va_sM = va_normalize_term (" + (string_of_exp eFrame) + ") in");
-        psi.PrintLine sRets
+        printPType psi "-> " decreases0
   );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
-        // omit the "irreducible" qualifier from recursive procedures until  we no longer 
-        // have to have separate "lemma" and "irreducible_lemma" functions
-        let irreducible = if isRecursive then "" else "irreducible " in
-        ps.PrintLine (irreducible + "val " + (sid (irreducible_id p.pname)) + " : " + (val_string_of_formals args));
-        printPType ps "-> " decreases0
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
+        (if not isReducible then ps.PrintLine "[@\"opaque_to_smt\"]");
         let header = if isRecursive then "let rec " else "let " in
-        ps.PrintLine (irreducible + header + (sid (irreducible_id p.pname)) + " " + formals + " =");
-//        ps.PrintLine ("irreducible let " + (sid p.pname) + " " + formals + " =");
+        ps.PrintLine (header + (sid p.pname) + " " + formals + " =")
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
         let (_, ss) = let_updates_stmts mutable_scope ss in
         let outs = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
-        emit_stmts ps (Some outs) ss;
+        if isAdmit then
+          ps.PrintLine "admit ()"
+        else
+          emit_stmts ps (Some (isDependent, outs)) ss;
         ps.Unindent ();
         ( match tactic with
           | None -> ()
@@ -449,27 +473,31 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
               ps.PrintLine ") <: ("
               printPType ps "" "";
               ps.PrintLine (") by " + (string_of_exp_prec 99 e))
-        );
-        let header = if isRecursive then "and " else "let " in
-        ps.PrintLine (header + (sid (if fast_state then internal_id p.pname else p.pname)) + " " + formals + " = " + (sid (irreducible_id p.pname)) + " " + formals)
+        )
   )
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim (args, lines) ->
+    | DVerbatim (attrs, lines) ->
       (
-        (match args with
-          | [] | ["interface"] | ["implementation"] | ["interface"; "implementation"] -> ()
-          | _ -> err ("unexpected arguments to #verbatim: " + (String.concat "," (List.map (fun x -> "'" + x + "'") args)))
-        );
-        match (args, ps.print_interface) with
-        | (["interface"], Some psi) -> List.iter psi.PrintUnbrokenLine lines
-        | (["interface"; "implementation"], Some psi) ->
+        emit_laxness ps attrs;
+        let isInterface = attrs_get_bool (Id "interface") false attrs in
+        let isImplementation = attrs_get_bool (Id "implementation") false attrs in
+        match (isInterface, isImplementation, ps.print_interface) with
+        | (true, false, Some psi) -> List.iter psi.PrintUnbrokenLine lines
+        | (true, true, Some psi) ->
             List.iter psi.PrintUnbrokenLine lines;
             List.iter ps.PrintUnbrokenLine lines
         | _ -> List.iter ps.PrintUnbrokenLine lines
       )
+    | DPragma (ModuleName s) ->
+        ps.PrintLine ("module " + s);
+        match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("module " + s)
+    | DPragma (ResetOptions s) ->
+        resetOptions := s;
+        prevResetOptionsPs := s;
+        ps.PrintUnbrokenLine ("#reset-options " + s)
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

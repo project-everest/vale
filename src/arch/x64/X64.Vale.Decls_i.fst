@@ -48,7 +48,8 @@ let lemma_valid_cmp_ge s o1 o2 = ()
 let lemma_valid_cmp_lt s o1 o2 = ()
 let lemma_valid_cmp_gt s o1 o2 = ()
 
-let va_lemma_merge_total = Lemmas_i.lemma_merge_total
+let va_compute_merge_total = Lemmas_i.compute_merge_total
+let va_lemma_merge_total b0 s0 f0 sM fM sN = Lemmas_i.lemma_merge_total b0 s0 f0 sM fM sN; Lemmas_i.compute_merge_total f0 fM
 let va_lemma_empty_total = Lemmas_i.lemma_empty_total
 let va_lemma_ifElse_total = Lemmas_i.lemma_ifElse_total
 let va_lemma_ifElseTrue_total = Lemmas_i.lemma_ifElseTrue_total

@@ -3,10 +3,9 @@ include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
 include "../../../arch/x64/X64.Vale.InsAes.vaf"
 
-#verbatim interface implementation
-
 module X64.AES
 
+#verbatim{:interface}{:implementation}
 open Types_s
 open FStar.Seq
 open AES_s
@@ -20,9 +19,9 @@ open X64.Vale.InsAes
 open AES_helpers_i
 open Opaque_i
 
-#endverbatims
+#endverbatim
 
-#verbatim interface
+#verbatim{:interface}
 
 #reset-options "--max_fuel 5 --initial_fuel 5"
 let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
@@ -33,9 +32,7 @@ let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
 
 #endverbatim
 
-#verbatim
 #reset-options "--z3rlimit 400" 
-#endverbatim
 
 ///////////////////////////
 // KEY EXPANSION

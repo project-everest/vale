@@ -39,7 +39,7 @@ let bop2opcode (op:bop):BinaryExpr.Opcode =
   | BExply -> BinaryExpr.Opcode.Exp
   | BAnd | BLand -> BinaryExpr.Opcode.And
   | BOr | BLor -> BinaryExpr.Opcode.Or
-  | BEq -> BinaryExpr.Opcode.Eq
+  | BEq | BSeq -> BinaryExpr.Opcode.Eq
   | BNe -> BinaryExpr.Opcode.Neq
   | BLt -> BinaryExpr.Opcode.Lt
   | BGt -> BinaryExpr.Opcode.Gt
@@ -56,6 +56,7 @@ let bop2opcode (op:bop):BinaryExpr.Opcode =
 let is_rel_op (op:bop):bool =
   match op with
   | BEq -> true
+  | BSeq-> true
   | BNe -> true
   | BLt -> true
   | BGt -> true
@@ -194,7 +195,7 @@ let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:Resize
         let tok = create_token loc (string_of_bop op) in
         // validate op against current operator chain
         match op with
-            | BEq -> ()
+            | BEq | BSeq -> ()
             | BNe -> if ops.Contains BinaryExpr.Opcode.Neq then err "a chain cannot have more than one != operator"
             | BLt -> if (ops.Contains BinaryExpr.Opcode.Ge || ops.Contains BinaryExpr.Opcode.Gt) then err "this operator chain cannot continue with an ascending operator"
             | BLe -> if (ops.Contains BinaryExpr.Opcode.Ge || ops.Contains BinaryExpr.Opcode.Gt) then err "this operator chain cannot continue with an ascending operator"
@@ -262,7 +263,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let exp = create_expression built_ins loc e in
           let id = create_token loc (sid x + "?") in
           new ExprDotName(id, exp, id.``val``, null) :> Expression
-      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr "unary operator"
+      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr "unary operator"
       | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
       | EOp (Bop op, [e1; e2]) ->
           if need_rel_chain x
@@ -554,7 +555,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         stmts
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock ss -> notImplemented "block"
-    | SFastBlock ss -> internalErr "fast_block"
+    | SQuickBlock _ -> internalErr "quick_block"
     | SIfElse (_, e, ss1, ss2) ->
         let tok = create_token loc "if" in
         let guard = create_expression built_ins loc e in
@@ -682,6 +683,7 @@ let create_dafny_decl (mdl:LiteralModuleDecl) (built_ins:BuiltIns) (loc:loc, d:d
         let s = String.concat "" (List.map (fun s -> s + System.Environment.NewLine) lines) in
         let errCount = DafnyDriver.Parse_Verbatim_Block(s, loc.loc_file, loc.loc_line, mdl, built_ins) in
         if errCount > 0 then internalErr (sprintf "%i parse errors detected within verbatim block in %s at (%i,%i)/n" errCount loc.loc_file loc.loc_line loc.loc_col)
+    | DPragma _ -> ()
     | DVar _ -> ()
     | DFun f -> default_class.Members.Add(build_fun built_ins loc f)
     | DProc p ->

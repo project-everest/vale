@@ -125,6 +125,7 @@ let check_if_ins_consumes_fixed_time ins fuel ts =
 	  let ts' = set_taint dst ts' Public in
 	  fixedTime, TaintState ts'.regTaint Secret
         else begin match dst with
+	  | OConst _ -> false, ts (* Should not happen *)
 	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret)
 	  | OMem m -> (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), (TaintState ts'.regTaint Secret)
         end
@@ -136,9 +137,9 @@ let check_if_ins_consumes_fixed_time ins fuel ts =
   in
   b, ts'
 
-val lemma_public_flags_same: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins) -> Lemma (forall s1 s2. publicFlagValuesAreSame ts s1 s2 ==> publicFlagValuesAreSame (snd (check_if_ins_consumes_fixed_time ins fuel ts)) (taint_eval_ins ins s1) (taint_eval_ins ins s2))
+//val lemma_public_flags_same: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins) -> Lemma (forall s1 s2. publicFlagValuesAreSame ts s1 s2 ==> publicFlagValuesAreSame (snd (check_if_ins_consumes_fixed_time ins fuel ts)) (taint_eval_ins ins s1) (taint_eval_ins ins s2))
 
-let lemma_public_flags_same ts fuel ins = ()
+//let lemma_public_flags_same ts fuel ins = ()
 
 val lemma_mov_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mov64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in

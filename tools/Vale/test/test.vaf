@@ -1,7 +1,8 @@
 include "../../../src/arch/x64/X64.Vale.InsBasic.vaf"
 
-#verbatim interface implementation
 module Test
+
+#verbatim{:interface}{:implementation}
 open X64.Machine_s
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -19,7 +20,7 @@ procedure p()
     Add64Wrap(rax, 2);
 }
 
-#verbatim implementation
+#verbatim{:implementation}
 let double (x:int):int = x + x
 #endverbatim
 

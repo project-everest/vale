@@ -7,6 +7,14 @@ open Parse
 open Parse_util
 open System.Numerics
 
+type lex_mode =
+| LexNormal
+| LexVerbatim // after end-of-line, start reading verbatim lines
+
+let mode = ref LexNormal
+
+let init_lex () = mode := LexNormal
+
 let macros = ref (Map.empty:Map<string,token list>)
 let lexeme (lexbuf:LexBuffer<_>):(string) = System.Text.Encoding.ASCII.GetString lexbuf.Lexeme
 let next_line (lexbuf:LexBuffer<_>) = lexbuf.EndPos <- lexbuf.EndPos.NextLine
@@ -64,47 +72,55 @@ and preprocess_skip deep = parse
 and skip_line = parse
 | [^'\n''\r']*  {()}
 and file_name = parse
-| [' ']*[^' ''\n''\r']+[^'\n''\r']* { token lexbuf }
-| [^'\n''\r']* { token lexbuf }
+| [' ']*[^' ''\n''\r']+[^'\n''\r']* { lextoken lexbuf }
+| [^'\n''\r']* { lextoken lexbuf }
 and line_number = parse
 | ['0'-'9']+ { file_name lexbuf }
-and verbatim loc lines line = parse
-| "\n\r" { next_line lexbuf; verbatim loc (line::lines) "" lexbuf }
-| "\r\n" { next_line lexbuf; verbatim loc (line::lines) "" lexbuf }
-| ['\n''\r'] { next_line lexbuf; verbatim loc (line::lines) "" lexbuf }
+and verbatim lines line = parse
+| "\n\r" { next_line lexbuf; verbatim (line::lines) "" lexbuf }
+| "\r\n" { next_line lexbuf; verbatim (line::lines) "" lexbuf }
+| ['\n''\r'] { next_line lexbuf; verbatim (line::lines) "" lexbuf }
 | [^'\n''\r']*
 {
+  mode := LexNormal;
   let s = (lexeme lexbuf) in
-  if s.Trim().StartsWith("#endverbatim") then VERBATIM_BLOCK (loc, List.rev lines)
-  else verbatim loc lines s lexbuf
+  if s.Trim().StartsWith("#endverbatim") then VERBATIM_BLOCK (List.rev lines)
+  else verbatim lines s lexbuf
 }
 and end_line = parse
-| "\n\r" { next_line lexbuf; token lexbuf }
-| "\r\n" { next_line lexbuf; token lexbuf }
-| ['\n''\r'] { next_line lexbuf; token lexbuf }
-and token = parse
-| "\n\r" { next_line lexbuf; token lexbuf }
-| "\r\n" { next_line lexbuf; token lexbuf }
-| ['\n''\r'] { next_line lexbuf; token lexbuf }
-| [' ']+ { token lexbuf }
-| "//"[^'\n''\r']* { token lexbuf }
+| "\n\r" { next_line lexbuf; lextoken lexbuf }
+| "\r\n" { next_line lexbuf; lextoken lexbuf }
+| ['\n''\r'] { next_line lexbuf; lextoken lexbuf }
+and lextoken = parse
+| "\n\r" { next_line lexbuf; match !mode with LexNormal -> lextoken lexbuf | LexVerbatim -> verbatim [] "" lexbuf }
+| "\r\n" { next_line lexbuf; match !mode with LexNormal -> lextoken lexbuf | LexVerbatim -> verbatim [] "" lexbuf }
+| ['\n''\r'] { next_line lexbuf; match !mode with LexNormal -> lextoken lexbuf | LexVerbatim -> verbatim [] "" lexbuf }
+| [' ']+ { lextoken lexbuf }
+| "//"[^'\n''\r']* { lextoken lexbuf }
 | "#line"[' ']+ { line_number lexbuf }
-| "/*" { comment lexbuf ; token lexbuf }
-| "(*" { comment lexbuf ; token lexbuf }
+| "/*" { comment lexbuf ; lextoken lexbuf }
+| "(*" { comment lexbuf ; lextoken lexbuf }
 | "#ifdef"[' ']+['A'-'Z''a'-'z''0'-'9''_''$''?']+
 {
   let s = lexeme lexbuf in
   let x = s.Substring("#ifdef".Length).Trim() in
-  if Map.containsKey x !macros then token lexbuf else (preprocess_skip false lexbuf ; token lexbuf)
+  if Map.containsKey x !macros then lextoken lexbuf else (preprocess_skip false lexbuf ; lextoken lexbuf)
 }
 | "#ifndef"[' ']+['A'-'Z''a'-'z''0'-'9''_''$''?']+
 {
   let s = lexeme lexbuf in
   let x = s.Substring("#ifndef".Length).Trim() in
-  if not (Map.containsKey x !macros) then token lexbuf else (preprocess_skip false lexbuf ; token lexbuf)
+  if not (Map.containsKey x !macros) then lextoken lexbuf else (preprocess_skip false lexbuf ; lextoken lexbuf)
 }
-| "#else" { preprocess_skip false lexbuf ; token lexbuf }
-| "#endif" { token lexbuf }
+| "#else" { preprocess_skip false lexbuf ; lextoken lexbuf }
+| "#endif" { lextoken lexbuf }
+| "#reset-options" { RESET_OPTIONS (curLoc lexbuf, "") }
+| "#reset-options "[^'\n''\r']*
+{
+  let s = lexeme lexbuf in
+  let i1 = "#reset-options ".Length in
+  RESET_OPTIONS (curLoc lexbuf, s.Substring(i1))
+}
 | "#token"[' ']+[^' ''\n''\r']+[' ']+"precedence"[' ']+[^' ''\n''\r']+[' ']*
 {
   let s = lexeme lexbuf in
@@ -119,7 +135,7 @@ and token = parse
     | Some f -> custom_tokens := Map.add name f !custom_tokens);
   end_line lexbuf
 }
-| "#verbatim" { verbatim (curLoc lexbuf) [] "" lexbuf }
+| "#verbatim" { mode := LexVerbatim; VERBATIM (curLoc lexbuf) }
 | ";" { SEMI (curLoc lexbuf) }
 | "(" { LPAREN (curLoc lexbuf) }
 | ")" { RPAREN (curLoc lexbuf) }
@@ -161,12 +177,12 @@ and token = parse
 | "axiom" { AXIOM (curLoc lexbuf) }
 | "extern" { EXTERN (curLoc lexbuf) }
 | "procedure" { PROCEDURE (curLoc lexbuf) }
-| "implementation" { IMPLEMENTATION (curLoc lexbuf) }
 | "lets" { LETS (curLoc lexbuf) }
 | "requires" { REQUIRES (curLoc lexbuf) }
 | "ensures" { ENSURES (curLoc lexbuf) }
 | "reads" { READS (curLoc lexbuf) }
 | "modifies" { MODIFIES (curLoc lexbuf) }
+| "preserves" { PRESERVES (curLoc lexbuf) }
 | "decreases" { DECREASES (curLoc lexbuf) }
 | "invariant" { INVARIANT (curLoc lexbuf) }
 | "assert" { ASSERT (curLoc lexbuf) }
@@ -175,6 +191,7 @@ and token = parse
 | "calc" { CALC (curLoc lexbuf) }
 | "havoc" { HAVOC (curLoc lexbuf)}
 | "goto" { GOTO (curLoc lexbuf) }
+| "lemma" { LEMMA (curLoc lexbuf) }
 | "call" { CALL (curLoc lexbuf) }
 | "forall" { FORALL (curLoc lexbuf) }
 | "exists" { EXISTS (curLoc lexbuf) }
@@ -198,7 +215,6 @@ and token = parse
 | "reveal" { REVEAL (curLoc lexbuf) }
 | "static" { STATIC (curLoc lexbuf) }
 | "module" { MODULE (curLoc lexbuf) }
-| "interface" { INTERFACE (curLoc lexbuf) }
 | "import" { IMPORT (curLoc lexbuf) }
 | "ghost" { GHOST (curLoc lexbuf) }
 | "inline" { INLINE (curLoc lexbuf) }
