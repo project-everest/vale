@@ -197,7 +197,6 @@ procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
     inline if (0 < n <= 10) {
         ghost var w_mid:seq(nat32);
         w_mid := KeyExpansionRoundUnrolledRecursive(key, w_in, dst, n-1);
-assume false;
         assert validDstAddrs128(mem, rdx, dst, 11);
         assert key_expansion_partial(AES_128, key, w_mid, 4+(n-1)*4);
         assert rdx % 16 == 0;
