@@ -1056,6 +1056,15 @@ and add_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):stmt list
       (SQuickBlock (info, ss1))::(add_quick_blocks_stmts env next_sym ss2)
   | s::ss -> (add_quick_blocks_stmt env next_sym s)::(add_quick_blocks_stmts env next_sym ss)
 
+let add_quick_type_stmts (ss:stmt list):stmt list =
+  let fs (s:stmt) =
+    match s with
+    | SAssert ({is_quicktype = true}, e) ->
+        Replace [SAssign ([(Id "_", Some (None, Ghost))], EApply (Id "AssertQuickType", [e]))]
+    | _ -> Unchanged
+    in
+  map_stmts (fun e -> e) fs ss
+
 ///////////////////////////////////////////////////////////////////////////////
 // Hoist while loops into top-level procedures
 
@@ -1338,6 +1347,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
         let ss = resolve_overload_stmts envp ss in
         //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
+        let ss = add_quick_type_stmts ss in
         let ss = rewrite_vars_stmts envp ss in
         let ss = add_quick_blocks_stmts envp (ref 0) ss in
         Some ss

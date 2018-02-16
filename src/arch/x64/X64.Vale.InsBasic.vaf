@@ -40,6 +40,13 @@ var{:state reg(R15)} r15:nat64;
 var{:state flags()} efl:nat64;
 var{:state mem()} mem:mem;
 
+procedure{:quick exportOnly} AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
+    requires
+        p;
+{
+    u := tuple();
+}
+
 procedure{:instruction Ins(S.Mov64(dst,src))}{:fast_instruction}{:quick exportOnly} Mov64(inout dst: dst_opr64, src: opr64)
     ensures
         dst == old(src);
