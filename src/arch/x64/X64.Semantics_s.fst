@@ -229,19 +229,19 @@ let eval_ins (ins:ins) : st unit =
 
   | Xor64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (Types_s.logxor (eval_operand dst s) (eval_operand src s))
+    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s))
 
   | And64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (Types_s.logand (eval_operand dst s) (eval_operand src s))
+    update_operand dst ins (Types_s.iand (eval_operand dst s) (eval_operand src s))
 
   | Shr64 dst amt ->
     check (valid_shift_operand amt);;
-    update_operand dst ins (Types_s.shift_right (eval_operand dst s) (eval_operand amt s))
+    update_operand dst ins (Types_s.ishr (eval_operand dst s) (eval_operand amt s))
 
   | Shl64 dst amt ->
     check (valid_shift_operand amt);;
-    update_operand dst ins (Types_s.shift_left (eval_operand dst s) (eval_operand amt s))
+    update_operand dst ins (Types_s.ishl (eval_operand dst s) (eval_operand amt s))
 
 (*
  * these functions return an option state

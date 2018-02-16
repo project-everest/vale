@@ -22,9 +22,10 @@ let nat128 = natN nat128_max
 
 let add_wrap (#n:nat) (x:natN n) (y:natN n) : natN n = if x + y < n then x + y else x + y - n
 
-assume val logand : #n:nat -> a:natN n -> b:natN n -> natN n
-assume val logxor : #n:nat -> a:natN n -> b:natN n -> natN n
-assume val logor : #n:nat -> a:natN n -> b:natN n -> natN n
-assume val lognot : #n:nat -> a:natN n  -> natN n
-assume val shift_left : #n:nat -> a:natN n -> s:int -> natN n
-assume val shift_right : #n:nat -> a:natN n -> s:int -> natN n
+// abstract bitwise operations on integers:
+assume val iand : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val ixor : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val ior : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val inot : #n:nat -> a:natN n  -> natN n
+assume val ishl : #n:nat -> a:natN n -> s:int -> natN n
+assume val ishr : #n:nat -> a:natN n -> s:int -> natN n

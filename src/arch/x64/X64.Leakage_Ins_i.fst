@@ -284,8 +284,8 @@ let lemma_and_same_public ts fuel ins s1 s2 =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.logand v11 v12 in
-	  let v2 = Types_s.logand v21 v22 in
+	  let v1 = Types_s.iand v11 v12 in
+	  let v2 = Types_s.iand v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
@@ -390,8 +390,8 @@ let lemma_shr_same_public ts fuel ins s1 s2 =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.shift_right v11 v12 in
-	  let v2 = Types_s.shift_right v21 v22 in
+	  let v1 = Types_s.ishr v11 v12 in
+	  let v2 = Types_s.ishr v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
@@ -421,8 +421,8 @@ let lemma_shl_same_public ts fuel ins s1 s2 =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.shift_left v11 v12 in
-	  let v2 = Types_s.shift_left v21 v22 in
+	  let v1 = Types_s.ishl v11 v12 in
+	  let v2 = Types_s.ishl v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
@@ -435,10 +435,10 @@ val lemma_xor_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let
 (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-val lemma_aux_xor: (x:nat64) -> Lemma (Types_s.logxor x x = 0)
+val lemma_aux_xor: (x:nat64) -> Lemma (Types_s.ixor x x = 0)
 
 let lemma_aux_xor x =
-  TypesNative_s.reveal_logxor 64 x x;
+  TypesNative_s.reveal_ixor 64 x x;
   FStar.UInt.logxor_self #64 x
 
 let lemma_xor_same_public ts fuel ins s1 s2 =
@@ -446,7 +446,7 @@ let lemma_xor_same_public ts fuel ins s1 s2 =
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
-  assert_by_tactic (forall (v:nat64). Types_s.logxor v v = 0) (v <-- forall_intro; apply_lemma (quote lemma_aux_xor));
+  assert_by_tactic (forall (v:nat64). Types_s.ixor v v = 0) (v <-- forall_intro; apply_lemma (quote lemma_aux_xor));
   match dsts with
     | [OConst _] -> ()
     | [OReg _] -> ()
@@ -459,8 +459,8 @@ let lemma_xor_same_public ts fuel ins s1 s2 =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.logxor v11 v12 in
-	  let v2 = Types_s.logxor v21 v22 in
+	  let v1 = Types_s.ixor v11 v12 in
+	  let v2 = Types_s.ixor v21 v22 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;

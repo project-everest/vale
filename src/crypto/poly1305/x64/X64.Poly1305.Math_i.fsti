@@ -5,10 +5,10 @@ open Types_s
 open Poly1305.Spec_s
 open Opaque_i
 
-unfold let logand64 (x:nat64) (y:nat64) : nat64 = Types_s.logand x y
-unfold let logand128 (x:nat128) (y:nat128) : nat128 = Types_s.logand x y
-unfold let shift_left64 (x:nat64) (amt:nat64) : nat64 = Types_s.shift_left x amt
-unfold let shift_right64 (x:nat64) (amt:nat64) : nat64 = Types_s.shift_right x amt
+unfold let logand64 (x:nat64) (y:nat64) : nat64 = Types_s.iand x y
+unfold let logand128 (x:nat128) (y:nat128) : nat128 = Types_s.iand x y
+unfold let shift_left64 (x:nat64) (amt:nat64) : nat64 = Types_s.ishl x amt
+unfold let shift_right64 (x:nat64) (amt:nat64) : nat64 = Types_s.ishr x amt
 
 let lowerUpper128 (l:nat64) (u:nat64) : nat128 =
     0x10000000000000000 `op_Multiply` u + l
@@ -152,5 +152,5 @@ let modp_0 () : Lemma
     reveal_opaque modp';
     ()
 
-let bare_r (key_r:nat128) : nat128 = logand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
+let bare_r (key_r:nat128) : nat128 = iand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 

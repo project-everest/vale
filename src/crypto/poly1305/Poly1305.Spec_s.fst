@@ -7,7 +7,7 @@ let modp'(x:int):int =
   x % (nat128_max * 4 - 5)
 
 let and128 (x:nat128) (y:nat128) : nat128 =
-  logand x y
+  iand x y
 
 let rec poly1305_hash_blocks (h:int) (pad:int) (r:int) (inp:int->nat128) (k:nat) : Tot int =
   if k = 0 then h
@@ -17,7 +17,7 @@ let rec poly1305_hash_blocks (h:int) (pad:int) (r:int) (inp:int->nat128) (k:nat)
     modp' ((hh + pad + inp kk) * r)
 
 let poly1305_hash (key_r:nat128) (key_s:nat128) (inp:int->nat128) (len:nat) :int =
-  let r = logand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
+  let r = iand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff in
   let nBlocks = len / 16 in
   let nExtra = len % 16 in
   let padBlocks = nat128_max in
