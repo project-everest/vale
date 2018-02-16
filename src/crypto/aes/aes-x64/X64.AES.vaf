@@ -205,12 +205,11 @@ procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
         w_out := KeyExpansionRound(n-1, aes_rcon(n-1), dst, key, w_mid);
     }
     else {
-//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 0);
-//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 1);
-//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 2);
-//        assert KeyExpansionPredicateSpecific(key, AES_128, w_in, 3);
+        assert key_expansion_specific(AES_128, key, w_in, 0);
+        assert key_expansion_specific(AES_128, key, w_in, 1);
+        assert key_expansion_specific(AES_128, key, w_in, 2);
+        assert key_expansion_specific(AES_128, key, w_in, 3);
         w_out := w_in;
-assume xmm1 == buffer128_read(dst, n, mem);
     }
 }
 
