@@ -2,7 +2,6 @@ module X64.Vale.Lemmas_i
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
-open FStar.UInt
 module S = X64.Semantics_s
 
 unfold let code = S.code

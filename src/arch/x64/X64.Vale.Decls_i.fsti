@@ -382,17 +382,6 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
     eval_while_inv c s0 fN sN
   ))
 
-(* maybe we want these to be transparent*)
-val logxor64 : (x:nat64) -> (y:nat64) -> nat64
-val logand64 : (x:nat64) -> (y:nat64) -> nat64
-val logand128 : (x:nat128) -> (y:nat128) -> nat128
-val shift_left64 : (x:nat64) -> (amt:nat64) -> nat64
-val shift_right64 : (x:nat64) -> (amt:nat64) -> nat64
-
-val reveal_logand128 (x y:nat128) : Lemma
-    (requires True)
-    (ensures logand128 x y == FStar.UInt.logand #128 x y)
-
 val printer : Type0
 val print_string : string -> FStar.All.ML unit
 val print_header : printer -> FStar.All.ML unit

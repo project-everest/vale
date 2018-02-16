@@ -13,9 +13,18 @@ let _ = assert_norm (pow2 32 = nat32_max)
 let _ = assert_norm (pow2 64 = nat64_max)
 let _ = assert_norm (pow2 128 = nat128_max)
 
-type nat8 = x:nat{x < nat8_max}
-type nat16 = x:nat{x < nat16_max}
-type nat32 = x:nat{x < nat32_max}
-type nat64 = x:nat{x < nat64_max}
-type nat128 = x:nat{x < nat128_max}
+let natN (n:nat) = x:nat{x < n}
+let nat8 = natN nat8_max
+let nat16 = natN nat16_max
+let nat32 = natN nat32_max
+let nat64 = natN nat64_max
+let nat128 = natN nat128_max
 
+let add_wrap (#n:nat) (x:natN n) (y:natN n) : natN n = if x + y < n then x + y else x + y - n
+
+assume val logand : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val logxor : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val logor : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val lognot : #n:nat -> a:natN n  -> natN n
+assume val shift_left : #n:nat -> a:natN n -> s:int -> natN n
+assume val shift_right : #n:nat -> a:natN n -> s:int -> natN n
