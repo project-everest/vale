@@ -294,17 +294,17 @@ Stmt
   | ASSUME Exp SEMI { stmtAt $1 (SAssume $2) }
   | ASSERT Exp SEMI { stmtAt $1 (SAssert (assert_attrs_default, $2)) }
   | ASSERT Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], EBool true, $2, $5)) }
-  | ASSERT LBRACECOLON AnyId RBRACE LITBOOL SEMI
+  | ASSERT LBRACECOLON AnyId RBRACE Exp SEMI
     {
       let attrs =
-        match ($3, snd $5) with
-        | (_, false) -> parse_err "expected 'assert{...} true'"
-        | (Id "split_here", true) -> {assert_attrs_default with is_split = true}
-        | (Id "quick_start", true) -> {assert_attrs_default with is_quickstart = true}
-        | (Id "quick_end", true) -> {assert_attrs_default with is_quickend = true}
+        match ($3, skip_loc $5) with
+        | (Id "split_here", EBool true) -> {assert_attrs_default with is_split = true}
+        | (Id "quick_start", EBool true) -> {assert_attrs_default with is_quickstart = true}
+        | (Id "quick_end", EBool true) -> {assert_attrs_default with is_quickend = true}
+        | (Id "quick_type", _) -> {assert_attrs_default with is_quicktype = true}
         | _ -> parse_err ("unknown attribute: " + (err_id $3))
         in
-      stmtAt $1 (SAssert (attrs, EBool true))
+      stmtAt $1 (SAssert (attrs, $5))
     }
   | ASSERT LBRACECOLON AnyId RBRACE LBRACECOLON AnyId RBRACE LITBOOL SEMI
     {

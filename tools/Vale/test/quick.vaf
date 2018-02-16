@@ -256,3 +256,11 @@ procedure{:quick} While(ghost g1:int) returns(ghost go:int)
     Add64(rax, 3);
     go := g2 + gc;
 }
+
+procedure{:quick} TestAssertTyping(ghost i:int) returns(ghost j:nat)
+    requires
+        i >= 0;
+{
+    assert{:quick_type} i >= 0;
+    j := i;
+}

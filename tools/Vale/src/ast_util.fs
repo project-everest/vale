@@ -53,7 +53,15 @@ let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
 let and_of_list = binary_op_of_list BLand (EBool true)
 let or_of_list = binary_op_of_list BLor (EBool false)
 
-let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false; is_quickstart = false; is_quickend = false}
+let assert_attrs_default =
+  {
+    is_inv = false;
+    is_split = false;
+    is_refined = false;
+    is_quickstart = false;
+    is_quickend = false;
+    is_quicktype = false;
+  }
 
 let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
   match es with

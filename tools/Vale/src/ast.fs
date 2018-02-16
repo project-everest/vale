@@ -85,7 +85,7 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool}
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool; is_quicktype:bool}
 type quick_info = {qsym:string; qmods:id list}
 type lhs = id * (typ option * ghost) option
 type stmt =
