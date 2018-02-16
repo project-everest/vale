@@ -604,7 +604,7 @@ procedure{:quick} poly1305_impl(
     Store64_buffer(ctx, r0, 24, ctx_b, 3);
     Store64_buffer(ctx, r1, 32, ctx_b, 4);
 
-    ghost var r:nat128 := ghost lowerUpper128_opaque(r0, r1);
+    ghost var r:nat128 := lowerUpper128_opaque(r0, r1);
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
 
     let mask:nat128 := 0x0ffffffc_0ffffffc_0ffffffc_0fffffff; // REVIEW: why do we need to put this constant in a variable?
@@ -646,21 +646,21 @@ procedure{:quick} poly1305_impl(
         Load64_buffer(rax, ctx, 32, ctx_b, 4);
         Load64_buffer(r8, inp, 0, inp_b, (len_in / 16) * 2);
         Load64_buffer(r9, inp, 8, inp_b, (len_in / 16) * 2 + 1);
-        ghost var a := ghost seqTo128(buffer64_as_seq(mem, inp_b), len_in / 16);
+        ghost var a := seqTo128(buffer64_as_seq(mem, inp_b), len_in / 16);
         assert lowerUpper128_opaque(r8, r9) == a
             by { /* reveal heapletTo128; */ reveal_opaque(lowerUpper128); }
         poly1305_last_block();
-        h := ghost lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
+        h := lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2);
     }
 
     lemma_add_mod128(modp(h), key_s);
     poly1305_reduce_last();
-    h := ghost lowerUpper128_opaque(h0, h1);
+    h := lowerUpper128_opaque(h0, h1);
 
     Load64_buffer(rax, ctx, 40, ctx_b, 5);
     Load64_buffer(rdx, ctx, 48, ctx_b, 6);
     poly1305_add_key_s();
-    h := ghost lowerUpper128_opaque(h0, h1);
+    h := lowerUpper128_opaque(h0, h1);
 
     assert h == poly1305_hash(key_r, key_s, seqTo128(buffer64_as_seq(mem, inp_b)), len_in)
         by { reveal_opaque(mod2_128'); reveal_opaque(modp'); }

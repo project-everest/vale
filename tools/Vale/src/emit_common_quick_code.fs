@@ -60,8 +60,8 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     match skip_loc e with
     | EApply (Id xp, es) when Map.containsKey (Id xp) env.procs ->
         inline_call xp [(x, tOpt)] es
-    | EApply (xp, es) when allowLemma ->
-        lemma_call xp [(x, tOpt)] es
+//    | EApply (xp, es) when allowLemma ->
+//        lemma_call xp [(x, tOpt)] es
     | _ ->
         let e = qlemma_exp e in
         (true, EBind (BindLet, [e], [(x, tOpt)], [], eTail))
