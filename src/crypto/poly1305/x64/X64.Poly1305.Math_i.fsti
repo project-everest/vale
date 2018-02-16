@@ -1,11 +1,14 @@
 module X64.Poly1305.Math_i
 
 open FStar.Mul
-open X64.Machine_s   // needed for nat64
-open X64.Vale.Decls_i // needed for shift_right64, logand64
-open Poly1305.Spec_s // for modp
-open X64.Vale.State_i // for add_wrap
+open Types_s
+open Poly1305.Spec_s
 open Opaque_i
+
+unfold let logand64 (x:nat64) (y:nat64) : nat64 = Types_s.logand x y
+unfold let logand128 (x:nat128) (y:nat128) : nat128 = Types_s.logand x y
+unfold let shift_left64 (x:nat64) (amt:nat64) : nat64 = Types_s.shift_left x amt
+unfold let shift_right64 (x:nat64) (amt:nat64) : nat64 = Types_s.shift_right x amt
 
 let lowerUpper128 (l:nat64) (u:nat64) : nat128 =
     0x10000000000000000 `op_Multiply` u + l
@@ -22,44 +25,6 @@ let mod2_128' x:int = x % nat128_max
 let mod2_128 = make_opaque mod2_128'
 
 let modp = make_opaque modp'
-
-// Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec
-let heapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) : int->nat128 =
-  fun index -> if 0 <= index && index < len / 2 then 
-               (Seq.index s (2*index)) + 0x10000000000000000 * (Seq.index s (2*index + 1)) 
-            else 42
-
-let applyHeapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) (index:int) : nat128 =
-  heapletTo128 s len index 
-
-let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
-        (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0})
-        : Tot int (decreases k)
-    =
-    if k = 0 then h
-    else
-        let kk = k - 2 in
-	//assert (i >= 0 ==> precedes (kk - i) (k-i));
-	//assert (i < 0 ==> precedes (kk - i) (k-i));
-	let hh = poly1305_heap_blocks' h pad r s kk in
-        modp((hh + pad + nat64_max * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
-
-val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : int
-
-val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : Lemma
-  (requires 0 <= k /\ k <= Seq.length s /\ k % 2 == 0)
-  (ensures poly1305_heap_blocks h pad r s k = poly1305_heap_blocks' h pad r s k)
-
-val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
-        (len:nat{ len % 2 == 0 /\ len <= buffer_length b})
-        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : Lemma
-  (requires True)
-//i <= k && k <= i + len /\
- //           (k - i) % 16 == 0 /\
- //           validSrcAddrs m i  64 ((len + 15) / 16 * 16))
-           // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
-  (ensures poly1305_heap_blocks h pad r (buffer64_as_seq m b) k == poly1305_hash_blocks h pad r (heapletTo128 (buffer64_as_seq m b) len) k)
-          
 
 // There are some assumptions here, which will either go away when the library switches to ints everywhere (for division too)
 // or when we switch to nats (which is doable right away)
@@ -125,7 +90,7 @@ val lemma_bytes_and_mod : x:nat64 -> y:nat64 -> Lemma
   (ensures 
     shift_left64 y 3 < 64 /\
     (let z = shift_left64 1 (shift_left64 y 3) in
-     z <> 0 /\ X64.Vale.Decls_i.logand64 x (z-1) == x % z))
+     z <> 0 /\ logand64 x (z-1) == x % z))
 
 val lemma_mod_power2_lo : x0:nat64 -> x1:nat64 -> y:int -> z:int -> Lemma
   (requires 
@@ -180,30 +145,12 @@ val lemma_add_mod128 (x y :int) : Lemma
   (requires True)
   (ensures mod2_128 ((mod2_128 x) + y) == mod2_128 (x + y))
 
-type t_seqTo128 = int -> nat128
-let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
-  let f (i:int) : nat128 =
-    let open FStar.Mul in
-    if 0 <= i && i < Seq.length s / 2 then
-      (Seq.index s (2 * i)) + 0x10000000000000000 * (Seq.index s (2 * i + 1))
-    else
-      42
-  in f
-
 let modp_0 () : Lemma
   (requires True)
   (ensures modp 0 == 0)
     =
     reveal_opaque modp';
     ()
-let bare_r (key_r:nat128) = FStar.UInt.logand #128 key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 
-let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
-  (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
-  (ensures
-    ((n + n) % 2) == 0 /\ // REVIEW
-    poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
-    poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
-  =
-  assume False
+let bare_r (key_r:nat128) : nat128 = logand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
 

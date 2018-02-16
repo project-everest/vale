@@ -1,7 +1,6 @@
 module X64.Vale.StateLemmas_i
 open X64.Machine_s
 open X64.Vale.State_i
-open FStar.UInt
 open FStar.FunctionalExtensionality
 module S = X64.Semantics_s
 module M = TransparentMap

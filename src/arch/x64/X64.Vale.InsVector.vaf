@@ -11,12 +11,12 @@ open X64.Vale.QuickCode_i
 #endverbatim
 
 #verbatim
+open Types_s
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
 open X64.Vale.Decls_i
-open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"

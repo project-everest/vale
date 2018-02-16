@@ -30,6 +30,7 @@ module X64.Poly1305
 
 #verbatim{:interface}{:implementation}
 module M = Memory_i_s
+open Types_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -40,36 +41,8 @@ open X64.Vale.QuickCodes_i
 //open X64.Vale.StrongPost_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i
+open X64.Poly1305.Util_i
 open Opaque_i
-#endverbatim
-
-#verbatim{:interface}
-let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
-match l with
-| [] -> True
-| b :: l'  -> buffer_readable h b /\ buffers_readable h l'
-
-unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
-
-let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
-    buffer_readable m b /\
-    len <= buffer_length b /\
-    buffer_addr b == addr
-
-let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
-    modifies_buffer b h1 h2 /\
-    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
-    (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
-                        0 <= i /\ i < buffer_length b 
-                     /\ (i < start || i > last) 
-                    ==> buffer64_read b i h1
-                     == buffer64_read b i h2)
-
-unfold let buffers_disjoint (b1 b2:buffer64) =
-    locs_disjoint [loc_buffer b1; loc_buffer b2]
-
-let readable_words (len:nat) =
-    ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
 #endverbatim
 
 procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
@@ -426,7 +399,7 @@ procedure{:quick} poly1305_last_block()
         assert rdx == padLast;
 
         lemma_bytes_and_mod(r8, nExtra);
-        //assert logand64(r8, shift_left64(1, shift_left64(nExtra, 3)) - 1) == r8 % shift_left64(1, shift_left64(nExtra, 3));
+        //assert logand(r8, shift_left64(1, shift_left64(nExtra, 3)) - 1) == r8 % shift_left64(1, shift_left64(nExtra, 3));
         assert padLast == shift_left64(1, shift_left64(nExtra, 3));
         lemma_mod_power2_lo(r8, r9, nExtra, pow2(nExtra * 8));
         Mov64(rcx, rdx);
@@ -547,6 +520,14 @@ procedure{:quick} poly1305_add_key_s()
     lemma_add_key(old(h0), old(h1), h_in, key_s0, key_s1, key_s, h0, h1);
 }
 
+#verbatim
+// REVIEW: not clear why TypesNative_s.reveal_logand doesn't work directly
+let reveal_logand128 (x y:nat128) : Lemma
+  (requires True)
+  (ensures Types_s.logand x y == FStar.UInt.logand #128 x y)
+  = TypesNative_s.reveal_logand 128 x y
+#endverbatim
+
 procedure{:quick} poly1305_impl(
     ghost key_r:nat128,
     ghost key_s:nat128,
@@ -608,7 +589,7 @@ procedure{:quick} poly1305_impl(
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
 
     let mask:nat128 := 0x0ffffffc_0ffffffc_0ffffffc_0fffffff; // REVIEW: why do we need to put this constant in a variable?
-    assert r == logand128(key_r, mask) by
+    assert r == logand(key_r, mask) by
     {
         reveal_opaque(lowerUpper128);
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, mask,
@@ -633,7 +614,7 @@ procedure{:quick} poly1305_impl(
     }
     lemma_poly1305_heap_hash_blocks_alt(0, n * n, r, mem, inp_b, old(len) / 16);
 
-    reveal_logand128(key_r, 0x0ffffffc0ffffffc0ffffffc0fffffff);
+    reveal_logand128(key_r, mask);
     assert r == bare_r(key_r);
     assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
         by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }

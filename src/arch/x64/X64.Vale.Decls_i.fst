@@ -59,32 +59,6 @@ let va_lemma_whileTrue_total = Lemmas_i.lemma_whileTrue_total
 let va_lemma_whileFalse_total = Lemmas_i.lemma_whileFalse_total
 let va_lemma_whileMerge_total = Lemmas_i.lemma_whileMerge_total
 
-let logxor32 (x:nat32) (y:nat32) : nat32 =
-  FStar.UInt.logxor #32 x y
-
-let logxor64 (x:nat64) (y:nat64) : nat64 =
-  FStar.UInt.logxor #64 x y
-
-let logand64 (x:nat64) (y:nat64) : nat64 =
-  FStar.UInt.logand #64 x y
-
-let logand128 (x:nat128) (y:nat128) : nat128 =
-  FStar.UInt.logand #128 x y
-(*
-  if FStar.UInt.fits x 64
-  && FStar.UInt.fits y 64
-  then FStar.UInt.logand #64 x y
-  else 0
-*)
-
-let shift_left64 (x:nat64) (amt:nat64) : nat64 =
-  FStar.UInt.shift_left #64 x amt
-
-let shift_right64 (x:nat64) (amt:nat64) : nat64 =
-  FStar.UInt.shift_right #64 x amt
-
-let reveal_logand128 (x y:nat128) = ()
-
 let printer = P.printer
 let print_string = FStar.IO.print_string
 let print_header = P.print_header

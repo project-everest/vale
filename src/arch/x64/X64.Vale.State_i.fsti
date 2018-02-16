@@ -94,7 +94,3 @@ let state_eq (s0:state) (s1:state) : Type0 =
   s0.flags == s1.flags /\
   s0.mem == s1.mem
 
-let add_wrap (x:int) (y:int) = if x + y < nat64_max then x + y else x + y - nat64_max
-
-unfold let eq_int (i1:int) (i2:int) = i1 == i2
-

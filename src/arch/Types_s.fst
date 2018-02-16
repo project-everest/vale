@@ -13,12 +13,21 @@ let _ = assert_norm (pow2 32 = nat32_max)
 let _ = assert_norm (pow2 64 = nat64_max)
 let _ = assert_norm (pow2 128 = nat128_max)
 
-type nat8 = x:nat{x < nat8_max}
-type nat16 = x:nat{x < nat16_max}
-type nat32 = x:nat{x < nat32_max}
-type nat64 = x:nat{x < nat64_max}
-type nat128 = x:nat{x < nat128_max}
+let natN (n:nat) = x:nat{x < n}
+let nat8 = natN nat8_max
+let nat16 = natN nat16_max
+let nat32 = natN nat32_max
+let nat64 = natN nat64_max
+let nat128 = natN nat128_max
 
+let add_wrap (#n:nat) (x:natN n) (y:natN n) : natN n = if x + y < n then x + y else x + y - n
+
+assume val logand : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val logxor : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val logor : #n:nat -> a:natN n -> b:natN n -> natN n
+assume val lognot : #n:nat -> a:natN n  -> natN n
+assume val shift_left : #n:nat -> a:natN n -> s:int -> natN n
+assume val shift_right : #n:nat -> a:natN n -> s:int -> natN n
 
 type twobits = i:int{0 <= i && i < 4}
 type bits_of_byte = | Bits_of_Byte :
@@ -42,14 +51,11 @@ type quad32 = | Quad32:
   hi:nat32 ->
   quad32
 
-let quad32_xor_native (x y:quad32) = Quad32
-  (FStar.UInt.logxor #32 x.lo y.lo)
-  (FStar.UInt.logxor #32 x.mid_lo y.mid_lo)
-  (FStar.UInt.logxor #32 x.mid_hi y.mid_hi)
-  (FStar.UInt.logxor #32 x.hi y.hi)   
-
-assume val quad32_xor (x y:quad32) : quad32
-assume val reveal_quad32_xor (x y:quad32) : Lemma (quad32_xor x y == quad32_xor_native x y)
+let quad32_xor (x y:quad32) = Quad32
+  (logxor x.lo y.lo)
+  (logxor x.mid_lo y.mid_lo)
+  (logxor x.mid_hi y.mid_hi)
+  (logxor x.hi y.hi)   
 
 let select_word (q:quad32) (selector:twobits) =
   match selector with
