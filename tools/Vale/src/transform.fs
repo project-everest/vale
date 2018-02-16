@@ -1057,10 +1057,13 @@ and add_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):stmt list
   | s::ss -> (add_quick_blocks_stmt env next_sym s)::(add_quick_blocks_stmts env next_sym ss)
 
 let add_quick_type_stmts (ss:stmt list):stmt list =
+  let sym = ref 0 in
   let fs (s:stmt) =
     match s with
     | SAssert ({is_quicktype = true}, e) ->
-        Replace [SAssign ([(Id "_", Some (None, Ghost))], EApply (Id "AssertQuickType", [e]))]
+        incr sym;
+        let x = Reserved ("u" + (string !sym)) in
+        Replace [SAssign ([(x, Some (None, Ghost))], EApply (Id "AssertQuickType", [e]))]
     | _ -> Unchanged
     in
   map_stmts (fun e -> e) fs ss
