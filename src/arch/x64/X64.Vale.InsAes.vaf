@@ -69,9 +69,9 @@ procedure{:instruction Ins(S.AESNI_keygen_assist(dst, src, imm))}{:quick exportO
   modifies efl;
   ensures
     dst == old(Quad32(sub_word(src.mid_lo), 
-                      logxor(rot_word(sub_word(src.mid_lo)), imm),
+                      ixor(rot_word(sub_word(src.mid_lo)), imm),
                       sub_word(src.hi),
-                      logxor(rot_word(sub_word(src.hi)), imm)));
+                      ixor(rot_word(sub_word(src.hi)), imm)));
 {
 }
 

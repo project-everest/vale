@@ -57,7 +57,7 @@ let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_ke
   let state = quad32_xor state (index round_keys (nr alg)) in
   state
 
-let nat32_xor (x y:nat32) : nat32 = FStar.UInt.logxor #32 x y
+let nat32_xor (x y:nat32) : nat32 = ixor x y
 
 let rec expand_key (alg:algorithm) (key:seq nat32 { length key == nk alg}) (size:nat{size <= (nb * ((nr alg) + 1))})
   : (ek:seq nat32 {length ek == size}) =

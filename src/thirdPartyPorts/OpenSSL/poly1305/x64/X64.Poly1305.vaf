@@ -399,7 +399,7 @@ procedure{:quick} poly1305_last_block()
         assert rdx == padLast;
 
         lemma_bytes_and_mod(r8, nExtra);
-        //assert logand(r8, shift_left64(1, shift_left64(nExtra, 3)) - 1) == r8 % shift_left64(1, shift_left64(nExtra, 3));
+        //assert iand(r8, shift_left64(1, shift_left64(nExtra, 3)) - 1) == r8 % shift_left64(1, shift_left64(nExtra, 3));
         assert padLast == shift_left64(1, shift_left64(nExtra, 3));
         lemma_mod_power2_lo(r8, r9, nExtra, pow2(nExtra * 8));
         Mov64(rcx, rdx);
@@ -521,11 +521,11 @@ procedure{:quick} poly1305_add_key_s()
 }
 
 #verbatim
-// REVIEW: not clear why TypesNative_s.reveal_logand doesn't work directly
+// REVIEW: not clear why TypesNative_s.reveal_iand doesn't work directly
 let reveal_logand128 (x y:nat128) : Lemma
   (requires True)
-  (ensures Types_s.logand x y == FStar.UInt.logand #128 x y)
-  = TypesNative_s.reveal_logand 128 x y
+  (ensures Types_s.iand x y == FStar.UInt.logand #128 x y)
+  = TypesNative_s.reveal_iand 128 x y
 #endverbatim
 
 procedure{:quick} poly1305_impl(
@@ -589,7 +589,7 @@ procedure{:quick} poly1305_impl(
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
 
     let mask:nat128 := 0x0ffffffc_0ffffffc_0ffffffc_0fffffff; // REVIEW: why do we need to put this constant in a variable?
-    assert r == logand(key_r, mask) by
+    assert r == iand(key_r, mask) by
     {
         reveal_opaque(lowerUpper128);
         lemma_lowerUpper128_and(key_r, key_r0, key_r1, mask,
