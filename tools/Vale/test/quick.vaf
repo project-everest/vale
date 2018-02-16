@@ -262,5 +262,6 @@ procedure{:quick} TestAssertTyping(ghost i:int) returns(ghost j:nat)
         i >= 0;
 {
     assert{:quick_type} i >= 0;
+    assert{:quick_type} i >= 0;
     j := i;
 }
