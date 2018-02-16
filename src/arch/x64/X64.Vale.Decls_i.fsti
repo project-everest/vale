@@ -176,10 +176,16 @@ let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
 
 unfold let va_value_opr64 = nat64
 unfold let va_value_dst_opr64 = nat64
+unfold let va_value_xmm = quad32
 [@va_qattr] unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
 [@va_qattr] unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
 [@va_qattr] unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
 [@va_qattr] unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
+[@va_qattr] unfold let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
+
+[@va_qattr]
+let va_upd_operand_xmm (x:xmm) (v:quad32) (s:state) : state =
+  update_xmm x v s
 
 [@va_qattr]
 let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
@@ -188,7 +194,10 @@ let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
   | OReg r -> update_reg r v s
   | OMem m -> s // TODO: support destination memory operands
 let va_lemma_upd_update (sM:state) : Lemma
-  (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK)
+  (
+    (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
+    (forall (sK:state) (x:xmm).{:pattern (va_update_operand_xmm x sM sK)} va_update_operand_xmm x sM sK == va_upd_operand_xmm x (eval_xmm x sM) sK)
+  )
   = ()
 
 (** Constructors for va_codes *)

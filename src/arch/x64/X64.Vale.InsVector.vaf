@@ -7,6 +7,7 @@ open Types_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
+open X64.Vale.QuickCode_i
 #endverbatim
 
 #verbatim
@@ -21,23 +22,23 @@ module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
 
-var{:state xmm(0)}   xmm0:int;
-var{:state xmm(1)}   xmm1:int;
-var{:state xmm(2)}   xmm2:int;
-var{:state xmm(3)}   xmm3:int;
-var{:state xmm(4)}   xmm4:int;
-var{:state xmm(5)}   xmm5:int;
-var{:state xmm(6)}   xmm6:int;
-var{:state xmm(7)}   xmm7:int;
+var{:state xmm(0)} xmm0:quad32;
+var{:state xmm(1)} xmm1:quad32;
+var{:state xmm(2)} xmm2:quad32;
+var{:state xmm(3)} xmm3:quad32;
+var{:state xmm(4)} xmm4:quad32;
+var{:state xmm(5)} xmm5:quad32;
+var{:state xmm(6)} xmm6:quad32;
+var{:state xmm(7)} xmm7:quad32;
 
-procedure{:instruction Ins(S.Pxor(dst, src))} Pxor(inout dst:xmm, src:xmm)
+procedure{:instruction Ins(S.Pxor(dst, src))}{:quick exportOnly} Pxor(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
     dst == old(quad32_xor(dst, src));
 {
 }
 
-procedure{:instruction Ins(S.Pshufd(dst, src, permutation))} 
+procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
   modifies efl;
   ensures
@@ -48,20 +49,20 @@ procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}
 {
 }
 
-procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))} VPSLLDQ4(inout dst:xmm, src:xmm)
+procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))}{:quick exportOnly} VPSLLDQ4(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
     dst == old(Quad32(0, src.lo, src.mid_lo, src.mid_hi));
 {
 }
 
-procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst),Mov128Xmm(src)))}{:fast_instruction} Mov128(inout dst:xmm, src:xmm)
+procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst),Mov128Xmm(src)))}{:quick exportOnly} Mov128(inout dst:xmm, src:xmm)
     ensures
         dst == old(src);
 {
 }
 
-procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src), offset))))}{:fast_instruction} Load128_buffer(
+procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src), offset))))}{:quick exportOnly} Load128_buffer(
     out dst:xmm,
         src:reg_opr64,
         inline offset:int,
@@ -79,7 +80,7 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src),
     lemma_load_mem128(b, index, mem);
 }
 
-procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov128Xmm(src)))}{:fast_instruction} Store128_buffer(
+procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov128Xmm(src)))}{:quick exportOnly} Store128_buffer(
         dst:reg_opr64,
         src:xmm,
         inline offset:int,

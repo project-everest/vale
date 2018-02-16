@@ -42,11 +42,14 @@ type quad32 = | Quad32:
   hi:nat32 ->
   quad32
 
-let quad32_xor (x y:quad32) = Quad32
+let quad32_xor_native (x y:quad32) = Quad32
   (FStar.UInt.logxor #32 x.lo y.lo)
   (FStar.UInt.logxor #32 x.mid_lo y.mid_lo)
   (FStar.UInt.logxor #32 x.mid_hi y.mid_hi)
   (FStar.UInt.logxor #32 x.hi y.hi)   
+
+assume val quad32_xor (x y:quad32) : quad32
+assume val reveal_quad32_xor (x y:quad32) : Lemma (quad32_xor x y == quad32_xor_native x y)
 
 let select_word (q:quad32) (selector:twobits) =
   match selector with

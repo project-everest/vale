@@ -16,6 +16,8 @@ open X64.Vale.InsBasic
 open X64.Vale.InsMem
 open X64.Vale.InsVector
 open X64.Vale.InsAes
+open X64.Vale.QuickCode_i
+open X64.Vale.QuickCodes_i
 open AES_helpers_i
 open Opaque_i
 
@@ -38,7 +40,7 @@ let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
 // KEY EXPANSION
 ///////////////////////////
 
-procedure KeyExpansionRound(
+procedure{:quick} KeyExpansionRound(
     inline round:nat64,
     inline rcon:imm8,
 //    inline taint:taint,
@@ -109,10 +111,12 @@ procedure KeyExpansionRound(
 
     ghost var new_round := round + 1;
     //w_out := append(w_in, quad32_to_seq(xmm1));
-    w_out := upd(w_in, new_round*4,     xmm1.lo);
-    w_out := upd(w_in, new_round*4 + 1, xmm1.mid_lo);
-    w_out := upd(w_in, new_round*4 + 2, xmm1.mid_hi);
-    w_out := upd(w_in, new_round*4 + 3, xmm1.hi);
+    assert{:quick_type} new_round*4 + 4 <= length(w_in);
+    w_out := w_in;
+    w_out := upd(w_out, new_round*4,     xmm1.lo);
+    w_out := upd(w_out, new_round*4 + 1, xmm1.mid_lo);
+    w_out := upd(w_out, new_round*4 + 2, xmm1.mid_hi);
+    w_out := upd(w_out, new_round*4 + 3, xmm1.hi);
 
 //    w_out := w_in[new_round*4     := xmm1.lo]
 //                 [new_round*4 + 1 := xmm1.mid_lo]
@@ -129,6 +133,7 @@ procedure KeyExpansionRound(
 //    lemma_AES128Size(alg);
     //lemma_KeyExpansionRoundHelper(alg, key, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
     
+    assert{:quick_type} length(key) == 4 /\ 4+(round+1)*4 <= length(w_out);
     assume key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
 
     // Interesting note: This currently goes through in ~133 seconds as written.
