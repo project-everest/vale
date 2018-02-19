@@ -13,6 +13,9 @@ assume val inv_shift_rows (q:quad32) : quad32
 assume val rot_word (w:nat32) : nat32
 assume val sub_word (w:nat32) : nat32
 
+assume val commute_sub_bytes_shift_rows (q:quad32) : Lemma
+  (sub_bytes (shift_rows q) == shift_rows (sub_bytes q))
+
 type algorithm = | AES_128 | AES_192 | AES_256
 
 let aes_rcon (i:int) : nat32 =
@@ -42,16 +45,15 @@ let round (state round_key:quad32) =
   let s = quad32_xor s round_key in
   s
 
-let rec rounds (state:quad32) (round_keys:seq quad32)
-               (start:nat) (last:nat{start <= last /\ last < length round_keys}) : Tot quad32 (decreases %[last - start]) =
-  if start = last then 
-    state
+let rec rounds (init:quad32) (round_keys:seq quad32) (n:nat{n < length round_keys}) : quad32 =
+  if n = 0 then
+    init
   else
-    rounds (round state (index round_keys start)) round_keys (start + 1) last
+    round (rounds init round_keys (n - 1)) (index round_keys n)
 
 let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_keys == (nr alg) + 1}) = 
   let state = quad32_xor input (index round_keys 0) in
-  let state = rounds state round_keys 1 (nr alg) in
+  let state = rounds state round_keys (nr alg - 1) in
   let state = sub_bytes state in
   let state = shift_rows state in
   let state = quad32_xor state (index round_keys (nr alg)) in
@@ -86,8 +88,12 @@ let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * ro
     let rk = Quad32 (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in
     append round_keys (create 1 rk)
 
+let key_to_round_keys (alg:algorithm) (key:seq nat32 {length key == nk alg})
+  : (round_keys:seq quad32 {length round_keys == nr alg + 1}) =
+  (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
+
 let aes_encrypt (alg:algorithm) (key:seq nat32 {length key == nk alg}) (input:quad32) =
-  cipher alg input (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
+  cipher alg input (key_to_round_keys alg key)
 
 #reset-options "--max_fuel 5 --initial_fuel 5"
 abstract let quad32_to_seq (q:quad32) : 

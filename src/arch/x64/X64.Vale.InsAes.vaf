@@ -28,7 +28,7 @@ procedure{:instruction Ins(S.AESNI_enc(dst, src))}{:quick exportOnly}
           AESNI_enc(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
-    dst == old(quad32_xor(mix_columns(sub_bytes(shift_rows(src))), src));
+    dst == old(quad32_xor(mix_columns(sub_bytes(shift_rows(dst))), src));
 {
 }
 
@@ -36,7 +36,7 @@ procedure{:instruction Ins(S.AESNI_enc_last(dst, src))}{:quick exportOnly}
           AESNI_enc_last(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
-    dst == old(quad32_xor(sub_bytes(shift_rows(src)), src));
+    dst == old(quad32_xor(sub_bytes(shift_rows(dst)), src));
 {
 }
 
@@ -44,7 +44,7 @@ procedure{:instruction Ins(S.AESNI_dec(dst, src))}{:quick exportOnly}
           AESNI_dec(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
-    dst == old(quad32_xor(inv_mix_columns(inv_sub_bytes(inv_shift_rows(src))), src));
+    dst == old(quad32_xor(inv_mix_columns(inv_sub_bytes(inv_shift_rows(dst))), src));
 {
 }
 
@@ -52,7 +52,7 @@ procedure{:instruction Ins(S.AESNI_dec_last(dst, src))}{:quick exportOnly}
           AESNI_dec_last(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
-    dst == old(quad32_xor(inv_sub_bytes(inv_shift_rows(src)), src));
+    dst == old(quad32_xor(inv_sub_bytes(inv_shift_rows(dst)), src));
 {
 }
 

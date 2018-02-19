@@ -319,20 +319,24 @@ let eval_ins (ins:ins) : st unit =
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
   | AESNI_enc dst src ->
+    let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.mix_columns (AES_s.sub_bytes (AES_s.shift_rows src_q))) src_q)
-    
-   | AESNI_enc_last dst src ->
+    update_xmm dst ins (quad32_xor (AES_s.mix_columns (AES_s.sub_bytes (AES_s.shift_rows dst_q))) src_q)
+
+  | AESNI_enc_last dst src ->
+    let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows src_q)) src_q)
-      
+    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows dst_q)) src_q)
+
   | AESNI_dec dst src ->
+    let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns (AES_s.inv_sub_bytes (AES_s.inv_shift_rows src_q))) src_q)
-    
-   | AESNI_dec_last dst src ->
+    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q))) src_q)
+
+  | AESNI_dec_last dst src ->
+    let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows src_q)) src_q)
+    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q)) src_q)
 
   | AESNI_imc dst src ->
     let src_q = eval_xmm src s in
