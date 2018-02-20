@@ -42,6 +42,7 @@ fstar_include_paths = [
   'obj/arch',
   'obj/arch/x64/',
   'obj/lib/collections/',
+  'obj/lib/math',
   'obj/lib/util',
   'obj/crypto/aes/',
   'obj/crypto/aes/aes-x64',
