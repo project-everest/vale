@@ -4,6 +4,7 @@ open Types_s
 open FStar.Seq
 open AES_s
 open FStar.Mul
+//open Calc
 
 // syntax for seq accesses, s.[index] and s.[index] <- value
 unfold
@@ -12,6 +13,8 @@ let op_String_Access (#a:Type) (s:seq a) (i:nat{ i < length s}) : Tot a = index 
 unfold
 let op_String_Assignment = Seq.upd
 
+let key_seq_type_helper (alg:algorithm) (key:seq nat32) : (key':seq nat32 { length key' == nk alg }) =
+  if length key = nk alg then key else create (nk alg) 0
 
 let rec key_expansion_specific (alg:algorithm) (key:seq nat32 { length key == nk alg})
                                (w:seq nat32) (i:nat{i < length w}) =
@@ -93,17 +96,26 @@ let lemma_KeyExpansionRoundHelperHelper (alg:algorithm) (key:seq nat32 { length 
         nat32_xor(w_final.[completed_bytes-4], nat32_xor(SubWord(RotWord(w_final.[completed_bytes-1])), AES_Rcon()[ (completed_bytes / Nk(alg))-1 ]));
     }
     *)
+    assert (w_final.[completed_bytes] == (nat32_xor w_final.[completed_bytes-4] (nat32_xor  (sub_word (rot_word w_final.[completed_bytes-1])) (aes_rcon ((completed_bytes / (nk alg))-1))))); 
 
-    //calc {
-    //    w_final.[completed_bytes+1];
-    //    xmm1_v9.mid_lo;
-    //    nat32_xor(nat32_xor(w_final.[completed_bytes-4], w_final.[completed_bytes-3]), important_value);
-    lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3];
-    //    nat32_xor(nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes-4]), important_value);
-    lemma_BitwiseXorAssociative w_final.[completed_bytes-3] w_final.[completed_bytes-4] important_value;
-    //    nat32_xor(w_final.[completed_bytes-3], nat32_xor(w_final.[completed_bytes-4], important_value));
-    //    nat32_xor(w_final.[completed_bytes-3], w_final.[completed_bytes]);
-    //}
+    let s:nat32 = xmm1_v9.mid_lo in
+    let t:nat32 = nat32_xor (nat32_xor w_final.[completed_bytes-4] w_final.[completed_bytes-3]) important_value in
+    let u:nat32 = nat32_xor (nat32_xor w_final.[completed_bytes-3] w_final.[completed_bytes-4]) important_value in
+    (*
+    calc (
+      s &= t &= u &| using (lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3]; z3)
+      ); admit()
+     calc (
+           w_final.[completed_bytes+1]
+        &= s
+        //&= t
+       // &= u &| using (lemma_BitwiseXorCommutative w_final.[completed_bytes-4] w_final.[completed_bytes-3])
+
+       //&= nat32_xor w_final.[completed_bytes-3] (nat32_xor w_final.[completed_bytes-4] important_value) &| using (    lemma_BitwiseXorAssociative w_final.[completed_bytes-3] w_final.[completed_bytes-4] important_value)
+       //&= nat32_xor w_final.[completed_bytes-3] w_final.[completed_bytes]
+    );
+    admit()
+    *)
 
     //calc {
        // w_final.[completed_bytes+2];
@@ -156,7 +168,7 @@ assume (key_expansion_partial alg key w_final completed_bytes);         ////////
   *)
   admit()
 
-(*
+
 #reset-options "--z3rlimit 500"
 let lemma_KeyExpansionRoundHelper (alg:algorithm) (key:seq nat32 { length key == nk alg})
                                   (w_init w_final:seq nat32) (completed_bytes:int)
@@ -238,7 +250,6 @@ let lemma_KeyExpansionRoundHelper (alg:algorithm) (key:seq nat32 { length key ==
 
   lemma_KeyExpansionRoundHelperHelper alg key w_init w_final completed_bytes xmm1_v9 important_value;
   ()
-*)
 
 (*
 {

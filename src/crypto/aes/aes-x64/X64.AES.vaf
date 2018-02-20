@@ -131,9 +131,10 @@ procedure{:quick} KeyExpansionRound(
 //
     ghost var alg := AES_128; 
 //    lemma_AES128Size(alg);
-    //lemma_KeyExpansionRoundHelper(alg, key, w_in, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9, w_out);
+    assert{:quick_type} nk(alg) == 4 /\ length(key) == nk(alg) /\ length(key) == 4 /\ 4+(round+1)*4 <= length(w_out);
+    ghost var key' := key_seq_type_helper(alg, key);
+    //lemma_KeyExpansionRoundHelper(alg, key', w_in, w_out, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9);
     
-    assert{:quick_type} length(key) == 4 /\ 4+(round+1)*4 <= length(w_out);
     assume key_expansion_partial(AES_128, key, w_out, 4+(round+1)*4);
 
     // Interesting note: This currently goes through in ~133 seconds as written.
