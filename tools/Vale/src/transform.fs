@@ -409,20 +409,22 @@ and compute_read_mods_stmts (env0:env) (env1:env) (ss:stmt list):(env * Set<id> 
 
 ///////////////////////////////////////////////////////////////////////////////
 // Resolve overloading
-let resolve_overload_expr (env:env) (e:exp):exp =
-   let rec fe (env:env) (e:exp):exp map_modify =
-     match e with
-     | EOp (Uop (UCustom op), l) ->
-       match Map.tryFind (Operator op) env.funs with
-       | Some {fargs = [_]; fattrs = attrs} ->
-          Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
-       | _ -> err ("operator '" + op + "' must be overloaded to use as a prefix operator")
-     | EOp (Bop (BCustom op), l) ->
-       match Map.tryFind (Operator op) env.funs with
-       | Some {fargs = [_; _]; fattrs = attrs} ->
-          Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
-       | _ -> err ("operator '" + op + "' must be overloaded to use as a infix operator")
-     | _ -> Unchanged
+let rec resolve_overload_expr (env:env) (e:exp):exp =
+  let rec fe (env:env) (e:exp):exp map_modify =
+    let r = resolve_overload_expr env in
+    let rs = List.map r in
+    match e with
+    | EOp (Uop (UCustom op), l) ->
+        match Map.tryFind (Operator op) env.funs with
+        | Some {fargs = [_]; fattrs = attrs} ->
+            Replace (EApply (attrs_get_id (Reserved "alias") attrs, rs l))
+        | _ -> err ("operator '" + op + "' must be overloaded to use as a prefix operator")
+    | EOp (Bop (BCustom op), l) ->
+        match Map.tryFind (Operator op) env.funs with
+        | Some {fargs = [_; _]; fattrs = attrs} ->
+            Replace (EApply (attrs_get_id (Reserved "alias") attrs, rs l))
+        | _ -> err ("operator '" + op + "' must be overloaded to use as a infix operator")
+    | _ -> Unchanged
     in
     env_map_exp fe env e
 
