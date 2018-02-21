@@ -39,7 +39,7 @@ let is_buffer arg =
 let rec liveness heap args =
   let args = List.Tot.Base.filter is_buffer args in
   let rec aux heap = function
-  | [] -> ""
+  | [] -> "True"
   | [(a,TBuffer ty)] -> "live " ^ print_explicit_basety ty ^ heap ^ " " ^ a 
   | [(a, TBase ty)] -> "" // Should not happen
   | (a, TBuffer ty)::q -> "live " ^ print_explicit_basety ty ^ heap ^ " " ^ a ^ " /\\ " ^ aux heap q
@@ -60,12 +60,12 @@ let rec disjoint args =
 
 let translate_lowstar (func:func_ty) =
   let name, args = func in
-  let separator = if (List.Tot.Base.length (List.Tot.Base.filter is_buffer args) = 0) then " " else " /\\ " in
+  let separator1 = if (List.Tot.Base.length (List.Tot.Base.filter is_buffer args) <= 1) then "" else " /\\ " in
   "module " ^ name ^
   "\n\nopen FStar.Buffer\nopen FStar.HyperStack.ST\n\n" ^
   "assume val " ^ name ^ ": " ^ (print_low_args args) ^
-  "\n\t(requires (fun h -> " ^ (liveness "h" args) ^ separator ^ (disjoint args) ^ "))\n\t" ^
-  "(ensures (fun h0 _ h1 -> " ^ (liveness "h0" args) ^ separator ^ (liveness "h1" args) ^ "))\n"
+  "\n\t(requires (fun h -> " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ "))\n\t" ^
+  "(ensures (fun h0 _ h1 -> " ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ "))\n"
   
 let print_vale_bufferty = function
   | TUInt8 -> "buffer8"
@@ -125,7 +125,7 @@ let translate_vale os target (func:func_ty{supported_func os target func}) =
   "{\n\n}\n"
 
 
-let memcpy = ("memcpy", [("src", TBuffer TUInt8); ("dest", TBase TUInt8)])
+let memcpy = ("memcpy", [("src", TBuffer TUInt8); ("dest", TBuffer TUInt8)])
 
 let _ = translate_lowstar memcpy
 let _ = translate_vale Linux X86 memcpy
