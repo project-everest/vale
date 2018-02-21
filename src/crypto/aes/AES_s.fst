@@ -38,6 +38,8 @@ unfold let nr(alg:algorithm) =
   | AES_192 -> 12
   | AES_256 -> 14
 
+type aes_key (alg:algorithm) : Type0 = s:(seq nat32){length s == nk alg}
+
 let round (state round_key:quad32) =
   let s = sub_bytes state in
   let s = shift_rows s in
@@ -61,7 +63,7 @@ let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_ke
 
 let nat32_xor (x y:nat32) : nat32 = ixor x y
 
-let rec expand_key (alg:algorithm) (key:seq nat32 { length key == nk alg}) (size:nat{size <= (nb * ((nr alg) + 1))})
+let rec expand_key (alg:algorithm) (key:aes_key alg) (size:nat{size <= (nb * ((nr alg) + 1))})
   : (ek:seq nat32 {length ek == size}) =
   if size = 0 then createEmpty
   else
@@ -88,11 +90,11 @@ let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * ro
     let rk = Quad32 (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in
     append round_keys (create 1 rk)
 
-let key_to_round_keys (alg:algorithm) (key:seq nat32 {length key == nk alg})
+let key_to_round_keys (alg:algorithm) (key:aes_key alg)
   : (round_keys:seq quad32 {length round_keys == nr alg + 1}) =
   (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
 
-let aes_encrypt (alg:algorithm) (key:seq nat32 {length key == nk alg}) (input:quad32) =
+let aes_encrypt (alg:algorithm) (key:aes_key alg) (input:quad32) =
   cipher alg input (key_to_round_keys alg key)
 
 #reset-options "--max_fuel 5 --initial_fuel 5"

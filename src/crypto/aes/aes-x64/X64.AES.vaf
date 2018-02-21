@@ -45,7 +45,7 @@ procedure{:quick} KeyExpansionRound(
     inline rcon:imm8,
 //    inline taint:taint,
     ghost dst:buffer128,
-    ghost key:seq(nat32),
+    ghost key:aes_key(AES_128),
     ghost w_in:seq(nat32)
     ) returns (
     ghost w_out:seq(nat32)
@@ -54,7 +54,6 @@ procedure{:quick} KeyExpansionRound(
         validDstAddrs128(mem, rdx, dst, 11);
         0 <= round < 10;
         rcon == aes_rcon(round);
-        length(key) == 4;
     requires
         length(w_in) == 44;
         //length(w_in) == 4 + round*4;
@@ -132,11 +131,10 @@ procedure{:quick} KeyExpansionRound(
 //        assert j != new_round ==> buffer128_read(dst, j, mem) == Quadword(index(w_out,4*j), index(w_out,4*j+1), index(w_out,4*j+2), index(w_out,4*j+3));
 //    }
 //
-    ghost var alg := AES_128; 
+//    ghost var alg := AES_128; 
 //    lemma_AES128Size(alg);
-    assert{:quick_type} nk(alg) == 4 /\ length(key) == nk(alg) /\ length(key) == 4 /\ 4+(round+1)*4 <= length(w_out);
-    ghost var key' := key_seq_type_helper(alg, key);
-    lemma_KeyExpansionRoundHelper(alg, key', w_in, w_out, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9);
+    assert{:quick_type} 4+(round+1)*4 <= length(w_out);
+    lemma_KeyExpansionRoundHelper(AES_128, key, w_in, w_out, 4+round*4, xmm1_v0, xmm2_v1, xmm2_v2, xmm3_v3, xmm1_v4, xmm3_v5, xmm1_v6, xmm3_v7, xmm1_v8, xmm1_v9);
     
 }
 
@@ -153,7 +151,7 @@ procedure{:quick} KeyExpansionRound(
 //#endverbatim
 
 procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
-    ghost key:seq(nat32), 
+    ghost key:aes_key(AES_128),
     ghost w_in:seq(nat32),
 //    inline taint:taint,
     ghost dst:buffer128,
@@ -170,7 +168,6 @@ procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
         rdx % 16 == 0;
     requires
         0 <= n <= 10;
-        length(key) == 4;
         length(w_in) == 44;
         quad32_to_seq(xmm1) == key;
         key_expansion_partial(AES_128, key, w_in, 4);
@@ -216,7 +213,7 @@ procedure {:recursive} {:decrease n} KeyExpansionRoundUnrolledRecursive(
 
 /*
 procedure KeyExpansionRoundUnrolled(
-    ghost key:seq(nat32), 
+    ghost key:aes_key(AES_128),
 //    ghost w_in:seq(nat32),
 //    inline taint:taint,
     ghost dst:buffer128)
@@ -231,7 +228,6 @@ procedure KeyExpansionRoundUnrolled(
         validDstAddrs128(mem, rdx, dst, 11);
         rdx % 16 == 0;
     requires
-        length(key) == 4;
         key == quad32_to_seq(xmm1);
 //        SeqLength(w_in) == 44;
 //        key_expansion_partial(key, AES_128, w_in, 4);
@@ -250,7 +246,7 @@ procedure KeyExpansionRoundUnrolled(
 }
 
 procedure KeyExpansionImpl(
-    ghost key:seq(nat32),
+    ghost key:aes_key(AES_128),
 //    inline taint:taint,
     ghost dst:buffer128)
 //    ) returns (
@@ -261,7 +257,6 @@ procedure KeyExpansionImpl(
     modifies
         mem; xmm1; xmm2; xmm3; efl;
     requires
-        length(key) == 4;
         key == quad32_to_seq(xmm1);
         validDstAddrs128(mem, rdx, dst, 11);
         rdx % 16 == 0;
@@ -394,7 +389,7 @@ procedure{:quick} AES128EncryptRound(
 
 procedure{:quick} AES128EncryptBlock(
     ghost input:quad32,
-    ghost key:seq(nat32),
+    ghost key:aes_key(AES_128),
     ghost round_keys:seq(quad32),
     ghost keys_buffer:buffer128
     )
@@ -403,7 +398,6 @@ procedure{:quick} AES128EncryptBlock(
     modifies
         xmm0; xmm2; efl;
     requires
-        length(key) == 4;
         length(round_keys) == 11;
         round_keys == key_to_round_keys(AES_128, key);
         xmm0 == input;
@@ -438,7 +432,7 @@ procedure{:quick} AES128EncryptBlock(
 procedure{:quick} AES128EncryptBlockStdcall(
     inline win:bool,
     ghost input:quad32,
-    ghost key:seq(nat32),
+    ghost key:aes_key(AES_128),
     ghost input_buffer:buffer128,
     ghost output_buffer:buffer128,
     ghost keys_buffer:buffer128
@@ -453,7 +447,6 @@ procedure{:quick} AES128EncryptBlockStdcall(
         input_ptr := if win then rdx else rsi;
         expanded_key_ptr := if win then r8 else rdx;
     requires
-        length(key) == 4;
         buffer128_read(input_buffer, 0, mem) == input;
         expanded_key_ptr == buffer_addr(keys_buffer);
         validSrcAddrs128(mem, input_ptr, input_buffer, 1);
@@ -476,7 +469,6 @@ procedure{:quick} AES128EncryptBlockStdcall(
         Mov64(r8, rdx);
     }
 
-    assert{:quick_type} length(key) == 4;
     AES128EncryptBlock(input, key, key_to_round_keys(AES_128, key), keys_buffer);
 
     inline if (win)
@@ -498,7 +490,7 @@ procedure KeyInversionRound(
     inline round:int,
 //    inline taint:taint,
     ghost k_b:buffer128)
-//    ghost key:seq(nat32),
+//    ghost key:aes_key(AES_128),
 //    ghost w:seq(nat32),
 //    ghost dw_in:seq(nat32)
 //    ) returns (
@@ -508,7 +500,6 @@ procedure KeyInversionRound(
         validSrcAddrs128(mem, rdx, k_b, 11);
     requires
         0 <= round <= 8;
-//        SeqLength(key) == 4;
 //        SeqLength(w) == 44;
 //        SeqLength(dw_in) == 4*(round+1);
 //        KeyExpansionPredicate(key, AES_128, w);
@@ -551,7 +542,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
     inline rounds:int,
 //    inline taint:taint,
     ghost k_b:buffer128)
-//    ghost key:seq(nat32),
+//    ghost key:aes_key(AES_128),
 //    ghost w:seq(nat32),
 //    ghost dw_in:seq(nat32)
 //    ) returns (
@@ -562,7 +553,6 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
     requires
         0 <= rounds <= 9;
         rdx % 16 == 0;
-//        SeqLength(key) == 4;
 //        SeqLength(w) == 44;
 //        SeqLength(dw_in) == 4;
 //        KeyExpansionPredicate(key, AES_128, w);
@@ -593,7 +583,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
 }
 
 procedure KeyInversionImpl(
-//    ghost key:seq(nat32),
+//    ghost key:aes_key(AES_128),
 //    ghost w:seq(nat32),
 //    inline taint:taint,
     ghost k_b:buffer128)
@@ -604,7 +594,6 @@ procedure KeyInversionImpl(
         validSrcAddrs128(mem, rdx, k_b, 11);
     requires
         rdx % 16 == 0;
-//        SeqLength(key) == 4;
 //        SeqLength(w) == 44;
 //        forall j :: 0 <= j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
 //        KeyExpansionPredicate(key, AES_128, w);
