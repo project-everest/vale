@@ -121,8 +121,14 @@ fstar_test_suite = [
   'src/lib/collections/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
-  'obj/arch/x64/X64.Vale.Decls.fst',
-  'obj/arch/x64/X64.Vale.Decls.fsti'
+  'obj/arch/x64/X64.Vale.InsAes.fst',
+  'obj/arch/x64/X64.Vale.InsBasic.fst',
+  'obj/arch/x64/X64.Vale.InsMem.fst',
+  'obj/arch/x64/X64.Vale.InsVector.fst',
+  'obj/arch/x64/X64.Vale.InsAes.fsti',
+  'obj/arch/x64/X64.Vale.InsBasic.fsti',
+  'obj/arch/x64/X64.Vale.InsMem.fsti',
+  'obj/arch/x64/X64.Vale.InsVector.fsti',
 ]
 
 Export('fstar_test_suite')
