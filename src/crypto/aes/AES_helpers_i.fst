@@ -54,11 +54,12 @@ let rec expand_key_128 (key:aes_key AES_128) (round:nat) : quad32 =
   if round = 0 then Quad32 key.[0] key.[1] key.[2] key.[3]
   else round_key_128 (expand_key_128 key (round - 1)) round
 
-#reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0 --z3rlimit 40"
+#reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0"
 let lemma_expand_key_128_0 (key:aes_key AES_128) : Lemma
   (equal key (expand_key AES_128 key 4))
   = ()
 
+#reset-options "--initial_fuel 1 --max_fuel 1 --max_ifuel 0 --z3rlimit 10"
 let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
   (requires
     0 < i /\ i < 11
@@ -72,7 +73,13 @@ let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
     let Quad32 r0 r1 r2 r3 = round_key_128 prev i in
     r0 == w.[n + 0] /\ r1 == w.[n + 1] /\ r2 == w.[n + 2] /\ r3 == w.[n + 3]
   ))
-  = ()
+  =
+  let n = 4 * i in
+  // unfold expand_key 4 times (could use fuel, but that unfolds everything):
+  let _ = expand_key AES_128 key (n + 1) in
+  let _ = expand_key AES_128 key (n + 2) in
+  let _ = expand_key AES_128 key (n + 3) in
+  ()
 #reset-options
 
 // expand_key for large 'size' argument agrees with expand_key for smaller 'size' argument
