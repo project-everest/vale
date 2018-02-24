@@ -72,8 +72,8 @@ procedure {:quick} gctr_core(
         invariant
             0 <= rdx <= len;
 //            len == old(len);        // Do I need this?  Unclear.
-//            r9 == in_ptr + 16 * rdx;
-//            r10 == out_ptr + 16 * rdx;
+            r9 == in_ptr + 16 * rdx;
+            r10 == out_ptr + 16 * rdx;
             //icb == inc32(old(icb), rdx);
             
             //////////////////// From requires //////////////////////
@@ -81,8 +81,8 @@ procedure {:quick} gctr_core(
             //buffers_disjoint(in_b, out_b);
 //            validSrcAddrs128(mem, in_ptr, in_b, len);
 //            validDstAddrs128(mem, out_ptr, out_b, len);
-//            in_ptr  + 16 * len < nat64_max;
-//            out_ptr + 16 * len < nat64_max;
+            in_ptr  + 16 * len < nat64_max;
+            out_ptr + 16 * len < nat64_max;
 
             // AES reqs
 //            length(round_keys) == 11;
@@ -100,8 +100,8 @@ procedure {:quick} gctr_core(
 //        Store128_buffer(xmm1, r10, 0, out_b, rdx);
 
         Add64(rdx, 1);
-//        Add64(r9, 16);
-//        Add64(r10, 16);
+        Add64(r9, 16);
+        Add64(r10, 16);
         // Inc32 icb
     }
 }
