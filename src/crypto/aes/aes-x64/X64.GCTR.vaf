@@ -1,0 +1,107 @@
+include "../../../arch/x64/X64.Vale.InsBasic.vaf"
+include "../../../arch/x64/X64.Vale.InsMem.vaf"
+include "../../../arch/x64/X64.Vale.InsVector.vaf"
+//include "../../../arch/x64/X64.Vale.InsAes.vaf"
+include "X64.AES.vaf"
+
+module X64.GCTR
+
+#verbatim{:interface}{:implementation}
+open Types_s
+open FStar.Seq
+open AES_s
+open GCTR_s
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+open X64.Vale.InsVector
+open X64.Vale.InsAes
+open X64.Vale.QuickCode_i
+open X64.Vale.QuickCodes_i
+//open Opaque_i
+#endverbatim
+
+#reset-options "--z3rlimit 20"
+
+///////////////////////////
+// GCTR encryption
+///////////////////////////
+
+procedure {:quick} gctr_core(
+    ghost in_b:buffer128,
+    ghost out_b:buffer128,
+    ghost input:quad32,
+    ghost key:aes_key(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_buffer:buffer128
+    )
+    lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm0;
+
+    reads
+        r8; in_ptr; out_ptr; len; mem;
+
+    modifies
+        rdx; r9; r10; xmm1; icb; xmm2; efl;
+
+    requires
+        // GCTR reqs
+//        buffers_disjoint(in_b, out_b);
+        validSrcAddrs128(mem, in_ptr, in_b, len);
+        validDstAddrs128(mem, out_ptr, out_b, len);
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys(AES_128, key);
+        r8 == buffer_addr(keys_buffer);
+        validSrcAddrs128(mem, r8, keys_buffer, 11);
+        forall i:int :: 0 <= i < 11 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
+    ensures
+        //modifies_buffer(out_b, old(mem), mem);
+        validSrcAddrs128(mem, out_ptr, out_b, len);
+        //buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
+{
+    rdx := 0;
+    r9  := in_ptr;
+    r10 := out_ptr;
+/*
+    while (rdx != len)
+        invariant
+            0 <= rdx <= len;
+            r9 == in_ptr + 16 * rdx;
+            r10 == out_ptr + 16 * rdx;
+            icb == inc32(old(icb), rdx);
+            
+            //////////////////// From requires //////////////////////
+            // GCTR reqs
+            //buffers_disjoint(in_b, out_b);
+            validSrcAddrs128(mem, in_ptr, in_b, len);
+            validDstAddrs128(mem, out_ptr, out_b, len);
+
+            // AES reqs
+            length(round_keys) == 11;
+            round_keys == key_to_round_keys(AES_128, key);
+            r8 == buffer_addr(keys_buffer);
+            validSrcAddrs128(mem, r8, keys_buffer, 11);
+            forall i:int :: 0 <= i < 11 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
+
+        decreases
+            len - rdx;
+    {
+//        Load128_buffer(xmm1, r9, 0, in_b, rdx);
+//        AES128EncryptBlock(xmm0, key, round_keys, keys_buffer);
+//        Pxor(xmm1, xmm0);
+//        Store128_buffer(xmm1, r10, 0, out_b, rdx);
+
+        Add64(rdx, 1);
+        Add64(r9, 16);
+        Add64(r10, 16);
+        assert false;
+        // Inc32 icb
+    }
+        assert false;
+    */
+    assume false;
+}
+
