@@ -61,17 +61,17 @@ procedure {:quick} gctr_core(
         forall i:int :: 0 <= i < 11 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
     ensures
         //modifies_buffer(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, len);
+        //validSrcAddrs128(mem, out_ptr, out_b, len);
         //buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
 {
-    rdx := 0;
-    r9  := in_ptr;
-    r10 := out_ptr;
+    Mov64(rdx, 0);
+    Mov64(r9, in_ptr);
+    Mov64(r10, out_ptr);
 
     while (rdx != len)
         invariant
             0 <= rdx <= len;
-            len == old(len);        // Do I need this?  Unclear.
+//            len == old(len);        // Do I need this?  Unclear.
 //            r9 == in_ptr + 16 * rdx;
 //            r10 == out_ptr + 16 * rdx;
             //icb == inc32(old(icb), rdx);
@@ -98,14 +98,11 @@ procedure {:quick} gctr_core(
 //        AES128EncryptBlock(xmm0, key, round_keys, keys_buffer);
 //        Pxor(xmm1, xmm0);
 //        Store128_buffer(xmm1, r10, 0, out_b, rdx);
-        assume rdx + 1 < nat64_max;
 
         Add64(rdx, 1);
 //        Add64(r9, 16);
 //        Add64(r10, 16);
         // Inc32 icb
-        assume false;
     }
-    assume false;
 }
 
