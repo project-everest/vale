@@ -297,7 +297,11 @@ let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Ty
 unfold let buffers_disjoint (b1 b2:buffer64) =
     locs_disjoint [loc_buffer b1; loc_buffer b2]
 
+unfold let buffers_disjoint128 (b1 b2:buffer128) =
+    locs_disjoint [loc_buffer b1; loc_buffer b2]
 
+unfold let buffers3_disjoint128 (b1 b2 b3:buffer128) =
+    locs_disjoint [loc_buffer b1; loc_buffer b2; loc_buffer b3]
 
 val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0
