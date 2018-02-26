@@ -19,6 +19,12 @@ let calling_registers os target = match target with
     | Linux -> ["rdi"; "rsi"; "rdx"; "rcx"; "r8"; "r9"]
   end
 
+let callee_saved os target = match target with
+  | X86 -> begin match os with
+    | Windows -> ["rbx"; "rbp"; "rdi"; "rsi"; "rsp"; "r12"; "r13"; "r14"; "r15"]
+    | Linux -> ["rbx"; "rbp"; "r12"; "r13"; "r14"; "r15"]
+  end
+
 let print_low_basety = function
   | TUInt8 -> "UInt8.t"
 
@@ -101,6 +107,12 @@ let print_calling_args os target (args:list arg{supported os target args}) =
     | r1::rn, (a, _)::q -> "        " ^ r1 ^ " == buffer_addr(" ^ a ^ ");\n" ^ aux rn q
   in aux (calling_registers os target) args
 
+let print_callee_saved os target =
+  let rec aux = function
+    | [] -> ""
+    | a::q -> "        " ^ a ^ " == old(" ^ a ^ ");\n" ^ aux q
+  in aux (callee_saved os target)
+
 let print_vale_reads os target (args: list arg{supported os target args}) =
   let rec aux regs (args:list arg{List.Tot.Base.length args <= List.Tot.Base.length regs}) = 
   match regs, args with
@@ -117,6 +129,7 @@ let translate_vale os target (func:func_ty{supported_func os target func}) =
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
   print_buff_readable args ^
   print_calling_args os target args ^
+  "    ensures\n" ^ print_callee_saved os target ^ 
   "    reads\n" ^
   "        " ^ print_vale_reads os target args ^
   "    modifies\n" ^
