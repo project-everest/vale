@@ -68,9 +68,9 @@ let down_mem_list mem buffers =
   in aux buffers heap
   
 (* Takes a low-level Vale Heap and the initial Hyperstack, and reconstructs the buffers in the HyperStack *)
-val up_mem: Vale_Sem.heap -> list P.(buffer (TBase TUInt8)) -> HS.mem -> GTot HS.mem
+val up_mem_list: Vale_Sem.heap -> list P.(buffer (TBase TUInt8)) -> HS.mem -> GTot HS.mem
 
-let up_mem heap buffers mem =
+let up_mem_list heap buffers mem =
   let rec aux bufs accu_mem heap : GTot HS.mem = match bufs with
     | [] -> accu_mem
     | a :: q -> aux q (reconstruct_buf a accu_mem heap) heap
@@ -103,3 +103,21 @@ let down mem ptr1 ptr2 =
   let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in
   Vale_Sem.Mkstate true (fun x -> if x = Rax then addr1 else if x = Rbx then addr2 else 0) heap 
 
+val up_mem: Vale_Sem.heap -> P.(buffer (TBase TUInt8)) -> nat64 -> P.(buffer (TBase TUInt8)) -> nat64 -> HS.mem -> GTot HS.mem
+
+let up_mem heap ptr1 addr1 ptr2 addr2 mem =
+  let length1 = P.buffer_length ptr1 in
+  let length2 = P.buffer_length ptr2 in
+  let rec aux length addr buf (i:nat{i <= UInt32.v length}) curr_mem : GTot HS.mem (decreases %[sub length i]) =
+    if i >= (UInt32.v length) then curr_mem
+    else
+      aux length addr buf (i+1) (write_buffer buf (UInt32.uint_to_t i) heap.[addr + i] curr_mem)
+  in let mem1 = aux length1 addr1 ptr1 0 mem in
+  let mem2 = aux length2 addr2 ptr2 0 mem in
+  mem2
+
+val down_up_identity: (mem:HS.mem) -> (ptr1:P.(buffer (TBase TUInt8))) -> (ptr2:P.(buffer (TBase TUInt8))) -> Lemma 
+  (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 mem in
+    new_mem == mem)
+
+let down_up_identity mem ptr1 ptr2 = admit()
