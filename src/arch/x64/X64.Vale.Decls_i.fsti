@@ -52,6 +52,7 @@ unfold let buffer_readable (#t:M.typ) (h:mem) (b:M.buffer t) = M.buffer_readable
 //unfold let buffer_length = M.buffer_length
 unfold let buffer_length (#t:M.typ) (b:M.buffer t) = M.buffer_length #t b
 unfold let buffer64_as_seq (m:mem) (b:buffer64) : GTot (Seq.seq nat64) = M.buffer_as_seq m b
+unfold let buffer128_as_seq (m:mem) (b:buffer128) : GTot (Seq.seq quad32) = M.buffer_as_seq m b
 unfold let valid_src_addr (#t:M.typ) (m:mem) (b:M.buffer t) (i:int) : Type0 =
   0 <= i /\ i < buffer_length b /\ buffer_readable m b
 unfold let valid_dst_addr (#t:M.typ) (m:mem) (b:M.buffer t) (i:int) : Type0 =
