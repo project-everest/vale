@@ -12,6 +12,7 @@ open FStar.Seq
 open AES_s
 open X64.AES
 open GCTR_s
+open GCTR_i
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -110,6 +111,7 @@ procedure {:quick} gctr_core(
             // Postconditions
             modifies_buffer128(out_b, old(mem), mem);
             validSrcAddrs128(mem, out_ptr, out_b, len);
+            gctr_partial(rdx, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 //            forall j :: 0 <= j < rdx ==> 
 //                        buffer128_read(out_b, j, mem) == 
 //                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt(AES_128, key, inc32(old(icb), j)));

@@ -6,6 +6,12 @@ open FStar.List.Tot.Base
 open FStar.List.Tot.Properties
 open AES_s
 open GCTR_s 
+open FStar.Math.Lemmas
+
+let gctr_partial (bound:nat) (plain cipher:Seq.seq quad32) (key:aes_key(AES_128)) (icb:quad32) =
+  let bound = min bound (min (Seq.length plain) (Seq.length cipher)) in
+  forall j . {:pattern (Seq.index cipher j)} 0 <= j /\ j < bound ==> Seq.index cipher j == quad32_xor (Seq.index plain j) (aes_encrypt AES_128 key (inc32 icb j))
+  
 
 let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain) 
 				      (alg:algorithm) (key:aes_key alg) (i:int) : 
