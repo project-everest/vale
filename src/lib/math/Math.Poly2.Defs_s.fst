@@ -91,3 +91,14 @@ let mul (a b:poly) : Pure poly
   let len = length a + length b in
   of_fun len (fun (i:nat) -> mul_element a b i)
 
+let rec divmod (a:poly) (b:poly{length b > 0}) : Tot (poly * poly) (decreases (length a)) =
+  if length a < length b then
+    (zero, a)
+  else
+    let _ = assert a.[length a - 1] in
+    let a' = add a (shift b (length a - length b)) in
+    let (d, m) = divmod a' b in
+    (add d (monomial (length a - length b)), m)
+
+let div (a:poly) (b:poly{length b > 0}) : poly = fst (divmod a b)
+let mod (a:poly) (b:poly{length b > 0}) : poly = snd (divmod a b)

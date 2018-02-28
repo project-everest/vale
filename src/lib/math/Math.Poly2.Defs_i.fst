@@ -9,6 +9,8 @@ let poly_equal (a b:poly) : Type0 =
 unfold let ( =. ) = poly_equal
 unfold let ( +. ) = add
 unfold let ( *. ) = mul
+unfold let ( /. ) = div
+unfold let ( %. ) = mod
 
 let lemma_poly_equal_elim (a b:poly) : Lemma
   (requires a =. b)
@@ -30,6 +32,11 @@ let lemma_add_cancel (a:poly) : Lemma ((a +. a) =. zero) = ()
 let lemma_add_cancel_eq (a b:poly) : Lemma (requires (a +. b) == zero) (ensures a =. b) = ()
 let lemma_add_commute (a b:poly) : Lemma ((a +. b) =. (b +. a)) = ()
 let lemma_add_associate (a b c:poly) : Lemma ((a +. (b +. c)) =. ((a +. b) +. c)) = ()
+
+let lemma_add_move (a b:poly) : Lemma (ensures a == (a +. b) +. b) =
+  lemma_add_associate a b b;
+  lemma_add_cancel b;
+  lemma_add_zero a
 
 // SUMMATION
 
@@ -263,3 +270,75 @@ let lemma_mul_distribute (a b c:poly) : Lemma (a *. (b +. c) =. (a *. b) +. (a *
       (mul_element_fun a c k)
     in
   FStar.Classical.forall_intro f
+
+let lemma_mul_distribute_right (a b c:poly) : Lemma ((a +. b) *. c =. (a *. c) +. (b *. c)) =
+  lemma_mul_commute (a +. b) c;
+  lemma_mul_commute a c;
+  lemma_mul_commute b c;
+  lemma_mul_distribute c a b
+
+let rec lemma_shift_is_mul (a:poly) (n:nat) : Lemma (shift a n =. a *. (monomial n)) =
+  let an = shift a n in
+  let b = monomial n in
+  let lem (k:nat) : Lemma (an.[k] == mul_element a b k) =
+    if k < n then
+      lemma_sum_of_zero 0 k (mul_element_fun a b k)
+    else
+    (
+      // mul_element_fun a b k i is zero except for i = k - n:
+      lemma_sum_of_zero 0 (k - n) (mul_element_fun a b k);
+      lemma_sum_of_zero (k - n + 1) (k + 1) (mul_element_fun a b k);
+      lemma_sum_join 0 (k - n) (k - n + 1) (mul_element_fun a b k);
+      lemma_sum_join 0 (k - n + 1) (k + 1) (mul_element_fun a b k);
+      ()
+    )
+    in
+  FStar.Classical.forall_intro lem
+
+
+// DIVISION, MOD
+
+let rec lemma_mod_is_small (a b:poly) : Lemma
+  (requires length b > 0)
+  (ensures length (a %. b) < length b)
+  (decreases (length a))
+  =
+  if length a >= length b then
+  (
+    let _ = assert a.[length a - 1] in
+    let n = length a - length b in
+    let a' = add a (shift b n) in
+    lemma_mod_is_small a' b
+  )
+
+let rec lemma_div_mod (a b:poly) : Lemma
+  (requires length b > 0)
+  (ensures a =. (a /. b) *. b +. (a %. b))
+  (decreases (length a))
+  =
+  if length a < length b then
+  (
+    lemma_mul_zero b;
+    lemma_mul_commute b zero;
+    ()
+  )
+  else
+  (
+    let _ = assert a.[length a - 1] in
+    let n = length a - length b in
+    let a' = a +. (shift b n) in
+    let xn = monomial n in
+    lemma_shift_is_mul b n;
+    lemma_mul_commute b xn;
+    // a' == a +. xn *. b
+    // (a /. b == a' /. b +. xn);
+    lemma_add_move (a' /. b) xn;
+    // (a' /. b == a /. b +. xn);
+    lemma_div_mod a' b;
+    // a' == (a' /. b) *. b +. (a' %. b)
+    // a +. xn * b == (a /. b + xn) *. b +. (a %. b))
+    lemma_mul_distribute_right (a /. b) xn b;
+    // a +. xn *. b == (a /. b) *. b +. xn *. b +. (a %. b)
+    // a == (a /. b) *. b +. (a %. b)
+    ()
+  )

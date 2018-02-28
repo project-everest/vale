@@ -12,6 +12,11 @@ let of_seq s = D.of_seq s
 let of_fun len f = D.of_fun len f
 let add a b = D.add a b
 let mul a b = D.mul a b
-let div a b = zero // TODO
-let mod a b = zero // TODO
+
+assume val undefined_div_by_zero (a:poly) : poly
+assume val undefined_mod_by_zero (a:poly) : poly
+
+let div a b = if degree b >= 0 then D.div a b else undefined_div_by_zero a
+let mod a b = if degree b >= 0 then D.mod a b else undefined_mod_by_zero a
+
 let reveal_defs () = ()
