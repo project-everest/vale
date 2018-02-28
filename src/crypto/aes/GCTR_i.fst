@@ -87,3 +87,8 @@ let gctr_partial_completed (plain cipher:Seq.seq quad32) (key:aes_key(AES_128)) 
   FStar.Classical.forall_intro helper;
   gctr_indexed icb plain_list AES_128 key cipher_list;
   ()
+
+open AES_helpers_i
+
+let lemma_quad32_xor () : Lemma (forall q . {:pattern quad32_xor q q} quad32_xor q q == Quad32 0 0 0 0) =
+  xor_lemmas()

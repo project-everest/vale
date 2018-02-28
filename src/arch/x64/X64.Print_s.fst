@@ -126,6 +126,10 @@ let print_ins (ins:ins) (p:printer) =
   let print_shift (dst:operand) (amount:operand) =
     print_op_pair dst amount print_operand print_shift_operand
   in
+  let print_xmm_op (dst:xmm) (src:operand) =
+    let first, second = p.op_order (print_xmm dst) (print_operand src p) in
+      first ^ ", " ^ second ^ "\n"
+  in 
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst) (print_xmm src) in
       first ^ ", " ^ second ^ "\n"
@@ -149,8 +153,10 @@ let print_ins (ins:ins) (p:printer) =
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
+  | Paddd dst src           -> " paddd "      ^ print_xmms dst src
   | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
   | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count)
+  | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op dst src) (print_imm8 index)
   | VPSLLDQ dst src count  -> "   vpslldq "   ^ print_pair (print_xmms dst src) (print_imm8 count)
   | MOVDQU dst src         -> "   movdqu "    ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
   | AESNI_enc dst src      -> "  aesenc "     ^ print_xmms dst src

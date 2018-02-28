@@ -8,6 +8,9 @@ open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
+
+// Annoying type problem workaround
+let nat64_to_nat32 (n:nat64 { n < nat32_max }) : nat32 = n
 #endverbatim
 
 #verbatim
@@ -31,6 +34,17 @@ var{:state xmm(5)} xmm5:quad32;
 var{:state xmm(6)} xmm6:quad32;
 var{:state xmm(7)} xmm7:quad32;
 
+procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly}
+          Paddd(inout dst:xmm, src:xmm)
+  modifies efl;
+  ensures
+    dst == old(Quad32(add_wrap(dst.lo, src.lo),
+                      add_wrap(dst.mid_lo, src.mid_lo),
+                      add_wrap(dst.mid_hi, src.mid_hi),
+                      add_wrap(dst.hi, src.hi)));
+{
+}
+
 procedure{:instruction Ins(S.Pxor(dst, src))}{:quick exportOnly} Pxor(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
@@ -46,6 +60,17 @@ procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
                       select_word(src, get_mid_lo_bits(byte_to_twobits(permutation))),
                       select_word(src, get_mid_hi_bits(byte_to_twobits(permutation))),
                       select_word(src, get_hi_bits    (byte_to_twobits(permutation)))));
+{
+}
+
+procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
+          Pinsrd(inout dst:xmm, src:opr64, inline index:imm8)
+  requires 
+    src < nat32_max;
+    index < 4;
+  modifies efl;
+  ensures
+    dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index); 
 {
 }
 

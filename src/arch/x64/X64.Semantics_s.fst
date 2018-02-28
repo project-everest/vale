@@ -19,8 +19,10 @@ type ins =
   | And64      : dst:operand -> src:operand -> ins
   | Shr64      : dst:operand -> amt:operand -> ins
   | Shl64      : dst:operand -> amt:operand -> ins
+  | Paddd      : dst:xmm -> src:xmm -> ins
   | Pxor       : dst:xmm -> src:xmm -> ins
-  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
+  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
   | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
   | AESNI_enc           : dst:xmm -> src:xmm -> ins
@@ -293,7 +295,15 @@ let eval_ins (ins:ins) : st unit =
 
 // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
 // since all possibilities are valid, thanks to dependent types 
-   
+
+  | Paddd dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (Quad32 ((dst_q.lo + src_q.lo) % nat32_max)
+			       ((dst_q.mid_lo + src_q.mid_lo) % nat32_max)
+			       ((dst_q.mid_hi + src_q.mid_hi) % nat32_max)
+			       ((dst_q.hi + src_q.hi) % nat32_max))
+
   | Pxor dst src ->
     update_xmm dst ins (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
@@ -307,7 +317,12 @@ let eval_ins (ins:ins) : st unit =
          (select_word src_val (Bits_of_Byte?.hi bits))
     in
     update_xmm dst ins permuted_xmm
-    
+
+  | Pinsrd dst src index ->
+    check (valid_operand src);;
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % nat32_max) (index % 4))
+
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need
     let src_q = eval_xmm src s in

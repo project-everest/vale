@@ -64,3 +64,10 @@ let select_word (q:quad32) (selector:twobits) =
   | 1 -> q.mid_lo
   | 2 -> q.mid_hi
   | 3 -> q.hi
+
+let insert_nat32 (q:quad32) (n:nat32) (i:twobits) =
+  match i with 
+  | 0 -> Quad32 n q.mid_lo q.mid_hi q.hi
+  | 1 -> Quad32 q.lo n q.mid_hi q.hi
+  | 2 -> Quad32 q.lo q.mid_lo n q.hi
+  | 3 -> Quad32 q.lo q.mid_lo q.mid_hi n

@@ -31,13 +31,28 @@ open X64.Vale.QuickCodes_i
 // GCTR encryption
 ///////////////////////////
 
+procedure {:quick} init_ctr()
+    modifies xmm4; efl;
+    ensures 
+        xmm4 == Quad32(1, 0, 0, 0);
+{
+    Pxor(xmm4, xmm4);
+    Pinsrd(xmm4, 1, 0);
+
+    lemma_quad32_xor();
+}
+
 procedure {:quick} inc32()
+    requires
+        xmm4 == Quad32(1, 0, 0, 0);
+    reads
+        xmm4;
     modifies 
-        xmm3;
+        xmm3; efl;
     ensures 
         xmm3 == inc32(old(xmm3), 1);
 {
-    assume false;
+    Paddd(xmm3, xmm4);
 }
 
 procedure {:quick} gctr_core(
@@ -50,10 +65,10 @@ procedure {:quick} gctr_core(
     lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm3;
 
     reads
-        r8; in_ptr; out_ptr; len;
+        r8; in_ptr; out_ptr; len; 
 
     modifies
-        rdx; r9; r10; xmm0; xmm1; xmm2; icb; mem; efl;
+        rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
 
     requires
         // GCTR reqs
@@ -79,6 +94,8 @@ procedure {:quick} gctr_core(
     Mov64(r9, in_ptr);
     Mov64(r10, out_ptr);
 
+    init_ctr();
+
     while (rdx != len)
         invariant
             //////////////////// Basic indexing //////////////////////
@@ -86,6 +103,7 @@ procedure {:quick} gctr_core(
             r9 == in_ptr + 16 * rdx;
             r10 == out_ptr + 16 * rdx;
             icb == inc32(old(icb), rdx);
+            xmm4 == Quad32(1, 0, 0, 0);
             
             //////////////////// From requires //////////////////////
             // GCTR reqs
