@@ -25,14 +25,6 @@ open X64.Vale.QuickCodes_i
 //open Opaque_i
 #endverbatim
 
-//#verbatim{:interface}//{:implementation}
-//
-//// TODO: Annoying work around
-//let index_workaround (s:seq quad32) (i:nat) =
-//   if i < length s then index s i else Quad32 0 0 0 0
-//
-//#endverbatim
-
 #reset-options "--z3rlimit 40"
 
 ///////////////////////////
@@ -89,6 +81,7 @@ procedure {:quick} gctr_core(
 
     while (rdx != len)
         invariant
+            //////////////////// Basic indexing //////////////////////
             0 <= rdx <= len;
             r9 == in_ptr + 16 * rdx;
             r10 == out_ptr + 16 * rdx;
@@ -109,7 +102,7 @@ procedure {:quick} gctr_core(
             validSrcAddrs128(mem, r8, keys_buffer, 11);
             buffer128_as_seq(mem, keys_buffer) == round_keys;
 
-            // Postconditions
+            //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);
             validSrcAddrs128(mem, out_ptr, out_b, len);
             gctr_partial(rdx, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
@@ -122,25 +115,18 @@ procedure {:quick} gctr_core(
     {
         Mov128(xmm0, icb);
         AES128EncryptBlock(icb, key, round_keys, keys_buffer);
-        //assert xmm0 == aes_encrypt(AES_128, key, inc32(old(icb), rdx));   // F* believes this
-        Load128_buffer(xmm1, r9, 0, in_b, rdx);
-//        assert len <= length(buffer128_as_seq(mem, in_b));    // F* believes this
-//        assert rdx < length(buffer128_as_seq(mem, in_b));    // F* believes this
-//        assert xmm1 == index_workaround(buffer128_as_seq(mem, in_b), rdx);  // F* believes this with annoying workaround
-        ghost var old_xmm1 := xmm1;
-        Pxor(xmm1, xmm0);
-//        assert xmm1 == quad32_xor(old_xmm1, aes_encrypt(AES_128, key, inc32(old(icb), rdx)));   // F* believes this
-        Store128_buffer(r10, xmm1, 0, out_b, rdx);
-//        assert buffer128_read(out_b, rdx, mem) == 
-//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), rdx), aes_encrypt(AES_128, key, inc32(old(icb), rdx)));
 
+        Load128_buffer(xmm1, r9, 0, in_b, rdx);
+        Pxor(xmm1, xmm0);
+        Store128_buffer(r10, xmm1, 0, out_b, rdx);
 
         Add64(rdx, 1);
         Add64(r9, 16);
         Add64(r10, 16);
         inc32();
     }
-
+    
+    // Call a helpful lemma
     gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
