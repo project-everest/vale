@@ -42,6 +42,15 @@ assume val write_buffer
   (mem: HS.mem)
   : HS.mem
 
+assume val write_spec
+  (#t: P.typ)
+  (b: P.buffer t)
+  (i: UInt32.t)
+  (v: P.type_of_typ t)
+  (mem: HS.mem) : Lemma 
+  (requires UInt32.v i < UInt32.v (P.buffer_length b))
+  (ensures Seq.index (P.buffer_as_seq (write_buffer #t b i v mem) b) (UInt32.v i) == v )
+
 (* Takes a buffer, the previous HyperStack, and a low-level Vale Heap, and reconstructs the buffer
    from the data in the Vale Heap *)
 val reconstruct_buf: P.(buffer (TBase TUInt8)) -> HS.mem -> Vale_Sem.heap -> GTot HS.mem
@@ -76,8 +85,44 @@ let up_mem_list heap buffers mem =
     | a :: q -> aux q (reconstruct_buf a accu_mem heap) heap
   in aux buffers mem heap
 
+let rec write_vale_mem contents (length:UInt32.t{UInt32.v length = FStar.Seq.Base.length contents}) addr (i:nat{i <= UInt32.v length}) 
+      (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : GTot Vale_Sem.heap (decreases %[sub length i]) =
+    if i >= (UInt32.v length) then curr_heap
+    else
+      write_vale_mem contents length addr (i+1) (curr_heap.[addr + i] <- FStar.Seq.index contents i)
+
+let rec frame_write_vale_mem contents (length:UInt32.t{UInt32.v length = FStar.Seq.Base.length contents}) addr (i:nat{i <= UInt32.v length}) 
+      (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Lemma
+      (requires True)
+      (ensures (let new_heap = write_vale_mem contents length addr i curr_heap in
+      forall j. j < addr \/ j >= addr + UInt32.v length ==> curr_heap.[j] == new_heap.[j]))
+      (decreases %[sub length i])=
+      if i >= (UInt32.v length) then ()
+      else frame_write_vale_mem contents length addr (i+1) (curr_heap.[addr+i] <- Seq.index contents i)
+
+let rec load_store_write_vale_mem contents (length:UInt32.t{UInt32.v length = FStar.Seq.Base.length contents}) addr (i:nat{i <= UInt32.v length}) 
+      (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Lemma
+      (requires True)
+      (ensures (let new_heap = write_vale_mem contents length addr i curr_heap in
+      forall j. 0 <= j /\ j < UInt32.v length ==> Seq.index contents j == new_heap.[addr + j]))
+      (decreases %[sub length i])=
+      if i >= (UInt32.v length) then ()
+      else load_store_write_vale_mem contents length addr (i+1)  (curr_heap.[addr+i] <- Seq.index contents i)
+
+val correct_down: HS.mem -> P.(buffer (TBase TUInt8)) -> P.(buffer (TBase TUInt8)) -> Vale_Sem.heap * nat64 * nat64 -> Type0
+let correct_down mem ptr1 ptr2 res =
+  let heap, addr1, addr2 = res in
+  let length1 = P.buffer_length ptr1 in
+  let length2 = P.buffer_length ptr2 in
+  let contents1 = P.buffer_as_seq mem ptr1 in
+  let contents2 = P.buffer_as_seq mem ptr2 in
+  (forall i.  0 <= i /\ i < (UInt32.v length1) ==> heap.[addr1 + i] == FStar.Seq.index contents1 i) /\
+  (forall i.  0 <= i /\ i < (UInt32.v length2) ==> heap.[addr2 + i] == FStar.Seq.index contents2 i)
+
 (* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale memory + keep track of the vale addresses *)
-val down_mem: HS.mem -> P.(buffer (TBase TUInt8)) -> P.(buffer (TBase TUInt8)) -> GTot (Vale_Sem.heap * nat64 * nat64)
+val down_mem: (mem:HS.mem) -> (ptr1:P.(buffer (TBase TUInt8))) -> (ptr2:P.(buffer (TBase TUInt8))) -> GTot (res: (Vale_Sem.heap * nat64 * nat64){correct_down mem ptr1 ptr2 res})
+
+#set-options "--z3rlimit 40"
 
 let down_mem mem ptr1 ptr2 =
   (* Dummy heap *)
@@ -88,12 +133,11 @@ let down_mem mem ptr1 ptr2 =
   let contents2 = P.buffer_as_seq mem ptr2 in
   let addr1 = 0 in
   let addr2 = UInt32.v length1 in
-  let rec aux contents (length:UInt32.t{UInt32.v length = FStar.Seq.Base.length contents}) addr (i:nat{i <= UInt32.v length}) curr_heap : GTot Vale_Sem.heap (decreases %[sub length i]) =
-    if i >= (UInt32.v length) then curr_heap
-    else
-      aux contents length addr (i+1) (curr_heap.[addr + i] <- FStar.Seq.index contents i)
-  in let heap1 = aux contents1 length1 addr1 0 heap in
-  let heap2 = aux contents2 length2 addr2 0 heap1 in
+  let heap1 = write_vale_mem contents1 length1 addr1 0 heap in
+  load_store_write_vale_mem contents1 length1 addr1 0 heap;
+  let heap2 = write_vale_mem contents2 length2 addr2 0 heap1 in
+  frame_write_vale_mem contents2 length2 addr2 0 heap1;
+  load_store_write_vale_mem contents2 length2 addr2 0 heap1;
   heap2, addr1, addr2
 
 (* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale state *)
@@ -120,4 +164,11 @@ val down_up_identity: (mem:HS.mem) -> (ptr1:P.(buffer (TBase TUInt8))) -> (ptr2:
   (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 mem in
     new_mem == mem)
 
-let down_up_identity mem ptr1 ptr2 = admit()
+let down_up_identity mem ptr1 ptr2 =
+  let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 mem in
+  assume (UInt32.v (P.buffer_length ptr1) > 0); 
+  assert (heap.[addr1] == Seq.index (P.buffer_as_seq mem ptr1) 0);
+  // assert (Seq.index (P.buffer_as_seq mem ptr1) 0 == Seq.index (P.buffer_as_seq new_mem ptr1) 0);
+  // assert (forall i. 0 <= i /\ i < UInt32.v (P.buffer_length ptr1) ==> Seq.index (P.buffer_as_seq mem ptr1) i == Seq.index (P.buffer_as_seq new_mem ptr1) i);
+  // assert (P.buffer_as_seq mem ptr1 == P.buffer_as_seq new_mem ptr1);
+  admit()
