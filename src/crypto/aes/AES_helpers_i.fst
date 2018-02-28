@@ -90,6 +90,7 @@ let rec lemma_expand_append (key:aes_key AES_128) (size1:nat) (size2:nat) : Lemm
   =
   if size1 < size2 then lemma_expand_append key size1 (size2 - 1)
 
+#reset-options "--z3rlimit 10"
 // quad32 key expansion is equivalent to nat32 key expansion
 let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
   (requires size <= 11)
@@ -108,6 +109,7 @@ let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
     if i = 0 then lemma_expand_key_128_0 key
     else lemma_expand_key_128_i key i
   )
+#reset-options
 
 // Refine round_key_128 to a SIMD computation
 let simd_round_key_128 (prev:quad32) (rcon:nat32) : quad32 =
