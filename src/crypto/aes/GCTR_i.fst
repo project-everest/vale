@@ -66,3 +66,24 @@ let rec gctr_indexed (icb:quad32) (plain:gctr_plain)
   index_extensionality c cipher;
   ()
 
+open FStar.Seq.Properties
+
+let gctr_partial_completed (plain cipher:Seq.seq quad32) (key:aes_key(AES_128)) (icb:quad32) : Lemma
+  (requires Seq.length plain == Seq.length cipher /\
+	    256 * (Seq.length plain) < nat32_max /\
+	    gctr_partial (Seq.length cipher) plain cipher key icb)
+  (ensures seq_to_list cipher == gctr_encrypt icb (seq_to_list plain) AES_128 key)
+  =
+  let plain_list = seq_to_list plain in
+  let cipher_list = seq_to_list cipher in
+  let helper (i:int) : Lemma (0 <= i /\ i < Seq.length cipher ==> 
+				  index cipher_list i == Seq.index cipher i 
+				/\ index plain_list  i == Seq.index plain  i) =
+    if 0 <= i && i < Seq.length cipher then
+      (lemma_index_is_nth cipher i;
+       lemma_index_is_nth plain  i)
+    else ()
+  in
+  FStar.Classical.forall_intro helper;
+  gctr_indexed icb plain_list AES_128 key cipher_list;
+  ()

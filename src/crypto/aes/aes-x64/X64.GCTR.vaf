@@ -25,13 +25,13 @@ open X64.Vale.QuickCodes_i
 //open Opaque_i
 #endverbatim
 
-#verbatim{:interface}//{:implementation}
-
-// TODO: Annoying work around
-let index_workaround (s:seq quad32) (i:nat) =
-   if i < length s then index s i else Quad32 0 0 0 0
-
-#endverbatim
+//#verbatim{:interface}//{:implementation}
+//
+//// TODO: Annoying work around
+//let index_workaround (s:seq quad32) (i:nat) =
+//   if i < length s then index s i else Quad32 0 0 0 0
+//
+//#endverbatim
 
 #reset-options "--z3rlimit 40"
 
@@ -70,6 +70,7 @@ procedure {:quick} gctr_core(
         validDstAddrs128(mem, out_ptr, out_b, len);
         in_ptr  + 16 * len < nat64_max;
         out_ptr + 16 * len < nat64_max;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < nat32_max;
 
         // AES reqs
         length(round_keys) == 11;
@@ -80,7 +81,7 @@ procedure {:quick} gctr_core(
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
-        //buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
+        seq_to_list(buffer128_as_seq(mem, out_b)) == gctr_encrypt(old(icb), seq_to_list(buffer128_as_seq(old(mem), in_b)), AES_128, key);
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);
@@ -130,8 +131,8 @@ procedure {:quick} gctr_core(
         Pxor(xmm1, xmm0);
 //        assert xmm1 == quad32_xor(old_xmm1, aes_encrypt(AES_128, key, inc32(old(icb), rdx)));   // F* believes this
         Store128_buffer(r10, xmm1, 0, out_b, rdx);
-        assert buffer128_read(out_b, rdx, mem) == 
-                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), rdx), aes_encrypt(AES_128, key, inc32(old(icb), rdx)));
+//        assert buffer128_read(out_b, rdx, mem) == 
+//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), rdx), aes_encrypt(AES_128, key, inc32(old(icb), rdx)));
 
 
         Add64(rdx, 1);
@@ -139,5 +140,7 @@ procedure {:quick} gctr_core(
         Add64(r10, 16);
         inc32();
     }
+
+    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
