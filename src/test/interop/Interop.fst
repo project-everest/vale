@@ -154,21 +154,38 @@ let down mem ptr1 ptr2 =
   let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in
   Vale_Sem.Mkstate true (fun x -> if x = Rax then addr1 else if x = Rbx then addr2 else 0) heap 
 
-assume val upd: #a:Type -> b:B.buffer a -> (n:nat{n < B.length b}) -> z:a -> h0:HS.mem -> 
-  (h1:HS.mem{B.modifies_1 b h0 h1 /\ B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n z })
+assume val upd: #a:Type -> b:B.buffer a -> (n:nat{n < B.length b}) -> z:a -> (h0:HS.mem{B.live h0 b}) -> 
+  (h1:HS.mem{B.modifies_1 b h0 h1 /\ B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n z /\ B.live h1 b})
 
-let rec write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) curr_mem : GTot HS.mem (decreases %[sub length i]) = 
+let rec write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem (decreases %[sub length i]) = 
   if i >= length then curr_mem
   else
     write_low_mem heap length addr buf (i+1) (upd buf i heap.[addr + i] curr_mem)
 
-val up_mem: Vale_Sem.heap -> (ptr1: B.buffer UInt8.t) -> nat64 -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> nat64 -> HS.mem -> GTot HS.mem
+let rec frame_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires True)
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    forall (b:(B.buffer UInt8.t){B.live mem b}). B.disjoint b buf ==> B.equal mem b new_mem b))
+  (decreases %[sub length i]) =
+    if i >= length then ()
+    else begin
+      let new_mem = upd buf i heap.[addr+i] mem in
+      frame_write_low_mem heap length addr buf (i+1) new_mem
+    end
+
+
+let correct_up mem buf1 buf2 new_mem =
+  forall (b:(B.buffer UInt8.t){B.live mem b}). (B.disjoint b buf1 /\ B.disjoint b buf2 ==> B.equal mem b new_mem b)
+
+val up_mem: Vale_Sem.heap -> (ptr1: B.buffer UInt8.t) -> nat64 -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> nat64 -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem})
 
 let up_mem heap ptr1 addr1 ptr2 addr2 mem =
   let length1 = B.length ptr1 in
   let length2 = B.length ptr2 in
   let mem1 = write_low_mem heap length1 addr1 ptr1 0 mem in
+  frame_write_low_mem heap length1 addr1 ptr1 0 mem;
   let mem2 = write_low_mem heap length2 addr2 ptr2 0 mem in
+  frame_write_low_mem heap length2 addr2 ptr2 0 mem;
   mem2
 
 val down_up_identity: (mem:HS.mem) -> (ptr1:B.buffer UInt8.t) -> (ptr2:(B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> Lemma 
