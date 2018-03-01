@@ -38,6 +38,7 @@ let lemma_add_move (a b:poly) : Lemma (ensures a == (a +. b) +. b) =
   lemma_add_cancel b;
   lemma_add_zero a
 
+
 // SUMMATION
 
 let lemma_sum_empty (j:int) (f:int -> bool) : Lemma
@@ -271,7 +272,7 @@ let lemma_mul_distribute (a b c:poly) : Lemma (a *. (b +. c) =. (a *. b) +. (a *
     in
   FStar.Classical.forall_intro f
 
-let lemma_mul_distribute_right (a b c:poly) : Lemma ((a +. b) *. c =. (a *. c) +. (b *. c)) =
+let lemma_mul_distribute_left (a b c:poly) : Lemma ((a +. b) *. c =. (a *. c) +. (b *. c)) =
   lemma_mul_commute (a +. b) c;
   lemma_mul_commute a c;
   lemma_mul_commute b c;
@@ -295,21 +296,37 @@ let rec lemma_shift_is_mul (a:poly) (n:nat) : Lemma (shift a n =. a *. (monomial
     in
   FStar.Classical.forall_intro lem
 
+let lemma_mul_degree (a b:poly) : Lemma
+  (degree (a *. b) == (if degree a >= 0 && degree b >= 0 then degree a + degree b else -1))
+  =
+  if degree a >= 0 && degree b >= 0 then
+  (
+    let len = length a + length b in
+    lemma_sum_of_zero 0 len (mul_element_fun a b (len - 1));
+    lemma_sum_of_zero 0 (length a - 1) (mul_element_fun a b (len - 2));
+    lemma_sum_of_zero (length a) (len - 1) (mul_element_fun a b (len - 2));
+    lemma_sum_join 0 (length a - 1) (length a) (mul_element_fun a b (len - 2));
+    lemma_sum_join 0 (length a) (len - 1) (mul_element_fun a b (len - 2));
+    assert (not (a *. b).[len - 1]);
+    assert ((a *. b).[len - 2]);
+    ()
+  )
+  else if degree a < 0 then
+  (
+    assert (a =. zero);
+    lemma_mul_zero b;
+    lemma_mul_commute b zero;
+    ()
+  )
+  else
+  (
+    assert (b =. zero);
+    lemma_mul_zero a;
+    ()
+  )
+
 
 // DIVISION, MOD
-
-let rec lemma_mod_is_small (a b:poly) : Lemma
-  (requires length b > 0)
-  (ensures length (a %. b) < length b)
-  (decreases (length a))
-  =
-  if length a >= length b then
-  (
-    let _ = assert a.[length a - 1] in
-    let n = length a - length b in
-    let a' = add a (shift b n) in
-    lemma_mod_is_small a' b
-  )
 
 let rec lemma_div_mod (a b:poly) : Lemma
   (requires length b > 0)
@@ -337,8 +354,37 @@ let rec lemma_div_mod (a b:poly) : Lemma
     lemma_div_mod a' b;
     // a' == (a' /. b) *. b +. (a' %. b)
     // a +. xn * b == (a /. b + xn) *. b +. (a %. b))
-    lemma_mul_distribute_right (a /. b) xn b;
+    lemma_mul_distribute_left (a /. b) xn b;
     // a +. xn *. b == (a /. b) *. b +. xn *. b +. (a %. b)
     // a == (a /. b) *. b +. (a %. b)
     ()
   )
+
+let rec lemma_div_degree (a b:poly) : Lemma
+  (requires length b > 0)
+  (ensures degree (a /. b) == (if degree a < degree b then -1 else degree a - degree b))
+  (decreases (length a))
+  =
+  if length a >= length b then
+  (
+    let _ = assert a.[length a - 1] in
+    let n = length a - length b in
+    let a' = add a (shift b n) in
+    lemma_div_degree a' b;
+    assert ((a /. b).[degree a - degree b]);
+    ()
+  )
+
+let rec lemma_mod_degree (a b:poly) : Lemma
+  (requires length b > 0)
+  (ensures degree (a %. b) < degree b)
+  (decreases (length a))
+  =
+  if length a >= length b then
+  (
+    let _ = assert a.[length a - 1] in
+    let n = length a - length b in
+    let a' = add a (shift b n) in
+    lemma_mod_degree a' b
+  )
+
