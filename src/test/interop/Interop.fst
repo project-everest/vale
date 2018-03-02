@@ -116,8 +116,8 @@ let rec load_store_write_vale_mem contents (length:nat{length = FStar.Seq.Base.l
       if i >= length then ()
       else load_store_write_vale_mem contents length addr (i+1)  (curr_heap.[addr+i] <- Seq.index contents i)
 
-val correct_down: HS.mem -> B.buffer UInt8.t -> B.buffer UInt8.t -> Vale_Sem.heap * nat64 * nat64 -> Type0
-let correct_down mem ptr1 ptr2 res =
+logic val correct_down: HS.mem -> B.buffer UInt8.t -> B.buffer UInt8.t -> Vale_Sem.heap * nat64 * nat64 -> Type0
+logic let correct_down mem ptr1 ptr2 res =
   let heap, addr1, addr2 = res in
   let length1 = B.length ptr1 in
   let length2 = B.length ptr2 in
@@ -173,22 +173,51 @@ let rec frame_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.
       frame_write_low_mem heap length addr buf (i+1) new_mem
     end
 
+let rec load_store_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires forall j. 0 <= j /\ j < i ==> Seq.index (B.as_seq mem buf) j == heap.[addr + j])
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    forall j. 0 <= j /\ j < length ==> Seq.index (B.as_seq new_mem buf) j == heap.[addr + j]))
+  (decreases %[sub length i]) =
+  if i >= length then ()
+  else begin
+    let new_mem = upd buf i heap.[addr + i] mem in
+    load_store_write_low_mem heap length addr buf (i+1) new_mem
+  end
 
-let correct_up mem buf1 buf2 new_mem =
+let rec live_preserved_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires True)
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    forall (b:(B.buffer UInt8.t)). B.live mem b ==> B.live new_mem b))
+  (decreases %[sub length i]) =
+    if i >= length then ()
+    else begin
+      let new_mem = upd buf i heap.[addr + i] mem in
+      B.lemma_reveal_modifies_1 buf mem new_mem;
+      live_preserved_write_low_mem heap length addr buf (i+1) new_mem
+    end
+
+logic let correct_up mem buf1 buf2 new_mem heap addr1 addr2 =
+  let length1 = B.length buf1 in
+  let length2 = B.length buf2 in
   forall (b:(B.buffer UInt8.t){B.live mem b}). (B.disjoint b buf1 /\ B.disjoint b buf2 ==> B.equal mem b new_mem b)
+  /\ (forall j. 0 <= j /\ j < length1 ==> Seq.index (B.as_seq new_mem buf1) j == heap.[addr1 + j])
+  /\ (forall j. 0 <= j /\ j < length2 ==> Seq.index (B.as_seq new_mem buf2) j == heap.[addr2 + j])
 
-val up_mem: Vale_Sem.heap -> (ptr1: B.buffer UInt8.t) -> nat64 -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> nat64 -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem})
+val up_mem: (heap:Vale_Sem.heap) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (addr2:nat64) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem heap addr1 addr2})
 
 let up_mem heap ptr1 addr1 ptr2 addr2 mem =
   let length1 = B.length ptr1 in
   let length2 = B.length ptr2 in
   let mem1 = write_low_mem heap length1 addr1 ptr1 0 mem in
   frame_write_low_mem heap length1 addr1 ptr1 0 mem;
-  let mem2 = write_low_mem heap length2 addr2 ptr2 0 mem in
-  frame_write_low_mem heap length2 addr2 ptr2 0 mem;
+  load_store_write_low_mem heap length1 addr1 ptr1 0 mem;
+  live_preserved_write_low_mem heap length1 addr1 ptr1 0 mem;
+  let mem2 = write_low_mem heap length2 addr2 ptr2 0 mem1 in
+  frame_write_low_mem heap length2 addr2 ptr2 0 mem1;
+  load_store_write_low_mem heap length2 addr2 ptr2 0 mem1;
   mem2
 
-val down_up_identity: (mem:HS.mem) -> (ptr1:B.buffer UInt8.t) -> (ptr2:(B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> Lemma 
+val down_up_identity: (mem:HS.mem) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ B.disjoint ptr1 ptr2}) -> Lemma 
   (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 mem in
     new_mem == mem)
 
