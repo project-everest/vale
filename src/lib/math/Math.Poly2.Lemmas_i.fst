@@ -1,11 +1,31 @@
 module Math.Poly2.Lemmas_i
 
+let lemma_index a =
+  FStar.Classical.forall_intro (lemma_index_i a)
+
 let lemma_zero_define () =
   FStar.Classical.forall_intro lemma_zero_define_i
+
+let lemma_one_define () =
+  FStar.Classical.forall_intro lemma_one_define_i
+
+let lemma_monomial_define n =
+  FStar.Classical.forall_intro (lemma_monomial_define_i n)
+
+let lemma_shift_define p n =
+  FStar.Classical.forall_intro (lemma_shift_define_i p n)
+
+let lemma_reverse_define p n =
+  FStar.Classical.forall_intro (lemma_reverse_define_i p n)
 
 let lemma_zero_degree () =
   lemma_degree zero;
   lemma_zero_define ()
+
+let lemma_reverse_degree a n =
+  lemma_index a;
+  lemma_reverse_define a n;
+  lemma_degree (reverse a n)
 
 let lemma_degree_negative a =
   let f (i:int) : Lemma (not a.[i]) =
@@ -14,6 +34,24 @@ let lemma_degree_negative a =
   FStar.Classical.forall_intro f;
   lemma_zero_define ();
   lemma_equal a zero
+
+let lemma_degree_is a n =
+  lemma_index_i a n;
+  lemma_degree a
+
+let lemma_of_list_degree l =
+  let len = List.length l in
+  let s = of_list l in
+  let a = of_seq s in
+  lemma_of_list_length s l;
+  assert (forall (i:nat).{:pattern (index s i)} i < len ==> index s i == List.index l i);
+  lemma_index a;
+  lemma_degree a;
+  lemma_zero_define ();
+  if len > 0 then
+    lemma_degree_is a (len - 1)
+  else
+    assert (not a.[degree a])
 
 let lemma_add_define a b =
   FStar.Classical.forall_intro (lemma_add_define_i a b)
@@ -35,6 +73,20 @@ let lemma_mul_smaller_is_zero a b =
   lemma_mul_zero b;
   lemma_mul_commute a b;
   ()
+
+let lemma_mul_reverse_shift_1 a b n =
+  let ab = a *. b in
+  let ra = reverse a n in
+  let rb = reverse b n in
+  let rab = reverse ab (n + n) in
+  let rab1 = reverse ab (n + n + 1) in
+  lemma_index ab;
+  lemma_mul_reverse a b n;
+  lemma_mul_degree a b;
+  lemma_reverse_define ab (n + n);
+  lemma_reverse_define ab (n + n + 1);
+  lemma_shift_define (ra *. rb) 1;
+  lemma_equal rab1 (shift (ra *. rb) 1)
 
 let lemma_mod_distribute a b c =
   let ab = a +. b in

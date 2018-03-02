@@ -57,6 +57,17 @@ let of_fun (len:nat) (f:nat -> bool) : Pure poly
   of_seq (init len f)
 
 [@"opaque_to_smt"]
+let reverse (a:poly) (n:nat) : Pure poly
+  (requires True)
+  (ensures fun p ->
+    length p <= n + 1 /\
+    (forall (i:nat).{:pattern p.[i]} p.[i] == a.[n - i]) /\
+    (forall (i:int).{:pattern p.[i]} p.[i] ==> 0 <= i /\ i <= n)
+  )
+  =
+  of_fun (n + 1) (fun (i:nat) -> a.[n - i])
+
+[@"opaque_to_smt"]
 let add (a b:poly) : Pure poly
   (requires True)
   (ensures fun p ->

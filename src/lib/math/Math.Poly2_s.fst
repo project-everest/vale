@@ -7,6 +7,7 @@ let zero = D.zero
 let one = D.one
 let monomial n = D.monomial n
 let shift p n = D.shift p n
+let reverse p n = D.reverse p n
 let poly_index p n = D.poly_index p n
 let of_seq s = D.of_seq s
 let of_fun len f = D.of_fun len f

@@ -18,6 +18,7 @@ val lemma_zero_define_i (i:int) : Lemma (not zero.[i])
 val lemma_one_define_i (i:int) : Lemma (one.[i] == (i = 0))
 val lemma_monomial_define_i (n:nat) (i:int) : Lemma ((monomial n).[i] == (i = n))
 val lemma_shift_define_i (p:poly) (n:nat) (i:int) : Lemma ((shift p n).[i] == p.[i - n])
+val lemma_reverse_define_i (p:poly) (n:nat) (i:int) : Lemma ((reverse p n).[i] == (p.[n - i] && i >= 0))
 
 val lemma_add_zero (a:poly) : Lemma ((a +. zero) == a)
 val lemma_add_cancel (a:poly) : Lemma ((a +. a) == zero)
@@ -34,6 +35,9 @@ val lemma_mul_associate (a b c:poly) : Lemma (a *. (b *. c) == (a *. b) *. c)
 val lemma_mul_distribute (a b c:poly) : Lemma (a *. (b +. c) == (a *. b) +. (a *. c))
 val lemma_mul_degree (a b:poly) : Lemma
   (degree (a *. b) == (if degree a >= 0 && degree b >= 0 then degree a + degree b else -1))
+val lemma_mul_reverse (a b:poly) (n:nat) : Lemma
+  (requires degree a <= n /\ degree b <= n)
+  (ensures reverse (a *. b) (n + n) == reverse a n *. reverse b n)
 
 val lemma_shift_is_mul (a:poly) (n:nat) : Lemma (shift a n == a *. (monomial n))
 

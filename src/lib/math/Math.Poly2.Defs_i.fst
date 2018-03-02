@@ -3,6 +3,8 @@ open FStar.Seq
 open Math.Poly2.Defs_s
 unfold let max = FStar.Math.Lib.max
 
+#reset-options "--z3rlimit 10"
+
 let poly_equal (a b:poly) : Type0 =
   (forall (i:nat).{:pattern a.[i] \/ b.[i]} a.[i] == b.[i])
 
@@ -23,6 +25,10 @@ let lemma_poly_equal_elim (a b:poly) : Lemma
   assert (length a == length b);
   assert (forall (i:nat).{:pattern (index a i) \/ (index b i)} a.[i] == b.[i]);
   assert (equal a b)
+
+let lemma_pointwise_equal (a b:poly) (pf:(i:int -> Lemma (a.[i] == b.[i]))) : Lemma (a == b) =
+  FStar.Classical.forall_intro pf;
+  lemma_poly_equal_elim a b
 
 
 // ADDITION
@@ -61,6 +67,19 @@ let rec lemma_sum_join (i j k:int) (f:int -> bool) : Lemma
   (decreases (k - j))
   =
   if j < k then lemma_sum_join i j (k - 1) f
+
+let lemma_sum_extend (j' j k k':int) (f:int -> bool) : Lemma
+  (requires
+    j' <= j /\ j <= k /\ k <= k' /\
+    (forall (i:int).{:pattern (f i)} j' <= i /\ i < j ==> not (f i)) /\
+    (forall (i:int).{:pattern (f i)} k <= i /\ i < k' ==> not (f i))
+  )
+  (ensures sum_of_bools j' k' f == sum_of_bools j k f)
+  =
+  lemma_sum_of_zero j' j f;
+  lemma_sum_of_zero k k' f;
+  lemma_sum_join j' j k f;
+  lemma_sum_join j' k k' f
 
 let rec lemma_sum_of_pairs (j k:int) (f g h:int -> bool) : Lemma
   (requires (forall (i:int).{:pattern (f i)} j <= i /\ i < k ==> f i == (g i <> h i)))
@@ -176,17 +195,14 @@ let rec lemma_sum_swap_mul_associate (k:int) (ff gg:int -> int -> bool) (f g:int
     (if k <= y then lemma_sum_of_zero 0 (y + 1) (gg y));
     (if y < k then lemma_sum_of_zero 0 y (gg y));
     lemma_sum_of_zero (if y < k then k else 0) (k' - y) (gg y);
-    (if y < k then lemma_sum_join 0 y k (gg y));
-    (if y < k then lemma_sum_join 0 k (k' - y) (gg y));
+    (if y < k then lemma_sum_extend 0 y k (k' - y) (gg y));
     ()
     in
   FStar.Classical.forall_intro lemma_f;
   FStar.Classical.forall_intro lemma_g;
   lemma_sum_swap 0 k' ff gg f g;
-  lemma_sum_of_zero k k' f;
-  lemma_sum_of_zero k k' g;
-  lemma_sum_join 0 k k' f;
-  lemma_sum_join 0 k k' g;
+  lemma_sum_extend 0 0 k k' f;
+  lemma_sum_extend 0 0 k k' g;
   ()
 
 let rec lemma_sum_pointwise_equal (j k:int) (f g:int -> bool) (pf:(i:int -> Lemma (f i == g i))) : Lemma
@@ -285,14 +301,7 @@ let rec lemma_shift_is_mul (a:poly) (n:nat) : Lemma (shift a n =. a *. (monomial
     if k < n then
       lemma_sum_of_zero 0 k (mul_element_fun a b k)
     else
-    (
-      // mul_element_fun a b k i is zero except for i = k - n:
-      lemma_sum_of_zero 0 (k - n) (mul_element_fun a b k);
-      lemma_sum_of_zero (k - n + 1) (k + 1) (mul_element_fun a b k);
-      lemma_sum_join 0 (k - n) (k - n + 1) (mul_element_fun a b k);
-      lemma_sum_join 0 (k - n + 1) (k + 1) (mul_element_fun a b k);
-      ()
-    )
+      lemma_sum_extend 0 (k - n) (k - n + 1) (k + 1) (mul_element_fun a b k)
     in
   FStar.Classical.forall_intro lem
 
@@ -303,10 +312,7 @@ let lemma_mul_degree (a b:poly) : Lemma
   (
     let len = length a + length b in
     lemma_sum_of_zero 0 len (mul_element_fun a b (len - 1));
-    lemma_sum_of_zero 0 (length a - 1) (mul_element_fun a b (len - 2));
-    lemma_sum_of_zero (length a) (len - 1) (mul_element_fun a b (len - 2));
-    lemma_sum_join 0 (length a - 1) (length a) (mul_element_fun a b (len - 2));
-    lemma_sum_join 0 (length a) (len - 1) (mul_element_fun a b (len - 2));
+    lemma_sum_extend 0 (length a - 1) (length a) (len - 1) (mul_element_fun a b (len - 2));
     assert (not (a *. b).[len - 1]);
     assert ((a *. b).[len - 2]);
     ()
@@ -324,6 +330,40 @@ let lemma_mul_degree (a b:poly) : Lemma
     lemma_mul_zero a;
     ()
   )
+
+let lemma_mul_reverse (a b:poly) (n:nat) : Lemma
+  (requires degree a <= n /\ degree b <= n)
+  (ensures reverse (a *. b) (n + n) =. reverse a n *. reverse b n)
+  =
+  let ab = a *. b in
+  let rab = reverse ab (n + n) in
+  let ra = reverse a n in
+  let rb = reverse b n in
+  lemma_mul_degree a b;
+  lemma_mul_degree ra rb;
+  let f (k:int) : Lemma (rab.[k] == (ra *. rb).[k]) =
+    if 0 <= k && k <= n + n then
+    (
+      let f0 = mul_element_fun ra rb k in
+      let f1 (i:int) : bool = a.[n + i] && b.[n - k - i] in
+      let f2 = mul_element_fun a b (n + n - k) in
+      // mul_element a b (n + n - k) == sum_of_bools 0 (n + n + 1 - k) f2
+
+      // mul_element ra rb k == sum_of_bools 0 (k + 1) f0
+      lemma_sum_invert 0 (k + 1) f0 f1;
+      // mul_element ra rb k == sum_of_bools (-k) 1 f1
+      lemma_sum_shift (-k) 1 n f1 f2;
+      // mul_element ra rb k == sum_of_bools (n - k) (n + 1) f2
+
+      let lo = min (n - k) 0 in
+      let hi = max (n + 1) (n + n + 1 - k) in
+      lemma_sum_extend lo 0 (n + n + 1 - k) hi f2;
+      lemma_sum_extend lo (n - k) (n + 1) hi f2;
+      ()
+    )
+    in
+  lemma_pointwise_equal rab (ra *. rb) f
+
 
 
 // DIVISION, MOD
