@@ -74,8 +74,3 @@ let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb
   =
   gctr_indexed icb plain AES_128 key cipher;
   ()
-
-open AES_helpers_i
-
-let lemma_quad32_xor () : Lemma (forall q . {:pattern quad32_xor q q} quad32_xor q q == Quad32 0 0 0 0) =
-  xor_lemmas()

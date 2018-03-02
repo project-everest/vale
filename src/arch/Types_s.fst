@@ -30,6 +30,9 @@ assume val inot : #n:nat -> a:natN n  -> natN n
 assume val ishl : #n:nat -> a:natN n -> s:int -> natN n
 assume val ishr : #n:nat -> a:natN n -> s:int -> natN n
 
+// Alias
+unfold let nat32_xor (x y:nat32) : nat32 = ixor x y
+
 type twobits = i:int{0 <= i && i < 4}
 type bits_of_byte = | Bits_of_Byte :
   lo:twobits ->

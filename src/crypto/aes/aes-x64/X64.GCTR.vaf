@@ -8,6 +8,7 @@ module X64.GCTR
 
 #verbatim{:interface}{:implementation}
 open Types_s
+open Types_i
 open FStar.Seq
 open AES_s
 open X64.AES

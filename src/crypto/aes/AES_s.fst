@@ -61,8 +61,6 @@ let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_ke
   let state = quad32_xor state (index round_keys (nr alg)) in
   state
 
-unfold let nat32_xor (x y:nat32) : nat32 = ixor x y
-
 let rec expand_key (alg:algorithm) (key:aes_key alg) (size:nat{size <= (nb * ((nr alg) + 1))})
   : (ek:seq nat32 {length ek == size}) =
   if size = 0 then createEmpty
