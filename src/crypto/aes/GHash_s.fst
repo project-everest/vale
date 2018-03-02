@@ -20,3 +20,9 @@ let rec ghash (h:quad32) (x:ghash_plain) : Tot quad32 (decreases %[length x]) =
   let x_i = last x in
   let xor_poly = of_quad32 (quad32_xor y_i_minus_1 x_i) in
   to_quad32 (gf128_mul xor_poly h_poly)
+
+let get_last_slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
+  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
+    last (slice s start_pos end_pos)
+  else
+    Quad32 0 0 0 0 
