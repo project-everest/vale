@@ -88,7 +88,7 @@ procedure {:quick} gctr_core(
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
-        seq_to_list(buffer128_as_seq(mem, out_b)) == gctr_encrypt(old(icb), seq_to_list(buffer128_as_seq(old(mem), in_b)), AES_128, key);
+        buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);

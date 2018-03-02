@@ -2,28 +2,27 @@ module GCTR_i
 
 open Types_s
 open FStar.Mul
-open FStar.List.Tot.Base
-open FStar.List.Tot.Properties
+open FStar.Seq
 open AES_s
 open GCTR_s 
 open FStar.Math.Lemmas
 
-logic let gctr_partial (bound:nat) (plain cipher:Seq.seq quad32) (key:aes_key(AES_128)) (icb:quad32) =
-  let bound = min bound (min (Seq.length plain) (Seq.length cipher)) in
-  forall j . {:pattern (Seq.index cipher j)} 0 <= j /\ j < bound ==> Seq.index cipher j == quad32_xor (Seq.index plain j) (aes_encrypt AES_128 key (inc32 icb j))
+logic let gctr_partial (bound:nat) (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb:quad32) =
+  let bound = min bound (min (length plain) (length cipher)) in
+  forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==> index cipher j == quad32_xor (index plain j) (aes_encrypt AES_128 key (inc32 icb j))
   
 
 let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain) 
-				      (alg:algorithm) (key:aes_key alg) (i:int) : 
-  Lemma(length (gctr_encrypt_recursive icb plain alg key i) == length plain)
+				      (alg:algorithm) (key:aes_key alg) (i:int) : Lemma
+  (requires True)				      
+  (ensures length (gctr_encrypt_recursive icb plain alg key i) == length plain)
+  (decreases %[length plain])
   [SMTPat (length (gctr_encrypt_recursive icb plain alg key i))]
   =
-  match plain with 
-  | [] -> ()
-  | hd :: tl -> gctr_encrypt_recursive_length icb tl alg key (i + 1); 
-  ()
+  if length plain = 0 then ()
+  else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
   			
-let rec gctr_encrypt_length (icb:quad32) (plain:list quad32 { 256 * length plain < nat32_max }) 
+let rec gctr_encrypt_length (icb:quad32) (plain:seq quad32 { 256 * length plain < nat32_max }) 
 			     (alg:algorithm) (key:aes_key alg) : 
   Lemma(length (gctr_encrypt icb plain alg key) == length plain) 
   [SMTPat (length (gctr_encrypt icb plain alg key))]
@@ -38,10 +37,11 @@ let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain)
 	    length cipher == length plain /\
 	   (forall j . {:pattern index cipher j} 0 <= j /\ j < length plain ==>
 	   index cipher j == quad32_xor (index plain j) (aes_encrypt alg key (inc32 icb (i + j)) ))))
+  (decreases %[length plain])	   
 =
-  match plain with 
-  | [] -> ()
-  | hd :: tl ->
+  if length plain = 0 then ()
+  else
+      let tl = tail plain in
       let cipher = gctr_encrypt_recursive icb plain alg key i in  
       let r_cipher = gctr_encrypt_recursive icb tl alg key (i+1) in     
       let helper (j:int) : 
@@ -55,7 +55,7 @@ let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain)
       FStar.Classical.forall_intro helper
 
 let rec gctr_indexed (icb:quad32) (plain:gctr_plain) 
-		     (alg:algorithm) (key:aes_key alg) (cipher:list quad32) : Lemma
+		     (alg:algorithm) (key:aes_key alg) (cipher:seq quad32) : Lemma
   (requires  length cipher == length plain /\
              (forall i . {:pattern index cipher i} 0 <= i /\ i < length cipher ==> 
 	     index cipher i == quad32_xor (index plain i) (aes_encrypt alg key (inc32 icb i) )))
@@ -63,29 +63,16 @@ let rec gctr_indexed (icb:quad32) (plain:gctr_plain)
 =
   gctr_indexed_helper icb plain alg key 0;
   let c = gctr_encrypt_recursive icb plain alg key 0 in
-  index_extensionality c cipher;
-  ()
+  assert(eq cipher c)  // OBSERVE: Invoke extensionality lemmas
 
-open FStar.Seq.Properties
 
-let gctr_partial_completed (plain cipher:Seq.seq quad32) (key:aes_key(AES_128)) (icb:quad32) : Lemma
-  (requires Seq.length plain == Seq.length cipher /\
-	    256 * (Seq.length plain) < nat32_max /\
-	    gctr_partial (Seq.length cipher) plain cipher key icb)
-  (ensures seq_to_list cipher == gctr_encrypt icb (seq_to_list plain) AES_128 key)
+let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb:quad32) : Lemma
+  (requires length plain == length cipher /\
+	    256 * (length plain) < nat32_max /\
+	    gctr_partial (length cipher) plain cipher key icb)
+  (ensures cipher == gctr_encrypt icb plain AES_128 key)
   =
-  let plain_list = seq_to_list plain in
-  let cipher_list = seq_to_list cipher in
-  let helper (i:int) : Lemma (0 <= i /\ i < Seq.length cipher ==> 
-				  index cipher_list i == Seq.index cipher i 
-				/\ index plain_list  i == Seq.index plain  i) =
-    if 0 <= i && i < Seq.length cipher then
-      (lemma_index_is_nth cipher i;
-       lemma_index_is_nth plain  i)
-    else ()
-  in
-  FStar.Classical.forall_intro helper;
-  gctr_indexed icb plain_list AES_128 key cipher_list;
+  gctr_indexed icb plain AES_128 key cipher;
   ()
 
 open AES_helpers_i
