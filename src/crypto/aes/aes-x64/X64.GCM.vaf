@@ -70,7 +70,9 @@ procedure {:quick} gcm_core(
 
     requires
         // GCM reqs
-        locs_disjoint(list(loc_buffer(plain_b), loc_buffer(out_b), loc_buffer(keys_b), loc_buffer(auth_b)));
+        buffers_disjoint128(plain_b, out_b);
+        buffers_disjoint128(auth_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
         validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
@@ -98,10 +100,10 @@ procedure {:quick} gcm_core(
     // (inc32 j0 1)
     Pinsrd(iv, 2, 0);
     // assert iv == inc32(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
-/*
     // let c = gctr_encrypt (inc32 j0 1) p alg key in
     gctr_core(plain_b, out_b, key, round_keys, keys_b);
 
+/*
     // Compute the hashes incrementally
     // TODO: Need to get 
     //  rax := auth_ptr

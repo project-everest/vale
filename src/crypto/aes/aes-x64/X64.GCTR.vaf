@@ -60,7 +60,7 @@ procedure {:quick} gctr_core(
     ghost out_b:buffer128,
     ghost key:aes_key(AES_128),
     ghost round_keys:seq(quad32),
-    ghost keys_buffer:buffer128
+    ghost keys_b:buffer128
     )
     lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm3;
 
@@ -72,7 +72,8 @@ procedure {:quick} gctr_core(
 
     requires
         // GCTR reqs
-        buffers3_disjoint128(in_b, out_b, keys_buffer);
+        buffers_disjoint128(in_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
         validSrcAddrs128(mem, in_ptr, in_b, len);
         validDstAddrs128(mem, out_ptr, out_b, len);
         in_ptr  + 16 * len < nat64_max;
@@ -82,9 +83,9 @@ procedure {:quick} gctr_core(
         // AES reqs
         length(round_keys) == 11;
         round_keys == key_to_round_keys(AES_128, key);
-        r8 == buffer_addr(keys_buffer);
-        validSrcAddrs128(mem, r8, keys_buffer, 11);
-        buffer128_as_seq(mem, keys_buffer) == round_keys;
+        r8 == buffer_addr(keys_b);
+        validSrcAddrs128(mem, r8, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
@@ -107,7 +108,8 @@ procedure {:quick} gctr_core(
             
             //////////////////// From requires //////////////////////
             // GCTR reqs
-            buffers3_disjoint128(in_b, out_b, keys_buffer);
+            buffers_disjoint128(in_b, out_b);
+            buffers_disjoint128(keys_b, out_b);
             validSrcAddrs128(mem, in_ptr, in_b, len);
             validDstAddrs128(mem, out_ptr, out_b, len);
             in_ptr  + 16 * len < nat64_max;
@@ -116,9 +118,9 @@ procedure {:quick} gctr_core(
             // AES reqs
             length(round_keys) == 11;
             round_keys == key_to_round_keys(AES_128, key);
-            r8 == buffer_addr(keys_buffer);
-            validSrcAddrs128(mem, r8, keys_buffer, 11);
-            buffer128_as_seq(mem, keys_buffer) == round_keys;
+            r8 == buffer_addr(keys_b);
+            validSrcAddrs128(mem, r8, keys_b, 11);
+            buffer128_as_seq(mem, keys_b) == round_keys;
 
             //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);
@@ -132,7 +134,7 @@ procedure {:quick} gctr_core(
             len - rdx;
     {
         Mov128(xmm0, icb);
-        AES128EncryptBlock(icb, key, round_keys, keys_buffer);
+        AES128EncryptBlock(icb, key, round_keys, keys_b);
 
         Load128_buffer(xmm1, r9, 0, in_b, rdx);
         Pxor(xmm1, xmm0);
