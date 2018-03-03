@@ -26,9 +26,17 @@ open X64.Vale.QuickCodes_i
 #endverbatim
 
 #verbatim{:interface}
-let cast_seq_to_ghash_plain (s:seq quad32) : ghash_plain =
-    if length s > 0 then s
-    else (create 1 (Quad32 0 0 0 0))
+let get_last_slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
+  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
+    last (slice s start_pos end_pos)
+  else
+    Quad32 0 0 0 0 
+
+let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
+  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
+    slice s start_pos end_pos
+  else
+    create 1 (Quad32 0 0 0 0)
 #endverbatim
 
 #reset-options "--z3rlimit 40"
@@ -50,6 +58,7 @@ procedure {:quick} gf128_mul()
     modifies xmm0;
     ensures xmm0 == to_quad32(gf128_mul(of_quad32(old(xmm0)), of_quad32(xmm2)));
 {
+/////////////////////  TODO  ////////////////////
     assume false;
 }
 
@@ -63,7 +72,7 @@ procedure {:quick} ghash_core(
         mem;
 
     modifies
-        rdx; r9; xmm1; //r10; xmm0; xmm2; xmm4; icb; mem; efl;
+        rdx; r9; xmm1; 
         output; efl;
 
     requires
@@ -75,7 +84,7 @@ procedure {:quick} ghash_core(
 
     ensures
          length(buffer128_as_seq(mem, in_b)) > 0;
-         //output == ghash(h, buffer128_as_seq(mem, in_b));
+         output == ghash(h, buffer128_as_seq(mem, in_b));
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);
@@ -96,31 +105,17 @@ procedure {:quick} ghash_core(
 
             //////////////////// Postcondition goals //////////////////////
             rdx == 0 ==> output == Quad32(0, 0, 0, 0);
-            rdx > 0 ==> output == ghash(h, slice(buffer128_as_seq(mem, in_b), 0, rdx));
+            rdx > 0 ==> output == ghash(h, slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
 
         decreases
             len - rdx;
     {
         Load128_buffer(xmm1, r9, 0, in_b, rdx);
         Pxor(output, xmm1);    // Y_i := Y_{i-1} ^ x_i
-        // Believes this:
-        //assert rdx == 0 ==> output == quad32_xor(Quad32(0, 0, 0, 0), get_last_slice_workaround(buffer128_as_seq(mem, in_b), 0, 1));
-        ghost var old_output := output;
-
-        gf128_mul();        // xmm0/output := Y_i * H
-        assert rdx == 0 ==> output == to_quad32(gf128_mul(of_quad32(old_output), of_quad32(h)));
+        gf128_mul();           // xmm0/output := Y_i * H
 
         Add64(rdx, 1);
         Add64(r9, 16);
-        //assert rdx == 1 ==> output == ghash(h, slice(buffer128_as_seq(mem, in_b), 0, rdx));
-        //assert rdx == 1 ==> output == ghash(h, get_last_slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
-        assume false;
     }
-    
-    assert length(buffer128_as_seq(mem, in_b)) > 0;
-    assert length(buffer128_as_seq(mem, in_b)) == len;
-    assert rdx == len;
-    //assert eq(buffer128_as_seq(mem, in_b), slice(buffer128_as_seq(mem, in_b), 0, rdx));
-    // Call a helpful lemma
 }
 
