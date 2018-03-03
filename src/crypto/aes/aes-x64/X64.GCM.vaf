@@ -57,15 +57,15 @@ procedure {:quick} gcm_core(
     ghost keys_b:buffer128
     )
 
-    lets plain_ptr @= rax; out_ptr @= rbx; keys_ptr @= r8; auth_ptr @= r9;
-    plain_len @= rcx; auth_len @= r11; 
+    lets plain_ptr @= r12; out_ptr @= rbx; keys_ptr @= r8; auth_ptr @= r14;
+    plain_len @= r13; auth_len @= r11; 
     iv @= xmm3;
 
     reads
         plain_ptr; out_ptr; keys_ptr; auth_ptr; plain_len; auth_len; 
 
     modifies
-        rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; iv;
+        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; iv;
         mem; efl; 
 
     requires
@@ -77,6 +77,7 @@ procedure {:quick} gcm_core(
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
         plain_ptr + 16 * plain_len < nat64_max;
+        auth_ptr + 16 * auth_len < nat64_max;
         out_ptr + 16 * plain_len < nat64_max;
         buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
         buffer_length(auth_b) == auth_len;
@@ -101,19 +102,23 @@ procedure {:quick} gcm_core(
     Pinsrd(iv, 2, 0);
     // assert iv == inc32(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
     // let c = gctr_encrypt (inc32 j0 1) p alg key in
+    Mov64(rax, plain_ptr);
+    Mov64(rcx, plain_len);
     gctr_core(plain_b, out_b, key, round_keys, keys_b);
 
-/*
+
+// TODO: Need a version of ghash_core that takes Y_{i-1} as an argument
+
     // Compute the hashes incrementally
-    // TODO: Need to get 
-    //  rax := auth_ptr
-    //  rcx := auth_len
+    Mov64(rax, auth_ptr);
+    Mov64(rcx, auth_len);
     Mov128(xmm2, xmm0);     // Move h into xmm2, where ghash_core expects it
     ghash_core(auth_b);
-    // TODO: Need to get 
-    //  rax := out_ptr
-    //  rcx := out_len == plain_len
+
+    Mov64(rax, out_ptr);
+    Mov64(rcx, plain_len);
     Mov128(xmm2, xmm0);     // Move the output hash in xmm0 into xmm2 where ghash_core expects h
+/*
     ghash_core(out_b);
     Mov128(xmm2, xmm0);     // Move the output hash in xmm0 into xmm2 where ghash_core expects h
 

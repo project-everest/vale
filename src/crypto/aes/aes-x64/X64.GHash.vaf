@@ -76,45 +76,46 @@ procedure {:quick} ghash_core(
 
     requires
         // GHash reqs
-        validSrcAddrs128(mem, in_ptr, in_b, len);
-        in_ptr  + 16 * len < nat64_max;
-        len > 0;
-        buffer_length(in_b) == len;
+        len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);
+        len > 0 ==> in_ptr  + 16 * len < nat64_max;
+        len > 0 ==> buffer_length(in_b) == len;
 
     ensures
-         length(buffer128_as_seq(mem, in_b)) > 0;
-         output == ghash(h, buffer128_as_seq(mem, in_b));
+        len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ output == old(output);
+        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ output == ghash(h, buffer128_as_seq(mem, in_b));
 {
-    Mov64(rdx, 0);
-    Mov64(r9, in_ptr);
-    compute_Y0();
+    if (len != 0) {
+        Mov64(rdx, 0);
+        Mov64(r9, in_ptr);
+        compute_Y0();
 
-    while (rdx != len)
-        invariant
-            //////////////////// Basic indexing //////////////////////
-            0 <= rdx <= len;
-            r9 == in_ptr + 16 * rdx;
-            
-            //////////////////// From requires //////////////////////
-            // GHash reqs
-            validSrcAddrs128(mem, in_ptr, in_b, len);
-            in_ptr  + 16 * len < nat64_max;
-            len > 0;
-            buffer_length(in_b) == len;
+        while (rdx != len)
+            invariant
+                //////////////////// Basic indexing //////////////////////
+                0 <= rdx <= len;
+                r9 == in_ptr + 16 * rdx;
+                
+                //////////////////// From requires //////////////////////
+                // GHash reqs
+                validSrcAddrs128(mem, in_ptr, in_b, len);
+                in_ptr  + 16 * len < nat64_max;
+                len > 0;
+                buffer_length(in_b) == len;
 
-            //////////////////// Postcondition goals //////////////////////
-            rdx == 0 ==> output == Quad32(0, 0, 0, 0);
-            rdx > 0 ==> output == ghash(h, slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
+                //////////////////// Postcondition goals //////////////////////
+                rdx == 0 ==> output == Quad32(0, 0, 0, 0);
+                rdx > 0 ==> output == ghash(h, slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
 
-        decreases
-            len - rdx;
-    {
-        Load128_buffer(xmm1, r9, 0, in_b, rdx);
-        Pxor(output, xmm1);    // Y_i := Y_{i-1} ^ x_i
-        gf128_mul();           // xmm0/output := Y_i * H
+            decreases
+                len - rdx;
+        {
+            Load128_buffer(xmm1, r9, 0, in_b, rdx);
+            Pxor(output, xmm1);    // Y_i := Y_{i-1} ^ x_i
+            gf128_mul();           // xmm0/output := Y_i * H
 
-        Add64(rdx, 1);
-        Add64(r9, 16);
+            Add64(rdx, 1);
+            Add64(r9, 16);
+        }
     }
 }
 
