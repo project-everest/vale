@@ -11,19 +11,10 @@ open Ast
 open Ast_util
 open Parse
 open Microsoft.FSharp.Math
+open TypeChecker
 
 let fstar = ref false;
 let assumeUpdates = ref 0
-
-type id_local = {local_in_param:bool; local_exp:exp; local_typ:typ option} // In parameters are read-only and refer to old(state)
-type id_info =
-| GhostLocal of mutability * typ option
-| ProcLocal of id_local
-| ThreadLocal of id_local
-| InlineLocal of typ option
-| OperandLocal of inout * typ
-| StateInfo of string * exp list * typ
-| OperandAlias of id * id_info
 
 type env =
   {
@@ -36,6 +27,7 @@ type env =
     state:exp;
     abstractOld:bool; // if true, x --> va_old_x in abstract lemma
     checkMods:bool;
+    tcenv: TypeChecker.env;
   }
 
 let empty_env:env =
@@ -49,6 +41,7 @@ let empty_env:env =
     state = EVar (Reserved "s");
     abstractOld = false;
     checkMods = false;
+    tcenv = TypeChecker.empty_env;
   }
 
 let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
@@ -132,9 +125,11 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         let env =
           match (b, List.map (exp_abstract false) es, fs) with
           | (BindAlias, [EVar y], [(x, t)]) ->
+              let env = {env with tcenv = push_id env.tcenv x (make_operand_alias y env)} in
               {env with ids = Map.add x (make_operand_alias y env) env.ids}
           | (BindAlias, _, _) -> internalErr (sprintf "BindAlias %A %A" es fs)
           | (_, _, _) ->
+              let env = {env with tcenv = push_formals env.tcenv fs} in
               {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids fs}
           in
         let r = env_map_exp f env in
@@ -171,20 +166,25 @@ let rec env_stmt (env:env) (s:stmt):(env * env) =
         | XInline -> InlineLocal t
         | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
         in
+      let envp = {env with tcenv = push_id env.tcenv x info} in
       let ids = Map.add x info env.ids in
-      (env, {env with ids = ids})
+      (env, {envp with ids = ids})
     )
   | SAlias (x, y) ->
+      let envp = {env with tcenv = push_id env.tcenv x (make_operand_alias y env)} in
       let ids = Map.add x (make_operand_alias y env) env.ids in
-      (env, {env with ids = ids})
+      (env, {envp with ids = ids})
   | SAssign (xs, e) ->
+      let envp = {env with tcenv = push_lhss env.tcenv xs} in
       let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal (Mutable, t)) ids) env.ids xs in
       (env, {env with ids = ids})
   | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> (env, env)
   | SForall (xs, ts, ex, e, b) ->
-      ({env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}, env)
+      let envp = {env with tcenv = push_formals env.tcenv xs} in
+      ({envp with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}, env)
   | SExists (xs, ts, e) ->
-      (env, {env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs})
+      let envp = {env with tcenv = push_formals env.tcenv xs} in
+      (env, {envp with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs})
 
 let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (s:stmt):(env * stmt list) =
   map_apply_modify (fs env s) (fun () ->
@@ -241,10 +241,12 @@ let env_map_spec (fe:env -> exp -> exp) (fs:env -> loc * spec -> (env * (loc * s
         let map_let env (loc, l) =
           match l with
           | LetsVar (x, t, e) ->
+              let env = {env with tcenv = push_id env.tcenv x (GhostLocal (Immutable, t))} in
               let ids = Map.add x (GhostLocal (Immutable, t)) env.ids in
               let env = {env with ids = ids; lets = (loc, l)::env.lets} in
               (env, [(loc, LetsVar (x, t, fee e))])
           | LetsAlias (x, y) ->
+              let env = {env with tcenv = push_id env.tcenv x (make_operand_alias y env)} in
               let ids = Map.add x (make_operand_alias y env) env.ids in
               let env = {env with ids = ids; lets = (loc, l)::env.lets} in
               (env, [(loc, l)])
@@ -274,7 +276,7 @@ let operandProc (xa:id) (io:inout):id =
 // Read/modify analysis
 
 let rec resolve_alias (env:env) (x:id):id =
-  match Map.tryFind x env.ids with
+  match lookup_id env.tcenv x with
   | Some (OperandAlias (y, _)) -> resolve_alias env y
   | _ -> x
 
@@ -413,12 +415,12 @@ let resolve_overload_expr (env:env) (e:exp):exp =
    let rec fe (env:env) (e:exp):exp map_modify =
      match e with
      | EOp (Uop (UCustom op), l) ->
-       match Map.tryFind (Operator op) env.funs with
+       match lookup_func env.tcenv (Operator op)  with
        | Some {fargs = [_]; fattrs = attrs} ->
           Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
        | _ -> err ("operator '" + op + "' must be overloaded to use as a prefix operator")
      | EOp (Bop (BCustom op), l) ->
-       match Map.tryFind (Operator op) env.funs with
+       match lookup_func env.tcenv (Operator op)  with
        | Some {fargs = [_; _]; fattrs = attrs} ->
           Replace (EApply (attrs_get_id (Reserved "alias") attrs, l))
        | _ -> err ("operator '" + op + "' must be overloaded to use as a infix operator")
@@ -526,6 +528,7 @@ let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
   EOp (RefineOp, [EVar x; EVar abs_x; e])
 
 let check_state_info (env:env) (x:id):bool = // returns readWrite
+  // TODO: QUNYAN
   match (env.checkMods, Map.tryFind x env.mods) with
   | (true, None) -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
   | (false, None) -> true
@@ -563,6 +566,7 @@ let check_mods (env:env) (p:proc_decl):unit =
         match skip_loc (exp_abstract false e) with
         | EVar x ->
           (
+            // TODO: QUNYAN
             match (m, Map.tryFind x env.mods) with
             | (Read, None) -> err ("variable " + (err_id x) + " must be declared in reads clause or modifies clause")
             | ((Modify | Preserve), (None | Some false)) -> err ("variable " + (err_id x) + " must be declared in modifies clause")
@@ -777,7 +781,8 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
       with err -> raise (LocErr (loc, err))
   | (_, EApply(x, es)) ->
     (
-      match Map.tryFind x env.procs with
+      //match Map.tryFind x env.procs with
+      match lookup_proc env.tcenv x with
       | None -> (lhss, rewrite_vars_exp rctx env e)
       | Some p ->
           check_mods env p;
@@ -791,7 +796,8 @@ let check_lhs (env:env) (x:id, dOpt):unit =
   | (Reserved "this", None) -> ()
   | (_, None) ->
     (
-      match Map.tryFind x env.ids with
+      //match Map.tryFind x env.ids with
+      match lookup_id env.tcenv x with
       | None -> err ("cannot find variable '" + (err_id x) + "'")
       | Some (GhostLocal (Immutable, _)) -> err ("cannot assign to immutable variable '" + (err_id x) + "'")
       | _ -> ()
@@ -1004,7 +1010,8 @@ let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
       with err -> raise (LocErr (loc, err))
   | EApply(x, es) ->
     (
-      match Map.tryFind x env.procs with
+      //match Map.tryFind x env.procs with
+      match lookup_proc env.tcenv x with
       | None -> []
       | Some p ->
           let fArg e =
@@ -1106,7 +1113,8 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         // each read/mod is one of: (ghost/inline), state
         // move (ghost/inline) readsOld into reads, keep state in readsOld
         let find_var (x:id):id_info =
-          match Map.tryFind x env.ids with
+          //match Map.tryFind x env.ids with
+          match lookup_id env.tcenv x with
           | None -> err ("could not find variable " + (err_id x))
           | Some info -> info
           in
@@ -1278,7 +1286,8 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
       match e with
       | EVar x ->
         (
-          match Map.tryFind x env.ids with
+          //match Map.tryFind x env.ids with
+          match lookup_id env.tcenv x with
           | None -> err ("cannot find variable " + (err_id x))
           | Some (StateInfo _) -> (x, (match m with Read -> false | (Modify | Preserve) -> true))
           | Some _ -> mod_err ()
@@ -1305,6 +1314,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   // globals named x, so that requires and ensures don't see two different x variables.
   // This makes it sane to share "lets" declarations between requires and ensures.
   let envpIn = {envpIn with ids = List.fold (addParam false) envpIn.ids p.pargs} in
+  let envpIn = {envpIn with tcenv = push_params_without_rets envpIn.tcenv p.pargs p.prets} in
   let envpIn = {envpIn with ids = List.fold (fun ids (x, _, _, _, _) -> Map.remove x ids) envpIn.ids p.prets} in
   // Desugar specs and update p so other procedures see desugared version
   let (envDesugar, pspecs) = env_map_specs (fun _ e -> e) desugar_spec envpIn pspecs in
@@ -1324,11 +1334,14 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let envpIn = {envpIn with abstractOld = true} in
   let envp = envpIn in
   let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
+  let envp = {envp with tcenv = push_rets envp.tcenv p.prets} in
   let envp = {envp with checkMods = isRefined || isFrame} in
   let envp = {envp with abstractOld = false} in
   let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
   let specs = List_mapSnd (resolve_overload_spec envpIn envp) specs in
   let envp = if isRecursive then {envp with procs = Map.add p.pname {p with pspecs = specs} envp.procs} else envp in
+  let envp = if isRecursive then {envp with tcenv = push_proc envp.tcenv p.pname {p with pspecs = specs}} else envp
+  // TODO: QUNYAN
   let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
   // Hoist while loops
   let envpOrig = List.fold (fun env s -> snd (env_stmt env s)) envp bodyLets in
@@ -1358,6 +1371,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let pNew = {p with pbody = body; pspecs = specs} in
   let envBody = envp in
   let envProc = {env with procs = Map.add p.pname pNew env.procs} in
+  let envProc = {envProc with tcenv = push_proc env.tcenv p.pname pNew} in
   let envRec = if isRecursive then envProc else env in
   TransformedDone ((envRec, envBody, pNew), envProc)
 
@@ -1370,18 +1384,21 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
 let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * env) =
   match d with
   | DVar (x, t, XAlias (AliasThread, e), _) ->
+      let env = {env with tcenv = push_id env.tcenv x (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t})} in
       let env = {env with ids = Map.add x (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t}) env.ids} in
       ([(env, env, d)], env)
   | DVar (x, t, XState e, _) ->
     (
       match skip_loc e with
       | EApply (Id id, es) ->
+          let env = {env with tcenv = push_id env.tcenv x (StateInfo (id, es, t))} in
           let env = {env with ids = Map.add x (StateInfo (id, es, t)) env.ids} in
           ([(env, env, d)], env)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )
   | DFun ({fbody = None} as f) ->
-      ([], {env with funs = Map.add f.fname f env.funs})
+    let env = {env with tcenv = push_func env.tcenv f.fname f} in
+    ([], {env with funs = Map.add f.fname f env.funs})
   | DProc p ->
     (
       match transform_proc env loc p with
@@ -1391,6 +1408,12 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
           let (env, eds) = List_mapFoldFlip f env ds in
           (List.concat eds, env)
     )
+  | DOpen m ->
+    let env = {env with tcenv = load_module_exports env.tcenv m} in
+    ([(env, env, d)], env)
+  | DModuleAbbrev (x, l) ->
+    let env = {env with tcenv = load_module_exports env.tcenv l} in
+    ([(env, env, d)], env)
   | _ -> ([(env, env, d)], env)
 
 

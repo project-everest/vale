@@ -691,6 +691,8 @@ let create_dafny_decl (mdl:LiteralModuleDecl) (built_ins:BuiltIns) (loc:loc, d:d
         match p.pghost with
         | Ghost -> default_class.Members.Add(build_lemma built_ins loc p)
         | NotGhost -> notImplemented "NotGhost procedure block handling"
+    | DOpen _ -> ()
+    | DModuleAbbrev (_, _) -> ()
   with err -> raise (LocErr (loc, err))
 
 let add_includes (dmod:DefaultModuleDecl) (included_file:string):unit =

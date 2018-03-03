@@ -108,6 +108,7 @@ SRC = [
   '../../obj/Vale/parse.fs',
   '../../obj/Vale/lex.fs',
   'src/emit_vale_text.fs',
+  'src/typechecker.fs',
   'src/transform.fs',
   'src/emit_common_base.fs',
   'src/emit_common_quick_code.fs',

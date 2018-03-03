@@ -216,6 +216,7 @@ and lextoken = parse
 | "static" { STATIC (curLoc lexbuf) }
 | "module" { MODULE (curLoc lexbuf) }
 | "import" { IMPORT (curLoc lexbuf) }
+| "open" { OPEN (curLoc lexbuf) }
 | "ghost" { GHOST (curLoc lexbuf) }
 | "inline" { INLINE (curLoc lexbuf) }
 | "operator" { OPERATOR (curLoc lexbuf) }

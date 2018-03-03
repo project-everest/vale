@@ -170,6 +170,8 @@ type decl =
 | DProc of proc_decl
 | DVerbatim of attrs * string list
 | DPragma of prag
+| DOpen of string
+| DModuleAbbrev of string * string
 
 type decls = (loc * decl) list
 
@@ -177,3 +179,13 @@ type include_decl = {inc_loc:loc; inc_attrs:attrs; inc_path:string}
 
 let expAt (l:loc) (e:exp):exp = ELoc (l, e)
 let stmtAt (l:loc) (s:stmt):stmt list = [SLoc (l, s)]
+
+type id_local = {local_in_param:bool; local_exp:exp; local_typ:typ option} // In parameters are read-only and refer to old(state)
+type id_info =
+| GhostLocal of mutability * typ option
+| ProcLocal of id_local
+| ThreadLocal of id_local
+| InlineLocal of typ option
+| OperandLocal of inout * typ
+| StateInfo of string * exp list * typ
+| OperandAlias of id * id_info

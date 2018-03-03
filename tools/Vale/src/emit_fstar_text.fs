@@ -502,6 +502,8 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p
+    | DOpen _ -> ()
+    | DModuleAbbrev (_, _) -> ()
   with err -> raise (LocErr (loc, err))
 
 let emit_decls (ps:print_state) (ds:decls):unit =
