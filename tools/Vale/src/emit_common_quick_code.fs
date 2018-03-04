@@ -6,6 +6,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
@@ -58,7 +59,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with
-    | EApply (Id xp, es) when Map.containsKey (Id xp) env.procs ->
+    | EApply (Id xp, es) when contains_proc env.tcenv (Id xp) ->
         inline_call xp [(x, tOpt)] es
 //    | EApply (xp, es) when allowLemma ->
 //        lemma_call xp [(x, tOpt)] es
@@ -86,7 +87,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         in
       let xs = List.map formal_of_lhs xs in
       match skip_loc e with
-      | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+      | EApply (Id x, es) when contains_proc env.tcenv (Id x) ->
           inline_call x xs es
       | EApply (x, es) ->
           lemma_call x xs es
@@ -190,7 +191,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     let eEq = and_of_list (List.map eqMod info.qmods) in
     let fEq = EBind (Lambda, [], [(sM, Some tState); (sN, Some tState)], [], eEq) in
     let frameMod e x =
-      match Map.tryFind x env.ids with
+      match lookup_id env.tcenv x with
       | Some (StateInfo (prefix, es, t)) -> vaApp ("update_" + prefix) (es @ [EVar sN; e])
       | _ -> internalErr ("gen_quick_block: could not find variable " + (err_id x))
       in

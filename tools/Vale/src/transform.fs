@@ -107,13 +107,15 @@ let stmts_refined (ss:stmt list):stmt list =
   map_stmts exp_refined (fun _ -> Unchanged) ss
 
 let make_operand_alias (x:id) (env:env) =
-  if not (Map.containsKey x env.ids) then err ("cannot find declaration of '" + (err_id x) + "'") else
-  let info = Map.find x env.ids in
+  let info = 
+    match lookup_id env.tcenv x with
+    | Some info -> info
+    | None -> err ("cannot find declaration of '" + (err_id x) + "'") in
   match info with
   | OperandLocal _ | StateInfo _ | OperandAlias _ -> OperandAlias (x, info)
   | GhostLocal _ | ProcLocal _ | ThreadLocal _ | InlineLocal _ ->
       err ("'" + (err_id x) + "' must be an operand or state member")
-
+  
 let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
   map_apply_modify (f env e) (fun () ->
     let r = env_map_exp f env in
@@ -285,7 +287,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   let rs = compute_read_mods_stmts env0 env1 in
   let filter_ids (xs:Set<id>) =
     let xs = Set.map (resolve_alias env1) xs in
-    Set.filter (fun x -> Map.containsKey x env0.ids && not (Map.containsKey x env1.ids)) xs
+    Set.filter (fun x -> contains_id env0.tcenv x && not (contains_id env1.tcenv x)) xs
     in
   let env1 = snd (env_stmt env1 s) in
   let compute_exps (es:exp list) =
@@ -322,7 +324,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
               [((match io with In -> Read | InOut | Out -> Modify), x)]
             )
           | EOp (Uop UConst, _) | EInt _ -> []
-          | EApply (xa, args) when Map.containsKey (operandProc xa io) env0.procs ->
+          | EApply (xa, args) when contains_proc env0.tcenv (operandProc xa io) ->
             (
               let xa_in = operandProc xa In in
               let xa_out = operandProc xa Out in
@@ -330,13 +332,17 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
                 let (rs, ms) =
                   match io with
                   | In | InOut ->
-                      if (not (Map.containsKey xa_in env0.procs)) then err ("could not find procedure " + (err_id xa_in)) else
-                      let p_in = Map.find xa_in env0.procs in
+                      let p_in = 
+                        match lookup_proc env0.tcenv xa_in with
+                        | Some decl -> decl
+                        | _ -> err ("could not find procedure " + (err_id xa_in)) in
                       let p_in = {p_in with prets = []} in
                       compute_call p_in [] args
                   | Out ->
-                      if (not (Map.containsKey xa_out env0.procs)) then err ("could not find procedure " + (err_id xa_out)) else
-                      let p_out = Map.find xa_out env0.procs in
+                      let p_out =
+                        match lookup_proc env0.tcenv xa_out with
+                        | Some decl -> decl
+                        | _ -> err ("could not find procedure " + (err_id xa_out)) in
                       let p_out = {p_out with pargs = List.take (List.length p_out.pargs - 1) p_out.pargs} in
                       compute_call p_out [] args
                   in
@@ -372,8 +378,11 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   | SAssign (lhss, e) ->
       let (rs0, mods0) =
         match skip_loc e with
-        | EApply (x, es) when Map.containsKey x env0.procs ->
-            let p = Map.find x env0.procs in
+        | EApply (x, es) when contains_proc env0.tcenv x ->
+            let p = 
+              match lookup_proc env0.tcenv x with
+              | Some p -> p
+              | _ -> internalErr "missing decl info " in
             compute_call p lhss es
         | _ -> (Set.empty, Set.empty)
         in
@@ -519,8 +528,8 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
 // Rewrite variables
 
 let stateGet (env:env) (x:id):exp =
-  match Map.find x env.ids with
-  | StateInfo (prefix, es, _) -> vaApp ("get_" + prefix) (es @ [env.state])
+  match lookup_id env.tcenv x with
+  | Some (StateInfo (prefix, es, _)) -> vaApp ("get_" + prefix) (es @ [env.state])
   | _ -> internalErr "stateGet"
 
 let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
@@ -596,7 +605,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
       in
     let locs = locs_of_exp e in
     match (g, skip_loc e) with
-    | (_, EVar x) when Map.containsKey x env.ids ->
+    | (_, EVar x) when contains_id env.tcenv x ->
       (
         let rec f x info =
           match info with
@@ -638,25 +647,33 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
             )
           | OperandAlias (x, info) -> f x info
           in
-        f x (Map.find x env.ids)
+        let info = 
+          match lookup_id env.tcenv x with
+          | Some info -> info
+          | _ -> internalErr "rewrite_vars_arg missing id_info"
+        f x info
       )
     | (NotGhost, EOp (Uop UConst, [ec])) -> Replace (constOp (rewrite_vars_exp rctx env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
-    | (NotGhost, EApply (xa, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
+    | (NotGhost, EApply (xa, args)) when (asOperand <> None && contains_proc env.tcenv (operandProc xa io)) ->
       (
         let xa_in = operandProc xa In in
         let xa_out = operandProc xa Out in
         let get_p io =
           match io with
           | In | InOut ->
-            if (not (Map.containsKey xa_in env.procs)) then err ("could not find procedure " + (err_id xa_in)) else
-            let p_in = Map.find xa_in env.procs in
+            let p_in = 
+              match lookup_proc env.tcenv xa_in with
+              | Some decl -> decl
+              | _ -> err ("could not find procedure " + (err_id xa_in))
             let p_in = {p_in with prets = []} in
             check_mods env p_in;
             p_in
           | Out ->
-            if (not (Map.containsKey xa_out env.procs)) then err ("could not find procedure " + (err_id xa_out)) else
-            let p_out = Map.find xa_out env.procs in
+            let p_out = 
+              match lookup_proc env.tcenv xa_out with
+              | Some decl -> decl
+              | _ -> err ("could not find procedure " + (err_id xa_out))
             let p_out = {p_out with pargs = List.take (List.length p_out.pargs - 1) p_out.pargs} in
             check_mods env p_out;
             p_out
@@ -863,14 +880,18 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
       | RModifies m ->
           let rewrite env e =
             match e with
-            | EVar x when Map.containsKey x env.ids ->
+            | EVar x when contains_id env.tcenv x ->
               (
                 let rec f x info =
                   match info with
                   | OperandAlias (x, info) -> f x info
                   | _ -> Replace (EVar x)
                   in
-                f x (Map.find x env.ids)
+                let info = 
+                  match lookup_id env.tcenv x with
+                  | Some info -> info
+                  | _ -> internalErr "missing id_info"
+                f x info
               )
             | _ -> Unchanged
             in
@@ -923,6 +944,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     let rec assign e =
       match e with
       | ELoc (loc, e) -> try assign e with err -> raise (LocErr (loc, err))
+      // TODO: QUNYAN
       | EApply (x, es) when Map.containsKey x env.raw_procs ->
         let pCall = Map.find x env.raw_procs in
         if List.length es = List.length pCall.pargs then

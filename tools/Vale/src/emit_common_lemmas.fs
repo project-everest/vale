@@ -4,6 +4,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
@@ -129,7 +130,7 @@ let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id *
       match skip_loc (exp_abstract false e) with
       | EVar x ->
         (
-          match Map.tryFind x env.ids with
+          match lookup_id env.tcenv x with
           | Some (StateInfo (_, _, t)) -> [(io, (x, t))]
           | _ -> internalErr ("specMod: could not find variable " + (err_id x))
         )
@@ -176,8 +177,11 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, es) when Map.containsKey x env.procs ->
-        let p = Map.find x env.procs in
+    | EApply (x, es) when contains_proc env.tcenv x ->
+        let p = 
+          match lookup_proc env.tcenv x with
+          | Some decl -> decl
+          | _ -> internalErr "build_lemma_stmt: not finding proc" in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
         let pretsArgs = pretsOp @ pargs in
@@ -401,7 +405,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
     match io with
     | (InOut | Out) ->
       (
-        match Map.tryFind x env.ids with
+        match lookup_id env.tcenv x with
         | Some (StateInfo (prefix, es, t)) -> vaApp ("update_" + prefix) (es @ [EVar sM; e])
         | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
       )

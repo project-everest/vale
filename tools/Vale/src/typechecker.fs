@@ -85,6 +85,11 @@ let lookup_id env (id:id) =
   | Some (Info info) -> Some info
   | _ -> None
 
+let contains_id env id =
+  match lookup_id env id with
+  | Some _ -> true
+  | _ -> false
+
 let lookup_func (env:env) (id:id) = 
   match lookup_name env id with
   | Some (Func_decl decl) -> Some decl
@@ -94,6 +99,11 @@ let lookup_proc env (id:id) =
   match lookup_name env id with
   | Some (Proc_decl decl) -> Some decl
   | _ -> None
+
+let contains_proc env id =
+  match lookup_proc env id with
+  | Some _ -> true
+  | _ -> false
 
 let push_scope_mod env scope_mod =
  {env with scope_mods = scope_mod :: env.scope_mods}

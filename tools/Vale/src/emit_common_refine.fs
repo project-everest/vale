@@ -4,6 +4,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
@@ -39,7 +40,7 @@ let rec build_code_stmt (env:env) (s:stmt):exp list =
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+    | EApply (Id x, es) when contains_proc env.tcenv (Id x) ->
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in
@@ -383,7 +384,7 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
                 connect_subst_ghost = blend m0.connect_subst_ghost m1.connect_subst_ghost
             } in
           let old_incarnation_exp id =
-            match (Map.tryFind id operandMap, Map.tryFind id env.ids) with
+            match (Map.tryFind id operandMap, lookup_id env.tcenv id) with
             | (Some (t, XOperand), _) -> vaEvalOp t (EVar (Reserved "s0")) (EVar id)
             | (_, Some (StateInfo _)) -> stateGet {env with state = EVar (Reserved "s0")} id
             | _ -> internalErr ("old_incarnation: " + (err_id id))
@@ -495,7 +496,7 @@ let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * (id * ty
       match skip_loc (exp_abstract false e) with
       | EVar x ->
         (
-          match Map.tryFind x env.ids with
+          match lookup_id env.tcenv x with
           | Some (StateInfo (_, _, t)) ->
             (if useOld then [(io, (old_id x, t))] else []) @
             (if useNew && (not suppressRead || readWrite) then [(io, (x, t))] else [])
@@ -570,8 +571,11 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (src, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, es) when Map.containsKey x env.procs ->
-        let p = Map.find x env.procs in
+    | EApply (x, es) when contains_proc env.tcenv x ->
+        let p = 
+          match lookup_proc env.tcenv x with
+          | Some decl -> decl
+          | _ -> internalErr "build_lemma_stmt: not finding proc" in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
         let pretsArgs = pretsOp @ pargs in
@@ -909,7 +913,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
     match io with
     | (InOut | Out) ->
       (
-        match Map.tryFind x env.ids with
+        match lookup_id env.tcenv x with
         | Some (StateInfo (prefix, es, t)) -> vaApp ("modify_" + prefix) (es @ [EVar sM; e])
         | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
       )
