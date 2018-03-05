@@ -55,6 +55,40 @@ procedure {:quick} inc32()
     Paddd(xmm3, xmm4);
 }
 
+// GCTR encrypt one block
+procedure {:quick} gctr_register(
+    ghost key:aes_key(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128
+    )
+    lets io @= xmm1; icb @= xmm3;
+    reads r8; icb; mem;
+    modifies
+        xmm0; xmm1; xmm2; efl;
+
+    requires
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys(AES_128, key);
+        r8 == buffer_addr(keys_b);
+        validSrcAddrs128(mem, r8, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
+    ensures
+        create(1, io) == gctr_encrypt(icb, create(1, old(io)), AES_128, key);
+        icb.mid_lo == old(icb.mid_lo);
+        icb.mid_hi == old(icb.mid_hi);
+        icb.hi     == old(icb.hi);
+{
+    Mov128(xmm0, icb);
+    AES128EncryptBlock(icb, key, round_keys, keys_b);
+
+    Pxor(xmm1, xmm0);
+
+    // Call a helpful lemma
+    gctr_encrypt_one_block(icb, old(io), AES_128, key);
+}
+
+
 procedure {:quick} gctr_core(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -90,6 +124,9 @@ procedure {:quick} gctr_core(
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
         buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
+        icb.mid_lo == old(icb.mid_lo);
+        icb.mid_hi == old(icb.mid_hi);
+        icb.hi     == old(icb.hi);
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);

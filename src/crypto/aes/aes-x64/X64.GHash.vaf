@@ -119,6 +119,24 @@ procedure {:quick} compute_ghash_incremental(
     }
 }
 
+
+procedure {:quick} compute_ghash_incremental_register()
+    lets input @= xmm1; output @= xmm0; h @= xmm2;
+    reads
+        input; h;
+
+    modifies
+        output; efl;
+
+    requires
+    ensures
+        output == ghash_incremental(h, old(output), create(1, old(input)));
+{
+    Pxor(output, input);    // Y_i := Y_{i-1} ^ x_i
+    gf128_mul();         // xmm0/output := Y_i * H
+}
+
+
 procedure {:quick}  ghash_core(
     ghost in_b:buffer128
     )

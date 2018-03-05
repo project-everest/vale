@@ -65,7 +65,7 @@ procedure {:quick} gcm_core(
         plain_ptr; out_ptr; keys_ptr; auth_ptr; plain_len; auth_len; 
 
     modifies
-        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; iv;
+        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; xmm5; iv;
         mem; efl; 
 
     requires
@@ -90,7 +90,8 @@ procedure {:quick} gcm_core(
     ensures
 //        modifies_buffer128(out_b, old(mem), mem);
 //        validSrcAddrs128(mem, out_ptr, out_b, len);
-//        buffer128_as_seq(mem, out_b) == gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b));
+//        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+//        create(1, xmm1) == snd(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
     assume false;
 
@@ -98,6 +99,8 @@ procedure {:quick} gcm_core(
     Pxor(xmm0, xmm0);
     lemma_quad32_xor(); // xmm0 = 0
     AES128EncryptBlock(xmm0, key, round_keys, keys_b); // h = xmm0 = aes_encrypt alg key (Quad32 0 0 0 0) in
+    ghost var h := xmm0;
+    Mov128(xmm5, xmm0);     // Save a copy of h
 
     // let j0 = Quad32 1 iv.mid_lo iv.mid_hi iv.hi in
     // (inc32 j0 1)
@@ -114,31 +117,38 @@ procedure {:quick} gcm_core(
     // Compute the hashes incrementally
     Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
-    Mov128(xmm2, xmm0);     // Move h into xmm2, where ghash_core expects it
-    ghash_core(auth_b);
+    Mov128(xmm2, xmm5);     // Move h into xmm2, where ghash expects it
+    assert xmm2 == h;
+    ghost var y_0 := Quad32(0, 0, 0, 0);
+    compute_Y0();
+    assert xmm0 == y_0;
+    compute_ghash_incremental(auth_b);
+    ghost var y_auth := xmm0;
 
     Mov64(rax, out_ptr);
     Mov64(rcx, plain_len);
-    Mov128(xmm2, xmm0);     // Move the output hash in xmm0 into xmm2 where ghash_core expects h
 
 /*
-    ghash_core(out_b);
-    Mov128(xmm2, xmm0);     // Move the output hash in xmm0 into xmm2 where ghash_core expects h
+    compute_ghash_incremental(out_b);
 
     // Prepare length fields
-    Pxor(xmm0, xmm0);
-    Pinsrd(xmm0, auth_len, 1);
-    Pinsrd(xmm0, plain_len, 3);
-    
-    // TODO: Hash xmm0 using the h value that's now in xmm2
+    Pxor(xmm1, xmm1);
+    Pinsrd(xmm1, auth_len, 1);
+    Pinsrd(xmm1, plain_len, 3);
 
-    // TODO: Invoke lemma showing that incremental hashing works
+    ghost var length_quad32 := xmm1;
 
-    // TODO: Strengthen gctr_core to say that it only changes iv.lo
-    Pinsrd(iv, 1, 0);   // Reconstruct j0
+    compute_ghash_incremental_register();
 
-    // TODO: Put the hash value currently in xmm0 somewhere gctr_core will encrypt it 
-    // Call gctr_core on j0 and xmm0
+    // Invoke lemma showing that incremental hashing works
+    lemma_hash_append(h, y_0, buffer128_as_seq(old(mem), auth_b), append(buffer128_as_seq(old(mem), plain_b), create(1, length_quad32))); 
+    lemma_hash_append(h, y_auth, buffer128_as_seq(old(mem), plain_b), create(1, length_quad32)); 
+
+    Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo)
+
+    // Put the hash value currently in xmm0 into xmm1, where gctr_register will encrypt it 
+    Mov128(xmm1, xmm0);
+    gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
 */
 }
 

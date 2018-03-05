@@ -74,3 +74,21 @@ let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb
   =
   gctr_indexed icb plain AES_128 key cipher;
   ()
+
+let gctr_encrypt_one_block (icb plain:quad32) (alg:algorithm) (key:aes_key alg) : 
+  Lemma(gctr_encrypt icb (create 1 plain) alg key =
+        (create 1 (quad32_xor plain (aes_encrypt alg key icb)))) =
+  //assert(inc32 icb 0 == icb);
+  let encrypted_icb = aes_encrypt alg key icb in
+  let p = create 1 plain in
+  //assert(length p == 1);
+  //assert(tail p == createEmpty);
+  //assert(length (tail p) == 0);
+  //assert(head p == plain);
+  assert(gctr_encrypt_recursive icb (tail p) alg key 1 == createEmpty);   // OBSERVE
+  //assert(gctr_encrypt icb p alg key == cons (quad32_xor plain encrypted_icb) createEmpty);
+  let x = quad32_xor plain encrypted_icb in
+  append_empty_r (create 1 x);                 // This is the missing piece
+  //assert(cons x createEmpty == create 1 x);
+  ()
+  
