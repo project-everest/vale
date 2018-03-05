@@ -6,6 +6,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
@@ -74,7 +75,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):exp * formal list =
     match io with
     | (InOut | Out) ->
       (
-        match Map.tryFind x env.ids with
+        match lookup_id env.tcenv x with
         | Some (StateInfo (prefix, es, t)) -> [(id_x x, t, prefix, es)]
         | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
       )

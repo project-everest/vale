@@ -37,7 +37,7 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+    | EApply (Id x, es) when contains_id env.tcenv (Id x) ->
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in

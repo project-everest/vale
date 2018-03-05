@@ -8,6 +8,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
@@ -33,7 +34,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
           | SAssign (_, e) ->
             (
               match skip_loc e with
-              | EApply(x, _) when Map.containsKey x env.procs -> Unchanged
+              | EApply(x, _) when contains_proc env.tcenv x -> Unchanged
               | _ -> modGhost
             )
           | SAssume _ | SAssert _ | SCalc _ | SVar _ -> modGhost

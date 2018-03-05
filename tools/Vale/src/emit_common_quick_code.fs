@@ -72,7 +72,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
   | SAlias _ -> (needsState, eTail)
   | SAssign ([(x, None)], e) ->
       let tOpt =
-        match Map.tryFind x env0.ids with
+        match lookup_id env0.tcenv x with
         | Some (GhostLocal (Mutable, tOpt)) -> tOpt
         | _ -> None
         in
