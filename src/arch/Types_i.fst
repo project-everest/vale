@@ -1,26 +1,33 @@
 module Types_i
 
 open Types_s
+open TypesNative_i
 
-unfold let ( *^ ) = nat32_xor
-unfold let ( *^^ ) = quad32_xor
+let lemma_BitwiseXorCommutative x y =
+  lemma_ixor_nth_all 32;
+  lemma_equal_nth 32 (x *^ y) (y *^ x)
 
-let quad32_shl32 (q:quad32) : quad32 =
-  let Quad32 v0 v1 v2 v3 = q in
-  Quad32 0 v0 v1 v2
+let lemma_BitwiseXorWithZero n =
+  lemma_ixor_nth_all 32;
+  lemma_zero_nth 32;
+  lemma_equal_nth 32 (n *^ 0) n
 
-assume val lemma_BitwiseXorCommutative (x y:nat32) : Lemma (x *^ y == y *^ x)
-assume val lemma_BitwiseXorWithZero (n:nat32) : Lemma (n *^ 0 == n)
-assume val lemma_BitwiseXorCancel (n:nat32) : Lemma (n *^ n == 0)
-assume val lemma_BitwiseXorAssociative (x y z:nat32) : Lemma (x *^ (y *^ z) == (x *^ y) *^ z)
+let lemma_BitwiseXorCancel n =
+  lemma_ixor_nth_all 32;
+  lemma_zero_nth 32;
+  lemma_equal_nth 32 (n *^ n) 0
 
-assume val xor_lemmas (_:unit) : Lemma
-  (ensures
-    (forall (x y:nat32).{:pattern (x *^ y)} x *^ y == y *^ x) /\
-    (forall (n:nat32).{:pattern (n *^ 0)} n *^ 0 == n) /\
-    (forall (n:nat32).{:pattern (n *^ n)} n *^ n == 0) /\
-    (forall (x y z:nat32).{:pattern (x *^ (y *^ z))} x *^ (y *^ z) == (x *^ y) *^ z)
-  )
+let lemma_BitwiseXorAssociative x y z =
+  lemma_ixor_nth_all 32;
+  lemma_equal_nth 32 (x *^ (y *^ z)) ((x *^ y) *^ z)
 
-let lemma_quad32_xor () : Lemma (forall q . {:pattern quad32_xor q q} quad32_xor q q == Quad32 0 0 0 0) =
+let xor_lemmas () =
+  FStar.Classical.forall_intro_2 lemma_BitwiseXorCommutative;
+  FStar.Classical.forall_intro lemma_BitwiseXorWithZero;
+  FStar.Classical.forall_intro lemma_BitwiseXorCancel;
+  FStar.Classical.forall_intro_3 lemma_BitwiseXorAssociative;
+  ()
+
+let lemma_quad32_xor () =
   xor_lemmas()
+

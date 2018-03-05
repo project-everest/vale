@@ -3,6 +3,9 @@ module Math.Poly2.Lemmas_i
 let lemma_index a =
   FStar.Classical.forall_intro (lemma_index_i a)
 
+let lemma_index_all () =
+  FStar.Classical.forall_intro_2 lemma_index_i
+
 let lemma_zero_define () =
   FStar.Classical.forall_intro lemma_zero_define_i
 
@@ -17,6 +20,9 @@ let lemma_shift_define p n =
 
 let lemma_reverse_define p n =
   FStar.Classical.forall_intro (lemma_reverse_define_i p n)
+
+let lemma_reverse_define_all () =
+  FStar.Classical.forall_intro_2 lemma_reverse_define
 
 let lemma_zero_degree () =
   lemma_degree zero;

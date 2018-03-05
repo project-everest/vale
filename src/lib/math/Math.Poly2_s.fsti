@@ -15,9 +15,17 @@ val shift (p:poly) (n:nat) : poly // x^n * p
 val reverse (p:poly) (n:nat) : poly // x^n <--> x^0, x^(n-1) <--> x^1, ...
 
 // Index any coefficient, where all coefficients beyond highest-order term are zero
-// (and n < 0 returns zero)
+// (and n < 0 returns zero).
+// p.[0] is the coefficient of the lowest-order term (x^0).
 val poly_index (p:poly) (n:int) : bool
 unfold let ( .[] ) = poly_index
+
+val to_seq (p:poly) (n:nat) : Pure (seq bool)
+  (requires True)
+  (ensures fun s ->
+    length s == n /\
+    (forall (i:nat).{:pattern (p.[i]) \/ (index s i)} i < length s ==> p.[i] == index s i)
+  )
 
 val of_seq (s:seq bool) : Pure poly
   (requires True)

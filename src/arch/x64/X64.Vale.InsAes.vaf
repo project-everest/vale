@@ -5,7 +5,10 @@ module X64.Vale.InsAes
 
 #verbatim{:interface}
 open Types_s
+open Types_i
 open AES_s
+open Math.Poly2_s
+open Math.Poly2.Bits_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -23,6 +26,17 @@ module S = X64.Semantics_s
 module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
+
+procedure{:quick exportOnly}
+    {:instruction Ins(S.Pclmulqdq(dst, src, (if dstHi then 1 else 0) + (if srcHi then 16 else 0)))}
+    Pclmullqlqdq(inout dst:xmm, src:xmm, inline dstHi:bool, inline srcHi:bool)
+    modifies efl;
+    ensures
+        dst == old(to_quad32(mul(
+            of_double32(if dstHi then quad32_double_hi(dst) else quad32_double_lo(dst)),
+            of_double32(if srcHi then quad32_double_hi(src) else quad32_double_lo(src)))));
+{
+}
 
 procedure{:instruction Ins(S.AESNI_enc(dst, src))}{:quick exportOnly}
           AESNI_enc(inout dst:xmm, src:xmm)

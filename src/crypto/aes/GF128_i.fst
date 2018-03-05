@@ -1,4 +1,47 @@
 module GF128_i
+open TypesNative_i
+
+let lemma_to_of_quad32 q =
+  reveal_of_quad32 q;
+  reveal_to_quad32 (of_quad32 q);
+  let a = of_quad32 q in
+  let Quad32 q0 q1 q2 q3 = q in
+  let Quad32 q0' q1' q2' q3' = to_quad32 a in
+  lemma_index a;
+  lemma_reverse_define_all ();
+  let s0 = UInt.to_vec #32 q0 in
+  let s1 = UInt.to_vec #32 q1 in
+  let s2 = UInt.to_vec #32 q2 in
+  let s3 = UInt.to_vec #32 q3 in
+  let s0' = UInt.to_vec #32 q0' in
+  let s1' = UInt.to_vec #32 q1' in
+  let s2' = UInt.to_vec #32 q2' in
+  let s3' = UInt.to_vec #32 q3' in
+  assert (equal s0 s0');
+  assert (equal s1 s1');
+  assert (equal s2 s2');
+  assert (equal s3 s3');
+  ()
+
+let lemma_of_to_quad32 a =
+  reveal_to_quad32 a;
+  reveal_of_quad32 (to_quad32 a);
+  lemma_index_all ();
+  lemma_reverse_define_all ();
+  lemma_equal a (of_quad32 (to_quad32 a))
+
+let lemma_shift_left_1 a =
+  lemma_zero_nth 32;
+  reveal_to_quad32 a;
+  reveal_to_quad32 (shift a 1);
+  lemma_ishl_nth_all 32;
+  lemma_ishr_nth_all 32;
+  lemma_ixor_nth_all 32;
+  lemma_index_all ();
+  lemma_shift_define a 1;
+  lemma_reverse_define_all ();
+  lemma_quad32_vec_equal (to_quad32 (shift a 1)) (quad32_shift_left_1 (to_quad32 a));
+  ()
 
 let lemma_gf128_degree () =
   lemma_add_define_all ();

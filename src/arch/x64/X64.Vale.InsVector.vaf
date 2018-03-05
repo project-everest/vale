@@ -52,6 +52,24 @@ procedure{:instruction Ins(S.Pxor(dst, src))}{:quick exportOnly} Pxor(inout dst:
 {
 }
 
+procedure{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout dst:xmm, inline amt:int)
+    modifies efl;
+    requires
+        0 <= amt < 32;
+    ensures
+        dst == quad32_map((lambda i:nat32 :: ishl(i, amt)), old(dst));
+{
+}
+
+procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout dst:xmm, inline amt:int)
+    modifies efl;
+    requires
+        0 <= amt < 32;
+    ensures
+        dst == quad32_map((lambda i:nat32 :: ishr(i, amt)), old(dst));
+{
+}
+
 procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
   modifies efl;

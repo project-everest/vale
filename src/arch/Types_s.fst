@@ -48,6 +48,8 @@ let byte_to_twobits (b:nat8) =
     ((b / 16) % 4)
     ((b / 64) % 4)
 
+type double32 = | Double32: lo:nat32 -> hi:nat32 -> double32
+
 type quad32 = | Quad32:
   lo:nat32 ->
   mid_lo:nat32 ->
@@ -55,11 +57,18 @@ type quad32 = | Quad32:
   hi:nat32 ->
   quad32
 
-let quad32_xor (x y:quad32) = Quad32
-  (ixor x.lo y.lo)
-  (ixor x.mid_lo y.mid_lo)
-  (ixor x.mid_hi y.mid_hi)
-  (ixor x.hi y.hi)   
+unfold
+let quad32_map (f:nat32 -> nat32) (x:quad32) : quad32 =
+  let Quad32 x0 x1 x2 x3 = x in
+  Quad32 (f x0) (f x1) (f x2) (f x3)
+
+unfold
+let quad32_map2 (f:nat32 -> nat32 -> nat32) (x y:quad32) : quad32 =
+  let Quad32 x0 x1 x2 x3 = x in
+  let Quad32 y0 y1 y2 y3 = y in
+  Quad32 (f x0 y0) (f x1 y1) (f x2 y2) (f x3 y3)
+
+let quad32_xor (x y:quad32) : quad32 = quad32_map2 nat32_xor x y
 
 let select_word (q:quad32) (selector:twobits) =
   match selector with

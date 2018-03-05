@@ -33,6 +33,15 @@ let poly_index (p:poly) (n:int) : bool =
 
 unfold let ( .[] ) = poly_index
 
+let to_seq (p:poly) (n:nat) : Pure (seq bool)
+  (requires True)
+  (ensures fun s ->
+    length s == n /\
+    (forall (i:nat).{:pattern (p.[i]) \/ (index s i)} i < length s ==> p.[i] == index s i)
+  )
+  =
+  init n (poly_index p)
+
 let rec of_seq (s:seq bool) : Pure poly
   (requires True)
   (ensures fun p ->

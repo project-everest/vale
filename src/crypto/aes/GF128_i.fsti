@@ -1,10 +1,38 @@
 module GF128_i
+open Types_s
 open GF128_s
 open Math.Poly2_s
+open Math.Poly2.Bits_s
 open Math.Poly2_i
 open Math.Poly2.Lemmas_i
 open FStar.Seq
 open FStar.Mul
+
+val lemma_to_of_quad32 (q:quad32) : Lemma (to_quad32 (of_quad32 q) == q)
+
+val lemma_of_to_quad32 (a:poly) : Lemma
+  (requires degree a < 128)
+  (ensures of_quad32 (to_quad32 a) == a)
+
+let quad32_shift_left_1 (q:quad32) =
+  let Quad32 q0 q1 q2 q3 = q in
+  let l0 = ishl q0 1 in
+  let l1 = ishl q1 1 in
+  let l2 = ishl q2 1 in
+  let l3 = ishl q3 1 in
+  let r0 = ishr q0 31 in
+  let r1 = ishr q1 31 in
+  let r2 = ishr q2 31 in
+  let r3 = ishr q3 31 in
+  let x0 = ixor l0 0 in
+  let x1 = ixor l1 r0 in
+  let x2 = ixor l2 r1 in
+  let x3 = ixor l3 r2 in
+  Quad32 x0 x1 x2 x3
+
+val lemma_shift_left_1 (a:poly) : Lemma
+  (requires degree a < 127)
+  (ensures to_quad32 (shift a 1) == quad32_shift_left_1 (to_quad32 a))
 
 val lemma_gf128_degree (_:unit) : Lemma
   (ensures

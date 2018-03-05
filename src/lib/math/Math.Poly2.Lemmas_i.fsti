@@ -7,6 +7,8 @@ module List = FStar.List.Tot
 // Derived lemmas (see Math.Poly2_i for fundamental lemmas)
 
 val lemma_index (a:poly) : Lemma (forall (i:int).{:pattern a.[i]} a.[i] ==> 0 <= i /\ i <= degree a)
+val lemma_index_all (_:unit) : Lemma
+  (forall (a:poly) (i:int).{:pattern a.[i]} a.[i] ==> 0 <= i /\ i <= degree a)
 
 val lemma_zero_define (_:unit) : Lemma (forall (i:int).{:pattern zero.[i]} not zero.[i])
 val lemma_one_define (_:unit) : Lemma (forall (i:int).{:pattern one.[i]} one.[i] == (i = 0))
@@ -16,6 +18,9 @@ val lemma_shift_define (p:poly) (n:nat) : Lemma
   (forall (i:int).{:pattern (shift p n).[i]} (shift p n).[i] == p.[i - n])
 val lemma_reverse_define (a:poly) (n:nat) : Lemma
   (forall (i:int).{:pattern (reverse a n).[i]} (reverse a n).[i] == (a.[n - i] && i >= 0))
+val lemma_reverse_define_all (_:unit) : Lemma
+  (forall (a:poly) (n:nat).{:pattern (reverse a n)}
+    (forall (i:int).{:pattern (reverse a n).[i]} (reverse a n).[i] == (a.[n - i] && i >= 0)))
 
 val lemma_zero_degree (_:unit) : Lemma (degree zero == -1)
 val lemma_reverse_degree (a:poly) (n:nat) : Lemma (degree (reverse a n) <= n)

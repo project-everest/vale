@@ -9,6 +9,7 @@ let monomial n = D.monomial n
 let shift p n = D.shift p n
 let reverse p n = D.reverse p n
 let poly_index p n = D.poly_index p n
+let to_seq s n = D.to_seq s n
 let of_seq s = D.of_seq s
 let of_fun len f = D.of_fun len f
 let add a b = D.add a b
