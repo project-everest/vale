@@ -111,9 +111,6 @@ procedure {:quick} gcm_core(
     Mov64(rcx, plain_len);
     gctr_core(plain_b, out_b, key, round_keys, keys_b);
 
-
-// TODO: Need a version of ghash_core that takes Y_{i-1} as an argument
-
     // Compute the hashes incrementally
     Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
