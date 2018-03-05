@@ -137,11 +137,11 @@ let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buf
 [@va_qattr] unfold let va_get_mem (s:va_state) : mem = s.mem
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
-[@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
-[@va_qattr] unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
-[@va_qattr] unfold let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
+[@va_qattr] let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
+[@va_qattr] let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
+[@va_qattr] let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
   update_reg r (eval_reg r sM) sK
-[@va_qattr] unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
+[@va_qattr] let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
 
 [@va_qattr]
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
