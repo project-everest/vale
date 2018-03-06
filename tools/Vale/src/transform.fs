@@ -18,10 +18,7 @@ let assumeUpdates = ref 0
 
 type env =
   {
-    //funs:Map<id, fun_decl>;
-    //procs:Map<id, proc_decl>;
     raw_procs:Map<id, proc_decl>;
-    //ids:Map<id, id_info>;
     mods:Map<id, bool>;
     lets:(loc * lets) list
     state:exp;
@@ -32,11 +29,7 @@ type env =
 
 let empty_env:env =
   {
-    //funs = Map.empty;
-    //procs = Map.empty;
     raw_procs = Map.empty;
-    //ids = Map.empty;
-    mods = Map.empty;
     lets = [];
     state = EVar (Reserved "s");
     abstractOld = false;
@@ -531,7 +524,6 @@ let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
   EOp (RefineOp, [EVar x; EVar abs_x; e])
 
 let check_state_info (env:env) (x:id):bool = // returns readWrite
-  // TODO: QUNYAN
   match (env.checkMods, Map.tryFind x env.mods) with
   | (true, None) -> err ("variable " + (err_id x) + " must be declared in procedure's reads clause or modifies clause")
   | (false, None) -> true
@@ -569,7 +561,6 @@ let check_mods (env:env) (p:proc_decl):unit =
         match skip_loc (exp_abstract false e) with
         | EVar x ->
           (
-            // TODO: QUNYAN
             match (m, Map.tryFind x env.mods) with
             | (Read, None) -> err ("variable " + (err_id x) + " must be declared in reads clause or modifies clause")
             | ((Modify | Preserve), (None | Some false)) -> err ("variable " + (err_id x) + " must be declared in modifies clause")
@@ -792,7 +783,6 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
       with err -> raise (LocErr (loc, err))
   | (_, EApply(x, es)) ->
     (
-      //match Map.tryFind x env.procs with
       match lookup_proc env.tcenv x with
       | None -> (lhss, rewrite_vars_exp rctx env e)
       | Some p ->
@@ -1025,7 +1015,6 @@ let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
       with err -> raise (LocErr (loc, err))
   | EApply(x, es) ->
     (
-      //match Map.tryFind x env.procs with
       match lookup_proc env.tcenv x with
       | None -> []
       | Some p ->
@@ -1291,7 +1280,6 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
       match e with
       | EVar x ->
         (
-          //match Map.tryFind x env.ids with
           match lookup_id env.tcenv x with
           | None -> err ("cannot find variable " + (err_id x))
           | Some (StateInfo _) -> (x, (match m with Read -> false | (Modify | Preserve) -> true))

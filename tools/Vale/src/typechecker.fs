@@ -129,7 +129,6 @@ let param_info isRet (x, t, g, io, a) =
 let push_rets (env:env) (rets:pformal list):env =
   {env with scope_mods = List.fold (fun s (x, t, g, io, a) -> Local(x, (param_info true (x, t, g, io, a))):: s) env.scope_mods rets}
 
-// TODO: QUNYAN
 let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):env =
   let arg_in_rets arg l = List.exists (fun elem -> elem = arg) l in
   let rec aux s l = 
