@@ -10,7 +10,7 @@ open System.IO
 type name_info =
 | Info of id_info
 | Func_decl of fun_decl
-| Proc_decl of proc_decl
+| Proc_decl of (proc_decl * proc_decl option) // second proc_decl is for raw_proc
 | Name of string
 
 type export_ids_map = System.Collections.Generic.Dictionary<string, list<string>>
@@ -19,7 +19,7 @@ type scope_mod =
 | Module_abbrev of (string * string)
 | Local of (id * id_info)
 | Func of (id * fun_decl)
-| Proc of (id * proc_decl)
+| Proc of (id * proc_decl * proc_decl option)
 
 type env = {
   curmodule: option<string>; (* name of the module being typechecked *)
@@ -70,7 +70,7 @@ let lookup_name (env:env) (x:id) =
     | Module_abbrev (m, l) -> find_in_module_exports env l (string_of_id x)
     | Local (s, info) when s=x -> Some (Info info)
     | Func (s, decl) when s=x -> Some (Func_decl decl)
-    | Proc (s, decl) when s=x -> Some (Proc_decl decl)
+    | Proc (s, decl, raw_decl) when s=x -> Some (Proc_decl (decl,raw_decl))
     | _ -> None
   let rec aux = function
     | a :: q -> 
@@ -97,11 +97,24 @@ let lookup_func (env:env) (id:id) =
 
 let lookup_proc env (id:id) =
   match lookup_name env id with
-  | Some (Proc_decl decl) -> Some decl
+  | Some (Proc_decl (decl, raw_decl)) -> Some decl
+  | _ -> None
+
+let lookup_raw_proc env (id:id) =
+  match lookup_name env id with
+  | Some (Proc_decl (decl, raw_decl)) -> 
+    match raw_decl with 
+    | Some d -> Some d
+    | _ -> None
   | _ -> None
 
 let contains_proc env id =
   match lookup_proc env id with
+  | Some _ -> true
+  | _ -> false
+
+let contains_raw_proc env id =
+  match lookup_raw_proc env id with
   | Some _ -> true
   | _ -> false
 
@@ -114,8 +127,8 @@ let push_id env id info =
 let push_func env id func =
   push_scope_mod env (Func (id, func))
   
-let push_proc env id proc =
-  push_scope_mod env (Proc (id, proc))
+let push_proc env id proc raw_proc =
+  push_scope_mod env (Proc (id, proc, raw_proc))
 
 let param_info isRet (x, t, g, io, a) =
   match g with

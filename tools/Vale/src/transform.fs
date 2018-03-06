@@ -18,7 +18,6 @@ let assumeUpdates = ref 0
 
 type env =
   {
-    raw_procs:Map<id, proc_decl>;
     mods:Map<id, bool>;
     lets:(loc * lets) list
     state:exp;
@@ -29,7 +28,6 @@ type env =
 
 let empty_env:env =
   {
-    raw_procs = Map.empty;
     lets = [];
     state = EVar (Reserved "s");
     abstractOld = false;
@@ -929,8 +927,11 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
       match e with
       | ELoc (loc, e) -> try assign e with err -> raise (LocErr (loc, err))
       // TODO: QUNYAN
-      | EApply (x, es) when Map.containsKey x env.raw_procs ->
-        let pCall = Map.find x env.raw_procs in
+      | EApply (x, es) when contains_raw_proc env.tcenv x ->
+        let pCall =
+          match lookup_raw_proc env.tcenv x with
+          | Some p -> p
+          | _ -> internalErr "missing raw decl info " in
         if List.length es = List.length pCall.pargs then
           (* Generate one assertion for each precondition of the procedure pCall that we're calling.
              Also generate "assert true" to mark the location of the call itself.
@@ -1330,9 +1331,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let envp = {envp with abstractOld = false} in
   let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
   let specs = List_mapSnd (resolve_overload_spec envpIn envp) specs in
-  let envp = if isRecursive then {envp with tcenv = push_proc envp.tcenv p.pname {p with pspecs = specs}} else envp
-  // TODO: QUNYAN
-  let env = {env with raw_procs = Map.add p.pname p env.raw_procs}
+  let envp = if isRecursive then {envp with tcenv = push_proc envp.tcenv p.pname {p with pspecs = specs} None} else envp
   // Hoist while loops
   let envpOrig = List.fold (fun env s -> snd (env_stmt env s)) envp bodyLets in
   let hoisted = if isQuick then hoist_while_loops envpOrig loc pOrig else [] in
@@ -1360,7 +1359,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
     in
   let pNew = {p with pbody = body; pspecs = specs} in
   let envBody = envp in
-  let envProc = {env with tcenv = push_proc env.tcenv p.pname pNew} in
+  let envProc = {env with tcenv = push_proc env.tcenv p.pname pNew (Some p)} in
   let envRec = if isRecursive then envProc else env in
   TransformedDone ((envRec, envBody, pNew), envProc)
 
