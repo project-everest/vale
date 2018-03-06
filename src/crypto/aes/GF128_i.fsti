@@ -14,25 +14,37 @@ val lemma_of_to_quad32 (a:poly) : Lemma
   (requires degree a < 128)
   (ensures of_quad32 (to_quad32 a) == a)
 
-let quad32_shift_left_1 (q:quad32) =
-  let Quad32 q0 q1 q2 q3 = q in
-  let l0 = ishl q0 1 in
-  let l1 = ishl q1 1 in
-  let l2 = ishl q2 1 in
-  let l3 = ishl q3 1 in
-  let r0 = ishr q0 31 in
-  let r1 = ishr q1 31 in
-  let r2 = ishr q2 31 in
-  let r3 = ishr q3 31 in
-  let x0 = ixor l0 0 in
-  let x1 = ixor l1 r0 in
-  let x2 = ixor l2 r1 in
-  let x3 = ixor l3 r2 in
-  Quad32 x0 x1 x2 x3
+let quad32_shift_left_1 (q:quad32) : quad32 =
+  let l = quad32_map (fun (i:nat32) -> ishl i 1) q in
+  let r = quad32_map (fun (i:nat32) -> ishr i 31) q in
+  let Quad32 r0 r1 r2 r3 = r in
+  quad32_xor l (Quad32 0 r0 r1 r2)
+
+let quad32_shift_2_left_1 (qa qb:quad32) : tuple2 quad32 quad32 =
+  let la = quad32_map (fun (i:nat32) -> ishl i 1) qa in
+  let lb = quad32_map (fun (i:nat32) -> ishl i 1) qb in
+  let ra = quad32_map (fun (i:nat32) -> ishr i 31) qa in
+  let rb = quad32_map (fun (i:nat32) -> ishr i 31) qb in
+  let Quad32 ra0 ra1 ra2 ra3 = ra in
+  let Quad32 rb0 rb1 rb2 rb3 = rb in
+  let qa' = quad32_xor la (Quad32 0 ra0 ra1 ra2) in
+  let qb' = quad32_xor lb (quad32_xor (Quad32 ra3 0 0 0) (Quad32 0 rb0 rb1 rb2)) in
+  (qa', qb')
 
 val lemma_shift_left_1 (a:poly) : Lemma
   (requires degree a < 127)
   (ensures to_quad32 (shift a 1) == quad32_shift_left_1 (to_quad32 a))
+
+val lemma_shift_2_left_1 (lo hi:poly) : Lemma
+  (requires degree hi < 127 /\ degree lo < 128)
+  (ensures (
+    let n = monomial 128 in
+    let a = hi *. n +. lo in
+    let a' = shift a 1 in
+    let (lo', hi') = quad32_shift_2_left_1 (to_quad32 lo) (to_quad32 hi) in
+    lo' == to_quad32 (a' %. n) /\
+    hi' == to_quad32 (a' /. n)
+  ))
 
 val lemma_gf128_degree (_:unit) : Lemma
   (ensures

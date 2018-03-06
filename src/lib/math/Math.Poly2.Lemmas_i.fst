@@ -18,6 +18,9 @@ let lemma_monomial_define n =
 let lemma_shift_define p n =
   FStar.Classical.forall_intro (lemma_shift_define_i p n)
 
+let lemma_shift_define_forward p n =
+  lemma_shift_define p n
+
 let lemma_reverse_define p n =
   FStar.Classical.forall_intro (lemma_reverse_define_i p n)
 

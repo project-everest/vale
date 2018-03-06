@@ -44,6 +44,58 @@ procedure{:quick} ShiftLeft128_1(ghost a:poly)
     lemma_shift_left_1(a);
 }
 
+procedure{:quick} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
+    modifies
+        efl;
+        xmm1; xmm2; xmm3; xmm4; xmm5;
+    requires
+        degree(hi) < 127;
+        degree(lo) <= 127;
+        xmm1 == to_quad32(lo);
+        xmm2 == to_quad32(hi);
+    ensures
+        let n := monomial(128);
+        let a := add(mul(hi, n), lo);
+        let b := shift(a, 1);
+        xmm1 == to_quad32(mod(b, n));
+        xmm2 == to_quad32(div(b, n));
+{
+    // qa := xmm1
+    // qb := xmm2
+
+    // ra := map(>> 31)(qa)
+    Mov128(xmm3, xmm1);
+    Psrld(xmm3, 31);
+
+    // rb := map(>> 31)(qb)
+    Mov128(xmm4, xmm2);
+    Psrld(xmm4, 31);
+
+    // la := map(<< 1)(qa)
+    // lb := map(<< 1)(qb)
+    Pslld(xmm1, 1);
+    Pslld(xmm2, 1);
+
+    // ra012 := ra << 32
+    // rb012 := rb << 32
+    VPSLLDQ4(xmm5, xmm3);
+    VPSLLDQ4(xmm4, xmm4);
+
+    // ra3 := ra >> 96
+    Pinsrd(xmm3, 0, 0);
+    Pshufd(xmm3, xmm3, 0x03); // (hi) 0 0 0 3 (lo)
+
+    // ra3_rb012 := ra3 + rb012
+    Pxor(xmm3, xmm4);
+
+    // qa' := la + ra012
+    // qb' := lb + ra3_rb012
+    Pxor(xmm1, xmm5);
+    Pxor(xmm2, xmm3);
+
+    lemma_shift_2_left_1(lo, hi);
+}
+
 procedure{:quick} ClmulRev64(ghost a:poly, ghost b:poly, inline dstHi:bool, inline srcHi:bool)
     reads
     modifies
@@ -106,7 +158,7 @@ procedure{:quick exportOnly} AddPoly(out dst:xmm, src:xmm, ghost a:poly, ghost b
     lemma_add128(a, b);
 }
 
-procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost hi:poly, ghost lo:poly)
+procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, ghost hi:poly)
     modifies
         efl;
         xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -117,7 +169,7 @@ procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost hi:poly, 
         xmm2 == to_quad32(cd);
     ensures
         degree(lo) <= 127;
-        degree(hi) <= 127;
+        degree(hi) < 127;
         mul(ab, cd) == add(shift(hi, 128), lo);
         xmm1 == to_quad32(lo);
         xmm2 == to_quad32(hi);
@@ -180,7 +232,7 @@ procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost hi:poly, 
     lemma_gf128_mul(a, b, c, d, 64);
 }
 
-procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost hi:poly, ghost lo:poly)
+procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, ghost hi:poly)
     modifies
         efl;
         xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -196,10 +248,16 @@ procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost hi:pol
         xmm1 == to_quad32(lo);
         xmm2 == to_quad32(hi);
 {
-    // TODO: ClmulRev64, lemma_gf128_mul, ...
-    hi := zero;
-    lo := zero;
-    assume False;
+    lo, hi := Clmul128(reverse(ab, 127), reverse(cd, 127));
+    ShiftLeft2_128_1(lo, hi);
+
+    let m := shift(add(shift(hi, 128), lo), 1);
+    lemma_shift_is_mul(hi, 128);
+    lo := mod(m, monomial(128));
+    hi := div(m, monomial(128));
+    lemma_div_mod(m, monomial(128));
+    lemma_shift_is_mul(hi, 128);
+    lemma_mul_reverse_shift_1(ab, cd, 127);
 }
 
 procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)

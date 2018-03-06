@@ -31,9 +31,9 @@ let lemma_of_to_quad32 a =
   lemma_equal a (of_quad32 (to_quad32 a))
 
 let lemma_shift_left_1 a =
-  lemma_zero_nth 32;
   reveal_to_quad32 a;
   reveal_to_quad32 (shift a 1);
+  lemma_zero_nth 32;
   lemma_ishl_nth_all 32;
   lemma_ishr_nth_all 32;
   lemma_ixor_nth_all 32;
@@ -42,6 +42,41 @@ let lemma_shift_left_1 a =
   lemma_reverse_define_all ();
   lemma_quad32_vec_equal (to_quad32 (shift a 1)) (quad32_shift_left_1 (to_quad32 a));
   ()
+
+#reset-options "--z3rlimit 10"
+let lemma_shift_2_left_1 lo hi =
+  let n = monomial 128 in
+  let a = hi *. n +. lo in
+  let a' = shift a 1 in
+  let (qlo', qhi') = quad32_shift_2_left_1 (to_quad32 lo) (to_quad32 hi) in
+  reveal_to_quad32 lo;
+  reveal_to_quad32 hi;
+  reveal_to_quad32 (a' %. n);
+  reveal_to_quad32 (a' /. n);
+  lemma_zero_nth 32;
+  lemma_ishl_nth_all 32;
+  lemma_ishr_nth_all 32;
+  lemma_ixor_nth_all 32;
+  lemma_index_all ();
+  lemma_shift_define a 1;
+  lemma_add_define_all ();
+  lemma_reverse_define_all ();
+  lemma_div_mod a' n;
+  lemma_shift_is_mul hi 128;
+  lemma_shift_define hi 128;
+  lemma_shift_is_mul (a' /. n) 128;
+  let lemma_lo () : Lemma (qlo' == to_quad32 (a' %. n)) =
+    lemma_shift_define (a' /. n) 128;
+    lemma_quad32_vec_equal qlo' (to_quad32 (a' %. n))
+    in
+  let lemma_hi () : Lemma (qhi' == to_quad32 (a' /. n)) =
+    lemma_shift_define_forward (a' /. n) 128;
+    lemma_quad32_vec_equal qhi' (to_quad32 (a' /. n))
+    in
+  lemma_lo ();
+  lemma_hi ();
+  ()
+#reset-options
 
 let lemma_gf128_degree () =
   lemma_add_define_all ();
