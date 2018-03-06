@@ -35,6 +35,7 @@ let empty_env:env =
     abstractOld = false;
     checkMods = false;
     tcenv = TypeChecker.empty_env;
+    mods = Map.empty;
   }
 
 let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
