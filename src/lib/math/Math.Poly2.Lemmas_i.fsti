@@ -22,12 +22,25 @@ val lemma_reverse_define_all (_:unit) : Lemma
   (forall (a:poly) (n:nat).{:pattern (reverse a n)}
     (forall (i:int).{:pattern (reverse a n).[i]} (reverse a n).[i] == (a.[n - i] && i >= 0)))
 
-val lemma_zero_degree (_:unit) : Lemma (degree zero == -1)
-val lemma_reverse_degree (a:poly) (n:nat) : Lemma (degree (reverse a n) <= n)
-val lemma_degree_negative (a:poly) : Lemma (requires degree a < 0) (ensures a == zero)
 val lemma_degree_is (a:poly) (n:nat) : Lemma
   (requires a.[n] /\ (forall (i:int).{:pattern a.[i]} i > n ==> not a.[i]))
   (ensures degree a == n)
+
+val lemma_degree_negative (a:poly) : Lemma (requires degree a < 0) (ensures a == zero)
+
+val lemma_zero_degree : (_:unit{degree zero == -1})
+
+val lemma_monomial_degree (n:nat) : Lemma
+  (degree (monomial n) == n)
+  [SMTPat (degree (monomial n))]
+
+val lemma_shift_degree (a:poly) (n:nat) : Lemma
+  (degree (shift a n) == (if degree a < 0 then degree a else degree a + n))
+  [SMTPat (degree (shift a n))]
+
+val lemma_reverse_degree (a:poly) (n:nat) : Lemma
+  (degree (reverse a n) <= n)
+  [SMTPat (degree (reverse a n))]
 
 val lemma_of_list_degree (l:list bool) : Lemma
   (requires (
@@ -54,6 +67,9 @@ val lemma_mul_distribute_right (a b c:poly) : Lemma (a *. (b +. c) == (a *. b) +
 val lemma_mul_smaller_is_zero (a b:poly) : Lemma
   (requires degree b > degree (a *. b))
   (ensures a == zero /\ a *. b == zero)
+
+val lemma_mul_monomials (m n:nat) : Lemma
+  (monomial (m + n) == monomial m *. monomial n)
 
 val lemma_mul_reverse_shift_1 (a b:poly) (n:nat) : Lemma
   (requires degree a <= n /\ degree b <= n)

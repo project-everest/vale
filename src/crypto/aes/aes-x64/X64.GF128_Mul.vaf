@@ -10,6 +10,7 @@ open Types_i
 open Math.Poly2_s
 open Math.Poly2_i
 open Math.Poly2.Bits_s
+open Math.Poly2.Bits_i
 open Math.Poly2.Lemmas_i
 open GF128_s
 open GF128_i
@@ -27,47 +28,171 @@ open X64.Vale.QuickCodes_i
 procedure{:quick} ShiftLeft128_1(ghost a:poly)
     modifies
         efl;
-        xmm1; // ...TODO
+        xmm1; xmm2;
     requires
-        degree(a) <= 127;
+        degree(a) < 127;
         xmm1 == to_quad32(a);
     ensures
         xmm1 == to_quad32(shift(a, 1));
 {
-    // TODO: Psrll by 1, Psrld by 31, VPSLLDQ4, Pxor
-    assume False;
+    Mov128(xmm2, xmm1);
+    Psrld(xmm2, 31);
+    Pslld(xmm1, 1);
+    VPSLLDQ4(xmm2, xmm2);
+    Pxor(xmm1, xmm2);
+
     lemma_shift_left_1(a);
 }
 
 procedure{:quick} ClmulRev64(ghost a:poly, ghost b:poly, inline dstHi:bool, inline srcHi:bool)
+    reads
     modifies
         efl;
-        xmm1; xmm2; // ...TODO
+        xmm1; xmm2;
     requires
         degree(a) <= 63;
         degree(b) <= 63;
         reverse(a, 63) == of_double32(if dstHi then quad32_double_hi(xmm1) else quad32_double_lo(xmm1));
         reverse(b, 63) == of_double32(if srcHi then quad32_double_hi(xmm2) else quad32_double_lo(xmm2));
     ensures
-        xmm1 == to_quad32(reverse(old(mul(a, b)), 127));
+        xmm1 == to_quad32(reverse(mul(a, b), 127));
 {
-    // TODO: Pclmullqlqdq, ShiftLeft128_1, lemma_mul_reverse_shift_1, ...
-    assume False;
+    Pclmulqdq(xmm1, xmm2, dstHi, srcHi);
+    ShiftLeft128_1(mul(reverse(a, 63), reverse(b, 63)));
+
+    lemma_mul_reverse_shift_1(a, b, 63);
 }
 
-procedure{:quick} ClmulRev128(ghost a:poly, ghost b:poly) returns(ghost hi:poly, ghost lo:poly)
+procedure{:quick exportOnly} High64ToLow(out dst:xmm, ghost a:poly)
     modifies
         efl;
-        xmm1; xmm2; // ...TODO
+    requires
+        degree(a) <= 127;
+        dst == to_quad32(a);
+    ensures
+        dst == to_quad32(div(a, monomial(64)));
+{
+    Pinsrd(dst, 0, 0);
+    Pshufd(dst, dst, 0x0e); // (hi) 0 0 3 2 (lo)
+    lemma_quad32_double_shift(a);
+}
+
+procedure{:quick exportOnly} Low64ToHigh(out dst:xmm, ghost a:poly)
+    modifies
+        efl;
+    requires
+        degree(a) <= 127;
+        dst == to_quad32(a);
+    ensures
+        dst == to_quad32(mul(mod(a, monomial(64)), monomial(64)));
+{
+    Pinsrd(dst, 0, 3);
+    Pshufd(dst, dst, 0x4f); // (hi) 1 0 3 3 (lo)
+    lemma_quad32_double_shift(a);
+}
+
+procedure{:quick exportOnly} AddPoly(out dst:xmm, src:xmm, ghost a:poly, ghost b:poly)
+    modifies
+        efl;
     requires
         degree(a) <= 127;
         degree(b) <= 127;
-        xmm1 == to_quad32(reverse(a, 127));
-        xmm2 == to_quad32(reverse(b, 127));
+        dst == to_quad32(a);
+        src == to_quad32(b);
+    ensures
+        dst == to_quad32(add(a, b));
+{
+    Pxor(dst, src);
+    lemma_add128(a, b);
+}
+
+procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost hi:poly, ghost lo:poly)
+    modifies
+        efl;
+        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
+    requires
+        degree(ab) <= 127;
+        degree(cd) <= 127;
+        xmm1 == to_quad32(ab);
+        xmm2 == to_quad32(cd);
     ensures
         degree(lo) <= 127;
         degree(hi) <= 127;
-        old(reverse(mul(a, b), 255)) == add(shift(hi, 128), lo);
+        mul(ab, cd) == add(shift(hi, 128), lo);
+        xmm1 == to_quad32(lo);
+        xmm2 == to_quad32(hi);
+{
+    let n := monomial(64);
+    let a := div(ab, n);
+    let b := mod(ab, n);
+    let c := div(cd, n);
+    let d := mod(cd, n);
+    let ac := mul(a, c);
+    let ad := mul(a, d);
+    let bc := mul(b, c);
+    let bd := mul(b, d);
+    lemma_div_mod(ab, n);
+    lemma_quad32_double(ab);
+    lemma_quad32_double(cd);
+
+    Mov128(xmm5, xmm1);
+    Mov128(xmm6, xmm2);
+
+    // xmm3 := ac
+    Pclmulqdq(xmm1, xmm2, true, true);
+    Mov128(xmm3, xmm1);
+
+    // xmm4 := ad
+    Mov128(xmm1, xmm5);
+    Mov128(xmm2, xmm6);
+    Pclmulqdq(xmm1, xmm2, true, false);
+    Mov128(xmm4, xmm1);
+
+    // xmm6 := bd
+    Mov128(xmm1, xmm5);
+    Mov128(xmm2, xmm6);
+    Pclmulqdq(xmm1, xmm2, false, false);
+    Mov128(xmm2, xmm6);
+    Mov128(xmm6, xmm1);
+
+    // xmm1 := bc
+    // xmm5 := bc
+    Mov128(xmm1, xmm5);
+    Pclmulqdq(xmm1, xmm2, false, true);
+    Mov128(xmm5, xmm1);
+
+    // xmm1 := lo(bc) * n + lo(ad) * n + bd
+    Low64ToHigh(xmm1, bc);
+    Mov128(xmm2, xmm4);
+    Low64ToHigh(xmm2, ad);
+    AddPoly(xmm1, xmm2, mul(mod(bc, n), n), mul(mod(ad, n), n));
+    AddPoly(xmm1, xmm6, add(mul(mod(bc, n), n), mul(mod(ad, n), n)), bd);
+
+    // xmm2 := ac + hi(bc) + hi(ad)
+    Mov128(xmm2, xmm3);
+    High64ToLow(xmm5, bc);
+    High64ToLow(xmm4, ad);
+    AddPoly(xmm2, xmm5, ac, div(bc, n));
+    AddPoly(xmm2, xmm4, add(ac, div(bc, n)), div(ad, n));
+
+    hi := add(add(ac, div(bc, n)), div(ad, n));
+    lo := add(add(mul(mod(bc, n), n), mul(mod(ad, n), n)), bd);
+    lemma_gf128_mul(a, b, c, d, 64);
+}
+
+procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost hi:poly, ghost lo:poly)
+    modifies
+        efl;
+        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
+    requires
+        degree(ab) <= 127;
+        degree(cd) <= 127;
+        xmm1 == to_quad32(reverse(ab, 127));
+        xmm2 == to_quad32(reverse(cd, 127));
+    ensures
+        degree(lo) <= 127;
+        degree(hi) <= 127;
+        reverse(mul(ab, cd), 255) == add(shift(hi, 128), lo);
         xmm1 == to_quad32(lo);
         xmm2 == to_quad32(hi);
 {

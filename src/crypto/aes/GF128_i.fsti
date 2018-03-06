@@ -42,18 +42,18 @@ val lemma_gf128_degree (_:unit) : Lemma
   )
 
 // Compute 128-bit multiply in terms of 64-bit multiplies
-val lemma_gf128_mul (a b c d n:poly) : Lemma
-  (requires degree n >= 0)
+val lemma_gf128_mul (a b c d:poly) (n:nat) : Lemma
   (ensures (
-    let ab = a *. n +. b in
-    let cd = c *. n +. d in
+    let m = monomial n in
+    let ab = a *. m +. b in
+    let cd = c *. m +. d in
     let ac = a *. c in
     let ad = a *. d in
     let bc = b *. c in
     let bd = b *. d in
     ab *. cd ==
-      ((ac /. n) *. n +. (ac %. n +. bc /. n +. ad /. n)) *. (n *. n) +.
-      ((bc %. n +. ad %. n +. bd /. n) *. n +. bd %. n)
+      shift (ac +. bc /. m +. ad /. m) (n + n) +.
+      ((bc %. m) *. m +. (ad %. m) *. m +. bd)
   ))
 
 // Compute (a * b) % g, where g = n + h and %. n is easy to compute (e.g. n = x^128)

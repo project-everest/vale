@@ -53,6 +53,6 @@ val to_quad32 (a:poly) : quad32
 val of_quad32 (q:quad32) : poly
 
 val reveal_to_double32 (a:poly) : Lemma (to_double32 a == to_double32_def a)
-val reveal_of_double32 (q:double32) : Lemma (of_double32 q == of_double32_def q)
+val reveal_of_double32 (d:double32) : Lemma (of_double32 d == of_double32_def d)
 val reveal_to_quad32 (a:poly) : Lemma (to_quad32 a == to_quad32_def a)
 val reveal_of_quad32 (q:quad32) : Lemma (of_quad32 q == of_quad32_def q)

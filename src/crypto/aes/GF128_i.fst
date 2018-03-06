@@ -52,58 +52,64 @@ let lemma_gf128_degree () =
   ()
 
 let lemma_gf128_mul a b c d n =
-  let ab = a *. n +. b in
-  let cd = c *. n +. d in
+  let m = monomial n in
+  let ab = a *. m +. b in
+  let cd = c *. m +. d in
   let ac = a *. c in
   let ad = a *. d in
   let bc = b *. c in
   let bd = b *. d in
-  let ach = ac /. n in
-  let adh = ad /. n in
-  let bch = bc /. n in
-  let bdh = bd /. n in
-  let acl = ac %. n in
-  let adl = ad %. n in
-  let bcl = bc %. n in
-  let bdl = bd %. n in
+  let adh = ad /. m in
+  let bch = bc /. m in
+  let adl = ad %. m in
+  let bcl = bc %. m in
   // ab *. cd
-  // (a *. n +. b) *. (c *. n +. d)
-  lemma_mul_distribute_right (a *. n +. b) (c *. n) d;
-  lemma_mul_distribute_left (a *. n) b (c *. n);
-  lemma_mul_distribute_left (a *. n) b d;
-  // ((a *. n) *. (c *. n) +. b *. (c *. n)) +. ((a *. n) *. d +. b *. d);
-  lemma_mul_associate b c n;
-  lemma_mul_associate a n d;
-  lemma_mul_commute n d;
-  lemma_mul_associate a d n;
-  lemma_mul_associate a n (c *. n);
-  lemma_mul_associate n c n;
-  lemma_mul_commute c n;
-  lemma_mul_associate c n n;
-  lemma_mul_associate a c (n *. n);
-  // (ac *. (n *. n) +. bc *. n) +. (ad *. n +. bd)
-  lemma_div_mod ac n;
-  lemma_div_mod ad n;
-  lemma_div_mod bc n;
-  lemma_div_mod bd n;
-  // ((ach *. n +. acl) *. (n *. n) +. (bch *. n +. bcl) *. n) +. ((adh *. n +. adl) *. n +. (bdh *. n +. bdl))
-  lemma_mul_distribute_left (ach *. n) acl (n *. n);
-  lemma_mul_distribute_left (bch *. n) bcl n;
-  lemma_mul_distribute_left (adh *. n) adl n;
-  // (((ach *. n) *. (n *. n) +. acl *. (n *. n)) +. (bch *. n *. n +. bcl *. n)) +. ((adh *. n *. n +. adl *. n) +. (bdh *. n +. bdl))
-  lemma_mul_associate bch n n;
-  lemma_mul_associate adh n n;
-  // ((((ach *. n) *. (n *. n)) +. acl *. (n *. n)) +. (bch *. (n *. n) +. bcl *. n)) +. ((adh *. (n *. n) +. adl *. n) +. (bdh *. n +. bdl))
-  assert (ab *. cd == ((((ach *. n) *. (n *. n)) +. acl *. (n *. n)) +. (bch *. (n *. n) +. bcl *. n)) +. ((adh *. (n *. n) +. adl *. n) +. (bdh *. n +. bdl)));
+  // (a *. m +. b) *. (c *. m +. d)
+  lemma_mul_distribute_right (a *. m +. b) (c *. m) d;
+  lemma_mul_distribute_left (a *. m) b (c *. m);
+  lemma_mul_distribute_left (a *. m) b d;
+  // ((a *. m) *. (c *. m) +. b *. (c *. m)) +. ((a *. m) *. d +. b *. d);
+  lemma_mul_associate b c m;
+  lemma_mul_associate a m d;
+  lemma_mul_commute m d;
+  lemma_mul_associate a d m;
+  lemma_mul_associate a m (c *. m);
+  lemma_mul_associate m c m;
+  lemma_mul_commute c m;
+  lemma_mul_associate c m m;
+  lemma_mul_associate a c (m *. m);
+  // (ac *. (m *. m) +. bc *. m) +. (ad *. m +. bd)
+  lemma_div_mod ad m;
+  lemma_div_mod bc m;
+  // (ac *. (m *. m) +. (bch *. m +. bcl) *. m) +. ((adh *. m +. adl) *. m +. bd)
+  lemma_mul_distribute_left (bch *. m) bcl m;
+  lemma_mul_distribute_left (adh *. m) adl m;
+  // (ac *. (m *. m) +. (bch *. m *. m +. bcl *. m)) +. ((adh *. m *. m +. adl *. m) +. bd)
+  lemma_mul_associate bch m m;
+  lemma_mul_associate adh m m;
+  // (ac *. (m *. m) +. (bch *. (m *. m) +. bcl *. m)) +. ((adh *. (m *. m) +. adl *. m) +. bd)
+  assert (ab *. cd == (ac *. (m *. m) +. (bch *. (m *. m) +. bcl *. m)) +. ((adh *. (m *. m) +. adl *. m) +. bd));
   lemma_add_define_all ();
-  lemma_equal (ab *. cd) (((ach *. n) *. (n *. n) +. (acl *. (n *. n) +. bch *. (n *. n) +. adh *. (n *. n))) +. (bcl *. n +. adl *. n +. bdh *. n +. bdl));
-  // ((ach *. n) *. (n *. n) +. (acl *. (n *. n) +. bch *. (n *. n) +. adh *. (n *. n))) +. (bcl *. n +. adl *. n +. bdh *. n +. bdl)
-  lemma_mul_distribute_left acl bch (n *. n);
-  lemma_mul_distribute_left (acl +. bch) adh (n *. n);
-  lemma_mul_distribute_left bcl adl n;
-  lemma_mul_distribute_left (bcl +. adl) bdh n;
-  lemma_mul_distribute_left (ach *. n) (acl +. bch +. adh) (n *. n);
-  // ((ach *. n) +. (acl +. bch +. adh)) *. (n *. n) +. ((bcl +. adl +. bdh) *. n +. bdl)
+  lemma_equal (ab *. cd) ((ac *. (m *. m) +. bch *. (m *. m) +. adh *. (m *. m)) +. (bcl *. m +. adl *. m +. bd));
+  // (ac *. (m *. m) +. bch *. (m *. m) +. adh *. (m *. m)) +. (bcl *. m +. adl *. m +. bd)
+  lemma_mul_distribute_left ac bch (m *. m);
+  lemma_mul_distribute_left (ac +. bch) adh (m *. m);
+  // (ac +. bch +. adh) *. (m *. m) +. (bcl *. m +. adl *. m +. bd)
+  lemma_mul_monomials n n;
+  lemma_shift_is_mul (ac +. bch +. adh) (n + n);
+  // shift (ac +. bch +. adh) (n + n) +. (bcl *. m +. adl *. m +. bd)
+
+  // ((((ach *. m) *. (m *. m)) +. acl *. (m *. m)) +. (bch *. (m *. m) +. bcl *. m)) +. ((adh *. (m *. m) +. adl *. m) +. (bdh *. m +. bdl))
+//  assert (ab *. cd == ((((ach *. m) *. (m *. m)) +. acl *. (m *. m)) +. (bch *. (m *. m) +. bcl *. m)) +. ((adh *. (m *. m) +. adl *. m) +. (bdh *. m +. bdl)));
+
+//  lemma_equal (ab *. cd) (((ach *. m) *. (m *. m) +. (acl *. (m *. m) +. bch *. (m *. m) +. adh *. (m *. m))) +. (bcl *. m +. adl *. m +. bdh *. m +. bdl));
+  // ((ach *. m) *. (m *. m) +. (acl *. (m *. m) +. bch *. (m *. m) +. adh *. (m *. m))) +. (bcl *. m +. adl *. m +. bdh *. m +. bdl)
+//  lemma_mul_distribute_left acl bch (m *. m);
+//  lemma_mul_distribute_left (acl +. bch) adh (m *. m);
+//  lemma_mul_distribute_left bcl adl m;
+//  lemma_mul_distribute_left (bcl +. adl) bdh m;
+//  lemma_mul_distribute_left (ach *. m) (acl +. bch +. adh) (m *. m);
+  // ((ach *. m) +. (acl +. bch +. adh)) *. (m *. m) +. ((bcl +. adl +. bdh) *. m +. bdl)
   ()
 
 let lemma_gf128_reduce a b g n h =
@@ -115,13 +121,6 @@ let lemma_gf128_reduce a b g n h =
   let m' = dh %. n in
   lemma_div_mod ab n;
   lemma_div_mod dh n;
-  lemma_div_degree ab n;
-  lemma_mod_degree ab n;
-  lemma_div_degree dh n;
-  lemma_mod_degree dh n;
-  lemma_mul_degree a b;
-  lemma_mul_degree d' h;
-  lemma_mul_degree d h;
   // ab == d *. n +. m
   // dh == d' *. n +. m'
 
@@ -144,8 +143,6 @@ let lemma_gf128_reduce a b g n h =
   lemma_div_mod_exact (d +. d') g;
   lemma_equal (ab %. g) ((d' *. h +. m' +. m) %. g);
   // (d' *. h +. m' +. m) % g
-  lemma_add_degree (d' *. h) m';
-  lemma_add_degree (d' *. h +. m') m;
   lemma_mod_small (d' *. h +. m' +. m) g;
   // d' *. h +. m' +. m
   ()

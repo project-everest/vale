@@ -26,7 +26,9 @@ val lemma_add_cancel_eq (a b:poly) : Lemma (requires (a +. b) == zero) (ensures 
 val lemma_add_commute (a b:poly) : Lemma ((a +. b) == (b +. a))
 val lemma_add_associate (a b c:poly) : Lemma ((a +. (b +. c)) == ((a +. b) +. c))
 val lemma_add_define_i (a b:poly) (i:int) : Lemma ((a +. b).[i] == (a.[i] <> b.[i]))
-val lemma_add_degree (a b:poly) : Lemma (degree (a +. b) <= degree a \/ degree (a +. b) <= degree b)
+val lemma_add_degree (a b:poly) : Lemma
+  (degree (a +. b) <= degree a \/ degree (a +. b) <= degree b)
+  [SMTPat (degree (a +. b))]
 
 val lemma_mul_zero (a:poly) : Lemma ((a *. zero) == zero)
 val lemma_mul_one (a:poly) : Lemma ((a *. one) == a)
@@ -35,6 +37,7 @@ val lemma_mul_associate (a b c:poly) : Lemma (a *. (b *. c) == (a *. b) *. c)
 val lemma_mul_distribute (a b c:poly) : Lemma (a *. (b +. c) == (a *. b) +. (a *. c))
 val lemma_mul_degree (a b:poly) : Lemma
   (degree (a *. b) == (if degree a >= 0 && degree b >= 0 then degree a + degree b else -1))
+  [SMTPat (degree (a *. b))]
 val lemma_mul_reverse (a b:poly) (n:nat) : Lemma
   (requires degree a <= n /\ degree b <= n)
   (ensures reverse (a *. b) (n + n) == reverse a n *. reverse b n)
@@ -48,7 +51,9 @@ val lemma_div_mod (a b:poly) : Lemma
 val lemma_div_degree (a b:poly) : Lemma
   (requires degree b >= 0)
   (ensures degree (a /. b) == (if degree a < degree b then -1 else degree a - degree b))
+  [SMTPat (degree (a /. b))]
 
 val lemma_mod_degree (a b:poly) : Lemma
   (requires degree b >= 0)
   (ensures degree (a %. b) < degree b)
+  [SMTPat (degree (a %. b))]

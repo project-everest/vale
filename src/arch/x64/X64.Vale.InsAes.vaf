@@ -29,7 +29,7 @@ module P = X64.Print_s
 
 procedure{:quick exportOnly}
     {:instruction Ins(S.Pclmulqdq(dst, src, (if dstHi then 1 else 0) + (if srcHi then 16 else 0)))}
-    Pclmullqlqdq(inout dst:xmm, src:xmm, inline dstHi:bool, inline srcHi:bool)
+    Pclmulqdq(inout dst:xmm, src:xmm, inline dstHi:bool, inline srcHi:bool)
     modifies efl;
     ensures
         dst == old(to_quad32(mul(

@@ -24,14 +24,9 @@ let lemma_reverse_define p n =
 let lemma_reverse_define_all () =
   FStar.Classical.forall_intro_2 lemma_reverse_define
 
-let lemma_zero_degree () =
-  lemma_degree zero;
-  lemma_zero_define ()
-
-let lemma_reverse_degree a n =
-  lemma_index a;
-  lemma_reverse_define a n;
-  lemma_degree (reverse a n)
+let lemma_degree_is a n =
+  lemma_index_i a n;
+  lemma_degree a
 
 let lemma_degree_negative a =
   let f (i:int) : Lemma (not a.[i]) =
@@ -41,9 +36,31 @@ let lemma_degree_negative a =
   lemma_zero_define ();
   lemma_equal a zero
 
-let lemma_degree_is a n =
-  lemma_index_i a n;
-  lemma_degree a
+let lemma_zero_degree =
+  lemma_degree zero;
+  lemma_zero_define ()
+
+let lemma_monomial_degree n =
+  lemma_monomial_define n;
+  lemma_degree_is (monomial n) n
+
+let lemma_shift_degree a n =
+  lemma_index a;
+  lemma_degree a;
+  lemma_shift_define a n;
+  lemma_zero_define ();
+  if degree a < 0 then
+  (
+    lemma_equal zero (shift a n);
+    lemma_degree_negative a
+  )
+  else
+    lemma_degree_is (shift a n) (degree a + n)
+
+let lemma_reverse_degree a n =
+  lemma_index a;
+  lemma_reverse_define a n;
+  lemma_degree (reverse a n)
 
 let lemma_of_list_degree l =
   let len = List.length l in
@@ -74,11 +91,17 @@ let lemma_mul_distribute_left a b c =
 let lemma_mul_distribute_right a b c = lemma_mul_distribute a b c
 
 let lemma_mul_smaller_is_zero a b =
-  lemma_mul_degree a b;
-  (if degree a < 0 then lemma_degree_negative a);
   lemma_mul_zero b;
+  (if degree a < 0 then lemma_degree_negative a);
   lemma_mul_commute a b;
   ()
+
+let lemma_mul_monomials m n =
+  lemma_shift_is_mul (monomial m) n; // monomial m *. monomial n == shift (monomial m) n
+  lemma_monomial_define m;
+  lemma_monomial_define (m + n);
+  lemma_shift_define (monomial m) n;
+  lemma_equal (shift (monomial m) n) (monomial (m + n))
 
 let lemma_mul_reverse_shift_1 a b n =
   let ab = a *. b in
@@ -88,7 +111,6 @@ let lemma_mul_reverse_shift_1 a b n =
   let rab1 = reverse ab (n + n + 1) in
   lemma_index ab;
   lemma_mul_reverse a b n;
-  lemma_mul_degree a b;
   lemma_reverse_define ab (n + n);
   lemma_reverse_define ab (n + n + 1);
   lemma_shift_define (ra *. rb) 1;
@@ -105,9 +127,6 @@ let lemma_mod_distribute a b c =
   lemma_div_mod a c;
   lemma_div_mod b c;
   lemma_div_mod ab c;
-  lemma_mod_degree a c;
-  lemma_mod_degree b c;
-  lemma_mod_degree ab c;
   // (a +. b) == (a) +. (b)
   assert ((ab' *. c +. ab'') == (a' *. c +. a'') +. (b' *. c +. b''));
   lemma_add_define_all ();
@@ -115,8 +134,6 @@ let lemma_mod_distribute a b c =
   lemma_mul_distribute_left ab' a' c;
   lemma_mul_distribute_left (ab' +. a') b' c;
   assert ((ab' +. a' +. b') *. c == ab'' +. a'' +. b'');
-  lemma_add_degree ab'' a'';
-  lemma_add_degree (ab'' +. a'') b'';
   lemma_mul_smaller_is_zero (ab' +. a' +. b') c;
   assert (ab'' +. a'' +. b'' == zero);
   lemma_zero_define ();
@@ -127,13 +144,11 @@ let lemma_div_mod_unique a b x y =
   let x' = a /. b in
   let y' = a %. b in
   lemma_div_mod a b;
-  lemma_mod_degree a b;
   assert (x *. b +. y == x' *. b +. y');
   lemma_add_define_all ();
   lemma_equal (x *. b +. x' *. b) (y +. y');
   lemma_mul_distribute_left x x' b;
   assert ((x +. x') *. b == y +. y');
-  lemma_add_degree y y';
   lemma_mul_smaller_is_zero (x +. x') b;
   assert (y +. y' == zero);
   lemma_zero_define ();
@@ -144,7 +159,6 @@ let lemma_div_mod_unique a b x y =
 let lemma_div_mod_exact a b =
   // (a *. b == a *. b +. zero)
   lemma_add_zero (a *. b);
-  lemma_zero_degree ();
   lemma_div_mod_unique (a *. b +. zero) b a zero
 
 let lemma_mod_small a b =
@@ -155,7 +169,6 @@ let lemma_mod_small a b =
   lemma_div_mod_unique a b zero a
 
 let lemma_mod_mod a b =
-  lemma_mod_degree a b;
   lemma_mod_small (a %. b) b
 
 let lemma_mod_cancel a =
@@ -173,8 +186,6 @@ let lemma_mod_mul_mod a b c =
   let y' = ac %. b in
   lemma_div_mod abc b;
   lemma_div_mod ac b;
-  lemma_mod_degree abc b;
-  lemma_mod_degree ac b;
   // ab *. c == x *. b +. y
   // a *. c == x' *. b +. y'
   assert ((ab *. c) +. (a *. c) == (x *. b +. y) +. (x' *. b +. y'));
@@ -200,7 +211,6 @@ let lemma_mod_mul_mod a b c =
   lemma_mul_distribute_left (z *. c) x b;
   lemma_mul_distribute_left (z *. c +. x) x' b;
   assert ((z *. c +. x +. x') *. b == y +. y');
-  lemma_add_degree y y';
   lemma_mul_smaller_is_zero (z *. c +. x +. x') b;
   lemma_add_cancel_eq y y';
   ()
