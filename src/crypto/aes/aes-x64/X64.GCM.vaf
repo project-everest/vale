@@ -14,6 +14,7 @@ open Types_i
 open AES_s
 open GCTR_s
 open GHash_s
+open GHash_i
 open X64.AES
 open X64.GHash
 open X64.GCTR
@@ -48,7 +49,7 @@ open X64.Vale.QuickCodes_i
 // GCM
 ///////////////////////////
 
-procedure {:quick} gcm_core(
+procedure {:quick exportOnly} gcm_core(
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
@@ -82,6 +83,10 @@ procedure {:quick} gcm_core(
         buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
         buffer_length(auth_b) == auth_len;
 
+        // To simplify length calculations, restrict auth and plain length further
+        auth_len < nat32_max;
+        plain_len < nat32_max;
+
         // AES reqs
         length(round_keys) == 11;
         round_keys == key_to_round_keys(AES_128, key);
@@ -93,8 +98,6 @@ procedure {:quick} gcm_core(
 //        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 //        create(1, xmm1) == snd(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
-    assume false;
-
     // let h = aes_encrypt alg key (Quad32 0 0 0 0) in
     Pxor(xmm0, xmm0);
     lemma_quad32_xor(); // xmm0 = 0
@@ -125,7 +128,6 @@ procedure {:quick} gcm_core(
     Mov64(rax, out_ptr);
     Mov64(rcx, plain_len);
 
-/*
     compute_ghash_incremental(out_b);
 
     // Prepare length fields
@@ -138,15 +140,15 @@ procedure {:quick} gcm_core(
     compute_ghash_incremental_register();
 
     // Invoke lemma showing that incremental hashing works
-    lemma_hash_append(h, y_0, buffer128_as_seq(old(mem), auth_b), append(buffer128_as_seq(old(mem), plain_b), create(1, length_quad32))); 
-    lemma_hash_append(h, y_auth, buffer128_as_seq(old(mem), plain_b), create(1, length_quad32)); 
+    // TODO: Have to cope with possibly empty sequences which aren't valid hash_plains
+//    lemma_hash_append(h, y_0, buffer128_as_seq(old(mem), auth_b), append(buffer128_as_seq(old(mem), plain_b), create(1, length_quad32))); 
+//    lemma_hash_append(h, y_auth, buffer128_as_seq(old(mem), plain_b), create(1, length_quad32)); 
 
     Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo)
 
     // Put the hash value currently in xmm0 into xmm1, where gctr_register will encrypt it 
     Mov128(xmm1, xmm0);
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
-*/
 }
 
   
