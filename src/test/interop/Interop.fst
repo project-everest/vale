@@ -93,7 +93,7 @@ let up_mem_list heap buffers mem =
 **)
 
 let rec write_vale_mem contents (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
-      (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : GTot Vale_Sem.heap (decreases %[sub length i]) =
+      (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Tot Vale_Sem.heap (decreases %[sub length i]) =
     if i >= length then curr_heap
     else
       write_vale_mem contents length addr (i+1) (curr_heap.[addr + i] <- FStar.Seq.index contents i)
@@ -154,8 +154,43 @@ let down mem ptr1 ptr2 =
   let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in
   Vale_Sem.Mkstate true (fun x -> if x = Rax then addr1 else if x = Rbx then addr2 else 0) heap 
 
+
+val write_low_mem: (heap:Vale_Sem.heap) -> (length:nat) -> (addr:nat) -> (buf:(B.buffer UInt8.t){length = B.length buf}) -> (i:nat{i <= length}) -> HyperStack.ST.Stack unit
+  (requires (fun h -> B.live h buf /\
+    (forall j. 0 <= j /\ j < i ==> Seq.index (B.as_seq h buf) j == heap.[addr + j])
+  ))
+  (ensures (fun h0 _ h1 -> B.live h0 buf /\ B.live h1 buf
+    /\ (forall (b:(B.buffer UInt8.t){B.live h0 b}). B.disjoint b buf ==> B.equal h0 b h1 b)
+    /\ (forall j. 0 <= j /\ j < length ==> Seq.index (B.as_seq h1 buf) j == heap.[addr + j])
+    /\ (forall (b:(B.buffer UInt8.t)). B.live h0 b ==> B.live h1 b)
+    /\ HyperStack.ST.equal_domains h0 h1
+  ))
+  (decreases %[sub length i])
+
+let rec write_low_mem heap length addr buf i  = 
+  if i >= length then ()
+  else begin
+    B.upd buf (UInt32.uint_to_t (UInt.to_uint_t 32 i)) heap.[addr + i];
+    write_low_mem heap length addr buf (i+1)
+  end
+
+(*
 assume val upd: #a:Type -> b:B.buffer a -> (n:nat{n < B.length b}) -> z:a -> (h0:HS.mem{B.live h0 b}) -> 
   (h1:HS.mem{B.modifies_1 b h0 h1 /\ B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n z /\ B.live h1 b})
+
+
+let rec frame_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires True)
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    forall (b:(B.buffer UInt8.t){B.live mem b}). B.disjoint b buf ==> B.equal mem b new_mem b))
+  (decreases %[sub length i]) =
+    if i >= length then ()
+    else begin
+      let new_mem = upd buf i heap.[addr+i] mem in
+      frame_write_low_mem heap length addr buf (i+1) new_mem
+    end
+
+(*    let _, _, new_mem = Buffer.upd buf (UInt32.uint_to_t (UInt.to_uint_t 32 i)) heap.[addr+i] curr_mem in *)
 
 let rec write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem (decreases %[sub length i]) = 
   if i >= length then curr_mem
@@ -196,35 +231,47 @@ let rec live_preserved_write_low_mem heap length addr (buf:(B.buffer UInt8.t){le
       live_preserved_write_low_mem heap length addr buf (i+1) new_mem
     end
 
+let rec equal_domains_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires True)
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    HyperStack.ST.equal_domains mem new_mem))
+  (decreases %[sub length i]) =
+    if i >= length then ()
+    else begin
+      let new_mem = upd buf i heap.[addr + i] mem in
+      equal_domains_write_low_mem heap length addr buf (i+1) new_mem
+    end
+*)
+
 logic let correct_up mem buf1 buf2 new_mem heap addr1 addr2 =
   let length1 = B.length buf1 in
   let length2 = B.length buf2 in
   forall (b:(B.buffer UInt8.t){B.live mem b}). (B.disjoint b buf1 /\ B.disjoint b buf2 ==> B.equal mem b new_mem b)
   /\ (forall j. 0 <= j /\ j < length1 ==> Seq.index (B.as_seq new_mem buf1) j == heap.[addr1 + j])
   /\ (forall j. 0 <= j /\ j < length2 ==> Seq.index (B.as_seq new_mem buf2) j == heap.[addr2 + j])
+  /\ HyperStack.ST.equal_domains mem new_mem
 
-val up_mem: (heap:Vale_Sem.heap) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (addr2:nat64) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem heap addr1 addr2})
+val up_mem: (heap:Vale_Sem.heap) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (addr2:nat64) 
+  -> (length1:nat{length1 = B.length ptr1}) -> (length2:nat{length2 = B.length ptr2}) -> HyperStack.ST.Stack unit 
+  (requires (fun h -> B.live h ptr1 /\ B.live h ptr2))
+  (ensures (fun h0 _ h1 -> correct_up h0 ptr1 ptr2 h1 heap addr1 addr2))
 
-let up_mem heap ptr1 addr1 ptr2 addr2 mem =
-  let length1 = B.length ptr1 in
-  let length2 = B.length ptr2 in
-  let mem1 = write_low_mem heap length1 addr1 ptr1 0 mem in
-  frame_write_low_mem heap length1 addr1 ptr1 0 mem;
-  load_store_write_low_mem heap length1 addr1 ptr1 0 mem;
-  live_preserved_write_low_mem heap length1 addr1 ptr1 0 mem;
-  let mem2 = write_low_mem heap length2 addr2 ptr2 0 mem1 in
-  frame_write_low_mem heap length2 addr2 ptr2 0 mem1;
-  load_store_write_low_mem heap length2 addr2 ptr2 0 mem1;
-  mem2
+let up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 = 
+  write_low_mem heap length1 addr1 ptr1 0;
+  write_low_mem heap length2 addr2 ptr2 0
 
-val down_up_identity: (mem:HS.mem) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ B.disjoint ptr1 ptr2}) -> Lemma 
-  (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 mem in
-    new_mem == mem)
+let hs_equal (h0:HS.mem) (h1:HS.mem) = FStar.HyperStack.ST.equal_domains h0 h1 /\ HS.modifies Set.empty h0 h1
+
+val down_up_identity: (mem:HS.mem) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ B.disjoint ptr1 ptr2})
+  -> (length1:nat{length1 = B.length ptr1}) -> (length2:nat{length2 = B.length ptr2}) -> Lemma 
+  (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let mem = HyperStack.ST.get() in let _ = up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 in let new_mem = HyperStack.ST.get() in
+    hs_equal mem new_mem)
 
 let down_up_identity mem ptr1 ptr2 =
   let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 mem in
   assume (B.length ptr1 > 0); 
   assert (heap.[addr1] == Seq.index (B.as_seq mem ptr1) 0);
+  assert (FStar.HyperStack.ST.equal_domains mem new_mem);
   // assert (Seq.index (P.buffer_as_seq mem ptr1) 0 == Seq.index (P.buffer_as_seq new_mem ptr1) 0);
   // assert (forall i. 0 <= i /\ i < UInt32.v (P.buffer_length ptr1) ==> Seq.index (P.buffer_as_seq mem ptr1) i == Seq.index (P.buffer_as_seq new_mem ptr1) i);
   // assert (P.buffer_as_seq mem ptr1 == P.buffer_as_seq new_mem ptr1);
