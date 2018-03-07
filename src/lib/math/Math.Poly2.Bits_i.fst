@@ -19,9 +19,7 @@ let lemma_quad32_double a =
   reveal_to_quad32 a;
   reveal_of_double32 lo;
   reveal_of_double32 hi;
-  lemma_div_mod a n;
-  lemma_shift_is_mul (a /. n) 64;
-  lemma_shift_define (a /. n) 64;
+  lemma_split_define a 64;
   lemma_add_define_all ();
   lemma_reverse_define_all ();
   lemma_index_all ();
@@ -36,9 +34,7 @@ let lemma_quad32_double_shift a =
   reveal_to_quad32 a;
   reveal_to_quad32 (a /. n);
   reveal_to_quad32 ((a %. n) *. n);
-  lemma_div_mod a n;
-  lemma_shift_is_mul (a /. n) 64;
-  lemma_shift_define (a /. n) 64;
+  lemma_split_define a 64;
   lemma_shift_is_mul (a %. n) 64;
   lemma_shift_define (a %. n) 64;
   lemma_add_define_all ();

@@ -217,3 +217,26 @@ let lemma_mod_mul_mod a b c =
   lemma_mul_smaller_is_zero (z *. c +. x +. x') b;
   lemma_add_cancel_eq y y';
   ()
+
+let lemma_split_define a n =
+  let b = monomial n in
+  lemma_div_mod a b;
+  lemma_shift_is_mul (a /. b) n;
+  lemma_shift_define (a /. b) n;
+  lemma_add_define_all ();
+  lemma_index_all ();
+  ()
+
+let lemma_split_define_forward a n =
+  lemma_split_define a n
+
+let lemma_combine_define a b n =
+  let m = monomial n in
+  let ab = a *. m +. b in
+  lemma_div_mod ab m;
+  lemma_div_mod_unique (a *. m +. b) m a b;
+  lemma_shift_is_mul a n;
+  lemma_shift_define a n;
+  lemma_add_define_all ();
+  lemma_index_all ();
+  ()

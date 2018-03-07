@@ -111,3 +111,32 @@ val lemma_mod_cancel (a:poly) : Lemma
 val lemma_mod_mul_mod (a b c:poly) : Lemma
   (requires degree b >= 0)
   (ensures ((a %. b) *. c) %. b == (a *. c) %. b)
+
+val lemma_split_define (a:poly) (n:nat) : Lemma
+  (ensures (
+    let b = monomial n in
+    a == (a /. b) *. b +. (a %. b) /\
+    shift (a /. b) n == (a /. b) *. b /\
+    (forall (i:int).{:pattern a.[i] \/ (a %. b).[i]} a.[i] == (if i < n then (a %. b).[i] else (a /. b).[i - n]))
+  ))
+
+val lemma_split_define_forward (a:poly) (n:nat) : Lemma
+  (ensures (
+    let b = monomial n in
+    a == (a /. b) *. b +. (a %. b) /\
+    shift (a /. b) n == (a /. b) *. b /\
+    (forall (i:int).{:pattern (a %. b).[i]} i < n ==> (a %. b).[i] == a.[i]) /\
+    (forall (i:nat).{:pattern (a /. b).[i]} (a /. b).[i] == a.[i + n])
+  ))
+
+val lemma_combine_define (a b:poly) (n:nat) : Lemma
+  (requires degree b < n)
+  (ensures (
+    let m = monomial n in
+    let ab = a *. m +. b in
+    a == ab /. m /\
+    b == ab %. m /\
+    shift a n == a *. m /\
+    (forall (i:int).{:pattern ab.[i] \/ b.[i]} ab.[i] == (if i < n then b.[i] else a.[i - n]))
+  ))
+

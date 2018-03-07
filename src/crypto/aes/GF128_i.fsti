@@ -1,5 +1,6 @@
 module GF128_i
 open Types_s
+open Types_i
 open GF128_s
 open Math.Poly2_s
 open Math.Poly2.Bits_s
@@ -46,12 +47,27 @@ val lemma_shift_2_left_1 (lo hi:poly) : Lemma
     hi' == to_quad32 (a' /. n)
   ))
 
+val lemma_reverse_reverse (a:poly) (n:nat) : Lemma
+  (requires degree a <= n)
+  (ensures reverse (reverse a n) n == a)
+  [SMTPat (reverse (reverse a n) n)]
+
 val lemma_gf128_degree (_:unit) : Lemma
   (ensures
     degree gf128_modulus_low_terms == 7 /\
     degree (monomial 128) == 128 /\
     degree gf128_modulus == 128
   )
+
+val lemma_gf128_constant_rev (q:quad32) : Lemma
+  (ensures
+    to_quad32 (reverse gf128_modulus_low_terms 127) == Quad32 0 0 0 0xe1000000 /\
+    quad32_xor q q == Quad32 0 0 0 0
+  )
+
+val lemma_quad32_double_hi_rev (a:poly) : Lemma
+  (requires degree a <= 127 /\ degree (reverse a 127) <= 63)
+  (ensures of_double32 (quad32_double_hi (to_quad32 a)) == reverse (reverse a 127) 63)
 
 // Compute 128-bit multiply in terms of 64-bit multiplies
 val lemma_gf128_mul (a b c d:poly) (n:nat) : Lemma
@@ -85,3 +101,25 @@ val lemma_gf128_reduce (a b g n h:poly) : Lemma
     (a *. b) %. g == (dh /. n) *. h +. dh %. n +. (a *. b) %. n
   ))
 
+val lemma_gf128_reduce_rev (a b h:poly) (n:pos) : Lemma
+  (requires
+    degree h >= 0 /\
+    n > 2 * degree h /\
+    degree (monomial n +. h) == n /\
+    degree a < n /\
+    degree b < n
+  )
+  (ensures (
+    let m = monomial n in
+    let g = m +. h in
+    let r x = reverse x (n - 1) in
+    let rr x = reverse x (2 * n - 1) in
+    let rab = rr (a *. b) in
+    let rd = rab %. m in
+    let rdh = rr (r rd *. h) in
+    let rdhL = rdh %. m in
+    let rdhLh = r (r rdhL *. h) in
+    degree (r rdhL) <= 2 * degree h /\
+    degree (r rdhLh) <= 2 * degree h /\
+    r ((a *. b) %. g) == rdhLh +. rdh /. m +. rab /. m
+  ))
