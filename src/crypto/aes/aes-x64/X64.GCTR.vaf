@@ -42,17 +42,17 @@ procedure {:quick} init_ctr()
     lemma_quad32_xor();
 }
 
-procedure {:quick} inc32()
+procedure {:quick exportOnly} inc32(inout dst:xmm)
     requires
         xmm4 == Quad32(1, 0, 0, 0);
     reads
         xmm4;
     modifies 
-        xmm3; efl;
+        efl;
     ensures 
-        xmm3 == inc32(old(xmm3), 1);
+        dst == inc32(old(dst), 1);
 {
-    Paddd(xmm3, xmm4);
+    Paddd(dst, xmm4);
 }
 
 // GCTR encrypt one block
@@ -61,7 +61,7 @@ procedure {:quick} gctr_register(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    lets io @= xmm1; icb @= xmm3;
+    lets io @= xmm1; icb @= xmm7;
     reads r8; icb; mem;
     modifies
         xmm0; xmm1; xmm2; efl;
@@ -96,7 +96,7 @@ procedure {:quick} gctr_core(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm3;
+    lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm7;
 
     reads
         r8; in_ptr; out_ptr; len; 
@@ -180,7 +180,7 @@ procedure {:quick} gctr_core(
         Add64(rdx, 1);
         Add64(r9, 16);
         Add64(r10, 16);
-        inc32();
+        inc32(icb);
     }
     
     // Call a helpful lemma

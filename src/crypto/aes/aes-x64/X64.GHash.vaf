@@ -55,15 +55,6 @@ procedure {:quick} compute_Y0()
     lemma_quad32_xor();
 }
 
-//procedure {:quick} gf128_mul()
-//    reads xmm2;
-//    modifies xmm0;
-//    ensures xmm0 == to_quad32(gf128_mul(of_quad32(old(xmm0)), of_quad32(xmm2)));
-//{
-///////////////////////  TODO  ////////////////////
-//    assume false;
-//}
-
 procedure {:quick} compute_ghash_incremental(
     ghost in_b:buffer128
     )
@@ -78,7 +69,7 @@ procedure {:quick} compute_ghash_incremental(
         io; efl;
 
         // ReduceMulRev128 touches almost everything
-        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; 
 
     requires
         // GHash reqs
@@ -137,17 +128,18 @@ procedure {:quick} compute_ghash_incremental_register()
     modifies
         io; efl;
 
-        xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        xmm2; xmm3; xmm4; xmm5; xmm6; 
 
     requires
     ensures
         io == ghash_incremental(h, old(io), create(1, old(input)));
 {
     Pxor(io, input);    // Y_i := Y_{i-1} ^ x_i
+    Mov128(xmm2, h);    // Move h into the register that ReduceMulRev128 expects
 
-// TODO:
-    assume false;
-    ReduceMulRev128(gf128_of_quad32(io), gf128_of_quad32(h));         // /io := Y_i * H
+    lemma_to_of_quad32(io);   // Help satisfy precondition
+    lemma_to_of_quad32(h);    // Help satisfy precondition
+    ReduceMulRev128(gf128_of_quad32(io), gf128_of_quad32(h));    // io := Y_i * H
 }
 
 
@@ -165,7 +157,7 @@ procedure {:quick} ghash_core(
         output; efl;
 
         // ReduceMulRev128 touches almost everything
-        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; 
     requires
         // GHash reqs
         len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);

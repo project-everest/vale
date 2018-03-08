@@ -61,13 +61,13 @@ procedure {:quick exportOnly} gcm_core(
 
     lets plain_ptr @= r12; out_ptr @= rbx; keys_ptr @= r8; auth_ptr @= r14;
     plain_len @= r13; auth_len @= r11; 
-    iv @= xmm3;
+    iv @= xmm7;
 
     reads
         plain_ptr; out_ptr; keys_ptr; auth_ptr; plain_len; auth_len; 
 
     modifies
-        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; xmm5; iv;
+        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; iv;
         xmm6; xmm7;
         mem; efl; 
 
@@ -153,13 +153,15 @@ procedure {:quick exportOnly} gcm_core(
                        buffer128_as_seq(mem, auth_b),
                        buffer128_as_seq(mem, out_b),
                        create(1, length_quad32)); 
+    assert xmm1 == ghash(h, append(buffer128_as_seq(mem, auth_b), append(buffer128_as_seq(mem, out_b), create(1, length_quad32)))); 
+    ghost var hash := xmm1;
 
-// TODO:
-    assume iv == old(iv);
     Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo)
+    assert iv == old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi));
 
     // Encrypt the hash value with gctr_register 
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
+    assert create(1, xmm1) == gctr_encrypt(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
 
   
