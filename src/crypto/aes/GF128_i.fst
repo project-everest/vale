@@ -99,7 +99,31 @@ let lemma_gf128_degree () =
   ()
 
 let lemma_gf128_constant_rev q =
-  assume False // TODO
+  Types_i.lemma_quad32_xor ();
+  let h = gf128_modulus_low_terms in
+  let rh = reverse h 127 in
+  reveal_to_quad32 rh;
+  lemma_gf128_degree ();
+  lemma_zero_nth 32;
+  lemma_reverse_define h 127;
+  lemma_index h;
+  let s = to_seq (reverse rh 127) 128 in
+  let s0_32 = slice s 0 32 in
+  let s0_8 = slice s0_32 0 8 in
+  let s8_32 = slice s0_32 8 32 in
+  let l = [true; true; true; false; false; false; false; true] in
+  let sl = of_list l in
+  assert_norm (List.length l == 8);
+  lemma_of_list_length sl l;
+  assert (equal sl s0_8);
+  assert (equal s8_32 (UInt.to_vec #24 (UInt.zero 24)));
+  Collections.Lists_i.lemma_from_list_be l;
+  assert_norm (Collections.Lists_i.from_list_be l == 0xe1);
+  assert (UInt.from_vec #8 sl == 0xe1);
+  UInt.from_vec_propriety #32 s0_32 8;
+  assert_norm (pow2 24 == 0x1000000);
+  assert (UInt.from_vec #32 s0_32 == 0xe1000000);
+  lemma_quad32_vec_equal (to_quad32 rh) (Quad32 0 0 0 0xe1000000)
 
 let lemma_quad32_double_hi_rev a =
   let ra = reverse a 127 in
