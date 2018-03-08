@@ -16,6 +16,9 @@ assume val sub_word (w:nat32) : nat32
 assume val commute_sub_bytes_shift_rows (q:quad32) : Lemma
   (sub_bytes (shift_rows q) == shift_rows (sub_bytes q))
 
+assume val commute_rot_word_sub_word (x:nat32) : Lemma
+  (rot_word (sub_word x) == sub_word (rot_word x))
+
 type algorithm = | AES_128 | AES_192 | AES_256
 
 let aes_rcon (i:int) : nat32 =

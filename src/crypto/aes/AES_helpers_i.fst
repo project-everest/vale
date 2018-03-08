@@ -19,22 +19,6 @@ let quad32_shl32 (q:quad32) : quad32 =
   let Quad32 v0 v1 v2 v3 = q in
   Quad32 0 v0 v1 v2
 
-assume val lemma_BitwiseXorCommutative (x y:nat32) : Lemma (x *^ y == y *^ x)
-assume val lemma_BitwiseXorWithZero (n:nat32) : Lemma (n *^ 0 == n)
-assume val lemma_BitwiseXorCancel (n:nat32) : Lemma (n *^ n == 0)
-assume val lemma_BitwiseXorAssociative (x y z:nat32) : Lemma (x *^ (y *^ z) == (x *^ y) *^ z)
-
-assume val xor_lemmas (_:unit) : Lemma
-  (ensures
-    (forall (x y:nat32).{:pattern (x *^ y)} x *^ y == y *^ x) /\
-    (forall (n:nat32).{:pattern (n *^ 0)} n *^ 0 == n) /\
-    (forall (n:nat32).{:pattern (n *^ n)} n *^ n == 0) /\
-    (forall (x y z:nat32).{:pattern (x *^ (y *^ z))} x *^ (y *^ z) == (x *^ y) *^ z)
-  )
-
-assume val lemma_RotWordSubWordCommutativity (x:nat32) : Lemma
-  (rot_word (sub_word x) == sub_word (rot_word x))
-
 
 // Redefine key expansion in terms of quad32 values rather than nat32 values,
 // then prove both definitions are equivalent.
@@ -124,5 +108,5 @@ let simd_round_key_128 (prev:quad32) (rcon:nat32) : quad32 =
 let lemma_simd_round_key (prev:quad32) (rcon:nat32) : Lemma
   (simd_round_key_128 prev rcon == round_key_128_rcon prev rcon)
   =
-  lemma_RotWordSubWordCommutativity prev.hi;
-  xor_lemmas ()
+  commute_rot_word_sub_word prev.hi;
+  Types_i.xor_lemmas ()
