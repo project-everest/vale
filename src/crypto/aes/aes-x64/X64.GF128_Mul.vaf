@@ -161,7 +161,7 @@ procedure{:quick exportOnly} AddPoly(out dst:xmm, src:xmm, ghost a:poly, ghost b
 procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, ghost hi:poly)
     modifies
         efl;
-        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
+        xmm1; xmm2; xmm3; xmm4; xmm5;
     requires
         degree(ab) <= 127;
         degree(cd) <= 127;
@@ -188,44 +188,39 @@ procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, 
     lemma_quad32_double(cd);
 
     Mov128(xmm5, xmm1);
-    Mov128(xmm6, xmm2);
 
-    // xmm3 := ac
-    Pclmulqdq(xmm1, xmm2, true, true);
+    // xmm3 := bc
+    Pclmulqdq(xmm1, xmm2, false, true);
     Mov128(xmm3, xmm1);
 
     // xmm4 := ad
     Mov128(xmm1, xmm5);
-    Mov128(xmm2, xmm6);
     Pclmulqdq(xmm1, xmm2, true, false);
     Mov128(xmm4, xmm1);
 
-    // xmm6 := bd
+    // xmm1 := bd
     Mov128(xmm1, xmm5);
-    Mov128(xmm2, xmm6);
     Pclmulqdq(xmm1, xmm2, false, false);
-    Mov128(xmm2, xmm6);
-    Mov128(xmm6, xmm1);
 
-    // xmm1 := bc
-    // xmm5 := bc
-    Mov128(xmm1, xmm5);
-    Pclmulqdq(xmm1, xmm2, false, true);
-    Mov128(xmm5, xmm1);
-
-    // xmm1 := lo(bc) * n + lo(ad) * n + bd
-    Low64ToHigh(xmm1, bc);
-    Mov128(xmm2, xmm4);
-    Low64ToHigh(xmm2, ad);
-    AddPoly(xmm1, xmm2, mul(mod(bc, n), n), mul(mod(ad, n), n));
-    AddPoly(xmm1, xmm6, add(mul(mod(bc, n), n), mul(mod(ad, n), n)), bd);
+    // xmm5 := ac
+    Pclmulqdq(xmm5, xmm2, true, true);
 
     // xmm2 := ac + hi(bc) + hi(ad)
-    Mov128(xmm2, xmm3);
-    High64ToLow(xmm5, bc);
-    High64ToLow(xmm4, ad);
-    AddPoly(xmm2, xmm5, ac, div(bc, n));
-    AddPoly(xmm2, xmm4, add(ac, div(bc, n)), div(ad, n));
+    Mov128(xmm2, xmm5); // ac
+    Mov128(xmm5, xmm1); // bd
+    Mov128(xmm1, xmm3); // bc
+    High64ToLow(xmm1, bc);
+    AddPoly(xmm2, xmm1, ac, div(bc, n));
+    Mov128(xmm1, xmm4); // ad
+    High64ToLow(xmm1, ad);
+    AddPoly(xmm2, xmm1, add(ac, div(bc, n)), div(ad, n));
+
+    // xmm1 := lo(bc) * n + lo(ad) * n + bd
+    Mov128(xmm1, xmm3); // bc
+    Low64ToHigh(xmm1, bc);
+    Low64ToHigh(xmm4, ad);
+    AddPoly(xmm1, xmm4, mul(mod(bc, n), n), mul(mod(ad, n), n));
+    AddPoly(xmm1, xmm5, add(mul(mod(bc, n), n), mul(mod(ad, n), n)), bd);
 
     hi := add(add(ac, div(bc, n)), div(ad, n));
     lo := add(add(mul(mod(bc, n), n), mul(mod(ad, n), n)), bd);
@@ -235,7 +230,7 @@ procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, 
 procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, ghost hi:poly)
     modifies
         efl;
-        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
+        xmm1; xmm2; xmm3; xmm4; xmm5;
     requires
         degree(ab) <= 127;
         degree(cd) <= 127;
@@ -273,7 +268,7 @@ procedure{:quick exportOnly} Gf128ModulusRev(inout dst:xmm)
 procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
     modifies
         efl;
-        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
     requires
         degree(a) <= 127;
         degree(b) <= 127;
@@ -296,13 +291,13 @@ procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
 
     (ghost var lo1), (ghost var hi1) := ClmulRev128(a, b);
     lemma_combine_define(hi1, lo1, 128);
-    Mov128(xmm7, xmm2); // div(rab, m);
+    Mov128(xmm6, xmm2); // div(rab, m);
 
     Gf128ModulusRev(xmm2);
     // REVIEW: h is small, so we could make a more efficient version of ClmulRev128 for this:
     (ghost var lo2), (ghost var hi2) := ClmulRev128(reverse(rd, 127), h);
     lemma_combine_define(hi2, lo2, 128);
-    Mov128(xmm6, xmm2); // div(rdh, m);
+    Mov128(xmm5, xmm2); // div(rdh, m);
 
     Gf128ModulusRev(xmm2);
 
@@ -310,6 +305,6 @@ procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
     lemma_quad32_double_hi_rev(rh);
     ClmulRev64(reverse(rdhL, 127), h, true, true);
 
-    AddPoly(xmm1, xmm6, rdhLh, div(rdh, m));
-    AddPoly(xmm1, xmm7, add(rdhLh, div(rdh, m)), div(rab, m));
+    AddPoly(xmm1, xmm5, rdhLh, div(rdh, m));
+    AddPoly(xmm1, xmm6, add(rdhLh, div(rdh, m)), div(rab, m));
 }
