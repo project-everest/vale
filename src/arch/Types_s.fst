@@ -83,3 +83,21 @@ let insert_nat32 (q:quad32) (n:nat32) (i:twobits) =
   | 1 -> Quad32 q.lo n q.mid_hi q.hi
   | 2 -> Quad32 q.lo q.mid_lo n q.hi
   | 3 -> Quad32 q.lo q.mid_lo q.mid_hi n
+
+open FStar.Seq
+
+assume val be_bytes_to_nat32 (b:seq nat8 {length b == 4}) : Tot nat32
+assume val nat32_to_be_bytes (n:nat32) : Tot (b:seq nat8 { length b = 4 /\ be_bytes_to_nat32 b == n }) 
+
+let rec reverse_seq (#a:eqtype) (s:seq a) : Tot (s':seq a {length s' == length s}) (decreases %[length s]) =
+  if length s = 0 then createEmpty 
+  else (lemma_empty s; append (reverse_seq (tail s)) (create 1 (head s)))
+
+let reverse_bytes_nat32 (n:nat32) : Tot (nat32) =
+  be_bytes_to_nat32 (reverse_seq (nat32_to_be_bytes n))
+
+let reverse_bytes_quad32 (q:quad32) : quad32 =
+  Quad32 (reverse_bytes_nat32 q.hi)
+	 (reverse_bytes_nat32 q.mid_hi)
+	 (reverse_bytes_nat32 q.mid_lo)
+	 (reverse_bytes_nat32 q.lo)

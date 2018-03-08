@@ -23,6 +23,7 @@ type ins =
   | Pxor       : dst:xmm -> src:xmm -> ins
   | Pslld      : dst:xmm -> amt:int -> ins
   | Psrld      : dst:xmm -> amt:int -> ins
+  | Pshufb     : dst:xmm -> src:xmm -> ins  
   | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
   | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
@@ -58,6 +59,8 @@ noeq type state = {
 //let v (u:uint64) : nat64 = FStar.UInt64.v u
 
 assume val havoc : state -> ins -> nat64
+
+// TODO: Need to be sure that load/store_mem does an appropriate little-endian load
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
@@ -324,7 +327,17 @@ let eval_ins (ins:ins) : st unit =
   | Psrld dst amt ->
     check_imm (0 <= amt && amt < 32);;
     update_xmm dst ins (quad32_map (fun i -> ishr i amt) (eval_xmm dst s))
-
+ 
+  | Pshufb dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    // We only spec a restricted version sufficient for doing a byte reversal
+    check_imm (src_q.lo     = 0x0C0D0E0F &&
+	       src_q.mid_lo = 0x08090A0B &&
+	       src_q.mid_hi = 0x04050607 &&
+	       src_q.hi     = 0x00010203);;
+    update_xmm dst ins (reverse_bytes_quad32 dst_q)
+    
   | Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in

@@ -70,6 +70,16 @@ procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout ds
 {
 }
 
+procedure{:instruction Ins(S.Pshufb(dst, src))}{:quick exportOnly}
+          Pshufb(inout dst:xmm, src:xmm)
+  requires
+    src == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+  modifies efl;
+  ensures
+    dst == reverse_bytes_quad32(old(dst));
+{
+}
+
 procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
   modifies efl;
