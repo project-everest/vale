@@ -2,6 +2,12 @@ module GF128_i
 open TypesNative_i
 open Math.Poly2.Bits_i
 
+let lemma_of_double32_degree (d:double32) =
+  reveal_of_double32 d
+
+let lemma_of_quad32_degree (q:quad32) =
+  reveal_of_quad32 q
+
 let lemma_to_of_quad32 q =
   reveal_of_quad32 q;
   reveal_to_quad32 (of_quad32 q);

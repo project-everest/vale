@@ -9,6 +9,14 @@ open Math.Poly2.Lemmas_i
 open FStar.Seq
 open FStar.Mul
 
+val lemma_of_double32_degree (d:double32) : Lemma
+  (degree (of_double32 d) < 64)
+  [SMTPat (degree (of_double32 d))]
+
+val lemma_of_quad32_degree (q:quad32) : Lemma
+  (degree (of_quad32 q) < 128)
+  [SMTPat (degree (of_quad32 q))]
+
 val lemma_to_of_quad32 (q:quad32) : Lemma (to_quad32 (of_quad32 q) == q)
 
 val lemma_of_to_quad32 (a:poly) : Lemma
