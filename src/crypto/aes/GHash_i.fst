@@ -32,15 +32,15 @@ let lemma_all_but_last_append (#t:eqtype) (a:seq t) (b:seq t{length b > 0}) :
   assert (eq ab app_a_b)  // OBSERVE: extensionality
 
 let rec ghash_incremental (h:quad32) (y_prev:quad32) (x:ghash_plain) : Tot quad32 (decreases %[length x]) = 
-  let h_poly = of_quad32 h in
+  let h_poly = gf128_of_quad32 h in
   let y_i_minus_1 =
     (if length x = 1 then
        y_prev
      else
        ghash_incremental h y_prev (all_but_last x)) in
   let x_i = last x in
-  let xor_poly = of_quad32 (quad32_xor y_i_minus_1 x_i) in
-  to_quad32 (gf128_mul xor_poly h_poly)
+  let xor_poly = gf128_of_quad32 (quad32_xor y_i_minus_1 x_i) in
+  gf128_to_quad32 (gf128_mul xor_poly h_poly)
 
 let rec ghash_incremental_to_ghash (h:quad32) (x:ghash_plain) :
   Lemma(ensures ghash_incremental h (Quad32 0 0 0 0) x == ghash h x)

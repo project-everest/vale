@@ -11,13 +11,13 @@ let all_but_last (s:seq 'a {length s > 0}) =
   slice s 0 (length s - 1)
 
 let rec ghash (h:quad32) (x:ghash_plain) : Tot quad32 (decreases %[length x]) = 
-  let h_poly = of_quad32 h in
+  let h_poly = gf128_of_quad32 h in
   let y_i_minus_1 =
     (if length x = 1 then
        Quad32 0 0 0 0
      else
        ghash h (all_but_last x)) in
   let x_i = last x in
-  let xor_poly = of_quad32 (quad32_xor y_i_minus_1 x_i) in
-  to_quad32 (gf128_mul xor_poly h_poly)
+  let xor_poly = gf128_of_quad32 (quad32_xor y_i_minus_1 x_i) in
+  gf128_to_quad32 (gf128_mul xor_poly h_poly)
 
