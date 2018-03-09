@@ -149,10 +149,10 @@ and build_qcode_block (add_old:bool) (env:env) (outs:id list) (loc:loc) (ss:stmt
   let fApp = EBind (Lambda, [], [(s, Some tState)], [], eLet) in
   EApply (Id "qblock", [fApp])
 
-let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
+let make_gen_quick_block (env:env) (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
   let funs = ref ([]:decls) in
   let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
-  let fParams = make_fun_params p.prets p.pargs in
+  let fParams = make_fun_params env p.prets p.pargs in
   let gen_quick_block env info outs args ss =
     let id = Reserved ("qcode_" + info.qsym + "_" + (string_of_id p.pname)) in
     let cid = Reserved ("code_" + info.qsym + "_" + (string_of_id p.pname)) in
@@ -215,7 +215,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
     )))
   )
   *)
-  let cParams = make_fun_params p.prets p.pargs in
+  let cParams = make_fun_params env p.prets p.pargs in
   let makeParam (x, t, storage, io, attrs) = (x, Some t) in
   let qParams = List.map makeParam p.pargs in
   let makeRet (x, t, storage, io, attrs) = match storage with XGhost -> [(x, t)] | _ -> [] in

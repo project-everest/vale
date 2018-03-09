@@ -52,7 +52,7 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
       // REVIEW: would be more consistent to generate a value of type "code" rather than "codes",
       // but the normalization doesn't seem to work as well for "code".
       let p = benv.proc in
-      let fParams = make_fun_params p.prets p.pargs in
+      let fParams = make_fun_params env p.prets p.pargs in
       let name = benv.code_name (info.qsym + "_") in
       let f =
         {
@@ -96,25 +96,25 @@ and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
 // pfIsRet == true ==> pf is output return value
 // ret == false ==> generate parameters
 // ret == true ==> generate return values
-let make_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (pf:pformal):pformal list =
+let make_proc_param (env:env) (modifies:bool) (pfIsRet:bool) (ret:bool) (pf:pformal):pformal list =
   let (x, t, storage, io, attrs) = pf in
   let pfOp xo = (x, tOperand xo, XPhysical, In, attrs) in
   match (ret, storage, pfIsRet, modifies) with
   | (_, XGhost, _, false) -> if ret = pfIsRet then [pf] else []
   | (_, _, _, true) -> []
   | (false, XInline, false, false) -> [pf]
-  | (_, XOperand, _, false) -> if ret = pfIsRet then [pfOp (vaOperandTyp t)] else []
+  | (_, XOperand, _, false) -> if ret = pfIsRet then [pfOp (vaOperandTyp env t)] else []
   | (_, XAlias _, _, false) -> []
   | (true, XInline, false, _) -> []
   | (_, XInline, true, _) -> internalErr "XInline"
   | (_, XState _, _, _) -> internalErr "XState"
   | (_, XPhysical, _, _) -> internalErr "XPhysical"
 
-let make_proc_params (ret:bool) (prets:pformal list) (pargs:pformal list):pformal list =
-  (List.collect (make_proc_param false true ret) prets) @
-  (List.collect (make_proc_param true true ret) prets) @
-  (List.collect (make_proc_param false false ret) pargs) @
-  (List.collect (make_proc_param true false ret) pargs)
+let make_proc_params (env:env) (ret:bool) (prets:pformal list) (pargs:pformal list):pformal list =
+  (List.collect (make_proc_param env false true ret) prets) @
+  (List.collect (make_proc_param env true true ret) prets) @
+  (List.collect (make_proc_param env false false ret) pargs) @
+  (List.collect (make_proc_param env true false ret) pargs)
 
 let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id * typ)) list =
   match s with
@@ -385,10 +385,10 @@ let build_lemma_spec (env:env) (s0:id) (sM:exp) (loc:loc, s:spec):((loc * spec) 
 
 // Generate well-formedness for operands:
 //   requires va_is_dst_int(dummy, s0)
-let reqIsArg (s0:id) (isRet:bool) ((x, t, storage, io, _):pformal):exp list =
+let reqIsArg (env:env) (s0:id) (isRet:bool) ((x, t, storage, io, _):pformal):exp list =
   match (isRet, storage, io) with
-  | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp ("is_dst_") t [EVar x; EVar s0]]
-  | (false, XOperand, In) -> [vaAppOp ("is_src_") t [EVar x; EVar s0]]
+  | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp env ("is_dst_") t [EVar x; EVar s0]]
+  | (false, XOperand, In) -> [vaAppOp env ("is_src_") t [EVar x; EVar s0]]
   | _ -> []
   in
 
@@ -398,7 +398,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
   let specModsIo = List.collect (specModIo env true) p.pspecs in
   let frameArg (isRet:bool) e (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp ("update_" + (vaOperandTyp t)) [EVar x; EVar sM; e]
+    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp ("update_" + (vaOperandTyp env t)) [EVar x; EVar sM; e]
     | _ -> e
     in
   let frameMod e (io, (x, _)) =
@@ -425,7 +425,7 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand)
 *)
 let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
-  let fParams = make_fun_params p.prets p.pargs in
+  let fParams = make_fun_params env p.prets p.pargs in
   let f =
     {
       fname = benv.code_name "";
@@ -473,8 +473,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let retS = (sM, tState, XPhysical, In, []) in
   let retF = (fM, tFuel, XPhysical, In, []) in
   let argR = (sN, tState, XPhysical, In, []) in
-  let prets = make_proc_params true p.prets p.pargs in
-  let pargs = make_proc_params false p.prets p.pargs in
+  let prets = make_proc_params env true p.prets p.pargs in
+  let pargs = make_proc_params env false p.prets p.pargs in
   let pargs = (if total then [argS] else [argS; argR]) @ pargs in
   let xReq = "require" + total_suffix total in
   let xEns = "ensure" + total_suffix total in
@@ -489,8 +489,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let sb1 = SVar (b1, Some tCodes, Immutable, XPhysical, [], Some eb1) in // var va_b1:va_codes := va_get_block(va_cM);
 
   let reqIsExps =
-    (List.collect (reqIsArg s0 true) p.prets) @
-    (List.collect (reqIsArg s0 false) p.pargs)
+    (List.collect (reqIsArg env s0 true) p.prets) @
+    (List.collect (reqIsArg env s0 false) p.pargs)
     in
   let reqsIs = List.map (fun e -> (loc, require e)) reqIsExps in
 
@@ -583,7 +583,7 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           | SVar (x, _, _, XGhost, _, _) -> x::(List.concat xss)
           | _ -> List.concat xss
           in
-        let (gen_quick_block, gen_quick_block_funs) = Emit_common_quick_code.make_gen_quick_block loc p in
+        let (gen_quick_block, gen_quick_block_funs) = Emit_common_quick_code.make_gen_quick_block env loc p in
         let benv =
           {
             proc = p;

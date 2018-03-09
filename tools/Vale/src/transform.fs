@@ -38,29 +38,39 @@ let empty_env:env =
 
 let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
 
-let vaAppOp (prefix:string) (t:typ) (es:exp list):exp =
+let vaAppOp (env:env) (prefix:string) (t:typ) (es:exp list):exp =
   match t with
-  | TName (Id x) -> vaApp (qprefix prefix x) es
+  | TName (Id x) -> 
+    let x = fail_or env.tcenv lookup_typ (Id x) in
+    vaApp (qprefix prefix x) es
   | _ -> err "operands must have simple named types"
 
-let vaEvalOp (t:typ) (state:exp) (e:exp):exp =
+let vaEvalOp (env:env) (t:typ) (state:exp) (e:exp):exp =
   match t with
-  | TName (Id x) -> vaApp (qprefix ("eval_") x) [state; e]
+  | TName (Id x) -> 
+    let x = fail_or env.tcenv lookup_typ (Id x) in
+    vaApp (qprefix ("eval_") x) [state; e]
   | _ -> err "operands must have simple named types"
 
-let vaOperandTyp (t:typ) : string =
+let vaOperandTyp (env:env) (t:typ) : string =
   match t with
-  | TName (Id x) -> "operand_" + x
+  | TName (Id x) -> 
+    let x = fail_or env.tcenv lookup_typ (Id x) in
+    "operand_" + x
   | _ -> err "operands must have simple named types"
 
-let vaValueTyp (t:typ) : string =
+let vaValueTyp (env:env) (t:typ) : string =
   match t with
-  | TName (Id x) -> "value_" + x
+  | TName (Id x) ->
+    let x = fail_or env.tcenv lookup_typ (Id x) in
+    "value_" + x
   | _ -> err "operands must have simple named types"
 
-let vaTyp (t:typ) : string =
+let vaTyp (env:env) (t:typ) : string =
   match t with
-  | TName (Id x) -> x
+  | TName (Id x) -> 
+    let x = fail_or env.tcenv lookup_typ (Id x) in 
+    x
   | _ -> err "operands must have simple named types"
 
 let in_id (x:id) = Reserved ("in_" + (string_of_id x))
@@ -598,10 +608,10 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
           | InlineLocal _ -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
           | OperandLocal (opIo, t) ->
             (
-              let xo = vaTyp t in
+              let xo = vaTyp env t in
               if env.checkMods then (match (opIo, io) with (_, In) | ((InOut | Out), _) -> () | (In, (InOut | Out)) -> err ("cannot pass 'in' operand as 'out'/'inout'"));
               match g with
-              | Ghost -> Replace (refineOp env opIo x (vaEvalOp t env.state e))
+              | Ghost -> Replace (refineOp env opIo x (vaEvalOp env t env.state e))
               | NotGhost ->
                 (
                   match asOperand with
@@ -619,7 +629,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
                   | Ghost ->
                       let getType t = match t with Some t -> t | None -> err ((err_id x) + " must have type annotation") in
                       let es = if inParam then EVar (Reserved "old_s") else env.state in
-                      vaEvalOp (getType t) es e)
+                      vaEvalOp env (getType t) es e)
           | StateInfo (prefix, es, t) ->
             (
               match (g, asOperand) with
@@ -728,7 +738,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
   let (mrets, margs) = match_proc_args p rets args in
   let rewrite_arg (pp, ea) =
     match pp with
-    | (x, t, XOperand, io, _) -> [rewrite_vars_arg rctx NotGhost (Some (vaTyp t)) io env ea]
+    | (x, t, XOperand, io, _) -> [rewrite_vars_arg rctx NotGhost (Some (vaTyp env t)) io env ea]
     | (x, t, XInline, io, _) -> [(rewrite_vars_arg rctx Ghost None io env ea)]
     | (x, t, XAlias _, io, _) ->
         let _ = rewrite_vars_arg rctx NotGhost None io env ea in // check argument validity
@@ -739,7 +749,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
     in
   let rewrite_ret (pp, ((xlhs, _) as lhs)) =
     match pp with
-    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg rctx NotGhost (Some (vaOperandTyp t)) Out env (EVar xlhs)])
+    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg rctx NotGhost (Some (vaOperandTyp env t)) Out env (EVar xlhs)])
     | (x, t, XAlias _, _, _) ->
         let _ = rewrite_vars_arg rctx NotGhost None Out env (EVar xlhs) in // check argument validity
         ([], []) // drop argument
@@ -926,7 +936,6 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     let rec assign e =
       match e with
       | ELoc (loc, e) -> try assign e with err -> raise (LocErr (loc, err))
-      // TODO: QUNYAN
       | EApply (x, es) when contains_raw_proc env.tcenv x ->
         let pCall =
           match lookup_raw_proc env.tcenv x with
@@ -1395,9 +1404,11 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
           (List.concat eds, env)
     )
   | DOpen m ->
+    let env = {env with tcenv = push_module env.tcenv m} in 
     let env = {env with tcenv = load_module_exports env.tcenv m} in
     ([(env, env, d)], env)
   | DModuleAbbrev (x, l) ->
+    let env = {env with tcenv = push_module_abbrev env.tcenv x l} in
     let env = {env with tcenv = load_module_exports env.tcenv l} in
     ([(env, env, d)], env)
   | _ -> ([(env, env, d)], env)

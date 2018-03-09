@@ -136,23 +136,23 @@ let collect_specs (addLabels:bool) (ss:(loc * spec) list):(exp list * exp list) 
 // compute function parameters
 // pfIsRet == false ==> pf is input parameter
 // pfIsRet == true ==> pf is output return value
-let make_fun_param (modifies:bool) (pfIsRet:bool) (pf:pformal):formal list =
+let make_fun_param (env:env) (modifies:bool) (pfIsRet:bool) (pf:pformal):formal list =
   let (x, t, storage, io, attrs) = pf in
   let fx = (x, Some t) in
   match (storage, pfIsRet, modifies) with
   | (XInline, false, false) -> [fx]
   | ((XGhost | XAlias _), _, false) -> []
-  | (XOperand, _, false) -> [(x, Some (tOperand (vaOperandTyp t)))]
+  | (XOperand, _, false) -> [(x, Some (tOperand (vaOperandTyp env t)))]
   | (_, _, true) -> []
   | (XInline, true, _) -> internalErr "XInline"
   | (XState _, _, _) -> internalErr "XState"
   | (XPhysical, _, _) -> internalErr "XPhysical"
 
-let make_fun_params (prets:pformal list) (pargs:pformal list):formal list =
-  (List.collect (make_fun_param false true) prets) @
-  (List.collect (make_fun_param true true) prets) @
-  (List.collect (make_fun_param false false) pargs) @
-  (List.collect (make_fun_param true false) pargs)
+let make_fun_params (env:env) (prets:pformal list) (pargs:pformal list):formal list =
+  (List.collect (make_fun_param env false true) prets) @
+  (List.collect (make_fun_param env true true) prets) @
+  (List.collect (make_fun_param env false false) pargs) @
+  (List.collect (make_fun_param env true false) pargs)
 
 let fArg (x, t, g, io, a):exp list =
   match g with

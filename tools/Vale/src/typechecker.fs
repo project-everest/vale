@@ -28,8 +28,16 @@ type env = {
   exported_ids: export_ids_map; (* identifiers reachable in a module *)
 }
 
+let default_type_module = "Vale.DefaultType"
+let default_types = ["reg"; "reg32"; "opr32"; "opr"; "opr64"; "opr_quad"; "opr_imm8";
+                     "opr_reg"; "mem_opr"; "mem"; "mem32"; "mem64"; "dst_opr64";
+                     "reg_opr64"; "shift_amt64"; "reg_MyModule__MyType"; "opr_MyRecord"]
+let init_export_ids = 
+  let exported_ids = new Dictionary<string, list<string>>(10) in
+  exported_ids.Add(default_type_module, default_types); exported_ids
+
 let empty_env:env= {curmodule=None; modules=[]; scope_mods=[];
-                   exported_ids = new Dictionary<string, list<string>>(10)}
+                   exported_ids = init_export_ids}
 
 let load_module (env:env) (m:string):env =
   // TODO: find the file, convert to lowercase?
@@ -63,11 +71,22 @@ let find_in_module_exports (env:env) (m:string) (x:string) =
     | Some n -> Some (Name n)
     | _ -> None
   | _ -> None
-        
+
+let name_of_id x =
+  let s = match x with Id s | Reserved s | Operator s -> s in
+  let es = s.Split ([|'.'|])  |> Array.toList in
+  let rec aux s l = 
+    match l with
+    | hd::[] -> (s, hd)
+    | hd :: tl -> aux (if (s = "") then hd else (s ^ "." ^ hd)) tl
+    | _ -> failwith "Empty list." in
+  aux "" es in
+
 let lookup_name (env:env) (x:id) =
+  let (mn, sn) = name_of_id x in
   let find = function
-    | Open_module m -> find_in_module_exports env m (string_of_id x)
-    | Module_abbrev (m, l) -> find_in_module_exports env l (string_of_id x)
+    | Open_module m when (mn = "" || m = mn) -> find_in_module_exports env m sn
+    | Module_abbrev (m, l) when (mn = "" || m = mn) -> find_in_module_exports env l sn
     | Local (s, info) when s=x -> Some (Info info)
     | Func (s, decl) when s=x -> Some (Func_decl decl)
     | Proc (s, decl, raw_decl) when s=x -> Some (Proc_decl (decl,raw_decl))
@@ -77,7 +96,9 @@ let lookup_name (env:env) (x:id) =
       match (find a) with
       | Some r -> Some r
       | None -> aux q
-    | [] -> None
+    | [] -> 
+      // find in the default type module.
+      find_in_module_exports env "Vale.DefaultType" sn
   aux env.scope_mods
 
 let lookup_id env (id:id) = 
@@ -118,8 +139,24 @@ let contains_raw_proc env id =
   | Some _ -> true
   | _ -> false
 
+let lookup_typ env id =
+  match lookup_name env id with
+  | Some (Name s) -> Some s
+  | _ -> None
+
+let fail_or env lookup id =
+  match lookup env id with
+  | None -> err ("Identifier not found " + (err_id id))
+  | Some r -> r
+
 let push_scope_mod env scope_mod =
  {env with scope_mods = scope_mod :: env.scope_mods}
+
+let push_module env m =
+  push_scope_mod env (Open_module m)
+
+let push_module_abbrev env x l =
+  push_scope_mod env (Module_abbrev (x,l))
 
 let push_id env id info =
   push_scope_mod env (Local (id, info))

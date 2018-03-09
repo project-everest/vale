@@ -192,15 +192,15 @@ Parameters are always listed in the following order:
 // compute the parameters for functions (code/requires/ensures)
 // pfIsRet == false ==> pf is input parameter
 // pfIsRet == true ==> pf is output return value
-let area_fun_param (modifies:bool) (pfIsRet:bool) (area:emit_area_fun) (pf:pformal):formal list =
+let area_fun_param (env:env) (modifies:bool) (pfIsRet:bool) (area:emit_area_fun) (pf:pformal):formal list =
   let (x, t, storage, io, attrs) = pf in
-  let typ = match storage with XOperand -> tOperand (vaValueTyp t) | _ -> t in
+  let typ = match storage with XOperand -> tOperand (vaValueTyp env t) | _ -> t in
   let fx = (x, Some typ) in
   let fOld = (old_id x, Some typ) in
   match (area, storage, io, pfIsRet, modifies) with
   | (EmitCode, XInline, _, false, false) -> [fx]
   | (EmitCode, (XGhost | XAlias _), _, _, false) -> []
-  | (EmitCode, XOperand, _, _, false) -> [(x, Some (tOperand (vaOperandTyp t)))]
+  | (EmitCode, XOperand, _, _, false) -> [(x, Some (tOperand (vaOperandTyp env t)))]
   | (EmitCode, _, _, _, true) -> []
   | (_, XOperand, _, _, false) -> []
   | (_, (XInline | XGhost), _, _, true) -> []
@@ -218,20 +218,20 @@ let area_fun_param (modifies:bool) (pfIsRet:bool) (area:emit_area_fun) (pf:pform
   | (_, XState _, _, _, _) -> internalErr "XState"
   | (_, XPhysical, _, _, _) -> internalErr "XPhysical"
 
-let area_fun_params (area:emit_area_fun) (prets:pformal list) (pargs:pformal list):formal list =
-  (List.collect (area_fun_param false true area) prets) @
-  (List.collect (area_fun_param true true area) prets) @
-  (List.collect (area_fun_param false false area) pargs) @
-  (List.collect (area_fun_param true false area) pargs)
+let area_fun_params (env:env) (area:emit_area_fun) (prets:pformal list) (pargs:pformal list):formal list =
+  (List.collect (area_fun_param env false true area) prets) @
+  (List.collect (area_fun_param env true true area) prets) @
+  (List.collect (area_fun_param env false false area) pargs) @
+  (List.collect (area_fun_param env true false area) pargs)
 
 // compute parameters/returns for procedures (abstract/concrete/lemma) 
 // pfIsRet == false ==> pf is input parameter
 // pfIsRet == true ==> pf is output return value
 // ret == false ==> generate parameters
 // ret == true ==> generate return values
-let area_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_proc) (pf:pformal):pformal list =
+let area_proc_param (env:env) (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_proc) (pf:pformal):pformal list =
   let (x, t, storage, io, attrs) = pf in
-  let typ = match storage with XOperand -> tOperand (vaValueTyp t) | _ -> t in
+  let typ = match storage with XOperand -> tOperand (vaValueTyp env t) | _ -> t in
   let pfOld () = (old_id x, typ, storage, io, attrs) in
   let pfOp xo = (x, tOperand xo, XPhysical, In, attrs) in
   match (ret, area, storage, io, pfIsRet, modifies) with
@@ -244,7 +244,7 @@ let area_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_pr
   | (true, EmitAbstract, XOperand, _, _, _) -> []
   | (_, (EmitConcrete | EmitLemma), _, _, _, true) -> []
   | (false, (EmitConcrete | EmitLemma), XInline, _, false, false) -> [pf]
-  | (_, (EmitConcrete | EmitLemma), XOperand, _, _, false) -> if ret = pfIsRet then [pfOp (vaOperandTyp t)] else []
+  | (_, (EmitConcrete | EmitLemma), XOperand, _, _, false) -> if ret = pfIsRet then [pfOp (vaOperandTyp env t)] else []
   | (_, EmitLemma, XAlias _, _, _, false) -> []
   | (true, _, XInline, _, false, _) -> []
   | (_, (EmitAbstract | EmitConcrete), XAlias _, _, _, _) -> notImplemented "alias arguments not yet supported for {:refined true} procedures"
@@ -252,11 +252,11 @@ let area_proc_param (modifies:bool) (pfIsRet:bool) (ret:bool) (area:emit_area_pr
   | (_, _, XState _, _, _, _) -> internalErr "XState"
   | (_, _, XPhysical, _, _, _) -> internalErr "XPhysical"
 
-let area_proc_params (ret:bool) (area:emit_area_proc) (prets:pformal list) (pargs:pformal list):pformal list =
-  (List.collect (area_proc_param false true ret area) prets) @
-  (List.collect (area_proc_param true true ret area) prets) @
-  (List.collect (area_proc_param false false ret area) pargs) @
-  (List.collect (area_proc_param true false ret area) pargs)
+let area_proc_params (env:env) (ret:bool) (area:emit_area_proc) (prets:pformal list) (pargs:pformal list):pformal list =
+  (List.collect (area_proc_param env false true ret area) prets) @
+  (List.collect (area_proc_param env true true ret area) prets) @
+  (List.collect (area_proc_param env false false ret area) pargs) @
+  (List.collect (area_proc_param env true false ret area) pargs)
 
 type connect_env =
   {
@@ -283,8 +283,8 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
           let rewrite_mod (cenv_read:connect_env) (cenv_write:connect_env) (io:inout, arg:proc_arg, formal_id:id option):(connect_env * (formal list * proc_arg list * (id * exp) list) * (id * exp) list) =
             match arg with
             | ArgOperand (x, typ) ->
-                let t = tOperand (vaValueTyp typ) in
-                let idExp = vaEvalOp typ c.esc_state (EVar x) in
+                let t = tOperand (vaValueTyp env typ) in
+                let idExp = vaEvalOp env typ c.esc_state (EVar x) in
                 let x1 = match Map.tryFind x cenv_read.connect_map with None -> old_id x | Some y -> y in
                 match io with
                 | In ->
@@ -385,7 +385,7 @@ let connect_estmts (env:env) (p:proc_decl) (mods:id list) (ss:estmt list):(conne
             } in
           let old_incarnation_exp id =
             match (Map.tryFind id operandMap, lookup_id env.tcenv id) with
-            | (Some (t, XOperand), _) -> vaEvalOp t (EVar (Reserved "s0")) (EVar id)
+            | (Some (t, XOperand), _) -> vaEvalOp env t (EVar (Reserved "s0")) (EVar id)
             | (_, Some (StateInfo _)) -> stateGet {env with state = EVar (Reserved "s0")} id
             | _ -> internalErr ("old_incarnation: " + (err_id id))
             in
@@ -453,14 +453,14 @@ let rec calls_of_estmt (guards:exp list) (s:estmt):abstract_call_info list =
   | EsWhile (e, invs, dec, ss) -> calls_of_estmts guards ss
 and calls_of_estmts (guards:exp list) (ss:estmt list):abstract_call_info list = List.collect (calls_of_estmt guards) ss
 
-let specArgEns (inSpec:bool) (s0:id option) (sM:id) (modifies:bool) (x, t, g, io, a):exp list =
+let specArgEns (env:env) (inSpec:bool) (s0:id option) (sM:id) (modifies:bool) (x, t, g, io, a):exp list =
   match g with
   | XGhost -> if inSpec && not modifies then [EVar x] else []
   | XInline -> if modifies then [] else [EVar x]
   | XOperand ->
     (
       if not modifies then [] else
-      let f s = vaEvalOp t (EVar s) (EVar x) in
+      let f s = vaEvalOp env t (EVar s) (EVar x) in
       if inSpec then
         match (s0, io) with
         | (None, _) | (Some _, Out) -> [f sM]
@@ -473,11 +473,11 @@ let specArgEns (inSpec:bool) (s0:id option) (sM:id) (modifies:bool) (x, t, g, io
   | XAlias _ -> notImplemented ("specArg: XAlias: " + (err_id x))
   | XState _ -> err ("unexpected state variable declaration: " + (err_id x))
 
-let specArgEnss (inSpec:bool) (s0:id) (sM:id) (prets:pformal list) (pargs:pformal list):exp list =
-  (List.collect (specArgEns inSpec None sM false) prets) @
-  (List.collect (specArgEns inSpec (Some s0) sM false) pargs) @
-  (List.collect (specArgEns inSpec None sM true) prets) @
-  (List.collect (specArgEns inSpec (Some s0) sM true) pargs)
+let specArgEnss (env:env) (inSpec:bool) (s0:id) (sM:id) (prets:pformal list) (pargs:pformal list):exp list =
+  (List.collect (specArgEns env inSpec None sM false) prets) @
+  (List.collect (specArgEns env inSpec (Some s0) sM false) pargs) @
+  (List.collect (specArgEns env inSpec None sM true) prets) @
+  (List.collect (specArgEns env inSpec (Some s0) sM true) pargs)
 
 let specModIo (env:env) (area:emit_area_mod) (loc:loc, s:spec):(inout * (id * typ)) list =
   let (useOld, useNew, suppressRead) =
@@ -906,7 +906,7 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id) =
   let specModsIo = List.collect (specModIo env EmitModCall) p.pspecs in
   let frameArg (isRet:bool) e (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp ("update_" + (vaTyp t)) [EVar x; EVar sM; e]
+    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> vaApp ("update_" + (vaTyp env t)) [EVar x; EVar sM; e]
     | _ -> e
     in
   let frameMod e (io, (x, _)) =
@@ -933,7 +933,7 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand)
 *)
 let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
   let p = benv.proc in
-  let fParams = area_fun_params EmitCode p.prets p.pargs in
+  let fParams = area_fun_params env EmitCode p.prets p.pargs in
   {
     fname = benv.code_name;
     fghost = NotGhost;
@@ -950,8 +950,8 @@ let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
 let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt list):proc_decl =
   let p = benv.proc in
   let loc = benv.loc in
-  let prets = area_proc_params true EmitAbstract p.prets p.pargs in
-  let pargs = area_proc_params false EmitAbstract p.prets p.pargs in
+  let prets = area_proc_params env true EmitAbstract p.prets p.pargs in
+  let pargs = area_proc_params env false EmitAbstract p.prets p.pargs in
 
   // For each call:
   //   P(ebx, 10, 100);
@@ -998,7 +998,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
     Set.toList (Set.ofList ((Reserved ("spec_" + (string_of_id p.pname)))::spcs)) in
   let reveals = List.map reveal_of_spec specs in
 
-  let specArgs = area_fun_params EmitEns (drop_ghosts p.prets) p.pargs in
+  let specArgs = area_fun_params env EmitEns (drop_ghosts p.prets) p.pargs in
   let specArgEns (x, _) =
     if Map.containsKey x cenv.connect_subst_ghost
     then match Map.tryFind x cenv.connect_map with None -> old_id x | Some x -> x
@@ -1084,8 +1084,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   let argR = (sN, tState, XPhysical, In, []) in
   let isRefined = benv.is_refined in
   let emitArea = if isRefined then EmitConcrete else EmitLemma in
-  let prets = area_proc_params true emitArea p.prets p.pargs in
-  let pargs = area_proc_params false emitArea p.prets p.pargs in
+  let prets = area_proc_params env true emitArea p.prets p.pargs in
+  let pargs = area_proc_params env false emitArea p.prets p.pargs in
   let pargs = [argS; argR] @ pargs in
   let req = require (vaApp "require" [EVar b0; EApply (codeName, fArgs); EVar s0; EVar sN]) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
   let ens = ensure (vaApp "ensure" ([EVar b0] @ (if !concise_lemmas then [EVar bM] else []) @ [EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
@@ -1101,8 +1101,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   //   requires va_is_dst_int(dummy, s0)
   let reqIsArg (isRet:bool) (x, t, storage, io, _) =
     match (isRet, storage, io) with
-    | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp ("is_dst_") t [EVar x; EVar s0]]
-    | (false, XOperand, In) -> [vaAppOp ("is_src_") t [EVar x; EVar s0]]
+    | (true, XOperand, _) | (false, XOperand, (InOut | Out)) -> [vaAppOp env ("is_dst_") t [EVar x; EVar s0]]
+    | (false, XOperand, In) -> [vaAppOp env ("is_src_") t [EVar x; EVar s0]]
     | _ -> []
     in
   let reqIsExps =
@@ -1132,7 +1132,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       }
     *)
     let reqs = reqsIs in
-    let specArgsEns = specArgEnss true s0 sM (drop_ghosts p.prets) p.pargs in
+    let specArgsEns = specArgEnss env true s0 sM (drop_ghosts p.prets) p.pargs in
     let specModsEns =
       let f env s x = stateGet {env with state = EVar s} x in
       let g (io, (x, t)) =
@@ -1157,7 +1157,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let ss = stmts_refined (stmts_of_estmts true false estmts) in
         let calls = calls_of_estmts [] estmts in
         let specMods = List.collect (specMod env EmitModRefined) p.pspecs in
-        let absArgsIo = specArgEnss false s0 sM p.prets p.pargs in
+        let absArgsIo = specArgEnss env false s0 sM p.prets p.pargs in
         let absArgsMods = List.map (fun (x, _) -> stateGet {env with state = EVar s0} x) specMods in
         let args_of_call aci =
           match aci with
@@ -1278,8 +1278,8 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       ) p.pspecs in
   let eReq use_old = and_of_list (List.map (exp_abstract use_old) reqs) in
   let build_specs () =
-    let reqArgs = area_fun_params EmitReq p.prets p.pargs in
-    let ensArgs = area_fun_params EmitEns (drop_ghosts p.prets) p.pargs in
+    let reqArgs = area_fun_params env EmitReq p.prets p.pargs in
+    let ensArgs = area_fun_params env EmitEns (drop_ghosts p.prets) p.pargs in
     let eSpecReq = and_of_list (List.map (exp_abstract true) reqs) in
     let eSpecEns = and_of_list (List.map (exp_abstract true) enss) in
     let ghostRets = List.collect ghostFormal p.prets in

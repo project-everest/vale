@@ -83,20 +83,20 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):exp * formal list =
     in
   let mods = List.collect collectMod specModsIo in
   let args = (List.collect (collectArg true) p.prets) @ (List.collect (collectArg false) p.pargs) in
-  let frameArg e (x, xx, t) = vaApp ("upd_" + (vaOperandTyp t)) [EVar x; EVar xx; e] in
+  let frameArg e (x, xx, t) = vaApp ("upd_" + (vaOperandTyp env t)) [EVar x; EVar xx; e] in
   let frameMod e (x, _, prefix, es) = vaApp ("upd_" + prefix) (es @ [EVar x; e]) in
   let e = EVar s0 in
   let e = List.fold frameArg e args in
   let e = List.fold frameMod e mods in
   let fs = [] in
-  let fs = List.fold (fun fs (_, xx, t) -> (xx, Some (tOperand (vaValueTyp t)))::fs) fs args in
+  let fs = List.fold (fun fs (_, xx, t) -> (xx, Some (tOperand (vaValueTyp env t)))::fs) fs args in
   let fs = List.fold (fun fs (x, t, _, _) -> (x, Some t)::fs) fs mods in
   (e, List.rev fs)
 
 let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let makeParam (x, t, storage, io, attrs) =
     match storage with
-    | XOperand -> (x, tOperand (vaOperandTyp t), storage, io, attrs)
+    | XOperand -> (x, tOperand (vaOperandTyp env t), storage, io, attrs)
     | _ -> (x, t, storage, io, attrs)
     in
   let pargs = List.map makeParam p.pargs in
@@ -141,8 +141,8 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let eCode = EApply (Reserved ("code_" + (string_of_id p.pname)), eArgsCode) in
 
   let reqIsExps =
-    (List.collect (Emit_common_lemmas.reqIsArg s0 true) p.prets) @
-    (List.collect (Emit_common_lemmas.reqIsArg s0 false) p.pargs)
+    (List.collect (Emit_common_lemmas.reqIsArg env s0 true) p.prets) @
+    (List.collect (Emit_common_lemmas.reqIsArg env s0 false) p.pargs)
     in
 
   // wp_X
