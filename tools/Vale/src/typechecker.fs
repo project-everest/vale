@@ -7,6 +7,8 @@ open Microsoft.FSharp.Math
 open System.Collections.Generic
 open System.IO
 
+let exportsDir = ref "."
+
 type name_info =
 | Info of id_info
 | Func_decl of fun_decl
@@ -40,9 +42,7 @@ let empty_env:env= {curmodule=None; modules=[]; scope_mods=[];
                    exported_ids = init_export_ids}
 
 let load_module (env:env) (m:string):env =
-  // TODO: find the file, convert to lowercase?
-  // TODO: hardcoded dependence
-  let filename = m ^ ".exported" in
+  let filename = Path.Combine (!exportsDir, m ^ ".exported") in
   let lines = File.ReadAllLines filename |> Array.toList in
   let rec aux (ids:list<string>) (l:list<string>) = 
     match l with
@@ -139,16 +139,6 @@ let contains_raw_proc env id =
   | Some _ -> true
   | _ -> false
 
-let lookup_typ env id =
-  match lookup_name env id with
-  | Some (Name s) -> Some s
-  | _ -> None
-
-let fail_or env lookup id =
-  match lookup env id with
-  | None -> err ("Identifier not found " + (err_id id))
-  | Some r -> r
-
 let push_scope_mod env scope_mod =
  {env with scope_mods = scope_mod :: env.scope_mods}
 
@@ -196,4 +186,70 @@ let push_lhss (env:env) (lhss:lhs list):env =
 let push_formals (env:env) (formals:formal list):env =
   {env with scope_mods = List.fold (fun s (x, t) -> Local(x, (GhostLocal (Immutable, t))):: s) env.scope_mods formals}
 
+let resolve_id env id:unit =
+  match lookup_name env id with
+  | None -> err ("Identifier not found " + (err_id id))
+  | Some r -> ()
 
+let rec resolve_type env t =
+  let resolve_name id = 
+    match lookup_name env id with
+    | Some _ -> ()
+    | None -> err ("type not found " + (err_id id))
+  match t with 
+  | TName id -> resolve_name id
+  | TApp (t, ts) -> resolve_type env t; resolve_types env ts
+and resolve_types env ts = List.iter (resolve_type env) ts;
+
+let resolve_formal (env:env) (x:id, t:typ option):unit =
+  resolve_id env x;
+  match t with | Some t -> resolve_type env t | None -> ();
+
+let resolve_formals (env:env) (fs: formal list):unit = 
+  List.iter (resolve_formal env) fs
+  
+let rec resolve_exp (env:env) (e:exp):unit = 
+  match e with  
+  | ELoc (loc, e) -> resolve_exp env e
+  | EVar x -> resolve_id env x;
+  | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> ()
+  | EBind (b, es, fs, ts, e) -> 
+    resolve_exps env es; resolve_formals env fs; resolve_triggers env ts; resolve_exp env e;
+  | EOp (op, es) -> resolve_exps env es;
+  | EApply (x, es) ->  resolve_id env x; resolve_exps env es
+and resolve_exps (env:env) (es: exp list) = List.iter (resolve_exp env) es
+and resolve_triggers (env:env) (ts: triggers) = 
+  List.iter (resolve_exps env) ts
+ 
+let rec resolve_stmt (env:env) (s:stmt):unit =
+  match s with
+  | SLoc (loc, s) -> resolve_stmt env s
+  | SLabel x -> resolve_id env x
+  | SGoto x -> resolve_id env x
+  | SReturn -> ()
+  | SAssume e -> resolve_exp env e
+  | SAssert (attrs, e) -> resolve_exp env e
+  | SCalc (oop, contents) -> resolve_calc_contents env contents
+  | SVar (x, t, m, g, a, eOpt) -> 
+    resolve_id env x;
+    match t with | Some t -> resolve_type env t | None ->();
+    match eOpt with | Some e -> resolve_exp env e | None -> ();
+  | SAlias (x, y) -> resolve_id env x; resolve_id env y;
+  | SAssign (xs, e) -> resolve_exp env e
+  | SLetUpdates _ -> internalErr "SLetUpdates"
+  | SBlock b -> resolve_stmts env b
+  | SQuickBlock (x, b) -> resolve_stmts env b
+  | SIfElse (g, e, b1, b2) -> 
+    resolve_exp env e; resolve_stmts env b1; resolve_stmts env b2;
+  | SWhile (e, invs, ed, b) ->
+    resolve_exp env e; resolve_stmts env b
+  | SForall (xs, ts, ex, e, b) ->
+    resolve_formals env xs; resolve_triggers env ts; resolve_exp env ex; 
+    resolve_exp env e; resolve_stmts env b
+  | SExists (xs, ts, e) ->
+    resolve_formals env xs; resolve_triggers env ts; resolve_exp env e
+and resolve_stmts (env:env) (ss:stmt list):unit = List.iter (resolve_stmt env) ss
+and resolve_calc_content (env:env) (cc:calcContents):unit =
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  resolve_exp env e; List.iter (resolve_stmts env) hints
+and resolve_calc_contents (env:env) (contents:calcContents list):unit = List.iter (resolve_calc_content env) contents

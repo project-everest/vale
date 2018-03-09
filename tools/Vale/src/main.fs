@@ -2,6 +2,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Emit_common_top
@@ -89,6 +90,10 @@ let main (argv) =
           match l with
           | x :: l -> destDir := x; match_args l
           | _ -> failwith "Specify destination directory (to be prepended to -out file)"
+        | "-exportsDir" :: l ->
+          match l with
+          | x :: l -> exportsDir := x; match_args l
+          | _ -> failwith "Specify exports directory (with files contains exported symbols)"
         | "-includeSuffix" :: l ->
           match l with
           | src :: dst :: l -> suffixMap_rev := (src, dst)::(!suffixMap_rev); match_args l

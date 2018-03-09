@@ -41,35 +41,35 @@ let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
 let vaAppOp (env:env) (prefix:string) (t:typ) (es:exp list):exp =
   match t with
   | TName (Id x) -> 
-    let x = fail_or env.tcenv lookup_typ (Id x) in
+    resolve_type env.tcenv t;
     vaApp (qprefix prefix x) es
   | _ -> err "operands must have simple named types"
 
 let vaEvalOp (env:env) (t:typ) (state:exp) (e:exp):exp =
   match t with
   | TName (Id x) -> 
-    let x = fail_or env.tcenv lookup_typ (Id x) in
+    resolve_type env.tcenv t;
     vaApp (qprefix ("eval_") x) [state; e]
   | _ -> err "operands must have simple named types"
 
 let vaOperandTyp (env:env) (t:typ) : string =
   match t with
   | TName (Id x) -> 
-    let x = fail_or env.tcenv lookup_typ (Id x) in
+    resolve_type env.tcenv t;
     "operand_" + x
   | _ -> err "operands must have simple named types"
 
 let vaValueTyp (env:env) (t:typ) : string =
   match t with
   | TName (Id x) ->
-    let x = fail_or env.tcenv lookup_typ (Id x) in
+    resolve_type env.tcenv t;
     "value_" + x
   | _ -> err "operands must have simple named types"
 
 let vaTyp (env:env) (t:typ) : string =
   match t with
   | TName (Id x) -> 
-    let x = fail_or env.tcenv lookup_typ (Id x) in 
+    resolve_type env.tcenv t; 
     x
   | _ -> err "operands must have simple named types"
 
@@ -1357,6 +1357,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
               Replace [SWhile (e, invs, ed, map_stmts (fun e -> e) add_while_ok b)]
           | _ -> Unchanged
           in
+        resolve_stmts envp.tcenv ss;
         let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
         let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
         let ss = resolve_overload_stmts envp ss in
