@@ -14,6 +14,8 @@ module HH = FStar.Monotonic.HyperHeap
 module B = FStar.Buffer
 open Machine
 
+open FStar.Tactics
+
 open Vale_Sem
 
 let op_String_Access = Map.sel
@@ -247,6 +249,49 @@ let rec equal_domains_write_low_mem heap length addr (buf:(B.buffer UInt8.t){len
       equal_domains_write_low_mem heap length addr buf (i+1) new_mem
     end
 
+let rec modifies_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires True)
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    B.modifies_1 buf mem new_mem))
+  (decreases %[sub length i]) =
+    if i >= length then ()
+    else begin
+      let new_mem = upd_tot buf i heap.[addr + i] mem in
+      modifies_write_low_mem heap length addr buf (i+1) new_mem
+    end
+
+let rec underlying_seq_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (requires True)
+  (ensures (let new_mem = write_low_mem heap length addr buf i mem in
+    let s0 = B.sel mem buf in
+    let s1 = B.sel new_mem buf in
+    (forall j. 0 <= j /\ j < B.idx buf ==> Seq.index s0 j == Seq.index s1 j) /\
+    (forall j. B.idx buf + length <= j /\ j < Seq.length s0 ==> Seq.index s0 j == Seq.index s1 j)))
+  (decreases %[sub length i]) =
+    if i >= length then ()
+    else begin
+      let new_mem = upd_tot buf i heap.[addr + i] mem in
+      underlying_seq_write_low_mem heap length addr buf (i+1) new_mem
+    end
+
+let equal_non_seq_buf mem new_mem buf =
+  let s0 = B.sel mem buf in
+  let s1 = B.sel new_mem buf in
+  (forall j. {:pattern (Seq.index s0 j == Seq.index s1 j)} 0 <= j /\ j < B.idx buf ==> Seq.index s0 j == Seq.index s1 j) /\
+  (forall j. {:pattern (Seq.index s0 j == Seq.index s1 j)} B.idx buf + B.length buf <= j /\ j < Seq.length s0 ==> Seq.index s0 j == Seq.index s1 j)
+
+let equal_non_seq_bufs mem new_mem buf1 buf2 =
+  if B.frameOf buf1 <> B.frameOf buf2 || B.as_addr buf1 <> B.as_addr buf2 then begin
+    equal_non_seq_buf mem new_mem buf1 /\ equal_non_seq_buf mem new_mem buf2
+  end
+  else begin
+    forall i. 0 <= i /\ i < B.max_length buf1 /\ i < B.max_length buf2 ==>
+      not (i >= B.idx buf1 && i < B.idx buf1 + B.length buf1) ==>
+      not (i >= B.idx buf2 && i < B.idx buf2 + B.length buf2) ==>
+      Seq.index (B.sel mem buf1) i == Seq.index (B.sel new_mem buf1) i /\
+      Seq.index (B.sel mem buf2) i == Seq.index (B.sel new_mem buf2) i
+  end
+
 logic let correct_up mem buf1 buf2 new_mem heap addr1 addr2 =
   let length1 = B.length buf1 in
   let length2 = B.length buf2 in
@@ -254,25 +299,67 @@ logic let correct_up mem buf1 buf2 new_mem heap addr1 addr2 =
   /\ (forall j. 0 <= j /\ j < length1 ==> Seq.index (B.as_seq new_mem buf1) j == heap.[addr1 + j])
   /\ (forall j. 0 <= j /\ j < length2 ==> Seq.index (B.as_seq new_mem buf2) j == heap.[addr2 + j])
   /\ HyperStack.ST.equal_domains mem new_mem
+  /\ equal_non_seq_bufs mem new_mem buf1 buf2
+  /\ B.modifies_2 buf1 buf2 mem new_mem
+
+assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
 
 val up_mem: (heap:Vale_Sem.heap) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (addr2:nat64) 
   -> (length1:nat{length1 = B.length ptr1}) -> (length2:nat{length2 = B.length ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem heap addr1 addr2})
-  
+
 let up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 mem = 
   let mem1 = write_low_mem heap length1 addr1 ptr1 0 mem in
   frame_write_low_mem heap length1 addr1 ptr1 0 mem;
   load_store_write_low_mem heap length1 addr1 ptr1 0 mem;
   live_preserved_write_low_mem heap length1 addr1 ptr1 0 mem;
   equal_domains_write_low_mem heap length1 addr1 ptr1 0 mem;
+  underlying_seq_write_low_mem heap length1 addr1 ptr1 0 mem;
+  modifies_write_low_mem heap length1 addr1 ptr1 0 mem;
+  B.lemma_reveal_modifies_1 ptr1 mem mem1;
   let mem2 = write_low_mem heap length2 addr2 ptr2 0 mem1 in
   frame_write_low_mem heap length2 addr2 ptr2 0 mem1;
   load_store_write_low_mem heap length2 addr2 ptr2 0 mem1;
   equal_domains_write_low_mem heap length2 addr2 ptr2 0 mem1;
+  underlying_seq_write_low_mem heap length2 addr2 ptr2 0 mem1;
+  modifies_write_low_mem heap length2 addr2 ptr2 0 mem1;
+  B.lemma_reveal_modifies_1 ptr2 mem1 mem2;
+  if (B.as_addr ptr1 <> B.as_addr ptr2 || B.frameOf ptr1 <> B.frameOf ptr2) then
+  begin
+  assert (B.sel mem1 ptr1 == B.sel mem2 ptr1);
+  assert (B.sel mem ptr2 == B.sel mem1 ptr2);
   mem2
- 
+  end
+  else begin
+  let h0 = Map.sel mem2.HS.h (B.frameOf ptr1) in
+  ref_extensionality h0 (B.as_ref ptr1) (B.as_ref ptr2);
+  mem2
+  end
 
 let hs_equal (h0:HS.mem) (h1:HS.mem) = FStar.HyperStack.ST.equal_domains h0 h1 /\ HS.modifies Set.empty h0 h1
 
+let shift_equal_seq (b:B.buffer UInt8.t) (h0 h1: HS.mem) : Lemma
+  (requires (forall i. 0 <= i /\ i < B.length b ==> Seq.index (B.sel h0 b) (B.idx b + i) == Seq.index (B.sel h1 b) (B.idx b + i)))
+  (ensures (forall i. B.idx b <= i /\ i < B.idx b + B.length b ==> Seq.index (B.sel h0 b) i == Seq.index (B.sel h1 b) i)) =
+  let s0 = B.sel h0 b in
+  let s1 = B.sel h1 b in
+  assert (forall i. 0 <= i /\ i < B.length b ==> Seq.index s0 (B.idx b + i) == Seq.index s1 (B.idx b + i));
+  assert (forall i. B.idx b <= i /\ i < B.idx b + B.length b ==> Seq.index s0 (B.idx b + (i - B.idx b)) == Seq.index s1 (B.idx b + (i - B.idx b)));
+  assert (forall i. {:pattern (Seq.index s1 i)} B.idx b <= i /\ i < B.idx b + B.length b ==> Seq.index s1 i == Seq.index s1 (B.idx b + (i - B.idx b)));
+  assert (forall i. {:pattern (Seq.index s0 i)} B.idx b <= i /\ i < B.idx b + B.length b ==> Seq.index s0 (B.idx b + (i - B.idx b)) == Seq.index s0 i);
+ ()
+
+let non_seq_as_seq_equal (b:B.buffer UInt8.t) (h0 h1: HS.mem) : Lemma 
+  (requires (B.as_seq h0 b == B.as_seq h1 b /\ equal_non_seq_buf h0 h1 b))
+  (ensures (Seq.equal (B.sel h0 b) (B.sel h1 b))) =
+ let s0 = B.sel h0 b in
+ let s1 = B.sel h1 b in
+ assert (forall i. 0 <= i /\ i < B.idx b ==> Seq.index s0 i == Seq.index s1 i);
+ assert (forall i. 0 <= i /\ i < B.length b ==> Seq.index (B.as_seq h0 b) i == Seq.index (B.as_seq h1 b) i);
+ assert (forall i. 0 <= i /\ i < B.length b ==> Seq.index s0 (B.idx b + i) == Seq.index s1 (B.idx b + i));
+ shift_equal_seq b h0 h1;
+ assert (forall i. B.idx b <= i /\ i < B.idx b + B.length b ==> Seq.index s0 i == Seq.index s1 i);
+ ()
+  
 val down_up_identity: (mem:HS.mem) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ B.disjoint ptr1 ptr2})
   -> (length1:nat{length1 = B.length ptr1}) -> (length2:nat{length2 = B.length ptr2}) -> Lemma 
   (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 mem in
@@ -302,10 +389,17 @@ let down_up_identity mem ptr1 ptr2 length1 length2 =
   assert (Heap.modifies (Set.singleton addrof) (Map.sel mem.HS.h r) (Map.sel new_mem.HS.h r));
   assert (Seq.equal (B.as_seq mem ptr1) (B.as_seq new_mem ptr1));
   assert (B.as_seq mem ptr1 == B.as_seq new_mem ptr1);
-  // assert (B.sel mem ptr1 == B.sel new_mem ptr1);
-  assume (h1 == Heap.upd h0 ref (B.sel new_mem ptr1));
-  assert (Heap.sel h0 ref == Heap.sel h1 ref);
-  admit()
+  if (B.as_addr ptr1 <> B.as_addr ptr2 || B.frameOf ptr1 <> B.frameOf ptr2) then begin
+    non_seq_as_seq_equal ptr1 mem new_mem;
+    assert (Seq.equal (B.sel mem ptr1) (B.sel new_mem ptr1));
+    admit()
+  end
+  else admit()
+  //assert (B.sel mem ptr1 == B.sel new_mem ptr1);
+  
+  // assume (h1 == Heap.upd h0 ref (B.sel new_mem ptr1));
+  // assert (Heap.sel h0 ref == Heap.sel h1 ref);
+  // admit()
 
  // assert (forall (a:Type) (rel:Preorder.preorder a) (r:Heap.mref a rel). Heap.addr_of r == addrof /\ Heap.is_mm r == Heap.is_mm (B.as_ref ptr1) ==> Heap.sel h0 r == Heap.sel h1 r);
 //  assume (forall (a:Type) (rel:Preorder.preorder a) (r:Heap.mref a rel). Heap.addr_of r == addrof ==> Heap.sel h0 r == Heap.sel h1 r);
