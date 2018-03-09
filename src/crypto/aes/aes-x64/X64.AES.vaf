@@ -52,10 +52,10 @@ procedure{:quick} KeyExpansionRound(
     requires
         0 <= round < 10;
         rcon == aes_rcon(round);
-        xmm1 == expand_key_128(key, round);
+        xmm1 == reverse_bytes_quad32(expand_key_128(key, round));
     ensures
         xmm1 == buffer128_read(dst, round + 1, mem);
-        xmm1 == expand_key_128(key, round + 1);
+        xmm1 == reverse_bytes_quad32(expand_key_128(key, round + 1));
         modifies_buffer_specific128(dst, old(mem), mem, round + 1, round + 1);
 {
     AESNI_keygen_assist(xmm2, xmm1, rcon);
@@ -114,7 +114,7 @@ procedure{:quick} KeyExpansionStdcall(
         key_expansion_ptr := if win then rdx else rsi;
         key := quad32_to_seq(buffer128_read(input_key_b, 0, mem));
     requires/ensures
-        locs_disjoint(list(loc_buffer(input_key_b), loc_buffer(output_key_expansion_b)));
+        buffers_disjoint128(input_key_b, output_key_expansion_b); 
         validSrcAddrs128(mem, key_ptr, input_key_b, 1);
         validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, 11);
     ensures

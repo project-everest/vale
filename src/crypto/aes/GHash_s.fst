@@ -2,13 +2,11 @@ module GHash_s
 
 open Types_s
 open GF128_s
+open Collections.Seqs_s
 open FStar.Mul
 open FStar.Seq
 
 type ghash_plain = s:seq quad32 { length s > 0 }
-
-let all_but_last (s:seq 'a {length s > 0}) = 
-  slice s 0 (length s - 1)
 
 let rec ghash (h:quad32) (x:ghash_plain) : Tot quad32 (decreases %[length x]) = 
   let h_poly = gf128_of_quad32 h in

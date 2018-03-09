@@ -1,6 +1,7 @@
 module Types_i
 
 open Types_s
+open FStar.Seq
 
 unfold let ( *^ ) = nat32_xor
 unfold let ( *^^ ) = quad32_xor
@@ -31,3 +32,4 @@ let quad32_double_lo (q:quad32) : double32 =
 let quad32_double_hi (q:quad32) : double32 =
   let Quad32 q0 q1 q2 q3 = q in
   Double32 q2 q3
+

@@ -3,34 +3,10 @@ module GHash_i
 open Types_s
 open GHash_s
 open GF128_s
+open Collections.Seqs_i
 open FStar.Seq
 
-let lemma_slice_first_exactly_in_append (#a:eqtype) (x y:seq a) :
-  Lemma (slice (append x y) 0 (length x) == x) =
-  let xy = append x y in
-  let xy_slice = slice xy 0 (length x) in
-  let x_slice = slice x 0 (length x) in
-  assert(eq xy_slice x_slice);   // OBSERVE: extensionality
-  //assert(eq x_slice x);
-  ()
-
 #reset-options "--use_two_phase_tc true"
-let lemma_all_but_last_append (#t:eqtype) (a:seq t) (b:seq t{length b > 0}) :
-  Lemma (all_but_last (append a b) == append a (all_but_last b)) =
-  let ab = all_but_last (append a b) in
-  let app_a_b = append a (all_but_last b) in
-  (*
-  assert(length ab == length app_a_b);
-  let helper (i:int) : Lemma (0 <= i /\ i < length ab ==> index ab i == index app_a_b i) =
-    if 0 <= i && i < length ab then (
-      if i < length a then ()
-      else ()
-    ) else ()
-  in
-  FStar.Classical.forall_intro helper;
-  *)
-  assert (eq ab app_a_b)  // OBSERVE: extensionality
-
 let rec ghash_incremental (h:quad32) (y_prev:quad32) (x:ghash_plain) : Tot quad32 (decreases %[length x]) = 
   let h_poly = gf128_of_quad32 h in
   let y_i_minus_1 =

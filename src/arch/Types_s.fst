@@ -1,5 +1,7 @@
 module Types_s
 
+open Collections.Seqs_s
+
 unfold let nat8_max = 0x100
 unfold let nat16_max = 0x10000
 unfold let nat32_max = 0x100000000
@@ -88,10 +90,6 @@ open FStar.Seq
 
 assume val be_bytes_to_nat32 (b:seq nat8 {length b == 4}) : Tot nat32
 assume val nat32_to_be_bytes (n:nat32) : Tot (b:seq nat8 { length b = 4 /\ be_bytes_to_nat32 b == n }) 
-
-let rec reverse_seq (#a:eqtype) (s:seq a) : Tot (s':seq a {length s' == length s}) (decreases %[length s]) =
-  if length s = 0 then createEmpty 
-  else (lemma_empty s; append (reverse_seq (tail s)) (create 1 (head s)))
 
 let reverse_bytes_nat32 (n:nat32) : Tot (nat32) =
   be_bytes_to_nat32 (reverse_seq (nat32_to_be_bytes n))
