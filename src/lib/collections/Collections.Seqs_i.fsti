@@ -17,3 +17,4 @@ val reverse_seq_append (#a:eqtype) (s:seq a) (t:seq a) :
 val reverse_reverse_seq (#a:eqtype) (s:seq a) : 
   Lemma(ensures reverse_seq (reverse_seq s) == s)
        (decreases %[length s]) 
+  [SMTPat (reverse_seq (reverse_seq s))]

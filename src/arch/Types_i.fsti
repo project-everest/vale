@@ -1,6 +1,8 @@
 module Types_i
 
 open Types_s
+open Collections.Seqs_s
+open Collections.Seqs_i
 open FStar.Seq
 
 unfold let ( *^ ) = nat32_xor
@@ -33,3 +35,11 @@ let quad32_double_hi (q:quad32) : double32 =
   let Quad32 q0 q1 q2 q3 = q in
   Double32 q2 q3
 
+val lemma_reverse_reverse_bytes_nat32 (n:nat32) :
+  Lemma (reverse_bytes_nat32 (reverse_bytes_nat32 n) == n)
+  [SMTPat (reverse_bytes_nat32 (reverse_bytes_nat32 n))]
+
+let lemma_reverse_bytes_quad32 (q:quad32) : 
+  Lemma (reverse_bytes_quad32 (reverse_bytes_quad32 q) == q)
+  [SMTPat (reverse_bytes_quad32 (reverse_bytes_quad32 q))]
+  = ()

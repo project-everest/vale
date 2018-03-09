@@ -31,3 +31,10 @@ let xor_lemmas () =
 let lemma_quad32_xor () =
   xor_lemmas()
 
+let lemma_reverse_reverse_bytes_nat32 (n:nat32) :
+  Lemma (reverse_bytes_nat32 (reverse_bytes_nat32 n) == n)
+  =
+  let r = reverse_seq (nat32_to_be_bytes n) in
+  be_bytes_to_nat32_to_be_bytes r;
+  ()
+

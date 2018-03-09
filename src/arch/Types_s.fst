@@ -91,6 +91,9 @@ open FStar.Seq
 assume val be_bytes_to_nat32 (b:seq nat8 {length b == 4}) : Tot nat32
 assume val nat32_to_be_bytes (n:nat32) : Tot (b:seq nat8 { length b = 4 /\ be_bytes_to_nat32 b == n }) 
 
+assume val be_bytes_to_nat32_to_be_bytes (b:seq nat8 {length b == 4}) : 
+  Lemma (nat32_to_be_bytes (be_bytes_to_nat32 b) == b)
+
 let reverse_bytes_nat32 (n:nat32) : Tot (nat32) =
   be_bytes_to_nat32 (reverse_seq (nat32_to_be_bytes n))
 
