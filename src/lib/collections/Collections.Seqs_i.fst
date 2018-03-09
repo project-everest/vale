@@ -1,5 +1,18 @@
 module Collections.Seqs_i
 
+let lemma_empty_ambient (#a:Type) (s:seq a) :
+  Lemma (length s = 0 ==> s == createEmpty #a) 
+  [SMTPat (length s = 0)]
+  = lemma_empty s
+
+let lemma_append_empty_ambient (#a:Type) (s:seq a) :
+  Lemma (append s createEmpty == s /\ append createEmpty s == s)
+  [SMTPatOr [ 
+    [SMTPat (append s createEmpty)]; 
+    [SMTPat (append createEmpty s)]
+  ]]
+  = append_empty_l s; append_empty_r s
+
 let lemma_slice_first_exactly_in_append (#a:eqtype) (x y:seq a) :
   Lemma (slice (append x y) 0 (length x) == x) =
   let xy = append x y in
@@ -31,7 +44,7 @@ let rec reverse_seq_append (#a:eqtype) (s:seq a) (t:seq a) :
   Lemma(ensures reverse_seq (append s t) == append (reverse_seq t) (reverse_seq s))
        (decreases %[length s])
   =
-  if length s = 0 then (lemma_empty s; append_empty_l t; append_empty_r (reverse_seq t))
+  if length s = 0 then ()
   else (
     let (st:seq a{length s > 0}) = append s t in
     //assert(length st > 0);  
@@ -53,7 +66,7 @@ let rec reverse_reverse_seq (#a:eqtype) (s:seq a) :
   Lemma(ensures reverse_seq (reverse_seq s) == s)
        (decreases %[length s]) 
   =
-  if length s = 0 then (lemma_empty s)
+  if length s = 0 then ()
   else (    
     assert(length s > 0);
     let h = create 1 (head s) in
@@ -65,7 +78,7 @@ let rec reverse_reverse_seq (#a:eqtype) (s:seq a) :
     //assert ( reverse_seq (append (reverse_seq t) h) ==
     //	     append (reverse_seq (reverse_seq h)) 
     //		    (reverse_seq (reverse_seq t)));
-    append_empty_l h;		      
+    //append_empty_l h;		      
     //assert (reverse_seq h == h);
     //assert (reverse_seq (reverse_seq h) == h);
     //assert ( reverse_seq (append (reverse_seq t) h) ==
