@@ -382,35 +382,42 @@ let eval_ins (ins:ins) : st unit =
     )
 
   | AESNI_enc dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.mix_columns (AES_s.sub_bytes (AES_s.shift_rows dst_q))) src_q)
+    let dst_q = reverse_bytes_quad32 (eval_xmm dst s) in
+    let src_q = reverse_bytes_quad32 (eval_xmm src s) in
+    let result_q = reverse_bytes_quad32 (quad32_xor (AES_s.mix_columns (AES_s.sub_bytes (AES_s.shift_rows dst_q))) src_q) in
+    update_xmm dst ins result_q
 
   | AESNI_enc_last dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows dst_q)) src_q)
+    let dst_q = reverse_bytes_quad32 (eval_xmm dst s) in
+    let src_q = reverse_bytes_quad32 (eval_xmm src s) in
+    let result_q = reverse_bytes_quad32 (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows dst_q)) src_q) in
+    update_xmm dst ins result_q
 
   | AESNI_dec dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q))) src_q)
+    let dst_q = reverse_bytes_quad32 (eval_xmm dst s) in
+    let src_q = reverse_bytes_quad32 (eval_xmm src s) in
+    let result_q = reverse_bytes_quad32 (quad32_xor (AES_s.inv_mix_columns (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q))) src_q) in
+    update_xmm dst ins result_q
 
   | AESNI_dec_last dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q)) src_q)
+    let dst_q = reverse_bytes_quad32 (eval_xmm dst s) in
+    let src_q = reverse_bytes_quad32 (eval_xmm src s) in
+    let result_q = reverse_bytes_quad32 (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q)) src_q) in
+    update_xmm dst ins result_q
 
   | AESNI_imc dst src ->
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (AES_s.inv_mix_columns src_q)
+    let src_q = reverse_bytes_quad32 (eval_xmm src s) in
+    let result_q = reverse_bytes_quad32 (AES_s.inv_mix_columns src_q) in
+    update_xmm dst ins result_q
 
   | AESNI_keygen_assist dst src imm ->
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (Quad32 (AES_s.sub_word src_q.mid_lo) 
+    let src_q = reverse_bytes_quad32 (eval_xmm src s) in
+    let result_q = reverse_bytes_quad32
+                     (Quad32 (AES_s.sub_word src_q.mid_lo) 
 			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.mid_lo)) imm)
 			       (AES_s.sub_word src_q.hi)
-			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.hi)) imm))
+			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.hi)) imm)) in
+    update_xmm dst ins result_q
  
  
 (*
