@@ -272,7 +272,7 @@ let rec underlying_seq_write_low_mem heap length addr (buf:(B.buffer UInt8.t){le
     else begin
       let new_mem = upd_tot buf i heap.[addr + i] mem in
       underlying_seq_write_low_mem heap length addr buf (i+1) new_mem
-    end
+    end			
 
 let equal_non_seq_buf mem new_mem buf =
   let s0 = B.sel mem buf in
@@ -302,7 +302,8 @@ logic let correct_up mem buf1 buf2 new_mem heap addr1 addr2 =
   /\ equal_non_seq_bufs mem new_mem buf1 buf2
   /\ B.modifies_2 buf1 buf2 mem new_mem
 
-assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
+assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
+  (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
 
 val up_mem: (heap:Vale_Sem.heap) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (addr2:nat64) 
   -> (length1:nat{length1 = B.length ptr1}) -> (length2:nat{length2 = B.length ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem heap addr1 addr2})
@@ -379,13 +380,31 @@ val down_up_identity: (mem:HS.mem) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})
 
 assume val equal_heap: (h0:Heap.heap) -> (h1:Heap.heap) -> Lemma (Heap.equal_dom h0 h1 /\ Heap.modifies Set.empty h0 h1 ==> Heap.equal h0 h1)
 
+let sel_heap_eq #a #rel (h0 h1:Heap.heap) (ref:Heap.mref a rel) : Lemma
+  (requires Heap.contains h0 ref /\ Heap.sel h0 ref == Heap.sel h1 ref)
+  (ensures (forall (a:Type0) (rel:Preorder.preorder a) (r:Heap.mref a rel). Heap.contains h0 r /\ Heap.addr_of r == Heap.addr_of ref ==> Heap.sel h0 r == Heap.sel h1 r)) =
+  Heap.lemma_distinct_addrs_distinct_preorders ();
+  let open FStar.Classical in
+  forall_intro (ref_extensionality #a #rel h0 ref)
+
+let heap_modifies_one_modifies_none #a #rel (h0 h1:Heap.heap) (ref:Heap.mref a rel) : Lemma
+  (requires (Heap.contains h0 ref /\ Heap.sel h0 ref == Heap.sel h1 ref /\ Heap.modifies (Set.singleton (Heap.addr_of ref)) h0 h1) /\ 
+  (forall (a:Type) (rel:Preorder.preorder a) (r:Heap.mref a rel).
+                               Heap.contains h0 r ==> Heap.contains h1 r) /\
+  (forall (a:Type) (rel:Preorder.preorder a) (r:Heap.mref a rel).
+                               Heap.unused_in r h0 ==> Heap.unused_in r h1))
+  (ensures (Heap.modifies Set.empty h0 h1)) =
+    let s = TSet.tset_of_set (Set.singleton (Heap.addr_of ref)) in
+    sel_heap_eq h0 h1 ref
+
+
 let down_up_identity mem ptr1 ptr2 length1 length2 =
   let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 mem in
   assert (FStar.HyperStack.ST.equal_domains mem new_mem);
-  assume (B.modifies_1 ptr1 mem new_mem);
+  assume (B.modifies_1 ptr1 mem new_mem); // Does not actually hold, but is a first step
   B.lemma_reveal_modifies_1 ptr1 mem new_mem;
   let r = B.frameOf ptr1 in // rid
-  let s = Set.singleton r in // Set of rid, containing only {r}
+    let s = Set.singleton r in // Set of rid, containing only {r}
   let m1 = new_mem.HS.h in // hmap of Hyperstack
   let m_inter = Map.restrict (HS.mod_set s) mem.HS.h in
   let m2 = Map.concat new_mem.HS.h m_inter in
@@ -415,18 +434,15 @@ let down_up_identity mem ptr1 ptr2 length1 length2 =
   assert (B.sel mem ptr1 == B.sel new_mem ptr1); // The complete underlying sequence (not just B.as_seq) is the same before and after
   assert (Heap.sel h1 ref == B.sel new_mem ptr1);
 
-  // assume (h1 == Heap.upd h0 ref (B.sel new_mem ptr1));
-  // assert (Heap.sel h0 ref == Heap.sel h1 ref);
-  admit()
+  assume (h1 == Heap.upd h0 ref (B.sel new_mem ptr1));
+  assert (Heap.sel h0 ref == Heap.sel h1 ref);
 
- // assert (forall (a:Type) (rel:Preorder.preorder a) (r:Heap.mref a rel). Heap.addr_of r == addrof /\ Heap.is_mm r == Heap.is_mm (B.as_ref ptr1) ==> Heap.sel h0 r == Heap.sel h1 r);
-//  assume (forall (a:Type) (rel:Preorder.preorder a) (r:Heap.mref a rel). Heap.addr_of r == addrof ==> Heap.sel h0 r == Heap.sel h1 r);
-(* This is sufficient to prove the property  
-  
+  heap_modifies_one_modifies_none h0 h1 ref;
+
   assert (Heap.modifies Set.empty h0 h1);
   assert (Heap.equal (Map.sel m1 r) (Map.sel m2 r));
   assert (forall k. Map.sel m1 k == Map.sel m2 k);
   assert (Map.equal new_mem.HS.h (Map.concat new_mem.HS.h (Map.restrict (HS.mod_set s) mem.HS.h)));
   assert (HS.equal_on s mem.HS.h new_mem.HS.h);
-  assert (FStar.HyperStack.modifies Set.empty mem new_mem) *)
+  assert (FStar.HyperStack.modifies Set.empty mem new_mem)
   
