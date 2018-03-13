@@ -14,14 +14,44 @@ module HH = FStar.Monotonic.HyperHeap
 module B = FStar.Buffer
 open Machine
 
-open FStar.Tactics
-
 open Vale_Sem
 
 let op_String_Access = Map.sel
 let op_String_Assignment = Map.upd
 
 let sub l i = l - i
+
+assume val lemma_aux: #a:Type -> b:B.buffer a -> n:nat{n < B.length b} -> z:a
+  -> h0:HS.mem -> Lemma
+  (requires (B.live h0 b))
+  (ensures (B.live h0 b
+    /\ B.modifies_1 b h0 (HS.upd h0 (B.content b) (Seq.upd (B.sel h0 b) (B.idx b + n) z)) ))
+
+(* Tot version of upd for Hyperstacks *)
+val upd_tot: #a:Type -> b:B.buffer a -> (n:nat{n < B.length b}) -> z:a -> (h0:HS.mem{B.live h0 b}) -> GTot
+  (h1:HS.mem{B.modifies_1 b h0 h1 /\ B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n z /\ B.live h1 b /\ HyperStack.ST.equal_domains h0 h1})
+
+(* The assumes would very likely be proven directly with access to the private elements of FStar.Buffer *)
+let upd_tot #a b n z h0 =
+  let s0 = B.sel h0 b in
+  assume (B.idx b + B.length b <= B.max_length b);
+  assume (B.max_length b == Seq.Base.length s0);
+  assume (0 <= B.idx b + n /\ B.idx b + n < B.max_length b);
+  let s = Seq.upd s0 (B.idx b + n) z in
+  assume (HS.live_region h0 (B.frameOf b));
+  let h1 = HS.upd h0 (B.content b) s in
+  lemma_aux #a b n z h0;
+  h1
+
+(* If two refs have the same address, and are in the heap, they are equal *)
+assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
+  (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
+
+(* Two heaps are equal if they have the same domains, and there is no modification *)
+assume val equal_heap: (h0:Heap.heap) -> (h1:Heap.heap) -> Lemma (Heap.equal_dom h0 h1 /\ Heap.modifies Set.empty h0 h1 ==> Heap.equal h0 h1)
+
+(* The equality on HyperStacks. Proven when calling up of down at the end of this file *)
+let hs_equal (h0:HS.mem) (h1:HS.mem) = FStar.HyperStack.ST.equal_domains h0 h1 /\ HS.modifies Set.empty h0 h1
 
 (**
 
@@ -178,26 +208,6 @@ let rec write_low_mem heap length addr buf i  =
   end
 *)
 
-assume val lemma_aux: #a:Type -> b:B.buffer a -> n:nat{n < B.length b} -> z:a
-  -> h0:HS.mem -> Lemma
-  (requires (B.live h0 b))
-  (ensures (B.live h0 b
-    /\ B.modifies_1 b h0 (HS.upd h0 (B.content b) (Seq.upd (B.sel h0 b) (B.idx b + n) z)) ))
-
-val upd_tot: #a:Type -> b:B.buffer a -> (n:nat{n < B.length b}) -> z:a -> (h0:HS.mem{B.live h0 b}) -> GTot
-  (h1:HS.mem{B.modifies_1 b h0 h1 /\ B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n z /\ B.live h1 b /\ HyperStack.ST.equal_domains h0 h1})
-  
-let upd_tot #a b n z h0 =
-  let s0 = B.sel h0 b in
-  assume (B.idx b + B.length b <= B.max_length b);
-  assume (B.max_length b == Seq.Base.length s0);
-  assume (0 <= B.idx b + n /\ B.idx b + n < B.max_length b);
-  let s = Seq.upd s0 (B.idx b + n) z in
-  assume (HS.live_region h0 (B.frameOf b));
-  let h1 = HS.upd h0 (B.content b) s in
-  lemma_aux #a b n z h0;
-  h1
-  
 
 let rec write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (i:nat{i <= length}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem (decreases %[sub length i]) = 
   if i >= length then curr_mem
@@ -302,9 +312,6 @@ logic let correct_up mem buf1 buf2 new_mem heap addr1 addr2 =
   /\ equal_non_seq_bufs mem new_mem buf1 buf2
   /\ B.modifies_2 buf1 buf2 mem new_mem
 
-assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
-  (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
-
 val up_mem: (heap:Vale_Sem.heap) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (addr2:nat64) 
   -> (length1:nat{length1 = B.length ptr1}) -> (length2:nat{length2 = B.length ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem ptr1 ptr2 new_mem heap addr1 addr2})
 
@@ -335,8 +342,6 @@ let up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 mem =
   ref_extensionality h0 (B.as_ref ptr1) (B.as_ref ptr2);
   mem2
   end
-
-let hs_equal (h0:HS.mem) (h1:HS.mem) = FStar.HyperStack.ST.equal_domains h0 h1 /\ HS.modifies Set.empty h0 h1
 
 let shift_equal_seq (b:B.buffer UInt8.t) (h0 h1: HS.mem) : Lemma
   (requires (forall i. 0 <= i /\ i < B.length b ==> Seq.index (B.as_seq h0 b) i == Seq.index (B.as_seq h1 b) i))
@@ -378,7 +383,6 @@ val down_up_identity: (mem:HS.mem) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})
   (let heap, addr1, addr2 = down_mem mem ptr1 ptr2 in let new_mem = up_mem heap ptr1 addr1 ptr2 addr2 length1 length2 mem in
     hs_equal mem new_mem)
 
-assume val equal_heap: (h0:Heap.heap) -> (h1:Heap.heap) -> Lemma (Heap.equal_dom h0 h1 /\ Heap.modifies Set.empty h0 h1 ==> Heap.equal h0 h1)
 
 let sel_heap_eq #a #rel (h0 h1:Heap.heap) (ref:Heap.mref a rel) : Lemma
   (requires Heap.contains h0 ref /\ Heap.sel h0 ref == Heap.sel h1 ref)
@@ -477,23 +481,40 @@ let down_up_identity mem ptr1 ptr2 length1 length2 =
   assert (HS.equal_on s mem.HS.h new_mem.HS.h);
   assert (FStar.HyperStack.modifies Set.empty mem new_mem)
   end
-  else
-  admit()
-
-(*
-  assert (HS.modifies_ref r (Set.singleton addrof) mem new_mem);
-  assert (Heap.modifies (Set.singleton addrof) (Map.sel mem.HS.h r) (Map.sel new_mem.HS.h r)); // Only this address is modified in this heap
-*)
-
-(* Was enough to complete proof assuming modifies_1 ptr1 mem new_mem *)
-  // assert (Heap.sel h0 ref == Heap.sel h1 ref);
-
-  // heap_modifies_one_modifies_none h0 h1 ref;
-
-  // assert (Heap.modifies Set.empty h0 h1);
-  // assert (Heap.equal (Map.sel m1 r) (Map.sel m2 r));
-  // assert (forall k. Map.sel m1 k == Map.sel m2 k);
-  // assert (Map.equal new_mem.HS.h (Map.concat new_mem.HS.h (Map.restrict (HS.mod_set s) mem.HS.h)));
-  // assert (HS.equal_on s mem.HS.h new_mem.HS.h);
-  // assert (FStar.HyperStack.modifies Set.empty mem new_mem)
-  
+  else begin
+  let ref1 = B.as_ref ptr1 in
+  let ref2 = B.as_ref ptr2 in
+  let addrof1 = Heap.addr_of ref1 in
+  let addrof2 = Heap.addr_of ref2 in
+  let s = Set.union (Set.singleton r1) (Set.singleton r2) in
+  let m1 = new_mem.HS.h in // hmap of Hyperstack
+  let m_inter = Map.restrict (HS.mod_set s) mem.HS.h in
+  let m2 = Map.concat new_mem.HS.h m_inter in
+  // Proving equality of the heap corresponding to ptr1
+  let h0_1 = Map.sel m1 r1 in // Heap
+  let h1_1 = Map.sel m2 r1 in // Heap
+  equal_heap h0_1 h1_1;
+  assert (Heap.equal_dom h0_1 h1_1);
+  assert (HS.modifies_ref r1 (Set.singleton addrof1) mem new_mem);
+  assert (Heap.modifies (Set.singleton addrof1) (Map.sel mem.HS.h r1) (Map.sel new_mem.HS.h r1)); // Only this address is modified in this heap
+  assert (Heap.sel h0_1 ref1 == Heap.sel h1_1 ref1);
+  heap_modifies_one_modifies_none h0_1 h1_1 ref1;
+  assert (Heap.modifies Set.empty h0_1 h1_1);
+  assert (Heap.equal (Map.sel m1 r1) (Map.sel m2 r1));
+  // Proving equality of the heap corresponding to ptr2
+  let h0_2 = Map.sel m1 r2 in // Heap
+  let h1_2 = Map.sel m2 r2 in // Heap
+  equal_heap h0_2 h1_2;
+  assert (Heap.equal_dom h0_2 h1_2);
+  assert (HS.modifies_ref r2 (Set.singleton addrof2) mem new_mem);
+  assert (Heap.modifies (Set.singleton addrof2) (Map.sel mem.HS.h r2) (Map.sel new_mem.HS.h r2)); // Only this address is modified in this heap
+  assert (Heap.sel h0_2 ref2 == Heap.sel h1_2 ref2);
+  heap_modifies_one_modifies_none h0_2 h1_2 ref2;
+  assert (Heap.modifies Set.empty h0_2 h1_2);
+  assert (Heap.equal (Map.sel m1 r2) (Map.sel m2 r2));
+  // Proving the final property
+  assert (forall k. Map.sel m1 k == Map.sel m2 k);
+  assert (Map.equal new_mem.HS.h (Map.concat new_mem.HS.h (Map.restrict (HS.mod_set s) mem.HS.h)));
+  assert (HS.equal_on s mem.HS.h new_mem.HS.h);
+  assert (FStar.HyperStack.modifies Set.empty mem new_mem)
+  end
