@@ -21,6 +21,17 @@ let op_String_Assignment = Map.upd
 
 let sub l i = l - i
 
+(* Abstract maps linking buffers to addresses in the Vale heap. A buffer is uniquely identified by its address, idx and length. TODO : Add Type? *)
+type buffer_triple = nat * nat * nat
+let disjoint_addr addr1 length1 addr2 length2 =
+  (* The first buffer is completely before the second, or the opposite *)
+  addr1 + length1 < addr2 || addr2 + length2 < addr1
+
+type addr_map = (m:(Map.t buffer_triple nat64){forall (buf1 buf2:B.buffer UInt8.t). B.disjoint buf1 buf2 ==> disjoint_addr (m.[(B.as_addr buf1, B.idx buf1, B.length buf1)]) (B.length buf1)
+  (m.[(B.as_addr buf2, B.idx buf2, B.length buf2)]) (B.length buf2)})
+
+(* Additional hypotheses, which should be added to the corresponding libraries at some point *)
+
 assume val lemma_aux: #a:Type -> b:B.buffer a -> n:nat{n < B.length b} -> z:a
   -> h0:HS.mem -> Lemma
   (requires (B.live h0 b))
@@ -124,6 +135,8 @@ let up_mem_list heap buffers mem =
   in aux buffers mem heap
 
 **)
+
+(* Write a buffer in the vale memory *)
 
 let rec write_vale_mem contents (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
       (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Tot Vale_Sem.heap (decreases %[sub length i]) =
