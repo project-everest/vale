@@ -7,11 +7,16 @@ open AES_s
 open GCTR_s 
 open FStar.Math.Lemmas
 
+let aes_encrypt_le (alg:algorithm) (key:aes_key(alg)) (p:quad32) =
+  let r_key = reverse_bytes_nat32_seq key in
+  let r_p = reverse_bytes_quad32 p in
+  aes_encrypt alg r_key r_p
+
 logic let gctr_partial (bound:nat) (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb:quad32) =
   let bound = min bound (min (length plain) (length cipher)) in
-  forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==> index cipher j == quad32_xor (index plain j) (aes_encrypt AES_128 key (inc32 icb j))
+  forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==> 
+    index cipher j == quad32_xor (index plain j) (aes_encrypt_le AES_128 key (inc32 icb j))
   
-
 let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain) 
 				      (alg:algorithm) (key:aes_key alg) (i:int) : Lemma
   (requires True)				      
@@ -36,7 +41,7 @@ let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain)
   (ensures (let cipher = gctr_encrypt_recursive icb plain alg key i in
 	    length cipher == length plain /\
 	   (forall j . {:pattern index cipher j} 0 <= j /\ j < length plain ==>
-	   index cipher j == quad32_xor (index plain j) (aes_encrypt alg key (inc32 icb (i + j)) ))))
+	   index cipher j == quad32_xor (index plain j) (aes_encrypt_le alg key (inc32 icb (i + j)) ))))
   (decreases %[length plain])	   
 =
   if length plain = 0 then ()
@@ -45,11 +50,11 @@ let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain)
       let cipher = gctr_encrypt_recursive icb plain alg key i in  
       let r_cipher = gctr_encrypt_recursive icb tl alg key (i+1) in     
       let helper (j:int) : 
-	Lemma ((0 <= j /\ j < length plain) ==> (index cipher j == quad32_xor (index plain j) (aes_encrypt alg key (inc32 icb (i + j)) )))
+	Lemma ((0 <= j /\ j < length plain) ==> (index cipher j == quad32_xor (index plain j) (aes_encrypt_le alg key (inc32 icb (i + j)) )))
 	= 
 	if 0 < j && j < length plain then (
 	  gctr_indexed_helper icb tl alg key (i+1);
-	  assert(index r_cipher (j-1) == quad32_xor (index tl (j-1)) (aes_encrypt alg key (inc32 icb (i + 1 + j - 1)) )) // OBSERVE
+	  assert(index r_cipher (j-1) == quad32_xor (index tl (j-1)) (aes_encrypt_le alg key (inc32 icb (i + 1 + j - 1)) )) // OBSERVE
 	) else ()
       in
       FStar.Classical.forall_intro helper
@@ -58,7 +63,7 @@ let rec gctr_indexed (icb:quad32) (plain:gctr_plain)
 		     (alg:algorithm) (key:aes_key alg) (cipher:seq quad32) : Lemma
   (requires  length cipher == length plain /\
              (forall i . {:pattern index cipher i} 0 <= i /\ i < length cipher ==> 
-	     index cipher i == quad32_xor (index plain i) (aes_encrypt alg key (inc32 icb i) )))
+	     index cipher i == quad32_xor (index plain i) (aes_encrypt_le alg key (inc32 icb i) )))
   (ensures  cipher == gctr_encrypt icb plain alg key)
 =
   gctr_indexed_helper icb plain alg key 0;
@@ -77,9 +82,9 @@ let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb
 
 let gctr_encrypt_one_block (icb plain:quad32) (alg:algorithm) (key:aes_key alg) : 
   Lemma(gctr_encrypt icb (create 1 plain) alg key =
-        (create 1 (quad32_xor plain (aes_encrypt alg key icb)))) =
+        (create 1 (quad32_xor plain (aes_encrypt_le alg key icb)))) =
   //assert(inc32 icb 0 == icb);
-  let encrypted_icb = aes_encrypt alg key icb in
+  let encrypted_icb = aes_encrypt_le alg key icb in
   let p = create 1 plain in
   //assert(length p == 1);
   //assert(tail p == createEmpty);

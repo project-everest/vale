@@ -22,7 +22,6 @@ open X64.Vale.InsVector
 open X64.Vale.InsAes
 open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
-//open Opaque_i
 #endverbatim
 
 #reset-options "--z3rlimit 40"
@@ -40,6 +39,18 @@ procedure {:quick} init_ctr()
     Pinsrd(xmm4, 1, 0);
 
     lemma_quad32_xor();
+}
+
+procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
+    modifies efl;
+    ensures
+        dst == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+{
+    // TODO: Add an instruction to simplify this
+    Pinsrd(dst, 0x0C0D0E0F, 0);
+    Pinsrd(dst, 0x08090A0B, 1);
+    Pinsrd(dst, 0x04050607, 2);
+    Pinsrd(dst, 0x00010203, 3);
 }
 
 procedure {:quick exportOnly} inc32(inout dst:xmm)
@@ -69,7 +80,7 @@ procedure {:quick} gctr_register(
     requires
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, key);
+        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
         r8 == buffer_addr(keys_b);
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
@@ -80,14 +91,15 @@ procedure {:quick} gctr_register(
         icb.hi     == old(icb.hi);
 {
     Mov128(xmm0, icb);
-    AES128EncryptBlock(icb, key, round_keys, keys_b);
+    init_pshufb_mask(xmm2);
+    Pshufb(xmm0, xmm2);
+    AES128EncryptBlock(reverse_bytes_quad32(icb), reverse_bytes_nat32_seq(key), round_keys, keys_b);
 
     Pxor(xmm1, xmm0);
 
     // Call a helpful lemma
     gctr_encrypt_one_block(icb, old(io), AES_128, key);
 }
-
 
 procedure {:quick} gctr_core(
     ghost in_b:buffer128,
@@ -116,7 +128,7 @@ procedure {:quick} gctr_core(
 
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, key);
+        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
         r8 == buffer_addr(keys_b);
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
@@ -133,6 +145,7 @@ procedure {:quick} gctr_core(
     Mov64(r10, out_ptr);
 
     init_ctr();
+    init_pshufb_mask(xmm1);
 
     while (rdx != len)
         invariant
@@ -141,7 +154,6 @@ procedure {:quick} gctr_core(
             r9 == in_ptr + 16 * rdx;
             r10 == out_ptr + 16 * rdx;
             icb == inc32(old(icb), rdx);
-            xmm4 == Quad32(1, 0, 0, 0);
             
             //////////////////// From requires //////////////////////
             // GCTR reqs
@@ -154,10 +166,14 @@ procedure {:quick} gctr_core(
 
             // AES reqs
             length(round_keys) == 11;
-            round_keys == key_to_round_keys(AES_128, key);
+            round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
             r8 == buffer_addr(keys_b);
             validSrcAddrs128(mem, r8, keys_b, 11);
             buffer128_as_seq(mem, keys_b) == round_keys;
+
+            //////////////////// GCTR invariants //////////////////////
+            xmm1 == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+            xmm4 == Quad32(1, 0, 0, 0);
 
             //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);
@@ -171,11 +187,12 @@ procedure {:quick} gctr_core(
             len - rdx;
     {
         Mov128(xmm0, icb);
-        AES128EncryptBlock(icb, key, round_keys, keys_b);
+        Pshufb(xmm0, xmm1);
+        AES128EncryptBlock(reverse_bytes_quad32(icb), reverse_bytes_nat32_seq(key), round_keys, keys_b);
 
-        Load128_buffer(xmm1, r9, 0, in_b, rdx);
-        Pxor(xmm1, xmm0);
-        Store128_buffer(r10, xmm1, 0, out_b, rdx);
+        Load128_buffer(xmm2, r9, 0, in_b, rdx);
+        Pxor(xmm2, xmm0);
+        Store128_buffer(r10, xmm2, 0, out_b, rdx);
 
         Add64(rdx, 1);
         Add64(r9, 16);
@@ -186,4 +203,3 @@ procedure {:quick} gctr_core(
     // Call a helpful lemma
     gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
-

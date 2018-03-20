@@ -92,7 +92,7 @@ procedure {:quick exportOnly} gcm_core(
 
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, key);
+        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
         validSrcAddrs128(mem, keys_ptr, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
@@ -106,7 +106,7 @@ procedure {:quick exportOnly} gcm_core(
     // let h = aes_encrypt alg key (Quad32 0 0 0 0) in
     Pxor(xmm0, xmm0);
     lemma_quad32_xor(); // xmm0 = 0
-    AES128EncryptBlock(xmm0, key, round_keys, keys_b); // h = xmm0 = aes_encrypt alg key (Quad32 0 0 0 0) in
+    AES128EncryptBlock(xmm0, reverse_bytes_nat32_seq(key), round_keys, keys_b); // h = xmm0 = aes_encrypt alg (reverse_bytes_nat32_seq key) (Quad32 0 0 0 0) in
     ghost var h := xmm0;
     Mov128(xmm5, xmm0);     // Save a copy of h
 
@@ -140,8 +140,8 @@ procedure {:quick exportOnly} gcm_core(
 
     // Prepare length fields
     Pxor(xmm2, xmm2);
-    Pinsrd(xmm2, auth_len, 1);
-    Pinsrd(xmm2, plain_len, 3);
+    Pinsrd(xmm2, auth_len, 3);
+    Pinsrd(xmm2, plain_len, 1);
 
     ghost var length_quad32 := xmm2;
 
@@ -163,5 +163,3 @@ procedure {:quick exportOnly} gcm_core(
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
     assert create(1, xmm1) == gctr_encrypt(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
-
-  
