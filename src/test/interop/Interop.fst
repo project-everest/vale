@@ -332,7 +332,7 @@ logic let correct_up mem (addrs:addr_map) buf1 buf2 new_mem heap =
 
 val up_mem: (heap:Vale_Sem.heap) -> (addrs:addr_map) -> (ptr1: B.buffer UInt8.t) -> (addr1:nat64) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem addrs ptr1 ptr2 new_mem heap})
 
-#set-options "--z3rlimit 100"
+#set-options "--z3rlimit 100 --z3refresh"
 
 (* The unused variable addr1 is needed for the postcondition to verify ?! *)
 let up_mem heap addrs ptr1 addr1 ptr2 mem = 
