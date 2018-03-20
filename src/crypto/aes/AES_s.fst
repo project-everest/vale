@@ -1,5 +1,9 @@
 module AES_s
 
+// IMPORTANT: This specification is written assuming a little-endian mapping from bytes to quad32s
+//            This is explicit in key_schedule_to_round_keys when we construct the round_key rk,
+//            but it also applies implicitly to the input quad32
+
 open Types_s
 open FStar.Seq
 open FStar.Mul
@@ -97,5 +101,4 @@ let key_to_round_keys (alg:algorithm) (key:aes_key alg)
 
 let aes_encrypt (alg:algorithm) (key:aes_key alg) (input:quad32) =
   cipher alg input (key_to_round_keys alg key)
-
 

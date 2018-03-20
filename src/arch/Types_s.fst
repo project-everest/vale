@@ -102,3 +102,8 @@ let reverse_bytes_quad32 (q:quad32) : quad32 =
 	 (reverse_bytes_nat32 q.mid_hi)
 	 (reverse_bytes_nat32 q.mid_lo)
 	 (reverse_bytes_nat32 q.lo)
+
+// Reverses the bytes in each nat32, but not the nat32s themselves
+let rec reverse_bytes_nat32_seq (s:seq nat32) : Tot (s':seq nat32 { length s == length s' }) (decreases %[length s]) =
+  if length s = 0 then createEmpty
+  else (lemma_empty s; cons (reverse_bytes_nat32 (head s)) (reverse_bytes_nat32_seq (tail s)))
