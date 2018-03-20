@@ -44,9 +44,15 @@ let lemma_reverse_bytes_quad32 (q:quad32) :
   [SMTPat (reverse_bytes_quad32 (reverse_bytes_quad32 q))]
   = ()
 
-
+val lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
+  Lemma (ensures reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s) == s)
+  (decreases %[length s])
+  [SMTPat (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s))]
+  
 val quad32_to_seq (q:quad32) : 
   Tot (s:seq nat32 { length s == 4 /\ 
                      (let q' = Quad32 (index s 0) (index s 1) (index s 2) (index s 3) in
                       q == q')           
                    })
+
+

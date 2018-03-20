@@ -2,6 +2,7 @@ module Types_i
 
 open Types_s
 open TypesNative_i
+open Collections.Seqs_i
 
 let lemma_BitwiseXorCommutative x y =
   lemma_ixor_nth_all 32;
@@ -37,6 +38,25 @@ let lemma_reverse_reverse_bytes_nat32 (n:nat32) :
   let r = reverse_seq (nat32_to_be_bytes n) in
   be_bytes_to_nat32_to_be_bytes r;
   ()
+
+let rec lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
+  Lemma (ensures reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s) == s)
+  (decreases %[length s])
+  =
+  lemma_empty s;
+  if length s = 0 then ()
+  else (
+    lemma_reverse_reverse_bytes_nat32 (head s); 
+    //assert (reverse_bytes_nat32 (reverse_bytes_nat32 (head s)) == head s);
+    lemma_reverse_reverse_bytes_nat32_seq (tail s);
+    //assert (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq (tail s)) == tail s);
+    let r_s = reverse_bytes_nat32_seq s in
+    //assert (head r_s == reverse_bytes_nat32 (head s));
+    //assert (cons (head s) (tail s) == s);
+    lemma_tl (reverse_bytes_nat32 (head s)) (reverse_bytes_nat32_seq (tail s));
+    //assert (tail r_s == reverse_bytes_nat32_seq (tail s));
+    ()
+  )
 
 #reset-options "--max_fuel 5 --initial_fuel 5"
 let quad32_to_seq (q:quad32) : 
