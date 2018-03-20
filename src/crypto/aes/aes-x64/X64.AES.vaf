@@ -18,17 +18,9 @@ open X64.Vale.InsVector
 open X64.Vale.InsAes
 open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
+open Types_i
 open AES_helpers_i
 open Opaque_i
-#endverbatim
-
-#verbatim{:interface}
-#reset-options "--max_fuel 5 --initial_fuel 5"
-let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
-  let l = [q.lo; q.mid_lo; q.mid_hi; q.hi] in
-  let s = of_list l in
-  lemma_of_list_length s l; 
-  of_list l
 #endverbatim
 
 #reset-options "--z3rlimit 20"

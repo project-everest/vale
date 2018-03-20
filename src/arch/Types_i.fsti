@@ -43,3 +43,10 @@ let lemma_reverse_bytes_quad32 (q:quad32) :
   Lemma (reverse_bytes_quad32 (reverse_bytes_quad32 q) == q)
   [SMTPat (reverse_bytes_quad32 (reverse_bytes_quad32 q))]
   = ()
+
+
+val quad32_to_seq (q:quad32) : 
+  Tot (s:seq nat32 { length s == 4 /\ 
+                     (let q' = Quad32 (index s 0) (index s 1) (index s 2) (index s 3) in
+                      q == q')           
+                   })

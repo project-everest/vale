@@ -38,3 +38,17 @@ let lemma_reverse_reverse_bytes_nat32 (n:nat32) :
   be_bytes_to_nat32_to_be_bytes r;
   ()
 
+#reset-options "--max_fuel 5 --initial_fuel 5"
+let quad32_to_seq (q:quad32) : 
+  Tot (s:seq nat32 { length s == 4 /\ 
+                     (let q' = Quad32 (index s 0) (index s 1) (index s 2) (index s 3) in
+                      q == q')           
+                   }) =
+  let l = [q.lo; q.mid_lo; q.mid_hi; q.hi] in
+  let s = of_list l in
+  lemma_of_list_length s l; 
+  lemma_of_list s l 0;
+  lemma_of_list s l 1;
+  lemma_of_list s l 2;
+  lemma_of_list s l 3;  
+  of_list l
