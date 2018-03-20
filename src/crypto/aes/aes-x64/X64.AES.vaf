@@ -38,7 +38,7 @@ let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
 ///////////////////////////
 
 // Given round key for round, generate round key for round + 1
-procedure{:quick} KeyExpansionRound(
+procedure{:quick} {:verify true} KeyExpansionRound(
     inline round:nat64,
     inline rcon:imm8,
     ghost dst:buffer128,
@@ -52,27 +52,25 @@ procedure{:quick} KeyExpansionRound(
     requires
         0 <= round < 10;
         rcon == aes_rcon(round);
-        //xmm1 == reverse_bytes_quad32(expand_key_128(key, round));
-        xmm1 == expand_key_128(key, round);
+        xmm1 == reverse_bytes_quad32(expand_key_128(key, round));
     ensures
         xmm1 == buffer128_read(dst, round + 1, mem);
-        //xmm1 == reverse_bytes_quad32(expand_key_128(key, round + 1));
-        xmm1 == expand_key_128(key, round + 1);
+        xmm1 == reverse_bytes_quad32(expand_key_128(key, round + 1));
         modifies_buffer_specific128(dst, old(mem), mem, round + 1, round + 1);
 {
-//    assert reverse_bytes_quad32(xmm1) == expand_key_128(key, round);
+    assert reverse_bytes_quad32(xmm1) == expand_key_128(key, round);
 
     AESNI_keygen_assist(xmm2, xmm1, rcon);
 
-//    ghost var r_src := old(reverse_bytes_quad32(xmm1)); //expand_key_128(key, round);
-//    assert r_src == expand_key_128(key, round);
-//    assert xmm2 == reverse_bytes_quad32(
-//               Quad32(sub_word(r_src.mid_lo), 
-//                      ixor(rot_word(sub_word(r_src.mid_lo)), rcon),
-//                      sub_word(r_src.hi),
-//                      ixor(rot_word(sub_word(r_src.hi)), rcon)));
-//// TODO:
-//    assume false;
+    ghost var r_src := old(reverse_bytes_quad32(xmm1)); //expand_key_128(key, round);
+    assert r_src == expand_key_128(key, round);
+    assert xmm2 == reverse_bytes_quad32(
+               Quad32(sub_word(r_src.mid_lo), 
+                      ixor(rot_word(sub_word(r_src.mid_lo)), rcon),
+                      sub_word(r_src.hi),
+                      ixor(rot_word(sub_word(r_src.hi)), rcon)));
+// TODO:
+    assume false;
     Pshufd(xmm2, xmm2, 255);
     VPSLLDQ4(xmm3, xmm1);
     Pxor(xmm1,xmm3);
@@ -84,10 +82,10 @@ procedure{:quick} KeyExpansionRound(
     Store128_buffer(rdx, xmm1, 16 * (round + 1), dst, round + 1);
 
     // assert xmm1 == simd_round_key_128(old(xmm1), rcon);
-    //lemma_simd_round_key(reverse_bytes_quad32(old(xmm1)), rcon);
-    lemma_simd_round_key(old(xmm1), rcon);
+    lemma_simd_round_key(reverse_bytes_quad32(old(xmm1)), rcon);
 }
 
+/*
 procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(
     ghost key:aes_key(AES_128),
     ghost dst:buffer128,
@@ -173,14 +171,14 @@ procedure{:quick} AES128EncryptRound(
         xmm0; xmm2; efl;
     requires
         1 <= n < 10 <= length(round_keys);
-        xmm0 == reverse_bytes_quad32(rounds(init, round_keys, n - 1));
+        xmm0 == rounds(init, round_keys, n - 1);
         r8 == buffer_addr(keys_buffer);
         validSrcAddrs128(mem, r8, keys_buffer, 11);
         buffer128_read(keys_buffer, n, mem) == index(round_keys, n);
     ensures
-        xmm0 == reverse_bytes_quad32(rounds(init, round_keys, n));
+        xmm0 == rounds(init, round_keys, n);
 {
-    commute_sub_bytes_shift_rows(reverse_bytes_quad32(xmm0));
+    commute_sub_bytes_shift_rows(xmm0);
     Load128_buffer(xmm2, r8, 16 * n, keys_buffer, n);
     AESNI_enc(xmm0, xmm2);
 }
@@ -198,22 +196,18 @@ procedure{:quick} AES128EncryptBlock(
     requires
         length(round_keys) == 11;
         round_keys == key_to_round_keys(AES_128, key);
-        xmm0 == reverse_bytes_quad32(input);
+        xmm0 == input;
         r8 == buffer_addr(keys_buffer);
         validSrcAddrs128(mem, r8, keys_buffer, 11);
         forall i:int :: 0 <= i < 11 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
     ensures
-        xmm0 == reverse_bytes_quad32(aes_encrypt(AES_128, key, input));
+        xmm0 == aes_encrypt(AES_128, key, input);
 {
     assert{:quick_type} length(round_keys) == 11;
-
-    // TODO: Do we need to reveal the fact that Load128_buffer gives us reverse_bytes_quad32 of (index(round_keys, 0))?
-    //       And then make use of the fact that reverse_bytes_quad32 distributes over xor?
-    let init := quad32_xor(reverse_bytes_quad32(input), index(round_keys, 0));
+    let init := quad32_xor(input, index(round_keys, 0));
 
     Load128_buffer(xmm2, r8, 0, keys_buffer, 0);
     Pxor(xmm0, xmm2);
-    assert xmm0 == init;    // But we want xmm0 to be reverse_bytes_quad32
     AES128EncryptRound(1, init, round_keys, keys_buffer);
     AES128EncryptRound(2, init, round_keys, keys_buffer);
     AES128EncryptRound(3, init, round_keys, keys_buffer);
@@ -223,7 +217,7 @@ procedure{:quick} AES128EncryptBlock(
     AES128EncryptRound(7, init, round_keys, keys_buffer);
     AES128EncryptRound(8, init, round_keys, keys_buffer);
     AES128EncryptRound(9, init, round_keys, keys_buffer);
-    commute_sub_bytes_shift_rows(reverse_bytes_quad32(xmm0));
+    commute_sub_bytes_shift_rows(xmm0);
     Load128_buffer(xmm2, r8, 16 * 10, keys_buffer, 10);
     AESNI_enc_last(xmm0, xmm2);
 
@@ -231,7 +225,6 @@ procedure{:quick} AES128EncryptBlock(
     Pxor(xmm2, xmm2);
 }
 
-/*
 procedure{:quick} AES128EncryptBlockStdcall(
     inline win:bool,
     ghost input:quad32,
