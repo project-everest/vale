@@ -38,7 +38,7 @@ let quad32_to_seq (q:quad32) : Tot (s:seq nat32 { length s == 4 }) =
 ///////////////////////////
 
 // Given round key for round, generate round key for round + 1
-procedure{:quick} {:verify true} KeyExpansionRound(
+procedure{:quick} KeyExpansionRound(
     inline round:nat64,
     inline rcon:imm8,
     ghost dst:buffer128,
@@ -58,19 +58,7 @@ procedure{:quick} {:verify true} KeyExpansionRound(
         xmm1 == reverse_bytes_quad32(expand_key_128(key, round + 1));
         modifies_buffer_specific128(dst, old(mem), mem, round + 1, round + 1);
 {
-    assert reverse_bytes_quad32(xmm1) == expand_key_128(key, round);
-
     AESNI_keygen_assist(xmm2, xmm1, rcon);
-
-    ghost var r_src := old(reverse_bytes_quad32(xmm1)); //expand_key_128(key, round);
-    assert r_src == expand_key_128(key, round);
-    assert xmm2 == reverse_bytes_quad32(
-               Quad32(sub_word(r_src.mid_lo), 
-                      ixor(rot_word(sub_word(r_src.mid_lo)), rcon),
-                      sub_word(r_src.hi),
-                      ixor(rot_word(sub_word(r_src.hi)), rcon)));
-// TODO:
-    assume false;
     Pshufd(xmm2, xmm2, 255);
     VPSLLDQ4(xmm3, xmm1);
     Pxor(xmm1,xmm3);
@@ -82,10 +70,9 @@ procedure{:quick} {:verify true} KeyExpansionRound(
     Store128_buffer(rdx, xmm1, 16 * (round + 1), dst, round + 1);
 
     // assert xmm1 == simd_round_key_128(old(xmm1), rcon);
-    lemma_simd_round_key(reverse_bytes_quad32(old(xmm1)), rcon);
+    lemma_simd_round_key(old(xmm1), rcon);
 }
 
-/*
 procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(
     ghost key:aes_key(AES_128),
     ghost dst:buffer128,
@@ -278,7 +265,7 @@ procedure{:quick} AES128EncryptBlockStdcall(
 }
 
 
-*/
+
 
 
 

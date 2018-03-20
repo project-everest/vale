@@ -3,7 +3,6 @@ module GHash_i
 open Types_s
 open GHash_s
 open GF128_s
-open Collections.Seqs_s
 open Collections.Seqs_i
 open FStar.Seq
 
