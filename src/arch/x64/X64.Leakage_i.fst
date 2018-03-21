@@ -5,6 +5,7 @@ open X64.Taint_Semantics_s
 open X64.Leakage_s
 open X64.Leakage_Helpers_i
 open X64.Leakage_Ins_i
+open X64.Leakage_Ins_Xmm_i
 
 open FStar.Tactics
 
@@ -16,7 +17,14 @@ let combine_reg_taints_monotone regs1 regs2: Lemma
 (forall r. Public? ((combine_reg_taints regs1 regs2) r) ==> Public? (regs1 r) /\ Public? (regs2 r))
 = ()
 
-let taintstate_monotone ts ts' = ( forall r. Public? (ts'.regTaint r) ==> Public? (ts.regTaint r)) /\ (Public? (ts'.flagsTaint) ==> Public? (ts.flagsTaint))
+let combine_xmm_taints xmms1 xmms2 =
+    fun x -> merge_taint (xmms1 x) (xmms2 x)
+
+let combine_xmm_taints_monotone xmms1 xmms2: Lemma
+(forall r. Public? ((combine_xmm_taints xmms1 xmms2) r) ==> Public? (xmms1 r) /\ Public? (xmms2 r))
+= ()
+
+let taintstate_monotone ts ts' = ( forall r. Public? (ts'.regTaint r) ==> Public? (ts.regTaint r)) /\ (Public? (ts'.flagsTaint) ==> Public? (ts.flagsTaint)) /\ (forall x. Public? (ts'.xmmTaint x) ==> Public? (ts.xmmTaint x))
 
 val taintstate_monotone_trans: (ts1:taintState) -> (ts2:taintState) -> (ts3:taintState) ->
 Lemma (taintstate_monotone ts1 ts2 /\ taintstate_monotone ts2 ts3 ==> taintstate_monotone ts1 ts3)
@@ -40,7 +48,7 @@ let isExplicit_monotone2 ts ts1 ts2 code fuel s1 s2 = ()
 
 val combine_taint_states: (ts1:taintState) -> (ts2:taintState) -> (ts:taintState{taintstate_monotone ts1 ts /\ taintstate_monotone ts2 ts})
 let combine_taint_states (ts1:taintState) (ts2:taintState) =
-  TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) (merge_taint ts1.flagsTaint ts2.flagsTaint)
+  TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) (merge_taint ts1.flagsTaint ts2.flagsTaint) (combine_xmm_taints ts1.xmmTaint ts2.xmmTaint)
 
 val check_if_block_consumes_fixed_time: (block:tainted_codes) -> (fuel:nat) -> (ts:taintState) -> Tot (bool * taintState)
 (decreases %[fuel; block])
@@ -58,7 +66,8 @@ let rec check_if_block_consumes_fixed_time (block:tainted_codes) (fuel:nat) (ts:
 
 and check_if_code_consumes_fixed_time (code:tainted_code) (fuel:nat) (ts:taintState) : bool * taintState =
   match code with
-  | Ins ins -> check_if_ins_consumes_fixed_time ins fuel ts
+  | Ins ins -> if is_xmm_ins ins then check_if_xmm_ins_consumes_fixed_time ins fuel ts
+	else check_if_ins_consumes_fixed_time ins fuel ts
   
   | Block block -> check_if_block_consumes_fixed_time block fuel ts
 
@@ -213,7 +222,8 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
 
 #set-options "--z3rlimit 140"
  let rec lemma_code_explicit_leakage_free ts code fuel s1 s2 = match code with
-  | Ins ins -> lemma_ins_leakage_free ts fuel ins
+  | Ins ins -> if is_xmm_ins ins then ()
+	else lemma_ins_leakage_free ts fuel ins
   | Block block -> lemma_block_explicit_leakage_free ts block fuel s1 s2
   | IfElse ifCond ifTrue ifFalse ->
     let b_fin, ts_fin = check_if_code_consumes_fixed_time code fuel ts in

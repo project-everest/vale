@@ -5,7 +5,7 @@ open X64.Semantics_s
 open X64.Taint_Semantics_s
 
 noeq type taintState = 
-  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> taintState
+  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> xmmTaint:(xmm -> taint) -> taintState
 
 let publicFlagValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
   ts.flagsTaint = Public ==> (s1.state.flags = s2.state.flags)
@@ -18,10 +18,15 @@ let publicRegisterValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) 
 let publicMemValuesAreSame (s1:traceState) (s2:traceState) =
   forall x. (Public? (s1.memTaint.[x]) || Public? (s2.memTaint.[x])) ==> (valid_mem64 x s1.state.mem /\ valid_mem64 x s2.state.mem) ==> (eval_mem x s1.state == eval_mem x s2.state)
 
+let publicXmmValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
+  forall x. ts.xmmTaint x = Public ==>
+     (s1.state.xmms x == s2.state.xmms x)
+
 let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
    publicRegisterValuesAreSame ts s1 s2
   /\ publicFlagValuesAreSame ts s1 s2
   /\ publicMemValuesAreSame s1 s2
+  /\ publicXmmValuesAreSame ts s1 s2
 
 let constTimeInvariant (ts:taintState) (s:traceState) (s':traceState) =
     publicValuesAreSame ts s s'

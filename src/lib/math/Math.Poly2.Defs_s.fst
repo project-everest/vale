@@ -115,7 +115,7 @@ let rec divmod (a:poly) (b:poly{length b > 0}) : Tot (poly * poly) (decreases (l
   if length a < length b then
     (zero, a)
   else
-    let _ = assert a.[length a - 1] in
+    let _ = assert (a.[length a - 1]) in
     let a' = add a (shift b (length a - length b)) in
     let (d, m) = divmod a' b in
     (add d (monomial (length a - length b)), m)

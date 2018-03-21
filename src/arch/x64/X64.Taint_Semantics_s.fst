@@ -26,6 +26,11 @@ noeq type traceState = {
   memTaint: map int taint;
 }
 
+// TODO : Add the next address also, since we're the heap addresses 64-bit values
+let mem128_to_op = function
+  | Mov128Xmm _ -> []
+  | Mov128Mem addr -> [OMem addr]
+  
 // Extract a list of destinations written to and a list of sources read from
 let extract_operands (i:ins) : (list operand * list operand) =
   match i with
@@ -40,6 +45,9 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | And64 dst src -> [dst], [dst; src]
   | Shr64 dst amt -> [dst], [dst; amt]
   | Shl64 dst amt -> [dst], [dst; amt]
+  | MOVDQU dst src -> mem128_to_op dst, mem128_to_op src
+  | Pinsrd _ src _ -> [], [src]
+  | _ -> [], []
   
 type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
                                 -> t:taint -> tainted_ins
@@ -159,3 +167,15 @@ and taint_eval_while c fuel s0 =
     | None -> None
     | Some s1 -> if not s1.state.ok then Some s1
       else taint_eval_while c (fuel - 1) s1
+
+(* Used to split the analysis between instructions added for xmm, and other insns *)
+let is_xmm_ins (ins:tainted_ins) =
+  let i, _, _ = ins.ops in
+  match i with
+    | Paddd _ _ | Pxor _ _ | Pslld _ _ | Psrld _ _ | Pshufb _ _ 
+    | Pshufd _ _ _ | Pinsrd _ _ _ | VPSLLDQ _ _ _ | MOVDQU _ _
+    | Pclmulqdq _ _ _ | AESNI_enc _ _ | AESNI_enc_last _ _ 
+    | AESNI_dec _ _ | AESNI_dec_last _ _ | AESNI_imc _ _ 
+    | AESNI_keygen_assist _ _ _ -> true
+    | _ -> false
+  
