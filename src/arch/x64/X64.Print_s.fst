@@ -115,7 +115,7 @@ let _ = assert (forall o . o == cmp_not (cmp_not o))
 let print_ins (ins:ins) (p:printer) =
   let print_pair (dst src:string) =
     let first, second = p.op_order dst src in
-      first ^ ", " ^ second ^ "\n"
+      first ^ ", " ^ second
   in    
   let print_op_pair (dst:operand) (src:operand) (print_dst:operand->printer->string) (print_src:operand->printer-> string) =
     print_pair (print_dst dst p) (print_src src p)
@@ -128,11 +128,11 @@ let print_ins (ins:ins) (p:printer) =
   in
   let print_xmm_op (dst:xmm) (src:operand) =
     let first, second = p.op_order (print_xmm dst) (print_operand src p) in
-      first ^ ", " ^ second ^ "\n"
+      first ^ ", " ^ second
   in 
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst) (print_xmm src) in
-      first ^ ", " ^ second ^ "\n"
+      first ^ ", " ^ second
   in  
   match ins with
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
@@ -147,7 +147,7 @@ let print_ins (ins:ins) (p:printer) =
                              name ^ print_ops dst src
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
-  | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p) ^ "\n"
+  | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
   | Xor64 dst src -> p.ins_name "  xor" [dst; src] ^ print_ops dst src
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
@@ -192,7 +192,7 @@ let rec print_block (b:codes) (n:int) (p:printer) : string * int =
     head_str ^ rest, n''
 and print_code (c:code) (n:int) (p:printer) : string * int =
   match c with
-  | Ins ins -> print_ins ins p, n
+  | Ins ins -> (print_ins ins p ^ "\n", n)
   | Block b -> print_block b n p
   | IfElse cond true_code false_code ->
     let n1 = n in

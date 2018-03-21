@@ -12,7 +12,7 @@ let is_it_win b =
 *)
 let parse_cmdline :
   string -> (Prims.bool -> 
-    (X64_Vale_Decls.ins,X64_Vale_Decls.ocmp) X64_Machine_s.precode) -> unit
+    (X64_Vale_Decls_i.ins,X64_Vale_Decls_i.ocmp) X64_Machine_s.precode) -> unit
   = 
   fun name ->
   fun code ->
@@ -43,10 +43,10 @@ let parse_cmdline :
     in
     let printer = 
       match asm_choice with
-      | GCC -> X64_Vale_Decls.gcc
-      | MASM -> X64_Vale_Decls.masm
+      | GCC -> X64_Vale_Decls_i.gcc
+      | MASM -> X64_Vale_Decls_i.masm
     in
     let windows = platform_choice = Win in
-    X64_Vale_Decls.print_header printer;
-    X64_Vale_Decls.print_proc name (code windows) (Prims.parse_int "0") printer;
-    X64_Vale_Decls.print_footer printer
+    X64_Vale_Decls_i.print_header printer;
+    X64_Vale_Decls_i.print_proc name (code windows) (Prims.parse_int "0") printer;
+    X64_Vale_Decls_i.print_footer printer

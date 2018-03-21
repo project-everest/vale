@@ -381,7 +381,7 @@ let rec lemma_div_mod (a b:poly) : Lemma
   )
   else
   (
-    let _ = assert a.[length a - 1] in
+    let _ = assert (a.[length a - 1]) in
     let n = length a - length b in
     let a' = a +. (shift b n) in
     let xn = monomial n in
@@ -407,7 +407,7 @@ let rec lemma_div_degree (a b:poly) : Lemma
   =
   if length a >= length b then
   (
-    let _ = assert a.[length a - 1] in
+    let _ = assert (a.[length a - 1]) in
     let n = length a - length b in
     let a' = add a (shift b n) in
     lemma_div_degree a' b;
@@ -422,7 +422,7 @@ let rec lemma_mod_degree (a b:poly) : Lemma
   =
   if length a >= length b then
   (
-    let _ = assert a.[length a - 1] in
+    let _ = assert (a.[length a - 1]) in
     let n = length a - length b in
     let a' = add a (shift b n) in
     lemma_mod_degree a' b

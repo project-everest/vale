@@ -13,6 +13,7 @@ let precise_opaque = ref false;
 let reprint_decls_rev = ref ([]:decls)
 let disable_verify = ref false
 let omit_unverified = ref false
+let no_lemmas = ref false
 
 let require e = Requires (Refined, e)
 let ensure e = Ensures (Refined, e)

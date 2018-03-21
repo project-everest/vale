@@ -13,7 +13,7 @@ let m_of_typ (t:typ) : M.typ =
   | TBase TUInt16 -> M.tuint16
   | TBase TUInt32 -> M.tuint32
   | TBase TUInt64 -> M.tuint64
-  | TBase TUInt128 -> M.tuint128
+  | TBase TUInt128 -> admit () // M.tuint128
 
 let v_of_typ (t:typ) (v:type_of_typ t) : M.type_of_typ (m_of_typ t) =
   match t with
