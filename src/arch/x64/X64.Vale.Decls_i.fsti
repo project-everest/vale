@@ -261,6 +261,7 @@ let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) 
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 unfold let modifies_buffer128 (b:buffer128) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+unfold let modifies_buffer128_2 (b1 b2:buffer128) (h1 h2:mem) = modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     buffer_readable m b /\
