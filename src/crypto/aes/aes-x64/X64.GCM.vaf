@@ -173,6 +173,7 @@ procedure {:quick} callee_save_registers(ghost buffer:buffer64)
     reads rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
     modifies mem;
     ensures
+        validDstAddrs64(mem, ptr, buffer, 8);
         rbx == buffer64_read(buffer, 0, mem);
         rbp == buffer64_read(buffer, 1, mem);
         rdi == buffer64_read(buffer, 2, mem);
@@ -267,11 +268,14 @@ procedure {:quick} {:verify true} gcm_stdcall(
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
+
         validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
         validSrcAddrs128(mem, iv_ptr, iv_b, 1);
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
         validDstAddrs128(mem, tag_ptr, tag_b, 1);
+        validDstAddrs64(mem, tmp_ptr, tmp_b, 8);
+
         plain_ptr + 16 * plain_len < nat64_max;
         auth_ptr + 16 * auth_len < nat64_max;
         out_ptr + 16 * plain_len < nat64_max;
