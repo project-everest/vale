@@ -165,6 +165,59 @@ procedure {:quick exportOnly} gcm_core(
 }
 
 
+
+procedure {:quick} callee_save_registers(ghost buffer:buffer64)
+    lets ptr @= rax;
+    requires 
+        validDstAddrs64(mem, ptr, buffer, 8);
+    reads rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+    modifies mem;
+    ensures
+        rbx == buffer64_read(buffer, 0, mem);
+        rbp == buffer64_read(buffer, 1, mem);
+        rdi == buffer64_read(buffer, 2, mem);
+        rsi == buffer64_read(buffer, 3, mem);
+        r12 == buffer64_read(buffer, 4, mem);
+        r13 == buffer64_read(buffer, 5, mem);
+        r14 == buffer64_read(buffer, 6, mem);
+        r15 == buffer64_read(buffer, 7, mem);
+{
+    Store64_buffer(ptr, rbx,  0, buffer, 0);
+    Store64_buffer(ptr, rbp,  8, buffer, 1);
+    Store64_buffer(ptr, rdi, 16, buffer, 2);
+    Store64_buffer(ptr, rsi, 24, buffer, 3);
+    Store64_buffer(ptr, r12, 32, buffer, 4);
+    Store64_buffer(ptr, r13, 40, buffer, 5);
+    Store64_buffer(ptr, r14, 48, buffer, 6);
+    Store64_buffer(ptr, r15, 56, buffer, 7);
+}
+
+procedure {:quick} callee_restore_registers(ghost buffer:buffer64)
+    lets ptr @= rax;
+    requires 
+        validSrcAddrs64(mem, ptr, buffer, 8);
+    reads rax; mem; 
+    modifies rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+    ensures
+        rbx == buffer64_read(buffer, 0, mem);
+        rbp == buffer64_read(buffer, 1, mem);
+        rdi == buffer64_read(buffer, 2, mem);
+        rsi == buffer64_read(buffer, 3, mem);
+        r12 == buffer64_read(buffer, 4, mem);
+        r13 == buffer64_read(buffer, 5, mem);
+        r14 == buffer64_read(buffer, 6, mem);
+        r15 == buffer64_read(buffer, 7, mem);
+{
+    Load64_buffer(rbx, ptr,  0, buffer, 0);
+    Load64_buffer(rbp, ptr,  8, buffer, 1);
+    Load64_buffer(rdi, ptr, 16, buffer, 2);
+    Load64_buffer(rsi, ptr, 24, buffer, 3);
+    Load64_buffer(r12, ptr, 32, buffer, 4);
+    Load64_buffer(r13, ptr, 40, buffer, 5);
+    Load64_buffer(r14, ptr, 48, buffer, 6);
+    Load64_buffer(r15, ptr, 56, buffer, 7);
+}
+
 #verbatim{:interface}
 let mk_gctr_plain (p:seq quad32) : gctr_plain =
   let open FStar.Mul in
@@ -172,7 +225,7 @@ let mk_gctr_plain (p:seq quad32) : gctr_plain =
 #endverbatim
 
 
-procedure {:quick} gcm_stdcall(
+procedure {:quick} {:verify true} gcm_stdcall(
     inline win:bool,
     ghost args_b:buffer64,
     ghost iv:quad32,
@@ -182,6 +235,7 @@ procedure {:quick} gcm_stdcall(
     ghost iv_b:buffer128,
     ghost out_b:buffer128,
     ghost tag_b:buffer128,
+    ghost tmp_b:buffer64,
 
     ghost key:aes_key(AES_128),
     ghost round_keys:seq(quad32),
@@ -191,6 +245,7 @@ procedure {:quick} gcm_stdcall(
         rdi;
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
         mem; efl;
     lets
         args_ptr := if win then rcx else rdi;
@@ -203,9 +258,10 @@ procedure {:quick} gcm_stdcall(
         expanded_key_ptr  := buffer64_read(args_b, 5, mem);
         out_ptr           := buffer64_read(args_b, 6, mem);
         tag_ptr           := buffer64_read(args_b, 7, mem);
+        tmp_ptr           := buffer64_read(args_b, 8, mem);
 
     requires
-        validSrcAddrs64(mem, args_ptr, args_b, 8);
+        validSrcAddrs64(mem, args_ptr, args_b, 9);
 
         buffers_disjoint128(plain_b, out_b);
         buffers_disjoint128(auth_b, out_b);
@@ -244,6 +300,26 @@ procedure {:quick} gcm_stdcall(
         256 * buffer_length(auth_b) < nat32_max;
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
         create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+
+        // Calling convention for caller/callee saved registers
+
+        // Windows:
+        win ==> rbx == old(rbx);
+        win ==> rbp == old(rbp);
+        win ==> rdi == old(rdi);
+        win ==> rsi == old(rsi);
+        win ==> r12 == old(r12);
+        win ==> r13 == old(r13);
+        win ==> r14 == old(r14);
+        win ==> r15 == old(r15);
+
+        // Linux:
+        !win ==> rbx == old(rbx);
+        //!win ==> rbp == old(rbp);
+        !win ==> r12 == old(r12);
+        !win ==> r13 == old(r13);
+        !win ==> r14 == old(r14);
+        !win ==> r15 == old(r15);
 {
     // Shuffle the incoming pointer around
     // REVIEW: Why can't I write: Mov64(r12, plain_ptr);  ?
@@ -252,7 +328,10 @@ procedure {:quick} gcm_stdcall(
     } else {
         Mov64(r9, rdi);
     }
+
+    Load64_buffer(rax, r9, 64, args_b, 8);
     //assert r9 == args_ptr;
+    callee_save_registers(tmp_b);
 
     Load64_buffer(r12, r9,  0, args_b, 0);
     //assert r12 == plain_ptr;
@@ -286,4 +365,5 @@ procedure {:quick} gcm_stdcall(
     // REVIEW: With no ensures clause, when we assume false, we verify in ~9 seconds, but without it, we take 186 seconds
     //         In exportOnly mode, it times out after 59 seconds
     //assume false;
+    callee_restore_registers(tmp_b);
 }

@@ -268,6 +268,9 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     len <= buffer_length b /\
     buffer_addr b == addr
 
+let validDstAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+    validSrcAddrs64 m addr b len
+
 let validSrcAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
     buffer_readable m b /\
     len <= buffer_length b /\
