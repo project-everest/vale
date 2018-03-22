@@ -212,18 +212,32 @@ procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     g2 := Bump3(b, if rax < 7 then rax else g1 + 0);
 }
 
-procedure Incr3()
+procedure{:quick} AddRaxG(ghost g:int)
+    modifies
+        efl;
+        rax;
+    requires
+        rax < 200;
+        g == rax;
+    ensures
+        rax == old(rax) + 1;
+{
+    Add64(rax, 1);
+}
+
+procedure Incr3(ghost g:int)
     modifies
         efl;
         rax;
     requires
         rax < 100;
+        g == rax;
     ensures
         rax == old(rax) + 3;
 {
     assert{:quick_start} true;
     Add64(rax, 1);
-    Add64(rax, 1);
+    AddRaxG(g + 1);
     Add64(rax, 1);
 }
 
