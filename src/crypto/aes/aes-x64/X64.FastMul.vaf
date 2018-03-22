@@ -17,7 +17,10 @@ open X64.Vale.QuickCodes_i
 #endverbatim
 
 #verbatim{:interface}
-unfold let validDstAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) = validSrcAddrs64
+unfold let validDstAddrs64 = validSrcAddrs64
+
+unfold let nat192_max = 0x1000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 192 = nat192_max)
 #endverbatim
 
 
@@ -30,9 +33,6 @@ procedure{:quick} fast_multiply(
         inA_ptr @= rdx;
         inB_ptr @= r8;
 
-//        A0 @= buffer64_read(inA_b, 0, mem);
-//        A1 @= buffer64_read(inA_b, 1, mem);
-//
     reads
         dst_ptr; inA_ptr; inB_ptr;
 
@@ -63,9 +63,9 @@ procedure{:quick} fast_multiply(
         let d2 := buffer64_read(dst_b, 2, mem);
         let d3 := buffer64_read(dst_b, 3, mem);
 
-        let a := a0 + nat64max * a1 + nat128max * a2 + nat192max * a3;
-        let b := b0 + nat64max * b1 + nat128max * b2 + nat192max * b3;
-        let d := d0 + nat64max * d1 + nat128max * d2 + nat192max * d3;
+        let a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
+        let b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
+        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3;
         d == a * b;
 {
     assume false;
