@@ -30,27 +30,11 @@ open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
 #endverbatim
 
-#verbatim{:interface}
-//let get_last_slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
-//  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
-//    last (slice s start_pos end_pos)
-//  else
-//    Quad32 0 0 0 0 
-//
-//let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
-//  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
-//    slice s start_pos end_pos
-//  else
-//    create 1 (Quad32 0 0 0 0)
-#endverbatim
-
-#reset-options "--z3rlimit 40"
-
 ///////////////////////////
 // GCM
 ///////////////////////////
 
-procedure {:quick exportOnly} gcm_core(
+procedure {:quick} {:verify true} gcm_core(
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
@@ -164,126 +148,3 @@ procedure {:quick exportOnly} gcm_core(
     assert create(1, xmm1) == gctr_encrypt(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
 
-
-#verbatim{:interface}
-let mk_gctr_plain (p:seq quad32) : gctr_plain =
-  let open FStar.Mul in
-  if 256 * length p < nat32_max then p else createEmpty
-#endverbatim
-
-
-procedure {:quick} gcm_stdcall(
-    inline win:bool,
-    ghost args_b:buffer64,
-    ghost iv:quad32,
-
-    ghost plain_b:buffer128,
-    ghost auth_b:buffer128,
-    ghost iv_b:buffer128,
-    ghost out_b:buffer128,
-    ghost tag_b:buffer128,
-
-    ghost key:aes_key(AES_128),
-    ghost round_keys:seq(quad32),
-    ghost keys_b:buffer128
-    )
-    reads
-        rdi;
-    modifies
-        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
-        mem; efl;
-    lets
-        args_ptr := if win then rcx else rdi;
-
-        plain_ptr         := buffer64_read(args_b, 0, mem);
-        plain_len         := buffer64_read(args_b, 1, mem);
-        auth_ptr          := buffer64_read(args_b, 2, mem);
-        auth_len          := buffer64_read(args_b, 3, mem);
-        iv_ptr            := buffer64_read(args_b, 4, mem);
-        expanded_key_ptr  := buffer64_read(args_b, 5, mem);
-        out_ptr           := buffer64_read(args_b, 6, mem);
-        tag_ptr           := buffer64_read(args_b, 7, mem);
-
-    requires
-        validSrcAddrs64(mem, args_ptr, args_b, 8);
-
-        buffers_disjoint128(plain_b, out_b);
-        buffers_disjoint128(auth_b, out_b);
-        buffers_disjoint128(keys_b, out_b);
-        buffers_disjoint128(out_b, tag_b);
-        validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
-        validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
-        validSrcAddrs128(mem, iv_ptr, iv_b, 1);
-        validDstAddrs128(mem, out_ptr, out_b, plain_len);
-        validDstAddrs128(mem, tag_ptr, tag_b, 1);
-        plain_ptr + 16 * plain_len < nat64_max;
-        auth_ptr + 16 * auth_len < nat64_max;
-        out_ptr + 16 * plain_len < nat64_max;
-        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
-        buffer_length(auth_b) == auth_len;
-
-        iv == buffer128_read(iv_b, 0, mem);
-
-        // To simplify length calculations, restrict auth and plain length further
-        256 * auth_len < nat32_max;
-        256 * plain_len < nat32_max;
-
-        // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
-        validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
-        buffer128_as_seq(mem, keys_b) == round_keys;
-
-    ensures
-        modifies_buffer128_2(out_b, tag_b, old(mem), mem);
-
-        validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
-        validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
-
-        256 * buffer_length(plain_b) < nat32_max;
-        256 * buffer_length(auth_b) < nat32_max;
-        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-{
-    // Shuffle the incoming pointer around
-    // REVIEW: Why can't I write: Mov64(r12, plain_ptr);  ?
-    inline if (win) {
-        Mov64(r9, rcx);
-    } else {
-        Mov64(r9, rdi);
-    }
-    //assert r9 == args_ptr;
-
-    Load64_buffer(r12, r9,  0, args_b, 0);
-    //assert r12 == plain_ptr;
-    Load64_buffer(r13, r9,  8, args_b, 1);
-    //assert r13 == plain_len;
-    Load64_buffer(r14, r9, 16, args_b, 2);
-    Load64_buffer(r11, r9, 24, args_b, 3);
-    Load64_buffer(r10, r9, 32, args_b, 4);
-    Load64_buffer(r8,  r9, 40, args_b, 5);
-    Load64_buffer(rbx, r9, 48, args_b, 6);
-    Load64_buffer(r15, r9, 56, args_b, 7);
-
-    // Load the IV into its XMM register
-    Load128_buffer(xmm7, r10, 0, iv_b, 0);
-
-    //assert iv == xmm7;
-
-    gcm_core(plain_b, auth_b, out_b, key, round_keys, keys_b);
-
-//    assert buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-
-    //assert create(1, xmm1) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-    // Auth tag is still in xmm1, so save it to memory
-    Store128_buffer(r15, xmm1, 0, tag_b, 0);
-    //assert buffer128_as_seq(mem, tag_b) == create(1, xmm1);
-    //assert buffer128_read(tag_b, 0, mem) == create(1, xmm1);
-
-    //assert create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-    //assert buffer128_as_seq(mem, tag_b) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-
-    // REVIEW: With no ensures clause, when we assume false, we verify in ~9 seconds, but without it, we take 186 seconds
-    //         In exportOnly mode, it times out after 59 seconds
-    //assume false;
-}
