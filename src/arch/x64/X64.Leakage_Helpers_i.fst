@@ -4,6 +4,7 @@ open X64.Machine_s
 open X64.Taint_Semantics_s
 open X64.Leakage_s
 
+
 let merge_taint t1 t2 =
   if Secret? t1 || Secret? t2 then
     Secret
@@ -30,8 +31,7 @@ let operand_does_not_use_secrets op ts =
   | OConst _ | OReg _ -> true
   | OMem m -> maddr_does_not_use_secrets m ts
 
-val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -> (s2:traceState) -> Lemma (operand_does_not_use_secrets dst ts /\ publicValuesAreSame ts s1 s2 ==>
-  operand_obs s1 dst = operand_obs s2 dst)
+val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -> (s2:traceState) -> Lemma ((operand_does_not_use_secrets dst ts) /\ publicValuesAreSame ts s1 s2 ==> (operand_obs s1 dst) = (operand_obs s2 dst))
 
 #reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 20"
 let lemma_operand_obs ts dst s1 s2 = match dst with
@@ -39,7 +39,7 @@ let lemma_operand_obs ts dst s1 s2 = match dst with
   | OMem m -> ()
 #reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 5"
   
-let set_taint (dst:operand) ts taint =
+let set_taint (dst:operand) ts taint : Tot taintState =
   match dst with
   | OConst _ -> ts  (* Shouldn't actually happen *)
   | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint ts.xmmTaint
@@ -56,15 +56,12 @@ val lemma_operands_imply_op: (ts:taintState) -> (ops:list operand{Cons? ops}) ->
 let lemma_operands_imply_op ts ops = match ops with
 | hd :: tl -> ()
 
-val lemma_operand_obs_list: (ts:taintState) -> (ops:list operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
-(requires True)
-(ensures  ( (operands_do_not_use_secrets ops ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 ops) == (operand_obs_list s2 ops)))
+val lemma_operand_obs_list: (ts:taintState) -> (ops:list operand) -> (s1:traceState) -> (s2:traceState) -> Lemma  ((operands_do_not_use_secrets ops ts /\ publicValuesAreSame ts s1 s2) ==>
+  (operand_obs_list s1 ops) == (operand_obs_list s2 ops))
 
 let rec lemma_operand_obs_list ts ops s1 s2 = match ops with
   | [] -> ()
-  | hd :: tl ->
-    lemma_operand_obs ts hd s1 s2;
-    lemma_operand_obs_list ts tl s1 s2
+  | hd :: tl -> lemma_operand_obs_list ts tl s1 s2
 
 let rec sources_taint srcs ts taint = match srcs with
   | [] -> taint
@@ -74,10 +71,9 @@ let rec set_taints dsts ts taint = match dsts with
   | [] -> ts
   | hd :: tl -> set_taints tl (set_taint hd ts taint) taint
 
-let ins_consumes_fixed_time (ins : tainted_ins) (fuel:nat) (ts:taintState) (res:bool*taintState) =
+let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintState) =
   let b, ts' = res in
-  ((b2t b) ==> isConstantTime (Ins ins) fuel ts)
-
+  ((b2t b) ==> isConstantTime (Ins ins) ts)
 
 val lemma_taint_sources: (ins:tainted_ins) -> (ts:taintState) -> Lemma
 (let i, d, s = ins.ops in

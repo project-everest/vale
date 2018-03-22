@@ -5,7 +5,7 @@ open X64.Semantics_s
 open X64.Taint_Semantics_s
 
 noeq type taintState = 
-  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> xmmTaint:(xmm -> taint) -> taintState
+  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> xmmTaint: (xmm -> taint) -> taintState
 
 let publicFlagValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
   ts.flagsTaint = Public ==> (s1.state.flags = s2.state.flags)
@@ -19,8 +19,9 @@ let publicMemValuesAreSame (s1:traceState) (s2:traceState) =
   forall x. (Public? (s1.memTaint.[x]) || Public? (s2.memTaint.[x])) ==> (valid_mem64 x s1.state.mem /\ valid_mem64 x s2.state.mem) ==> (eval_mem x s1.state == eval_mem x s2.state)
 
 let publicXmmValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
-  forall x. ts.xmmTaint x = Public ==>
-     (s1.state.xmms x == s2.state.xmms x)
+  forall r.
+      ts.xmmTaint r = Public
+    ==> (s1.state.xmms r = s2.state.xmms r)
 
 let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
    publicRegisterValuesAreSame ts s1 s2
@@ -42,8 +43,8 @@ let isConstantTimeGivenStates (code:tainted_code) (fuel:nat) (ts:taintState) (s1
    /\ constTimeInvariant ts s1 s2
   ) ==> (Some?.v r1).trace = (Some?.v r2).trace
 
-let isConstantTime (code:tainted_code) (fuel:nat) (ts:taintState) =
-  forall s1 s2.
+let isConstantTime (code:tainted_code) (ts:taintState) =
+  forall s1 s2 fuel.
       isConstantTimeGivenStates code fuel ts s1 s2
 
 let isExplicitLeakageFreeGivenStates (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) (s1:traceState) (s2:traceState) =
@@ -55,10 +56,10 @@ let isExplicitLeakageFreeGivenStates (code:tainted_code) (fuel:nat) (ts:taintSta
   /\ constTimeInvariant ts s1 s2
  ) ==> publicValuesAreSame ts' (Some?.v r1) (Some?.v r2)
 
-let isExplicitLeakageFree (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) =
-  forall s1 s2.
+let isExplicitLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
+  forall s1 s2 fuel.
     isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2
 
-let isLeakageFree (code:tainted_code) (fuel:nat) (ts:taintState) (ts':taintState) =
-    isConstantTime code fuel ts
-  /\ isExplicitLeakageFree code fuel ts ts'
+let isLeakageFree (code:tainted_code) (ts:taintState) (ts':taintState) =
+    isConstantTime code ts
+  /\ isExplicitLeakageFree code ts ts'
