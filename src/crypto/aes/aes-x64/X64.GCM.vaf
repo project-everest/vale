@@ -174,6 +174,8 @@ procedure {:quick} callee_save_registers(ghost buffer:buffer64)
     modifies mem;
     ensures
         validDstAddrs64(mem, ptr, buffer, 8);
+        modifies_buffer(buffer, old(mem), mem);
+
         rbx == buffer64_read(buffer, 0, mem);
         rbp == buffer64_read(buffer, 1, mem);
         rdi == buffer64_read(buffer, 2, mem);
@@ -268,6 +270,8 @@ procedure {:quick} {:verify true} gcm_stdcall(
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
+        
+        buffers_disjoint(args_b, tmp_b);
 
         validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
@@ -295,7 +299,7 @@ procedure {:quick} {:verify true} gcm_stdcall(
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
-        modifies_buffer128_2(out_b, tag_b, old(mem), mem);
+        modifies_mem(loc_union(loc_union(loc_buffer(tmp_b), loc_buffer(out_b)), loc_buffer(tag_b)), old(mem), mem);
 
         validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
         validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
@@ -334,8 +338,16 @@ procedure {:quick} {:verify true} gcm_stdcall(
     }
 
     Load64_buffer(rax, r9, 64, args_b, 8);
+    assert validSrcAddrs64(mem, r9, args_b, 9);
+    assume false;
     //assert r9 == args_ptr;
     callee_save_registers(tmp_b);
+
+    assert buffer_readable(mem, args_b);
+    assert 9 <= buffer_length(args_b);
+    assert buffer_addr(args_b) == r9;
+    assert validSrcAddrs64(mem, r9, args_b, 9);
+    assume false;
 
     Load64_buffer(r12, r9,  0, args_b, 0);
     //assert r12 == plain_ptr;
@@ -368,6 +380,6 @@ procedure {:quick} {:verify true} gcm_stdcall(
 
     // REVIEW: With no ensures clause, when we assume false, we verify in ~9 seconds, but without it, we take 186 seconds
     //         In exportOnly mode, it times out after 59 seconds
-    //assume false;
     callee_restore_registers(tmp_b);
+    assume false;
 }

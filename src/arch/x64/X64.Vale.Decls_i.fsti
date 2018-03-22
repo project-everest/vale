@@ -65,6 +65,7 @@ unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
+unfold let loc_union = M.loc_union
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
