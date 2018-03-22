@@ -21,6 +21,8 @@ let op_String_Assignment = Map.upd
 
 let sub l i = l - i
 
+let disjoint_or_eq ptr1 ptr2 = B.disjoint ptr1 ptr2 \/ ptr1 == ptr2
+
 (* Abstract maps linking buffers to addresses in the Vale heap. A buffer is uniquely identified by its address, idx and length. TODO : Add Type? *)
 type buffer_triple = nat * nat * nat
 let disjoint_addr addr1 length1 addr2 length2 =
@@ -31,28 +33,6 @@ type addr_map = (m:(Map.t buffer_triple nat64){forall (buf1 buf2:B.buffer UInt8.
   (m.[(B.as_addr buf2, B.idx buf2, B.length buf2)]) (B.length buf2)})
 
 (* Additional hypotheses, which should be added to the corresponding libraries at some point *)
-
-assume val lemma_aux: #a:Type -> b:B.buffer a -> n:nat{n < B.length b} -> z:a
-  -> h0:HS.mem -> Lemma
-  (requires (B.live h0 b))
-  (ensures (B.live h0 b
-    /\ B.modifies_1 b h0 (HS.upd h0 (B.content b) (Seq.upd (B.sel h0 b) (B.idx b + n) z)) ))
-
-(* Tot version of upd for Hyperstacks *)
-val upd_tot: #a:Type -> b:B.buffer a -> (n:nat{n < B.length b}) -> z:a -> (h0:HS.mem{B.live h0 b}) -> GTot
-  (h1:HS.mem{B.modifies_1 b h0 h1 /\ B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n z /\ B.live h1 b /\ HyperStack.ST.equal_domains h0 h1})
-
-(* The assumes would very likely be proven directly with access to the private elements of FStar.Buffer *)
-let upd_tot #a b n z h0 =
-  let s0 = B.sel h0 b in
-  assume (B.idx b + B.length b <= B.max_length b);
-  assume (B.max_length b == Seq.Base.length s0);
-  assume (0 <= B.idx b + n /\ B.idx b + n < B.max_length b);
-  let s = Seq.upd s0 (B.idx b + n) z in
-  assume (HS.live_region h0 (B.frameOf b));
-  let h1 = HS.upd h0 (B.content b) s in
-  lemma_aux #a b n z h0;
-  h1
 
 (* If two refs have the same address, and are in the heap, they are equal *)
 assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
@@ -183,7 +163,7 @@ logic let correct_down mem addrs ptr1 ptr2 heap =
   (forall i.  0 <= i /\ i < length2 ==> heap.[addr2 + i] == FStar.Seq.index contents2 i)
 
 (* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale memory + keep track of the vale addresses *)
-val down_mem: (mem:HS.mem) -> (addrs: addr_map) -> (ptr1:B.buffer UInt8.t) -> (ptr2:B.buffer UInt8.t{B.disjoint ptr1 ptr2}) -> GTot (heap :Vale_Sem.heap {correct_down mem addrs ptr1 ptr2 heap})
+val down_mem: (mem:HS.mem) -> (addrs: addr_map) -> (ptr1:B.buffer UInt8.t) -> (ptr2:B.buffer UInt8.t{disjoint_or_eq ptr1 ptr2}) -> GTot (heap :Vale_Sem.heap {correct_down mem addrs ptr1 ptr2 heap})
 
 #set-options "--z3rlimit 40"
 
@@ -240,7 +220,7 @@ let load_store_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B
   (let new_mem = write_low_mem heap length addr buf mem in
     forall j. 0 <= j /\ j < length ==> Seq.index (B.as_seq new_mem buf) j == heap.[addr + j]) = ()
 
-let invariant_write_low_memheap heap length addr (b:(B.buffer UInt8.t){length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
+let invariant_write_low_mem heap length addr (b:(B.buffer UInt8.t){length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
   (requires (forall i. 0 <= i /\ i < B.length b ==> Seq.index (B.as_seq mem b) i == heap.[addr + i]))
   (ensures (mem == write_low_mem heap length addr b mem)) 
   [SMTPat (mem == write_low_mem heap length addr b mem)]
@@ -255,6 +235,21 @@ let invariant_write_low_memheap heap length addr (b:(B.buffer UInt8.t){length = 
   assert (Seq.equal (HS.sel mem (B.content b)) s_app);
   ()
 
+let cancel_write_low_mem heap length addr (b:B.buffer UInt8.t{length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
+  (write_low_mem heap length addr b (write_low_mem heap length addr b mem) == write_low_mem heap length addr b mem) =
+  let s = B.sel mem b in
+  let modified = create_seq heap length addr in
+  let lo = Seq.slice s 0 (B.idx b) in
+  let hi = Seq.slice s (B.idx b + length) (B.max_length b) in
+  let s' = Seq.append lo (Seq.append modified hi) in
+  let mem1 = HS.upd mem (B.content b) s' in
+  let s1 = B.sel mem1 b in
+  let lo1 = Seq.slice s1 0 (B.idx b) in
+  let hi1 = Seq.slice s1 (B.idx b + length) (B.max_length b) in
+  assert (Seq.equal lo lo1);
+  assert (Seq.equal hi hi1);
+  ()
+
 logic let correct_up mem (addrs:addr_map) buf1 buf2 new_mem heap =
   let length1 = B.length buf1 in
   let length2 = B.length buf2 in
@@ -263,11 +258,10 @@ logic let correct_up mem (addrs:addr_map) buf1 buf2 new_mem heap =
   (forall j. 0 <= j /\ j < length1 ==> Seq.index (B.as_seq new_mem buf1) j == heap.[addr1 + j])
   /\ (forall j. 0 <= j /\ j < length2 ==> Seq.index (B.as_seq new_mem buf2) j == heap.[addr2 + j])
 
-val up_mem: (heap:Vale_Sem.heap) -> (addrs:addr_map) -> (ptr1: B.buffer UInt8.t) -> (ptr2: (B.buffer UInt8.t){B.disjoint ptr1 ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem addrs ptr1 ptr2 new_mem heap})
+val up_mem: (heap:Vale_Sem.heap) -> (addrs:addr_map) -> (ptr1: B.buffer UInt8.t) -> (ptr2: (B.buffer UInt8.t){disjoint_or_eq ptr1 ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem addrs ptr1 ptr2 new_mem heap})
 
 #set-options "--z3rlimit 100 --z3refresh"
 
-(* The unused variable addr1 is needed for the postcondition to verify ?! *)
 let up_mem heap addrs ptr1 ptr2 mem = 
   let length1 = B.length ptr1 in
   let length2 = B.length ptr2 in
@@ -281,10 +275,11 @@ let up_mem heap addrs ptr1 ptr2 mem =
   assert (B.live mem1 ptr1);
   frame_write_low_mem heap length2 addr2 ptr2 mem1;
   load_store_write_low_mem heap length2 addr2 ptr2 mem1;
+  cancel_write_low_mem heap length1 addr1 ptr1 mem;
   assert (B.equal mem1 ptr1 mem2 ptr1);
   mem2
 
-val down_up_identity: (mem:HS.mem) -> (addrs:addr_map) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ B.disjoint ptr1 ptr2}) -> Lemma 
+val down_up_identity: (mem:HS.mem) -> (addrs:addr_map) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ disjoint_or_eq ptr1 ptr2}) -> Lemma 
   (let heap = down_mem mem addrs ptr1 ptr2 in 
    let length1 = B.length ptr1 in
    let length2 = B.length ptr2 in
@@ -302,7 +297,7 @@ let down_up_identity mem addrs ptr1 ptr2 =
   let addr2 = addrs.[(B.as_addr ptr2, B.idx ptr2, B.length ptr2)] in   
   let b1 = B.content ptr1 in
   let b2 = B.content ptr2 in
-  invariant_write_low_memheap heap length1 addr1 ptr1 mem;
+  invariant_write_low_mem heap length1 addr1 ptr1 mem;
   let mem1 = write_low_mem heap length1 addr1 ptr1 mem in
-  invariant_write_low_memheap heap length2 addr2 ptr2 mem;
+  invariant_write_low_mem heap length2 addr2 ptr2 mem;
   ()
