@@ -15,6 +15,16 @@ let mode = ref LexNormal
 
 let init_lex () = mode := LexNormal
 
+// mode when parsing verbatim
+type verbatim_mode =
+| VerbatimNormal
+| VerbatimType
+| VerbatimTypeBranch
+| VerbatimLet
+| VerbatimIgnore
+
+let vmode = ref VerbatimNormal
+
 let macros = ref (Map.empty:Map<string,token list>)
 let lexeme (lexbuf:LexBuffer<_>):(string) = System.Text.Encoding.ASCII.GetString lexbuf.Lexeme
 let next_line (lexbuf:LexBuffer<_>) = lexbuf.EndPos <- lexbuf.EndPos.NextLine
@@ -244,4 +254,36 @@ and lextoken = parse
 | eof { EOF }
 | '\000' { EOF }
 | _ { parse_err ("cannot parse character: \"" ^ (lexeme lexbuf) ^ "\"" ^ "\n(ascii code " ^ (string (int ((lexeme lexbuf).Chars 0))) ^ ")") }
-
+and verbatimToken = parse
+| "open" { vmode := VerbatimNormal; OPEN (curLoc lexbuf) }
+| "module" { vmode := VerbatimNormal; MODULE (curLoc lexbuf)}
+| "type" { vmode:= VerbatimType; TYPE (curLoc lexbuf) }
+| "let" { vmode:= VerbatimLet; LET (curLoc lexbuf) }
+| "val" { vmode:= VerbatimLet; LET (curLoc lexbuf) }
+| "rec" { verbatimToken lexbuf }
+| "unfold" { verbatimToken lexbuf }
+| "assume" { verbatimToken lexbuf }
+| "." { if !vmode = VerbatimNormal then DOT (curLoc lexbuf) else verbatimToken lexbuf }
+| "=" { verbatimToken lexbuf }
+| "|" { if !vmode = VerbatimTypeBranch then vmode := VerbatimType; verbatimToken lexbuf else verbatimToken lexbuf}
+| ":" { vmode := VerbatimIgnore; verbatimToken lexbuf}
+| ['_''a'-'z''A'-'Z']+['_''a'-'z''A'-'Z''0'-'9''\'']* {
+    match !vmode with 
+    | VerbatimNormal -> 
+      ID ((curLoc lexbuf), lexeme lexbuf)
+    | VerbatimLet ->
+      vmode := VerbatimIgnore;
+      ID ((curLoc lexbuf), lexeme lexbuf)
+    | VerbatimType ->
+      vmode := VerbatimTypeBranch;
+      ID ((curLoc lexbuf), lexeme lexbuf)
+    | VerbatimIgnore ->
+      verbatimToken lexbuf
+    | VerbatimTypeBranch -> 
+      verbatimToken lexbuf
+  }
+| "//"[^'\n''\r']* { verbatimToken lexbuf }
+| "/*" { comment lexbuf ; verbatimToken lexbuf }
+| "(*" { comment lexbuf ; verbatimToken lexbuf }
+| eof { EOF }
+| _ { verbatimToken lexbuf }

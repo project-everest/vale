@@ -20,8 +20,6 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
     | DVar _ | DFun _ -> if !reprint_ghost_decls then [d] else []
     | DVerbatim _ -> if !reprint_verbatims then [d] else []
     | DPragma _ -> [d]
-    | DOpen _ -> []
-    | DModuleAbbrev (_, _) -> []
     | DProc p ->
         let p = if !reprint_specs then p else {p with pspecs = []} in
         let fs (s:stmt):stmt list map_modify =

@@ -107,16 +107,6 @@ let stmts_abstract (useOld:bool) (ss:stmt list):stmt list =
 
 let stmts_refined (ss:stmt list):stmt list =
   map_stmts exp_refined (fun _ -> Unchanged) ss
-
-let make_operand_alias (x:id) (env:env) =
-  let info = 
-    match lookup_id env.tcenv x with
-    | Some info -> info
-    | None -> err ("cannot find declaration of '" + (err_id x) + "'") in
-  match info with
-  | OperandLocal _ | StateInfo _ | OperandAlias _ -> OperandAlias (x, info)
-  | GhostLocal _ | ProcLocal _ | ThreadLocal _ | InlineLocal _ ->
-      err ("'" + (err_id x) + "' must be an operand or state member")
   
 let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
   map_apply_modify (f env e) (fun () ->
@@ -129,7 +119,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         let env =
           match (b, List.map (exp_abstract false) es, fs) with
           | (BindAlias, [EVar y], [(x, t)]) ->
-              let env = {env with tcenv = push_id env.tcenv x (make_operand_alias y env)} in
+              let env = {env with tcenv = push_id env.tcenv x (make_operand_alias y env.tcenv)} in
               env
           | (BindAlias, _, _) -> internalErr (sprintf "BindAlias %A %A" es fs)
           | (_, _, _) ->
@@ -157,35 +147,13 @@ let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp
   env_map_exp (map_apply_compose2 f f_state) env e
 
 let rec env_stmt (env:env) (s:stmt):(env * env) =
+  let envp = {env with tcenv = update_env_stmt env.tcenv s} in
   match s with
-  | SLoc (loc, s) -> env_stmt env s
-  | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SCalc _ -> (env, env)
-  | SVar (x, t, m, g, a, eOpt) ->
-    (
-      let info =
-        match g with
-        | XAlias (AliasThread, e) -> ThreadLocal {local_in_param = false; local_exp = e; local_typ = t}
-        | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
-        | XGhost -> GhostLocal (m, t)
-        | XInline -> InlineLocal t
-        | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
-        in
-      let envp = {env with tcenv = push_id env.tcenv x info} in
-      (env, envp)
-    )
-  | SAlias (x, y) ->
-      let envp = {env with tcenv = push_id env.tcenv x (make_operand_alias y env)} in
-      (env, envp)
-  | SAssign (xs, e) ->
-      let envp = {env with tcenv = push_lhss env.tcenv xs} in
-      (env, envp)
-  | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> (env, env)
   | SForall (xs, ts, ex, e, b) ->
-      let envp = {env with tcenv = push_formals env.tcenv xs} in
-      (envp, env)
-  | SExists (xs, ts, e) ->
-      let envp = {env with tcenv = push_formals env.tcenv xs} in
-      (env, envp)
+    (envp, env)
+  | _ ->
+    (env, envp)
+
 let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (s:stmt):(env * stmt list) =
   map_apply_modify (fs env s) (fun () ->
     let fee = fe env in
@@ -245,7 +213,7 @@ let env_map_spec (fe:env -> exp -> exp) (fs:env -> loc * spec -> (env * (loc * s
               let env = {env with lets = (loc, l)::env.lets} 
               (env, [(loc, LetsVar (x, t, fee e))])
           | LetsAlias (x, y) ->
-              let env = {env with tcenv = push_id env.tcenv x (make_operand_alias y env)} in
+              let env = {env with tcenv = push_id env.tcenv x (make_operand_alias y env.tcenv)} in
               let env = {env with lets = (loc, l)::env.lets} in
               (env, [(loc, l)])
         in
@@ -1357,7 +1325,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
               Replace [SWhile (e, invs, ed, map_stmts (fun e -> e) add_while_ok b)]
           | _ -> Unchanged
           in
-        resolve_stmts envp.tcenv ss;
+        //let t = resolve_stmts envp.tcenv ss in
         let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
         let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
         let ss = resolve_overload_stmts envp ss in
@@ -1365,6 +1333,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         let ss = add_quick_type_stmts ss in
         let ss = rewrite_vars_stmts envp ss in
         let ss = add_quick_blocks_stmts envp (ref 0) ss in
+        let t = resolve_stmts envp.tcenv ss in
         Some ss
     in
   let pNew = {p with pbody = body; pspecs = specs} in
@@ -1380,6 +1349,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
 //     - transformed declaration
 //   - env for subsequent declarations
 let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * env) =
+  let env = {env with tcenv = init_tcenv env.tcenv} in
   match d with
   | DVar (x, t, XAlias (AliasThread, e), _) ->
       let env = {env with tcenv = push_id env.tcenv x (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t})} in
@@ -1404,13 +1374,8 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
           let (env, eds) = List_mapFoldFlip f env ds in
           (List.concat eds, env)
     )
-  | DOpen m ->
-    let env = {env with tcenv = push_module env.tcenv m} in 
-    let env = {env with tcenv = load_module_exports env.tcenv m} in
-    ([(env, env, d)], env)
-  | DModuleAbbrev (x, l) ->
-    let env = {env with tcenv = push_module_abbrev env.tcenv x l} in
-    let env = {env with tcenv = load_module_exports env.tcenv l} in
+  | DVerbatim (a, s) ->
+    let env = {env with tcenv = parse_verbatim env.tcenv a s} in
     ([(env, env, d)], env)
   | _ -> ([(env, env, d)], env)
 

@@ -170,8 +170,6 @@ type decl =
 | DProc of proc_decl
 | DVerbatim of attrs * string list
 | DPragma of prag
-| DOpen of string
-| DModuleAbbrev of string * string
 
 type decls = (loc * decl) list
 
@@ -189,3 +187,9 @@ type id_info =
 | OperandLocal of inout * typ
 | StateInfo of string * exp list * typ
 | OperandAlias of id * id_info
+
+type verbatim_decl =
+| VOpen of string
+| VModuleAbbrev of string * string
+| VLet of string
+| VType of string list

@@ -43,6 +43,8 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 
 %start start
 %type <include_decl list * decls> start
+%start verbatim_start
+%type <verbatim_decl list> verbatim_start
 
 %token <loc * string> ID
 %token <loc * bigint> LITINT
@@ -417,8 +419,6 @@ Decl
       ($1, DVerbatim ($2, $3))
     }
   | MODULE AnyQualifiedId { ($1, DPragma (ModuleName (string_of_id $2))) }
-  | MODULE AnyQualifiedId EQ AnyQualifiedId {($1, DModuleAbbrev ((string_of_id $2), (string_of_id $4)))}
-  | OPEN AnyQualifiedId { ($1, DOpen (string_of_id $2)) }
   | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId SEMI
@@ -440,3 +440,24 @@ Decls
   : { [] }
   | Decl Decls { $1::$2 }
 
+verbatim_start:
+  Vdecls EOF { $1 }
+
+Vtype
+  : AnyQualifiedId { [string_of_id $1] }
+  | AnyQualifiedId Vtype { (string_of_id $1::$2) }
+
+Vtypes
+  : { [] }
+  | Vtype { $1 }
+
+Vdecl
+  : OPEN AnyQualifiedId { VOpen (string_of_id $2) }
+  | MODULE AnyQualifiedId AnyQualifiedId { VModuleAbbrev ((string_of_id $2), (string_of_id $3))}
+  | LET AnyQualifiedId { VLet (string_of_id $2) }
+	| TYPE AnyQualifiedId Vtypes { VType $3 }
+
+Vdecls
+  : {[]}
+	| Vdecl Vdecls { $1::$2 }
+ 
