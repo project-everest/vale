@@ -1,0 +1,73 @@
+include "../../../arch/x64/X64.Vale.InsBasic.vaf"
+include "../../../arch/x64/X64.Vale.InsMem.vaf"
+
+module X64.FastMul
+
+#reset-options "--z3rlimit 30"
+
+#verbatim{:interface}{:implementation}
+open Types_s
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+open X64.Vale.QuickCode_i
+open X64.Vale.QuickCodes_i
+#endverbatim
+
+#verbatim{:interface}
+unfold let validDstAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) = validSrcAddrs64
+#endverbatim
+
+
+procedure{:quick} fast_multiply(
+    ghost dst_b:buffer64, 
+    ghost inA_b:buffer64, 
+    ghost inB_b:buffer64)
+    lets
+        dst_ptr @= rcx;
+        inA_ptr @= rdx;
+        inB_ptr @= r8;
+
+//        A0 @= buffer64_read(inA_b, 0, mem);
+//        A1 @= buffer64_read(inA_b, 1, mem);
+//
+    reads
+        dst_ptr; inA_ptr; inB_ptr;
+
+    modifies
+        mem;
+
+    requires
+        buffers_disjoint(dst_b, inA_b);
+        buffers_disjoint(dst_b, inB_b);
+
+        validDstAddrs64(mem, dst_ptr, dst_b, 4);
+        validSrcAddrs64(mem, inA_ptr, inA_b, 4);
+        validSrcAddrs64(mem, inB_ptr, inB_b, 4);
+
+    ensures
+        let a0 := buffer64_read(inA_b, 0, mem);
+        let a1 := buffer64_read(inA_b, 1, mem);
+        let a2 := buffer64_read(inA_b, 2, mem);
+        let a3 := buffer64_read(inA_b, 3, mem);
+
+        let b0 := buffer64_read(inB_b, 0, mem);
+        let b1 := buffer64_read(inB_b, 1, mem);
+        let b2 := buffer64_read(inB_b, 2, mem);
+        let b3 := buffer64_read(inB_b, 3, mem);
+
+        let d0 := buffer64_read(dst_b, 0, mem);
+        let d1 := buffer64_read(dst_b, 1, mem);
+        let d2 := buffer64_read(dst_b, 2, mem);
+        let d3 := buffer64_read(dst_b, 3, mem);
+
+        let a := a0 + nat64max * a1 + nat128max * a2 + nat192max * a3;
+        let b := b0 + nat64max * b1 + nat128max * b2 + nat192max * b3;
+        let d := d0 + nat64max * d1 + nat128max * d2 + nat192max * d3;
+        d == a * b;
+{
+    assume false;
+}
+
