@@ -14,6 +14,9 @@ open Types_s
 unfold let quad32 = quad32
 
 val cf : (flags:int) -> bool
+val overflow (flags:int) : bool
+val update_cf (flags:int) (new_cf:bool) : (new_flags:int)
+val update_of (flags:int) (new_of:bool) : (new_flags:int)
 
 //unfold let va_subscript = Map.sel
 unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y

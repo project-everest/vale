@@ -89,6 +89,24 @@ procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction}{:quick ex
 {
 }
 
+procedure{:instruction Ins(S.Adcx64(dst, src))}{:fast_instruction}{:quick exportOnly} Adcx64Wrap(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
+        efl == update_cf(old(efl), old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max);
+{
+}
+
+procedure{:instruction Ins(S.Adox64(dst, src))}{:fast_instruction}{:quick exportOnly} Adox64Wrap(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap(add_wrap(dst, src), (if overflow(efl) then 1 else 0)));
+        efl == update_of(old(efl), old(dst + src + (if overflow(efl) then 1 else 0)) >= nat64_max);
+{
+}
+
 procedure{:instruction Ins(S.Sub64(dst, src))}{:fast_instruction}{:quick exportOnly} Sub64(inout dst: dst_opr64, src: opr64)
     requires
         0 <= dst - src;
@@ -123,6 +141,16 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} 
         nat64_max * rdx + rax == old(rax * src);
 {
     lemma_fundamental_div_mod(old(rax), old(src));
+}
+
+procedure{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:fast_instruction}{:quick exportOnly} Mulx64(out dst_hi: dst_opr64, out dst_lo: dst_opr64, src: opr64)
+    requires @dst_hi != @dst_lo;
+    reads
+        rdx; 
+    ensures
+        nat64_max * dst_hi + dst_lo == old(rdx * src);
+{
+    lemma_fundamental_div_mod(old(rdx), old(src));
 }
 
 procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction}{:quick exportOnly} IMul64(inout dst: dst_opr64, src: opr64)

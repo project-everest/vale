@@ -142,8 +142,15 @@ let print_ins (ins:ins) (p:printer) =
                                                MConst nat128_max) in  // Shouldn't hit this, but if we do, assembler will complain
                              name ^ print_ops dst src
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
+  | Adcx64 dst src -> p.ins_name "  adcx" [dst; src] ^ print_ops dst src
+  | Adox64 dst src -> p.ins_name "  adox" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
   | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p) ^ "\n"
+  | Mulx64 dst_hi dst_lo src -> 
+    let hi_s:string = print_operand dst_hi p in
+    let lo_s:string = print_operand dst_lo p in
+    let dst_s:string = hi_s ^ lo_s in  
+  p.ins_name "  mul" [dst_hi; dst_lo; src] ^ print_pair dst_s (print_operand src p)  ^ "\n"
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
   | Xor64 dst src -> p.ins_name "  xor" [dst; src] ^ print_ops dst src
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
