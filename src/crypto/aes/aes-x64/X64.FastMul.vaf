@@ -29,45 +29,108 @@ procedure{:quick} fast_multiply(
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
     lets
-        dst_ptr @= rcx;
-        inA_ptr @= rdx;
-        inB_ptr @= r8;
+        dst_ptr @= rbx;
+        inA_ptr @= rcx;
+        inB_ptr @= rsi;
 
     reads
         dst_ptr; inA_ptr; inB_ptr;
 
     modifies
-        mem;
+        rax; rdx; r8; r9; r10; r11; r12; r13; r14;
+        mem; efl;
 
     requires
         buffers_disjoint(dst_b, inA_b);
         buffers_disjoint(dst_b, inB_b);
 
-        validDstAddrs64(mem, dst_ptr, dst_b, 4);
+        validDstAddrs64(mem, dst_ptr, dst_b, 8);
         validSrcAddrs64(mem, inA_ptr, inA_b, 4);
         validSrcAddrs64(mem, inB_ptr, inB_b, 4);
 
     ensures
-        let a0 := buffer64_read(inA_b, 0, mem);
-        let a1 := buffer64_read(inA_b, 1, mem);
-        let a2 := buffer64_read(inA_b, 2, mem);
-        let a3 := buffer64_read(inA_b, 3, mem);
-
-        let b0 := buffer64_read(inB_b, 0, mem);
-        let b1 := buffer64_read(inB_b, 1, mem);
-        let b2 := buffer64_read(inB_b, 2, mem);
-        let b3 := buffer64_read(inB_b, 3, mem);
-
-        let d0 := buffer64_read(dst_b, 0, mem);
-        let d1 := buffer64_read(dst_b, 1, mem);
-        let d2 := buffer64_read(dst_b, 2, mem);
-        let d3 := buffer64_read(dst_b, 3, mem);
-
-        let a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
-        let b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
-        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3;
-        d == a * b;
+//        let a0 := buffer64_read(inA_b, 0, mem);
+//        let a1 := buffer64_read(inA_b, 1, mem);
+//        let a2 := buffer64_read(inA_b, 2, mem);
+//        let a3 := buffer64_read(inA_b, 3, mem);
+//
+//        let b0 := buffer64_read(inB_b, 0, mem);
+//        let b1 := buffer64_read(inB_b, 1, mem);
+//        let b2 := buffer64_read(inB_b, 2, mem);
+//        let b3 := buffer64_read(inB_b, 3, mem);
+//
+//        let d0 := buffer64_read(dst_b, 0, mem);
+//        let d1 := buffer64_read(dst_b, 1, mem);
+//        let d2 := buffer64_read(dst_b, 2, mem);
+//        let d3 := buffer64_read(dst_b, 3, mem);
+//
+//        let a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
+//        let b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
+//        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3;
+//        d == a * b;
 {
-    assume false;
+//    "movq   (%1), %%rdx; " /* A[0] */
+//    "mulx   (B),  %%r8,  %%r9; " /* A[0]*B[0] */    "xorl %%r10d, %%r10d ;"                           "movq  %%r8,  (dst) ;"
+//    "mulx  8(B), %%r10, %%r11; " /* A[0]*B[1] */    "adox  %%r9, %%r10 ;"                             "movq %%r10, 8(dst) ;"
+//    "mulx 16(B), %%r12, %%r13; " /* A[0]*B[2] */    "adox %%r11, %%r12 ;"
+//    "mulx 24(B), %%r14, %%rdx; " /* A[0]*B[3] */    "adox %%r13, %%r14 ;"                                                       "movq $0, %%rax ;"
+//    /*******************************************/   "adox %%rdx, %%rax ;"
+
+    Load64_buffer(rdx, inA_ptr,  0, inA_b, 0);     /* A[0] */
+    /* The Xo64 clears the flags used for carry bits; NOTE: Original code uses xorl with r10d, maybe produces smaller code? */
+    Mulx64( r8,  r9, Mem(inB_ptr,  0, inB_b, 0));  /* A[0]*B[0] */ Xor64(r10, r10);         Store64_buffer(dst_ptr, r8, 0, dst_b, 0);
+    Mulx64(r10, r11, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ Adox64Wrap(r10,  r9);    Store64_buffer(dst_ptr, r8, 8, dst_b, 1);
+    Mulx64(r12, r13, Mem(inB_ptr, 16, inB_b, 2));  /* A[0]*B[2] */ Adox64Wrap(r12, r11);    
+    Mulx64(r14, rdx, Mem(inB_ptr, 24, inB_b, 3));  /* A[0]*B[3] */ Adox64Wrap(r14, r13);    Mov64(rax, 0);
+    /*******************************************/                  Adox64Wrap(rax, rdx);
+
+    
+//
+//    "movq  8(A), %%rdx; " /* A[1] */
+//    "mulx   (B),  %%r8,  %%r9; " /* A[1]*B[0] */    "xorl %%r10d, %%r10d ;"  "adcx 8(dst),  %%r8 ;"    "movq  %%r8,  8(dst) ;"
+//    "mulx  8(B), %%r10, %%r11; " /* A[1]*B[1] */    "adox  %%r9, %%r10 ;"    "adcx %%r12, %%r10 ;"    "movq %%r10, 16(dst) ;"
+//    "mulx 16(B), %%r12, %%r13; " /* A[1]*B[2] */    "adox %%r11, %%r12 ;"    "adcx %%r14, %%r12 ;"                              "movq $0, %%r8  ;"
+//    "mulx 24(B), %%r14, %%rdx; " /* A[1]*B[3] */    "adox %%r13, %%r14 ;"    "adcx %%rax, %%r14 ;"                              "movq $0, %%rax ;"
+//    /*******************************************/   "adox %%rdx, %%rax ;"    "adcx  %%r8, %%rax ;"
+
+    Load64_buffer(rdx, inA_ptr,  8, inA_b, 1);     /* A[1] */
+    Mulx64( r8,  r9, Mem(inB_ptr,  0, inB_b, 0));  /* A[1]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr,  8, dst_b, 1));   Store64_buffer(dst_ptr, r8,  8, dst_b, 1);  // REVIEW: Why not combine the Adcx with the Store?
+    Mulx64(r10, r11, Mem(inB_ptr,  8, inB_b, 1));  /* A[1]*B[1] */ Adox64Wrap(r10,  r9);  Adcx64Wrap(r10, r12);                         Store64_buffer(dst_ptr, r10, 16, dst_b, 2);  
+    Mulx64(r12, r13, Mem(inB_ptr, 16, inB_b, 2));  /* A[1]*B[2] */ Adox64Wrap(r12, r11);  Adcx64Wrap(r12, r14);                         Mov64( r8, 0);
+    Mulx64(r14, rdx, Mem(inB_ptr, 24, inB_b, 3));  /* A[1]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(rax, r14);                         Mov64(rax, 0);
+    /*******************************************/                  Adox64Wrap(rax, rdx);  Adcx64Wrap(rax, r8);
+
+//
+//
+//    "movq 16(A), %%rdx; " /* A[2] */
+//    "mulx   (B),  %%r8,  %%r9; " /* A[2]*B[0] */    "xorl %%r10d, %%r10d ;"  "adcx 16(dst), %%r8 ;"    "movq  %%r8, 16(dst) ;"
+//    "mulx  8(B), %%r10, %%r11; " /* A[2]*B[1] */    "adox  %%r9, %%r10 ;"    "adcx %%r12, %%r10 ;"    "movq %%r10, 24(dst) ;"
+//    "mulx 16(B), %%r12, %%r13; " /* A[2]*B[2] */    "adox %%r11, %%r12 ;"    "adcx %%r14, %%r12 ;"                              "movq $0, %%r8  ;"
+//    "mulx 24(B), %%r14, %%rdx; " /* A[2]*B[3] */    "adox %%r13, %%r14 ;"    "adcx %%rax, %%r14 ;"                              "movq $0, %%rax ;"
+//    /*******************************************/   "adox %%rdx, %%rax ;"    "adcx  %%r8, %%rax ;"
+
+    Load64_buffer(rdx, inA_ptr, 16, inA_b, 2);     /* A[2] */
+    Mulx64( r8,  r9, Mem(inB_ptr,  0, inB_b, 0));  /* A[2]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr, 16, dst_b, 2));   Store64_buffer(dst_ptr,  r8, 16, dst_b, 2);  
+    Mulx64(r10, r11, Mem(inB_ptr,  8, inB_b, 1));  /* A[2]*B[1] */ Adox64Wrap(r10,  r9);  Adcx64Wrap(r10, r12);                         Store64_buffer(dst_ptr, r10, 24, dst_b, 3);  
+    Mulx64(r12, r13, Mem(inB_ptr, 16, inB_b, 2));  /* A[2]*B[2] */ Adox64Wrap(r12, r11);  Adcx64Wrap(r12, r14);                         Mov64( r8, 0);
+    Mulx64(r14, rdx, Mem(inB_ptr, 24, inB_b, 3));  /* A[2]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(rax, r14);                         Mov64(rax, 0);
+    /*******************************************/                  Adox64Wrap(rax, rdx);  Adcx64Wrap(rax, r8);
+
+//
+//    "movq 24(A), %%rdx; " /* A[3] */
+//    "mulx   (B),  %%r8,  %%r9; " /* A[3]*B[0] */    "xorl %%r10d, %%r10d ;"  "adcx 24(dst), %%r8 ;"   "movq  %%r8, 24(dst) ;"
+//    "mulx  8(B), %%r10, %%r11; " /* A[3]*B[1] */    "adox  %%r9, %%r10 ;"    "adcx %%r12, %%r10 ;"    "movq %%r10, 32(dst) ;"
+//    "mulx 16(B), %%r12, %%r13; " /* A[3]*B[2] */    "adox %%r11, %%r12 ;"    "adcx %%r14, %%r12 ;"    "movq %%r12, 40(dst) ;"    "movq $0, %%r8  ;"
+//    "mulx 24(B), %%r14, %%rdx; " /* A[3]*B[3] */    "adox %%r13, %%r14 ;"    "adcx %%rax, %%r14 ;"    "movq %%r14, 48(dst) ;"    "movq $0, %%rax ;"
+//    /*******************************************/   "adox %%rdx, %%rax ;"    "adcx  %%r8, %%rax ;"    "movq %%rax, 56(dst) ;"
+
+    Load64_buffer(rdx, inA_ptr, 24, inA_b, 3);     /* A[3] */
+    Mulx64( r8,  r9, Mem(inB_ptr,  0, inB_b, 0));  /* A[3]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr, 16, dst_b, 2));   Store64_buffer(dst_ptr,  r8, 24, dst_b, 3);  
+    Mulx64(r10, r11, Mem(inB_ptr,  8, inB_b, 1));  /* A[3]*B[1] */ Adox64Wrap(r10,  r9);  Adcx64Wrap(r10, r12);                         Store64_buffer(dst_ptr, r10, 32, dst_b, 4);  
+
+    Mulx64(r12, r13, Mem(inB_ptr, 16, inB_b, 2));  /* A[3]*B[2] */ Adox64Wrap(r12, r11);  Adcx64Wrap(r12, r14);                         Store64_buffer(dst_ptr, r12, 40, dst_b, 5);   Mov64( r8, 0);
+    Mulx64(r14, rdx, Mem(inB_ptr, 24, inB_b, 3));  /* A[3]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(rax, r14);                         Store64_buffer(dst_ptr, r14, 48, dst_b, 6);   Mov64(rax, 0);
+    /*******************************************/                  Adox64Wrap(rax, rdx);  Adcx64Wrap(rax, r8);                          Store64_buffer(dst_ptr, rax, 56, dst_b, 7);
+
 }
 
