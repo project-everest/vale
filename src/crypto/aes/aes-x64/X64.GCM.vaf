@@ -68,7 +68,7 @@ procedure {:quick exportOnly} gcm_core(
 
     modifies
         rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; iv;
-        xmm6; xmm7;
+        xmm6; 
         mem; efl; 
 
 
@@ -228,7 +228,112 @@ let mk_gctr_plain (p:seq quad32) : gctr_plain =
 #endverbatim
 
 
-procedure {:verify true} gcm_stdcall(
+procedure {:quick} gcm_stdcall_inner(
+    ghost args_b:buffer64,
+    ghost iv:quad32,
+
+    ghost plain_b:buffer128,
+    ghost auth_b:buffer128,
+    ghost iv_b:buffer128,
+    ghost out_b:buffer128,
+    ghost tag_b:buffer128,
+
+    ghost key:aes_key(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128
+    )
+    modifies
+        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        mem; efl;
+    lets
+        args_ptr := r9;
+
+        plain_ptr         := buffer64_read(args_b, 0, mem);
+        plain_len         := buffer64_read(args_b, 1, mem);
+        auth_ptr          := buffer64_read(args_b, 2, mem);
+        auth_len          := buffer64_read(args_b, 3, mem);
+        iv_ptr            := buffer64_read(args_b, 4, mem);
+        expanded_key_ptr  := buffer64_read(args_b, 5, mem);
+        out_ptr           := buffer64_read(args_b, 6, mem);
+        tag_ptr           := buffer64_read(args_b, 7, mem);
+
+    requires
+        validSrcAddrs64(mem, args_ptr, args_b, 9);
+
+        buffers_disjoint128(plain_b, out_b);
+        buffers_disjoint128(auth_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
+        buffers_disjoint128(out_b, tag_b);
+        
+        validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
+        validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
+        validSrcAddrs128(mem, iv_ptr, iv_b, 1);
+        validDstAddrs128(mem, out_ptr, out_b, plain_len);
+        validDstAddrs128(mem, tag_ptr, tag_b, 1);
+
+        plain_ptr + 16 * plain_len < nat64_max;
+        auth_ptr + 16 * auth_len < nat64_max;
+        out_ptr + 16 * plain_len < nat64_max;
+        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
+        buffer_length(auth_b) == auth_len;
+
+        iv == buffer128_read(iv_b, 0, mem);
+
+        // To simplify length calculations, restrict auth and plain length further
+        256 * auth_len < nat32_max;
+        256 * plain_len < nat32_max;
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
+
+    ensures
+        modifies_buffer128_2(out_b, tag_b, old(mem), mem);
+
+        validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
+        validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
+
+        256 * buffer_length(plain_b) < nat32_max;
+        256 * buffer_length(auth_b) < nat32_max;
+        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+{
+//    assert {:quick_start} true;
+
+    Load64_buffer(r12, r9,  0, args_b, 0);
+    //assert r12 == plain_ptr;
+    Load64_buffer(r13, r9,  8, args_b, 1);
+    //assert r13 == plain_len;
+    Load64_buffer(r14, r9, 16, args_b, 2);
+    Load64_buffer(r11, r9, 24, args_b, 3);
+    Load64_buffer(r10, r9, 32, args_b, 4);
+    Load64_buffer(r8,  r9, 40, args_b, 5);
+    Load64_buffer(rbx, r9, 48, args_b, 6);
+    Load64_buffer(r15, r9, 56, args_b, 7);
+
+    // Load the IV into its XMM register
+    Load128_buffer(xmm7, r10, 0, iv_b, 0);
+
+    //assert iv == xmm7;
+//    assert {:quick_end} true;
+
+    gcm_core(plain_b, auth_b, out_b, key, round_keys, keys_b);
+
+//    assert buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+
+    //assert create(1, xmm1) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+    // Auth tag is still in xmm1, so save it to memory
+    Store128_buffer(r15, xmm1, 0, tag_b, 0);
+    //assert buffer128_as_seq(mem, tag_b) == create(1, xmm1);
+    //assert buffer128_read(tag_b, 0, mem) == create(1, xmm1);
+
+    //assert create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+    //assert buffer128_as_seq(mem, tag_b) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+}
+
+procedure {:quick exportOnly} {:verify true} gcm_stdcall(
     inline win:bool,
     ghost args_b:buffer64,
     ghost iv:quad32,
@@ -244,11 +349,9 @@ procedure {:verify true} gcm_stdcall(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    reads
-        rdi;
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
-        rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+        rbp; rdi; rsi; 
         mem; efl;
     lets
         args_ptr := if win then rcx else rdi;
@@ -272,6 +375,13 @@ procedure {:verify true} gcm_stdcall(
         buffers_disjoint128(out_b, tag_b);
         
         buffers_disjoint(args_b, tmp_b);
+
+        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(plain_b)));
+        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(auth_b)));
+        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(iv_b)));
+        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(out_b)));
+        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(tag_b)));
+        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(keys_b)));
 
         validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
@@ -300,7 +410,7 @@ procedure {:verify true} gcm_stdcall(
 
     ensures
 //        modifies_mem(loc_union(loc_union(loc_buffer(tmp_b), loc_buffer(out_b)), loc_buffer(tag_b)), old(mem), mem);
-//
+
 //        validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
 //        validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
 //
@@ -308,7 +418,7 @@ procedure {:verify true} gcm_stdcall(
 //        256 * buffer_length(auth_b) < nat32_max;
 //        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 //        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-//
+
 //        // Calling convention for caller/callee saved registers
 //
 //        // Windows:
@@ -323,14 +433,13 @@ procedure {:verify true} gcm_stdcall(
 //
 //        // Linux:
 //        !win ==> rbx == old(rbx);
-//        //!win ==> rbp == old(rbp);
+//        !win ==> rbp == old(rbp);
 //        !win ==> r12 == old(r12);
 //        !win ==> r13 == old(r13);
 //        !win ==> r14 == old(r14);
 //        !win ==> r15 == old(r15);
 {
     // Shuffle the incoming pointer around
-    // REVIEW: Why can't I write: Mov64(r12, plain_ptr);  ?
     inline if (win) {
         Mov64(r9, rcx);
     } else {
@@ -338,50 +447,42 @@ procedure {:verify true} gcm_stdcall(
     }
     assert r9 == args_ptr;
 
+    //assert {:quick_start} true;
+    Load64_buffer(rax, r9, 64, args_b, 8);
+    callee_save_registers(tmp_b);
+
+    // Save a copy of the tmp_ptr
+    Mov64(rsi, rax);
+
+    gcm_stdcall_inner(args_b, iv, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
+
+    // Restore tmp_ptr
+    Mov64(rax, rsi);
+    callee_restore_registers(tmp_b);
+
+    assert modifies_mem(loc_union(loc_union(loc_buffer(tmp_b), loc_buffer(out_b)), loc_buffer(tag_b)), old(mem), mem);
+    assert validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
+    assert validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
+    assert 256 * buffer_length(plain_b) < nat32_max;
+    assert 256 * buffer_length(auth_b) < nat32_max;
+    assert buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+    assert create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+
+    assert win ==> rbx == old(rbx);
+    assert win ==> rbp == old(rbp);
+    assert win ==> rdi == old(rdi);
+    assert win ==> rsi == old(rsi);
+    assert win ==> r12 == old(r12);
+    assert win ==> r13 == old(r13);
+    assert win ==> r14 == old(r14);
+    assert win ==> r15 == old(r15);
+
+    assert !win ==> rbx == old(rbx);
+    assert !win ==> rbp == old(rbp);
+    assert !win ==> r12 == old(r12);
+    assert !win ==> r13 == old(r13);
+    assert !win ==> r14 == old(r14);
+    assert !win ==> r15 == old(r15);
+
     assume false;
-//    Load64_buffer(rax, r9, 64, args_b, 8);
-//    assert validSrcAddrs64(mem, r9, args_b, 9);
-//    assume false;
-//    //assert r9 == args_ptr;
-//    callee_save_registers(tmp_b);
-//
-//    assert buffer_readable(mem, args_b);
-//    assert 9 <= buffer_length(args_b);
-//    assert buffer_addr(args_b) == r9;
-//    assert validSrcAddrs64(mem, r9, args_b, 9);
-//    assume false;
-//
-//    Load64_buffer(r12, r9,  0, args_b, 0);
-//    //assert r12 == plain_ptr;
-//    Load64_buffer(r13, r9,  8, args_b, 1);
-//    //assert r13 == plain_len;
-//    Load64_buffer(r14, r9, 16, args_b, 2);
-//    Load64_buffer(r11, r9, 24, args_b, 3);
-//    Load64_buffer(r10, r9, 32, args_b, 4);
-//    Load64_buffer(r8,  r9, 40, args_b, 5);
-//    Load64_buffer(rbx, r9, 48, args_b, 6);
-//    Load64_buffer(r15, r9, 56, args_b, 7);
-//
-//    // Load the IV into its XMM register
-//    Load128_buffer(xmm7, r10, 0, iv_b, 0);
-//
-//    //assert iv == xmm7;
-//
-//    gcm_core(plain_b, auth_b, out_b, key, round_keys, keys_b);
-//
-////    assert buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-//
-//    //assert create(1, xmm1) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-//    // Auth tag is still in xmm1, so save it to memory
-//    Store128_buffer(r15, xmm1, 0, tag_b, 0);
-//    //assert buffer128_as_seq(mem, tag_b) == create(1, xmm1);
-//    //assert buffer128_read(tag_b, 0, mem) == create(1, xmm1);
-//
-//    //assert create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-//    //assert buffer128_as_seq(mem, tag_b) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
-//
-//    // REVIEW: With no ensures clause, when we assume false, we verify in ~9 seconds, but without it, we take 186 seconds
-//    //         In exportOnly mode, it times out after 59 seconds
-//    callee_restore_registers(tmp_b);
-//    assume false;
 }
