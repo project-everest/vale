@@ -112,6 +112,8 @@ val check_if_block_consumes_fixed_time: (block:tainted_codes) -> (ts:taintState)
 val check_if_code_consumes_fixed_time: (code:tainted_code) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[code; count_publics ts; 1])
 val check_if_loop_consumes_fixed_time: (code:tainted_code{While? code}) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[code; count_publics ts; 0])
 
+#set-options "--detail_errors"
+
 let rec check_if_block_consumes_fixed_time (block:tainted_codes) (ts:taintState) : bool * taintState =
   match block with
   | [] -> true, ts
@@ -128,8 +130,8 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
 
   | IfElse ifCond ifTrue ifFalse ->
     let cond_taint = ifCond.ot in
-    let o1 = operand_taint (get_fst_ocmp ifCond.o) ts in
-    let o2 = operand_taint (get_snd_ocmp ifCond.o) ts in
+    let o1 = operand_taint (get_fst_ocmp ifCond.o) ts Public in
+    let o2 = operand_taint (get_snd_ocmp ifCond.o) ts Public in
     let predTaint = merge_taint (merge_taint o1 o2) cond_taint in
     if (Secret? predTaint) then (false, ts)
     else
@@ -152,8 +154,8 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
 and check_if_loop_consumes_fixed_time c (ts:taintState) : bool * taintState =
   let While pred body = c in
   let cond_taint = pred.ot in
-  let o1 = operand_taint (get_fst_ocmp pred.o) ts in
-  let o2 = operand_taint (get_snd_ocmp pred.o) ts in
+  let o1 = operand_taint (get_fst_ocmp pred.o) ts Public in
+  let o2 = operand_taint (get_snd_ocmp pred.o) ts Public in
   let predTaint = merge_taint (merge_taint o1 o2) cond_taint in
 
   if (Secret? predTaint) then false, ts
@@ -184,7 +186,7 @@ let lemma_equal_eval_isConstant_aux code1 code2 ts ts' s1 s2 fuel = ()
 val lemma_equal_eval_isConstant: (code1: tainted_code) -> (code2:tainted_code) -> (ts:taintState) -> (ts':taintState) -> Lemma ((forall s. taint_eval_code code1 s == taint_eval_code code2 s) ==> 
   isConstantTime code1 ts /\ isLeakageFree code1 ts ts' ==> isConstantTime code2 ts /\ isLeakageFree code2 ts ts')
 
-#set-options "--z3rlimit 20"
+#reset-options "--z3rlimit 20 --initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2"
 let lemma_equal_eval_isConstant code1 code2 ts ts' = FStar.Classical.forall_intro_3 (lemma_equal_eval_isConstant_aux code1 code2 ts ts')
 
 val monotone_ok_eval: (code:tainted_code) -> (fuel:nat) -> (s:traceState) -> Lemma
@@ -253,7 +255,7 @@ val lemma_loop_taintstate_monotone: (ts:taintState) -> (code:tainted_code{While?
   taintstate_monotone ts ts'))
 (decreases %[count_publics ts; code])
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 60 --z3cliopt smt.CASE_SPLIT=2"
+#reset-options "--initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2 --z3rlimit 60"
 let rec lemma_loop_taintstate_monotone ts code =
   let While pred body = code in
   let b, ts' = check_if_code_consumes_fixed_time body ts in
@@ -284,7 +286,7 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
   (b2t b ==> isConstantTimeGivenStates code fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2)))
  (decreases %[fuel; code; 0])
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 150 --z3cliopt smt.CASE_SPLIT=3"
+#reset-options "--initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2 --z3rlimit 150 --detail_errors"
  let rec lemma_code_explicit_leakage_free ts code s1 s2 fuel = match code with
   | Ins ins -> lemma_ins_leakage_free ts ins
   | Block block -> lemma_block_explicit_leakage_free ts block s1 s2 fuel
@@ -295,7 +297,7 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
     let st2, b2 = taint_eval_ocmp s2 ifCond in
     let st2 = {st2 with trace=BranchPredicate(b2)::s2.trace} in
  
-    assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
+    // assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
     monotone_ok_eval ifTrue fuel st1;
     monotone_ok_eval ifTrue fuel st2;
     lemma_code_explicit_leakage_free ts ifTrue st1 st2 fuel;
@@ -329,11 +331,11 @@ and lemma_loop_explicit_leakage_free ts code s1 s2 fuel =
   let While cond body = code in
   let (st1, b1) = taint_eval_ocmp s1 cond in
   let (st2, b2) = taint_eval_ocmp s2 cond in
-  assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> b1 = b2);
-  assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
+  // assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> b1 = b2);
+  // assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
   if not b1 || not b2 then
   (
-  assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> not b1 /\ not b2);
+  // assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> not b1 /\ not b2);
   assert (not b1 ==> r1 == Some ({st1 with trace = BranchPredicate(false)::st1.trace}));
   assert (not b2 ==> r2 == Some ({st2 with trace = BranchPredicate(false)::st2.trace}));
   monotone_ok_eval_while code fuel s1;
@@ -347,7 +349,7 @@ and lemma_loop_explicit_leakage_free ts code s1 s2 fuel =
   else
   let st'1 = ({st1 with trace = BranchPredicate(true)::st1.trace}) in
   let st'2 = ({st2 with trace = BranchPredicate(true)::st2.trace}) in
-  assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st'1.state.ok /\ st'2.state.ok ==> constTimeInvariant ts st'1 st'2);
+  // assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st'1.state.ok /\ st'2.state.ok ==> constTimeInvariant ts st'1 st'2);
   let b', ts' = check_if_code_consumes_fixed_time body ts in
   lemma_code_explicit_leakage_free ts body st'1 st'2 (fuel-1);
   monotone_ok_eval body (fuel-1) st'1;
@@ -367,7 +369,6 @@ and lemma_loop_explicit_leakage_free ts code s1 s2 fuel =
   lemma_loop_explicit_leakage_free combined_ts code st1 st2 (fuel-1);
   isConstant_monotone ts combined_ts code (fuel-1) st1 st2;
   isExplicit_monotone2 ts_aux ts combined_ts code (fuel-1) st1 st2;
-  assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts' st1 st2);
   ()
   
 val lemma_code_leakage_free: (ts:taintState) -> (code:tainted_code) -> Lemma
