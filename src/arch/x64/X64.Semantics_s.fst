@@ -22,10 +22,16 @@ type ins =
   | And64      : dst:operand -> src:operand -> ins
   | Shr64      : dst:operand -> amt:operand -> ins
   | Shl64      : dst:operand -> amt:operand -> ins
+  | Paddd      : dst:xmm -> src:xmm -> ins
   | Pxor       : dst:xmm -> src:xmm -> ins
-  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
+  | Pslld      : dst:xmm -> amt:int -> ins
+  | Psrld      : dst:xmm -> amt:int -> ins
+  | Pshufb     : dst:xmm -> src:xmm -> ins  
+  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
   | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
+  | Pclmulqdq  : dst:xmm -> src:xmm -> imm:int -> ins
   | AESNI_enc           : dst:xmm -> src:xmm -> ins
   | AESNI_enc_last      : dst:xmm -> src:xmm -> ins
   | AESNI_dec           : dst:xmm -> src:xmm -> ins
@@ -56,6 +62,8 @@ noeq type state = {
 //let v (u:uint64) : nat64 = FStar.UInt64.v u
 
 assume val havoc : state -> ins -> nat64
+
+// TODO: Need to be sure that load/store_mem does an appropriate little-endian load
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
@@ -210,6 +218,13 @@ let fail :st unit =
   fun s -> (), {s with ok=false}
 
 unfold
+let check_imm (valid:bool) : st unit =
+  if valid then
+    return ()
+  else
+    fail
+
+unfold
 let check (valid: state -> bool) : st unit =
   s <-- get;
   if valid s then
@@ -338,10 +353,36 @@ let eval_ins (ins:ins) : st unit =
 
 // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
 // since all possibilities are valid, thanks to dependent types 
-   
+
+  | Paddd dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (Quad32 ((dst_q.lo + src_q.lo) % nat32_max)
+			       ((dst_q.mid_lo + src_q.mid_lo) % nat32_max)
+			       ((dst_q.mid_hi + src_q.mid_hi) % nat32_max)
+			       ((dst_q.hi + src_q.hi) % nat32_max))
+
   | Pxor dst src ->
     update_xmm dst ins (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
+  | Pslld dst amt ->
+    check_imm (0 <= amt && amt < 32);;
+    update_xmm dst ins (quad32_map (fun i -> ishl i amt) (eval_xmm dst s))
+
+  | Psrld dst amt ->
+    check_imm (0 <= amt && amt < 32);;
+    update_xmm dst ins (quad32_map (fun i -> ishr i amt) (eval_xmm dst s))
+ 
+  | Pshufb dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    // We only spec a restricted version sufficient for doing a byte reversal
+    check_imm (src_q.lo     = 0x0C0D0E0F &&
+	       src_q.mid_lo = 0x08090A0B &&
+	       src_q.mid_hi = 0x04050607 &&
+	       src_q.hi     = 0x00010203);;
+    update_xmm dst ins (reverse_bytes_quad32 dst_q)
+    
   | Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
@@ -352,7 +393,12 @@ let eval_ins (ins:ins) : st unit =
          (select_word src_val (Bits_of_Byte?.hi bits))
     in
     update_xmm dst ins permuted_xmm
-    
+
+  | Pinsrd dst src index ->
+    check (valid_operand src);;
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % nat32_max) (index % 4))
+
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need
     let src_q = eval_xmm src s in
@@ -362,6 +408,23 @@ let eval_ins (ins:ins) : st unit =
   | MOVDQU dst src ->
     check (valid_mov128_op src);; 
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
+
+  | Pclmulqdq dst src imm ->
+    (
+      let Quad32 a0 a1 a2 a3 = eval_xmm dst s in
+      let Quad32 b0 b1 b2 b3 = eval_xmm src s in
+      let f x0 x1 y0 y1 =
+        let x = Math.Poly2.Bits_s.of_double32 (Double32 x0 x1) in
+        let y = Math.Poly2.Bits_s.of_double32 (Double32 y0 y1) in
+        update_xmm dst ins (Math.Poly2.Bits_s.to_quad32 (Math.Poly2_s.mul x y))
+        in
+      match imm with
+      | 0 -> f a0 a1 b0 b1
+      | 1 -> f a2 a3 b0 b1
+      | 16 -> f a0 a1 b2 b3
+      | 17 -> f a2 a3 b2 b3
+      | _ -> fail
+    )
 
   | AESNI_enc dst src ->
     let dst_q = eval_xmm dst s in

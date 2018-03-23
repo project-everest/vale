@@ -19,22 +19,6 @@ let quad32_shl32 (q:quad32) : quad32 =
   let Quad32 v0 v1 v2 v3 = q in
   Quad32 0 v0 v1 v2
 
-assume val lemma_BitwiseXorCommutative (x y:nat32) : Lemma (x *^ y == y *^ x)
-assume val lemma_BitwiseXorWithZero (n:nat32) : Lemma (n *^ 0 == n)
-assume val lemma_BitwiseXorCancel (n:nat32) : Lemma (n *^ n == 0)
-assume val lemma_BitwiseXorAssociative (x y z:nat32) : Lemma (x *^ (y *^ z) == (x *^ y) *^ z)
-
-assume val xor_lemmas (_:unit) : Lemma
-  (ensures
-    (forall (x y:nat32).{:pattern (x *^ y)} x *^ y == y *^ x) /\
-    (forall (n:nat32).{:pattern (n *^ 0)} n *^ 0 == n) /\
-    (forall (n:nat32).{:pattern (n *^ n)} n *^ n == 0) /\
-    (forall (x y z:nat32).{:pattern (x *^ (y *^ z))} x *^ (y *^ z) == (x *^ y) *^ z)
-  )
-
-assume val lemma_RotWordSubWordCommutativity (x:nat32) : Lemma
-  (rot_word (sub_word x) == sub_word (rot_word x))
-
 
 // Redefine key expansion in terms of quad32 values rather than nat32 values,
 // then prove both definitions are equivalent.
@@ -54,11 +38,12 @@ let rec expand_key_128 (key:aes_key AES_128) (round:nat) : quad32 =
   if round = 0 then Quad32 key.[0] key.[1] key.[2] key.[3]
   else round_key_128 (expand_key_128 key (round - 1)) round
 
-#reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0 --z3rlimit 40"
+#reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0"
 let lemma_expand_key_128_0 (key:aes_key AES_128) : Lemma
   (equal key (expand_key AES_128 key 4))
   = ()
 
+#reset-options "--initial_fuel 1 --max_fuel 1 --max_ifuel 0 --z3rlimit 10"
 let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
   (requires
     0 < i /\ i < 11
@@ -72,7 +57,13 @@ let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
     let Quad32 r0 r1 r2 r3 = round_key_128 prev i in
     r0 == w.[n + 0] /\ r1 == w.[n + 1] /\ r2 == w.[n + 2] /\ r3 == w.[n + 3]
   ))
-  = ()
+  =
+  let n = 4 * i in
+  // unfold expand_key 4 times (could use fuel, but that unfolds everything):
+  let _ = expand_key AES_128 key (n + 1) in
+  let _ = expand_key AES_128 key (n + 2) in
+  let _ = expand_key AES_128 key (n + 3) in
+  ()
 #reset-options
 
 // expand_key for large 'size' argument agrees with expand_key for smaller 'size' argument
@@ -83,6 +74,7 @@ let rec lemma_expand_append (key:aes_key AES_128) (size1:nat) (size2:nat) : Lemm
   =
   if size1 < size2 then lemma_expand_append key size1 (size2 - 1)
 
+#reset-options "--z3rlimit 10"
 // quad32 key expansion is equivalent to nat32 key expansion
 let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
   (requires size <= 11)
@@ -101,6 +93,7 @@ let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
     if i = 0 then lemma_expand_key_128_0 key
     else lemma_expand_key_128_i key i
   )
+#reset-options
 
 // Refine round_key_128 to a SIMD computation
 let simd_round_key_128 (prev:quad32) (rcon:nat32) : quad32 =
@@ -115,5 +108,5 @@ let simd_round_key_128 (prev:quad32) (rcon:nat32) : quad32 =
 let lemma_simd_round_key (prev:quad32) (rcon:nat32) : Lemma
   (simd_round_key_128 prev rcon == round_key_128_rcon prev rcon)
   =
-  lemma_RotWordSubWordCommutativity prev.hi;
-  xor_lemmas ()
+  commute_rot_word_sub_word prev.hi;
+  Types_i.xor_lemmas ()

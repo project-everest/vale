@@ -55,6 +55,7 @@ unfold let buffer_readable (#t:M.typ) (h:mem) (b:M.buffer t) = M.buffer_readable
 //unfold let buffer_length = M.buffer_length
 unfold let buffer_length (#t:M.typ) (b:M.buffer t) = M.buffer_length #t b
 unfold let buffer64_as_seq (m:mem) (b:buffer64) : GTot (Seq.seq nat64) = M.buffer_as_seq m b
+unfold let buffer128_as_seq (m:mem) (b:buffer128) : GTot (Seq.seq quad32) = M.buffer_as_seq m b
 unfold let valid_src_addr (#t:M.typ) (m:mem) (b:M.buffer t) (i:int) : Type0 =
   0 <= i /\ i < buffer_length b /\ buffer_readable m b
 unfold let valid_dst_addr (#t:M.typ) (m:mem) (b:M.buffer t) (i:int) : Type0 =
@@ -67,6 +68,7 @@ unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
+unfold let loc_union = M.loc_union
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -263,11 +265,15 @@ let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) 
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 unfold let modifies_buffer128 (b:buffer128) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+unfold let modifies_buffer128_2 (b1 b2:buffer128) (h1 h2:mem) = modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b == addr
+
+let validDstAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+    validSrcAddrs64 m addr b len
 
 let validSrcAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
     buffer_readable m b /\
@@ -300,7 +306,11 @@ let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Ty
 unfold let buffers_disjoint (b1 b2:buffer64) =
     locs_disjoint [loc_buffer b1; loc_buffer b2]
 
+unfold let buffers_disjoint128 (b1 b2:buffer128) =
+    locs_disjoint [loc_buffer b1; loc_buffer b2]
 
+unfold let buffers3_disjoint128 (b1 b2 b3:buffer128) =
+    locs_disjoint [loc_buffer b1; loc_buffer b2; loc_buffer b3]
 
 val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0

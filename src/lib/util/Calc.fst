@@ -3,6 +3,7 @@ module Calc
 open FStar.Tactics
 open FStar.Tactics.Canon
 
+(*
 //The normalize_term's here are important, see (XXX)
 let ( &= ) (#a:Type) (x:a) (y:a) : 
     (unit -> Pure a (requires (normalize_term x == y)) (fun z -> z == y /\  
@@ -39,3 +40,4 @@ let z3 = ()
 let done = ()
 let qed = ()
 (* let ( &. ) (#a : Type) (x:a) (_:unit) = () *)
+*)
