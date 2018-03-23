@@ -333,7 +333,7 @@ procedure {:quick} gcm_stdcall_inner(
     //assert buffer128_as_seq(mem, tag_b) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 }
 
-procedure {:quick exportOnly} {:verify true} gcm_stdcall(
+procedure {:quick exportOnly} gcm_stdcall(
     inline win:bool,
     ghost args_b:buffer64,
     ghost iv:quad32,
