@@ -23,6 +23,9 @@ let sub l i = l - i
 
 let disjoint_or_eq ptr1 ptr2 = B.disjoint ptr1 ptr2 \/ ptr1 == ptr2
 
+let list_disjoint_or_eq (#a:Type0) (ptrs:list (B.buffer a)) =
+  forall p1 p2. List.memP p1 ptrs /\ List.memP p2 ptrs ==> disjoint_or_eq p1 p2
+
 (* Abstract maps linking buffers to addresses in the Vale heap. A buffer is uniquely identified by its address, idx and length. TODO : Add Type? *)
 type buffer_triple = nat * nat * nat
 let disjoint_addr addr1 length1 addr2 length2 =
@@ -151,37 +154,80 @@ let rec load_store_write_vale_mem contents (length:nat{length = FStar.Seq.Base.l
       if i >= length then ()
       else load_store_write_vale_mem contents length addr (i+1)  (curr_heap.[addr+i] <- Seq.index contents i)
 
-logic val correct_down: HS.mem -> addr_map -> B.buffer UInt8.t -> B.buffer UInt8.t -> Vale_Sem.heap -> Type0
-logic let correct_down mem addrs ptr1 ptr2 heap =
-  let length1 = B.length ptr1 in
-  let length2 = B.length ptr2 in
-  let contents1 = B.as_seq mem ptr1 in
-  let contents2 = B.as_seq mem ptr2 in
-  let addr1 = addrs.[(B.as_addr ptr1, B.idx ptr1, B.length ptr1)] in
-  let addr2 = addrs.[(B.as_addr ptr2, B.idx ptr2, B.length ptr2)] in
-  (forall i.  0 <= i /\ i < length1 ==> heap.[addr1 + i] == FStar.Seq.index contents1 i) /\
-  (forall i.  0 <= i /\ i < length2 ==> heap.[addr2 + i] == FStar.Seq.index contents2 i)
-
-(* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale memory + keep track of the vale addresses *)
-val down_mem: (mem:HS.mem) -> (addrs: addr_map) -> (ptr1:B.buffer UInt8.t) -> (ptr2:B.buffer UInt8.t{disjoint_or_eq ptr1 ptr2}) -> GTot (heap :Vale_Sem.heap {correct_down mem addrs ptr1 ptr2 heap})
+let correct_down_p mem (addrs:addr_map) heap p =
+  let length = B.length p in
+  let contents = B.as_seq mem p in
+  let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+  (forall i.  0 <= i /\ i < length ==> heap.[addr + i] == FStar.Seq.index contents i)
 
 #set-options "--z3rlimit 40"
 
-let down_mem mem addrs ptr1 ptr2 =
+let correct_down_p_cancel mem (addrs:addr_map) heap (p:B.buffer UInt8.t) : Lemma
+  (forall p'. p == p' ==>       
+      (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem contents length addr 0 heap in
+      correct_down_p mem addrs new_heap p')) = 
+  let rec aux (p':B.buffer UInt8.t) : Lemma 
+    (p == p'  ==> (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem contents length addr 0 heap in
+      correct_down_p mem addrs new_heap p')) =
+        let length = B.length p in
+        let contents = B.as_seq mem p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_heap = write_vale_mem contents length addr 0 heap in
+	load_store_write_vale_mem contents length addr 0 heap
+  in
+  Classical.forall_intro aux
+      
+let correct_down_p_frame mem (addrs:addr_map) heap (p:B.buffer UInt8.t) : Lemma
+  (forall p'. B.disjoint p p' /\ correct_down_p mem addrs heap p' ==>       
+      (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem contents length addr 0 heap in
+      correct_down_p mem addrs new_heap p')) = 
+  let rec aux (p':B.buffer UInt8.t) : Lemma 
+    (B.disjoint p p' /\ correct_down_p mem addrs heap p' ==> (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem contents length addr 0 heap in
+      correct_down_p mem addrs new_heap p')) =
+        let length = B.length p in
+        let contents = B.as_seq mem p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_heap = write_vale_mem contents length addr 0 heap in
+	frame_write_vale_mem contents length addr 0 heap
+  in
+  Classical.forall_intro aux
+
+let correct_down (#a:Type0) mem (addrs:addr_map) (ptrs: list (B.buffer a)) heap =
+  forall p. List.memP p ptrs ==> correct_down_p mem addrs heap p
+
+(* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale memory + keep track of the vale addresses *)
+val down_mem: (mem:HS.mem) -> (addrs: addr_map) -> (ptrs:list (B.buffer UInt8.t){list_disjoint_or_eq ptrs}) -> GTot (heap :Vale_Sem.heap {correct_down mem addrs ptrs heap})
+
+let down_mem mem addrs ptrs =
   (* Dummy heap *)
   let heap : heap = FStar.Map.const (UInt8.uint_to_t 0) in
-  let length1 = B.length ptr1 in
-  let length2 = B.length ptr2 in
-  let contents1 = B.as_seq mem ptr1 in
-  let contents2 = B.as_seq mem ptr2 in
-  let addr1 = addrs.[(B.as_addr ptr1, B.idx ptr1, B.length ptr1)] in
-  let addr2 = addrs.[(B.as_addr ptr2, B.idx ptr2, B.length ptr2)] in
-  let heap1 = write_vale_mem contents1 length1 addr1 0 heap in
-  load_store_write_vale_mem contents1 length1 addr1 0 heap;
-  let heap2 = write_vale_mem contents2 length2 addr2 0 heap1 in
-  frame_write_vale_mem contents2 length2 addr2 0 heap1;
-  load_store_write_vale_mem contents2 length2 addr2 0 heap1;
-  heap2
+  let rec aux ps (accu:list (B.buffer UInt8.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
+    (h:Vale_Sem.heap{correct_down mem addrs accu h}) : GTot (heap:Vale_Sem.heap{correct_down mem addrs ptrs heap}) = match ps with
+    | [] -> h
+    | a::q ->
+      let length = B.length a in
+      let contents = B.as_seq mem a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_heap = write_vale_mem contents length addr 0 h in
+      load_store_write_vale_mem contents length addr 0 h;
+      correct_down_p_cancel mem addrs h a;
+      correct_down_p_frame mem addrs h a;
+      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
+      aux q (a::accu) new_heap
+    in
+    aux ptrs [] heap
 
 let create_seq (#a:Type0) heap length addr : Tot (s':Seq.seq a{Seq.length s' = length /\ 
   (forall j. 0 <= j /\ j < length ==> Seq.index s' j == heap.[addr + j])}) =
