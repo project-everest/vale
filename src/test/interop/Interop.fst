@@ -240,7 +240,7 @@ let create_seq (#a:Type0) heap length addr : Tot (s':Seq.seq a{Seq.length s' = l
     aux heap length addr (i+1) s'
   in aux heap length addr 0 Seq.createEmpty
 
-let rec write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem = 
+let write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem = 
   let s = B.sel curr_mem buf in
   let modified = create_seq heap length addr in
   let lo = Seq.slice s 0 (B.idx buf) in
@@ -250,7 +250,9 @@ let rec write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length
 
 let frame_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.length buf}) (mem:HS.mem{B.live mem buf}) : Lemma
   (let new_mem = write_low_mem heap length addr buf mem in
-    forall (b:(B.buffer UInt8.t){B.live mem b /\ B.disjoint b buf}). B.equal mem b new_mem b) =
+    forall (b:(B.buffer UInt8.t){B.live mem b /\ B.disjoint b buf}). 
+    {:pattern (B.equal mem b new_mem b)}
+    B.equal mem b new_mem b) =
     let new_mem = write_low_mem heap length addr buf mem in
     let rec aux (b : B.buffer UInt8.t{B.live mem b /\ B.disjoint b buf}) : Lemma (B.equal mem b new_mem b) =
       if B.as_addr b <> B.as_addr buf || B.frameOf b <> B.frameOf buf then ()
@@ -296,34 +298,75 @@ let cancel_write_low_mem heap length addr (b:B.buffer UInt8.t{length = B.length 
   assert (Seq.equal hi hi1);
   ()
 
-logic let correct_up mem (addrs:addr_map) buf1 buf2 new_mem heap =
-  let length1 = B.length buf1 in
-  let length2 = B.length buf2 in
-  let addr1 = addrs.[(B.as_addr buf1, B.idx buf1, B.length buf1)] in
-  let addr2 = addrs.[(B.as_addr buf2, B.idx buf2, B.length buf2)] in  
-  (forall j. 0 <= j /\ j < length1 ==> Seq.index (B.as_seq new_mem buf1) j == heap.[addr1 + j])
-  /\ (forall j. 0 <= j /\ j < length2 ==> Seq.index (B.as_seq new_mem buf2) j == heap.[addr2 + j])
+logic let correct_up_p (addrs:addr_map) new_mem heap p =
+  let length = B.length p in
+  let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+  (forall i.  0 <= i /\ i < length ==> heap.[addr + i] == Seq.index (B.as_seq new_mem p) i)
 
-val up_mem: (heap:Vale_Sem.heap) -> (addrs:addr_map) -> (ptr1: B.buffer UInt8.t) -> (ptr2: (B.buffer UInt8.t){disjoint_or_eq ptr1 ptr2}) -> (mem:HS.mem{B.live mem ptr1 /\ B.live mem ptr2}) -> GTot (new_mem:HS.mem{correct_up mem addrs ptr1 ptr2 new_mem heap})
+let correct_up (addrs:addr_map) ptrs new_mem heap =
+  forall p. List.memP p ptrs ==> correct_up_p addrs new_mem heap p
+
+let list_live mem ptrs = forall p. List.memP p ptrs ==> B.live mem p
+
+
+let correct_up_p_cancel heap (addrs:addr_map) (p:B.buffer UInt8.t) (mem:HS.mem{B.live mem p}) : Lemma
+  (forall p'. p == p' ==>       
+      (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem heap length addr p mem in
+      correct_up_p addrs new_mem heap p')) = 
+  let rec aux (p':B.buffer UInt8.t) : Lemma 
+    (p == p'  ==> (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem heap length addr p mem in
+      correct_up_p addrs new_mem heap p')) =
+        let length = B.length p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_mem = write_low_mem heap length addr p mem in
+	load_store_write_low_mem heap length addr p mem
+  in
+  Classical.forall_intro aux
+
+let correct_up_p_frame heap (addrs:addr_map) (p:B.buffer UInt8.t) (mem:HS.mem{B.live mem p}) : Lemma
+  (forall (p':B.buffer UInt8.t). B.live mem p' /\ B.disjoint p p' /\ correct_up_p addrs mem heap p' ==>       
+      (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem heap length addr p mem in
+      correct_up_p addrs new_mem heap p')) = 
+  let rec aux (p':B.buffer UInt8.t) : Lemma 
+    (B.live mem p' /\ B.disjoint p p' /\ correct_up_p addrs mem heap p' ==> (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem heap length addr p mem in
+      correct_up_p addrs new_mem heap p')) =
+        let length = B.length p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_mem = write_low_mem heap length addr p mem in
+	frame_write_low_mem heap length addr p mem;
+	assert (B.live mem p' /\ B.disjoint p p' ==> B.equal mem p' new_mem p');
+	()
+  in
+  Classical.forall_intro aux
+
+val up_mem: (heap:Vale_Sem.heap) -> (addrs:addr_map) -> (ptrs: list (B.buffer UInt8.t){list_disjoint_or_eq ptrs}) -> (mem:HS.mem{list_live mem ptrs}) -> GTot (new_mem:HS.mem{correct_up addrs ptrs new_mem heap})
 
 #set-options "--z3rlimit 100 --z3refresh"
 
-let up_mem heap addrs ptr1 ptr2 mem = 
-  let length1 = B.length ptr1 in
-  let length2 = B.length ptr2 in
-  let addr1 = addrs.[(B.as_addr ptr1, B.idx ptr1, B.length ptr1)] in
-  let addr2 = addrs.[(B.as_addr ptr2, B.idx ptr2, B.length ptr2)] in  
-  let mem1 = write_low_mem heap length1 addr1 ptr1 mem in
-  frame_write_low_mem heap length1 addr1 ptr1 mem;
-  load_store_write_low_mem heap length1 addr1 ptr1 mem;
-  assert(forall j. 0 <= j /\ j < length1 ==> Seq.index (B.as_seq mem1 ptr1) j == heap.[addr1 + j]);
-  let mem2 = write_low_mem heap length2 addr2 ptr2 mem1 in
-  assert (B.live mem1 ptr1);
-  frame_write_low_mem heap length2 addr2 ptr2 mem1;
-  load_store_write_low_mem heap length2 addr2 ptr2 mem1;
-  cancel_write_low_mem heap length1 addr1 ptr1 mem;
-  assert (B.equal mem1 ptr1 mem2 ptr1);
-  mem2
+let up_mem heap addrs ptrs mem =
+  let rec aux (ps:list (B.buffer UInt8.t)) (accu: list (B.buffer UInt8.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu}) 
+    (m:HS.mem{list_live m ps /\ list_live m accu /\ correct_up addrs accu m heap}) : GTot (new_mem:HS.mem{correct_up addrs ptrs new_mem heap}) = 
+  match ps with
+    | [] -> m
+    | a::q ->
+      let length = B.length a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_mem = write_low_mem heap length addr a m in
+      load_store_write_low_mem heap length addr a m;
+      correct_up_p_cancel heap addrs a m;
+      correct_up_p_frame heap addrs a m;
+      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
+      aux q (a::accu) new_mem
+  in
+  aux ptrs [] mem
 
 val down_up_identity: (mem:HS.mem) -> (addrs:addr_map) -> (ptr1:(B.buffer UInt8.t){B.live mem ptr1})  -> (ptr2:(B.buffer UInt8.t){B.live mem ptr2 /\ disjoint_or_eq ptr1 ptr2}) -> Lemma 
   (let heap = down_mem mem addrs ptr1 ptr2 in 
