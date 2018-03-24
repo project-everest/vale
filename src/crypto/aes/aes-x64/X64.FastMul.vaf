@@ -21,10 +21,18 @@ unfold let validDstAddrs64 = validSrcAddrs64
 
 unfold let nat192_max = 0x1000000000000000000000000000000000000000000000000
 let _ = assert_norm (pow2 192 = nat192_max)
+unfold let nat256_max = 0x10000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 256 = nat256_max)
+unfold let nat320_max = 0x100000000000000000000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 320 = nat320_max)
+unfold let nat384_max = 0x1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 384 = nat384_max)
+//unfold let nat448_max = 0x10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+//let _ = assert_norm (pow2 448 = nat256_max)
 #endverbatim
 
 
-procedure{:quick} fast_multiply(
+procedure{:quick} {:verify true} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -66,7 +74,8 @@ procedure{:quick} fast_multiply(
 //
 //        let a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
 //        let b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
-//        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3;
+//        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3 + 
+//                 nat256_max * d4 + nat320_max * d5 + nat384_max * d6 + nat448_max * d7;
 //        d == a * b;
 {
 //    "movq   (%1), %%rdx; " /* A[0] */
