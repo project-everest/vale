@@ -45,9 +45,8 @@ let init_export_ids =
 let empty_env:env= {curmodule=None; modules=[]; scope_mods=[];
                    exported_ids = init_export_ids}
 
-let load_module (env:env) (m:string):env =
-  let filename = Path.Combine (!exportsDir, m ^ ".exported") in
-  if not (File.Exists(filename)) then env  // open namespace not module
+let load_exports (filename:string): string list =
+  if not (File.Exists(filename)) then []
   else 
     let lines = File.ReadAllLines filename |> Array.toList in
     let rec aux (ids:list<string>) (l:list<string>) = 
@@ -56,9 +55,14 @@ let load_module (env:env) (m:string):env =
         | line::tl -> 
           let es = line.Split ([|' '|]) |> Array.toList in
           List.append ids es in
-    let exports = aux [] lines in
-    let () = env.exported_ids.Add(m, exports) in
-    env
+    aux [] lines in
+
+let load_module (env:env) (m:string):env =
+  let f1 = Path.Combine (!exportsDir, m ^ ".fst.exported") in
+  let f2 = Path.Combine (!exportsDir, m ^ ".fsti.exported") in
+  let exports = List.append (load_exports f1) (load_exports f2) in
+  let () = env.exported_ids.Add(m, exports) in
+  env
 
 let get_exported_ids (m:export_ids_map) k =
   match m.TryGetValue(k) with
@@ -228,7 +232,7 @@ let rec resolve_exp (env:env) (e:exp):unit=
   | EBind (b, es, fs, ts, e) -> 
     resolve_exps env es; resolve_formals env fs; resolve_triggers env ts; resolve_exp env e
   | EOp (op, es) -> resolve_exps env es;
-  | EApply (x, es) ->  resolve_id env x; resolve_exps env es // QUNYAN
+  | EApply (x, es) ->  resolve_id env x; resolve_exps env es
 and resolve_exps (env:env) (es: exp list):unit = List.iter (resolve_exp env) es
 and resolve_triggers (env:env) (ts: triggers):unit = 
   List.iter (resolve_exps env) ts

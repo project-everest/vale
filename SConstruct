@@ -10,6 +10,7 @@ import pdb
 import SCons.Util
 import atexit
 import platform
+import json
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -280,6 +281,7 @@ if 'KREMLIN_HOME' in os.environ:
 
 env['VALE'] = File('bin/vale.exe')
 env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
+env['VALE_EXPORTSDIR'] = '-exportsDir ' + str(Dir('obj/exports'))
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
@@ -386,6 +388,12 @@ def to_hints_dir(path):
     return path.replace('obj/', 'hints/', 1)
   raise Exception('expected obj/..., found ' + path)
 
+def to_exported_dir(path):
+  path = os.path.relpath(path)
+  path = path.replace('\\', '/')
+  (filepath, filename) = os.path.split(path)
+  return path.replace(filepath, 'obj/exports')
+
 def has_obj_dir(path):
   path = os.path.relpath(path)
   path = path.replace('\\', '/')
@@ -409,7 +417,7 @@ def add_vale_builders(env):
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
                             emitter = vale_tool_dependency_Emitter)
-  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText $VALE_INCLUDE -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_SCONS_ARGS $VALE_USER_ARGS",
+  vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText $VALE_INCLUDE $VALE_EXPORTSDIR -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_SCONS_ARGS $VALE_USER_ARGS",
                             src_suffix = '.vaf',
                             emitter = vale_tool_dependency_Emitter)
   env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})
@@ -786,6 +794,53 @@ def verify_vale_dafny_files(env, files):
         target = os.path.splitext(to_obj_dir(f))[0] + '.gen.vdfy'
         dafny_gen_options.env.Dafny(target, dfy)
 
+# compute exports of a .fst file
+def compute_fstar_exports(target, source, env):
+  targetFile = str(target[0])
+  sourceFile = str(source[0])
+  fstar = str(env['FSTAR'])
+  args = ["--ide"] + env['INCLUDE'] + [sourceFile]
+  cmd = [fstar] + args
+  print(cmd)
+  proc = subprocess.Popen(cmd, stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+  output = json.loads(proc.stdout.readline())
+  if output['kind'] == 'protocol-info':
+    fileName = os.path.basename(sourceFile)
+    moduleName, extension = os.path.splitext(fileName)
+    if moduleName == 'prims':
+      moduleName = 'Prims'
+    command1 = "{\"query-id\":\"4\",\"query\":\"exported\",\"args\":{\"name\":\"" + moduleName + "\" }}"
+    proc.stdin.write('%s\n' % command1)
+    output = json.loads(proc.communicate()[0])
+    if output['status'] == 'success':
+      od = open(targetFile, "w+")
+      s = str(output['response'])
+      od.write(s)
+      od.close()
+
+def export_fstar_prims(env):
+  # compute exports of prims.fst
+  prims = str(Dir(env['FSTAR_PATH']).Dir('ulib').File('prims.fst'))
+  primsTarget = str(Dir('obj/exports').File('prims.fst.exported'))
+  primEnv = env.Clone()
+  primEnv['INCLUDE'] = []
+  primEnv.Command(primsTarget, prims, compute_fstar_exports)
+  
+def export_fstar_files(env, directories):
+  print("compute export files")
+  includes = []
+  for include in fstar_include_paths:
+    includes += ["--include", include]
+  env['INCLUDE'] = includes
+  files = []
+  for d in directories:
+    files.extend(recursive_glob(env, d+'/*.fst', strings=True))
+    files.extend(recursive_glob(env, d+'/*.fsti', strings=True))
+  for f in files:
+    #targetfile = os.path.splitext(to_exported_dir(f))[0]+'.exported'
+    targetfile = to_exported_dir(f)+'.exported'
+    env.Command(targetfile, f, compute_fstar_exports)
+
 def verify_vale_fstar_files(env, files):
   for f in files:
     options = get_build_options(f)
@@ -1032,6 +1087,13 @@ SConscript('./SConscript')
 Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
+
+if do_fstar:
+  print('%sF* compute exports: starting%s' % (colors['cyan'], colors['end']))
+  env.AddMethod(export_fstar_prims, "ExportPrims")
+  env.ExportPrims()
+  env.AddMethod(export_fstar_files, "ExportFilesIn")
+  env.ExportFilesIn(verify_paths)
 
 # F* dependencies
 if do_fstar and stage2 and not is_single_vaf:
