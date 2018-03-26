@@ -170,6 +170,9 @@ procedure{:instruction Ins(S.Xor64(dst, src))}{:quick exportOnly} Xor64(inout ds
         efl;
     ensures
         dst == old(ixor(dst,src));
+        !overflow(efl);
+        !cf(efl);
+        
 {
 }
 

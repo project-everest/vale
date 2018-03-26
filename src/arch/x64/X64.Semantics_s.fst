@@ -266,7 +266,11 @@ let update_xmm (x:xmm)  (ins:ins) (v:quad32) :st unit =
 let update_flags (new_flags:nat64) :st unit =
   s <-- get;
   set ( { s with flags = new_flags } )
-  
+
+let update_cf_of (new_cf new_of:bool) :st unit =
+  s <-- get;
+  set ( { s with flags = update_cf (update_of s.flags new_of) new_cf } )
+
 (* Core definition of instruction semantics *)
 let eval_ins (ins:ins) : st unit =
   s <-- get;
@@ -337,8 +341,9 @@ let eval_ins (ins:ins) : st unit =
 
   | Xor64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s))
-
+    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s));;
+    update_cf_of false false
+    
   | And64 dst src ->
     check (valid_operand src);;
     update_operand dst ins (Types_s.iand (eval_operand dst s) (eval_operand src s))
