@@ -41,6 +41,7 @@ let rec append_list_seq #a x y =
   FStar.Classical.forall_intro f;
   assert (equal (of_list (x @ y)) (append (of_list x) (of_list y)))
 
+#reset-options "--z3rlimit 20"
 let rec lemma_from_list_le l =
   match l with
   | [] -> ()

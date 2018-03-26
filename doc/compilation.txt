@@ -1,3 +1,24 @@
+
+########################################################
+#
+#  New version
+#
+########################################################
+
+scons --FSTAR-EXTRACT --NO-LEMMAS 
+cp src/crypto/aes/aes-x64/Main.ml  obj/ml_out
+cp src/lib/util/CmdLineParser.ml obj/ml_out
+cp Pointer shim
+
+# Must be an absolute path
+cd obj/ml_out;  OCAMLPATH="/Users/parno/git/Fstar/bin" ocamlbuild -use-ocamlfind -pkg fstarlib Main.native
+
+########################################################
+#
+#  Old version
+#
+########################################################
+
 make -C $FSTAR_HOME/ulib/ml
 #make -C $FSTAR_HOME/ulib install-fstar-tactics
 
