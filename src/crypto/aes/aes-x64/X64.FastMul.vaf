@@ -31,7 +31,7 @@ unfold let nat448_max = 0x100000000000000000000000000000000000000000000000000000
 let _ = assert_norm (pow2 448 = nat448_max)
 #endverbatim
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 500"
 
 procedure{:quick exportOnly} fast_multiply(
     ghost dst_b:buffer64, 
@@ -92,28 +92,27 @@ procedure{:quick exportOnly} fast_multiply(
 
     Load64_buffer(rdx, inA_ptr,  0, inA_b, 0);     /* A[0] */
 
-    assert valid_src_addr(mem, inB_b, 0);
-    assert inB_ptr + 0 == buffer_addr(inB_b) + 8 * 0; 
-
-
     // TODO: It would be really nice to not need the call to lemma_load_mem64, but it's the only connection between eval_operand and buffer64_read
     lemma_load_mem64(inB_b, 0, mem);
+
     /* The Xo64 clears the flags used for carry bits; NOTE: Original code uses xorl with r10d, maybe produces smaller code? */
     Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[0]*B[0] */ Xor64(r10, r10);         Store64_buffer(dst_ptr,  r8, 0, dst_b, 0);
-
-    ghost var d0 := buffer64_read(dst_b, 0, mem);
-    //assert nat64_max * r9 + r8 == rdx * currentB0;
-    assert d0 == a0 * b0 % nat64_max;
-
-/*
+    //assert not(overflow(efl));
+    lemma_load_mem64(inB_b, 1, mem);
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ Adox64Wrap(r10,  r9);    Store64_buffer(dst_ptr, r10, 8, dst_b, 1);
+    lemma_load_mem64(inB_b, 2, mem);
     Mulx64(r13, r12, Mem(inB_ptr, 16, inB_b, 2));  /* A[0]*B[2] */ Adox64Wrap(r12, r11);    
+    lemma_load_mem64(inB_b, 3, mem);
     Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[0]*B[3] */ Adox64Wrap(r14, r13);    Mov64(rax, 0);
     /*******************************************/                  Adox64Wrap(rax, rdx);
-*/
-//    ghost var carry := if overflow(efl) then 1 else 0;
-//    ghost var a0b := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * r12 + nat256_max * r14 + nat320_max * rdx + carry;
-//    assert a0b == b * a0;
+
+    ghost var d0 := buffer64_read(dst_b, 0, mem);
+    ghost var d1 := buffer64_read(dst_b, 1, mem);
+//    assert d0 == a0 * b0 % nat64_max;
+
+    ghost var carry := if overflow(efl) then 1 else 0;      // TODO: Should be able to prove that overflow == 0 at this point
+    ghost var a0b := d0 + nat64_max * d1 + nat128_max * r12 + nat192_max * r14 + nat256_max * rax + carry;
+    assert a0b == a0 * b; 
 
 /*    
 //
