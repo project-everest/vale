@@ -15,6 +15,7 @@ let quad32_shl32 (q:quad32) : quad32 =
 val lemma_BitwiseXorCommutative (x y:nat32) : Lemma (x *^ y == y *^ x)
 val lemma_BitwiseXorWithZero (n:nat32) : Lemma (n *^ 0 == n)
 val lemma_BitwiseXorCancel (n:nat32) : Lemma (n *^ n == 0)
+val lemma_BitwiseXorCancel64 (n:nat64) : Lemma (ixor n n == 0)
 val lemma_BitwiseXorAssociative (x y z:nat32) : Lemma (x *^ (y *^ z) == (x *^ y) *^ z)
 
 val xor_lemmas (_:unit) : Lemma
@@ -22,6 +23,7 @@ val xor_lemmas (_:unit) : Lemma
     (forall (x y:nat32).{:pattern (x *^ y)} x *^ y == y *^ x) /\
     (forall (n:nat32).{:pattern (n *^ 0)} n *^ 0 == n) /\
     (forall (n:nat32).{:pattern (n *^ n)} n *^ n == 0) /\
+    (forall (n:nat64).{:pattern (ixor n n)} ixor n n == 0) /\
     (forall (x y z:nat32).{:pattern (x *^ (y *^ z))} x *^ (y *^ z) == (x *^ y) *^ z)
   )
 

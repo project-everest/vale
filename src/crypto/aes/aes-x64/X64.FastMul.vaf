@@ -7,6 +7,7 @@ module X64.FastMul
 
 #verbatim{:interface}{:implementation}
 open Types_s
+open Types_i
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -31,9 +32,9 @@ unfold let nat448_max = 0x100000000000000000000000000000000000000000000000000000
 let _ = assert_norm (pow2 448 = nat448_max)
 #endverbatim
 
-#reset-options "--z3rlimit 500"
+#reset-options "--z3rlimit 30"
 
-procedure{:quick exportOnly} fast_multiply(
+procedure{:quick exportOnly} {:verify true} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -83,6 +84,8 @@ procedure{:quick exportOnly} fast_multiply(
                  nat256_max * d4 + nat320_max * d5 + nat384_max * d6 + nat448_max * d7;
 //        d == a * b;
 {
+    xor_lemmas();
+
 //    "movq   (%1), %%rdx; " /* A[0] */
 //    "mulx   (B),  %%r8,  %%r9; " /* A[0]*B[0] */    "xorl %%r10d, %%r10d ;"                           "movq  %%r8,  (dst) ;"
 //    "mulx  8(B), %%r10, %%r11; " /* A[0]*B[1] */    "adox  %%r9, %%r10 ;"                             "movq %%r10, 8(dst) ;"
@@ -91,15 +94,25 @@ procedure{:quick exportOnly} fast_multiply(
 //    /*******************************************/   "adox %%rdx, %%rax ;"
 
     Load64_buffer(rdx, inA_ptr,  0, inA_b, 0);     /* A[0] */
-
     // TODO: It would be really nice to not need the call to lemma_load_mem64, but it's the only connection between eval_operand and buffer64_read
     lemma_load_mem64(inB_b, 0, mem);
-
     /* The Xo64 clears the flags used for carry bits; NOTE: Original code uses xorl with r10d, maybe produces smaller code? */
     Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[0]*B[0] */ Xor64(r10, r10);         Store64_buffer(dst_ptr,  r8, 0, dst_b, 0);
-    //assert not(overflow(efl));
+//    assert r10 == 0;  // Passes
+//    ghost var d0 := buffer64_read(dst_b, 0, mem);
+//    assert d0 == a0 * b0 % nat64_max;     // Passes
+//    assert not(overflow(efl));            // Passes
     lemma_load_mem64(inB_b, 1, mem);
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ Adox64Wrap(r10,  r9);    Store64_buffer(dst_ptr, r10, 8, dst_b, 1);
+
+    ghost var d0 := buffer64_read(dst_b, 0, mem);
+    ghost var d1 := buffer64_read(dst_b, 1, mem);
+
+    ghost var carry := if overflow(efl) then 1 else 0;      
+    ghost var a0b0b1 := d0 + nat64_max * d1 + nat128_max * (r11 + carry);
+    assert a0b0b1 == a0 * (b0 + nat64_max * b1); 
+
+/*
     lemma_load_mem64(inB_b, 2, mem);
     Mulx64(r13, r12, Mem(inB_ptr, 16, inB_b, 2));  /* A[0]*B[2] */ Adox64Wrap(r12, r11);    
     lemma_load_mem64(inB_b, 3, mem);
@@ -113,6 +126,7 @@ procedure{:quick exportOnly} fast_multiply(
     ghost var carry := if overflow(efl) then 1 else 0;      // TODO: Should be able to prove that overflow == 0 at this point
     ghost var a0b := d0 + nat64_max * d1 + nat128_max * r12 + nat192_max * r14 + nat256_max * rax + carry;
     assert a0b == a0 * b; 
+*/
 
 /*    
 //

@@ -18,6 +18,11 @@ let lemma_BitwiseXorCancel n =
   lemma_zero_nth 32;
   lemma_equal_nth 32 (n *^ n) 0
 
+let lemma_BitwiseXorCancel64 (n:nat64) =
+  lemma_ixor_nth_all 64;
+  lemma_zero_nth 64;
+  lemma_equal_nth 64 (ixor n n) 0 
+
 let lemma_BitwiseXorAssociative x y z =
   lemma_ixor_nth_all 32;
   lemma_equal_nth 32 (x *^ (y *^ z)) ((x *^ y) *^ z)
@@ -26,6 +31,7 @@ let xor_lemmas () =
   FStar.Classical.forall_intro_2 lemma_BitwiseXorCommutative;
   FStar.Classical.forall_intro lemma_BitwiseXorWithZero;
   FStar.Classical.forall_intro lemma_BitwiseXorCancel;
+  FStar.Classical.forall_intro lemma_BitwiseXorCancel64;
   FStar.Classical.forall_intro_3 lemma_BitwiseXorAssociative;
   ()
 
