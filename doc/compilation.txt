@@ -6,9 +6,9 @@
 ########################################################
 
 scons --FSTAR-EXTRACT --NO-LEMMAS 
-cp src/crypto/aes/aes-x64/Main.ml  obj/ml_out
-cp src/lib/util/CmdLineParser.ml obj/ml_out
-cp Pointer shim
+cp src/crypto/aes/aes-x64/Main.ml     obj/ml_out/
+cp src/lib/util/CmdLineParser.ml      obj/ml_out/
+cp src/lib/util/FStar_Pointer_Base.ml obj/ml_out/
 
 # Must be an absolute path
 cd obj/ml_out;  OCAMLPATH="/Users/parno/git/Fstar/bin" ocamlbuild -use-ocamlfind -pkg fstarlib Main.native
