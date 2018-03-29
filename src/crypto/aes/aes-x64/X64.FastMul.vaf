@@ -34,7 +34,7 @@ let _ = assert_norm (pow2 448 = nat448_max)
 
 #reset-options "--z3rlimit 30"
 
-procedure{:quick exportOnly} {:verify true} fast_multiply(
+procedure{:quick exportOnly} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)

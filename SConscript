@@ -49,6 +49,7 @@ fstar_include_paths = [
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  env['FSTAR_PATH'] + '/examples/tactics/'
 ]
 Export('fstar_include_paths')
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
