@@ -110,7 +110,7 @@ procedure{:quick exportOnly} {:verify true} fast_multiply(
 
     ghost var carry := if overflow(efl) then 1 else 0;      
     ghost var a0b0b1 := d0 + nat64_max * d1 + nat128_max * (r11 + carry);
-    assert a0b0b1 == a0 * (b0 + nat64_max * b1); 
+//    assert a0b0b1 == a0 * (b0 + nat64_max * b1); 
 
 /*
     lemma_load_mem64(inB_b, 2, mem);
