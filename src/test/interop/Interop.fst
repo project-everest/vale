@@ -41,21 +41,6 @@ type addr_map = (m:(Map.t buffer_triple nat64){forall (buf1 buf2:B.buffer UInt8.
 assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
   (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
 
-assume val lemma_sel_upd_extensionality (#a:Type) (#rel:Preorder.preorder a) (h:HS.mem) (r:HS.mreference a rel{h `HS.contains` r})
- :Lemma (requires True) (ensures (HS.upd h r (HS.sel h r) == h))
-        [SMTPat (HS.upd h r (HS.sel h r))]
-
-assume val lemma_upd_cancel (#a:Type) (#rel:Preorder.preorder a) (h:HS.mem) (r:HS.mreference a rel{h `HS.contains` r}) (x y:a)
- :Lemma (requires True) (ensures (HS.upd (HS.upd h r x) r y ==
-                               HS.upd h r y))
-     [SMTPat (HS.upd (HS.upd h r x) r y)]
-
-assume val lemma_upd_commute (#a:Type) (#rel:Preorder.preorder a) (h:HS.mem) (r1:HS.mreference a rel{h `HS.contains` r1}) (r2:HS.mreference a rel{h `HS.contains` r2}) (x y:a)
- :Lemma (requires (HS.as_addr r1 <> HS.as_addr r2))
-        (ensures (HS.upd (HS.upd h r1 x) r2 y ==
-                  HS.upd (HS.upd h r2 y) r1 x))
-     [SMTPat (HS.upd (HS.upd h r1 x) r2 y)]
-
 (* Write a buffer in the vale memory *)
 
 let rec write_vale_mem contents (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
@@ -209,6 +194,7 @@ let invariant_write_low_mem heap length addr (b:(B.buffer UInt8.t){length = B.le
   let mi_create = create_seq heap length addr in
   let s_app = Seq.append lo_i (Seq.append mi_create hi_i) in
   assert (Seq.equal (HS.sel mem (B.content b)) s_app);
+  HS.lemma_heap_equality_upd_with_sel mem (B.content b);
   ()
 
 let cancel_write_low_mem heap length addr (b:B.buffer UInt8.t{length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
@@ -224,6 +210,7 @@ let cancel_write_low_mem heap length addr (b:B.buffer UInt8.t{length = B.length 
   let hi1 = Seq.slice s1 (B.idx b + length) (B.max_length b) in
   assert (Seq.equal lo lo1);
   assert (Seq.equal hi hi1);
+  HS.lemma_heap_equality_cancel_same_mref_upd mem (B.content b) s' s';
   ()
 
 logic let correct_up_p (addrs:addr_map) new_mem heap p =
