@@ -36,11 +36,14 @@ unfold let nat448_max = 0x100000000000000000000000000000000000000000000000000000
 let _ = assert_norm (pow2 448 = nat448_max)
 
 let int_canon = fun _ -> canon_semiring int_cr
+
+let my_bool_to_nat (b:bool) : nat = if b then 1 else 0
+
 #endverbatim
 
 #reset-options "--z3rlimit 30"
 
-procedure{:quick exportOnly} {:verify true} fast_multiply(
+procedure{:quick exportOnly} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -121,7 +124,13 @@ procedure{:quick exportOnly} {:verify true} fast_multiply(
     ghost var d0 := buffer64_read(dst_b, 0, mem);
     ghost var d1 := buffer64_read(dst_b, 1, mem);
 
-    ghost var carry := if overflow(efl) then 1 else 0;      
+
+    ghost var carry := if overflow(efl) then 1 else 0;          // BUG: With this version, the tactic fails to unify, perhaps due to the if-else
+    //ghost var carry := my_bool_to_nat(overflow(efl));         // BUG: With this version, we get: (Error 230) Variable "__fname__mem#303637" not found
+
+
+    //assume overflow(efl);
+    //ghost var carry := 1;
     ghost var a0b0b1 := d0 + nat64_max * d1 + nat128_max * (r11 + carry);
 
 //    assert nat64_max * a0b0_hi + d0 == a0 * b0;
