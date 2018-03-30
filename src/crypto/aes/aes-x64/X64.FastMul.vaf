@@ -128,10 +128,10 @@ procedure{:quick exportOnly} {:verify true} fast_multiply(
 //    assert nat64_max * r11 + a0b1_lo == a0 * b1;
 //    assert r10 == add_wrap(add_wrap(a0b1_lo, a0b0_hi), 0);
 //    assert overflow(efl) == (a0b1_lo + a0b0_hi >= nat64_max);
-    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
-    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
+//    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
+//    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
 
-    //assert_by_tactic(a0b0b1 == a0 * (b0 + nat64_max * b1), int_canon); // FAILS:
+    assert_by_tactic(a0b0b1 == a0 * (b0 + nat64_max * b1), int_canon); // FAILS:
     // user tactic failed: apply_lemma: Cannot instantiate lemma CanonCommSemiring.semiring_reflect CanonCommSemiring.const_last
 
 /*
