@@ -114,10 +114,9 @@ procedure{:quick exportOnly} {:verify true} fast_multiply(
 //    assert not(overflow(efl));            // Passes
     lemma_load_mem64(inB_b, 1, mem);
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ ghost var a0b1_lo := r10; Adox64Wrap(r10,  r9);    Store64_buffer(dst_ptr, r10, 8, dst_b, 1);
-    ghost var carry := a0b1_lo + r9 + 0 >= nat64_max;
-    assert efl == update_of(old_efl, carry);
-    assert overflow(efl) == carry;
-    /*
+//    ghost var carry := a0b1_lo + r9 + 0 >= nat64_max;
+//    assert efl == update_of(old_efl, carry);
+//    assert overflow(efl) == carry;
 
     ghost var d0 := buffer64_read(dst_b, 0, mem);
     ghost var d1 := buffer64_read(dst_b, 1, mem);
@@ -125,12 +124,12 @@ procedure{:quick exportOnly} {:verify true} fast_multiply(
     ghost var carry := if overflow(efl) then 1 else 0;      
     ghost var a0b0b1 := d0 + nat64_max * d1 + nat128_max * (r11 + carry);
 
-    assert nat64_max * a0b0_hi + d0 == a0 * b0;
-    assert nat64_max * r11 + a0b1_lo == a0 * b1;
-    assert r10 == add_wrap(add_wrap(a0b1_lo, a0b0_hi), 0);
-    assert overflow(efl) == (a0b1_lo + a0b0_hi >= nat64_max);
-    */
-    //simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
+//    assert nat64_max * a0b0_hi + d0 == a0 * b0;
+//    assert nat64_max * r11 + a0b1_lo == a0 * b1;
+//    assert r10 == add_wrap(add_wrap(a0b1_lo, a0b0_hi), 0);
+//    assert overflow(efl) == (a0b1_lo + a0b0_hi >= nat64_max);
+    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
+    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
 
     //assert_by_tactic(a0b0b1 == a0 * (b0 + nat64_max * b1), int_canon); // FAILS:
     // user tactic failed: apply_lemma: Cannot instantiate lemma CanonCommSemiring.semiring_reflect CanonCommSemiring.const_last
