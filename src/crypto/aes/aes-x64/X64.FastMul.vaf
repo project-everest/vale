@@ -48,9 +48,9 @@ procedure{:quick exportOnly} fast_multiply(
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
     lets
-        dst_ptr @= rbx;
-        inA_ptr @= rcx;
-        inB_ptr @= rsi;
+        dst_ptr @= rdi;
+        inA_ptr @= rsi;
+        inB_ptr @= rcx;
 
         a0 := buffer64_read(inA_b, 0, mem);
         a1 := buffer64_read(inA_b, 1, mem);
@@ -92,6 +92,10 @@ procedure{:quick exportOnly} fast_multiply(
         let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3 + 
                  nat256_max * d4 + nat320_max * d5 + nat384_max * d6 + nat448_max * d7;
 //        d == a * b;
+//        validSrcAddrs64(mem, dst_in, dst_b, 8);
+
+//        modifies_buffer(dst_b, old(mem), mem);
+
 {
     xor_lemmas();
 
@@ -209,3 +213,93 @@ procedure{:quick exportOnly} fast_multiply(
 */
 }
 
+
+// fast_mul_stdcall(dst, inA, buf, inB)
+// where buf is a pointer to an array of (at least) 5 uint64s, used for saving registers
+procedure{:quick} {:verify true} fast_mul_stdcall(
+    inline win:bool,
+    ghost dst_b:buffer64, 
+    ghost inA_b:buffer64, 
+    ghost inB_b:buffer64,
+    ghost stack_b:buffer64)
+    lets
+        dst_ptr @= rdi; inA_ptr @= rsi; stack_ptr @= rdx; inB_ptr @= rcx;
+        dst_in := (if win then rcx else rdi);
+        inA_in := (if win then rdx else rsi);
+        stack_in := (if win then r8 else rdx);
+        inB_in := (if win then r9 else rcx);
+    modifies
+        rax; rbx; rcx; rdx; rdi; rsi; r8; r9; r10; r11; r12; r13; r14;
+        efl; mem;
+    requires
+        buffers_disjoint(dst_b, inA_b);
+        buffers_disjoint(dst_b, inB_b);
+
+        validDstAddrs64(mem, dst_in, dst_b, 8);
+        validSrcAddrs64(mem, inA_in, inA_b, 4);
+        validSrcAddrs64(mem, inB_in, inB_b, 4);
+        validDstAddrs64(mem, stack_in, stack_b, 5);
+    ensures
+        let a0 := buffer64_read(inA_b, 0, mem);
+        let a1 := buffer64_read(inA_b, 1, mem);
+        let a2 := buffer64_read(inA_b, 2, mem);
+        let a3 := buffer64_read(inA_b, 3, mem);
+
+        let b0 := buffer64_read(inB_b, 0, mem);
+        let b1 := buffer64_read(inB_b, 1, mem);
+        let b2 := buffer64_read(inB_b, 2, mem);
+        let b3 := buffer64_read(inB_b, 3, mem);
+
+        let d0 := buffer64_read(dst_b, 0, mem);
+        let d1 := buffer64_read(dst_b, 1, mem);
+        let d2 := buffer64_read(dst_b, 2, mem);
+        let d3 := buffer64_read(dst_b, 3, mem);
+        let d4 := buffer64_read(dst_b, 4, mem);
+        let d5 := buffer64_read(dst_b, 5, mem);
+        let d6 := buffer64_read(dst_b, 6, mem);
+        let d7 := buffer64_read(dst_b, 7, mem);
+
+        let a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
+        let b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
+
+        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3 + 
+                 nat256_max * d4 + nat320_max * d5 + nat384_max * d6 + nat448_max * d7;
+//        d == a * b;
+
+        //////////////////////////////////////
+        //   Framing
+        //////////////////////////////////////
+
+//        modifies_buffer(dst_b, old(mem), mem);
+//        validSrcAddrs64(mem, dst_in, dst_b, 8);
+
+        rbx == old(rbx);
+        rsi == old(rsi);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+
+{
+    inline if (win)
+    {
+        Mov64(dst_ptr, rcx);
+        Mov64(inA_ptr, rdx);
+        Mov64(stack_ptr, r8);
+        Mov64(inB_ptr, r9);
+    }
+
+    // Store callee-save registers
+    Store64_buffer(stack_ptr, rbx,  0, stack_b, 0);
+    Store64_buffer(stack_ptr, rsi,  8, stack_b, 1);
+    Store64_buffer(stack_ptr, r12, 16, stack_b, 2);
+    Store64_buffer(stack_ptr, r13, 24, stack_b, 3);
+    Store64_buffer(stack_ptr, r14, 32, stack_b, 4);
+
+    fast_multiply(dst_b, inA_b, inB_b);
+
+    Load64_buffer(rbx, stack_ptr,  0, stack_b, 0);
+    Load64_buffer(rsi, stack_ptr,  8, stack_b, 1);
+    Load64_buffer(r12, stack_ptr, 16, stack_b, 2);
+    Load64_buffer(r13, stack_ptr, 24, stack_b, 3);
+    Load64_buffer(r14, stack_ptr, 32, stack_b, 4);
+}
