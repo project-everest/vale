@@ -264,6 +264,7 @@ let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) 
     | b :: l'  -> buffer_readable h b /\ buffers_readable h l'
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+unfold let modifies_buffer_2 (b1 b2:buffer64) (h1 h2:mem) =modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 unfold let modifies_buffer128 (b:buffer128) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 unfold let modifies_buffer128_2 (b1 b2:buffer128) (h1 h2:mem) = modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 
@@ -272,8 +273,8 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     len <= buffer_length b /\
     buffer_addr b == addr
 
-let validDstAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
-    validSrcAddrs64 m addr b len
+unfold 
+let validDstAddrs64 = validSrcAddrs64
 
 let validSrcAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
     buffer_readable m b /\
