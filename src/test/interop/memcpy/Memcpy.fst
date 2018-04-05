@@ -50,8 +50,7 @@ let correct_memcpy (s:state) : Lemma
   let s' = memcpy_vale s in
   let h0 = up_mem s.mem addrs buffers mem in
   let h1 = up_mem s'.mem addrs buffers mem in
-  assume(live h1 src);
-  assume(live h1 dst);
+  up_mem_liveness s.mem s'.mem addrs buffers mem;
   ()
 
 #set-options "--z3rlimit 200"

@@ -298,6 +298,22 @@ let rec invariant_up_mem_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list (
       invariant_write_low_mem heap length addr a m;
       invariant_up_mem_aux heap addrs ptrs q (a::accu) new_mem
 
+let rec liveness_up_mem_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list (B.buffer UInt8.t){list_disjoint_or_eq ptrs}) (ps:list (B.buffer UInt8.t))
+    (accu: list (B.buffer UInt8.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu}) 
+    (m:HS.mem{list_live m ps /\ list_live m accu /\ correct_up addrs accu m heap}) : Lemma
+  (forall #a (b:B.buffer a). B.live m b <==> B.live (up_mem_aux heap addrs ptrs ps accu m) b) =
+  match ps with
+    | [] -> ()
+    | a::q ->
+      let length = B.length a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_mem = write_low_mem heap length addr a m in
+      load_store_write_low_mem heap length addr a m;
+      correct_up_p_cancel heap addrs a m;
+      correct_up_p_frame heap addrs a m;      
+      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);      
+      liveness_up_mem_aux heap addrs ptrs q (a::accu) new_mem
+ 
 val down_up_identity: (mem:HS.mem) -> (addrs:addr_map) -> (ptrs:list (B.buffer UInt8.t){list_disjoint_or_eq ptrs /\ list_live mem ptrs }) -> Lemma 
   (let heap = down_mem mem addrs ptrs in 
    let new_mem = up_mem heap addrs ptrs mem in
@@ -309,3 +325,12 @@ let down_up_identity mem addrs ptrs =
   assert (forall (p:B.buffer UInt8.t{List.memP p ptrs}). correct_up_p addrs mem heap p);
   invariant_up_mem_aux heap addrs ptrs ptrs [] mem;
   ()
+
+val up_mem_liveness: (heap:Vale_Sem.heap) -> (heap':Vale_Sem.heap) -> (addrs:addr_map) -> (ptrs: list (B.buffer UInt8.t){list_disjoint_or_eq ptrs}) -> (mem:HS.mem{list_live mem ptrs}) -> Lemma
+  (let mem1 = up_mem heap addrs ptrs mem in
+   let mem2 = up_mem heap' addrs ptrs mem in
+   forall (b:B.buffer UInt8.t). B.live mem1 b ==> B.live mem2 b)
+
+let up_mem_liveness heap heap' addrs ptrs mem = 
+  liveness_up_mem_aux heap addrs ptrs ptrs [] mem;
+  liveness_up_mem_aux heap' addrs ptrs ptrs [] mem
