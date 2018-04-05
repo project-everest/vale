@@ -1,4 +1,4 @@
-module Machine
+module Machine_int
 
 let nat64_max = 0x10000000000000000
 unfold let nat64 = x:nat{x < nat64_max}

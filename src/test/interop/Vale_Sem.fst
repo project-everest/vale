@@ -2,7 +2,7 @@ module Vale_Sem
 
 open FStar.BaseTypes
 open FStar.Map
-open Machine
+open Machine_int
 open FStar.UInt
 open FStar.UInt8
 

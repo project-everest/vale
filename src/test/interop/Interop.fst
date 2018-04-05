@@ -12,7 +12,7 @@ module HS = FStar.Monotonic.HyperStack
 module HH = FStar.Monotonic.HyperHeap
 // module P = FStar.Pointer.Base
 module B = FStar.Buffer
-open Machine
+open Machine_int
 
 open Vale_Sem
 
