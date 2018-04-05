@@ -1,9 +1,11 @@
 make -C $FSTAR_HOME/ulib/ml
 #make -C $FSTAR_HOME/ulib install-fstar-tactics
 
-fstar.exe --smt /Users/parno/git/everest-project/z3-4.5.1.1f29cebd4df6-x64-osx-10.11.6/bin/z3 --include tools/Vale/test --include obj/Vale/test --include src/test --include obj/test --include src/arch/x64/ --include obj/arch/x64/ --include src/lib/collections/ --include src/lib/util --include src/crypto/poly1305/ --include src/crypto/poly1305/x64/ --include obj/thirdPartyPorts/OpenSSL/poly1305/x64/ --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints --codegen OCaml --odir obj/thirdPartyPorts/OpenSSL/poly1305/x64/out obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst --lax --extract X64.Poly1305
+fstar.exe --include obj/crypto/poly1305/x64 --include src/arch --include tools/Vale/test --include obj/Vale/test --include src/test --include obj/test --include src/arch/x64/ --include obj/arch/x64/ --include src/lib/collections/ --include src/lib/util --include src/crypto/poly1305/ --include src/crypto/poly1305/x64/ --include obj/thirdPartyPorts/OpenSSL/poly1305/x64/ --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints --codegen OCaml --odir obj/thirdPartyPorts/OpenSSL/poly1305/x64/out obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst --lax --extract X64.Poly1305
 
 Repeat with every needed module
+
+Extract Semantics_s/Taint_Semantics_s, but only keep datatypes. Manually remove states, and all evals
 
 Manually remove all references to Memory/lemmas/State in the ML code
 
@@ -15,7 +17,7 @@ cp ../../../../../../src/lib/util/CmdlineParser.ml .
 cp ../../../../../../src/crypto/poly1305/x64/Main.ml .
 
 cp $FSTAR_HOME/ulib/ml/*.ml .
-cp -r $FSTAR_HOME/ulib/extracted .
+cp -r $FSTAR_HOME/ulib/ml/extracted .
 
 add _tags file with:
 true: -traverse
