@@ -209,7 +209,7 @@ procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
         g2 == old(rax);
 {
     Add64(rax, 0);
-    g2 := Bump3(b, if rax < 7 then rax else g1 + 0);
+    g2 := Bump3(b, if rax < 7 then (let r:int := rax in r) else g1 + 0);
 }
 
 procedure Incr3()

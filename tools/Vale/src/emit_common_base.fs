@@ -162,3 +162,17 @@ let fArg (x, t, g, io, a):exp list =
   | _ -> []
   in
 
+let rec hide_ifs (e:exp):exp =
+  let thunk (e:exp):exp = EBind (Lambda, [], [(Id "_", None)], [], e) in
+  let f (e:exp):exp map_modify =
+    match e with
+    | EOp (Cond, [e1; e2; e3]) ->
+        let e1 = hide_ifs e1 in
+        let e2 = hide_ifs e2 in
+        let e3 = hide_ifs e3 in
+        Replace (vaApp "if" [e1; thunk e2; thunk e3])
+    | _ -> Unchanged
+    in
+  map_exp f e
+
+  
