@@ -3,21 +3,6 @@ module Math.Lemmas.Int_i
 // For more stable verification, most lemmas are proven with smt.arith.nl=false.
 open FStar.Mul
 
-let div_nonzero (a:int) (n:nonzero) : int =
-  if a >= 0 then a / n
-  else -1 - ((-1 - a) / n) // correct for both n < 0 and n > 0
-
-let mod_pos (a:int) (n:pos) : (m:nat{m < n}) =
-  if a >= 0 then a % n
-  else n - 1 - (-1 - a) % n // correct only for n > 0, see mod_nonzero for n < 0 case
-
-let mod_nonzero (a:int) (n:nonzero) : nat =
-  if n > 0 then mod_pos a n
-  else mod_pos a (-n)
-
-let ( / ) = div_nonzero
-let ( % ) = mod_pos
-
 val multiply_fractions (a:int) (n:pos) : Lemma (n * ( a / n ) <= a)
 
 val lemma_div_mod (a:int) (n:pos) : Lemma (a == (a / n) * n + a % n)
