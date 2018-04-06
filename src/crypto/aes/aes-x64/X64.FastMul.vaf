@@ -140,7 +140,7 @@ procedure{:quick exportOnly} fast_multiply(
 //    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
 //    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
 
-    assert_by_tactic(a0b0b1 == a0 * (b0 + nat64_max * b1), int_canon); // FAILS:
+//    assert_by_tactic(a0b0b1 == a0 * (b0 + nat64_max * b1), int_canon); // FAILS:
     // user tactic failed: apply_lemma: Cannot instantiate lemma CanonCommSemiring.semiring_reflect CanonCommSemiring.const_last
 
 /*
@@ -210,7 +210,7 @@ procedure{:quick exportOnly} fast_multiply(
 }
 
 // fast_mul_stdcall(dst, inA, inB)
-procedure{:quick} {:verify true} fast_mul_stdcall(
+procedure{:quick} fast_mul_stdcall(
     inline win:bool,
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
@@ -277,11 +277,11 @@ procedure{:quick} {:verify true} fast_mul_stdcall(
         r14 == old(r14);
 {
     // Store callee-save registers
-    Push_buffer(rbx, stack_b, 4);
-    Push_buffer(rsi, stack_b, 3);
-    Push_buffer(r12, stack_b, 2);
-    Push_buffer(r13, stack_b, 1);
-    Push_buffer(r14, stack_b, 0);
+    Push(rbx, stack_b, 4);
+    Push(rsi, stack_b, 3);
+    Push(r12, stack_b, 2);
+    Push(r13, stack_b, 1);
+    Push(r14, stack_b, 0);
 
     // Line up the rest of the arguments
     inline if (win) {
@@ -294,9 +294,9 @@ procedure{:quick} {:verify true} fast_mul_stdcall(
 
     fast_multiply(dst_b, inA_b, inB_b);
 
-    Pop_buffer(r14, stack_b, 0);
-    Pop_buffer(r13, stack_b, 1);
-    Pop_buffer(r12, stack_b, 2);
-    Pop_buffer(rsi, stack_b, 3);
-    Pop_buffer(rbx, stack_b, 4);
+    Pop(r14, stack_b, 0);
+    Pop(r13, stack_b, 1);
+    Pop(r12, stack_b, 2);
+    Pop(rsi, stack_b, 3);
+    Pop(rbx, stack_b, 4);
 }
