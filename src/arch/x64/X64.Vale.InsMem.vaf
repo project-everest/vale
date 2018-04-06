@@ -72,16 +72,31 @@ procedure{:instruction Ins(S.Pop(dst))}{:fast_instruction}{:quick exportOnly} Po
     requires
         valid_src_addr(mem, b, index);
         rsp == buffer_addr(b) + 8 * index;
+        rsp + 8 < nat64_max;
     ensures
         dst == buffer64_read(b, index, mem);
-        //rsp == old(rsp) + 8;
+        rsp == old(rsp) + 8;
 {
     lemma_valid_mem64(b, index, mem);
     lemma_load_mem64(b, index, mem);
+}
 
-    assert dst == eval_mem(old(rsp), this); // == load_mem64 old(rsp), mem
-    assert dst == load_mem64(buffer_addr(b) + 8 * index, mem);
-    assert dst == buffer64_read(b, index, mem);
-    assume false;
+procedure{:instruction Ins(S.Push(src))}{:fast_instruction}{:quick exportOnly} Push_buffer(
+        src: reg_opr64,
+        ghost b:buffer64,
+        ghost index:int)
+    modifies
+        rsp; mem;
+    requires
+        valid_dst_addr(mem, b, index);
+        rsp - 8 == buffer_addr(b) + 8 * index;
+        0 <= rsp - 8;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        mem == old(buffer64_write(b, index, src, mem));
+        rsp == old(rsp) - 8;
+{
+    lemma_valid_mem64(b, index, old(mem));
+    lemma_store_mem64(b, index, old(src), old(mem));
 }
 

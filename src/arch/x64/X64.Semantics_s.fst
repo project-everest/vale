@@ -362,15 +362,15 @@ let eval_ins (ins:ins) : st unit =
     check (valid_operand src);; // Not strictly necessary, since it should always be a register
     let new_rsp = ((eval_reg Rsp s) - 8) % nat64_max in
     update_operand_preserve_flags (OMem (MConst new_rsp)) (eval_operand src s);;
-    update_operand_preserve_flags (OReg Rsp) new_rsp
+    update_reg Rsp new_rsp
 
   | Pop dst ->
     let stack_val = OMem (MReg Rsp 0) in
     check (valid_operand stack_val);;    
     let new_dst = eval_operand stack_val s in
     let new_rsp = ((eval_reg Rsp s) + 8) % nat64_max in
-    update_operand_preserve_flags (OReg Rsp) new_rsp;;
-    update_operand_preserve_flags dst new_dst
+    update_operand_preserve_flags dst new_dst;;
+    update_reg Rsp new_rsp
 
 // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
 // since all possibilities are valid, thanks to dependent types 
