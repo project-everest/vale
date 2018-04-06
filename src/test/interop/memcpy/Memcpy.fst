@@ -16,57 +16,61 @@ let pre_cond (h:HS.mem) (src:bytes) (dest:bytes) =
 
 let post_cond (h:HS.mem) (h':HS.mem) (src:bytes) (dest:bytes) =
   live h src /\ live h dest /\ live h' src /\ live h' dest /\ disjoint src dest /\ length src == 1 /\ length dest == 1
+    /\ Seq.equal (as_seq h src) (as_seq h' dest)
 
+// Ideally, memcpy would have this form, but we cannot compose STATE and GHOST
 assume val memcpy: src:bytes -> dest:bytes ->
   STL unit
     (requires (fun h -> pre_cond h src dest))
     (ensures (fun h0 _ h1 -> post_cond h0 h1 src dest))
 
-assume val src:bytes
-type doeq_src = b:bytes{disjoint_or_eq src b}
-
-assume val dst:doeq_src
+// The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
-type live_mem = m:HS.mem{live m src /\ live m dst}
-assume val mem:live_mem
 
-let buffers = [src; dst]
-assume val addr1:nat64
-assume val addr2:nat64
+let memcpy_code1 = Mov (OReg Rax) (OMem (MReg Rax 0))
+let memcpy_code2 = Mov (OMem (MReg Rbx 0)) (OReg Rax)
 
-let memcpy_code = Mov (OMem (MConst addr2)) (OMem (MConst addr1))
+#set-options "--z3rlimit 60"
 
-let memcpy_vale (s:state) : state = eval_ins memcpy_code s
+let memcpy_vale (s:state) : (s':state{s.mem.[eval_reg Rax s] == s'.mem.[eval_reg Rbx s]}) = eval_ins memcpy_code2 (eval_ins memcpy_code1 s)
 
-let pre_v (s:state) = pre_cond (up_mem s.mem addrs buffers mem) src dst
-let post_v (s1:state) (s2:state) = post_cond (up_mem s1.mem addrs buffers mem)
-  (up_mem s2.mem addrs buffers mem) src dst
+let pre_v (s:state) (src:bytes) (dst:bytes{disjoint src dst}) (m:HS.mem{live m src /\ live m dst}) = 
+  let buffers = [src; dst] in
+  pre_cond (up_mem s.mem addrs buffers m) src dst
+  
+let post_v (s1:state) (s2:state) (src:bytes) (dst:bytes{disjoint src dst}) (m:HS.mem{live m src /\ live m dst}) = 
+  let buffers = [src; dst] in
+  post_cond (up_mem s1.mem addrs buffers m) (up_mem s2.mem addrs buffers m) src dst
 
-let correct_memcpy (s:state) : Lemma
-  (requires (pre_v s))
-  (ensures (let s' = memcpy_vale s in post_v s s')) =
-  assume (addrs.[(as_addr src, idx src, length src)] == addr1);
-  assume (addrs.[(as_addr dst, idx dst, length dst)] == addr2);
+let correct_memcpy (s:state) (src:bytes) (dst:bytes{disjoint src dst}) 
+  (m:HS.mem{live m src /\ live m dst}) : Lemma
+  (requires (pre_v s src dst m) /\ addrs.[(as_addr src, idx src, length src)] = eval_reg Rax s /\ addrs.[(as_addr dst, idx dst, length dst)] == eval_reg Rbx s)
+  (ensures (let s' = memcpy_vale s in post_v s s' src dst m)) =
   let s' = memcpy_vale s in
-  let h0 = up_mem s.mem addrs buffers mem in
-  let h1 = up_mem s'.mem addrs buffers mem in
-  up_mem_liveness s.mem s'.mem addrs buffers mem;
+  let buffers = [src; dst] in
+  up_mem_liveness s.mem s'.mem addrs buffers m;
   ()
 
-#set-options "--z3rlimit 200"
+// Memcpy at the low* level. Should ideally use type ST/STL
+let low_memcpy (src:bytes) (dst:bytes) (h0:HS.mem{pre_cond h0 src dst}) : GTot (h1:HS.mem{post_cond h0 h1 src dst}) =
+  let buffers = [src; dst] in
+  let s0_heap = down_mem h0 addrs buffers in
+  let addr1 = addrs.[(as_addr src, idx src, length src)] in
+  let addr2 = addrs.[(as_addr dst, idx dst, length dst)] in
+  // Not following calling conventions, but good for reduced semantics used here
+  let regs = fun x -> if x = Rax then addr1 else addr2 in
+  let s0 = {ok = true; regs = regs; mem = s0_heap} in
+  down_up_identity h0 addrs buffers;
+// down_up gives us the following assertion
+//  assert (pre_v s0 src dst h0);
+  let s1 = memcpy_vale s0 in
+  correct_memcpy s0 src dst h0;
+// correct_memcpy gives us the following assertion
+//  assert (post_v s0 s1 src dst h0);
+  let h1 = up_mem s1.mem addrs buffers h0 in
+// The definition of post_v gives us directly the postcondition
+  h1
 
-let correct_memcpy2 (s:state) : Lemma
-  (requires (pre_v s))
-  (ensures True) =
-  assume (addrs.[(as_addr src, idx src, length src)] == addr1);
-  assume (addrs.[(as_addr dst, idx dst, length dst)] == addr2);
-  let s' = memcpy_vale s in
-  let h0 = up_mem s.mem addrs buffers mem in
-  let h1 = up_mem s'.mem addrs buffers mem in
-  let d1 = as_seq h1 dst in
-  let d0 = as_seq h0 src in
-  // The property we actually want to prove
-  assert (Seq.equal d0 d1)
 
 // assume val memcpy_8: src:bytes -> dest:bytes ->
 //   STL unit 

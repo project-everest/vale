@@ -216,12 +216,12 @@ let cancel_write_low_mem heap length addr (b:B.buffer UInt8.t{length = B.length 
 logic let correct_up_p (addrs:addr_map) new_mem heap p =
   let length = B.length p in
   let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
-  (forall i.  0 <= i /\ i < length ==> heap.[addr + i] == Seq.index (B.as_seq new_mem p) i)
+  (forall i.{:pattern (heap.[addr + i]); (Seq.index (B.as_seq new_mem p) i)}  0 <= i /\ i < length ==> heap.[addr + i] == Seq.index (B.as_seq new_mem p) i)
 
 let correct_up (addrs:addr_map) ptrs new_mem heap =
   forall p. List.memP p ptrs ==> correct_up_p addrs new_mem heap p
 
-let list_live mem ptrs = forall p. List.memP p ptrs ==> B.live mem p
+let list_live mem ptrs = forall p . List.memP p ptrs ==> B.live mem p
 
 
 let correct_up_p_cancel heap (addrs:addr_map) (p:B.buffer UInt8.t) (mem:HS.mem{B.live mem p}) : Lemma
