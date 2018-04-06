@@ -152,12 +152,14 @@ let print_ins (ins:ins) (p:printer) =
   | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
   | Mulx64 dst_hi dst_lo src -> 
     let dst_s = print_ops dst_hi dst_lo in
-    p.ins_name "  mul" [dst_hi; dst_lo; src] ^ print_pair dst_s (print_operand src p)  ^ "\n"
+    p.ins_name "  mul" [dst_hi; dst_lo; src] ^ print_pair dst_s (print_operand src p)
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
   | Xor64 dst src -> p.ins_name "  xor" [dst; src] ^ print_ops dst src
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
+  | Push src      -> p.ins_name "  push" [src] ^ print_operand src p
+  | Pop dst       -> p.ins_name "  pop"  [dst] ^ print_operand dst p
   | Paddd dst src          -> "  paddd "      ^ print_xmms dst src
   | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
   | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst) (string_of_int amt)
