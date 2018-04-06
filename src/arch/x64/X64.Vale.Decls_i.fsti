@@ -286,6 +286,13 @@ let validDstAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
     len <= buffer_length b /\
     buffer_addr b == addr
 
+let valid_stack_slots (m:mem) (rsp:int) (b:buffer64) (num_slots:int) =
+    buffer_readable m b /\
+    num_slots <= buffer_length b /\
+    (let open FStar.Mul in
+     rsp == buffer_addr b + 8 * num_slots /\
+     0 <= rsp - 8 * num_slots)
+
 let modifies_buffer_specific128 (b:buffer128) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer128 b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2

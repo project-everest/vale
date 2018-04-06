@@ -209,24 +209,21 @@ procedure{:quick exportOnly} fast_multiply(
 */
 }
 
-
-// fast_mul_stdcall(dst, inA, buf, inB)
-// where buf is a pointer to an array of (at least) 5 uint64s, used for saving registers
-procedure{:quick} fast_mul_stdcall(
+// fast_mul_stdcall(dst, inA, inB)
+procedure{:quick} {:verify true} fast_mul_stdcall(
     inline win:bool,
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64,
     ghost stack_b:buffer64)
     lets
-        dst_ptr @= rdi; inA_ptr @= rsi; stack_ptr @= rax; inB_ptr @= rcx;
+        dst_ptr @= rdi; inA_ptr @= rsi; inB_ptr @= rcx;
         dst_in := (if win then rcx else rdi);
         inA_in := (if win then rdx else rsi);
-        stack_in := (if win then r8 else rdx);
-        inB_in := (if win then r9 else rcx);
+        inB_in := (if win then r8 else rdx);
     modifies
         rax; rbx; rcx; rdx; rdi; rsi; r8; r9; r10; r11; r12; r13; r14;
-        efl; mem;
+        rsp; efl; mem;
     requires
         buffers_disjoint(dst_b, inA_b);
         buffers_disjoint(dst_b, inB_b);
@@ -238,7 +235,7 @@ procedure{:quick} fast_mul_stdcall(
         validDstAddrs64(mem, dst_in, dst_b, 8);
         validSrcAddrs64(mem, inA_in, inA_b, 4);
         validSrcAddrs64(mem, inB_in, inB_b, 4);
-        validDstAddrs64(mem, stack_in, stack_b, 5);
+        valid_stack_slots(mem, rsp, stack_b, 5);
     ensures
         let a0 := buffer64_read(inA_b, 0, mem);
         let a1 := buffer64_read(inA_b, 1, mem);
@@ -279,36 +276,27 @@ procedure{:quick} fast_mul_stdcall(
         r13 == old(r13);
         r14 == old(r14);
 {
-    // Grab the "stack" pointer
-    inline if (win) {
-        Mov64(stack_ptr, r8);
-    } else {
-        Mov64(stack_ptr, rdx);
-    }
-    assert validDstAddrs64(mem, stack_ptr, stack_b, 5);
-
     // Store callee-save registers
-    Store64_buffer(stack_ptr, rbx,  0, stack_b, 0);
-    Store64_buffer(stack_ptr, rsi,  8, stack_b, 1);
-    Store64_buffer(stack_ptr, r12, 16, stack_b, 2);
-    Store64_buffer(stack_ptr, r13, 24, stack_b, 3);
-    Store64_buffer(stack_ptr, r14, 32, stack_b, 4);
+    Push_buffer(rbx, stack_b, 4);
+    Push_buffer(rsi, stack_b, 3);
+    Push_buffer(r12, stack_b, 2);
+    Push_buffer(r13, stack_b, 1);
+    Push_buffer(r14, stack_b, 0);
 
     // Line up the rest of the arguments
-    inline if (win)
-    {
+    inline if (win) {
         Mov64(dst_ptr, rcx);
         Mov64(inA_ptr, rdx);
-        Mov64(inB_ptr, r9);
+        Mov64(inB_ptr, r8);
+    } else {
+        Mov64(inB_ptr, rdx);
     }
 
-    Mov64(rbx, stack_ptr);  // Save a copy
     fast_multiply(dst_b, inA_b, inB_b);
-    Mov64(stack_ptr, rbx);  // Restore the "stack" pointer
 
-    Load64_buffer(rbx, stack_ptr,  0, stack_b, 0);
-    Load64_buffer(rsi, stack_ptr,  8, stack_b, 1);
-    Load64_buffer(r12, stack_ptr, 16, stack_b, 2);
-    Load64_buffer(r13, stack_ptr, 24, stack_b, 3);
-    Load64_buffer(r14, stack_ptr, 32, stack_b, 4);
+    Pop_buffer(r14, stack_b, 0);
+    Pop_buffer(r13, stack_b, 1);
+    Pop_buffer(r12, stack_b, 2);
+    Pop_buffer(rsi, stack_b, 3);
+    Pop_buffer(rbx, stack_b, 4);
 }
