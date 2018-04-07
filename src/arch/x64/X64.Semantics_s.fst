@@ -359,7 +359,7 @@ let eval_ins (ins:ins) : st unit =
     update_operand dst ins (Types_s.ishl (eval_operand dst s) (eval_operand amt s))
 
   | Push src ->
-    check (valid_operand src);; // Not strictly necessary, since it should always be a register
+    check (valid_operand src);;
     let new_rsp = ((eval_reg Rsp s) - 8) % nat64_max in
     update_operand_preserve_flags (OMem (MConst new_rsp)) (eval_operand src s);;
     update_reg Rsp new_rsp
