@@ -168,7 +168,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
         fargs = pParams;
 //        fret = TApp (TName (Reserved "quickCode"), [tUnit; tCodeApp]);
         fret = TApp (TName (Id "quickCodes"), [tUnit; tCodeApp]);
-        fbody = Some fBody;
+        fbody = Some (hide_ifs fBody);
         fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
       }
       in
@@ -236,7 +236,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
       fghost = NotGhost;
       fargs = qParams;
       fret = tRetQuick;
-      fbody = Some eQuick;
+      fbody = Some (hide_ifs eQuick);
       fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
     }
     in
@@ -256,7 +256,7 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   let qCodes_X = Reserved ("qcode_" + (string_of_id p.pname)) in
   let ghostRets = List.collect (fun (x, t, g, _, _) -> match g with XGhost -> [(x, t)] | _ -> []) p.prets in
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
-  let letGs = EBind (BindLet, [EVar g], gAssigns, [], ens) in
+  let letGs = EBind (BindLet, [EVar g], gAssigns, [], hide_ifs ens) in
   let funCont = EBind (Lambda, [], [(s0, None); (sM, None); (g, None)], [], letGs) in
   let eWpSound = EApply (wpSound_X, [code; EApply (qCodes_X, args); EVar s0; funCont]) in
   let sWpSound = SAssign ([(sM, None); (fM, None); (g, None)], eWpSound) in

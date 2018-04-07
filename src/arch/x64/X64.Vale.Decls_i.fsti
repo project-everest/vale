@@ -26,6 +26,10 @@ unfold let va_reveal_opaque = Opaque_i.reveal_opaque
 unfold let va_hd = Cons?.hd
 //unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
 
+// hide 'if' so that x and y get fully normalized
+let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
+  if b then x () else y ()
+
 (* Type aliases *)
 unfold let va_bool = bool
 unfold let va_int = int
