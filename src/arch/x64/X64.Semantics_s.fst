@@ -12,17 +12,28 @@ type ins =
   | Add64      : dst:operand -> src:operand -> ins
   | AddLea64   : dst:operand -> src1:operand -> src2:operand -> ins
   | AddCarry64 : dst:operand -> src:operand -> ins
+  | Adcx64     : dst:operand -> src:operand -> ins
+  | Adox64     : dst:operand -> src:operand -> ins
   | Sub64      : dst:operand -> src:operand -> ins
   | Mul64      : src:operand -> ins
+  | Mulx64     : dst_hi:operand -> dst_lo:operand -> src:operand -> ins
   | IMul64     : dst:operand -> src:operand -> ins
   | Xor64      : dst:operand -> src:operand -> ins
   | And64      : dst:operand -> src:operand -> ins
   | Shr64      : dst:operand -> amt:operand -> ins
   | Shl64      : dst:operand -> amt:operand -> ins
+  | Push       : src:operand -> ins
+  | Pop        : dst:operand -> ins
+  | Paddd      : dst:xmm -> src:xmm -> ins
   | Pxor       : dst:xmm -> src:xmm -> ins
-  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
+  | Pslld      : dst:xmm -> amt:int -> ins
+  | Psrld      : dst:xmm -> amt:int -> ins
+  | Pshufb     : dst:xmm -> src:xmm -> ins  
+  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
   | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
+  | Pclmulqdq  : dst:xmm -> src:xmm -> imm:int -> ins
   | AESNI_enc           : dst:xmm -> src:xmm -> ins
   | AESNI_enc_last      : dst:xmm -> src:xmm -> ins
   | AESNI_dec           : dst:xmm -> src:xmm -> ins
@@ -53,6 +64,8 @@ noeq type state = {
 //let v (u:uint64) : nat64 = FStar.UInt64.v u
 
 assume val havoc : state -> ins -> nat64
+
+// TODO: Need to be sure that load/store_mem does an appropriate little-endian load
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
@@ -150,6 +163,12 @@ let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : state =
 let cf (flags:nat64) : bool =
   flags % 2 = 1
 
+//unfold let bit11 = normalize_term (pow2 11)
+let _ = assert (2048 == normalize_term (pow2 11))
+
+let overflow(flags:nat64) : bool =
+  (flags / 2048) % 2 = 1  // OF is the 12th bit, so dividing by 2^11 shifts right 11 bits
+
 let update_cf (flags:nat64) (new_cf:bool) : (new_flags:nat64{cf new_flags == new_cf}) =
   if new_cf then
     if not (cf flags) then
@@ -159,6 +178,18 @@ let update_cf (flags:nat64) (new_cf:bool) : (new_flags:nat64{cf new_flags == new
   else
     if (cf flags) then
       flags - 1
+    else
+      flags
+
+let update_of (flags:nat64) (new_of:bool) : (new_flags:nat64{overflow new_flags == new_of}) =
+  if new_of then
+    if not (overflow flags) then
+      flags + 2048
+    else
+      flags
+  else
+    if (overflow flags) then
+      flags - 2048
     else
       flags
 
@@ -187,6 +218,13 @@ let set (s:state) :st unit =
 unfold
 let fail :st unit =
   fun s -> (), {s with ok=false}
+
+unfold
+let check_imm (valid:bool) : st unit =
+  if valid then
+    return ()
+  else
+    fail
 
 unfold
 let check (valid: state -> bool) : st unit =
@@ -230,7 +268,11 @@ let update_xmm (x:xmm)  (ins:ins) (v:quad32) :st unit =
 let update_flags (new_flags:nat64) :st unit =
   s <-- get;
   set ( { s with flags = new_flags } )
-  
+
+let update_cf_of (new_cf new_of:bool) :st unit =
+  s <-- get;
+  set ( { s with flags = update_cf (update_of s.flags new_of) new_cf } )
+
 (* Core definition of instruction semantics *)
 let eval_ins (ins:ins) : st unit =
   s <-- get;
@@ -257,7 +299,24 @@ let eval_ins (ins:ins) : st unit =
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
     let new_carry = sum >= nat64_max in
     update_operand dst ins (sum % nat64_max);;
-    update_flags (update_cf s.flags new_carry)
+    update_flags (havoc s ins);;
+    update_flags (update_cf s.flags new_carry)  // We specify cf, but underspecify everything else
+
+  | Adcx64 dst src ->
+    check (valid_operand src);;
+    let old_carry = if cf(s.flags) then 1 else 0 in
+    let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
+    let new_carry = sum >= nat64_max in
+    update_operand dst ins (sum % nat64_max);;
+    update_flags (update_cf s.flags new_carry)  // Explicitly touches only CF
+
+  | Adox64 dst src ->
+    check (valid_operand src);;
+    let old_carry = if overflow(s.flags) then 1 else 0 in
+    let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
+    let new_carry = sum >= nat64_max in
+    update_operand dst ins (sum % nat64_max);;
+    update_flags (update_of s.flags new_carry)  // Explicitly touches only OF
 
   | Sub64 dst src ->
     check (valid_operand src);;
@@ -270,15 +329,23 @@ let eval_ins (ins:ins) : st unit =
     update_reg Rax lo;;
     update_reg Rdx hi;;
     update_flags (havoc s ins)
- 
+
+  | Mulx64 dst_hi dst_lo src ->
+    check (valid_operand src);;
+    let hi = FStar.UInt.mul_div #64 (eval_reg Rdx s) (eval_operand src s) in
+    let lo = FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
+    update_operand_preserve_flags dst_lo lo;;
+    update_operand_preserve_flags dst_hi hi
+
   | IMul64 dst src ->
     check (valid_operand src);;
     update_operand dst ins (FStar.UInt.mul_mod #64 (eval_operand dst s) (eval_operand src s))
 
   | Xor64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s))
-
+    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s));;
+    update_cf_of false false
+    
   | And64 dst src ->
     check (valid_operand src);;
     update_operand dst ins (Types_s.iand (eval_operand dst s) (eval_operand src s))
@@ -291,12 +358,52 @@ let eval_ins (ins:ins) : st unit =
     check (valid_shift_operand amt);;
     update_operand dst ins (Types_s.ishl (eval_operand dst s) (eval_operand amt s))
 
+  | Push src ->
+    check (valid_operand src);;
+    let new_rsp = ((eval_reg Rsp s) - 8) % nat64_max in
+    update_operand_preserve_flags (OMem (MConst new_rsp)) (eval_operand src s);;
+    update_reg Rsp new_rsp
+
+  | Pop dst ->
+    let stack_val = OMem (MReg Rsp 0) in
+    check (valid_operand stack_val);;    
+    let new_dst = eval_operand stack_val s in
+    let new_rsp = ((eval_reg Rsp s) + 8) % nat64_max in
+    update_operand_preserve_flags dst new_dst;;
+    update_reg Rsp new_rsp
+
 // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
 // since all possibilities are valid, thanks to dependent types 
-   
+
+  | Paddd dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (Quad32 ((dst_q.lo + src_q.lo) % nat32_max)
+			       ((dst_q.mid_lo + src_q.mid_lo) % nat32_max)
+			       ((dst_q.mid_hi + src_q.mid_hi) % nat32_max)
+			       ((dst_q.hi + src_q.hi) % nat32_max))
+
   | Pxor dst src ->
     update_xmm dst ins (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
+  | Pslld dst amt ->
+    check_imm (0 <= amt && amt < 32);;
+    update_xmm dst ins (quad32_map (fun i -> ishl i amt) (eval_xmm dst s))
+
+  | Psrld dst amt ->
+    check_imm (0 <= amt && amt < 32);;
+    update_xmm dst ins (quad32_map (fun i -> ishr i amt) (eval_xmm dst s))
+ 
+  | Pshufb dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    // We only spec a restricted version sufficient for doing a byte reversal
+    check_imm (src_q.lo     = 0x0C0D0E0F &&
+	       src_q.mid_lo = 0x08090A0B &&
+	       src_q.mid_hi = 0x04050607 &&
+	       src_q.hi     = 0x00010203);;
+    update_xmm dst ins (reverse_bytes_quad32 dst_q)
+    
   | Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
@@ -307,7 +414,12 @@ let eval_ins (ins:ins) : st unit =
          (select_word src_val (Bits_of_Byte?.hi bits))
     in
     update_xmm dst ins permuted_xmm
-    
+
+  | Pinsrd dst src index ->
+    check (valid_operand src);;
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % nat32_max) (index % 4))
+
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need
     let src_q = eval_xmm src s in
@@ -317,6 +429,23 @@ let eval_ins (ins:ins) : st unit =
   | MOVDQU dst src ->
     check (valid_mov128_op src);; 
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
+
+  | Pclmulqdq dst src imm ->
+    (
+      let Quad32 a0 a1 a2 a3 = eval_xmm dst s in
+      let Quad32 b0 b1 b2 b3 = eval_xmm src s in
+      let f x0 x1 y0 y1 =
+        let x = Math.Poly2.Bits_s.of_double32 (Double32 x0 x1) in
+        let y = Math.Poly2.Bits_s.of_double32 (Double32 y0 y1) in
+        update_xmm dst ins (Math.Poly2.Bits_s.to_quad32 (Math.Poly2_s.mul x y))
+        in
+      match imm with
+      | 0 -> f a0 a1 b0 b1
+      | 1 -> f a2 a3 b0 b1
+      | 16 -> f a0 a1 b2 b3
+      | 17 -> f a2 a3 b2 b3
+      | _ -> fail
+    )
 
   | AESNI_enc dst src ->
     let dst_q = eval_xmm dst s in

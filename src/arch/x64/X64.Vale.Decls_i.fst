@@ -15,6 +15,9 @@ let lemma_mul_nat (x:nat) (y:nat) : Lemma (ensures 0 <= (x `op_Multiply` y)) = (
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
 let cf = Lemmas_i.cf
+let overflow = Lemmas_i.overflow
+let update_cf = Lemmas_i.update_cf
+let update_of = Lemmas_i.update_of
 let ins = S.ins
 type ocmp = S.ocmp
 type va_fuel = nat

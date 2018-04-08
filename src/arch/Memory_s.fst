@@ -27,11 +27,11 @@ let tuint8 = P.TBase P.TUInt8
 let tuint16 = P.TBase P.TUInt16
 let tuint32 = P.TBase P.TUInt32
 let tuint64 = P.TBase P.TUInt64
-let tuint128 = magic()
+//let tuint128 = magic()
 #reset-options
 
 // TODO: loc_readable
-let loc_readable h s = admit ()
+let loc_readable h s = unit // admit ()
 let loc_readable_none h = admit ()
 let loc_readable_union h s1 s2 = admit ()
 let loc_readable_buffer #t h b = admit ()
@@ -57,5 +57,5 @@ let modifies_loc_includes s1 h h' s2 = P.modifies_loc_includes s1 h h' s2
 let modifies_trans s12 h1 h2 s23 h3 = P.modifies_trans s12 h1 h2 s23 h3
 
 // TODO
-let buffer_read = admit ()
-let buffer_write = admit ()
+let buffer_read #_ _ _ _ = admit ()
+let buffer_write #_ _ _ _ _ = admit ()

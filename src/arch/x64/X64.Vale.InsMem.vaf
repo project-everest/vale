@@ -63,3 +63,40 @@ procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:fas
     lemma_store_mem64(b, index, old(src), old(mem));
 }
 
+procedure{:instruction Ins(S.Pop(dst))}{:fast_instruction}{:quick exportOnly} Pop(
+    out dst: dst_opr64,
+        ghost b:buffer64,
+        ghost index:int)
+    reads mem;
+    modifies rsp;
+    requires
+        valid_src_addr(mem, b, index);
+        rsp == buffer_addr(b) + 8 * index;
+        rsp + 8 < nat64_max;
+    ensures
+        dst == buffer64_read(b, index, mem);
+        rsp == old(rsp) + 8;
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
+}
+
+procedure{:instruction Ins(S.Push(src))}{:fast_instruction}{:quick exportOnly} Push(
+        src: reg_opr64,
+        ghost b:buffer64,
+        ghost index:int)
+    modifies
+        rsp; mem;
+    requires
+        valid_dst_addr(mem, b, index);
+        rsp - 8 == buffer_addr(b) + 8 * index;
+        0 <= rsp - 8;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        mem == old(buffer64_write(b, index, src, mem));
+        rsp == old(rsp) - 8;
+{
+    lemma_valid_mem64(b, index, old(mem));
+    lemma_store_mem64(b, index, old(src), old(mem));
+}
+

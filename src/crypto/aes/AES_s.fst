@@ -1,5 +1,9 @@
 module AES_s
 
+// IMPORTANT: This specification is written assuming a little-endian mapping from bytes to quad32s
+//            This is explicit in key_schedule_to_round_keys when we construct the round_key rk,
+//            but it also applies implicitly to the input quad32
+
 open Types_s
 open FStar.Seq
 open FStar.Mul
@@ -15,6 +19,9 @@ assume val sub_word (w:nat32) : nat32
 
 assume val commute_sub_bytes_shift_rows (q:quad32) : Lemma
   (sub_bytes (shift_rows q) == shift_rows (sub_bytes q))
+
+assume val commute_rot_word_sub_word (x:nat32) : Lemma
+  (rot_word (sub_word x) == sub_word (rot_word x))
 
 type algorithm = | AES_128 | AES_192 | AES_256
 
@@ -61,8 +68,6 @@ let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_ke
   let state = quad32_xor state (index round_keys (nr alg)) in
   state
 
-unfold let nat32_xor (x y:nat32) : nat32 = ixor x y
-
 let rec expand_key (alg:algorithm) (key:aes_key alg) (size:nat{size <= (nb * ((nr alg) + 1))})
   : (ek:seq nat32 {length ek == size}) =
   if size = 0 then createEmpty
@@ -96,20 +101,4 @@ let key_to_round_keys (alg:algorithm) (key:aes_key alg)
 
 let aes_encrypt (alg:algorithm) (key:aes_key alg) (input:quad32) =
   cipher alg input (key_to_round_keys alg key)
-
-#reset-options "--max_fuel 5 --initial_fuel 5"
-abstract let quad32_to_seq (q:quad32) : 
-  Tot (s:seq nat32 { length s == 4 /\ 
-                     (let q' = Quad32 (index s 0) (index s 1) (index s 2) (index s 3) in
-                      q == q')           
-                   }) =
-  let l = [q.lo; q.mid_lo; q.mid_hi; q.hi] in
-  let s = of_list l in
-  //assert (List.length l == 4);
-  lemma_of_list_length s l; 
-  lemma_of_list s l 0;
-  lemma_of_list s l 1;
-  lemma_of_list s l 2;
-  lemma_of_list s l 3;  
-  of_list l
 

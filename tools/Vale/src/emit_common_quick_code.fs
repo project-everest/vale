@@ -152,6 +152,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
   let funs = ref ([]:decls) in
   let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
   let fParams = make_fun_params p.prets p.pargs in
+  let pParams = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
+  let pArgs = List.map (fun (x, _) -> EVar x) pParams in
   let gen_quick_block env info outs args ss =
     let id = Reserved ("qcode_" + info.qsym + "_" + (string_of_id p.pname)) in
     let cid = Reserved ("code_" + info.qsym + "_" + (string_of_id p.pname)) in
@@ -163,7 +165,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
       {
         fname = id;
         fghost = Ghost;
-        fargs = fParams;
+        fargs = pParams;
 //        fret = TApp (TName (Reserved "quickCode"), [tUnit; tCodeApp]);
         fret = TApp (TName (Id "quickCodes"), [tUnit; tCodeApp]);
         fbody = Some (hide_ifs fBody);
@@ -178,7 +180,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
         (fun (sN:state) (sN':state) -> va_get_reg Rax sN == va_get_reg Rax sN' /\ va_get_flags sN == va_get_flags sN')
     *)
     let eCode = EApply (cid, fArgs) in
-    let eQCode = EApply (id, fArgs) in
+    let eQCode = EApply (id, pArgs) in
     let s0 = Reserved "s0" in
     let sM = Reserved "sM" in
     let sN = Reserved "sN" in

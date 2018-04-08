@@ -190,6 +190,16 @@ AddOption('--FSTARTEST',
   default=False,
   action='store_true',
   help="Bundle up files to add to F*'s test suite.  Results go into fstar_test_suite ")
+AddOption('--FSTAR-EXTRACT',
+  dest='fstar_extract',
+  default=False,
+  action='store_true',
+  help="Extract .ml files from F* files")
+AddOption('--NO-LEMMAS',
+  dest='no_lemmas',
+  default=False,
+  action='store_true',
+  help="Generate Vale code but no lemmas")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -206,10 +216,12 @@ stage1 = GetOption('stage1')
 stage2 = GetOption('stage2')
 fstar_my_version = GetOption('fstar_my_version')
 fstar_z3_my_version = GetOption('fstar_z3_my_version')
+fstar_extract = GetOption('fstar_extract')
+no_lemmas = GetOption('no_lemmas')
 gen_hints = GetOption('gen_hints')
 single_vaf = GetOption('single_vaf')
 is_single_vaf = not (single_vaf is None)
-env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else ''
+env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else '-noLemmas' if no_lemmas else ''
 
 ####################################################################
 #
@@ -250,7 +262,7 @@ if do_fstar and not stage1 and not stage2:
   # the user can always run "scons --STAGE1" and "scons --STAGE2" explicitly.
   #
   print("%s*** Running scons --STAGE1 ***%s" % (colors['yellow'], colors['end']))
-  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints')]
+  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints') and not x.endswith('.ml')]
   subprocess.check_call(['python'] + args_stage1 + ['--STAGE1'])
   print("%s*** Running scons --STAGE2 ***%s" % (colors['yellow'], colors['end']))
   stage2 = True
@@ -578,9 +590,20 @@ def verify_fstar(env, targetfile, sourcefile):
     Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
   return outs
 
+def extract_fstar(env, sourcefile):
+  base_name = os.path.splitext(str(sourcefile))[0]
+  module_name = os.path.split(base_name)[1]
+  mlfile = 'obj/ml_out/' + module_name + '.ml'
+  Depends(mlfile, base_name + '.fst.verified')
+  return env.Command(mlfile, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS --odir obj/ml_out --codegen OCaml --extract_module " + module_name)
+
 # Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
 def add_fstar_verifier(env):
   env.AddMethod(verify_fstar, "FStar")
+
+# Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
+def add_fstar_extract(env):
+  env.AddMethod(extract_fstar, "FStarExtract")
 
 # Add env.DafnyCompile(), to compile without verification, a .dfy file into a .exe
 def add_dafny_compiler(env):
@@ -772,6 +795,8 @@ def verify_fstar_files(env, files):
       if stage2:
         target = o + '.verified'
         options.env.FStar(target, o)
+        if os.path.splitext(o)[1] == '.fst' and fstar_extract:
+          options.env.FStarExtract(o)
 
 # Verify a set of Vale files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -801,6 +826,8 @@ def verify_vale_fstar_files(env, files):
         targeti = s + '.fsti.verified'
         fstar_gen_options.env.FStar(target, fsts[0])
         fstari_gen_options.env.FStar(targeti, fsts[1])
+        if fstar_extract:
+          fstar_gen_options.env.FStarExtract(fsts[0])
 
 def recursive_glob(env, pattern, strings=False):
   matches = []
@@ -973,6 +1000,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
 ####################################################################
 add_dafny_verifier(env)
 add_fstar_verifier(env)
+add_fstar_extract(env)
 add_dafny_compiler(env)
 add_dafny_kremlin(env)
 add_vale_builders(env)
