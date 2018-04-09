@@ -44,11 +44,13 @@ open X64.GF128_Mul
 //  else
 //    Mkfour 0 0 0 0 
 //
-//let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
-//  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
-//    slice s start_pos end_pos
-//  else
-//    create 1 (Mkfour 0 0 0 0)
+
+let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
+  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
+    slice s start_pos end_pos
+  else
+    create 1 (Mkfour 0 0 0 0)
+
 #endverbatim
 
 
@@ -141,12 +143,12 @@ procedure {:quick} compute_ghash_incremental()
 }
 
 
-#reset-options "--z3rlimit 40"
+#reset-options "--z3rlimit 60"
 
 ///////////////////////////
 // GCM
 ///////////////////////////
-procedure {:quick} gcm_core(
+procedure {:quick} {:verify true} gcm_core(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
     ghost key:aes_key(AES_128),
@@ -188,7 +190,7 @@ procedure {:quick} gcm_core(
         icb.hi3 == old(icb.hi3);
 
         // GHash
-        len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ hash == old(hash); 
+        len == 0 ==> hash == old(hash); 
         len > 0 ==> length(buffer128_as_seq(mem, out_b)) > 0 /\ hash == ghash_incremental(h, old(hash), buffer128_as_seq(mem, out_b));
 {
     Mov64(rdx, 0);
@@ -261,7 +263,11 @@ procedure {:quick} gcm_core(
         Add64(r10, 16);
         inc32(icb, one);
     }
-    
+
+//    assert length(buffer128_as_seq(mem, in_b)) == length(buffer128_as_seq(mem, out_b));
+//    assert 256 * length(buffer128_as_seq(mem, in_b)) < pow2_32;
+//    assert gctr_partial(length(buffer128_as_seq(mem, out_b)), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+//    
     // Call a helpful lemma
     gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
