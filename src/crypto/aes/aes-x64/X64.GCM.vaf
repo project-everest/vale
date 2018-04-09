@@ -45,7 +45,7 @@ open X64.Vale.QuickCodes_i
 //    create 1 (Mkfour 0 0 0 0)
 #endverbatim
 
-#reset-options "--z3rlimit 40"
+#reset-options "--z3rlimit 100"
 
 ///////////////////////////
 // GCM
@@ -68,7 +68,7 @@ procedure {:quick} gcm_core(
         plain_ptr; out_ptr; keys_ptr; auth_ptr; plain_len; auth_len; 
 
     modifies
-        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; iv;
+        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm11; iv;
         xmm6; 
         mem; efl; 
 
@@ -104,14 +104,12 @@ procedure {:quick} gcm_core(
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
         create(1, xmm1) == snd(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
-    assume false;
-    /*
     // let h = aes_encrypt alg key (Mkfour 0 0 0 0) in
     Pxor(xmm0, xmm0);
     lemma_quad32_xor(); // xmm0 = 0
     AES128EncryptBlock(xmm0, reverse_bytes_nat32_seq(key), round_keys, keys_b); // h = xmm0 = aes_encrypt alg (reverse_bytes_nat32_seq key) (Mkfour 0 0 0 0) in
     ghost var h := xmm0;
-    Mov128(xmm5, xmm0);     // Save a copy of h
+    Mov128(xmm11, xmm0);     // Save a copy of h
 
     // let j0 = Mkfour 1 iv.lo1 iv.hi2 iv.hi3 in
     // (inc32 j0 1)
@@ -126,8 +124,6 @@ procedure {:quick} gcm_core(
     // Compute the hashes incrementally
     Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
-    Mov128(xmm0, xmm5);     // Move h where ghash expects it
-    // assert xmm0 == h;
     ghost var y_0 := Mkfour(0, 0, 0, 0);
     compute_Y0();
     // assert xmm1 == y_0;
@@ -137,7 +133,6 @@ procedure {:quick} gcm_core(
     Mov64(rax, out_ptr);
     Mov64(rcx, plain_len);
 
-    // assert xmm0 == h;
     compute_ghash_incremental(out_b);
     ghost var y_cipher := xmm1;
 
@@ -163,9 +158,8 @@ procedure {:quick} gcm_core(
     // assert iv == old(Mkfour(1,iv.lo1,iv.hi2,iv.hi3));
 
     // Encrypt the hash value with gctr_register 
-    gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
+    gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm1 = hash_value 
     // assert create(1, xmm1) == gctr_encrypt(old(Mkfour(1,iv.lo1,iv.hi2,iv.hi3)), create(1, hash), AES_128, key);
-    */
 }
 
 
@@ -247,7 +241,7 @@ procedure {:quick} gcm_stdcall_inner(
     ghost keys_b:buffer128
     )
     modifies
-        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm11;
         mem; efl;
     lets
         args_ptr := r9;
@@ -352,7 +346,7 @@ procedure {:quick} gcm_stdcall(
     ghost keys_b:buffer128
     )
     modifies
-        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7;
+        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm11;
         rbp; rdi; rsi; 
         mem; efl;
     lets
