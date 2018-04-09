@@ -11,6 +11,7 @@ module X64.GCMopt
 
 #verbatim{:interface}{:implementation}
 open FStar.Seq
+open Words_s
 open Types_s
 open Types_i
 open AES_s
@@ -41,13 +42,13 @@ open X64.GF128_Mul
 //  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
 //    last (slice s start_pos end_pos)
 //  else
-//    Quad32 0 0 0 0 
+//    Mkfour 0 0 0 0 
 //
 //let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 //  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
 //    slice s start_pos end_pos
 //  else
-//    create 1 (Quad32 0 0 0 0)
+//    create 1 (Mkfour 0 0 0 0)
 #endverbatim
 
 
@@ -58,7 +59,7 @@ open X64.GF128_Mul
 procedure {:quick exportOnly} zero_xmm(inout dst:xmm)
     modifies efl;
     ensures
-        dst == Quad32(0, 0, 0, 0);
+        dst == Mkfour(0, 0, 0, 0);
 {
     Pxor(dst, dst);
     lemma_quad32_xor();
@@ -67,7 +68,7 @@ procedure {:quick exportOnly} zero_xmm(inout dst:xmm)
 procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
     modifies efl;
     ensures
-        dst == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+        dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 {
     // TODO: Add an instruction to simplify this
     Pinsrd(dst, 0x0C0D0E0F, 0);
@@ -78,7 +79,7 @@ procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
 
 procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
     requires
-        one == Quad32(1, 0, 0, 0);
+        one == Mkfour(1, 0, 0, 0);
     modifies 
         efl;
     ensures 
@@ -106,7 +107,7 @@ procedure {:quick} gctr_register(
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
         // GCM reqs
-        xmm2 == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+        xmm2 == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
     ensures
         io == quad32_xor(old(io), aes_encrypt_le(AES_128, key, icb));
 {
@@ -145,7 +146,6 @@ procedure {:quick} compute_ghash_incremental()
 ///////////////////////////
 // GCM
 ///////////////////////////
-/*
 procedure {:quick} gcm_core(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -167,9 +167,9 @@ procedure {:quick} gcm_core(
         buffers_disjoint128(keys_b, out_b);
         validSrcAddrs128(mem, in_ptr, in_b, len);
         validDstAddrs128(mem, out_ptr, out_b, len);
-        in_ptr  + 16 * len < nat64_max;
-        out_ptr + 16 * len < nat64_max;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < nat32_max;
+        in_ptr  + 16 * len < pow2_64;
+        out_ptr + 16 * len < pow2_64;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -183,9 +183,9 @@ procedure {:quick} gcm_core(
 
         // GCTR
         buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
-        icb.mid_lo == old(icb.mid_lo);
-        icb.mid_hi == old(icb.mid_hi);
-        icb.hi     == old(icb.hi);
+        icb.lo1 == old(icb.lo1);
+        icb.hi2 == old(icb.hi2);
+        icb.hi3 == old(icb.hi3);
 
         // GHash
         len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ hash == old(hash); 
@@ -215,8 +215,8 @@ procedure {:quick} gcm_core(
             buffers_disjoint128(keys_b, out_b);
             validSrcAddrs128(mem, in_ptr, in_b, len);
             validDstAddrs128(mem, out_ptr, out_b, len);
-            in_ptr  + 16 * len < nat64_max;
-            out_ptr + 16 * len < nat64_max;
+            in_ptr  + 16 * len < pow2_64;
+            out_ptr + 16 * len < pow2_64;
             buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len; 
 
             // AES reqs
@@ -227,8 +227,8 @@ procedure {:quick} gcm_core(
             buffer128_as_seq(mem, keys_b) == round_keys;
 
             //////////////////// GCTR invariants //////////////////////
-            mask == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-            one == Quad32(1, 0, 0, 0);
+            mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+            one == Mkfour(1, 0, 0, 0);
 
             //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);
@@ -265,7 +265,6 @@ procedure {:quick} gcm_core(
     // Call a helpful lemma
     gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
-*/
 
 /*
 procedure {:quick} gcm_core(
@@ -298,15 +297,15 @@ procedure {:quick} gcm_core(
         validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
-        plain_ptr + 16 * plain_len < nat64_max;
-        auth_ptr + 16 * auth_len < nat64_max;
-        out_ptr + 16 * plain_len < nat64_max;
-        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
+        plain_ptr + 16 * plain_len < pow2_64;
+        auth_ptr + 16 * auth_len < pow2_64;
+        out_ptr + 16 * plain_len < pow2_64;
+        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < pow2_32;
         buffer_length(auth_b) == auth_len;
 
         // To simplify length calculations, restrict auth and plain length further
-        256 * auth_len < nat32_max;
-        256 * plain_len < nat32_max;
+        256 * auth_len < pow2_32;
+        256 * plain_len < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -316,22 +315,22 @@ procedure {:quick} gcm_core(
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, plain_len);
-        256 * buffer_length(plain_b) < nat32_max;
-        256 * buffer_length(auth_b) < nat32_max;
+        256 * buffer_length(plain_b) < pow2_32;
+        256 * buffer_length(auth_b) < pow2_32;
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
         create(1, xmm1) == snd(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
-    // let h = aes_encrypt alg key (Quad32 0 0 0 0) in
+    // let h = aes_encrypt alg key (Mkfour 0 0 0 0) in
     Pxor(xmm0, xmm0);
     lemma_quad32_xor(); // xmm0 = 0
-    AES128EncryptBlock(xmm0, reverse_bytes_nat32_seq(key), round_keys, keys_b); // h = xmm0 = aes_encrypt alg (reverse_bytes_nat32_seq key) (Quad32 0 0 0 0) in
+    AES128EncryptBlock(xmm0, reverse_bytes_nat32_seq(key), round_keys, keys_b); // h = xmm0 = aes_encrypt alg (reverse_bytes_nat32_seq key) (Mkfour 0 0 0 0) in
     ghost var h := xmm0;
     Mov128(xmm5, xmm0);     // Save a copy of h
 
-    // let j0 = Quad32 1 iv.mid_lo iv.mid_hi iv.hi in
+    // let j0 = Mkfour 1 iv.mid_lo iv.mid_hi iv.hi in
     // (inc32 j0 1)
     Pinsrd(iv, 2, 0);
-    // assert iv == inc32(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
+    // assert iv == inc32(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
 
     // let c = gctr_encrypt (inc32 j0 1) p alg key in
     Mov64(rax, plain_ptr);
@@ -343,7 +342,7 @@ procedure {:quick} gcm_core(
     Mov64(rcx, auth_len);
     Mov128(xmm0, xmm5);     // Move h where ghash expects it
     // assert xmm0 == h;
-    ghost var y_0 := Quad32(0, 0, 0, 0);
+    ghost var y_0 := Mkfour(0, 0, 0, 0);
     compute_Y0();
     // assert xmm1 == y_0;
     compute_ghash_incremental(auth_b);
@@ -375,11 +374,11 @@ procedure {:quick} gcm_core(
     ghost var hash := xmm1;
 
     Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo)
-    // assert iv == old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi));
+    // assert iv == old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi));
 
     // Encrypt the hash value with gctr_register 
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
-    // assert create(1, xmm1) == gctr_encrypt(old(Quad32(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
+    // assert create(1, xmm1) == gctr_encrypt(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
 */
 
@@ -443,7 +442,7 @@ procedure {:quick} callee_restore_registers(ghost buffer:buffer64)
 #verbatim{:interface}
 let mk_gctr_plain (p:seq quad32) : gctr_plain =
   let open FStar.Mul in
-  if 256 * length p < nat32_max then p else createEmpty
+  if 256 * length p < pow2_32 then p else createEmpty
 #endverbatim
 
 
@@ -490,17 +489,17 @@ procedure {:quick} gcm_stdcall_inner(
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
         validDstAddrs128(mem, tag_ptr, tag_b, 1);
 
-        plain_ptr + 16 * plain_len < nat64_max;
-        auth_ptr + 16 * auth_len < nat64_max;
-        out_ptr + 16 * plain_len < nat64_max;
-        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
+        plain_ptr + 16 * plain_len < pow2_64;
+        auth_ptr + 16 * auth_len < pow2_64;
+        out_ptr + 16 * plain_len < pow2_64;
+        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < pow2_32;
         buffer_length(auth_b) == auth_len;
 
         iv == buffer128_read(iv_b, 0, mem);
 
         // To simplify length calculations, restrict auth and plain length further
-        256 * auth_len < nat32_max;
-        256 * plain_len < nat32_max;
+        256 * auth_len < pow2_32;
+        256 * plain_len < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -514,8 +513,8 @@ procedure {:quick} gcm_stdcall_inner(
         validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
         validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
 
-        256 * buffer_length(plain_b) < nat32_max;
-        256 * buffer_length(auth_b) < nat32_max;
+        256 * buffer_length(plain_b) < pow2_32;
+        256 * buffer_length(auth_b) < pow2_32;
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
         create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 {
@@ -607,17 +606,17 @@ procedure {:quick} gcm_stdcall(
         validDstAddrs128(mem, tag_ptr, tag_b, 1);
         validDstAddrs64(mem, tmp_ptr, tmp_b, 8);
 
-        plain_ptr + 16 * plain_len < nat64_max;
-        auth_ptr + 16 * auth_len < nat64_max;
-        out_ptr + 16 * plain_len < nat64_max;
-        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < nat32_max;
+        plain_ptr + 16 * plain_len < pow2_64;
+        auth_ptr + 16 * auth_len < pow2_64;
+        out_ptr + 16 * plain_len < pow2_64;
+        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < pow2_32;
         buffer_length(auth_b) == auth_len;
 
         iv == buffer128_read(iv_b, 0, mem);
 
         // To simplify length calculations, restrict auth and plain length further
-        256 * auth_len < nat32_max;
-        256 * plain_len < nat32_max;
+        256 * auth_len < pow2_32;
+        256 * plain_len < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -631,8 +630,8 @@ procedure {:quick} gcm_stdcall(
         validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
         validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
 
-        256 * buffer_length(plain_b) < nat32_max;
-        256 * buffer_length(auth_b) < nat32_max;
+        256 * buffer_length(plain_b) < pow2_32;
+        256 * buffer_length(auth_b) < pow2_32;
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
         create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 
