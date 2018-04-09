@@ -82,7 +82,7 @@ let valid_maddr (m:maddr) (s:state) : Type0 = valid_mem64 (eval_maddr m s) s.mem
 [@va_qattr]
 let valid_operand (o:operand) (s:state) : Type0 =
   match o with
-  | OConst n -> 0 <= n /\ n < nat64_max
+  | OConst n -> 0 <= n /\ n < pow2_64
   | OReg r -> True
   | OMem m -> valid_maddr m s
 

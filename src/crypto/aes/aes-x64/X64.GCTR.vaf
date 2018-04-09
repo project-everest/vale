@@ -6,6 +6,7 @@ include "X64.AES.vaf"
 module X64.GCTR
 
 #verbatim{:interface}{:implementation}
+open Words_s
 open Types_s
 open Types_i
 open FStar.Seq
@@ -33,7 +34,7 @@ open X64.Vale.QuickCodes_i
 procedure {:quick} init_ctr()
     modifies xmm4; efl;
     ensures 
-        xmm4 == Quad32(1, 0, 0, 0);
+        xmm4 == Mkfour(1, 0, 0, 0);
 {
     Pxor(xmm4, xmm4);
     Pinsrd(xmm4, 1, 0);
@@ -44,7 +45,7 @@ procedure {:quick} init_ctr()
 procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
     modifies efl;
     ensures
-        dst == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+        dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 {
     // TODO: Add an instruction to simplify this
     Pinsrd(dst, 0x0C0D0E0F, 0);
@@ -55,7 +56,7 @@ procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
 
 procedure {:quick exportOnly} inc32(inout dst:xmm)
     requires
-        xmm4 == Quad32(1, 0, 0, 0);
+        xmm4 == Mkfour(1, 0, 0, 0);
     reads
         xmm4;
     modifies 
@@ -86,9 +87,9 @@ procedure {:quick} gctr_register(
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         create(1, io) == gctr_encrypt(icb, create(1, old(io)), AES_128, key);
-        icb.mid_lo == old(icb.mid_lo);
-        icb.mid_hi == old(icb.mid_hi);
-        icb.hi     == old(icb.hi);
+        icb.lo1 == old(icb.lo1);
+        icb.hi2 == old(icb.hi2);
+        icb.hi3     == old(icb.hi3);
 {
     Mov128(xmm0, icb);
     init_pshufb_mask(xmm2);
@@ -122,9 +123,9 @@ procedure {:quick} gctr_core(
         buffers_disjoint128(keys_b, out_b);
         validSrcAddrs128(mem, in_ptr, in_b, len);
         validDstAddrs128(mem, out_ptr, out_b, len);
-        in_ptr  + 16 * len < nat64_max;
-        out_ptr + 16 * len < nat64_max;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < nat32_max;
+        in_ptr  + 16 * len < pow2_64;
+        out_ptr + 16 * len < pow2_64;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -136,9 +137,9 @@ procedure {:quick} gctr_core(
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
         buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
-        icb.mid_lo == old(icb.mid_lo);
-        icb.mid_hi == old(icb.mid_hi);
-        icb.hi     == old(icb.hi);
+        icb.lo1 == old(icb.lo1);
+        icb.hi2 == old(icb.hi2);
+        icb.hi3     == old(icb.hi3);
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);
@@ -161,8 +162,8 @@ procedure {:quick} gctr_core(
             buffers_disjoint128(keys_b, out_b);
             validSrcAddrs128(mem, in_ptr, in_b, len);
             validDstAddrs128(mem, out_ptr, out_b, len);
-            in_ptr  + 16 * len < nat64_max;
-            out_ptr + 16 * len < nat64_max;
+            in_ptr  + 16 * len < pow2_64;
+            out_ptr + 16 * len < pow2_64;
 
             // AES reqs
             length(round_keys) == 11;
@@ -172,8 +173,8 @@ procedure {:quick} gctr_core(
             buffer128_as_seq(mem, keys_b) == round_keys;
 
             //////////////////// GCTR invariants //////////////////////
-            xmm1 == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-            xmm4 == Quad32(1, 0, 0, 0);
+            xmm1 == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+            xmm4 == Mkfour(1, 0, 0, 0);
 
             //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);

@@ -2,6 +2,8 @@ module X64.Semantics_s
 
 open FStar.BaseTypes
 open X64.Machine_s
+open Words_s
+open Words.Four_s
 open Types_s
 module M = Memory_i_s
 
@@ -284,21 +286,21 @@ let eval_ins (ins:ins) : st unit =
   | Add64 dst src ->
     check (valid_operand src);;
     let sum = (eval_operand dst s) + (eval_operand src s) in
-    let new_carry = sum >= nat64_max in    
-    update_operand dst ins ((eval_operand dst s + eval_operand src s) % nat64_max);;
+    let new_carry = sum >= pow2_64 in    
+    update_operand dst ins ((eval_operand dst s + eval_operand src s) % pow2_64);;
     update_flags (update_cf s.flags new_carry)
 
   | AddLea64 dst src1 src2 ->
     check (valid_operand src1);;
     check (valid_operand src2);;
-    update_operand_preserve_flags dst ((eval_operand src1 s + eval_operand src2 s) % nat64_max)
+    update_operand_preserve_flags dst ((eval_operand src1 s + eval_operand src2 s) % pow2_64)
 
   | AddCarry64 dst src ->
     check (valid_operand src);;
     let old_carry = if cf(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
-    let new_carry = sum >= nat64_max in
-    update_operand dst ins (sum % nat64_max);;
+    let new_carry = sum >= pow2_64 in
+    update_operand dst ins (sum % pow2_64);;
     update_flags (havoc s ins);;
     update_flags (update_cf s.flags new_carry)  // We specify cf, but underspecify everything else
 
@@ -306,21 +308,21 @@ let eval_ins (ins:ins) : st unit =
     check (valid_operand src);;
     let old_carry = if cf(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
-    let new_carry = sum >= nat64_max in
-    update_operand dst ins (sum % nat64_max);;
+    let new_carry = sum >= pow2_64 in
+    update_operand dst ins (sum % pow2_64);;
     update_flags (update_cf s.flags new_carry)  // Explicitly touches only CF
 
   | Adox64 dst src ->
     check (valid_operand src);;
     let old_carry = if overflow(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
-    let new_carry = sum >= nat64_max in
-    update_operand dst ins (sum % nat64_max);;
+    let new_carry = sum >= pow2_64 in
+    update_operand dst ins (sum % pow2_64);;
     update_flags (update_of s.flags new_carry)  // Explicitly touches only OF
 
   | Sub64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins ((eval_operand dst s - eval_operand src s) % nat64_max)
+    update_operand dst ins ((eval_operand dst s - eval_operand src s) % pow2_64)
 
   | Mul64 src ->
     check (valid_operand src);;
@@ -360,7 +362,7 @@ let eval_ins (ins:ins) : st unit =
 
   | Push src ->
     check (valid_operand src);;
-    let new_rsp = ((eval_reg Rsp s) - 8) % nat64_max in
+    let new_rsp = ((eval_reg Rsp s) - 8) % pow2_64 in
     update_operand_preserve_flags (OMem (MConst new_rsp)) (eval_operand src s);;
     update_reg Rsp new_rsp
 
@@ -368,7 +370,7 @@ let eval_ins (ins:ins) : st unit =
     let stack_val = OMem (MReg Rsp 0) in
     check (valid_operand stack_val);;    
     let new_dst = eval_operand stack_val s in
-    let new_rsp = ((eval_reg Rsp s) + 8) % nat64_max in
+    let new_rsp = ((eval_reg Rsp s) + 8) % pow2_64 in
     update_operand_preserve_flags dst new_dst;;
     update_reg Rsp new_rsp
 
@@ -378,52 +380,52 @@ let eval_ins (ins:ins) : st unit =
   | Paddd dst src ->
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
-    update_xmm dst ins (Quad32 ((dst_q.lo + src_q.lo) % nat32_max)
-			       ((dst_q.mid_lo + src_q.mid_lo) % nat32_max)
-			       ((dst_q.mid_hi + src_q.mid_hi) % nat32_max)
-			       ((dst_q.hi + src_q.hi) % nat32_max))
+    update_xmm dst ins (Mkfour ((dst_q.lo0 + src_q.lo0) % pow2_32)
+			       ((dst_q.lo1 + src_q.lo1) % pow2_32)
+			       ((dst_q.hi2 + src_q.hi2) % pow2_32)
+			       ((dst_q.hi3 + src_q.hi3) % pow2_32))
 
   | Pxor dst src ->
     update_xmm dst ins (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
   | Pslld dst amt ->
     check_imm (0 <= amt && amt < 32);;
-    update_xmm dst ins (quad32_map (fun i -> ishl i amt) (eval_xmm dst s))
+    update_xmm dst ins (four_map (fun i -> ishl i amt) (eval_xmm dst s))
 
   | Psrld dst amt ->
     check_imm (0 <= amt && amt < 32);;
-    update_xmm dst ins (quad32_map (fun i -> ishr i amt) (eval_xmm dst s))
+    update_xmm dst ins (four_map (fun i -> ishr i amt) (eval_xmm dst s))
  
   | Pshufb dst src ->
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     // We only spec a restricted version sufficient for doing a byte reversal
-    check_imm (src_q.lo     = 0x0C0D0E0F &&
-	       src_q.mid_lo = 0x08090A0B &&
-	       src_q.mid_hi = 0x04050607 &&
-	       src_q.hi     = 0x00010203);;
+    check_imm (src_q.lo0     = 0x0C0D0E0F &&
+	       src_q.lo1 = 0x08090A0B &&
+	       src_q.hi2 = 0x04050607 &&
+	       src_q.hi3     = 0x00010203);;
     update_xmm dst ins (reverse_bytes_quad32 dst_q)
     
   | Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
-    let permuted_xmm = Quad32
-         (select_word src_val (Bits_of_Byte?.lo bits))
-         (select_word src_val (Bits_of_Byte?.mid_lo bits))
-         (select_word src_val (Bits_of_Byte?.mid_hi bits))
-         (select_word src_val (Bits_of_Byte?.hi bits))
+    let permuted_xmm = Mkfour
+         (select_word src_val bits.lo0)
+         (select_word src_val bits.lo1)
+         (select_word src_val bits.hi2)
+         (select_word src_val bits.hi3)
     in
     update_xmm dst ins permuted_xmm
 
   | Pinsrd dst src index ->
     check (valid_operand src);;
     let dst_q = eval_xmm dst s in
-    update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % nat32_max) (index % 4))
+    update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % pow2_32) (index % 4))
 
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need
     let src_q = eval_xmm src s in
-    let shifted_xmm = Quad32 0 src_q.lo src_q.mid_lo src_q.mid_hi in
+    let shifted_xmm = Mkfour 0 src_q.lo0 src_q.lo1 src_q.hi2 in
     update_xmm dst ins shifted_xmm
 
   | MOVDQU dst src ->
@@ -432,11 +434,11 @@ let eval_ins (ins:ins) : st unit =
 
   | Pclmulqdq dst src imm ->
     (
-      let Quad32 a0 a1 a2 a3 = eval_xmm dst s in
-      let Quad32 b0 b1 b2 b3 = eval_xmm src s in
+      let Mkfour a0 a1 a2 a3 = eval_xmm dst s in
+      let Mkfour b0 b1 b2 b3 = eval_xmm src s in
       let f x0 x1 y0 y1 =
-        let x = Math.Poly2.Bits_s.of_double32 (Double32 x0 x1) in
-        let y = Math.Poly2.Bits_s.of_double32 (Double32 y0 y1) in
+        let x = Math.Poly2.Bits_s.of_double32 (Mktwo x0 x1) in
+        let y = Math.Poly2.Bits_s.of_double32 (Mktwo y0 y1) in
         update_xmm dst ins (Math.Poly2.Bits_s.to_quad32 (Math.Poly2_s.mul x y))
         in
       match imm with
@@ -473,10 +475,10 @@ let eval_ins (ins:ins) : st unit =
 
   | AESNI_keygen_assist dst src imm ->
     let src_q = eval_xmm src s in
-    update_xmm dst ins (Quad32 (AES_s.sub_word src_q.mid_lo) 
-			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.mid_lo)) imm)
-			       (AES_s.sub_word src_q.hi)
-			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.hi)) imm))
+    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1) 
+			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.lo1)) imm)
+			       (AES_s.sub_word src_q.hi3)
+			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.hi3)) imm))
  
  
 (*

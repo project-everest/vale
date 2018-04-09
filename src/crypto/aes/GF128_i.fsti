@@ -1,4 +1,6 @@
 module GF128_i
+open Words_s
+open Words.Four_s
 open Types_s
 open Types_i
 open GF128_s
@@ -24,20 +26,20 @@ val lemma_of_to_quad32 (a:poly) : Lemma
   (ensures of_quad32 (to_quad32 a) == a)
 
 let quad32_shift_left_1 (q:quad32) : quad32 =
-  let l = quad32_map (fun (i:nat32) -> ishl i 1) q in
-  let r = quad32_map (fun (i:nat32) -> ishr i 31) q in
-  let Quad32 r0 r1 r2 r3 = r in
-  quad32_xor l (Quad32 0 r0 r1 r2)
+  let l = four_map (fun (i:nat32) -> ishl i 1) q in
+  let r = four_map (fun (i:nat32) -> ishr i 31) q in
+  let Mkfour r0 r1 r2 r3 = r in
+  quad32_xor l (Mkfour 0 r0 r1 r2)
 
 let quad32_shift_2_left_1 (qa qb:quad32) : tuple2 quad32 quad32 =
-  let la = quad32_map (fun (i:nat32) -> ishl i 1) qa in
-  let lb = quad32_map (fun (i:nat32) -> ishl i 1) qb in
-  let ra = quad32_map (fun (i:nat32) -> ishr i 31) qa in
-  let rb = quad32_map (fun (i:nat32) -> ishr i 31) qb in
-  let Quad32 ra0 ra1 ra2 ra3 = ra in
-  let Quad32 rb0 rb1 rb2 rb3 = rb in
-  let qa' = quad32_xor la (Quad32 0 ra0 ra1 ra2) in
-  let qb' = quad32_xor lb (quad32_xor (Quad32 ra3 0 0 0) (Quad32 0 rb0 rb1 rb2)) in
+  let la = four_map (fun (i:nat32) -> ishl i 1) qa in
+  let lb = four_map (fun (i:nat32) -> ishl i 1) qb in
+  let ra = four_map (fun (i:nat32) -> ishr i 31) qa in
+  let rb = four_map (fun (i:nat32) -> ishr i 31) qb in
+  let Mkfour ra0 ra1 ra2 ra3 = ra in
+  let Mkfour rb0 rb1 rb2 rb3 = rb in
+  let qa' = quad32_xor la (Mkfour 0 ra0 ra1 ra2) in
+  let qb' = quad32_xor lb (quad32_xor (Mkfour ra3 0 0 0) (Mkfour 0 rb0 rb1 rb2)) in
   (qa', qb')
 
 val lemma_shift_left_1 (a:poly) : Lemma
@@ -69,8 +71,8 @@ val lemma_gf128_degree (_:unit) : Lemma
 
 val lemma_gf128_constant_rev (q:quad32) : Lemma
   (ensures
-    to_quad32 (reverse gf128_modulus_low_terms 127) == Quad32 0 0 0 0xe1000000 /\
-    quad32_xor q q == Quad32 0 0 0 0
+    to_quad32 (reverse gf128_modulus_low_terms 127) == Mkfour 0 0 0 0xe1000000 /\
+    quad32_xor q q == Mkfour 0 0 0 0
   )
 
 val lemma_quad32_double_hi_rev (a:poly) : Lemma

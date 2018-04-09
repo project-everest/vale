@@ -72,7 +72,7 @@ procedure{:instruction Ins(S.Pop(dst))}{:fast_instruction}{:quick exportOnly} Po
     requires
         valid_src_addr(mem, b, index);
         rsp == buffer_addr(b) + 8 * index;
-        rsp + 8 < nat64_max;
+        rsp + 8 < pow2_64;
     ensures
         dst == buffer64_read(b, index, mem);
         rsp == old(rsp) + 8;

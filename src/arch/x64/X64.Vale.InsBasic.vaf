@@ -57,7 +57,7 @@ procedure{:instruction Ins(S.Add64(dst,src))}{:quick exportOnly} Add64(inout dst
     modifies
         efl;
     requires
-        src + dst < nat64_max;
+        src + dst < pow2_64;
     ensures
         dst == old(dst + src);
 {
@@ -68,13 +68,13 @@ procedure{:instruction Ins(S.Add64(dst,src))}{:fast_instruction}{:quick exportOn
         efl;
     ensures
         dst == old(add_wrap(dst, src));
-        cf(efl) == old(dst + src >= nat64_max);
+        cf(efl) == old(dst + src >= pow2_64);
 {
 }
 
 procedure{:instruction Ins(S.AddLea64(dst, src1, src2))}{:quick exportOnly} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
     requires
-        src1 + src2 < nat64_max;
+        src1 + src2 < pow2_64;
     ensures
         dst == old(src1) + old(src2);
 {
@@ -85,7 +85,7 @@ procedure{:instruction Ins(S.AddCarry64(dst, src))}{:fast_instruction}{:quick ex
         efl;
     ensures
         dst == old(add_wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
-        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max;
+        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= pow2_64;
 {
 }
 
@@ -94,7 +94,7 @@ procedure{:instruction Ins(S.Adcx64(dst, src))}{:fast_instruction}{:quick export
         efl;
     ensures
         dst == old(add_wrap(add_wrap(dst, src), (if cf(efl) then 1 else 0)));
-        efl == update_cf(old(efl), old(dst + src + (if cf(efl) then 1 else 0)) >= nat64_max);
+        efl == update_cf(old(efl), old(dst + src + (if cf(efl) then 1 else 0)) >= pow2_64);
 {
 }
 
@@ -103,7 +103,7 @@ procedure{:instruction Ins(S.Adox64(dst, src))}{:fast_instruction}{:quick export
         efl;
     ensures
         dst == old(add_wrap(add_wrap(dst, src), (if overflow(efl) then 1 else 0)));
-        efl == update_of(old(efl), old(dst + src + (if overflow(efl) then 1 else 0)) >= nat64_max);
+        efl == update_of(old(efl), old(dst + src + (if overflow(efl) then 1 else 0)) >= pow2_64);
 {
 }
 
@@ -121,13 +121,13 @@ procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64Wrap(inou
     modifies
         efl;
     ensures
-        dst == old(dst - src) % nat64_max;
+        dst == old(dst - src) % pow2_64;
 {
 }
 
 #verbatim
 let lemma_fundamental_div_mod (a b:nat64) :
-  Lemma (nat64_max `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
+  Lemma (pow2_64 `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
   =
   ()
 #endverbatim
@@ -138,7 +138,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} 
         rax;
         rdx;
     ensures
-        nat64_max * rdx + rax == old(rax * src);
+        pow2_64 * rdx + rax == old(rax * src);
 {
     lemma_fundamental_div_mod(old(rax), old(src));
 }
@@ -148,14 +148,14 @@ procedure{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:fast_instruction}{:q
     reads
         rdx; 
     ensures
-        nat64_max * dst_hi + dst_lo == old(rdx * src);
+        pow2_64 * dst_hi + dst_lo == old(rdx * src);
 {
     lemma_fundamental_div_mod(old(rdx), old(src));
 }
 
 procedure{:instruction Ins(S.IMul64(dst, src))}{:fast_instruction}{:quick exportOnly} IMul64(inout dst: dst_opr64, src: opr64)
     requires
-        dst * src < nat64_max;
+        dst * src < pow2_64;
     modifies
         efl;
     ensures

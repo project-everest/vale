@@ -7,6 +7,7 @@ module X64.GHash
 
 #verbatim{:interface}{:implementation}
 open FStar.Seq
+open Words_s
 open Types_s
 open Types_i
 open AES_s
@@ -32,13 +33,13 @@ let get_last_slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
   if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
     last (slice s start_pos end_pos)
   else
-    Quad32 0 0 0 0 
+    Mkfour 0 0 0 0 
 
 let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
   if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
     slice s start_pos end_pos
   else
-    create 1 (Quad32 0 0 0 0)
+    create 1 (Mkfour 0 0 0 0)
 #endverbatim
 
 #reset-options "--z3rlimit 40"
@@ -49,7 +50,7 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 
 procedure {:quick} compute_Y0()
     modifies xmm1; efl;
-    ensures xmm1 == Quad32(0, 0, 0, 0);
+    ensures xmm1 == Mkfour(0, 0, 0, 0);
 {
     Pxor(xmm1, xmm1);
     lemma_quad32_xor();
@@ -74,7 +75,7 @@ procedure {:quick} compute_ghash_incremental(
     requires
         // GHash reqs
         len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);
-        len > 0 ==> in_ptr  + 16 * len < nat64_max;
+        len > 0 ==> in_ptr  + 16 * len < pow2_64;
         len > 0 ==> buffer_length(in_b) == len;
 
     ensures
@@ -94,7 +95,7 @@ procedure {:quick} compute_ghash_incremental(
                 //////////////////// From requires //////////////////////
                 // GHash reqs
                 validSrcAddrs128(mem, in_ptr, in_b, len);
-                in_ptr  + 16 * len < nat64_max;
+                in_ptr  + 16 * len < pow2_64;
                 len > 0;
                 buffer_length(in_b) == len;
 
@@ -161,7 +162,7 @@ procedure {:quick} ghash_core(
     requires
         // GHash reqs
         len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);
-        len > 0 ==> in_ptr  + 16 * len < nat64_max;
+        len > 0 ==> in_ptr  + 16 * len < pow2_64;
         len > 0 ==> buffer_length(in_b) == len;
 
     ensures

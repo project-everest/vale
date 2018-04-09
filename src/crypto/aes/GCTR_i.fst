@@ -1,5 +1,6 @@
 module GCTR_i
 
+open Words_s
 open Types_s
 open FStar.Mul
 open FStar.Seq
@@ -27,7 +28,7 @@ let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain)
   if length plain = 0 then ()
   else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
   			
-let rec gctr_encrypt_length (icb:quad32) (plain:seq quad32 { 256 * length plain < nat32_max }) 
+let rec gctr_encrypt_length (icb:quad32) (plain:seq quad32 { 256 * length plain < pow2_32 }) 
 			     (alg:algorithm) (key:aes_key alg) : 
   Lemma(length (gctr_encrypt icb plain alg key) == length plain) 
   [SMTPat (length (gctr_encrypt icb plain alg key))]
@@ -68,12 +69,12 @@ let rec gctr_indexed (icb:quad32) (plain:gctr_plain)
 =
   gctr_indexed_helper icb plain alg key 0;
   let c = gctr_encrypt_recursive icb plain alg key 0 in
-  assert(eq cipher c)  // OBSERVE: Invoke extensionality lemmas
+  assert(equal cipher c)  // OBSERVE: Invoke extensionality lemmas
 
 
 let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key(AES_128)) (icb:quad32) : Lemma
   (requires length plain == length cipher /\
-	    256 * (length plain) < nat32_max /\
+	    256 * (length plain) < pow2_32 /\
 	    gctr_partial (length cipher) plain cipher key icb)
   (ensures cipher == gctr_encrypt icb plain AES_128 key)
   =

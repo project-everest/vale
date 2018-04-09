@@ -1,6 +1,7 @@
 module X64.Poly1305.Math_i
 
 open FStar.Mul
+open Words_s
 open Types_s
 open Poly1305.Spec_s
 open Opaque_i
@@ -20,7 +21,7 @@ let lowerUpper192 (l:nat128) (u:nat64) : int =
 
 let lowerUpper192_opaque = make_opaque lowerUpper192
 
-let mod2_128' x:int = x % nat128_max
+let mod2_128' x:int = x % pow2_128
 
 let mod2_128 = make_opaque mod2_128'
 
@@ -67,8 +68,8 @@ val lemma_poly_bits64 : u:unit -> Lemma
     (forall (x:nat64) . {:pattern (logand64 x 0)} logand64 x 0 == 0) /\
     (forall (x:nat64) . {:pattern (logand64 x 0xffffffffffffffff)} logand64 x 0xffffffffffffffff == x) /\
     (forall (x:nat64) . {:pattern (logand64 x 0xfffffffffffffffc)} logand64 x 0xfffffffffffffffc == (x / 4) * 4) /\
-    (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0fffffff)} logand64 x 0x0ffffffc0fffffff < nat64_max / 16) /\
-    (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0ffffffc)} logand64 x 0x0ffffffc0ffffffc < nat64_max / 16) /\
+    (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0fffffff)} logand64 x 0x0ffffffc0fffffff < pow2_64 / 16) /\
+    (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0ffffffc)} logand64 x 0x0ffffffc0ffffffc < pow2_64 / 16) /\
     (forall (x:nat64) . {:pattern (logand64 x 0x0ffffffc0ffffffc)} (logand64 x 0x0ffffffc0ffffffc) % 4 == 0) /\
     (forall (x:nat64)  (y:nat64) . (logand64 x y) == (logand64 y x)))
 
@@ -129,7 +130,7 @@ val lemma_add_key : old_h0:nat64 -> old_h1:nat64 -> h_in:int -> key_s0:nat64 -> 
   (requires h_in == lowerUpper128_opaque old_h0 old_h1 /\
             key_s == lowerUpper128_opaque key_s0 key_s1 /\
             h0 == add_wrap old_h0 key_s0 /\
-            (let c = old_h0 + key_s0 >= nat64_max in
+            (let c = old_h0 + key_s0 >= pow2_64 in
              h1 == add_wrap (add_wrap old_h1 key_s1) (if c then 1 else 0)))
   (ensures lowerUpper128_opaque h0 h1 == mod2_128 (h_in + key_s))
 

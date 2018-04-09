@@ -4,6 +4,7 @@ module AES_s
 //            This is explicit in key_schedule_to_round_keys when we construct the round_key rk,
 //            but it also applies implicitly to the input quad32
 
+open Words_s
 open Types_s
 open FStar.Seq
 open FStar.Mul
@@ -92,7 +93,7 @@ let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * ro
   if rounds = 0 then createEmpty
   else 
     let round_keys = key_schedule_to_round_keys (rounds - 1) w in
-    let rk = Quad32 (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in
+    let rk = Mkfour (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in
     append round_keys (create 1 rk)
 
 let key_to_round_keys (alg:algorithm) (key:aes_key alg)

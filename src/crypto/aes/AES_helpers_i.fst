@@ -1,5 +1,6 @@
 module AES_helpers_i
 
+open Words_s
 open Types_s
 open FStar.Seq
 open AES_s
@@ -16,26 +17,26 @@ unfold let ( *^ ) = nat32_xor
 unfold let ( *^^ ) = quad32_xor
 
 let quad32_shl32 (q:quad32) : quad32 =
-  let Quad32 v0 v1 v2 v3 = q in
-  Quad32 0 v0 v1 v2
+  let Mkfour v0 v1 v2 v3 = q in
+  Mkfour 0 v0 v1 v2
 
 
 // Redefine key expansion in terms of quad32 values rather than nat32 values,
 // then prove both definitions are equivalent.
 
 let round_key_128_rcon (prev:quad32) (rcon:nat32) : quad32 =
-  let Quad32 v0 v1 v2 v3 = prev in
+  let Mkfour v0 v1 v2 v3 = prev in
   let w0 = v0 *^ (sub_word (rot_word v3) *^ rcon) in
   let w1 = v1 *^ w0 in
   let w2 = v2 *^ w1 in
   let w3 = v3 *^ w2 in
-  Quad32 w0 w1 w2 w3
+  Mkfour w0 w1 w2 w3
 
 let round_key_128 (prev:quad32) (round:nat) : quad32 =
   round_key_128_rcon prev (aes_rcon (round - 1))
 
 let rec expand_key_128 (key:aes_key AES_128) (round:nat) : quad32 =
-  if round = 0 then Quad32 key.[0] key.[1] key.[2] key.[3]
+  if round = 0 then Mkfour key.[0] key.[1] key.[2] key.[3]
   else round_key_128 (expand_key_128 key (round - 1)) round
 
 #reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0"
@@ -53,8 +54,8 @@ let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
     let n = 4 * i in
     let v = expand_key AES_128 key n in
     let w = expand_key AES_128 key (n + 4) in
-    let prev = Quad32 v.[m + 0] v.[m + 1] v.[m + 2] v.[m + 3] in
-    let Quad32 r0 r1 r2 r3 = round_key_128 prev i in
+    let prev = Mkfour v.[m + 0] v.[m + 1] v.[m + 2] v.[m + 3] in
+    let Mkfour r0 r1 r2 r3 = round_key_128 prev i in
     r0 == w.[n + 0] /\ r1 == w.[n + 1] /\ r2 == w.[n + 2] /\ r3 == w.[n + 3]
   ))
   =
@@ -97,16 +98,16 @@ let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
 
 // Refine round_key_128 to a SIMD computation
 let simd_round_key_128 (prev:quad32) (rcon:nat32) : quad32 =
-  let r = rot_word (sub_word prev.hi) *^ rcon in
+  let r = rot_word (sub_word prev.hi3) *^ rcon in
   let q = prev in
   let q = q *^^ quad32_shl32 q in
   let q = q *^^ quad32_shl32 q in
   let q = q *^^ quad32_shl32 q in
-  q *^^ Quad32 r r r r
+  q *^^ Mkfour r r r r
 
 // SIMD version of round_key_128 is equivalent to scalar round_key_128
 let lemma_simd_round_key (prev:quad32) (rcon:nat32) : Lemma
   (simd_round_key_128 prev rcon == round_key_128_rcon prev rcon)
   =
-  commute_rot_word_sub_word prev.hi;
+  commute_rot_word_sub_word prev.hi3;
   Types_i.xor_lemmas ()

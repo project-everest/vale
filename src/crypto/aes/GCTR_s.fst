@@ -3,16 +3,17 @@ module GCTR_s
 // IMPORTANT: Following NIST's specification, this spec is written assuming a big-endian mapping from bytes to quad32s
 //            Since the AES spec (AES_s) is in little-endian, we need to byteswap each time we call AES
 
+open Words_s
 open Types_s
 open FStar.Mul
 open AES_s
 open FStar.Seq
 
-// length plain < nat32_max / 256 <= spec max of 2**39 - 256;
-type gctr_plain = p:seq quad32 { 256 * length p < nat32_max }
+// length plain < pow2_32 / 256 <= spec max of 2**39 - 256;
+type gctr_plain = p:seq quad32 { 256 * length p < pow2_32 }
 
-let inc32 (cb:quad32) (i:int) = 
-  Quad32 ((cb.lo + i) % nat32_max) cb.mid_lo cb.mid_hi cb.hi
+let inc32 (cb:quad32) (i:int) : quad32 =
+  Mkfour ((cb.lo0 + i) % pow2_32) cb.lo1 cb.hi2 cb.hi3
 
 let rec gctr_encrypt_recursive (icb:quad32) (plain:gctr_plain) 
 			       (alg:algorithm) (key:aes_key alg) (i:int) : Tot (seq quad32) (decreases %[length plain]) =

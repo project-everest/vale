@@ -238,12 +238,6 @@ type map (key:eqtype) (value:Type) = Map.t key value
 let op_String_Access     = Map.sel
 let op_String_Assignment = Map.upd
 
-(** Work around syntax mismatches between Vale and F* (and F*'s odd type resolution for destructors) **)
-unfold let get_lo_bits (b:bits_of_byte)     = Bits_of_Byte?.lo     b
-unfold let get_mid_lo_bits (b:bits_of_byte) = Bits_of_Byte?.mid_lo b
-unfold let get_mid_hi_bits (b:bits_of_byte) = Bits_of_Byte?.mid_hi b
-unfold let get_hi_bits (b:bits_of_byte)     = Bits_of_Byte?.hi     b
-
 (** Memory framing **)
 
 (*

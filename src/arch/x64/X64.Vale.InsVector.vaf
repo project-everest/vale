@@ -3,6 +3,8 @@ include "X64.Vale.InsBasic.vaf"
 module X64.Vale.InsVector
 
 #verbatim{:interface}
+open Words_s
+open Words.Four_s
 open Types_s
 open X64.Machine_s
 open X64.Vale.State_i
@@ -10,7 +12,7 @@ open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
 
 // Annoying type problem workaround
-let nat64_to_nat32 (n:nat64 { n < nat32_max }) : nat32 = n
+let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
 #endverbatim
 
 #verbatim
@@ -38,10 +40,10 @@ procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly}
           Paddd(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
-    dst == old(Quad32(add_wrap(dst.lo, src.lo),
-                      add_wrap(dst.mid_lo, src.mid_lo),
-                      add_wrap(dst.mid_hi, src.mid_hi),
-                      add_wrap(dst.hi, src.hi)));
+    dst == old(Mkfour(add_wrap(dst.lo0, src.lo0),
+                      add_wrap(dst.lo1, src.lo1),
+                      add_wrap(dst.hi2, src.hi2),
+                      add_wrap(dst.hi3, src.hi3)));
 {
 }
 
@@ -57,7 +59,7 @@ procedure{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout ds
     requires
         0 <= amt < 32;
     ensures
-        dst == quad32_map((lambda i:nat32 :: ishl(i, amt)), old(dst));
+        dst == four_map((lambda i:nat32 :: ishl(i, amt)), old(dst));
 {
 }
 
@@ -66,14 +68,14 @@ procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout ds
     requires
         0 <= amt < 32;
     ensures
-        dst == quad32_map((lambda i:nat32 :: ishr(i, amt)), old(dst));
+        dst == four_map((lambda i:nat32 :: ishr(i, amt)), old(dst));
 {
 }
 
 procedure{:instruction Ins(S.Pshufb(dst, src))}{:quick exportOnly}
           Pshufb(inout dst:xmm, src:xmm)
   requires
-    src == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+    src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
   modifies efl;
   ensures
     dst == reverse_bytes_quad32(old(dst));
@@ -84,17 +86,17 @@ procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
   modifies efl;
   ensures
-    dst == old(Quad32(select_word(src, get_lo_bits    (byte_to_twobits(permutation))),
-                      select_word(src, get_mid_lo_bits(byte_to_twobits(permutation))),
-                      select_word(src, get_mid_hi_bits(byte_to_twobits(permutation))),
-                      select_word(src, get_hi_bits    (byte_to_twobits(permutation)))));
+    dst == old(Mkfour(select_word(src, byte_to_twobits(permutation).lo0),
+                      select_word(src, byte_to_twobits(permutation).lo1),
+                      select_word(src, byte_to_twobits(permutation).hi2),
+                      select_word(src, byte_to_twobits(permutation).hi3)));
 {
 }
 
 procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
           Pinsrd(inout dst:xmm, src:opr64, inline index:imm8)
   requires 
-    src < nat32_max;
+    src < pow2_32;
     index < 4;
   modifies efl;
   ensures
@@ -105,7 +107,7 @@ procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
 procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))}{:quick exportOnly} VPSLLDQ4(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
-    dst == old(Quad32(0, src.lo, src.mid_lo, src.mid_hi));
+    dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
 {
 }
 

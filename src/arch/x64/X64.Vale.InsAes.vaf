@@ -4,6 +4,7 @@ include "X64.Vale.InsVector.vaf"
 module X64.Vale.InsAes
 
 #verbatim{:interface}
+open Words_s
 open Types_s
 open Types_i
 open AES_s
@@ -82,10 +83,10 @@ procedure{:instruction Ins(S.AESNI_keygen_assist(dst, src, imm))}{:quick exportO
           AESNI_keygen_assist(inout dst:xmm, src:xmm, inline imm:imm8)
   modifies efl;
   ensures
-    dst == old(Quad32(sub_word(src.mid_lo), 
-                      ixor(rot_word(sub_word(src.mid_lo)), imm),
-                      sub_word(src.hi),
-                      ixor(rot_word(sub_word(src.hi)), imm)));
+    dst == old(Mkfour(sub_word(src.lo1), 
+                      ixor(rot_word(sub_word(src.lo1)), imm),
+                      sub_word(src.hi3),
+                      ixor(rot_word(sub_word(src.hi3)), imm)));
 {
 }
 

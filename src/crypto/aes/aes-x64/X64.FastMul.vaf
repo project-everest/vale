@@ -22,16 +22,16 @@ open CanonCommSemiring
 #endverbatim
 
 #verbatim{:interface}
-unfold let nat192_max = 0x1000000000000000000000000000000000000000000000000
-let _ = assert_norm (pow2 192 = nat192_max)
-unfold let nat256_max = 0x10000000000000000000000000000000000000000000000000000000000000000
-let _ = assert_norm (pow2 256 = nat256_max)
-unfold let nat320_max = 0x100000000000000000000000000000000000000000000000000000000000000000000000000000000
-let _ = assert_norm (pow2 320 = nat320_max)
-unfold let nat384_max = 0x1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-let _ = assert_norm (pow2 384 = nat384_max)
-unfold let nat448_max = 0x10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-let _ = assert_norm (pow2 448 = nat448_max)
+unfold let pow2_192 = 0x1000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 192 = pow2_192)
+unfold let pow2_256 = 0x10000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 256 = pow2_256)
+unfold let pow2_320 = 0x100000000000000000000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 320 = pow2_320)
+unfold let pow2_384 = 0x1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 384 = pow2_384)
+unfold let pow2_448 = 0x10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+let _ = assert_norm (pow2 448 = pow2_448)
 
 let int_canon = fun _ -> canon_semiring int_cr
 
@@ -60,8 +60,8 @@ procedure{:quick exportOnly} fast_multiply(
         b2 := buffer64_read(inB_b, 2, mem);
         b3 := buffer64_read(inB_b, 3, mem);
 
-        a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
-        b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
+        a := a0 + pow2_64 * a1 + pow2_128 * a2 + pow2_192 * a3;
+        b := b0 + pow2_64 * b1 + pow2_128 * b2 + pow2_192 * b3;
     reads
         dst_ptr; inA_ptr; inB_ptr;
 
@@ -87,8 +87,8 @@ procedure{:quick exportOnly} fast_multiply(
         let d6 := buffer64_read(dst_b, 6, mem);
         let d7 := buffer64_read(dst_b, 7, mem);
 
-        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3 + 
-                 nat256_max * d4 + nat320_max * d5 + nat384_max * d6 + nat448_max * d7;
+        let d := d0 + pow2_64 * d1 + pow2_128 * d2 + pow2_192 * d3 + 
+                 pow2_256 * d4 + pow2_320 * d5 + pow2_384 * d6 + pow2_448 * d7;
 //        d == a * b;
         validSrcAddrs64(mem, dst_ptr, dst_b, 8);
         modifies_buffer(dst_b, old(mem), mem);
@@ -113,11 +113,11 @@ procedure{:quick exportOnly} fast_multiply(
     ghost var a0b0_hi := r9;
 //    assert r10 == 0;  // Passes
 //    ghost var d0 := buffer64_read(dst_b, 0, mem);
-//    assert d0 == a0 * b0 % nat64_max;     // Passes
+//    assert d0 == a0 * b0 % pow2_64;     // Passes
 //    assert not(overflow(efl));            // Passes
     lemma_load_mem64(inB_b, 1, mem);
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ ghost var a0b1_lo := r10; Adox64Wrap(r10,  r9);    Store64_buffer(dst_ptr, r10, 8, dst_b, 1);
-//    ghost var carry := a0b1_lo + r9 + 0 >= nat64_max;
+//    ghost var carry := a0b1_lo + r9 + 0 >= pow2_64;
 //    assert efl == update_of(old_efl, carry);
 //    assert overflow(efl) == carry;
 
@@ -131,16 +131,16 @@ procedure{:quick exportOnly} fast_multiply(
 
     //assume overflow(efl);
     //ghost var carry := 1;
-    ghost var a0b0b1 := d0 + nat64_max * d1 + nat128_max * (r11 + carry);
+    ghost var a0b0b1 := d0 + pow2_64 * d1 + pow2_128 * (r11 + carry);
 
-//    assert nat64_max * a0b0_hi + d0 == a0 * b0;
-//    assert nat64_max * r11 + a0b1_lo == a0 * b1;
+//    assert pow2_64 * a0b0_hi + d0 == a0 * b0;
+//    assert pow2_64 * r11 + a0b1_lo == a0 * b1;
 //    assert r10 == add_wrap(add_wrap(a0b1_lo, a0b0_hi), 0);
-//    assert overflow(efl) == (a0b1_lo + a0b0_hi >= nat64_max);
+//    assert overflow(efl) == (a0b1_lo + a0b0_hi >= pow2_64);
 //    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
-//    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
+//    assert a0b0b1 == a0 * (b0 + pow2_64 * b1); // FAILS:
 
-//    assert_by_tactic(a0b0b1 == a0 * (b0 + nat64_max * b1), int_canon); // FAILS:
+//    assert_by_tactic(a0b0b1 == a0 * (b0 + pow2_64 * b1), int_canon); // FAILS:
     // user tactic failed: apply_lemma: Cannot instantiate lemma CanonCommSemiring.semiring_reflect CanonCommSemiring.const_last
 
 /*
@@ -152,10 +152,10 @@ procedure{:quick exportOnly} fast_multiply(
 
     ghost var d0 := buffer64_read(dst_b, 0, mem);
     ghost var d1 := buffer64_read(dst_b, 1, mem);
-//    assert d0 == a0 * b0 % nat64_max;
+//    assert d0 == a0 * b0 % pow2_64;
 
     ghost var carry := if overflow(efl) then 1 else 0;      // TODO: Should be able to prove that overflow == 0 at this point
-    ghost var a0b := d0 + nat64_max * d1 + nat128_max * r12 + nat192_max * r14 + nat256_max * rax + carry;
+    ghost var a0b := d0 + pow2_64 * d1 + pow2_128 * r12 + pow2_192 * r14 + pow2_256 * rax + carry;
     assert a0b == a0 * b; 
 */
 
@@ -256,11 +256,11 @@ procedure{:quick} fast_mul_stdcall(
         let d6 := buffer64_read(dst_b, 6, mem);
         let d7 := buffer64_read(dst_b, 7, mem);
 
-        let a := a0 + nat64_max * a1 + nat128_max * a2 + nat192_max * a3;
-        let b := b0 + nat64_max * b1 + nat128_max * b2 + nat192_max * b3;
+        let a := a0 + pow2_64 * a1 + pow2_128 * a2 + pow2_192 * a3;
+        let b := b0 + pow2_64 * b1 + pow2_128 * b2 + pow2_192 * b3;
 
-        let d := d0 + nat64_max * d1 + nat128_max * d2 + nat192_max * d3 + 
-                 nat256_max * d4 + nat320_max * d5 + nat384_max * d6 + nat448_max * d7;
+        let d := d0 + pow2_64 * d1 + pow2_128 * d2 + pow2_192 * d3 + 
+                 pow2_256 * d4 + pow2_320 * d5 + pow2_384 * d6 + pow2_448 * d7;
 //        d == a * b;
 
         //////////////////////////////////////

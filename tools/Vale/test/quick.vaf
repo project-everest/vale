@@ -3,6 +3,7 @@ include "../../../src/arch/x64/X64.Vale.InsBasic.vaf"
 module Quick
 
 #verbatim{:interface}{:implementation}
+open Words_s
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State_i
@@ -137,7 +138,7 @@ procedure{:quick exportOnly} Add64Ghosts(
         i > 2;
         g1 == src;
         g2 > 3;
-        src + dst < nat64_max;
+        src + dst < pow2_64;
     ensures
         h1 == g1;
         h2 > 4;

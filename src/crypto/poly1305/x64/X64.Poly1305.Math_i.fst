@@ -184,7 +184,7 @@ let lemma_mul_pos_pos_is_pos_inverse (x:pos) (y:int) :
 let lemma_mod_factor_lo(x0:nat64) (x1:nat64) (y:int) (z:pos) :
   Lemma (requires z < 0x10000000000000000 /\
 		  y * z == 0x10000000000000000)
-	(ensures ((x0 % z) < nat64_max) /\ 
+	(ensures ((x0 % z) < pow2_64) /\ 
 		 lowerUpper128 x0 x1 % z == lowerUpper128 (x0 % z) 0) =
   lemma_mul_pos_pos_is_pos_inverse z y;
   modulo_range_lemma x0 z;

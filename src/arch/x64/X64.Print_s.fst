@@ -66,7 +66,7 @@ open FStar.UInt64
 let print_operand (o:operand) (p:printer) =
   match o with
   | OConst n ->
-      if 0 <= n && n < nat64_max then p.const n
+      if 0 <= n && n < pow2_64 then p.const n
       else "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg r p
   | OMem m -> print_maddr m "qword" p
@@ -143,7 +143,7 @@ let print_ins (ins:ins) (p:printer) =
                                              else if OReg? src1 && OReg? src2 then
                                                MIndex (OReg?.r src1) 1 (OReg?.r src2) 0
                                              else
-                                               MConst nat128_max) in  // Shouldn't hit this, but if we do, assembler will complain
+                                               MConst pow2_128) in  // Shouldn't hit this, but if we do, assembler will complain
                              name ^ print_ops dst src
   | AddCarry64 dst src -> p.ins_name "  adc" [dst; src] ^ print_ops dst src
   | Adcx64 dst src -> p.ins_name "  adcx" [dst; src] ^ print_ops dst src
