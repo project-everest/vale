@@ -148,7 +148,7 @@ procedure {:quick} compute_ghash_incremental()
 ///////////////////////////
 // GCM
 ///////////////////////////
-procedure {:quick} {:verify true} gcm_core(
+procedure {:quick} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
     ghost key:aes_key(AES_128),
@@ -273,7 +273,7 @@ procedure {:quick} {:verify true} gcm_core(
 }
 
 /*
-procedure {:quick} gcm_core(
+procedure {:quick}  {:verify true} gcm_core(
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
@@ -327,42 +327,36 @@ procedure {:quick} gcm_core(
         create(1, xmm1) == snd(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
     // let h = aes_encrypt alg key (Mkfour 0 0 0 0) in
-    Pxor(xmm0, xmm0);
-    lemma_quad32_xor(); // xmm0 = 0
+    zero_xmm(xmm0);
     AES128EncryptBlock(xmm0, reverse_bytes_nat32_seq(key), round_keys, keys_b); // h = xmm0 = aes_encrypt alg (reverse_bytes_nat32_seq key) (Mkfour 0 0 0 0) in
     ghost var h := xmm0;
-    Mov128(xmm5, xmm0);     // Save a copy of h
+    Mov128(xmm11, xmm0);     // Save a copy of h
 
     // let j0 = Mkfour 1 iv.mid_lo iv.mid_hi iv.hi in
     // (inc32 j0 1)
     Pinsrd(iv, 2, 0);
     // assert iv == inc32(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
 
-    // let c = gctr_encrypt (inc32 j0 1) p alg key in
-    Mov64(rax, plain_ptr);
-    Mov64(rcx, plain_len);
-    gctr_core(plain_b, out_b, key, round_keys, keys_b);
-
     // Compute the hashes incrementally
     Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
     Mov128(xmm0, xmm5);     // Move h where ghash expects it
     // assert xmm0 == h;
+    zero_xmm(xmm1);
     ghost var y_0 := Mkfour(0, 0, 0, 0);
-    compute_Y0();
     // assert xmm1 == y_0;
     compute_ghash_incremental(auth_b);
     ghost var y_auth := xmm1;
 
-    Mov64(rax, out_ptr);
+    // let c = gctr_encrypt (inc32 j0 1) p alg key in
+    Mov64(rax, plain_ptr);
+    Mov64(rbx, out_ptr);
     Mov64(rcx, plain_len);
-
-    // assert xmm0 == h;
-    compute_ghash_incremental(out_b);
+    gcm_one_pass(plain_b, out_b, key, round_keys, keys_b);
     ghost var y_cipher := xmm1;
 
     // Prepare length fields
-    Pxor(xmm2, xmm2);
+    zero_xmm(xmm2);
     Pinsrd(xmm2, auth_len, 3);
     Pinsrd(xmm2, plain_len, 1);
 
@@ -387,7 +381,6 @@ procedure {:quick} gcm_core(
     // assert create(1, xmm1) == gctr_encrypt(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
 */
-
 
 /*
 procedure {:quick} callee_save_registers(ghost buffer:buffer64)
