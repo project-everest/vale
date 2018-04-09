@@ -172,7 +172,7 @@ procedure{:quick exportOnly} fast_multiply(
     Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[1]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr,  8, dst_b, 1));   Store64_buffer(dst_ptr, r8,  8, dst_b, 1);  // REVIEW: Why not combine the Adcx with the Store?
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[1]*B[1] */ Adox64Wrap(r10,  r9);  Adcx64Wrap(r10, r12);                         Store64_buffer(dst_ptr, r10, 16, dst_b, 2);  
     Mulx64(r13, r12, Mem(inB_ptr, 16, inB_b, 2));  /* A[1]*B[2] */ Adox64Wrap(r12, r11);  Adcx64Wrap(r12, r14);                         Mov64( r8, 0);
-    Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[1]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(rax, r14);                         Mov64(rax, 0);
+    Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[1]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(r14, rax);                         Mov64(rax, 0);
     /*******************************************/                  Adox64Wrap(rax, rdx);  Adcx64Wrap(rax, r8);
 
 //
@@ -188,7 +188,7 @@ procedure{:quick exportOnly} fast_multiply(
     Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[2]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr, 16, dst_b, 2));   Store64_buffer(dst_ptr,  r8, 16, dst_b, 2);  
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[2]*B[1] */ Adox64Wrap(r10,  r9);  Adcx64Wrap(r10, r12);                         Store64_buffer(dst_ptr, r10, 24, dst_b, 3);  
     Mulx64(r13, r12, Mem(inB_ptr, 16, inB_b, 2));  /* A[2]*B[2] */ Adox64Wrap(r12, r11);  Adcx64Wrap(r12, r14);                         Mov64( r8, 0);
-    Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[2]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(rax, r14);                         Mov64(rax, 0);
+    Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[2]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(r14, rax);                         Mov64(rax, 0);
     /*******************************************/                  Adox64Wrap(rax, rdx);  Adcx64Wrap(rax, r8);
 
 //
@@ -200,11 +200,11 @@ procedure{:quick exportOnly} fast_multiply(
 //    /*******************************************/   "adox %%rdx, %%rax ;"    "adcx  %%r8, %%rax ;"    "movq %%rax, 56(dst) ;"
 
     Load64_buffer(rdx, inA_ptr, 24, inA_b, 3);     /* A[3] */
-    Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[3]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr, 16, dst_b, 2));   Store64_buffer(dst_ptr,  r8, 24, dst_b, 3);  
+    Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[3]*B[0] */ Xor64(r10, r10);       Adcx64Wrap(r8, Mem(dst_ptr, 24, dst_b, 2));   Store64_buffer(dst_ptr,  r8, 24, dst_b, 3);  
     Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[3]*B[1] */ Adox64Wrap(r10,  r9);  Adcx64Wrap(r10, r12);                         Store64_buffer(dst_ptr, r10, 32, dst_b, 4);  
 
     Mulx64(r13, r12, Mem(inB_ptr, 16, inB_b, 2));  /* A[3]*B[2] */ Adox64Wrap(r12, r11);  Adcx64Wrap(r12, r14);                         Store64_buffer(dst_ptr, r12, 40, dst_b, 5);   Mov64( r8, 0);
-    Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[3]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(rax, r14);                         Store64_buffer(dst_ptr, r14, 48, dst_b, 6);   Mov64(rax, 0);
+    Mulx64(rdx, r14, Mem(inB_ptr, 24, inB_b, 3));  /* A[3]*B[3] */ Adox64Wrap(r14, r13);  Adcx64Wrap(r14, rax);                         Store64_buffer(dst_ptr, r14, 48, dst_b, 6);   Mov64(rax, 0);
     /*******************************************/                  Adox64Wrap(rax, rdx);  Adcx64Wrap(rax, r8);                          Store64_buffer(dst_ptr, rax, 56, dst_b, 7);
 */
 }
