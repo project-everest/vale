@@ -3,9 +3,8 @@ include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
 include "X64.AES.vaf"
 include "X64.GF128_Mul.vaf"
-
-//include "X64.GCTR.vaf"
-//include "X64.GHash.vaf"
+include "X64.GCTR.vaf"
+include "X64.GHash.vaf"
 
 module X64.GCMopt
 
@@ -23,8 +22,8 @@ open GCM_s
 open X64.AES
 open GF128_s
 open GF128_i
-//open X64.GHash
-//open X64.GCTR
+open X64.GHash
+open X64.GCTR
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -67,62 +66,63 @@ procedure {:quick exportOnly} zero_xmm(inout dst:xmm)
     lemma_quad32_xor();
 }
 
-procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
-    modifies efl;
-    ensures
-        dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-{
-    // TODO: Add an instruction to simplify this
-    Pinsrd(dst, 0x0C0D0E0F, 0);
-    Pinsrd(dst, 0x08090A0B, 1);
-    Pinsrd(dst, 0x04050607, 2);
-    Pinsrd(dst, 0x00010203, 3);
-}
+//procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
+//    modifies efl;
+//    ensures
+//        dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+//{
+//    // TODO: Add an instruction to simplify this
+//    Pinsrd(dst, 0x0C0D0E0F, 0);
+//    Pinsrd(dst, 0x08090A0B, 1);
+//    Pinsrd(dst, 0x04050607, 2);
+//    Pinsrd(dst, 0x00010203, 3);
+//}
 
-procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
-    requires
-        one == Mkfour(1, 0, 0, 0);
-    modifies 
-        efl;
-    ensures 
-        dst == inc32(old(dst), 1);
-{
-    Paddd(dst, one);
-}
+//procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
+//    requires
+//        one == Mkfour(1, 0, 0, 0);
+//    modifies 
+//        efl;
+//    ensures 
+//        dst == inc32(old(dst), 1);
+//{
+//    Paddd(dst, one);
+//}
 
 // GCTR encrypt one block
-procedure {:quick} gctr_register(
-    ghost key:aes_key(AES_128),
-    ghost round_keys:seq(quad32),
-    ghost keys_b:buffer128
-    )
-    lets io @= xmm1; icb @= xmm7;
-    reads r8; icb; mem;
-    modifies
-        xmm0; xmm1; xmm2; efl;
+//procedure {:quick} gctr_register(
+//    ghost key:aes_key(AES_128),
+//    ghost round_keys:seq(quad32),
+//    ghost keys_b:buffer128
+//    )
+//    lets io @= xmm1; icb @= xmm7;
+//    reads r8; icb; mem;
+//    modifies
+//        xmm0; xmm1; xmm2; efl;
+//
+//    requires
+//        // AES reqs
+//        length(round_keys) == 11;
+//        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+//        r8 == buffer_addr(keys_b);
+//        validSrcAddrs128(mem, r8, keys_b, 11);
+//        buffer128_as_seq(mem, keys_b) == round_keys;
+//        // GCM reqs
+//        xmm2 == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+//    ensures
+//        io == quad32_xor(old(io), aes_encrypt_le(AES_128, key, icb));
+//{
+//    Mov128(xmm0, icb);
+//    Pshufb(xmm0, xmm2);
+//    AES128EncryptBlock(reverse_bytes_quad32(icb), reverse_bytes_nat32_seq(key), round_keys, keys_b);
+//
+//    Pxor(xmm1, xmm0);
+//
+////    // Call a helpful lemma
+////    gctr_encrypt_one_block(icb, old(io), AES_128, key);
+//}
 
-    requires
-        // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
-        r8 == buffer_addr(keys_b);
-        validSrcAddrs128(mem, r8, keys_b, 11);
-        buffer128_as_seq(mem, keys_b) == round_keys;
-        // GCM reqs
-        xmm2 == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-    ensures
-        io == quad32_xor(old(io), aes_encrypt_le(AES_128, key, icb));
-{
-    Mov128(xmm0, icb);
-    Pshufb(xmm0, xmm2);
-    AES128EncryptBlock(reverse_bytes_quad32(icb), reverse_bytes_nat32_seq(key), round_keys, keys_b);
-
-    Pxor(xmm1, xmm0);
-
-//    // Call a helpful lemma
-//    gctr_encrypt_one_block(icb, old(io), AES_128, key);
-}
-
+/*
 // Multiply one block
 procedure {:quick} compute_ghash_incremental()
     lets input @= xmm2; io @= xmm1; h @= xmm11;
@@ -141,6 +141,7 @@ procedure {:quick} compute_ghash_incremental()
     lemma_to_of_quad32(h);    // Help satisfy precondition
     ReduceMulRev128(gf128_of_quad32(io), gf128_of_quad32(h));    // io := Y_i * H
 }
+*/
 
 
 #reset-options "--z3rlimit 60"
@@ -256,7 +257,7 @@ procedure {:quick} gcm_one_pass(
         Store128_buffer(r10, xmm2, 0, out_b, rdx);
 
         // Update our hash
-        compute_ghash_incremental();
+        compute_ghash_incremental_register();
 
         Add64(rdx, 1);
         Add64(r9, 16);
@@ -272,8 +273,7 @@ procedure {:quick} gcm_one_pass(
     gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
-/*
-procedure {:quick}  {:verify true} gcm_core(
+procedure {:quick}   gcm_core(
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
@@ -290,7 +290,7 @@ procedure {:quick}  {:verify true} gcm_core(
         plain_ptr; out_ptr; keys_ptr; auth_ptr; plain_len; auth_len; 
 
     modifies
-        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; iv;
+        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm8; xmm10; xmm11; iv;
         xmm6; 
         mem; efl; 
 
@@ -337,11 +337,9 @@ procedure {:quick}  {:verify true} gcm_core(
     Pinsrd(iv, 2, 0);
     // assert iv == inc32(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
 
-    // Compute the hashes incrementally
+    // Compute the hashes incrementally, starting with auth data
     Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
-    Mov128(xmm0, xmm5);     // Move h where ghash expects it
-    // assert xmm0 == h;
     zero_xmm(xmm1);
     ghost var y_0 := Mkfour(0, 0, 0, 0);
     // assert xmm1 == y_0;
@@ -350,7 +348,7 @@ procedure {:quick}  {:verify true} gcm_core(
 
     // let c = gctr_encrypt (inc32 j0 1) p alg key in
     Mov64(rax, plain_ptr);
-    Mov64(rbx, out_ptr);
+    //Mov64(rbx, out_ptr);
     Mov64(rcx, plain_len);
     gcm_one_pass(plain_b, out_b, key, round_keys, keys_b);
     ghost var y_cipher := xmm1;
@@ -380,7 +378,6 @@ procedure {:quick}  {:verify true} gcm_core(
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
     // assert create(1, xmm1) == gctr_encrypt(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
-*/
 
 /*
 procedure {:quick} callee_save_registers(ghost buffer:buffer64)

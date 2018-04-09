@@ -54,17 +54,15 @@ procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
     Pinsrd(dst, 0x00010203, 3);
 }
 
-procedure {:quick exportOnly} inc32(inout dst:xmm)
+procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
     requires
-        xmm4 == Mkfour(1, 0, 0, 0);
-    reads
-        xmm4;
+        one == Mkfour(1, 0, 0, 0);
     modifies 
         efl;
     ensures 
         dst == inc32(old(dst), 1);
 {
-    Paddd(dst, xmm4);
+    Paddd(dst, one);
 }
 
 // GCTR encrypt one block
@@ -198,7 +196,7 @@ procedure {:quick} gctr_core(
         Add64(rdx, 1);
         Add64(r9, 16);
         Add64(r10, 16);
-        inc32(icb);
+        inc32(icb, xmm4);
     }
     
     // Call a helpful lemma
