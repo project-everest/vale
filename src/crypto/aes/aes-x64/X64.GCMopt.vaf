@@ -295,59 +295,62 @@ procedure {:quick} gcm_core(
     // assert create(1, xmm1) == gctr_encrypt(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
 }
 
-procedure {:quick} callee_save_registers(ghost buffer:buffer64)
+procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
     lets ptr @= rax;
     requires 
-        validDstAddrs64(mem, ptr, buffer, 8);
+        valid_stack_slots(mem, rsp, stack_b, 8);
     reads rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
-    modifies mem;
+    modifies mem; rsp;
     ensures
-        validDstAddrs64(mem, ptr, buffer, 8);
-        modifies_buffer(buffer, old(mem), mem);
+        modifies_buffer(stack_b, old(mem), mem);
 
-        rbx == buffer64_read(buffer, 0, mem);
-        rbp == buffer64_read(buffer, 1, mem);
-        rdi == buffer64_read(buffer, 2, mem);
-        rsi == buffer64_read(buffer, 3, mem);
-        r12 == buffer64_read(buffer, 4, mem);
-        r13 == buffer64_read(buffer, 5, mem);
-        r14 == buffer64_read(buffer, 6, mem);
-        r15 == buffer64_read(buffer, 7, mem);
+        rbx == buffer64_read(stack_b, 0, mem);
+        rbp == buffer64_read(stack_b, 1, mem);
+        rdi == buffer64_read(stack_b, 2, mem);
+        rsi == buffer64_read(stack_b, 3, mem);
+        r12 == buffer64_read(stack_b, 4, mem);
+        r13 == buffer64_read(stack_b, 5, mem);
+        r14 == buffer64_read(stack_b, 6, mem);
+        r15 == buffer64_read(stack_b, 7, mem);
+
+        rsp == old(rsp) - 64;
 {
-    Store64_buffer(ptr, rbx,  0, buffer, 0);
-    Store64_buffer(ptr, rbp,  8, buffer, 1);
-    Store64_buffer(ptr, rdi, 16, buffer, 2);
-    Store64_buffer(ptr, rsi, 24, buffer, 3);
-    Store64_buffer(ptr, r12, 32, buffer, 4);
-    Store64_buffer(ptr, r13, 40, buffer, 5);
-    Store64_buffer(ptr, r14, 48, buffer, 6);
-    Store64_buffer(ptr, r15, 56, buffer, 7);
+    Push(r15, stack_b, 7);
+    Push(r14, stack_b, 6);
+    Push(r13, stack_b, 5);
+    Push(r12, stack_b, 4);
+    Push(rsi, stack_b, 3);
+    Push(rdi, stack_b, 2);
+    Push(rbp, stack_b, 1);
+    Push(rbx, stack_b, 0);
 }
 
-procedure {:quick} callee_restore_registers(ghost buffer:buffer64)
-    lets ptr @= rax;
+procedure {:quick} callee_restore_registers(ghost stack_b:buffer64)
     requires 
-        validSrcAddrs64(mem, ptr, buffer, 8);
-    reads rax; mem; 
-    modifies rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+        valid_stack_slots(mem, rsp + 64, stack_b, 8);
+        rsp + 64 < pow2_64;
+    reads mem; 
+    modifies rbx; rbp; rdi; rsi; r12; r13; r14; r15; rsp;
     ensures
-        rbx == buffer64_read(buffer, 0, mem);
-        rbp == buffer64_read(buffer, 1, mem);
-        rdi == buffer64_read(buffer, 2, mem);
-        rsi == buffer64_read(buffer, 3, mem);
-        r12 == buffer64_read(buffer, 4, mem);
-        r13 == buffer64_read(buffer, 5, mem);
-        r14 == buffer64_read(buffer, 6, mem);
-        r15 == buffer64_read(buffer, 7, mem);
+        rbx == buffer64_read(stack_b, 0, mem);
+        rbp == buffer64_read(stack_b, 1, mem);
+        rdi == buffer64_read(stack_b, 2, mem);
+        rsi == buffer64_read(stack_b, 3, mem);
+        r12 == buffer64_read(stack_b, 4, mem);
+        r13 == buffer64_read(stack_b, 5, mem);
+        r14 == buffer64_read(stack_b, 6, mem);
+        r15 == buffer64_read(stack_b, 7, mem);
+        
+        rsp == old(rsp) + 64;
 {
-    Load64_buffer(rbx, ptr,  0, buffer, 0);
-    Load64_buffer(rbp, ptr,  8, buffer, 1);
-    Load64_buffer(rdi, ptr, 16, buffer, 2);
-    Load64_buffer(rsi, ptr, 24, buffer, 3);
-    Load64_buffer(r12, ptr, 32, buffer, 4);
-    Load64_buffer(r13, ptr, 40, buffer, 5);
-    Load64_buffer(r14, ptr, 48, buffer, 6);
-    Load64_buffer(r15, ptr, 56, buffer, 7);
+    Pop(rbx, stack_b, 0);
+    Pop(rbp, stack_b, 1);
+    Pop(rdi, stack_b, 2);
+    Pop(rsi, stack_b, 3);
+    Pop(r12, stack_b, 4);
+    Pop(r13, stack_b, 5);
+    Pop(r14, stack_b, 6);
+    Pop(r15, stack_b, 7);
 }
 
 #verbatim{:interface}
@@ -373,7 +376,7 @@ procedure {:quick} gcm_stdcall_inner(
     )
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl;
+        mem; efl; rsp;
     lets
         args_ptr := r9;
 
@@ -457,7 +460,7 @@ procedure {:quick} gcm_stdcall(
     ghost iv_b:buffer128,
     ghost out_b:buffer128,
     ghost tag_b:buffer128,
-    ghost tmp_b:buffer64,
+    ghost stack_b:buffer64,
 
     ghost key:aes_key(AES_128),
     ghost round_keys:seq(quad32),
@@ -466,7 +469,7 @@ procedure {:quick} gcm_stdcall(
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
         rbp; rdi; rsi; 
-        mem; efl;
+        mem; efl; rsp;
     lets
         args_ptr := if win then rcx else rdi;
 
@@ -478,7 +481,6 @@ procedure {:quick} gcm_stdcall(
         expanded_key_ptr  := buffer64_read(args_b, 5, mem);
         out_ptr           := buffer64_read(args_b, 6, mem);
         tag_ptr           := buffer64_read(args_b, 7, mem);
-        tmp_ptr           := buffer64_read(args_b, 8, mem);
 
     requires
         validSrcAddrs64(mem, args_ptr, args_b, 9);
@@ -488,21 +490,22 @@ procedure {:quick} gcm_stdcall(
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
         
-        buffers_disjoint(args_b, tmp_b);
+        buffers_disjoint(args_b, stack_b);
 
-        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(plain_b)));
-        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(auth_b)));
-        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(iv_b)));
-        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(out_b)));
-        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(tag_b)));
-        locs_disjoint(list(loc_buffer(tmp_b), loc_buffer(keys_b)));
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(plain_b)));
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(auth_b)));
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(iv_b)));
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(out_b)));
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(tag_b)));
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(keys_b)));
 
         validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
         validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
         validSrcAddrs128(mem, iv_ptr, iv_b, 1);
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
         validDstAddrs128(mem, tag_ptr, tag_b, 1);
-        validDstAddrs64(mem, tmp_ptr, tmp_b, 8);
+
+        valid_stack_slots(mem, rsp, stack_b, 8);
 
         plain_ptr + 16 * plain_len < pow2_64;
         auth_ptr + 16 * auth_len < pow2_64;
@@ -523,7 +526,7 @@ procedure {:quick} gcm_stdcall(
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
-        modifies_mem(loc_union(loc_union(loc_buffer(tmp_b), loc_buffer(out_b)), loc_buffer(tag_b)), old(mem), mem);
+        modifies_mem(loc_union(loc_union(loc_buffer(stack_b), loc_buffer(out_b)), loc_buffer(tag_b)), old(mem), mem);
 
         validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
         validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
@@ -534,6 +537,7 @@ procedure {:quick} gcm_stdcall(
         create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 
         // Calling convention for caller/callee saved registers
+        rsp == old(rsp);
 
         // Windows:
         win ==> rbx == old(rbx);
@@ -562,14 +566,9 @@ procedure {:quick} gcm_stdcall(
     // assert r9 == args_ptr;
 
     Load64_buffer(rax, r9, 64, args_b, 8);
-    callee_save_registers(tmp_b);
-
-    // Save a copy of the tmp_ptr
-    Mov64(rsi, rax);
+    callee_save_registers(stack_b);
 
     gcm_stdcall_inner(args_b, iv, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
 
-    // Restore tmp_ptr
-    Mov64(rax, rsi);
-    callee_restore_registers(tmp_b);
+    callee_restore_registers(stack_b);
 }
