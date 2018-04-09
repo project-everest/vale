@@ -122,7 +122,7 @@ procedure {:quick} gctr_register(
 
 // Multiply one block
 procedure {:quick} compute_ghash_incremental()
-    lets input @= xmm2; io @= xmm1; h @= xmm0;
+    lets input @= xmm2; io @= xmm1; h @= xmm11;
     reads
         input; h;
     modifies
@@ -145,6 +145,127 @@ procedure {:quick} compute_ghash_incremental()
 ///////////////////////////
 // GCM
 ///////////////////////////
+/*
+procedure {:quick} gcm_core(
+    ghost in_b:buffer128,
+    ghost out_b:buffer128,
+    ghost key:aes_key(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128
+    )
+    lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm7; mask @= xmm8; hash @= xmm1; one @= xmm10; h @= xmm11;
+
+    reads
+        r8; in_ptr; out_ptr; len; h;
+
+    modifies
+        rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; mask; hash; one; mem; efl;
+
+    requires
+        // GCTR reqs
+        buffers_disjoint128(in_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
+        validSrcAddrs128(mem, in_ptr, in_b, len);
+        validDstAddrs128(mem, out_ptr, out_b, len);
+        in_ptr  + 16 * len < nat64_max;
+        out_ptr + 16 * len < nat64_max;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < nat32_max;
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+        r8 == buffer_addr(keys_b);
+        validSrcAddrs128(mem, r8, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
+    ensures
+        modifies_buffer128(out_b, old(mem), mem);
+        validSrcAddrs128(mem, out_ptr, out_b, len);
+
+        // GCTR
+        buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
+        icb.mid_lo == old(icb.mid_lo);
+        icb.mid_hi == old(icb.mid_hi);
+        icb.hi     == old(icb.hi);
+
+        // GHash
+        len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ hash == old(hash); 
+        len > 0 ==> length(buffer128_as_seq(mem, out_b)) > 0 /\ hash == ghash_incremental(h, old(hash), buffer128_as_seq(mem, out_b));
+{
+    Mov64(rdx, 0);
+    Mov64(r9, in_ptr);
+    Mov64(r10, out_ptr);
+
+    // Initialize counter
+    zero_xmm(one);
+    Pinsrd(one, 1, 0);
+
+    init_pshufb_mask(mask);
+
+    while (rdx != len)
+        invariant
+            //////////////////// Basic indexing //////////////////////
+            0 <= rdx <= len;
+            r9 == in_ptr + 16 * rdx;
+            r10 == out_ptr + 16 * rdx;
+            icb == inc32(old(icb), rdx);
+            
+            //////////////////// From requires //////////////////////
+            // GCTR reqs
+            buffers_disjoint128(in_b, out_b);
+            buffers_disjoint128(keys_b, out_b);
+            validSrcAddrs128(mem, in_ptr, in_b, len);
+            validDstAddrs128(mem, out_ptr, out_b, len);
+            in_ptr  + 16 * len < nat64_max;
+            out_ptr + 16 * len < nat64_max;
+            buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len; 
+
+            // AES reqs
+            length(round_keys) == 11;
+            round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+            r8 == buffer_addr(keys_b);
+            validSrcAddrs128(mem, r8, keys_b, 11);
+            buffer128_as_seq(mem, keys_b) == round_keys;
+
+            //////////////////// GCTR invariants //////////////////////
+            mask == Quad32(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+            one == Quad32(1, 0, 0, 0);
+
+            //////////////////// Postcondition goals //////////////////////
+            modifies_buffer128(out_b, old(mem), mem);
+            validSrcAddrs128(mem, out_ptr, out_b, len);
+            gctr_partial(rdx, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+
+            rdx == 0 ==> hash == old(hash);
+            rdx > 0 ==> hash == ghash_incremental(h, old(hash), slice_workaround(buffer128_as_seq(mem, out_b), 0, rdx));
+
+//            forall j :: 0 <= j < rdx ==> 
+//                        buffer128_read(out_b, j, mem) == 
+//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt(AES_128, key, inc32(old(icb), j)));
+
+        decreases
+            len - rdx;
+    {
+        Mov128(xmm0, icb);
+        Pshufb(xmm0, mask);
+        AES128EncryptBlock(reverse_bytes_quad32(icb), reverse_bytes_nat32_seq(key), round_keys, keys_b);
+
+        Load128_buffer(xmm2, r9, 0, in_b, rdx);
+        Pxor(xmm2, xmm0);
+        Store128_buffer(r10, xmm2, 0, out_b, rdx);
+
+        // Update our hash
+        compute_ghash_incremental();
+
+        Add64(rdx, 1);
+        Add64(r9, 16);
+        Add64(r10, 16);
+        inc32(icb, one);
+    }
+    
+    // Call a helpful lemma
+    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+}
+*/
 
 /*
 procedure {:quick} gcm_core(
