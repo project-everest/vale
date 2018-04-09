@@ -35,6 +35,14 @@ var{:state xmm(4)} xmm4:quad32;
 var{:state xmm(5)} xmm5:quad32;
 var{:state xmm(6)} xmm6:quad32;
 var{:state xmm(7)} xmm7:quad32;
+var{:state xmm(8)} xmm8:quad32;
+var{:state xmm(9)} xmm9:quad32;
+var{:state xmm(10)} xmm10:quad32;
+var{:state xmm(11)} xmm11:quad32;
+var{:state xmm(12)} xmm12:quad32;
+var{:state xmm(13)} xmm13:quad32;
+var{:state xmm(14)} xmm14:quad32;
+var{:state xmm(15)} xmm15:quad32;
 
 procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly}
           Paddd(inout dst:xmm, src:xmm)

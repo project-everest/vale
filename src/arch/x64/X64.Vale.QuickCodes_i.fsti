@@ -263,7 +263,7 @@ let rec xmms_match (xmms:list xmm) (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0 =
 [@va_qattr]
 let all_xmms_match (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0
   =
-  let xmms = [0; 1; 2; 3; 4; 5; 6; 7] in
+  let xmms = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15] in
   xmms_match xmms r0 r1
 
 [@va_qattr]
