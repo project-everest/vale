@@ -98,8 +98,8 @@ verify_options = {
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
-  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_extracted_interfaces --use_two_phase_tc true'),
-  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_extracted_interfaces --use_two_phase_tc true'),
+  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),

@@ -303,7 +303,8 @@ fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1' \
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
   + ' --hint_info' \
   + ('' if is_single_vaf else ' --use_hints') \
-  + (' --record_hints' if gen_hints else ' --cache_checked_modules')
+  + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
+  + (' --use_extracted_interfaces')
 fstar_default_args = fstar_default_args_nosmtencoding \
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
 
