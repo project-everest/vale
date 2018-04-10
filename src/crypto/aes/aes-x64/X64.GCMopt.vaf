@@ -296,13 +296,13 @@ procedure {:quick} gcm_core(
 }
 
 procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
-    lets ptr @= rax;
     requires 
         valid_stack_slots(mem, rsp, stack_b, 8);
-    reads rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+    reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
     modifies mem; rsp;
     ensures
         modifies_buffer(stack_b, old(mem), mem);
+        buffer_readable(mem, stack_b);
 
         rbx == buffer64_read(stack_b, 0, mem);
         rbp == buffer64_read(stack_b, 1, mem);
@@ -376,7 +376,7 @@ procedure {:quick} gcm_stdcall_inner(
     )
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; rsp;
+        mem; efl; 
     lets
         args_ptr := r9;
 
@@ -390,7 +390,7 @@ procedure {:quick} gcm_stdcall_inner(
         tag_ptr           := buffer64_read(args_b, 7, mem);
 
     requires
-        validSrcAddrs64(mem, args_ptr, args_b, 9);
+        validSrcAddrs64(mem, args_ptr, args_b, 8);
 
         buffers_disjoint128(plain_b, out_b);
         buffers_disjoint128(auth_b, out_b);
@@ -483,7 +483,7 @@ procedure {:quick} gcm_stdcall(
         tag_ptr           := buffer64_read(args_b, 7, mem);
 
     requires
-        validSrcAddrs64(mem, args_ptr, args_b, 9);
+        validSrcAddrs64(mem, args_ptr, args_b, 8);
 
         buffers_disjoint128(plain_b, out_b);
         buffers_disjoint128(auth_b, out_b);
@@ -563,12 +563,8 @@ procedure {:quick} gcm_stdcall(
     } else {
         Mov64(r9, rdi);
     }
-    // assert r9 == args_ptr;
 
-    Load64_buffer(rax, r9, 64, args_b, 8);
     callee_save_registers(stack_b);
-
     gcm_stdcall_inner(args_b, iv, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
-
     callee_restore_registers(stack_b);
 }
