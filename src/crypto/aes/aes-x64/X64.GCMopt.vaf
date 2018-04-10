@@ -302,7 +302,7 @@ procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
     modifies mem; rsp;
     ensures
         modifies_buffer(stack_b, old(mem), mem);
-        buffer_readable(mem, stack_b);
+        valid_stack_slots(mem, rsp + 64, stack_b, 8);
 
         rbx == buffer64_read(stack_b, 0, mem);
         rbp == buffer64_read(stack_b, 1, mem);
@@ -313,7 +313,6 @@ procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
         r14 == buffer64_read(stack_b, 6, mem);
         r15 == buffer64_read(stack_b, 7, mem);
 
-        rsp == old(rsp) - 64;
 {
     Push(r15, stack_b, 7);
     Push(r14, stack_b, 6);
@@ -328,7 +327,6 @@ procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
 procedure {:quick} callee_restore_registers(ghost stack_b:buffer64)
     requires 
         valid_stack_slots(mem, rsp + 64, stack_b, 8);
-        rsp + 64 < pow2_64;
     reads mem; 
     modifies rbx; rbp; rdi; rsi; r12; r13; r14; r15; rsp;
     ensures
