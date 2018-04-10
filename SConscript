@@ -84,14 +84,6 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
   'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
-  # .fst/.fsti files default to this set of options
-  '.fst': BuildOptions(fstar_default_args),
-  '.fsti': BuildOptions(fstar_default_args),
-
-  # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
-  '.vad': BuildOptions(dafny_default_args_larith),
-  '.vaf': BuildOptions(fstar_default_args),
-
   # Disable verification by adding 'filename': None
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
@@ -103,8 +95,19 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
+
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
-  
+
+  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_extracted_interfaces --use_two_phase_tc true'),
+  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_extracted_interfaces --use_two_phase_tc true'),
+
+  # .fst/.fsti files default to this set of options
+  '.fst': BuildOptions(fstar_default_args),
+  '.fsti': BuildOptions(fstar_default_args),
+
+  # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
+  '.vad': BuildOptions(dafny_default_args_larith),
+  '.vaf': BuildOptions(fstar_default_args),  
 }
 if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None

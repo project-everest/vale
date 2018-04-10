@@ -10,6 +10,7 @@ import pdb
 import SCons.Util
 import atexit
 import platform
+import fnmatch
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -519,6 +520,9 @@ def get_build_options(srcpath):
   if srcpath in verify_options:
     return verify_options[srcpath]
   else:
+    for key in verify_options:
+      if fnmatch.fnmatch (srcpath, key):
+        return verify_options[key]
     ext = os.path.splitext(srcpath)[1]
     if ext in verify_options:
       return verify_options[ext]
