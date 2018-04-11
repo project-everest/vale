@@ -45,7 +45,14 @@ let lemma_reverse_reverse_bytes_nat32 (n:nat32) :
   be_bytes_to_nat32_to_be_bytes r;
   ()
 
+let lemma_reverse_bytes_quad32 (q:quad32) =
+  reveal_reverse_bytes_quad32 q;
+  reveal_reverse_bytes_quad32 (reverse_bytes_quad32 q);
+  ()
+
 let lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   Lemma (ensures reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s) == s)
   =
+  reveal_reverse_bytes_nat32_seq s;
+  reveal_reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s);
   assert (equal (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s)) s)

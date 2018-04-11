@@ -39,10 +39,9 @@ val lemma_reverse_reverse_bytes_nat32 (n:nat32) :
   Lemma (reverse_bytes_nat32 (reverse_bytes_nat32 n) == n)
   [SMTPat (reverse_bytes_nat32 (reverse_bytes_nat32 n))]
 
-let lemma_reverse_bytes_quad32 (q:quad32) : 
+val lemma_reverse_bytes_quad32 (q:quad32) : 
   Lemma (reverse_bytes_quad32 (reverse_bytes_quad32 q) == q)
   [SMTPat (reverse_bytes_quad32 (reverse_bytes_quad32 q))]
-  = ()
 
 val lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   Lemma (ensures reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s) == s)

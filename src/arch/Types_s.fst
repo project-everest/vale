@@ -52,9 +52,13 @@ assume val be_bytes_to_nat32_to_be_bytes (b:seq nat8 {length b == 4}) :
 let reverse_bytes_nat32 (n:nat32) : Tot (nat32) =
   be_bytes_to_nat32 (reverse_seq (nat32_to_be_bytes n))
 
-let reverse_bytes_quad32 (q:quad32) : quad32 =
-  four_reverse (four_map reverse_bytes_nat32 q)
+assume val reverse_bytes_quad32 (q:quad32) : quad32
+
+assume val reveal_reverse_bytes_quad32 (q:quad32) : Lemma
+  (reverse_bytes_quad32 q == four_reverse (four_map reverse_bytes_nat32 q))
 
 // Reverses the bytes in each nat32, but not the nat32s themselves
-let reverse_bytes_nat32_seq (s:seq nat32) : s':seq nat32 { length s == length s' } =
-  seq_map reverse_bytes_nat32 s
+assume val reverse_bytes_nat32_seq (s:seq nat32) : s':seq nat32 { length s == length s' }
+
+assume val reveal_reverse_bytes_nat32_seq (s:seq nat32) : Lemma
+  (reverse_bytes_nat32_seq s == seq_map reverse_bytes_nat32 s)
