@@ -1,20 +1,18 @@
-include "decls.vaf"
+include "../../../src/arch/x64/X64.Vale.InsBasic.vaf"
 
-#verbatim
 module Test
 
-open Semantics
-open Vale
-open Decls
-
+#verbatim{:interface}{:implementation}
+open X64.Machine_s
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
 #endverbatim
-
 
 procedure p()
     modifies
         rax; efl;
     requires
-        rax < 10;
+        0 <= rax < 10 <= 11;
     ensures
         rax == old(rax) + 4;
 {
@@ -22,7 +20,7 @@ procedure p()
     Add64Wrap(rax, 2);
 }
 
-#verbatim
+#verbatim{:implementation}
 let double (x:int):int = x + x
 #endverbatim
 
@@ -35,9 +33,22 @@ procedure Calls()
         rax == old(rax) + 7;
 {
     Add64Wrap(rax, 1);
+    ghost var z := rax;
     Mov64(rbx, const(double(1)));
     assert rbx == 2;
-    Add64Wrap(rax, rbx);
+    assert z == rax;
+    if (rbx == 2)
+    {
+        Add64Wrap(rax, rbx);
+        if (rbx == 3)
+        {
+            ghost var dummy := 2;
+            Add64Wrap(rax, rbx);
+            z := z + 2;
+        }
+        z := z + 2;
+    }
+    assert z == rax;
     p();
 }
 

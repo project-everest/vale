@@ -3,7 +3,8 @@ open Ast_util
 open Parse
 open Parse_util
 open Transform
-open Emit_common
+open Emit_common_base
+open Emit_common_top
 open Microsoft.Dafny
 open Microsoft.FSharp.Math
 open Microsoft.FSharp.Text.Lexing
@@ -21,6 +22,7 @@ let main (argv) =
   let sourceDir = ref "." in
   let destDir = ref "." in
   let outfile = ref (None:string option) in
+  let outfile_i = ref (None:string option) in
   let dafnyDirect = ref false in
   let emitFStarText = ref false in
   let arg_list = argv |> Array.toList in
@@ -99,6 +101,10 @@ let main (argv) =
           match l with
           | [] -> failwith "Specify output file"
           | f :: l -> outfile := Some f; match_args l
+        | "-outi" :: l ->
+          match l with
+          | [] -> failwith "Specify output interface file"
+          | f :: l -> outfile_i := Some f; match_args l
         | "-debug" :: l ->
           match l with
           | [] -> failwith "Specify debug feature name"
@@ -113,6 +119,9 @@ let main (argv) =
         | "-reprintLoopInvs=false" :: l -> reprint_loop_invs := false; match_args l
         | "-reprintBlankLines=false" :: l -> reprint_blank_lines := false; match_args l
         | "-conciseLemmas=false" :: l -> concise_lemmas := false; match_args l
+        | "-disableVerify" :: l -> disable_verify := true; match_args l
+        | "-omitUnverified" :: l -> omit_unverified := true; match_args l
+        | "-noLemmas" :: l -> no_lemmas := true ; match_args l
         | f :: l ->
           if f.[0] = '-' then
             failwith ("Unrecognized argument: " + f + "\n")
@@ -136,7 +145,8 @@ let main (argv) =
       let lexbuf = LexBuffer<byte>.FromBinaryReader parse_in in
       setInitialPos lexbuf name
       lexbufOpt := Some lexbuf;
-      let p = Parse.start Lex.token lexbuf in
+      Lex.init_lex ();
+      let p = Parse.start Lex.lextoken lexbuf in
       lexbufOpt := None;
       parse_in.Close ()
       stream_in.Close ()
@@ -229,39 +239,70 @@ let main (argv) =
           let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
           (new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter
       in
+    let stream_i =
+      match !outfile_i with
+      | None -> None
+      | Some s ->
+          let s = Path.Combine (!destDir, s) in
+          let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
+          Some ((new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter)
+      in
+    let ps_i =
+      match stream_i with
+      | None -> None
+      | Some s ->
+          Some {
+            print_out = s;
+            print_interface = None;
+            cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
+            cur_indent = ref "";
+          }
+      in
     let ps =
       {
         print_out = stream;
+        print_interface = ps_i;
         cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
         cur_indent = ref "";
       } in
-    if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
-    let decls = build_decls empty_env decls in
-    (match !reprint_file with
-      | None -> ()
-      | Some filename ->
-          let rstream = (new System.IO.StreamWriter(new System.IO.FileStream(filename, System.IO.FileMode.Create))):>System.IO.TextWriter in
-          let rps =
-            {
-              print_out = rstream;
-              cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
-              cur_indent = ref "";
-            } in
-          Emit_vale_text.emit_decls rps (List.rev (!reprint_decls_rev));
-          rstream.Close ()
-      );
-    if !emitFStarText then Emit_fstar_text.emit_decls ps decls
-    else
-      if !dafnyDirect then
-        // Initialize Dafny objects
-        let mdl = new LiteralModuleDecl(new DefaultModuleDecl(), null) in
-        let built_ins = new BuiltIns() in
-        let arg_list = List.rev (!cur_file::!dafny_opts_rev) in
-        DafnyOptions.Install(new DafnyOptions(new ConsoleErrorReporter()));
-        Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
-        DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
-      else Emit_dafny_text.emit_decls ps decls;
-    stream.Close ()
+    let close_streams () =
+      (match stream_i with None -> () | Some s -> s.Close());
+      stream.Close ()
+      in
+    try
+    (
+      if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
+      precise_opaque := !emitFStarText;
+      fstar := !emitFStarText;
+      let decls = build_decls empty_env decls in
+      (match !reprint_file with
+        | None -> ()
+        | Some filename ->
+            let rstream = (new System.IO.StreamWriter(new System.IO.FileStream(filename, System.IO.FileMode.Create))):>System.IO.TextWriter in
+            let rps =
+              {
+                print_out = rstream;
+                print_interface = None;
+                cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
+                cur_indent = ref "";
+              } in
+            Emit_vale_text.emit_decls rps (List.rev (!reprint_decls_rev));
+            rstream.Close ()
+        );
+      if !emitFStarText then
+        Emit_fstar_text.emit_decls ps decls
+      else
+        if !dafnyDirect then
+          // Initialize Dafny objects
+          let mdl = new LiteralModuleDecl(new DefaultModuleDecl(), null) in
+          let built_ins = new BuiltIns() in
+          let arg_list = List.rev (!cur_file::!dafny_opts_rev) in
+          DafnyOptions.Install(new DafnyOptions(new ConsoleErrorReporter()));
+          Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
+          DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
+        else Emit_dafny_text.emit_decls ps decls;
+      close_streams ()
+    ) with err -> close_streams (); raise err
   )
   with err -> print_error None err
 ;;

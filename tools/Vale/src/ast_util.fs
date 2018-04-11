@@ -42,18 +42,26 @@ let rec List_mem_assoc (a:'a) (l:('a * 'b) list):bool =
 let rec List_assoc (a:'a) (l:('a * 'b) list):'b =
   match l with [] -> internalErr "List_assoc" | (ha, hb)::t -> if ha = a then hb else List_assoc a t
 
-let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr "string_of_id"
-let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr "reserved_id"
+let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr (Printf.sprintf "string_of_id: %A" x)
+let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr (Printf.sprintf "reserved_id: %A" x)
 let err_id (x:id):string = match x with Id s -> s | Reserved s -> s | Operator s -> "operator(" + s + ")"
 
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with
   | [] -> empty
   | h::t -> List.fold (fun accum e -> EOp (Bop b, [accum; e])) h t
-let and_of_list = binary_op_of_list BAnd (EBool true)
-let or_of_list = binary_op_of_list BOr (EBool false)
+let and_of_list = binary_op_of_list BLand (EBool true)
+let or_of_list = binary_op_of_list BLor (EBool false)
 
-let assert_attrs_default = {is_inv = false; is_split = false; is_refined = false}
+let assert_attrs_default =
+  {
+    is_inv = false;
+    is_split = false;
+    is_refined = false;
+    is_quickstart = false;
+    is_quickend = false;
+    is_quicktype = false;
+  }
 
 let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
   match es with
@@ -70,6 +78,30 @@ let map_apply_modify (m:'a map_modify) (g:unit -> 'a):'a =
   | Unchanged -> g ()
   | Replace e -> e
   | PostProcess p -> p (g ())
+
+let map_apply_compose (f1:'a -> 'b map_modify) (f2:'a -> 'b map_modify) (x:'a):'b map_modify =
+  match f1 x with
+  | Unchanged -> f2 x
+  | Replace y -> Replace y
+  | PostProcess p1 ->
+    (
+      match f2 x with
+      | Unchanged -> PostProcess p1
+      | Replace y -> Replace (p1 y)
+      | PostProcess p2 -> PostProcess (fun y -> p1 (p2 y))
+    )
+
+let map_apply_compose2 (f1:'a -> 'b -> 'c map_modify) (f2:'a -> 'b -> 'c map_modify) (x1:'a) (x2:'b):'c map_modify =
+  match f1 x1 x2 with
+  | Unchanged -> f2 x1 x2
+  | Replace y -> Replace y
+  | PostProcess p1 ->
+    (
+      match f2 x1 x2 with
+      | Unchanged -> PostProcess p1
+      | Replace y -> Replace (p1 y)
+      | PostProcess p2 -> PostProcess (fun y -> p1 (p2 y))
+    )
 
 let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
   map_apply_modify (f e) (fun () ->
@@ -158,7 +190,9 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SVar (x, t, m, g, a, eOpt) -> [SVar (x, t, m, g, map_attrs fe a, mapOpt fe eOpt)]
     | SAlias (x, y) -> [SAlias (x, y)]
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
+    | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> [SBlock (map_stmts fe fs b)]
+    | SQuickBlock (x, b) -> [SQuickBlock (x, map_stmts fe fs b)]
     | SIfElse (g, e, b1, b2) -> [SIfElse (g, fe e, map_stmts fe fs b1, map_stmts fe fs b2)]
     | SWhile (e, invs, ed, b) ->
         [SWhile (
@@ -188,7 +222,9 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
     | SCalc (oop, contents) -> List.collect (gather_calc_contents fs fe) contents
     | SVar (x, t, m, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))
     | SAlias (x, y) -> []
+    | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> rs b
+    | SQuickBlock (x, b) -> rs b
     | SIfElse (g, e, b1, b2) -> [re e] @ (rs b1) @ (rs b2)
     | SWhile (e, invs, ed, b) -> [re e] @ (List.map re (List.map snd invs)) @ (List.map re (snd ed)) @ (rs b)
     | SForall (xs, ts, ex, e, b) -> (List.collect (List.map re) ts) @ [re e] @ (rs b)
@@ -269,6 +305,9 @@ let attrs_get_bool (x:id) (defaultVal:bool) (a:attrs):bool =
     | _ -> fErr ()
   else defaultVal
 
+let attrs_get_exps_opt (x:id) (a:attrs):exp list option =
+  if List_mem_assoc x a then Some (List_assoc x a) else None
+
 let attrs_get_exp_opt (x:id) (a:attrs):exp option =
   if List_mem_assoc x a then
     match List_assoc x a with
@@ -293,3 +332,80 @@ let attrs_get_id (x:id) (a:attrs):id =
   | _ -> err ("argument to attribute '" + (err_id x) + "' must be an identifier")
 
 let qprefix (s:string) (t:string):string = s + (t.Replace(".", "__"))
+
+type print_state =
+  {
+    print_out:System.IO.TextWriter;
+    print_interface:print_state option;
+    cur_loc:loc ref;
+    cur_indent:string ref;
+  }
+  member this.PrintUnbrokenLine (s:string) =
+    let {loc_file = f; loc_line = i} = !this.cur_loc in (this.cur_loc := {loc_file = f; loc_line = i + 1; loc_col = 1; loc_pos = 0});
+    this.print_out.WriteLine (!this.cur_indent + s);
+  member this.PrintLine (s:string) = this.PrintBreakLine true s
+  member this.PrintBreakLine (isFirst:bool) (s:string) =
+    let breakCol = 100 in
+    let s = s.TrimEnd() in
+    let (sBreak1, sBreak2Opt) =
+      if (!this.cur_indent + s).Length > breakCol then
+        let space0 = s.IndexOf(" ") in
+        let quote0 = s.IndexOf("\"") in
+        let width = breakCol - (!this.cur_indent).Length in
+        if space0 >= 0 && (quote0 < 0 || quote0 >= width) then
+          // try to find last space in s[0 .. breakCol-indentsize]
+          // if that fails, find first space in s
+          let s1 = s.Substring(0, width) in
+          let breakAt = if s1.Contains(" ") then s1.LastIndexOf(" ") else s.IndexOf(" ") in
+          let sBreak1 = s.Substring(0, breakAt) in
+          let sBreak2 = s.Substring(breakAt).Trim() in
+          if sBreak1.Contains("//") then (s, None) else // don't break up a "//" comment
+          (sBreak1, Some sBreak2)
+        else if s.Contains("\"") && not (s.Contains("\\\"")) then
+          // put strings on their own line
+          let i1 = s.IndexOf("\"") in
+          let i2 = s.IndexOf("\"", i1 + 1) + 1 in
+          if i2 > 0 && (i2 - i1) < s.Length then
+            if i1 = 0 then
+              let s1 = s.Substring(0, i2) in
+              let s2 = s.Substring(i2).Trim() in
+              (s1, Some s2)
+            else
+              let s1 = s.Substring(0, i1).Trim() in
+              let s2 = s.Substring(i1) in
+              if s1.Contains("//") then (s, None) else
+              (s1, Some s2)
+          else (s, None)
+        else (s, None)
+      else (s, None)
+      in
+    this.PrintUnbrokenLine sBreak1;
+    match (sBreak2Opt, isFirst) with
+    | (None, _) -> ()
+    | (Some s, false) -> this.PrintBreakLine false s
+    | (Some s, true) -> this.Indent (); this.PrintBreakLine false s; this.Unindent ()
+  member this.Indent () = this.cur_indent := "  " + !this.cur_indent
+  member this.Unindent () = this.cur_indent := (!this.cur_indent).Substring(2)
+  member this.SetLoc (({loc_file = f; loc_line = i} as l):loc) =
+    let {loc_file = cf; loc_line = ci} as cl = !this.cur_loc in
+    if l = cl then ()
+    else if f <> cf || i < ci || i > ci + 8 then this.cur_loc := l; this.print_out.WriteLine ("#line " + (string i) + " " + f)
+    else this.PrintLine ""; this.SetLoc l
+
+let debug_print_state ():print_state =
+  {
+    print_out = System.Console.Out;
+    print_interface = None;
+    cur_loc = ref {loc_file = "<stdout>"; loc_line = 0; loc_col = 0; loc_pos = 0};
+    cur_indent = ref "";
+  }
+
+let reprint_file = ref (None:string option);
+let reprint_verbatims = ref true;
+let reprint_ghost_decls = ref true;
+let reprint_specs = ref true;
+let reprint_ghost_stmts = ref true;
+let reprint_loop_invs = ref true;
+let reprint_blank_lines = ref true;
+let gen_lemma_sym_count = ref 0
+let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count

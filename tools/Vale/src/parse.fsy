@@ -58,13 +58,15 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
-%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE IMPLEMENTATION STATIC MODULE INTERFACE IMPORT OPERATOR
-%token <loc> CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
-%token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES
+%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
+%token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
+%token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS LAMBDA
 %token <loc> INCLUDE
 %token <loc * string> STRING
-%token <loc * string list> VERBATIM_BLOCK
+%token <loc> VERBATIM
+%token <string list> VERBATIM_BLOCK
+%token <loc * string> RESET_OPTIONS
 
 %token EOF
 
@@ -75,7 +77,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %left LTEQEQ
 %left BARBAR
 %left AMPAMP
-%left EQEQ NE
+%left EQEQ EQ NE
 %left LT GT LE GE IS
 %left PLUS MINUS
 %left STAR SLASH PERCENT
@@ -125,6 +127,7 @@ Exp1
   | Exp1 AMPAMP Exp1 { makeBop BAnd $2 $1 $3 }
   | Exp1 BARBAR Exp1 { makeBop BOr $2 $1 $3 }
   | Exp1 EQEQ Exp1 { makeBop BEq $2 $1 $3 }
+  | Exp1 EQ Exp1 { makeBop BSeq $2 $1 $3 }
   | Exp1 NE Exp1 { makeBop BNe $2 $1 $3 }
   | Exp1 LT Exp1 { makeBop BLt $2 $1 $3 }
   | Exp1 GT Exp1 { makeBop BGt $2 $1 $3 }
@@ -196,9 +199,7 @@ OpToken
   | LTEQEQGT { $1 }
 AnyIdOrOp
   : AnyId { $1 }
-/*
   | OPERATOR LPAREN OpToken RPAREN { let (_, (_, s)) = $3 in Operator s }
-*/
 CalcOp
   : LTEQEQGT { BEquiv }
   | EQEQGT { BImply }
@@ -206,6 +207,7 @@ CalcOp
   | AMPAMP { BAnd }
   | BARBAR { BOr }
   | EQEQ { BEq }
+  | EQ { BSeq }
   | LT { BLt }
   | GT { BGt }
   | LE { BLe }
@@ -221,6 +223,13 @@ Attrs
 GhostOpt: { NotGhost } | GHOST { Ghost }
 StmtModifier: { SmPlain } | GHOST { SmGhost } | INLINE { SmInline }
 
+ExpCall
+  : { fun e -> e }
+  | GHOST { fun e -> EOp (Uop (UCall CallGhost), [e]) }
+  | LEMMA { fun e -> EOp (Uop (UCall CallLemma), [e]) }
+  | INLINE { fun e -> EOp (Uop (UCall CallInline), [e]) }
+  | CALL { fun e -> EOp (Uop (UCall CallOutline), [e]) }
+
 Var
   : VAR { ($1, NotGhost) }
   | GHOST VAR { ($1, Ghost) }
@@ -229,7 +238,7 @@ VarAttrs
   | GHOST VAR Attrs { ($1, XGhost, $3) }
 VarInit
   : { None }
-  | COLONEQ Exp { Some $2 }
+  | COLONEQ ExpCall Exp { Some ($2 $3) }
 VarType
   : { None }
   | COLON Type { Some $2 }
@@ -248,17 +257,10 @@ Decreases
   | DECREASES STAR SEMI { ($1, []) }
   | DECREASES Exps1 SEMI { ($1, $2) }
 ExpAssign
-  : AnyId BANG
+  : Lhss1 COLONEQ ExpCall Exp
     {
-      let (loc, (isCustom, s)) = $2 in
-      if not isCustom then parse_err "unexpected postfix operator" else
-      stmtAt loc (SAssign ([], EOp (Uop (UCustomAssign s), [EVar $1])))
-    }
-  | Lhss1 COLONEQ Exp
-    {
-      let (loc, (isCustom, s)) = $2 in
-      if isCustom then stmtAt loc (SAssign ($1, EOp (Uop (UCustomAssign s), [$3])))
-      else stmtAt loc (SAssign ($1, $3))
+      let (loc, (_, s)) = $2 in
+      stmtAt loc (SAssign ($1, $3 $4))
     }
 ExpAssigns1
   : ExpAssign { $1 }
@@ -292,9 +294,17 @@ Stmt
   | ASSUME Exp SEMI { stmtAt $1 (SAssume $2) }
   | ASSERT Exp SEMI { stmtAt $1 (SAssert (assert_attrs_default, $2)) }
   | ASSERT Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], EBool true, $2, $5)) }
-  | ASSERT LBRACECOLON AnyId RBRACE LITBOOL SEMI
+  | ASSERT LBRACECOLON AnyId RBRACE Exp SEMI
     {
-      stmtAt $1 (if $3 = Id "split_here" && snd $5 then SAssert ({assert_attrs_default with is_split = true}, EBool true) else parse_err "Must use: assert {:split_here} true;" )
+      let attrs =
+        match ($3, skip_loc $5) with
+        | (Id "split_here", EBool true) -> {assert_attrs_default with is_split = true}
+        | (Id "quick_start", EBool true) -> {assert_attrs_default with is_quickstart = true}
+        | (Id "quick_end", EBool true) -> {assert_attrs_default with is_quickend = true}
+        | (Id "quick_type", _) -> {assert_attrs_default with is_quicktype = true}
+        | _ -> parse_err ("unknown attribute: " + (err_id $3))
+        in
+      stmtAt $1 (SAssert (attrs, $5))
     }
   | ASSERT LBRACECOLON AnyId RBRACE LBRACECOLON AnyId RBRACE LITBOOL SEMI
     {
@@ -385,8 +395,9 @@ SpecRaw
       (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
       ($1, RawSpec (REnsures Unrefined, $6))
     }
-  | READS SemiExps { ($1, RawSpec (RModifies false, $2)) }
-  | MODIFIES SemiExps { ($1, RawSpec (RModifies true, $2)) }
+  | READS SemiExps { ($1, RawSpec (RModifies Read, $2)) }
+  | MODIFIES SemiExps { ($1, RawSpec (RModifies Modify, $2)) }
+  | PRESERVES SemiExps { ($1, RawSpec (RModifies Preserve, $2)) }
 Specs
   : { [] }
   | SpecRaw Specs { let (loc, s) = $1 in (loc, SpecRaw s)::$2 }
@@ -401,17 +412,18 @@ ProcRet
   : { [] }
   | RETURNS LPAREN ProcFormals RPAREN { $3 }
 Decl
-  : VERBATIM_BLOCK { (fst $1, DVerbatim (snd $1)) }
+  : VERBATIM Attrs VERBATIM_BLOCK
+    {
+      ($1, DVerbatim ($2, $3))
+    }
+  | MODULE AnyQualifiedId { ($1, DPragma (ModuleName (string_of_id $2))) }
+  | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId SEMI
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = (Reserved "alias", [EVar $10])::$2}) }
 /*
   | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
     { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs COLONEQ AnyId SEMI
-    {
-      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = []; pbody = None; pattrs = (Reserved "alias", [EVar $11])::$2})
-    }
 */
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
     {

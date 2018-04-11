@@ -7,16 +7,52 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
 #
 verify_paths = [
   'src/',
-  'tools/Vale/test'
+  'tools/Vale/test',
 ]
 Export('verify_paths')
+
+manual_dependencies = {
+  'obj/arch/x64/X64.Vale.InsBasic.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
+  'obj/arch/x64/X64.Vale.InsMem.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
+  'obj/arch/x64/X64.Vale.InsVector.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
+  'obj/arch/x64/X64.Vale.InsAes.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
+}
+Export('manual_dependencies')
+
+#
+# All include paths for FStar should be in this list.
+# All files should use exactly the include paths in this list.
+# All .fst files and .fsti files in the include paths should have distinct names.
+# Otherwise, the dependency analysis will not be able to find all the
+# dependencies for all the files using just one invocation of FStar.exe --dep.
+#
+# For .vaf files, the generated .fst and .fsti files live under the obj directory,
+# so the include path should contain obj/... for any .vaf files.
+#
+fstar_include_paths = [
+  'obj/Vale/test',
+  'obj/test',
+  'obj/arch',
+  'obj/arch/x64/',
+  'obj/lib/collections/',
+  'obj/lib/math',
+  'obj/lib/util',
+  'obj/crypto/aes/',
+  'obj/crypto/aes/aes-x64',
+  'obj/crypto/poly1305/',
+  'obj/crypto/poly1305/x64/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  env['FSTAR_PATH'] + '/examples/tactics/'
+]
+Export('fstar_include_paths')
+env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
 #
 # Table of special-case Dafny source which requires non-default arguments
@@ -33,40 +69,92 @@ verify_options = {
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
+  'src/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
+
+  # Any use of expose_interfaces requires adding to manual_dependencies
+  'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsAes.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
 
-  'tools/Vale/test/vale-debug.vad': None,
-
-  # .vad files default to this set of options when compiling .gen.dfy
-  '.vad': BuildOptions(dafny_default_args_larith)
+  # Special treatment for sensitive modules
+  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
+  'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # Disable verification by adding 'filename': None
+  'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
+  'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
+  'src/test/Test.FastBlock.vaf': None,
+  'src/arch/x64/X64.Taint_Semantics_s.fst': None,
+  'src/arch/x64/X64.Leakage_s.fst': None,
+  'src/arch/x64/X64.Leakage_Ins_i.fst': None,
+  'src/arch/x64/X64.Leakage_i.fst': None,
+  'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
+  'tools/Vale/test/vale-debug.vad': None,
+  'tools/Vale/test/tactics1.vaf': None,
+
+  #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
+
+  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+
+  # .fst/.fsti files default to this set of options
+  '.fst': BuildOptions(fstar_default_args),
+  '.fsti': BuildOptions(fstar_default_args),
+
+  # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
+  '.vad': BuildOptions(dafny_default_args_larith),
+  '.vaf': BuildOptions(fstar_default_args),  
 }
-if env['TARGET_ARCH']!='x86':
+if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None
  verify_options['src/test/stack-test.vad'] = None
  
 Export('verify_options')
 
 #
+# Table of files we export to F*'s test suite
+#
+fstar_test_suite = [
+  'src/arch/x64/',
+  'src/crypto/poly1305/x64/',
+  'src/lib/util/',
+  'src/lib/collections/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  'obj/arch/x64/X64.Vale.InsAes.fst',
+  'obj/arch/x64/X64.Vale.InsBasic.fst',
+  'obj/arch/x64/X64.Vale.InsMem.fst',
+  'obj/arch/x64/X64.Vale.InsVector.fst',
+  'obj/arch/x64/X64.Vale.InsAes.fsti',
+  'obj/arch/x64/X64.Vale.InsBasic.fsti',
+  'obj/arch/x64/X64.Vale.InsMem.fsti',
+  'obj/arch/x64/X64.Vale.InsVector.fsti',
+]
+
+Export('fstar_test_suite')
+
+#
 # build sha256-exe
 #
-sha_asm = env.ExtractValeCode(
-  ['src/crypto/hashing/$SHA_ARCH_DIR/sha256.vad'],           # Vale source
-  'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
-  'sha256'                                                   # Base name for the ASM files and EXE
-  )
-if 'KREMLIN_HOME' in os.environ:
-  sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
-  sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
-  env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
+if do_dafny:
+  sha_asm = env.ExtractValeCode(
+    ['src/crypto/hashing/$SHA_ARCH_DIR/sha256.vad'],           # Vale source
+    'src/crypto/hashing/$SHA_ARCH_DIR/sha256_vale_main.i.dfy', # Dafny main
+    'sha256'                                                   # Base name for the ASM files and EXE
+    )
+  if 'KREMLIN_HOME' in os.environ:
+    sha_c_h = env.ExtractDafnyCode(['src/crypto/hashing/sha256_main.i.dfy'])
+    sha_include_dir = os.path.split(str(sha_c_h[0][1]))[0]
+    env.BuildTest(['src/crypto/hashing/testsha256.c', sha_asm[0], sha_c_h[0][0]], sha_include_dir, 'testsha256')
 
 #
 # build cbc-exe
 #
-if env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
+if do_dafny and (env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64'):   # x86 and x64 only
   cbc_asm = env.ExtractValeCode(
     ['src/crypto/aes/$AES_ARCH_DIR/aes.vad', 'src/crypto/aes/$AES_ARCH_DIR/cbc.vad'], # Vale source
     'src/crypto/aes/$AES_ARCH_DIR/cbc_main.i.dfy',              # Dafny main
@@ -74,12 +162,12 @@ if env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 onl
     )
   env.BuildTest(['src/crypto/aes/testcbc.c', cbc_asm[0]], '', 'testcbc')
 else:
-  print('Not building AES-CBC for this target architecture')  
+  print('Not building AES-CBC for this target architecture')
 
 #
 # build aes-exe
 #
-if env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64':   # x86 and x64 only
+if do_dafny and (env['TARGET_ARCH']=='x86' or env['TARGET_ARCH']=='amd64'):   # x86 and x64 only
   aes_asm = env.ExtractValeCode(
     ['src/crypto/aes/$AES_ARCH_DIR/aes.vad'],        # Vale source
     'src/crypto/aes/$AES_ARCH_DIR/aes_main.i.dfy',   # Dafny main
@@ -92,7 +180,7 @@ else:
 #
 # build poly1305
 #
-if env['TARGET_ARCH']=='amd64' and sys.platform == "win32":     # x64-only; not yet tested on Linux
+if do_dafny and env['TARGET_ARCH']=='amd64' and sys.platform == "win32":     # x64-only; not yet tested on Linux
   poly1305_asm = env.ExtractValeCode(
     ['src/thirdPartyPorts/OpenSSL/poly1305/x64/poly1305.vad'],  # Vale source
     'src/crypto/poly1305/x64/poly1305_main.i.dfy',              # Dafny main
@@ -109,7 +197,7 @@ if 'KREMLIN_HOME' in os.environ:
 #
 # Build the OpenSSL engine
 #
-if env['OPENSSL_PATH'] != None and 'KREMLIN_HOME' in os.environ:
+if do_dafny and env['OPENSSL_PATH'] != None and 'KREMLIN_HOME' in os.environ:
   engineenv = env.Clone()
   engineenv.Append(CPPPATH=[kremlib_path, '#obj/crypto/hashing', '$OPENSSL_PATH/include', '#src/lib/util'])
   cdeclenv = engineenv.Clone(CCFLAGS='/Ox /Zi /Gd /LD') # compile __cdecl so it can call OpenSSL code

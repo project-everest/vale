@@ -3,7 +3,7 @@ module Emit_dafny_text
 open Ast
 open Ast_util
 open Transform
-open Emit_common
+open Emit_common_base
 open Microsoft.FSharp.Math
 
 let sid (x:id):string =
@@ -16,9 +16,9 @@ let sid (x:id):string =
 let prec_of_bop (op:bop):(int * int * int) =
   match op with
   | BEquiv | BImply | BExply -> (10, 11, 11)
-  | BAnd | BOr -> (15, 16, 16) // TODO
+  | BAnd | BOr | BLand | BLor -> (15, 16, 16) // TODO
   | BLe | BGe | BLt | BGt | BIn -> (20, 20, 20)
-  | BEq | BNe -> (25, 25, 26)
+  | BEq | BSeq | BNe -> (25, 25, 26)
   | BAdd | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
   | BOldAt | BCustom _ -> internalErr ("binary operator " + (sprintf "%A" op))
@@ -28,9 +28,9 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> "<=="
-  | BAnd -> "&&"
-  | BOr -> "||"
-  | BEq -> "=="
+  | BAnd | BLand -> "&&"
+  | BOr | BLor -> "||"
+  | BEq | BSeq -> "=="
   | BNe -> "!="
   | BLt -> "<"
   | BGt -> ">"
@@ -70,7 +70,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop UNot, [e]) -> ("!" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _ | UCustomAssign _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))
     | EOp (Uop _, ([] | (_::_::_))) -> internalErr ("unary operator " + (sprintf "%A" e))
     | EOp (Bop op, [e1; e2]) ->
         let (pe, p1, p2) = prec_of_bop op in
@@ -138,7 +138,9 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssign (lhss, e) when List.forall (fun (x, d) -> d <> None) lhss ->
       ps.PrintLine ("ghost var " + (String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
   | SAssign _ -> emit_stmts ps (eliminate_assign_lhss s)
+  | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> notImplemented "block"
+  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, []) ->
       ps.PrintLine ("if (" + (string_of_exp e) + ")");
       emit_block ps ss1
@@ -225,7 +227,8 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
     match d with
-    | DVerbatim lines -> List.iter ps.PrintUnbrokenLine lines
+    | DVerbatim (_, lines) -> List.iter ps.PrintUnbrokenLine lines
+    | DPragma _ -> ()
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

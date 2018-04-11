@@ -1,0 +1,164 @@
+include "X64.Vale.InsBasic.vaf"
+
+module X64.Vale.InsVector
+
+#verbatim{:interface}
+open Words_s
+open Words.Four_s
+open Types_s
+open X64.Machine_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open X64.Vale.QuickCode_i
+
+// Annoying type problem workaround
+let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
+#endverbatim
+
+#verbatim
+open Types_s
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State_i
+open X64.Vale.StateLemmas_i
+open X64.Vale.Decls_i
+module S = X64.Semantics_s
+module P = X64.Print_s
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
+
+var{:state xmm(0)} xmm0:quad32;
+var{:state xmm(1)} xmm1:quad32;
+var{:state xmm(2)} xmm2:quad32;
+var{:state xmm(3)} xmm3:quad32;
+var{:state xmm(4)} xmm4:quad32;
+var{:state xmm(5)} xmm5:quad32;
+var{:state xmm(6)} xmm6:quad32;
+var{:state xmm(7)} xmm7:quad32;
+var{:state xmm(8)} xmm8:quad32;
+var{:state xmm(9)} xmm9:quad32;
+var{:state xmm(10)} xmm10:quad32;
+var{:state xmm(11)} xmm11:quad32;
+var{:state xmm(12)} xmm12:quad32;
+var{:state xmm(13)} xmm13:quad32;
+var{:state xmm(14)} xmm14:quad32;
+var{:state xmm(15)} xmm15:quad32;
+
+procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly}
+          Paddd(inout dst:xmm, src:xmm)
+  modifies efl;
+  ensures
+    dst == old(Mkfour(add_wrap(dst.lo0, src.lo0),
+                      add_wrap(dst.lo1, src.lo1),
+                      add_wrap(dst.hi2, src.hi2),
+                      add_wrap(dst.hi3, src.hi3)));
+{
+}
+
+procedure{:instruction Ins(S.Pxor(dst, src))}{:quick exportOnly} Pxor(inout dst:xmm, src:xmm)
+  modifies efl;
+  ensures
+    dst == old(quad32_xor(dst, src));
+{
+}
+
+procedure{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout dst:xmm, inline amt:int)
+    modifies efl;
+    requires
+        0 <= amt < 32;
+    ensures
+        dst == four_map((lambda i:nat32 :: ishl(i, amt)), old(dst));
+{
+}
+
+procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout dst:xmm, inline amt:int)
+    modifies efl;
+    requires
+        0 <= amt < 32;
+    ensures
+        dst == four_map((lambda i:nat32 :: ishr(i, amt)), old(dst));
+{
+}
+
+procedure{:instruction Ins(S.Pshufb(dst, src))}{:quick exportOnly}
+          Pshufb(inout dst:xmm, src:xmm)
+  requires
+    src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+  modifies efl;
+  ensures
+    dst == reverse_bytes_quad32(old(dst));
+{
+}
+
+procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
+          Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
+  modifies efl;
+  ensures
+    dst == old(Mkfour(select_word(src, byte_to_twobits(permutation).lo0),
+                      select_word(src, byte_to_twobits(permutation).lo1),
+                      select_word(src, byte_to_twobits(permutation).hi2),
+                      select_word(src, byte_to_twobits(permutation).hi3)));
+{
+}
+
+procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
+          Pinsrd(inout dst:xmm, src:opr64, inline index:imm8)
+  requires 
+    src < pow2_32;
+    index < 4;
+  modifies efl;
+  ensures
+    dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index); 
+{
+}
+
+procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))}{:quick exportOnly} VPSLLDQ4(inout dst:xmm, src:xmm)
+  modifies efl;
+  ensures
+    dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
+{
+}
+
+procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst),Mov128Xmm(src)))}{:quick exportOnly} Mov128(inout dst:xmm, src:xmm)
+    ensures
+        dst == old(src);
+{
+}
+
+procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src), offset))))}{:quick exportOnly} Load128_buffer(
+    out dst:xmm,
+        src:reg_opr64,
+        inline offset:int,
+        ghost b:buffer128,
+        ghost index:int)
+    reads
+        mem;
+    requires
+        valid_src_addr(mem, b, index);
+        src + offset == buffer_addr(b) + 16 * index;
+    ensures
+        dst == buffer128_read(b, index, mem);
+{
+    lemma_valid_mem128(b, index, mem);
+    lemma_load_mem128(b, index, mem);
+}
+
+procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov128Xmm(src)))}{:quick exportOnly} Store128_buffer(
+        dst:reg_opr64,
+        src:xmm,
+        inline offset:int,
+        ghost b:buffer128,
+        ghost index:int)
+    modifies
+        mem;
+    requires
+        valid_dst_addr(mem, b, index);
+        dst + offset == buffer_addr(b) + 16 * index;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        mem == old(buffer128_write(b, index, src, mem));
+{
+    lemma_valid_mem128(b, index, old(mem));
+    lemma_store_mem128(b, index, old(src), old(mem));
+}
+

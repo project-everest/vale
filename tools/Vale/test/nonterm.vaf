@@ -1,0 +1,236 @@
+var{:state ok()} ok:bool;
+var{:state reg(EAX)} eax:int;
+var{:state reg(EBX)} ebx:int;
+var{:state flags()} efl:int;
+var{:state mem()} mem:int;
+
+module Nonterm
+
+#verbatim{:interface}
+module Map=FStar.Map
+let map = Map.t
+let op_String_Access = Map.sel
+let op_String_Assignment = Map.upd
+let contains = Map.contains
+
+type reg = | EAX | EBX
+
+type va_bool = bool
+type va_int = int
+type ins = | IPlaceholder : int -> ins
+type ocmp = | OLe: o1:reg -> o2:reg -> ocmp
+type va_code =
+  | Ins : ins:ins -> va_code
+  | Block : block:va_codes -> va_code
+  | IfElse : ifCond:ocmp -> ifTrue:va_code -> ifFalse:va_code -> va_code
+  | While : whileCond:ocmp -> whileBody:va_code -> va_code
+and va_codes = list va_code
+
+let va_CNil () = []
+let va_CCons x y = x::y
+let va_Block (block:va_codes) : Tot va_code = Block block
+let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
+let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
+let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
+let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
+let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
+let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
+let va_get_whileCond (c:va_code{While? c}) : GTot ocmp = While?.whileCond c
+let va_get_whileBody (c:va_code{While? c}) : GTot va_code = While?.whileBody c
+
+type va_state = map reg int
+let va_get_ok (s:va_state) : GTot Type = True
+let va_get_reg (r:reg) (s:va_state) : GTot int = s.[r]
+let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
+let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
+
+type va_register = reg
+type va_operand_reg = reg
+let va_op_reg_reg (r:reg) : Tot va_register = r
+let va_is_src_reg (r:reg) (s:va_state) = True
+let va_is_dst_reg (r:reg) (s:va_state) = True
+let va_update_register (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_update_operand_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_eval_reg (s:va_state) (r:va_register) : GTot int = s.[r]
+
+type va_cmp = reg
+let va_op_cmp_reg (r:va_register) : va_cmp = r
+let va_cmp_le (a:va_register) (b:va_register) : ocmp = OLe a b
+
+let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
+
+type va_fuel = int
+
+val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
+
+unfold let va_hd = Cons?.hd
+unfold let va_tl = Cons?.tl
+
+let va_require (b0:va_codes) (c:va_code) (s0:va_state) (sN:va_state) : Type =
+     Cons? b0
+  /\ Cons?.hd b0 = c
+
+let va_ensure (b0:va_codes) (b1:va_codes) (s0:va_state) (s1:va_state) (sN:va_state) : Type =
+    Cons? b0
+ /\ Cons?.tl b0 = b1
+
+#endverbatim
+
+#verbatim
+assume val eval_code_assume (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
+let eval_code = eval_code_assume
+
+let eval_ocmp (s:va_state) (c:ocmp) : bool =
+  match c with
+  | OLe r1 r2 -> s.[r1] <= s.[r2]
+
+assume val va_lemma_block : b0:va_codes -> s0:va_state -> sN:va_state -> Ghost ((s1:va_state) * (c1:va_code) * (b1:va_codes))
+  (requires True)
+  (ensures (fun (s1, c1, b1) -> b0 = c1::b1))
+
+assume val va_lemma_empty : s0:va_state -> sN:va_state -> Ghost (sM:va_state)
+  (requires True)
+  (ensures (fun sM -> s0 == sM /\ sM == sN))
+
+assume val va_lemma_ifElse : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> sN:va_state -> Ghost (bool * va_state)
+  (requires True)
+  (ensures  (fun (cond, sM) -> cond == eval_ocmp s0 ifb /\ sM == s0))
+
+let va_whileInv (b:ocmp) (c:va_code) (n:int) (s0:va_state) (sN:va_state) : Type0 =
+  n >= 0
+
+unfold let va_evalCond (b:ocmp) (s:va_state) : bool = eval_ocmp s b
+
+assume val va_lemma_while : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost ((n:nat) * (s1:va_state))
+  (requires True)
+  (ensures fun (n, s1) -> s1 == s0)
+
+assume val va_lemma_whileTrue : b:ocmp -> c:va_code -> n:nat -> s0:va_state -> sN:va_state -> Ghost ((s0':va_state) * (s1:va_state))
+  (requires n > 0)
+  (ensures fun (s0', s1) ->
+    s0' == s0 /\
+    eval_ocmp s0 b
+  )
+
+assume val va_lemma_whileFalse : b:ocmp -> c:va_code -> s0:va_state -> sN:va_state -> Ghost (s1:va_state)
+  (requires True)
+  (ensures fun s1 ->
+    s1 == s0 /\
+    s0 == sN /\
+    not (eval_ocmp s0 b)
+  )
+
+assume val make_opaque : #a:Type -> a -> a
+assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
+unfold let va_make_opaque = make_opaque
+unfold let va_reveal_opaque = reveal_opaque
+
+let double (x:int):int = x + x
+let opaque_double = make_opaque double
+#endverbatim
+
+
+
+
+
+
+procedure{:terminates false} Imm(out x:reg, inline y:int)
+    ensures
+        x == y;
+{
+    assume false;
+}
+
+procedure{:terminates false} Increment(inout x:reg)
+    ensures
+        x == old(x) + 1;
+{
+    assume false;
+}
+
+procedure{:terminates false} Add(inout x:reg, y:reg)
+    ensures
+        x == old(x + y);
+{
+    assume false;
+}
+
+procedure{:terminates false} AddReg(inout x:reg, y:reg)
+    ensures
+        x == old(x + y);
+{
+    Add(x, y); // coerces y from register to operand
+}
+
+procedure{:terminates false} p()
+    modifies
+        eax;
+    requires
+        eax >= 0;
+    ensures
+        eax >= 2;
+{
+    Increment(eax);
+    Increment(eax);
+}
+
+procedure{:terminates false} Calls()
+    modifies
+        eax; ebx;
+    ensures
+        eax == old(eax) + 3;
+{
+    Increment(eax);
+    Imm(ebx, double(1));
+    assert ebx == 2;
+    ghost if (ebx <= ebx)
+    {
+        assert 2 == 2;
+    }
+    if (ebx <= ebx)
+    {
+        Add(eax, ebx);
+    }
+    assert 1 + 2 == 3 by { assert 1 + 2 == 2 + 1; }
+//    forall x:int, y:int {x + y} :| x >= 0 && y >= 0 :: x + y == y + x
+//    {
+//        assert x + y >= 0;
+//        ghost if (x < y)
+//        {
+//            assert x <= y;
+//        }
+//    }
+}
+
+procedure{:terminates false} WhileTest()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax <= ebx;
+    ensures
+        0 <= eax <= ebx + 1;
+        2 * ebx - eax == old(2 * ebx - eax);
+        eax > ebx;
+{
+    while (eax <= ebx)
+        invariant
+            0 <= eax <= ebx + 1;
+            2 * ebx - eax == old(2 * ebx - eax);
+        decreases 1 + ebx - eax;
+    {
+        Increment(eax);
+        Increment(eax);
+        Increment(ebx);
+    }
+}
+
+procedure{:terminates false} Ghosts(ghost g1:int) returns(ghost g2:int)
+    ensures
+        g2 == g1 + 1;
+{
+    assert opaque_double(3) == 6 by { reveal_opaque(double); }
+    assert opaque_double(3) == 6;
+    //assert opaque_double(4) == 8;
+    g2 := g1 + 1;
+}
+

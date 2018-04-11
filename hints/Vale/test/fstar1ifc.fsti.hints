@@ -1,0 +1,397 @@
+[
+  "—°ÞKà5/˜9_ê\u0005\u0014S³Ä",
+  [
+    [
+      "Fstar1ifc.uu___is_EAX",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "0497f1efabe6ddca14732c7ddc0ab232"
+    ],
+    [
+      "Fstar1ifc.uu___is_EBX",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "2f8989b98e5f8f4377e029de7c0d896f"
+    ],
+    [
+      "Fstar1ifc.ins",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Prims.HasEq_int" ],
+      0,
+      "87ec31163500d607c126e7cf359373a8"
+    ],
+    [
+      "Fstar1ifc.__proj__IPlaceholder__item___0",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "f3417cb7766a2ff116296b07ecb8bef8"
+    ],
+    [
+      "Fstar1ifc.ocmp",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "00a53080e80b0c8d092c6b71ebea8526"
+    ],
+    [
+      "Fstar1ifc.__proj__OLe__item__o1",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "b8bba1f75a3a962f8c8e5ed512c1fd2f"
+    ],
+    [
+      "Fstar1ifc.__proj__OLe__item__o2",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "21201113cbb7f701f6efb14531a72b6a"
+    ],
+    [
+      "Fstar1ifc.va_code",
+      1,
+      1,
+      0,
+      [
+        "@query", "assumption_Fstar1ifc.ins_haseq",
+        "assumption_Fstar1ifc.ocmp_haseq", "assumption_Prims.list_haseq",
+        "kinding_Fstar1ifc.va_code@tok"
+      ],
+      0,
+      "2b3ac6443d2c0c603be37768f17176be"
+    ],
+    [
+      "Fstar1ifc.uu___is_Ins",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "6c6123b761ed7be35fee8a04e589c072"
+    ],
+    [
+      "Fstar1ifc.__proj__Ins__item__ins",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.Ins",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_148cfcdaee2ff94a020d91ad59919338"
+      ],
+      0,
+      "864d977e84816f911a69d6b77365d7e5"
+    ],
+    [
+      "Fstar1ifc.uu___is_Block",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "abc8cb543782e03920d013c372defa53"
+    ],
+    [
+      "Fstar1ifc.__proj__Block__item__block",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.Block",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_7b99d22def9ff1bbcc77c358ff6f7086"
+      ],
+      0,
+      "bbdb5a51d7d8c7787ce64f75c07f9214"
+    ],
+    [
+      "Fstar1ifc.uu___is_IfElse",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "de6ddfb2d47a2b581e22cc0062daceaa"
+    ],
+    [
+      "Fstar1ifc.__proj__IfElse__item__ifCond",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.IfElse",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_97beaafa7d0b72f973f771357e2899b3"
+      ],
+      0,
+      "26504b648a53cb6f8b0f97a99d1ae382"
+    ],
+    [
+      "Fstar1ifc.__proj__IfElse__item__ifTrue",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.IfElse",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_97beaafa7d0b72f973f771357e2899b3"
+      ],
+      0,
+      "4d8273806e61bdc082ed1f3f4fc8b073"
+    ],
+    [
+      "Fstar1ifc.__proj__IfElse__item__ifFalse",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.IfElse",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_97beaafa7d0b72f973f771357e2899b3"
+      ],
+      0,
+      "5eab21f0f376e0dcd83a1775c0fbe19e"
+    ],
+    [
+      "Fstar1ifc.uu___is_While",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "f1595bc0db687439ea02a3a742296a6e"
+    ],
+    [
+      "Fstar1ifc.__proj__While__item__whileCond",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.While",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_c6ea869602ca3dfe5cff3c9d1e421e3b"
+      ],
+      0,
+      "c4bb46b8ee8abb06a1491cccbd533d7d"
+    ],
+    [
+      "Fstar1ifc.__proj__While__item__whileBody",
+      1,
+      1,
+      0,
+      [
+        "@MaxIFuel_assumption", "@query", "disc_equation_Fstar1ifc.While",
+        "projection_inverse_BoxBool_proj_0",
+        "refinement_interpretation_Fstar1ifc_Tm_refine_c6ea869602ca3dfe5cff3c9d1e421e3b"
+      ],
+      0,
+      "55003efc4c7f68ed60b1b180540738ff"
+    ],
+    [
+      "Fstar1ifc.va_state",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "ad9a1edbdea74333174e24f81c344f8c"
+    ],
+    [
+      "Fstar1ifc.va_get_reg",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "4a94d8112d16f0a11627e6d57668bf32"
+    ],
+    [
+      "Fstar1ifc.va_update_reg",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "07ab1262993cf94cd408d2e3843deb08"
+    ],
+    [
+      "Fstar1ifc.va_update_reg",
+      2,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "bd8f3c059bbd9992936321ba5fdc380f"
+    ],
+    [
+      "Fstar1ifc.va_eval_register_int",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "9c86ce3947efccdb26f802315e4c8cb4"
+    ],
+    [
+      "Fstar1ifc.va_state_eq",
+      1,
+      1,
+      0,
+      [ "@query", "assumption_Prims.HasEq_int" ],
+      0,
+      "358f825ddae878c7a713bf9a3601fe92"
+    ],
+    [
+      "Fstar1ifc.va_state_eq",
+      2,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "d719bf8a4273e661a194b39f730a33cf"
+    ],
+    [
+      "Fstar1ifc.va_state_eq",
+      3,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "4ae19794523a35999b9e203c5e53436a"
+    ],
+    [
+      "Fstar1ifc.va_state_eq",
+      4,
+      1,
+      0,
+      [ "@query", "assumption_Prims.HasEq_int" ],
+      0,
+      "51077f4bd617f35a45c327657f799fb2"
+    ],
+    [
+      "Fstar1ifc.va_state_eq",
+      5,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "4860330e3e5e7bf4471675b49ba90804"
+    ],
+    [
+      "Fstar1ifc.va_state_eq",
+      6,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.reg_haseq" ],
+      0,
+      "36dfdebe788a685e311dcd1fbf6b57b0"
+    ],
+    [
+      "Fstar1ifc.va_require_total",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "3d80e02fd6ef4d62d6bc7d9e012329ff"
+    ],
+    [
+      "Fstar1ifc.va_require_total",
+      2,
+      1,
+      0,
+      [ "@query", "assumption_Fstar1ifc.va_code_haseq" ],
+      0,
+      "b95ae4cbbb7f1019196bb03a2ff9a904"
+    ],
+    [
+      "Fstar1ifc.va_lemma_Imm",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "41311fb754a0b3b4d51290addc9393aa"
+    ],
+    [
+      "Fstar1ifc.va_lemma_Increment",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "786a0d73a31f16f757b769bd92bc02b2"
+    ],
+    [
+      "Fstar1ifc.va_lemma_Add",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "2071de64e89bc9bb3792689192fa5dbd"
+    ],
+    [
+      "Fstar1ifc.va_lemma_AddReg",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "53f6afb79d3e651548a30ada22027db3"
+    ],
+    [
+      "Fstar1ifc.va_lemma_p",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "db8fcd01bd26d06a48aa6ec3ed2456ae"
+    ],
+    [
+      "Fstar1ifc.va_lemma_Calls",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "5c6919f36390ebb93408824c83b21b29"
+    ],
+    [
+      "Fstar1ifc.va_lemma_WhileTest",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "719298a06a1f1028c52352919155a1b9"
+    ],
+    [
+      "Fstar1ifc.va_lemma_Ghosts",
+      1,
+      1,
+      0,
+      [ "@query" ],
+      0,
+      "32998659e4d663044b199b498eb06159"
+    ]
+  ]
+]
