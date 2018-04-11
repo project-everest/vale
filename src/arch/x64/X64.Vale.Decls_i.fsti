@@ -145,12 +145,20 @@ let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buf
 [@va_qattr] unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
 [@va_qattr] unfold let va_get_mem (s:va_state) : mem = s.mem
 
+[@va_qattr] let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
+[@va_qattr] let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
+[@va_qattr] let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
+[@va_qattr] let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
+[@va_qattr] let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
+
 (* Framing: va_update_foo means the two states are the same except for foo *)
-[@va_qattr] let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
-[@va_qattr] let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
-[@va_qattr] let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
-  update_reg r (eval_reg r sM) sK
-[@va_qattr] let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
+[@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = va_upd_ok sM.ok sK
+[@va_qattr] unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = va_upd_flags sM.flags sK
+[@va_qattr] unfold let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
+  va_upd_reg r (eval_reg r sM) sK
+[@va_qattr] unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = va_upd_mem sM.mem sK
+[@va_qattr] unfold let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
+  va_upd_xmm x (eval_xmm x sM) sK
 
 [@va_qattr]
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
@@ -179,18 +187,9 @@ let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
 let va_update_operand_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
   update_xmm x (eval_xmm x sM) sK
 
-[@va_qattr] unfold
-let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
-  update_xmm x (eval_xmm x sM) sK
-
 unfold let va_value_opr64 = nat64
 unfold let va_value_dst_opr64 = nat64
 unfold let va_value_xmm = quad32
-[@va_qattr] unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
-[@va_qattr] unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
-[@va_qattr] unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
-[@va_qattr] unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
-[@va_qattr] unfold let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
 
 [@va_qattr]
 let va_upd_operand_xmm (x:xmm) (v:quad32) (s:state) : state =
