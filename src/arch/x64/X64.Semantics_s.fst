@@ -269,6 +269,10 @@ let update_xmm (x:xmm)  (ins:ins) (v:quad32) :st unit =
   s <-- get;
   set (  { (update_xmm' x v s) with flags = havoc s ins } )
 
+let update_xmm_preserve_flags (x:xmm) (v:quad32) :st unit =
+  s <-- get;
+  set ( update_xmm' x v s )
+
 let update_flags (new_flags:nat64) :st unit =
   s <-- get;
   set ( { s with flags = new_flags } )
@@ -388,17 +392,17 @@ let eval_ins (ins:ins) : st unit =
 			       ((dst_q.hi3 + src_q.hi3) % pow2_32))
 
   | Pxor dst src ->
-    update_xmm dst ins (quad32_xor (eval_xmm dst s) (eval_xmm src s))
+    update_xmm_preserve_flags dst (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
   | Pslld dst amt ->
     check_imm (0 <= amt && amt < 32);;
-    update_xmm dst ins (four_map (fun i -> ishl i amt) (eval_xmm dst s))
+    update_xmm_preserve_flags dst (four_map (fun i -> ishl i amt) (eval_xmm dst s))
 
   | Psrld dst amt ->
     check_imm (0 <= amt && amt < 32);;
-    update_xmm dst ins (four_map (fun i -> ishr i amt) (eval_xmm dst s))
+    update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
  
-  | Pshufb dst src ->
+  | Pshufb dst src -> 
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     // We only spec a restricted version sufficient for doing a byte reversal
@@ -417,7 +421,7 @@ let eval_ins (ins:ins) : st unit =
          (select_word src_val bits.hi2)
          (select_word src_val bits.hi3)
     in
-    update_xmm dst ins permuted_xmm
+    update_xmm_preserve_flags dst permuted_xmm
 
   | Pextrq dst src index ->
     let high = index % 2 = 1 in
@@ -430,18 +434,18 @@ let eval_ins (ins:ins) : st unit =
   | Pinsrd dst src index ->
     check (valid_operand src);;
     let dst_q = eval_xmm dst s in
-    update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % pow2_32) (index % 4))
+    update_xmm_preserve_flags dst  (insert_nat32 dst_q ((eval_operand src s) % pow2_32) (index % 4))
 
   | Pinsrq dst src index ->
     check (valid_operand src);;
     let dst_q = eval_xmm dst s in
-    update_xmm dst ins (insert_nat64 dst_q (eval_operand src s) ((index % 2) = 1))
+    update_xmm_preserve_flags dst (insert_nat64 dst_q (eval_operand src s) ((index % 2) = 1))
 
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need
     let src_q = eval_xmm src s in
     let shifted_xmm = Mkfour 0 src_q.lo0 src_q.lo1 src_q.hi2 in
-    update_xmm dst ins shifted_xmm
+    update_xmm_preserve_flags dst shifted_xmm
 
   | MOVDQU dst src ->
     check (valid_mov128_op src);; 

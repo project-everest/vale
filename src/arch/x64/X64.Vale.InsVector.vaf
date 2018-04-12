@@ -58,14 +58,12 @@ procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly}
 }
 
 procedure{:instruction Ins(S.Pxor(dst, src))}{:quick exportOnly} Pxor(inout dst:xmm, src:xmm)
-  modifies efl;
   ensures
     dst == old(quad32_xor(dst, src));
 {
 }
 
 procedure{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout dst:xmm, inline amt:int)
-    modifies efl;
     requires
         0 <= amt < 32;
     ensures
@@ -74,7 +72,6 @@ procedure{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout ds
 }
 
 procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout dst:xmm, inline amt:int)
-    modifies efl;
     requires
         0 <= amt < 32;
     ensures
@@ -94,7 +91,6 @@ procedure{:instruction Ins(S.Pshufb(dst, src))}{:quick exportOnly}
 
 procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
-  modifies efl;
   ensures
     dst == old(Mkfour(select_word(src, byte_to_twobits(permutation).lo0),
                       select_word(src, byte_to_twobits(permutation).lo1),
@@ -118,7 +114,6 @@ procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
   requires 
     src < pow2_32;
     index < 4;
-  modifies efl;
   ensures
     dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index); 
 {
@@ -128,14 +123,12 @@ procedure{:instruction Ins(S.Pinsrq(dst, src, index))}{:quick exportOnly}
           Pinsrq(inout dst:xmm, src:opr64, inline index:imm8)
   requires 
     index < 2;
-  modifies efl;
   ensures
     dst == insert_nat64(old(dst), src, index = 1);
 {
 }
 
 procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))}{:quick exportOnly} VPSLLDQ4(inout dst:xmm, src:xmm)
-  modifies efl;
   ensures
     dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
 {
@@ -184,7 +177,6 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov12
     lemma_store_mem128(b, index, old(src), old(mem));
 }
 
-/*
 procedure {:quick exportOnly} PushXmm(
         src:xmm, 
     out tmp:reg_opr64, 
@@ -193,7 +185,6 @@ procedure {:quick exportOnly} PushXmm(
     modifies
         rsp; mem;
     requires
-//        valid_stack_slots(mem, rsp, b, 2)
         valid_dst_addr(mem, b, index);
         valid_dst_addr(mem, b, index - 1);
         rsp - 8 == buffer_addr(b) + 8 * index;
@@ -213,20 +204,24 @@ procedure {:quick exportOnly} PushXmm(
 
 procedure {:quick exportOnly} PopXmm(
     out dst:xmm,
-    out tmp:dst_opr64,
+    out tmp:reg_opr64,
         ghost b:buffer64,
         ghost index:int)
     reads mem;
     modifies rsp;
     requires
         valid_src_addr(mem, b, index);
+        valid_src_addr(mem, b, index + 1);
         rsp == buffer_addr(b) + 8 * index;
-        rsp + 8 < pow2_64;
+        rsp + 16 < pow2_64;
     ensures
-        dst == buffer64_read(b, index, mem);
-        rsp == old(rsp) + 8;
+        let hi := buffer64_read(b, index, mem);
+        let lo := buffer64_read(b, index + 1, mem);
+        dst == insert_nat64(insert_nat64(old(dst), hi, true), lo, false);
+        rsp == old(rsp) + 16;
 {
-    lemma_valid_mem64(b, index, mem);
-    lemma_load_mem64(b, index, mem);
+    Pop(tmp, b, index);
+    Pinsrq(dst, tmp, 1);
+    Pop(tmp, b, index + 1);
+    Pinsrq(dst, tmp, 0);
 }
-*/
