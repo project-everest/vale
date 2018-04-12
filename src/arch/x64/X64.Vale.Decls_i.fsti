@@ -91,6 +91,8 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 [@va_qattr] unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
 [@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
+[@va_qattr] unfold let va_coerce_reg_opr64_to_dst_opr64 (o:va_operand_reg_opr64) : va_operand_dst_opr64 = o
+[@va_qattr] unfold let va_coerce_reg_opr64_to_opr64 (o:va_operand_reg_opr64) : va_operand_opr64 = o
 [@va_qattr] unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
 [@va_qattr] unfold let va_coerce_opr64_to_cmp (o:va_operand) : va_cmp = o
 [@va_qattr] unfold let va_op_register (r:reg) : va_register = r
@@ -135,6 +137,7 @@ let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buf
 [@va_qattr] unfold let va_is_dst_reg (r:reg) (s:va_state) = True
 [@va_qattr] unfold let va_is_src_shift_amt64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
 [@va_qattr] unfold let va_is_src_reg_opr64 (o:operand) (s:va_state) = OReg? o
+[@va_qattr] unfold let va_is_dst_reg_opr64 (o:operand) (s:va_state) = OReg? o /\ not (Rsp? (OReg?.r o))
 [@va_qattr] unfold let va_is_src_xmm (x:xmm) (s:va_state) = True
 [@va_qattr] unfold let va_is_dst_xmm (x:xmm) (s:va_state) = True
 
@@ -184,11 +187,16 @@ let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
 [@va_qattr] unfold
+let va_update_operand_reg_opr64 (o:operand) (sM:va_state) (sK:va_state) : va_state =
+  va_update_dst_operand o sM sK
+
+[@va_qattr] unfold
 let va_update_operand_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
   update_xmm x (eval_xmm x sM) sK
 
 unfold let va_value_opr64 = nat64
 unfold let va_value_dst_opr64 = nat64
+unfold let va_value_reg_opr64 = nat64
 unfold let va_value_xmm = quad32
 
 [@va_qattr]
@@ -201,9 +209,18 @@ let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
   | OConst n -> s
   | OReg r -> update_reg r v s
   | OMem m -> s // TODO: support destination memory operands
+
+[@va_qattr]
+let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) =
+  match o with
+  | OConst n -> s
+  | OReg r -> update_reg r v s
+  | OMem m -> s 
+  
 let va_lemma_upd_update (sM:state) : Lemma
   (
     (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
+    (forall (sK:state) (o:operand).{:pattern (va_update_operand_reg_opr64 o sM sK)} va_is_dst_reg_opr64 o sK ==> va_update_operand_reg_opr64 o sM sK == va_upd_operand_reg_opr64 o (eval_operand o sM) sK) /\
     (forall (sK:state) (x:xmm).{:pattern (va_update_operand_xmm x sM sK)} va_update_operand_xmm x sM sK == va_upd_operand_xmm x (eval_xmm x sM) sK)
   )
   = ()
