@@ -3,6 +3,7 @@ module Types_i
 open Types_s
 open TypesNative_i
 open Collections.Seqs_i
+open Words_s
 
 let lemma_BitwiseXorCommutative x y =
   lemma_ixor_nth_all 32;
@@ -56,3 +57,18 @@ let lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   reveal_reverse_bytes_nat32_seq s;
   reveal_reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s);
   assert (equal (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s)) s)
+
+open Words.Two_s
+
+let push_pop_xmm (x y:quad32) : Lemma 
+  (let x_hi = x.hi2 + pow2_32 `op_Multiply` x.hi3 in
+   let x_lo = x.lo0 + pow2_32 `op_Multiply` x.lo1 in
+   let x' = insert_nat64 (insert_nat64 y x_hi true) x_lo false in
+   x == x')
+   =
+   let x_hi = x.hi2 + pow2_32 `op_Multiply` x.hi3 in
+   let Mktwo lo hi = nat_to_two 32 x_hi in
+   assert (lo == x_hi % pow2_32);
+   assert (hi == (x_hi / pow2_32) % pow2_32);
+   assert (lo == x.hi2);
+   ()
