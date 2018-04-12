@@ -1,4 +1,5 @@
 include "X64.Vale.InsBasic.vaf"
+include "X64.Vale.InsMem.vaf"
 
 module X64.Vale.InsVector
 
@@ -10,6 +11,7 @@ open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
+open X64.Vale.InsMem
 
 // Annoying type problem workaround
 let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
@@ -182,3 +184,49 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov12
     lemma_store_mem128(b, index, old(src), old(mem));
 }
 
+/*
+procedure {:quick exportOnly} PushXmm(
+        src:xmm, 
+    out tmp:reg_opr64, 
+        ghost b:buffer64, 
+        ghost index:int)
+    modifies
+        rsp; mem;
+    requires
+//        valid_stack_slots(mem, rsp, b, 2)
+        valid_dst_addr(mem, b, index);
+        valid_dst_addr(mem, b, index - 1);
+        rsp - 8 == buffer_addr(b) + 8 * index;
+        0 <= rsp - 16;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        let src_hi := src.hi2 + pow2_32 * src.hi3;
+        let src_lo := src.lo0 + pow2_32 * src.lo1;
+        mem == old(buffer64_write(b, index - 1, src_hi, buffer64_write(b, index, src_lo, mem)));
+        rsp == old(rsp) - 16;
+{
+    Pextrq(tmp, src, 0);   
+    Push(tmp, b, index);
+    Pextrq(tmp, src, 1);   
+    Push(tmp, b, index - 1);
+}
+
+procedure {:quick exportOnly} PopXmm(
+    out dst:xmm,
+    out tmp:dst_opr64,
+        ghost b:buffer64,
+        ghost index:int)
+    reads mem;
+    modifies rsp;
+    requires
+        valid_src_addr(mem, b, index);
+        rsp == buffer_addr(b) + 8 * index;
+        rsp + 8 < pow2_64;
+    ensures
+        dst == buffer64_read(b, index, mem);
+        rsp == old(rsp) + 8;
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
+}
+*/
