@@ -3,6 +3,7 @@ module X64.Semantics_s
 open FStar.BaseTypes
 open X64.Machine_s
 open Words_s
+open Words.Two_s
 open Words.Four_s
 open Types_s
 module M = Memory_i_s
@@ -322,7 +323,7 @@ let eval_ins (ins:ins) : st unit =
     check (valid_operand src);;
     let old_carry = if overflow(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
-    let new_carry = sum >= pow2_64 in
+    let new_carry = sum >= g64 in
     update_operand dst ins (sum % pow2_64);;
     update_flags (update_of s.flags new_carry)  // Explicitly touches only OF
 
@@ -406,10 +407,10 @@ let eval_ins (ins:ins) : st unit =
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     // We only spec a restricted version sufficient for doing a byte reversal
-    check_imm (src_q.lo0     = 0x0C0D0E0F &&
+    check_imm (src_q.lo0 = 0x0C0D0E0F &&
 	       src_q.lo1 = 0x08090A0B &&
 	       src_q.hi2 = 0x04050607 &&
-	       src_q.hi3     = 0x00010203);;
+	       src_q.hi3 = 0x00010203);;
     update_xmm dst ins (reverse_bytes_quad32 dst_q)
     
   | Pshufd dst src permutation ->  
@@ -424,11 +425,9 @@ let eval_ins (ins:ins) : st unit =
     update_xmm_preserve_flags dst permuted_xmm
 
   | Pextrq dst src index ->
-    let high = index % 2 = 1 in
     let src_q = eval_xmm src s in
-    let open FStar.Mul in
-    let extracted_nat64 = if high then src_q.hi2 + pow2_32 * src_q.hi3
-                          else src_q.lo0 + pow2_32 * src_q.lo1 in			  
+    let src_two = four_to_two_two src_q in
+    let extracted_nat64 = two_to_nat 32 (two_select src_two (index % 2)) in			  
     update_operand_preserve_flags dst extracted_nat64		   
 
   | Pinsrd dst src index ->
