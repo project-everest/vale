@@ -32,7 +32,9 @@ type ins =
   | Psrld      : dst:xmm -> amt:int -> ins
   | Pshufb     : dst:xmm -> src:xmm -> ins  
   | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pextrq     : dst:operand -> src:xmm -> index:imm8 -> ins
   | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
+  | Pinsrq     : dst:xmm -> src:operand -> index:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
   | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
   | Pclmulqdq  : dst:xmm -> src:xmm -> imm:int -> ins
@@ -417,10 +419,23 @@ let eval_ins (ins:ins) : st unit =
     in
     update_xmm dst ins permuted_xmm
 
+  | Pextrq dst src index ->
+    let high = index % 2 = 1 in
+    let src_q = eval_xmm src s in
+    let open FStar.Mul in
+    let extracted_nat64 = if high then src_q.hi2 + pow2_32 * src_q.hi3
+                          else src_q.lo0 + pow2_32 * src_q.lo1 in			  
+    update_operand_preserve_flags dst extracted_nat64		   
+
   | Pinsrd dst src index ->
     check (valid_operand src);;
     let dst_q = eval_xmm dst s in
     update_xmm dst ins (insert_nat32 dst_q ((eval_operand src s) % pow2_32) (index % 4))
+
+  | Pinsrq dst src index ->
+    check (valid_operand src);;
+    let dst_q = eval_xmm dst s in
+    update_xmm dst ins (insert_nat64 dst_q (eval_operand src s) ((index % 2) = 1))
 
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need

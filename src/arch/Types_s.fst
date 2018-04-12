@@ -1,6 +1,7 @@
 module Types_s
 
 open Words_s
+open Words.Two_s
 open Words.Four_s
 open Words.Seq_s
 open Collections.Seqs_s
@@ -35,7 +36,17 @@ let quad32_xor (x y:quad32) : quad32 = four_map2 nat32_xor x y
 
 let select_word (q:quad32) (selector:twobits) : nat32 = four_select q selector
 let insert_nat32 (q:quad32) (n:nat32) (i:twobits) : quad32 = four_insert q n i
-
+let insert_nat64 (q:quad32) (n:nat64) (high:bool) : quad32 = 
+  let Mktwo lo hi = nat_to_two 32 n in
+  if high then
+    let q' = four_insert q lo 2 in
+    let q' = four_insert q' hi 3 in
+    q'
+  else
+    let q' = four_insert q lo 0 in
+    let q' = four_insert q' hi 1 in
+    q'
+    
 open FStar.Seq
 
 let be_bytes_to_nat32 (b:seq4 nat8) : Tot nat32 =

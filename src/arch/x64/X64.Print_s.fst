@@ -130,6 +130,10 @@ let print_ins (ins:ins) (p:printer) =
     let first, second = p.op_order (print_xmm dst) (print_operand src p) in
       first ^ ", " ^ second
   in 
+  let print_op_xmm (dst:operand) (src:xmm) =
+    let first, second = p.op_order (print_operand dst p) (print_xmm src) in
+      first ^ ", " ^ second
+  in 
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst) (print_xmm src) in
       first ^ ", " ^ second
@@ -166,7 +170,9 @@ let print_ins (ins:ins) (p:printer) =
   | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst) (string_of_int amt)
   | Pshufb dst src         -> "  pshufb "     ^ print_xmms dst src
   | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count)
+  | Pextrq dst src index   -> "  pextrq "     ^ print_pair (print_op_xmm dst src) (print_imm8 index)
   | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op dst src) (print_imm8 index)
+  | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index)
   | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count)
   | MOVDQU dst src         -> "  movdqu "     ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
   | Pclmulqdq dst src imm  -> "  pclmulqdq "  ^ print_pair (print_xmms dst src) (string_of_int imm)

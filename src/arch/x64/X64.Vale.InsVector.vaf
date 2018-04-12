@@ -101,6 +101,16 @@ procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
 {
 }
 
+procedure{:instruction Ins(S.Pextrq(dst, src, index))}{:quick exportOnly}
+          Pextrq(out dst:dst_opr64, src:xmm, inline index:imm8)
+  requires 
+    index < 2;
+  ensures
+    dst == (if index = 1 then src.hi2 + pow2_32 * src.hi3
+            else src.lo0 + pow2_32 * src.lo1);
+{
+}
+
 procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
           Pinsrd(inout dst:xmm, src:opr64, inline index:imm8)
   requires 
@@ -109,6 +119,16 @@ procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
   modifies efl;
   ensures
     dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index); 
+{
+}
+
+procedure{:instruction Ins(S.Pinsrq(dst, src, index))}{:quick exportOnly}
+          Pinsrq(inout dst:xmm, src:opr64, inline index:imm8)
+  requires 
+    index < 2;
+  modifies efl;
+  ensures
+    dst == insert_nat64(old(dst), src, index = 1);
 {
 }
 
