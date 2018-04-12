@@ -217,10 +217,10 @@ procedure{:quick} poly1305_blocks(
         n:nat := pow2_64;
         p:pos := n * n * 4 - 5;
     reads
-        ctx; padbit; r11; r13;
+        ctx; padbit;
     modifies
         inp; len; d1; d2; d3; r0; r1; s1; h0; h1; h2; 
-        rax; rdx; r15;
+        rax; r15;
         efl;
         mem;
     requires
@@ -538,8 +538,7 @@ procedure{:quick} poly1305_impl(
         ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := pow2_64;
     modifies
-        rax; rcx; rdx; r8; r9; r10; r13; r15;
-        rdi; rsi; rdx; r11; r12; r14; rbx; rbp;
+        rax; rcx; rdx; rdi; rsi; rbx; rbp; r8; r9; r10; r11; r12; r13; r14; r15;
         efl;
         mem;
     requires
@@ -667,7 +666,7 @@ procedure{:quick} poly1305(
         n := 0x1_0000_0000_0000_0000;
         p := n * n * 4 - 5;
     modifies
-        rax; rcx; rdx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem;
+        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem;
     requires
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx_in, ctx_b, 24);
