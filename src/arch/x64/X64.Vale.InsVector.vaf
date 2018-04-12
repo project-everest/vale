@@ -104,8 +104,7 @@ procedure{:instruction Ins(S.Pextrq(dst, src, index))}{:quick exportOnly}
   requires 
     index < 2;
   ensures
-    dst == (if index = 1 then src.hi2 + pow2_32 * src.hi3
-            else src.lo0 + pow2_32 * src.lo1);
+    dst == two_to_nat(pow2_64, two_select(four_to_two_two(src), index));
 {
 }
 
@@ -191,9 +190,11 @@ procedure {:quick exportOnly} PushXmm(
         0 <= rsp - 16;
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
-        let src_hi := src.hi2 + pow2_32 * src.hi3;
-        let src_lo := src.lo0 + pow2_32 * src.lo1;
+
+        let src_lo := two_to_nat(pow2_64, two_select(four_to_two_two(src), 0));
+        let src_hi := two_to_nat(pow2_64, two_select(four_to_two_two(src), 1));
         mem == old(buffer64_write(b, index - 1, src_hi, buffer64_write(b, index, src_lo, mem)));
+
         rsp == old(rsp) - 16;
 {
     Pextrq(tmp, src, 0);   
