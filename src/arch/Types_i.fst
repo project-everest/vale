@@ -58,25 +58,11 @@ let lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   reveal_reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s);
   assert (equal (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s)) s)
 
-open Words.Two_s
-
-let nat_to_two_to_nat (n1 n2:nat32) : Lemma
-  (nat_to_two 32 (two_to_nat 32 (Mktwo n1 n2)) == Mktwo n1 n2)
-  =
-  assert (two_to_nat 32 (Mktwo n1 n2) == int_to_natN pow2_64 (n1 + n2 * pow2_32));
-  admit()
+open Words.Two_i
 
 let push_pop_xmm (x y:quad32) : Lemma 
-  (let x_two = four_to_two_two x in
-   let x_hi = two_to_nat 32 (two_select x_two 1) in
-   let x_lo = two_to_nat 32 (two_select x_two 0) in
-   let x' = insert_nat64 (insert_nat64 y x_hi true) x_lo false in
+  (let x' = insert_nat64 (insert_nat64 y (hi64 x) true) (lo64 x) false in
    x == x')
    =
-   let x_hi = x.hi2 + pow2_32 `op_Multiply` x.hi3 in
-   let Mktwo lo hi = nat_to_two 32 x_hi in
-   assert (lo == x_hi % pow2_32);
-   //()
-   assert (hi == (x_hi / pow2_32) % pow2_32);
-   assert (lo == x.hi2);
+//   assert (nat_to_two 32 (hi64 x) == two_select (four_to_two_two x) 1);
    ()

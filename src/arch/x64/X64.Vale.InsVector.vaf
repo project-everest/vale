@@ -7,6 +7,7 @@ module X64.Vale.InsVector
 open Words_s
 open Words.Four_s
 open Types_s
+open Types_i
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -104,7 +105,7 @@ procedure{:instruction Ins(S.Pextrq(dst, src, index))}{:quick exportOnly}
   requires 
     index < 2;
   ensures
-    dst == two_to_nat(pow2_64, two_select(four_to_two_two(src), index));
+    dst == (if index = 0 then lo64(src) else hi64(src));
 {
 }
 
@@ -191,8 +192,8 @@ procedure {:quick exportOnly} PushXmm(
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
 
-        let src_lo := two_to_nat(pow2_64, two_select(four_to_two_two(src), 0));
-        let src_hi := two_to_nat(pow2_64, two_select(four_to_two_two(src), 1));
+        let src_lo := lo64(src); 
+        let src_hi := hi64(src);
         mem == old(buffer64_write(b, index - 1, src_hi, buffer64_write(b, index, src_lo, mem)));
 
         rsp == old(rsp) - 16;
@@ -207,22 +208,24 @@ procedure {:quick exportOnly} PopXmm(
     out dst:xmm,
     out tmp:reg_opr64,
         ghost b:buffer64,
-        ghost index:int)
+        ghost index:int,
+        ghost expected_xmm:quad32)
     reads mem;
     modifies rsp;
     requires
         valid_src_addr(mem, b, index);
         valid_src_addr(mem, b, index + 1);
+        hi64(expected_xmm) == buffer64_read(b, index, mem);
+        lo64(expected_xmm) == buffer64_read(b, index + 1, mem);
         rsp == buffer_addr(b) + 8 * index;
         rsp + 16 < pow2_64;
     ensures
-        let hi := buffer64_read(b, index, mem);
-        let lo := buffer64_read(b, index + 1, mem);
-        dst == insert_nat64(insert_nat64(old(dst), hi, true), lo, false);
+        dst == expected_xmm;
         rsp == old(rsp) + 16;
 {
     Pop(tmp, b, index);
     Pinsrq(dst, tmp, 1);
     Pop(tmp, b, index + 1);
     Pinsrq(dst, tmp, 0);
+    push_pop_xmm(expected_xmm, old(dst));
 }

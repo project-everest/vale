@@ -323,7 +323,7 @@ let eval_ins (ins:ins) : st unit =
     check (valid_operand src);;
     let old_carry = if overflow(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
-    let new_carry = sum >= g64 in
+    let new_carry = sum >= pow2_64 in
     update_operand dst ins (sum % pow2_64);;
     update_flags (update_of s.flags new_carry)  // Explicitly touches only OF
 
