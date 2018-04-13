@@ -297,12 +297,12 @@ procedure {:quick} gcm_core(
 
 procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
     requires 
-        valid_stack_slots(mem, rsp, stack_b, 8);
-    reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
-    modifies mem; rsp;
+        valid_stack_slots(mem, rsp, stack_b, 18);
+    reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; xmm6; xmm7; xmm8; xmm10; xmm11; 
+    modifies mem; rsp; rax;
     ensures
         modifies_buffer(stack_b, old(mem), mem);
-        valid_stack_slots(mem, rsp + 64, stack_b, 8);
+        valid_stack_slots(mem, rsp + 144, stack_b, 18);
 
         rbx == buffer64_read(stack_b, 0, mem);
         rbp == buffer64_read(stack_b, 1, mem);
@@ -313,7 +313,22 @@ procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
         r14 == buffer64_read(stack_b, 6, mem);
         r15 == buffer64_read(stack_b, 7, mem);
 
+        lo64(xmm11) == buffer64_read(stack_b, 17, mem);
+        hi64(xmm11) == buffer64_read(stack_b, 16, mem);
+        lo64(xmm10) == buffer64_read(stack_b, 15, mem);
+        hi64(xmm10) == buffer64_read(stack_b, 14, mem);
+        lo64(xmm8)  == buffer64_read(stack_b, 13, mem);
+        hi64(xmm8)  == buffer64_read(stack_b, 12, mem);
+        lo64(xmm7)  == buffer64_read(stack_b, 11, mem);
+        hi64(xmm7)  == buffer64_read(stack_b, 10, mem);
+        lo64(xmm6)  == buffer64_read(stack_b, 9, mem);
+        hi64(xmm6)  == buffer64_read(stack_b, 8, mem);
 {
+    PushXmm(xmm11, rax, stack_b, 17);
+    PushXmm(xmm10, rax, stack_b, 15);
+    PushXmm(xmm8,  rax, stack_b, 13);
+    PushXmm(xmm7,  rax, stack_b, 11);
+    PushXmm(xmm6,  rax, stack_b,  9);
     Push(r15, stack_b, 7);
     Push(r14, stack_b, 6);
     Push(r13, stack_b, 5);
@@ -324,11 +339,32 @@ procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
     Push(rbx, stack_b, 0);
 }
 
-procedure {:quick} callee_restore_registers(ghost stack_b:buffer64)
+procedure {:quick} callee_restore_registers(
+        ghost stack_b:buffer64,
+        ghost old_xmm6:quad32,
+        ghost old_xmm7:quad32,
+        ghost old_xmm8:quad32,
+        ghost old_xmm10:quad32,
+        ghost old_xmm11:quad32
+        )
     requires 
-        valid_stack_slots(mem, rsp + 64, stack_b, 8);
+        valid_stack_slots(mem, rsp + 144, stack_b, 18);
+
+        lo64(old_xmm11) == buffer64_read(stack_b, 17, mem);
+        hi64(old_xmm11) == buffer64_read(stack_b, 16, mem);
+        lo64(old_xmm10) == buffer64_read(stack_b, 15, mem);
+        hi64(old_xmm10) == buffer64_read(stack_b, 14, mem);
+        lo64(old_xmm8)  == buffer64_read(stack_b, 13, mem);
+        hi64(old_xmm8)  == buffer64_read(stack_b, 12, mem);
+        lo64(old_xmm7)  == buffer64_read(stack_b, 11, mem);
+        hi64(old_xmm7)  == buffer64_read(stack_b, 10, mem);
+        lo64(old_xmm6)  == buffer64_read(stack_b, 9, mem);
+        hi64(old_xmm6)  == buffer64_read(stack_b, 8, mem);
     reads mem; 
-    modifies rbx; rbp; rdi; rsi; r12; r13; r14; r15; rsp;
+    modifies 
+        rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+        xmm6; xmm7; xmm8; xmm10; xmm11;
+        rsp;
     ensures
         rbx == buffer64_read(stack_b, 0, mem);
         rbp == buffer64_read(stack_b, 1, mem);
@@ -338,8 +374,15 @@ procedure {:quick} callee_restore_registers(ghost stack_b:buffer64)
         r13 == buffer64_read(stack_b, 5, mem);
         r14 == buffer64_read(stack_b, 6, mem);
         r15 == buffer64_read(stack_b, 7, mem);
+
+        xmm6  == old_xmm6;
+        xmm7  == old_xmm7;
+        xmm8  == old_xmm8;
+        xmm10 == old_xmm10;
+        xmm11 == old_xmm11;
         
-        rsp == old(rsp) + 64;
+        //rsp == old(rsp) + 144;
+        valid_stack_slots(mem, rsp, stack_b, 18);
 {
     Pop(rbx, stack_b, 0);
     Pop(rbp, stack_b, 1);
@@ -349,6 +392,12 @@ procedure {:quick} callee_restore_registers(ghost stack_b:buffer64)
     Pop(r13, stack_b, 5);
     Pop(r14, stack_b, 6);
     Pop(r15, stack_b, 7);
+
+    PopXmm(xmm6,  rax, stack_b,  8, old_xmm6);
+    PopXmm(xmm7,  rax, stack_b, 10, old_xmm7);
+    PopXmm(xmm8,  rax, stack_b, 12, old_xmm8);
+    PopXmm(xmm10, rax, stack_b, 14, old_xmm10);
+    PopXmm(xmm11, rax, stack_b, 16, old_xmm11);
 }
 
 #verbatim{:interface}
@@ -503,7 +552,7 @@ procedure {:quick} gcm_stdcall(
         validDstAddrs128(mem, out_ptr, out_b, plain_len);
         validDstAddrs128(mem, tag_ptr, tag_b, 1);
 
-        valid_stack_slots(mem, rsp, stack_b, 8);
+        valid_stack_slots(mem, rsp, stack_b, 18);
 
         plain_ptr + 16 * plain_len < pow2_64;
         auth_ptr + 16 * auth_len < pow2_64;
@@ -547,6 +596,12 @@ procedure {:quick} gcm_stdcall(
         win ==> r14 == old(r14);
         win ==> r15 == old(r15);
 
+        xmm6  == old(xmm6);
+        xmm7  == old(xmm7);
+        xmm8  == old(xmm8);
+        xmm10 == old(xmm10);
+        xmm11 == old(xmm11);
+
         // Linux:
         !win ==> rbx == old(rbx);
         !win ==> rbp == old(rbp);
@@ -564,5 +619,5 @@ procedure {:quick} gcm_stdcall(
 
     callee_save_registers(stack_b);
     gcm_stdcall_inner(args_b, iv, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
-    callee_restore_registers(stack_b);
+    callee_restore_registers(stack_b, old(xmm6), old(xmm7), old(xmm8), old(xmm10), old(xmm11));
 }
