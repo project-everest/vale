@@ -438,7 +438,7 @@ let eval_ins (ins:ins) : st unit =
   | Pinsrq dst src index ->
     check (valid_operand src);;
     let dst_q = eval_xmm dst s in
-    update_xmm_preserve_flags dst (insert_nat64 dst_q (eval_operand src s) ((index % 2) = 1))
+    update_xmm_preserve_flags dst (insert_nat64 dst_q (eval_operand src s) (index % 2))
 
   | VPSLLDQ dst src count ->
     check (fun s -> count = 4);;  // We only spec the one very special case we need
@@ -470,33 +470,33 @@ let eval_ins (ins:ins) : st unit =
   | AESNI_enc dst src ->
     let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.mix_columns (AES_s.sub_bytes (AES_s.shift_rows dst_q))) src_q)
+    update_xmm dst ins (quad32_xor (AES_s.mix_columns_LE (AES_s.sub_bytes (AES_s.shift_rows_LE dst_q))) src_q)
 
   | AESNI_enc_last dst src ->
     let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows dst_q)) src_q)
+    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows_LE dst_q)) src_q)
 
   | AESNI_dec dst src ->
     let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q))) src_q)
+    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns_LE (AES_s.inv_sub_bytes (AES_s.inv_shift_rows_LE dst_q))) src_q)
 
   | AESNI_dec_last dst src ->
     let dst_q = eval_xmm dst s in
     let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows dst_q)) src_q)
+    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows_LE dst_q)) src_q)
 
   | AESNI_imc dst src ->
     let src_q = eval_xmm src s in
-    update_xmm dst ins (AES_s.inv_mix_columns src_q)
+    update_xmm dst ins (AES_s.inv_mix_columns_LE src_q)
 
   | AESNI_keygen_assist dst src imm ->
     let src_q = eval_xmm src s in
     update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1) 
-			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.lo1)) imm)
+			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
 			       (AES_s.sub_word src_q.hi3)
-			       (ixor (AES_s.rot_word (AES_s.sub_word src_q.hi3)) imm))
+			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
  
  
 (*

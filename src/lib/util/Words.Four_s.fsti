@@ -50,7 +50,7 @@ let four_select (#a:Type) (x:four a) (selector:nat2) : a =
   | 3 -> x.hi3
 
 let four_insert (#a:Type) (x:four a) (y:a) (selector:nat2) : four a =
-  match selector with 
+  match selector with
   | 0 -> Mkfour y x.lo1 x.hi2 x.hi3
   | 1 -> Mkfour x.lo0 y x.hi2 x.hi3
   | 2 -> Mkfour x.lo0 x.lo1 y x.hi3
