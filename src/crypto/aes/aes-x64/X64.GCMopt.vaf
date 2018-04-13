@@ -600,11 +600,11 @@ procedure {:quick} gcm_stdcall(
         win ==> r14 == old(r14);
         win ==> r15 == old(r15);
 
-        xmm6  == old(xmm6);
-        xmm7  == old(xmm7);
-        xmm8  == old(xmm8);
-        xmm10 == old(xmm10);
-        xmm11 == old(xmm11);
+        win ==> xmm6  == old(xmm6);
+        win ==> xmm7  == old(xmm7);
+        win ==> xmm8  == old(xmm8);
+        win ==> xmm10 == old(xmm10);
+        win ==> xmm11 == old(xmm11);
 
         // Linux:
         !win ==> rbx == old(rbx);
