@@ -60,7 +60,7 @@ procedure {:quick exportOnly} zero_xmm(inout dst:xmm)
     lemma_quad32_xor();
 }
 
-#reset-options "--z3rlimit 60"
+#reset-options "--z3rlimit 100"
 
 ///////////////////////////
 // GCM
