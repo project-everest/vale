@@ -23,8 +23,7 @@ let eval_maddr (m:maddr) (s:state) : int =
   | MConst n -> n
   | MReg r offset -> (eval_reg r s) + offset
 
-let get_heap_value (ptr:int) (s:state) : nat64 =
-    let mem = s.mem in
+let get_heap_val (ptr:int) (mem:heap) : nat64 =
     UInt8.v (mem.[ptr]) + 
     UInt8.v (mem.[ptr+1]) `op_Multiply` 0x100 + 
     UInt8.v (mem.[ptr+2]) `op_Multiply` 0x10000 +
@@ -33,6 +32,12 @@ let get_heap_value (ptr:int) (s:state) : nat64 =
     UInt8.v (mem.[ptr+5]) `op_Multiply` 0x10000000000 +
     UInt8.v (mem.[ptr+6]) `op_Multiply` 0x1000000000000 +
     UInt8.v (mem.[ptr+7]) `op_Multiply` 0x100000000000000
+
+let get_heap_value (ptr:int) (s:state) : nat64 =
+    let mem = s.mem in
+    get_heap_val ptr mem
+
+
 
 let eval_operand (o:operand) (s:state) : nat64 = match o with
   | OConst n -> n
@@ -53,9 +58,8 @@ val mod_8: (n:nat64) -> uint8
 
 let mod_8 n =
   UInt8.uint_to_t (n % 0x100)
- 
-let update_mem (ptr:int) (v:nat64) (s:state) : state =
-  let mem = s.mem in
+
+let update_heap (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+1] <- (mod_8 v) in
@@ -71,10 +75,19 @@ let update_mem (ptr:int) (v:nat64) (s:state) : state =
   let mem = mem.[ptr+6] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+7] <- (mod_8 v) in
+  mem
+
+let frame_update_heap (ptr:int) (v:nat64) (mem:heap) : Lemma (
+  let new_mem = update_heap ptr v mem in
+  forall j. j < ptr \/ j >= ptr + 8 ==> mem.[j] == new_mem.[j]) = ()
+
+let update_mem (ptr:int) (v:nat64) (s:state) : state =
+  let mem = s.mem in
+  let mem = update_heap ptr v mem in
   {s with mem = mem}
 
-let correct_update_get (ptr:int) (v:nat64) (s:state) : Lemma (
-  get_heap_value ptr (update_mem ptr v s) == v) = ()
+let correct_update_get (ptr:int) (v:nat64) (mem:heap) : Lemma (
+  get_heap_val ptr (update_heap ptr v mem) == v) = ()
 
 let update_dst (dst:dst_op) (v:nat64) (s:state) : state = match dst with
   | OReg r -> update_reg r v s

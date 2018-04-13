@@ -35,45 +35,120 @@ type addr_map = (m:(Map.t buffer_triple nat64){forall (buf1 buf2:B.buffer UInt64
 assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
   (Heap.contains h r1 /\ Heap.contains h r2 /\ Heap.addr_of r1 = Heap.addr_of r2 ==> r1 == r2)
 
-let word_to_bytes (v:UInt64.t) : (s: Seq.seq UInt8.t{Seq.length s = 8}) =
-  let s = Seq.create 8 (UInt8.uint_to_t (UInt.zero 8)) in
-  let v = UInt64.v v in
-  let s0 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in 
-  let s1 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s2 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s3 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s4 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s5 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s6 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s7 = UInt8.uint_to_t (v % 0x100) in
-  let v = v / 0x100 in
-  let s = Seq.upd s 0 s0 in
-  let s = Seq.upd s 1 s1 in
-  let s = Seq.upd s 2 s2 in
-  let s = Seq.upd s 3 s3 in
-  let s = Seq.upd s 4 s4 in
-  let s = Seq.upd s 5 s5 in
-  let s = Seq.upd s 6 s6 in
-  let s = Seq.upd s 7 s7 in  
-  s
-  
+#set-options "--z3rlimit 60"
+
+let rec write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
+      (curr_heap:Vale_Sem.heap{forall j. {:pattern (Seq.index contents j)} 
+	0 <= j /\ j < i ==> get_heap_val (addr + (j `op_Multiply` 8)) curr_heap == UInt64.v (Seq.index contents j)}) : Tot Vale_Sem.heap (decreases %[sub length i]) =
+    if i >= length then curr_heap
+    else
+      write_vale_mem64 contents length addr (i + 1) (update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap)
+
+#set-options "--z3refresh --z3rlimit 300 --max_fuel 2 --max_ifuel 1"
+
+let rec frame_write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
+      (curr_heap:Vale_Sem.heap{forall j. {:pattern (Seq.index contents j)}
+	0 <= j /\ j < i ==> get_heap_val (addr + (j `op_Multiply` 8)) curr_heap == UInt64.v (Seq.index contents j)}) : Lemma
+      (requires True)
+      (ensures (let new_heap = write_vale_mem64 contents length addr i curr_heap in
+      forall j. {:pattern (new_heap.[j])} j < addr \/ j >= addr + (length `op_Multiply` 8) ==> curr_heap.[j] == new_heap.[j]))
+      (decreases %[sub length i])=
+      if i >= length then ()
+      else begin
+      let new_heap = update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap in
+      frame_update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap;
+      let helper(j:nat) : Lemma(0 <= j /\ j < i + 1 ==> j < FStar.Seq.Base.length contents /\ get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j)) =
+        if 0 <= j && j < i then assert (get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j))
+	else if j = i then begin
+	  correct_update_get (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap;
+	  assert (get_heap_val (addr + (i `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents i));
+	  ()
+	end
+	else ()
+      in
+      Classical.forall_intro helper;
+      let (new_heap : Vale_Sem.heap{(forall j. {:pattern (Seq.index contents j)} 0 <= j /\ j < i+1 ==> get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j))}) = new_heap in
+      assert (sub length (i+1) < sub length i);
+      frame_write_vale_mem64 contents length addr (i+1) new_heap
+      end
 
 
-let rec write_vale64 (v:UInt64.t) addr (heap:Vale_Sem.heap) : Tot Vale_Sem.heap = 
-  let v' = word_to_bytes v in
-  let heap = heap.[addr] <- Seq.index v' 0 in
-  let heap = heap.[addr + 1] <- Seq.index v' 1 in
-  let heap = heap.[addr + 2] <- Seq.index v' 2 in
-  let heap = heap.[addr + 3] <- Seq.index v' 3 in
-  let heap = heap.[addr + 4] <- Seq.index v' 4 in
-  let heap = heap.[addr + 5] <- Seq.index v' 5 in
-  let heap = heap.[addr + 6] <- Seq.index v' 6 in  
-  let heap = heap.[addr + 7] <- Seq.index v' 7 in  
-  heap
+let rec load_store_write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
+      (curr_heap:Vale_Sem.heap{forall j. {:pattern (Seq.index contents j)} 0 <= j /\ j < i ==> get_heap_val (addr + (j `op_Multiply` 8)) curr_heap == UInt64.v (Seq.index contents j)}) : Lemma
+      (requires True)
+      (ensures (let new_heap = write_vale_mem64 contents length addr i curr_heap in
+      forall j. {:pattern (Seq.index contents j)} 0 <= j /\ j < length ==> UInt64.v (Seq.index contents j) == get_heap_val (addr + (j `op_Multiply` 8)) new_heap))
+      (decreases %[sub length i])=
+      if i >= length then ()
+      else begin
+      let new_heap = update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap in
+      frame_update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap;
+      let helper(j:nat) : Lemma(0 <= j /\ j < i + 1 ==> j < FStar.Seq.Base.length contents /\ get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j)) =
+        if 0 <= j && j < i then assert (get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j))
+	else if j = i then begin
+	  correct_update_get (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap;
+	  assert (get_heap_val (addr + (i `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents i));
+	  ()
+	end
+	else ()
+      in
+      Classical.forall_intro helper;
+      let (new_heap : Vale_Sem.heap{(forall j. {:pattern (Seq.index contents j)} 0 <= j /\ j < i+1 ==> get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j))}) = new_heap in
+      assert (sub length (i+1) < sub length i);
+      load_store_write_vale_mem64 contents length addr (i+1) new_heap
+      end
+
+let correct_down_p64 mem (addrs:addr_map) heap (p:B.buffer UInt64.t) =
+  let length = B.length p in
+  let contents = B.as_seq mem p in
+  let addr = addrs.[(B.as_addr p, B.idx p, length)] in
+  (forall i. {:pattern (Seq.index contents i)} 0 <= i /\ i < length ==> get_heap_val (addr + (i `op_Multiply` 8)) heap == UInt64.v (Seq.index contents i))
+
+#set-options "--z3rlimit 100"
+
+let correct_down_p64_cancel mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Lemma
+  (forall p'. p == p' ==>       
+      (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem64 contents length addr 0 heap in
+      correct_down_p64 mem addrs new_heap p')) = 
+  let rec aux (p':B.buffer UInt64.t) : Lemma 
+    (p == p'  ==> (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem64 contents length addr 0 heap in
+      correct_down_p64 mem addrs new_heap p')) =
+        let length = B.length p in
+        let contents = B.as_seq mem p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_heap = write_vale_mem64 contents length addr 0 heap in
+	load_store_write_vale_mem64 contents length addr 0 heap
+  in
+  Classical.forall_intro aux
+
+(*
+let correct_down_p64_frame mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Lemma
+  (forall (p':B.buffer UInt64.t). B.disjoint p p' /\ correct_down_p64 mem addrs heap p' ==>       
+      (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem64 contents length addr 0 heap in
+      correct_down_p64 mem addrs new_heap p')) = 
+  let rec aux (p':B.buffer UInt64.t) : Lemma 
+    (B.disjoint p p' /\ correct_down_p64 mem addrs heap p' ==> (let length = B.length p in
+      let contents = B.as_seq mem p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_heap = write_vale_mem64 contents length addr 0 heap in
+      correct_down_p64 mem addrs new_heap p')) =
+        let length = B.length p in
+        let contents = B.as_seq mem p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_heap = write_vale_mem64 contents length addr 0 heap in
+	frame_write_vale_mem64 contents length addr 0 heap
+  in
+  Classical.forall_intro aux
+*)
+
+let correct_down64 mem (addrs:addr_map) (ptrs: list (B.buffer UInt64.t)) heap =
+  forall p. List.memP p ptrs ==> correct_down_p64 mem addrs heap p
