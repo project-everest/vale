@@ -14,6 +14,7 @@ open AES_s
 open X64.AES
 open GCTR_s
 open GCTR_i
+open Words.Two_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -47,11 +48,10 @@ procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
     ensures
         dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 {
-    // TODO: Add an instruction to simplify this
-    Pinsrd(dst, 0x0C0D0E0F, 0);
-    Pinsrd(dst, 0x08090A0B, 1);
-    Pinsrd(dst, 0x04050607, 2);
-    Pinsrd(dst, 0x00010203, 3);
+    assert two_to_nat(32, Mktwo(0x0C0D0E0F, 0x08090A0B)) == 0x08090A0B0C0D0E0F; // OBSERVE
+    assert two_to_nat(32, Mktwo(0x04050607, 0x00010203)) == 0x0001020304050607; // OBSERVE
+    Pinsrq(dst, 0x08090A0B0C0D0E0F, 0);
+    Pinsrq(dst, 0x0001020304050607, 1);
 }
 
 procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
