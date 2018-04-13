@@ -49,12 +49,13 @@ var{:state xmm(15)} xmm15:quad32;
 
 procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly}
           Paddd(inout dst:xmm, src:xmm)
-  modifies efl;
-  ensures
-    dst == old(Mkfour(add_wrap(dst.lo0, src.lo0),
-                      add_wrap(dst.lo1, src.lo1),
-                      add_wrap(dst.hi2, src.hi2),
-                      add_wrap(dst.hi3, src.hi3)));
+    modifies efl;
+    ensures
+        dst == old(Mkfour(
+            add_wrap(dst.lo0, src.lo0),
+            add_wrap(dst.lo1, src.lo1),
+            add_wrap(dst.hi2, src.hi2),
+            add_wrap(dst.hi3, src.hi3)));
 {
 }
 
@@ -82,55 +83,56 @@ procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout ds
 
 procedure{:instruction Ins(S.Pshufb(dst, src))}{:quick exportOnly}
           Pshufb(inout dst:xmm, src:xmm)
-  requires
-    src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-  modifies efl;
-  ensures
-    dst == reverse_bytes_quad32(old(dst));
+    requires
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+    modifies efl;
+    ensures
+        dst == reverse_bytes_quad32(old(dst));
 {
 }
 
 procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
-  ensures
-    dst == old(Mkfour(select_word(src, byte_to_twobits(permutation).lo0),
-                      select_word(src, byte_to_twobits(permutation).lo1),
-                      select_word(src, byte_to_twobits(permutation).hi2),
-                      select_word(src, byte_to_twobits(permutation).hi3)));
+    ensures
+        dst == old(Mkfour(
+            select_word(src, byte_to_twobits(permutation).lo0),
+            select_word(src, byte_to_twobits(permutation).lo1),
+            select_word(src, byte_to_twobits(permutation).hi2),
+            select_word(src, byte_to_twobits(permutation).hi3)));
 {
 }
 
 procedure{:instruction Ins(S.Pextrq(dst, src, index))}{:quick exportOnly}
           Pextrq(out dst:dst_opr64, src:xmm, inline index:imm8)
-  requires 
-    index < 2;
-  ensures
-    dst == (if index = 0 then lo64(src) else hi64(src));
+    requires
+        index < 2;
+    ensures
+        dst == (if index = 0 then lo64(src) else hi64(src));
 {
 }
 
 procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
           Pinsrd(inout dst:xmm, src:opr64, inline index:imm8)
-  requires 
-    src < pow2_32;
-    index < 4;
-  ensures
-    dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index); 
+    requires
+        src < pow2_32;
+        index < 4;
+    ensures
+        dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index);
 {
 }
 
 procedure{:instruction Ins(S.Pinsrq(dst, src, index))}{:quick exportOnly}
           Pinsrq(inout dst:xmm, src:opr64, inline index:imm8)
-  requires 
-    index < 2;
-  ensures
-    dst == insert_nat64(old(dst), src, index = 1);
+    requires
+        index < 2;
+    ensures
+        dst == insert_nat64(old(dst), src, index);
 {
 }
 
 procedure{:instruction Ins(S.VPSLLDQ(dst, src, 4))}{:quick exportOnly} VPSLLDQ4(inout dst:xmm, src:xmm)
-  ensures
-    dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
+    ensures
+        dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
 {
 }
 
@@ -228,4 +230,25 @@ procedure {:quick exportOnly} PopXmm(
     Pop(tmp, b, index + 1);
     Pinsrq(dst, tmp, 0);
     push_pop_xmm(expected_xmm, old(dst));
+}
+
+procedure {:quick exportOnly} ZeroXmm(inout dst:xmm)
+    modifies efl;
+    ensures
+        dst == Mkfour(0, 0, 0, 0);
+{
+    Pxor(dst, dst);
+    Types_i.lemma_quad32_xor();
+}
+
+procedure {:quick exportOnly} InitPshufbMask(inout dst:xmm)
+    modifies efl;
+    ensures
+        dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+{
+    // TODO: Add an instruction to simplify this
+    Pinsrd(dst, 0x0C0D0E0F, 0);
+    Pinsrd(dst, 0x08090A0B, 1);
+    Pinsrd(dst, 0x04050607, 2);
+    Pinsrd(dst, 0x00010203, 3);
 }

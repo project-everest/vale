@@ -47,19 +47,6 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 #endverbatim
 
 
-///////////////////////////
-//  Useful helper steps
-///////////////////////////
-
-procedure {:quick exportOnly} zero_xmm(inout dst:xmm)
-    modifies efl;
-    ensures
-        dst == Mkfour(0, 0, 0, 0);
-{
-    Pxor(dst, dst);
-    lemma_quad32_xor();
-}
-
 #reset-options "--z3rlimit 60"
 
 ///////////////////////////
@@ -68,7 +55,7 @@ procedure {:quick exportOnly} zero_xmm(inout dst:xmm)
 procedure {:quick} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -92,7 +79,7 @@ procedure {:quick} gcm_one_pass(
 
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+        round_keys == key_to_round_keys_LE(AES_128, key);
         r8 == buffer_addr(keys_b);
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
@@ -101,7 +88,7 @@ procedure {:quick} gcm_one_pass(
         validSrcAddrs128(mem, out_ptr, out_b, len);
 
         // GCTR
-        buffer128_as_seq(mem, out_b) == gctr_encrypt(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
+        buffer128_as_seq(mem, out_b) == gctr_encrypt_LE(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
         icb.lo1 == old(icb.lo1);
         icb.hi2 == old(icb.hi2);
         icb.hi3 == old(icb.hi3);
@@ -115,10 +102,10 @@ procedure {:quick} gcm_one_pass(
     Mov64(r10, out_ptr);
 
     // Initialize counter
-    zero_xmm(one);
+    ZeroXmm(one);
     Pinsrd(one, 1, 0);
 
-    init_pshufb_mask(mask);
+    InitPshufbMask(mask);
 
     while (rdx != len)
         invariant
@@ -140,7 +127,7 @@ procedure {:quick} gcm_one_pass(
 
             // AES reqs
             length(round_keys) == 11;
-            round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+            round_keys == key_to_round_keys_LE(AES_128, key);
             r8 == buffer_addr(keys_b);
             validSrcAddrs128(mem, r8, keys_b, 11);
             buffer128_as_seq(mem, keys_b) == round_keys;
@@ -159,14 +146,14 @@ procedure {:quick} gcm_one_pass(
 
 //            forall j :: 0 <= j < rdx ==> 
 //                        buffer128_read(out_b, j, mem) == 
-//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt(AES_128, key, inc32(old(icb), j)));
+//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt_LE(AES_128, key, inc32(old(icb), j)));
 
         decreases
             len - rdx;
     {
         Mov128(xmm0, icb);
         Pshufb(xmm0, mask);
-        AES128EncryptBlock(reverse_bytes_quad32(icb), reverse_bytes_nat32_seq(key), round_keys, keys_b);
+        AES128EncryptBlock(reverse_bytes_quad32(icb), key, round_keys, keys_b);
 
         Load128_buffer(xmm2, r9, 0, in_b, rdx);
         Pxor(xmm2, xmm0);
@@ -190,10 +177,11 @@ procedure {:quick} gcm_one_pass(
 }
 
 procedure {:quick} gcm_core(
+    ghost iv_BE:quad32,
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -213,6 +201,7 @@ procedure {:quick} gcm_core(
 
     requires
         // GCM reqs
+        iv == reverse_bytes_quad32(iv_BE);
         buffers_disjoint128(plain_b, out_b);
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
@@ -231,7 +220,7 @@ procedure {:quick} gcm_core(
 
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+        round_keys == key_to_round_keys_LE(AES_128, key);
         validSrcAddrs128(mem, keys_ptr, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
@@ -239,30 +228,32 @@ procedure {:quick} gcm_core(
         validSrcAddrs128(mem, out_ptr, out_b, plain_len);
         256 * buffer_length(plain_b) < pow2_32;
         256 * buffer_length(auth_b) < pow2_32;
-        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, xmm1) == snd(gcm_encrypt(AES_128, key, old(iv), buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+        create(1, xmm1) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
-    // let h = aes_encrypt alg key (Mkfour 0 0 0 0) in
-    zero_xmm(xmm0);
-    AES128EncryptBlock(xmm0, reverse_bytes_nat32_seq(key), round_keys, keys_b); // h = xmm0 = aes_encrypt alg (reverse_bytes_nat32_seq key) (Mkfour 0 0 0 0) in
+    // let h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
+    ZeroXmm(xmm0);
+    AES128EncryptBlock(xmm0, key, round_keys, keys_b); // h = xmm0 = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
     ghost var h := xmm0;
     Mov128(xmm11, xmm0);     // Save a copy of h
 
-    // let j0 = Mkfour 1 iv.mid_lo iv.mid_hi iv.hi in
+    // let j0_BE = Mkfour 1 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
     // (inc32 j0 1)
+    InitPshufbMask(xmm0);
+    Pshufb(iv, xmm0); // to big endian
     Pinsrd(iv, 2, 0);
-    // assert iv == inc32(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), 1);
+    // assert iv == inc32(Mkfour(1, iv_BE.lo1, iv_BE.hi2, iv_BE.hi3), 1);
 
     // Compute the hashes incrementally, starting with auth data
     Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
-    zero_xmm(xmm1);
+    ZeroXmm(xmm1);
     ghost var y_0 := Mkfour(0, 0, 0, 0);
     // assert xmm1 == y_0;
     compute_ghash_incremental(auth_b);
     ghost var y_auth := xmm1;
 
-    // let c = gctr_encrypt (inc32 j0 1) p alg key in
+    // let c = gctr_encrypt_LE (inc32 j0 1) p alg key in
     Mov64(rax, plain_ptr);
     //Mov64(rbx, out_ptr);
     Mov64(rcx, plain_len);
@@ -270,9 +261,15 @@ procedure {:quick} gcm_core(
     ghost var y_cipher := xmm1;
 
     // Prepare length fields
-    zero_xmm(xmm2);
-    Pinsrd(xmm2, auth_len, 3);
-    Pinsrd(xmm2, plain_len, 1);
+    ZeroXmm(xmm2);
+    Mov64(rax, plain_len);
+    IMul64(rax, 128);
+    Pinsrd(xmm2, rax, 0);
+    Mov64(rax, auth_len);
+    IMul64(rax, 128);
+    Pinsrd(xmm2, rax, 2);
+    InitPshufbMask(xmm0);
+    Pshufb(xmm2, xmm0);
 
     ghost var length_quad32 := xmm2;
 
@@ -284,15 +281,15 @@ procedure {:quick} gcm_core(
                        buffer128_as_seq(mem, auth_b),
                        buffer128_as_seq(mem, out_b),
                        create(1, length_quad32)); 
-    // assert xmm1 == ghash(h, append(buffer128_as_seq(mem, auth_b), append(buffer128_as_seq(mem, out_b), create(1, length_quad32)))); 
+    // assert xmm1 == ghash_LE(h, append(buffer128_as_seq(mem, auth_b), append(buffer128_as_seq(mem, out_b), create(1, length_quad32)))); 
     ghost var hash := xmm1;
 
-    Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo)
-    // assert iv == old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi));
+    Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo0)
+    // assert iv == iv_BE.(lo0 := 1);
 
     // Encrypt the hash value with gctr_register 
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
-    // assert create(1, xmm1) == gctr_encrypt(old(Mkfour(1,iv.mid_lo,iv.mid_hi,iv.hi)), create(1, hash), AES_128, key);
+    // assert create(1, xmm1) == gctr_encrypt_LE(iv_BE.(lo0 := 1), create(1, hash), AES_128, key);
 }
 
 procedure {:quick} callee_save_registers(ghost stack_b:buffer64)
@@ -352,7 +349,7 @@ procedure {:quick} callee_restore_registers(ghost stack_b:buffer64)
 }
 
 #verbatim{:interface}
-let mk_gctr_plain (p:seq quad32) : gctr_plain =
+let mk_gctr_plain (p:seq quad32) : gctr_plain_LE =
   let open FStar.Mul in
   if 256 * length p < pow2_32 then p else createEmpty
 #endverbatim
@@ -360,7 +357,7 @@ let mk_gctr_plain (p:seq quad32) : gctr_plain =
 
 procedure {:quick} gcm_stdcall_inner(
     ghost args_b:buffer64,
-    ghost iv:quad32,
+    ghost iv_BE:quad32,
 
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
@@ -368,7 +365,7 @@ procedure {:quick} gcm_stdcall_inner(
     ghost out_b:buffer128,
     ghost tag_b:buffer128,
 
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -407,7 +404,7 @@ procedure {:quick} gcm_stdcall_inner(
         buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < pow2_32;
         buffer_length(auth_b) == auth_len;
 
-        iv == buffer128_read(iv_b, 0, mem);
+        iv_BE == reverse_bytes_quad32(buffer128_read(iv_b, 0, mem));
 
         // To simplify length calculations, restrict auth and plain length further
         256 * auth_len < pow2_32;
@@ -415,7 +412,7 @@ procedure {:quick} gcm_stdcall_inner(
 
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+        round_keys == key_to_round_keys_LE(AES_128, key);
         validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -427,8 +424,8 @@ procedure {:quick} gcm_stdcall_inner(
 
         256 * buffer_length(plain_b) < pow2_32;
         256 * buffer_length(auth_b) < pow2_32;
-        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 {
     Load64_buffer(r12, r9,  0, args_b, 0);
     Load64_buffer(r13, r9,  8, args_b, 1);
@@ -442,7 +439,7 @@ procedure {:quick} gcm_stdcall_inner(
     // Load the IV into its XMM register
     Load128_buffer(xmm7, r10, 0, iv_b, 0);
 
-    gcm_core(plain_b, auth_b, out_b, key, round_keys, keys_b);
+    gcm_core(iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
 
     // Auth tag is still in xmm1, so save it to memory
     Store128_buffer(r15, xmm1, 0, tag_b, 0);
@@ -451,7 +448,7 @@ procedure {:quick} gcm_stdcall_inner(
 procedure {:quick} gcm_stdcall(
     inline win:bool,
     ghost args_b:buffer64,
-    ghost iv:quad32,
+    ghost iv_BE:quad32,
 
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
@@ -460,7 +457,7 @@ procedure {:quick} gcm_stdcall(
     ghost tag_b:buffer128,
     ghost stack_b:buffer64,
 
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -511,7 +508,7 @@ procedure {:quick} gcm_stdcall(
         buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < pow2_32;
         buffer_length(auth_b) == auth_len;
 
-        iv == buffer128_read(iv_b, 0, mem);
+        iv_BE == reverse_bytes_quad32(buffer128_read(iv_b, 0, mem));
 
         // To simplify length calculations, restrict auth and plain length further
         256 * auth_len < pow2_32;
@@ -519,7 +516,7 @@ procedure {:quick} gcm_stdcall(
 
         // AES reqs
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, reverse_bytes_nat32_seq(key));
+        round_keys == key_to_round_keys_LE(AES_128, key);
         validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -531,8 +528,8 @@ procedure {:quick} gcm_stdcall(
 
         256 * buffer_length(plain_b) < pow2_32;
         256 * buffer_length(auth_b) < pow2_32;
-        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt(AES_128, key, iv, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt(AES_128, key, iv, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 
         // Calling convention for caller/callee saved registers
         rsp == old(rsp);
@@ -563,6 +560,6 @@ procedure {:quick} gcm_stdcall(
     }
 
     callee_save_registers(stack_b);
-    gcm_stdcall_inner(args_b, iv, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
+    gcm_stdcall_inner(args_b, iv_BE, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
     callee_restore_registers(stack_b);
 }

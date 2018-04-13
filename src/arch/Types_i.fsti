@@ -54,5 +54,5 @@ let lo64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 0)
 let hi64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 1)
 
 val push_pop_xmm (x y:quad32) : Lemma 
-  (let x' = insert_nat64 (insert_nat64 y (hi64 x) true) (lo64 x) false in
+  (let x' = insert_nat64 (insert_nat64 y (hi64 x) 1) (lo64 x) 0 in
    x == x')

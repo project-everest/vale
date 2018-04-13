@@ -34,7 +34,7 @@ procedure{:quick} KeyExpansionRound(
     inline round:nat64,
     inline rcon:imm8,
     ghost dst:buffer128,
-    ghost key:aes_key(AES_128))
+    ghost key:aes_key_LE(AES_128))
     reads
         rdx;
     modifies
@@ -66,7 +66,7 @@ procedure{:quick} KeyExpansionRound(
 }
 
 procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost dst:buffer128,
     inline n:int)
     reads
@@ -112,7 +112,7 @@ procedure{:quick} KeyExpansionStdcall(
     ensures
         modifies_buffer128(output_key_expansion_b, old(mem), mem);
         forall j {buffer128_read(output_key_expansion_b, j, mem)} :: 0 <= j <= 10 ==>
-            buffer128_read(output_key_expansion_b, j, mem) == index(key_to_round_keys(AES_128, key), j);
+            buffer128_read(output_key_expansion_b, j, mem) == index(key_to_round_keys_LE(AES_128, key), j);
 {
     inline if (win)
     {
@@ -164,7 +164,7 @@ procedure{:quick} AES128EncryptRound(
 
 procedure{:quick} AES128EncryptBlock(
     ghost input:quad32,
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost round_keys:seq(quad32),
     ghost keys_buffer:buffer128
     )
@@ -174,13 +174,13 @@ procedure{:quick} AES128EncryptBlock(
         xmm0; xmm2; efl;
     requires
         length(round_keys) == 11;
-        round_keys == key_to_round_keys(AES_128, key);
+        round_keys == key_to_round_keys_LE(AES_128, key);
         xmm0 == input;
         r8 == buffer_addr(keys_buffer);
         validSrcAddrs128(mem, r8, keys_buffer, 11);
         forall i:int :: 0 <= i < 11 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
     ensures
-        xmm0 == aes_encrypt(AES_128, key, input);
+        xmm0 == aes_encrypt_LE(AES_128, key, input);
 {
     assert{:quick_type} length(round_keys) == 11;
     let init := quad32_xor(input, index(round_keys, 0));
@@ -207,7 +207,7 @@ procedure{:quick} AES128EncryptBlock(
 procedure{:quick} AES128EncryptBlockStdcall(
     inline win:bool,
     ghost input:quad32,
-    ghost key:aes_key(AES_128),
+    ghost key:aes_key_LE(AES_128),
     ghost input_buffer:buffer128,
     ghost output_buffer:buffer128,
     ghost keys_buffer:buffer128
@@ -228,11 +228,11 @@ procedure{:quick} AES128EncryptBlockStdcall(
         validSrcAddrs128(mem, output_ptr, output_buffer, 1);
         validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, 11);
         forall i:int :: 0 <= i < 11 ==>
-            buffer128_read(keys_buffer, i, mem) == index(key_to_round_keys(AES_128, key), i);
+            buffer128_read(keys_buffer, i, mem) == index(key_to_round_keys_LE(AES_128, key), i);
     ensures
         modifies_mem(loc_buffer(output_buffer), old(mem), mem);
         validSrcAddrs128(mem, output_ptr, output_buffer, 1);
-        buffer128_read(output_buffer, 0, mem) == aes_encrypt(AES_128, key, input);
+        buffer128_read(output_buffer, 0, mem) == aes_encrypt_LE(AES_128, key, input);
 {
     inline if (win)
     {
@@ -244,7 +244,7 @@ procedure{:quick} AES128EncryptBlockStdcall(
         Mov64(r8, rdx);
     }
 
-    AES128EncryptBlock(input, key, key_to_round_keys(AES_128, key), keys_buffer);
+    AES128EncryptBlock(input, key, key_to_round_keys_LE(AES_128, key), keys_buffer);
 
     inline if (win)
     {
@@ -270,7 +270,7 @@ procedure KeyInversionRound(
     inline round:int,
 //    inline taint:taint,
     ghost k_b:buffer128)
-//    ghost key:aes_key(AES_128),
+//    ghost key:aes_key_LE(AES_128),
 //    ghost w:seq(nat32),
 //    ghost dw_in:seq(nat32)
 //    ) returns (
@@ -322,7 +322,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
     inline rounds:int,
 //    inline taint:taint,
     ghost k_b:buffer128)
-//    ghost key:aes_key(AES_128),
+//    ghost key:aes_key_LE(AES_128),
 //    ghost w:seq(nat32),
 //    ghost dw_in:seq(nat32)
 //    ) returns (
@@ -363,7 +363,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
 }
 
 procedure KeyInversionImpl(
-//    ghost key:aes_key(AES_128),
+//    ghost key:aes_key_LE(AES_128),
 //    ghost w:seq(nat32),
 //    inline taint:taint,
     ghost k_b:buffer128)

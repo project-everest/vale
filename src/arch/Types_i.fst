@@ -58,10 +58,12 @@ let lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   reveal_reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s);
   assert (equal (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s)) s)
 
-open Words.Two_i
+//TODO (waiting for file to be added): open Words.Two_i
+assume val temp_TODO (x:two nat32) : Lemma (nat_to_two 32 (two_to_nat 32 x) == x) [SMTPat (nat_to_two 32 (two_to_nat 32 x))]
+
 
 let push_pop_xmm (x y:quad32) : Lemma 
-  (let x' = insert_nat64 (insert_nat64 y (hi64 x) true) (lo64 x) false in
+  (let x' = insert_nat64 (insert_nat64 y (hi64 x) 1) (lo64 x) 0 in
    x == x')
    =
 //   assert (nat_to_two 32 (hi64 x) == two_select (four_to_two_two x) 1);
