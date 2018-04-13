@@ -51,7 +51,7 @@ let rec frame_write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = 
 	0 <= j /\ j < i ==> get_heap_val (addr + (j `op_Multiply` 8)) curr_heap == UInt64.v (Seq.index contents j)}) : Lemma
       (requires True)
       (ensures (let new_heap = write_vale_mem64 contents length addr i curr_heap in
-      forall j. {:pattern (new_heap.[j])} j < addr \/ j >= addr + (length `op_Multiply` 8) ==> curr_heap.[j] == new_heap.[j]))
+      forall j. j < addr \/ j >= addr + (length `op_Multiply` 8) ==> curr_heap.[j] == new_heap.[j]))
       (decreases %[sub length i])=
       if i >= length then ()
       else begin
@@ -127,7 +127,6 @@ let correct_down_p64_cancel mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Le
   in
   Classical.forall_intro aux
 
-(*
 let correct_down_p64_frame mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Lemma
   (forall (p':B.buffer UInt64.t). B.disjoint p p' /\ correct_down_p64 mem addrs heap p' ==>       
       (let length = B.length p in
@@ -144,11 +143,38 @@ let correct_down_p64_frame mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Lem
         let length = B.length p in
         let contents = B.as_seq mem p in
         let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+	let addr' = addrs.[(B.as_addr p', B.idx p', B.length p')] in
         let new_heap = write_vale_mem64 contents length addr 0 heap in
-	frame_write_vale_mem64 contents length addr 0 heap
+	frame_write_vale_mem64 contents length addr 0 heap;
+	assert (B.disjoint p p' ==> (forall i. 0 <= i /\ i < 8 `op_Multiply` B.length p' ==> addr' + i < addr \/ addr + (8 `op_Multiply` length) < addr' + i));
+	assert (B.disjoint p p' ==> (forall i. 0 <= i /\ i < 8 `op_Multiply` B.length p' ==> heap.[addr' + i] == new_heap.[addr' + i]));
+	()
   in
   Classical.forall_intro aux
-*)
+
 
 let correct_down64 mem (addrs:addr_map) (ptrs: list (B.buffer UInt64.t)) heap =
   forall p. List.memP p ptrs ==> correct_down_p64 mem addrs heap p
+
+val down_mem64: (mem:HS.mem) -> (addrs:addr_map) -> (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) -> GTot (heap :Vale_Sem.heap {correct_down64 mem addrs ptrs heap})
+
+#set-options "--z3rlimit 40"
+
+let down_mem64 mem addrs ptrs =
+  (* Dummy heap *)
+  let heap : heap = FStar.Map.const (UInt8.uint_to_t 0) in
+  let rec aux ps (accu:list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
+    (h:Vale_Sem.heap{correct_down64 mem addrs accu h}) : GTot (heap:Vale_Sem.heap{correct_down64 mem addrs ptrs heap}) = match ps with
+    | [] -> h
+    | a::q ->
+      let length = B.length a in
+      let contents = B.as_seq mem a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_heap = write_vale_mem64 contents length addr 0 h in
+      load_store_write_vale_mem64 contents length addr 0 h;
+      correct_down_p64_cancel mem addrs h a;
+      correct_down_p64_frame mem addrs h a;
+      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
+      aux q (a::accu) new_heap
+    in
+    aux ptrs [] heap 
