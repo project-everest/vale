@@ -7,6 +7,7 @@ open Words_s
 open Words.Four_s
 open Words.Seq_s
 open FStar.Seq
+open Words.Two_s
 
 unfold let ( *^ ) = nat32_xor
 unfold let ( *^^ ) = quad32_xor
@@ -48,3 +49,10 @@ val lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   [SMTPat (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s))]
 
 unfold let quad32_to_seq (q:quad32) = four_to_seq_LE q
+
+let lo64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 0)
+let hi64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 1)
+
+val push_pop_xmm (x y:quad32) : Lemma 
+  (let x' = insert_nat64 (insert_nat64 y (hi64 x) true) (lo64 x) false in
+   x == x')
