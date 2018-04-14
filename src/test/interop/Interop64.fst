@@ -178,3 +178,38 @@ let down_mem64 mem addrs ptrs =
       aux q (a::accu) new_heap
     in
     aux ptrs [] heap 
+
+let create_seq64 heap length addr : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
+  (forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) =
+  let rec aux heap length addr (i:nat{i <= length}) (s:Seq.seq UInt64.t{Seq.length s = i /\ 
+    (forall j. 0 <= j /\ j < i ==> UInt64.v (Seq.index s j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
+    (forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) (decreases %[sub length i]) =
+  if i = length then s
+    else
+    let s' = Seq.append s (Seq.create 1 (UInt64.uint_to_t (get_heap_val (addr + i `op_Multiply` 8) heap))) in
+    aux heap length addr (i+1) s'
+  in aux heap length addr 0 Seq.createEmpty
+
+let write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.length buf}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem = 
+  let s = B.sel curr_mem buf in
+  let modified = create_seq64 heap length addr in
+  let lo = Seq.slice s 0 (B.idx buf) in
+  let hi = Seq.slice s (B.idx buf + length) (B.max_length buf) in
+  let s' = Seq.append lo (Seq.append modified hi) in
+  HS.upd curr_mem (B.content buf) s'
+
+#set-options "--z3rlimit 100"
+
+let frame_write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.length buf}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (let new_mem = write_low_mem64 heap length addr buf mem in
+    forall (b:(B.buffer UInt64.t){B.live mem b /\ B.disjoint b buf}). 
+    {:pattern (B.equal mem b new_mem b)}
+    B.equal mem b new_mem b) =
+    let new_mem = write_low_mem64 heap length addr buf mem in
+    let aux (b : B.buffer UInt64.t{B.live mem b /\ B.disjoint b buf}) : Lemma (B.equal mem b new_mem b) =
+      if B.as_addr b <> B.as_addr buf || B.frameOf b <> B.frameOf buf then ()
+      else begin
+	ref_extensionality (Map.sel mem.HS.h (B.frameOf b)) (B.as_ref buf) (B.as_ref b);
+	assert (Seq.equal (B.as_seq mem b) (B.as_seq new_mem b))
+      end
+    in Classical.forall_intro aux
