@@ -595,12 +595,21 @@ def verify_fstar(env, targetfile, sourcefile):
     Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
   return outs
 
+def ml_name(sourcefile):
+  base_name = os.path.splitext(str(sourcefile))[0]
+  module_name = os.path.split(base_name)[1]
+  mlfile = 'obj/ml_out/' + module_name.replace('.', '_') + '.ml'
+  return mlfile
+
 def extract_fstar(env, sourcefile):
   base_name = os.path.splitext(str(sourcefile))[0]
   module_name = os.path.split(base_name)[1]
-  mlfile = 'obj/ml_out/' + module_name + '.ml'
+  mlfile = ml_name(sourcefile)
   Depends(mlfile, base_name + '.fst.verified')
-  return env.Command(mlfile, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS --odir obj/ml_out --codegen OCaml --extract_module " + module_name)
+  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces", ""))
+  cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
+  cmd_line += " --odir obj/ml_out --codegen OCaml --extract_module " + module_name
+  return env.Command(mlfile, sourcefile, cmd_line)
 
 # Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
 def add_fstar_verifier(env):
@@ -800,8 +809,9 @@ def verify_fstar_files(env, files):
       if stage2:
         target = o + '.verified'
         options.env.FStar(target, o)
-        if os.path.splitext(o)[1] == '.fst' and fstar_extract:
-          options.env.FStarExtract(o)
+        if fstar_extract:
+          if os.path.splitext(o)[1] == '.fst':
+            options.env.FStarExtract(o)
 
 # Verify a set of Vale files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -987,9 +997,14 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       targets, sources = line.split(': ', 1) # ': ', not ':', because of Windows drive letters
       sources = sources.split()
       targets = targets.split()
-      sources = [to_obj_dir(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x))) for x in sources if has_obj_dir(x)]
-      targets = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
-      Depends(targets, sources)
+      sources_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x))) for x in sources if has_obj_dir(x)]
+      targets_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
+      Depends(targets_ver, sources_ver)
+      if fstar_extract:
+        sources_ml = [ml_name(x) for x in sources if has_obj_dir(x)]
+        targets_ml = [ml_name(x) for x in targets if has_obj_dir(x)]
+        sources_ml = [x for x in sources_ml if not (x in targets_ml)]
+        Depends(targets_ml, sources_ml)
   if fstar_deps_ok:
     # Save results in depsBackupFile
     with open(depsBackupFile, 'w') as myfile:

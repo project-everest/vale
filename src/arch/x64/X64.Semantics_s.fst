@@ -1,6 +1,5 @@
 module X64.Semantics_s
 
-open FStar.BaseTypes
 open X64.Machine_s
 open Words_s
 open Words.Two_s

@@ -12,12 +12,12 @@ unfold let fuel = va_fuel
 unfold let eval = eval_code
 
 [@va_qattr "opaque_to_smt"]
-let labeled_wrap (r:range) (msg:string) (p:Type0) = labeled r msg p
+let labeled_wrap (r:range) (msg:string) (p:Type0) : GTot Type0 = labeled r msg p
 
 // REVIEW: when used inside a function definition, 'labeled' can show up in an SMT query
 // as an uninterpreted function.  Make a wrapper around labeled that is interpreted:
 [@va_qattr "opaque_to_smt"]
-let label (r:range) (msg:string) (p:Type0) : Pure Type (requires True) (ensures fun q -> q <==> p) =
+let label (r:range) (msg:string) (p:Type0) : Ghost Type (requires True) (ensures fun q -> q <==> p) =
   assert_norm (labeled_wrap r msg p <==> p);
   labeled_wrap r msg p
 
@@ -27,7 +27,7 @@ val lemma_label_bool (r:range) (msg:string) (b:bool) : Lemma
   [SMTPat (label r msg b)]
 
 // wrap "precedes" and LexCons to avoid issues with label (precedes ...)
-let precedes_wrap (a:lex_t) (b:lex_t) = precedes a b
+let precedes_wrap (a:lex_t) (b:lex_t) : GTot Type0 = precedes a b
 let lexCons (#a:Type) (h:a) (t:lex_t) : lex_t = LexCons h t
 
 [@va_qattr]
