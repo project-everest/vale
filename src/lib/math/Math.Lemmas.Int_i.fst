@@ -90,6 +90,7 @@ let lemma_mod_add_distr (a:int) (b:int) (n:pos) =
 
 let lemma_mod_sub_distr (a:int) (b:int) (n:pos) =
   lemma_div_mod b n;
+  FStar.Math.Lemmas.distributivity_sub_left 0 (b / n) n;
   // (a - b) % n == (a - (b % n) - (b / n) * n) % n
   lemma_mod_plus (a - (b % n)) (-(b / n)) n
 
