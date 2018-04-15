@@ -41,6 +41,20 @@ let print_reg (r:reg) (p:printer) =
   | R15 -> "r15"
   )
 
+let print_reg32 (r:reg) (p:printer) =
+  p.reg_prefix() ^
+  (match r with
+  | Rax -> "eax"
+  | Rbx -> "ebx"
+  | Rcx -> "ecx"
+  | Rdx -> "edx"
+  | Rsi -> "esi"
+  | Rdi -> "edi"
+  | Rbp -> "ebp"
+  | Rsp -> "esp"
+  | _ -> print_reg r p ^ "d"
+  )
+
 let print_small_reg (r:reg) (p:printer) =
   p.reg_prefix() ^
   (match r with
@@ -70,6 +84,14 @@ let print_operand (o:operand) (p:printer) =
       else "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg r p
   | OMem m -> print_maddr m "qword" p
+
+let print_operand32 (o:operand) (p:printer) =
+  match o with
+  | OConst n ->
+      if 0 <= n && n < pow2_32 then p.const n
+      else "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
+  | OReg r -> print_reg32 r p
+  | OMem m -> print_maddr m "dword" p
 
 let print_small_operand (o:operand) (p:printer) =
   match o with
@@ -134,6 +156,10 @@ let print_ins (ins:ins) (p:printer) =
     let first, second = p.op_order (print_operand dst p) (print_xmm src) in
       first ^ ", " ^ second
   in 
+  let print_op32_xmm (dst:operand) (src:xmm) =
+    let first, second = p.op_order (print_operand32 dst p) (print_xmm src) in
+      first ^ ", " ^ second
+  in
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst) (print_xmm src) in
       first ^ ", " ^ second
@@ -181,7 +207,7 @@ let print_ins (ins:ins) (p:printer) =
   | AESNI_dec dst src      -> "  aesdec "     ^ print_xmms dst src
   | AESNI_dec_last dst src -> "  aesdeclast " ^ print_xmms dst src
   | AESNI_imc dst src      -> "  aesimc "     ^ print_xmms dst src
-  | AESNI_keygen_assist dst src imm -> "  aeskeygenassist" ^ print_pair (print_xmms dst src) (print_imm8 imm)
+  | AESNI_keygen_assist dst src imm -> "  aeskeygenassist " ^ print_pair (print_xmms dst src) (print_imm8 imm)
  
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =
