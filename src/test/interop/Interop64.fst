@@ -213,3 +213,163 @@ let frame_write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.l
 	assert (Seq.equal (B.as_seq mem b) (B.as_seq new_mem b))
       end
     in Classical.forall_intro aux
+
+let load_store_write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.length buf}) (mem:HS.mem{B.live mem buf}) : Lemma
+  (let new_mem = write_low_mem64 heap length addr buf mem in
+    forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index (B.as_seq new_mem buf) j) == get_heap_val (addr + j `op_Multiply` 8) heap) = ()
+
+let invariant_write_low_mem64 heap length addr (b:(B.buffer UInt64.t){length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
+  (requires (forall i. 0 <= i /\ i < B.length b ==> UInt64.v (Seq.index (B.as_seq mem b) i) == get_heap_val (addr + i `op_Multiply` 8) heap))
+  (ensures (mem == write_low_mem64 heap length addr b mem)) 
+  [SMTPat (mem == write_low_mem64 heap length addr b mem)]
+  =
+  let new_mem = write_low_mem64 heap length addr b mem in	  
+  let s = B.sel mem b in
+  let s' = B.sel new_mem b in
+  let lo_i = Seq.slice s 0 (B.idx b) in
+  let hi_i = Seq.slice s (B.idx b + length) (B.max_length b) in
+  let mi_create = create_seq64 heap length addr in
+  let s_app = Seq.append lo_i (Seq.append mi_create hi_i) in
+  assert (Seq.equal (HS.sel mem (B.content b)) s_app);
+  HS.lemma_heap_equality_upd_with_sel mem (B.content b);
+  ()
+
+let cancel_write_low_mem64 heap length addr (b:B.buffer UInt64.t{length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
+  (write_low_mem64 heap length addr b (write_low_mem64 heap length addr b mem) == write_low_mem64 heap length addr b mem) =
+  let s = B.sel mem b in
+  let modified = create_seq64 heap length addr in
+  let lo = Seq.slice s 0 (B.idx b) in
+  let hi = Seq.slice s (B.idx b + length) (B.max_length b) in
+  let s' = Seq.append lo (Seq.append modified hi) in
+  let mem1 = HS.upd mem (B.content b) s' in
+  let s1 = B.sel mem1 b in
+  let lo1 = Seq.slice s1 0 (B.idx b) in
+  let hi1 = Seq.slice s1 (B.idx b + length) (B.max_length b) in
+  assert (Seq.equal lo lo1);
+  assert (Seq.equal hi hi1);
+  HS.lemma_heap_equality_cancel_same_mref_upd mem (B.content b) s' s';
+  ()
+
+logic let correct_up_p64 (addrs:addr_map) new_mem heap p =
+  let length = B.length p in
+  let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+  (forall i.{:pattern (get_heap_val (addr + i `op_Multiply` 8) heap); (Seq.index (B.as_seq new_mem p) i)}  0 <= i /\ i < length ==> get_heap_val (addr + i `op_Multiply` 8) heap == UInt64.v (Seq.index (B.as_seq new_mem p) i))
+
+let correct_up64 (addrs:addr_map) ptrs new_mem heap =
+  forall p. List.memP p ptrs ==> correct_up_p64 addrs new_mem heap p
+
+let list_live mem ptrs = forall p . List.memP p ptrs ==> B.live mem p
+
+let correct_up_p64_cancel heap (addrs:addr_map) (p:B.buffer UInt64.t) (mem:HS.mem{B.live mem p}) : Lemma
+  (forall p'. p == p' ==>       
+      (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem64 heap length addr p mem in
+      correct_up_p64 addrs new_mem heap p')) = 
+  let rec aux (p':B.buffer UInt64.t) : Lemma 
+    (p == p'  ==> (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem64 heap length addr p mem in
+      correct_up_p64 addrs new_mem heap p')) =
+        let length = B.length p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_mem = write_low_mem64 heap length addr p mem in
+	load_store_write_low_mem64 heap length addr p mem
+  in
+  Classical.forall_intro aux
+
+let correct_up_p64_frame heap (addrs:addr_map) (p:B.buffer UInt64.t) (mem:HS.mem{B.live mem p}) : Lemma
+  (forall (p':B.buffer UInt64.t). B.live mem p' /\ B.disjoint p p' /\ correct_up_p64 addrs mem heap p' ==>       
+      (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem64 heap length addr p mem in
+      correct_up_p64 addrs new_mem heap p')) = 
+  let rec aux (p':B.buffer UInt64.t) : Lemma 
+    (B.live mem p' /\ B.disjoint p p' /\ correct_up_p64 addrs mem heap p' ==> (let length = B.length p in
+      let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+      let new_mem = write_low_mem64 heap length addr p mem in
+      correct_up_p64 addrs new_mem heap p')) =
+        let length = B.length p in
+        let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
+        let new_mem = write_low_mem64 heap length addr p mem in
+	frame_write_low_mem64 heap length addr p mem;
+	assert (B.live mem p' /\ B.disjoint p p' ==> B.equal mem p' new_mem p');
+	()
+  in
+  Classical.forall_intro aux
+
+val up_mem64: (heap:Vale_Sem.heap) -> (addrs:addr_map) -> (ptrs: list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) -> (mem:HS.mem{list_live mem ptrs}) -> GTot (new_mem:HS.mem{correct_up64 addrs ptrs new_mem heap})
+
+let rec up_mem64_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) (ps:list (B.buffer UInt64.t))
+    (accu: list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu}) 
+    (m:HS.mem{list_live m ps /\ list_live m accu /\ correct_up64 addrs accu m heap}) : GTot (new_mem:HS.mem{correct_up64 addrs ptrs new_mem heap}) = 
+  match ps with
+    | [] -> m
+    | a::q ->
+      let length = B.length a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_mem = write_low_mem64 heap length addr a m in
+      load_store_write_low_mem64 heap length addr a m;
+      correct_up_p64_cancel heap addrs a m;
+      correct_up_p64_frame heap addrs a m;
+      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
+      up_mem64_aux heap addrs ptrs q (a::accu) new_mem
+
+let up_mem64 heap addrs ptrs mem =  up_mem64_aux heap addrs ptrs ptrs [] mem
+
+
+let rec invariant_up_mem64_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) (ps:list (B.buffer UInt64.t))
+    (accu: list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu}) 
+    (m:HS.mem{list_live m ps /\ list_live m accu /\ correct_up64 addrs accu m heap}) : Lemma
+  (requires (forall b. List.memP b ptrs ==> (forall i. 0 <= i /\ i < B.length b ==> UInt64.v (Seq.index (B.as_seq m b) i) == get_heap_val (addrs.[(B.as_addr b, B.idx b, B.length b)] + i `op_Multiply` 8) heap)))
+  (ensures (m == up_mem64_aux heap addrs ptrs ps accu m)) 
+  [SMTPat (m == up_mem64_aux heap addrs ptrs ps accu m)] =
+  match ps with 
+    | [] -> ()
+    | a::q ->  
+      let length = B.length a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_mem = write_low_mem64 heap length addr a m in
+      invariant_write_low_mem64 heap length addr a m;
+      invariant_up_mem64_aux heap addrs ptrs q (a::accu) new_mem
+
+let rec liveness_up_mem64_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) (ps:list (B.buffer UInt64.t))
+    (accu: list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu}) 
+    (m:HS.mem{list_live m ps /\ list_live m accu /\ correct_up64 addrs accu m heap}) : Lemma
+  (forall #a (b:B.buffer a). B.live m b <==> B.live (up_mem64_aux heap addrs ptrs ps accu m) b) =
+  match ps with
+    | [] -> ()
+    | a::q ->
+      let length = B.length a in
+      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+      let new_mem = write_low_mem64 heap length addr a m in
+      load_store_write_low_mem64 heap length addr a m;
+      correct_up_p64_cancel heap addrs a m;
+      correct_up_p64_frame heap addrs a m;      
+      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);      
+      liveness_up_mem64_aux heap addrs ptrs q (a::accu) new_mem
+
+
+val down_up_identity64: (mem:HS.mem) -> (addrs:addr_map) -> (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs /\ list_live mem ptrs }) -> Lemma 
+  (let heap = down_mem64 mem addrs ptrs in 
+   let new_mem = up_mem64 heap addrs ptrs mem in
+    mem == new_mem)
+
+#set-options "--z3rlimit 200"
+
+let down_up_identity64 mem addrs ptrs =
+  let heap = down_mem64 mem addrs ptrs in 
+  let new_mem = up_mem64 heap addrs ptrs mem in
+  assert (forall (p:B.buffer UInt64.t{List.memP p ptrs}). correct_up_p64 addrs mem heap p);
+  assert (forall (p:B.buffer UInt64.t{List.memP p ptrs}). correct_up_p64 addrs new_mem heap p);
+  invariant_up_mem64_aux heap addrs ptrs ptrs [] mem;
+  ()
+
+val up_mem_liveness64: (heap:Vale_Sem.heap) -> (heap':Vale_Sem.heap) -> (addrs:addr_map) -> (ptrs: list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) -> (mem:HS.mem{list_live mem ptrs}) -> Lemma
+  (let mem1 = up_mem64 heap addrs ptrs mem in
+   let mem2 = up_mem64 heap' addrs ptrs mem in
+   forall (b:B.buffer UInt64.t). B.live mem1 b ==> B.live mem2 b)
+
+let up_mem_liveness64 heap heap' addrs ptrs mem = 
+  liveness_up_mem64_aux heap addrs ptrs ptrs [] mem;
+  liveness_up_mem64_aux heap' addrs ptrs ptrs [] mem
