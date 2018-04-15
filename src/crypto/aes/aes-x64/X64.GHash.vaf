@@ -50,7 +50,7 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 
 procedure{:quick} ReduceMul128_LE(ghost a:poly, ghost b:poly)
     modifies
-        efl;
+        efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
     requires
         degree(a) <= 127;
@@ -60,11 +60,11 @@ procedure{:quick} ReduceMul128_LE(ghost a:poly, ghost b:poly)
     ensures
         xmm1 == reverse_bytes_quad32(gf128_to_quad32(gf128_mul(a, b)));
 {
-    InitPshufbMask(xmm3);
+    InitPshufbMask(xmm3, r12);
     Pshufb(xmm1, xmm3);
     Pshufb(xmm2, xmm3);
     ReduceMulRev128(a, b);
-    InitPshufbMask(xmm3);
+    InitPshufbMask(xmm3, r12);
     Pshufb(xmm1, xmm3);
 }
 
@@ -86,7 +86,7 @@ procedure {:quick} compute_ghash_incremental(
         mem;
 
     modifies
-        rdx; r9;
+        rdx; r9; r12;
         io; efl;
 
         // ReduceMul128_LE touches almost everything
@@ -146,7 +146,7 @@ procedure {:quick} compute_ghash_incremental_register()
     reads
         h;
     modifies
-        io; efl;
+        io; efl; r12;
         xmm2; xmm3; xmm4; xmm5; xmm6;
     ensures
         io == ghash_incremental(h, old(io), create(1, old(input)));
@@ -170,7 +170,7 @@ procedure {:quick} ghash_core(
         mem;
 
     modifies
-        rdx; r9;
+        rdx; r9; r12;
         output; efl;
 
         // ReduceMul128_LE touches almost everything

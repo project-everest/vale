@@ -33,12 +33,12 @@ open X64.Vale.QuickCodes_i
 ///////////////////////////
 
 procedure {:quick} init_ctr()
-    modifies xmm4; efl;
+    modifies xmm4; efl; r12;
     ensures 
         xmm4 == Mkfour(1, 0, 0, 0);
 {
     Pxor(xmm4, xmm4);
-    Pinsrd(xmm4, 1, 0);
+    PinsrdImm(xmm4, 1, 0, r12);
 
     lemma_quad32_xor();
 }
@@ -63,7 +63,7 @@ procedure {:quick} gctr_register(
     lets io @= xmm1; icb_BE @= xmm7;
     reads r8; icb_BE; mem;
     modifies
-        xmm0; xmm1; xmm2; efl;
+        xmm0; xmm1; xmm2; efl; r12;
 
     requires
         // AES reqs
@@ -76,7 +76,7 @@ procedure {:quick} gctr_register(
         create(1, io) == gctr_encrypt_LE(icb_BE, create(1, old(io)), AES_128, key);
 {
     Mov128(xmm0, icb_BE);
-    InitPshufbMask(xmm2);
+    InitPshufbMask(xmm2, r12);
     Pshufb(xmm0, xmm2);
     AES128EncryptBlock(reverse_bytes_quad32(icb_BE), key, round_keys, keys_b);
 
@@ -100,7 +100,7 @@ procedure {:quick} gctr_core(
         r8; in_ptr; out_ptr; len;
 
     modifies
-        rdx; r9; r10; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
+        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
 
     requires
         // GCTR reqs
@@ -130,7 +130,7 @@ procedure {:quick} gctr_core(
     Mov64(r10, out_ptr);
 
     init_ctr();
-    InitPshufbMask(xmm1);
+    InitPshufbMask(xmm1, r12);
 
     while (rdx != len)
         invariant

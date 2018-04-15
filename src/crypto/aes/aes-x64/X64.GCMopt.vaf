@@ -65,7 +65,7 @@ procedure {:quick} gcm_one_pass(
         r8; in_ptr; out_ptr; len; h;
 
     modifies
-        rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; mask; one; mem; efl;
+        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; mask; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -103,9 +103,9 @@ procedure {:quick} gcm_one_pass(
 
     // Initialize counter
     ZeroXmm(one);
-    Pinsrd(one, 1, 0);
+    PinsrdImm(one, 1, 0, r12);
 
-    InitPshufbMask(mask);
+    InitPshufbMask(mask, r12);
 
     while (rdx != len)
         invariant
@@ -186,15 +186,15 @@ procedure {:quick} gcm_core(
     ghost keys_b:buffer128
     )
 
-    lets plain_ptr @= r12; out_ptr @= rbx; keys_ptr @= r8; auth_ptr @= r14;
+    lets plain_ptr @= r14; out_ptr @= rbx; keys_ptr @= r8; auth_ptr @= rax;
     plain_len @= r13; auth_len @= r11; 
     iv @= xmm7;
 
     reads
-        plain_ptr; out_ptr; keys_ptr; auth_ptr; plain_len; auth_len; 
+        out_ptr; plain_ptr; keys_ptr; plain_len; auth_len; 
 
     modifies
-        rax; rcx; rdx; r9; r10; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm8; xmm10; xmm11; iv;
+        rax; rcx; rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm8; xmm10; xmm11; iv;
         xmm6; 
         mem; efl; 
 
@@ -239,13 +239,13 @@ procedure {:quick} gcm_core(
 
     // let j0_BE = Mkfour 1 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
     // (inc32 j0 1)
-    InitPshufbMask(xmm0);
+    InitPshufbMask(xmm0, r12);
     Pshufb(iv, xmm0); // to big endian
-    Pinsrd(iv, 2, 0);
+    PinsrdImm(iv, 2, 0, r12);
     // assert iv == inc32(Mkfour(1, iv_BE.lo1, iv_BE.hi2, iv_BE.hi3), 1);
 
     // Compute the hashes incrementally, starting with auth data
-    Mov64(rax, auth_ptr);
+    //Mov64(rax, auth_ptr);
     Mov64(rcx, auth_len);
     ZeroXmm(xmm1);
     ghost var y_0 := Mkfour(0, 0, 0, 0);
@@ -268,7 +268,7 @@ procedure {:quick} gcm_core(
     Mov64(rax, auth_len);
     IMul64(rax, 128);
     Pinsrd(xmm2, rax, 2);
-    InitPshufbMask(xmm0);
+    InitPshufbMask(xmm0, r12);
     Pshufb(xmm2, xmm0);
 
     ghost var length_quad32 := xmm2;
@@ -284,7 +284,7 @@ procedure {:quick} gcm_core(
     // assert xmm1 == ghash_LE(h, append(buffer128_as_seq(mem, auth_b), append(buffer128_as_seq(mem, out_b), create(1, length_quad32)))); 
     ghost var hash := xmm1;
 
-    Pinsrd(iv, 1, 0);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo0)
+    PinsrdImm(iv, 1, 0, r12);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo0)
     // assert iv == iv_BE.(lo0 := 1);
 
     // Encrypt the hash value with gctr_register 
@@ -480,9 +480,9 @@ procedure {:quick} gcm_stdcall_inner(
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
         create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 {
-    Load64_buffer(r12, r9,  0, args_b, 0);
+    Load64_buffer(r14, r9,  0, args_b, 0);
     Load64_buffer(r13, r9,  8, args_b, 1);
-    Load64_buffer(r14, r9, 16, args_b, 2);
+    Load64_buffer(rax, r9, 16, args_b, 2);
     Load64_buffer(r11, r9, 24, args_b, 3);
     Load64_buffer(r10, r9, 32, args_b, 4);
     Load64_buffer(r8,  r9, 40, args_b, 5);
