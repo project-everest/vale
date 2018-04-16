@@ -62,10 +62,10 @@ procedure {:quick} gcm_one_pass(
     lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm7; mask @= xmm8; hash @= xmm1; one @= xmm10; h @= xmm11;
 
     reads
-        r8; in_ptr; out_ptr; len; h;
+        r8; in_ptr; out_ptr; len; mask; h;
 
     modifies
-        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; mask; one; mem; efl;
+        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -76,6 +76,7 @@ procedure {:quick} gcm_one_pass(
         in_ptr  + 16 * len < pow2_64;
         out_ptr + 16 * len < pow2_64;
         buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < pow2_32;
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         // AES reqs
         length(round_keys) == 11;
@@ -104,8 +105,6 @@ procedure {:quick} gcm_one_pass(
     // Initialize counter
     ZeroXmm(one);
     PinsrdImm(one, 1, 0, r12);
-
-    InitPshufbMask(mask, r12);
 
     while (rdx != len)
         invariant
@@ -187,14 +186,14 @@ procedure {:quick} gcm_core(
     )
 
     lets plain_ptr @= r14; out_ptr @= rbx; keys_ptr @= r8; auth_ptr @= rax;
-    plain_len @= r13; auth_len @= r11; 
+    plain_len @= r13; auth_len @= r11; mask @= xmm8;
     iv @= xmm7;
 
     reads
         out_ptr; plain_ptr; keys_ptr; plain_len; auth_len; 
 
     modifies
-        rax; rcx; rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm8; xmm10; xmm11; iv;
+        rax; rcx; rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
         mem; efl; 
 
@@ -239,8 +238,8 @@ procedure {:quick} gcm_core(
 
     // let j0_BE = Mkfour 1 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
     // (inc32 j0 1)
-    InitPshufbMask(xmm0, r12);
-    Pshufb(iv, xmm0); // to big endian
+    InitPshufbMask(xmm8, r12);
+    Pshufb(iv, xmm8); // to big endian
     PinsrdImm(iv, 2, 0, r12);
     // assert iv == inc32(Mkfour(1, iv_BE.lo1, iv_BE.hi2, iv_BE.hi3), 1);
 
@@ -268,8 +267,8 @@ procedure {:quick} gcm_core(
     Mov64(rax, auth_len);
     IMul64(rax, 128);
     Pinsrd(xmm2, rax, 2);
-    InitPshufbMask(xmm0, r12);
-    Pshufb(xmm2, xmm0);
+    //InitPshufbMask(xmm0, r12);
+    Pshufb(xmm2, xmm8);
 
     ghost var length_quad32 := xmm2;
 

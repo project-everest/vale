@@ -49,6 +49,8 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 ///////////////////////////
 
 procedure{:quick} ReduceMul128_LE(ghost a:poly, ghost b:poly)
+    lets mask @= xmm8;
+    reads mask;
     modifies
         efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -57,15 +59,14 @@ procedure{:quick} ReduceMul128_LE(ghost a:poly, ghost b:poly)
         degree(b) <= 127;
         xmm1 == reverse_bytes_quad32(gf128_to_quad32(a));
         xmm2 == reverse_bytes_quad32(gf128_to_quad32(b));
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
     ensures
         xmm1 == reverse_bytes_quad32(gf128_to_quad32(gf128_mul(a, b)));
 {
-    InitPshufbMask(xmm3, r12);
-    Pshufb(xmm1, xmm3);
-    Pshufb(xmm2, xmm3);
+    Pshufb(xmm1, mask);
+    Pshufb(xmm2, mask);
     ReduceMulRev128(a, b);
-    InitPshufbMask(xmm3, r12);
-    Pshufb(xmm1, xmm3);
+    Pshufb(xmm1, mask);
 }
 
 procedure {:quick} compute_Y0()
@@ -79,10 +80,9 @@ procedure {:quick} compute_Y0()
 procedure {:quick} compute_ghash_incremental(
     ghost in_b:buffer128
     )
-    lets in_ptr @= rax; len @= rcx; io @= xmm1; h @= xmm11;
-
+    lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11; 
     reads
-        in_ptr; len; h;
+        in_ptr; len; h; mask;
         mem;
 
     modifies
@@ -97,6 +97,7 @@ procedure {:quick} compute_ghash_incremental(
         len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);
         len > 0 ==> in_ptr  + 16 * len < pow2_64;
         len > 0 ==> buffer_length(in_b) == len;
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
     ensures
         len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
@@ -118,6 +119,7 @@ procedure {:quick} compute_ghash_incremental(
                 in_ptr  + 16 * len < pow2_64;
                 len > 0;
                 buffer_length(in_b) == len;
+                mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
                 //////////////////// Postcondition goals //////////////////////
                 rdx == 0 ==> io == old(io);
@@ -142,9 +144,10 @@ procedure {:quick} compute_ghash_incremental(
 
 
 procedure {:quick} compute_ghash_incremental_register()
-    lets input @= xmm2; io @= xmm1; h @= xmm11;
+    lets input @= xmm2; io @= xmm1; mask @= xmm8; h @= xmm11;
+    requires mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
     reads
-        h;
+        h; mask;
     modifies
         io; efl; r12;
         xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -163,10 +166,10 @@ procedure {:quick} compute_ghash_incremental_register()
 procedure {:quick} ghash_core(
     ghost in_b:buffer128
     )
-    lets in_ptr @= rax; len @= rcx; output @= xmm1; h @= xmm11;
+    lets in_ptr @= rax; len @= rcx; output @= xmm1; mask @= xmm8; h @= xmm11;
 
     reads
-        in_ptr; len; h;
+        in_ptr; len; h; mask;
         mem;
 
     modifies
@@ -180,6 +183,7 @@ procedure {:quick} ghash_core(
         len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);
         len > 0 ==> in_ptr  + 16 * len < pow2_64;
         len > 0 ==> buffer_length(in_b) == len;
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
     ensures
         len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ output == old(output);
