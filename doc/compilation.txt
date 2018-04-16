@@ -5,7 +5,7 @@
 #
 ########################################################
 
-scons --FSTAR-EXTRACT obj/ml_out/X64_GCM.ml
+scons --FSTAR-EXTRACT obj/ml_out/X64_GCMopt.ml
 cp src/crypto/aes/aes-x64/Main.ml     obj/ml_out/
 cp src/lib/util/CmdLineParser.ml      obj/ml_out/
 cp src/lib/util/FStar_Pointer_Base.ml obj/ml_out/
