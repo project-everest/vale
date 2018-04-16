@@ -10,10 +10,12 @@ cp src/crypto/aes/aes-x64/Main.ml     obj/ml_out/
 cp src/lib/util/CmdLineParser.ml      obj/ml_out/
 cp src/lib/util/FStar_Pointer_Base.ml obj/ml_out/
 
-Comment out labeled_wrap, label, and precedes_wrap from obj/ml_out/X64_Vale_QuickCodes_i.ml
-
 # Must be an absolute path
 cd obj/ml_out;  OCAMLPATH="/Users/parno/git/Fstar/bin" ocamlbuild -use-ocamlfind -pkg fstarlib Main.native
+
+./Main.native GCC Linux > aes.S
+
+gcc -c aes.S -o aes.o -maes
 
 ########################################################
 #

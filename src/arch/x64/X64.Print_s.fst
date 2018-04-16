@@ -20,9 +20,8 @@ noeq type printer = {
   ret        : string -> string;
 }
 
-let print_reg (r:reg) (p:printer) =
-  p.reg_prefix() ^
-  (match r with
+let print_reg_name (r:reg) =
+  match r with
   | Rax -> "rax"
   | Rbx -> "rbx"
   | Rcx -> "rcx"
@@ -39,7 +38,9 @@ let print_reg (r:reg) (p:printer) =
   | R13 -> "r13"
   | R14 -> "r14"
   | R15 -> "r15"
-  )
+  
+let print_reg (r:reg) (p:printer) =
+  p.reg_prefix() ^ print_reg_name r
 
 let print_reg32 (r:reg) (p:printer) =
   p.reg_prefix() ^
@@ -52,7 +53,7 @@ let print_reg32 (r:reg) (p:printer) =
   | Rdi -> "edi"
   | Rbp -> "ebp"
   | Rsp -> "esp"
-  | _ -> print_reg r p ^ "d"
+  | _ -> print_reg_name r ^ "d"
   )
 
 let print_small_reg (r:reg) (p:printer) =
@@ -65,14 +66,14 @@ let print_small_reg (r:reg) (p:printer) =
   | _ -> " !!! INVALID small operand !!!  Expected al, bl, cl, or dl."
   )
 
-let print_maddr (m:maddr) (ptr_type:string) (p:printer) =
+let print_maddr (m:maddr) (ptr_type:string) (reg_printer:reg->printer->string) (p:printer) =
   p.mem_prefix ptr_type ^
   (match m with
      | MConst n -> p.const n
-     | MReg r offset -> p.maddr (print_reg r p) None (string_of_int offset)
+     | MReg r offset -> p.maddr (reg_printer r p) None (string_of_int offset)
      | MIndex base scale index offset ->
-          p.maddr (print_reg base p)
-          (Some (string_of_int scale, print_reg index p))
+          p.maddr (reg_printer base p)
+          (Some (string_of_int scale, reg_printer index p))
           (string_of_int offset)
    )
 open FStar.UInt64
@@ -83,7 +84,7 @@ let print_operand (o:operand) (p:printer) =
       if 0 <= n && n < pow2_64 then p.const n
       else "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg r p
-  | OMem m -> print_maddr m "qword" p
+  | OMem m -> print_maddr m "qword" print_reg p
 
 let print_operand32 (o:operand) (p:printer) =
   match o with
@@ -91,7 +92,7 @@ let print_operand32 (o:operand) (p:printer) =
       if 0 <= n && n < pow2_32 then p.const n
       else "!!! INVALID constant: " ^ string_of_int n ^ " !!!"
   | OReg r -> print_reg32 r p
-  | OMem m -> print_maddr m "dword" p
+  | OMem m -> print_maddr m "dword" print_reg32 p
 
 let print_small_operand (o:operand) (p:printer) =
   match o with
@@ -101,16 +102,16 @@ let print_small_operand (o:operand) (p:printer) =
   | OReg r -> print_small_reg r p
   | _ -> "!!! INVALID small operand !!! Expected al, bl, cl, or dl."
 
-let print_imm8 (i:imm8) =
-  string_of_int i
+let print_imm8 (i:int) (p:printer) =
+  p.const i
 
-let print_xmm (x:xmm) =
-  "xmm" ^ string_of_int x
+let print_xmm (x:xmm) (p:printer) =
+  p.reg_prefix() ^ "xmm" ^ string_of_int x
 
 let print_mov128_op (o:mov128_op) (p:printer) =
   match o with
-  | Mov128Xmm x -> print_xmm x
-  | Mov128Mem m -> print_maddr m "xmmword" p
+  | Mov128Xmm x -> print_xmm x p
+  | Mov128Mem m -> print_maddr m "xmmword" print_reg p
 
 assume val print_any: 'a -> string
 
@@ -149,19 +150,19 @@ let print_ins (ins:ins) (p:printer) =
     print_op_pair dst amount print_operand print_shift_operand
   in
   let print_xmm_op (dst:xmm) (src:operand) =
-    let first, second = p.op_order (print_xmm dst) (print_operand src p) in
+    let first, second = p.op_order (print_xmm dst p) (print_operand src p) in
       first ^ ", " ^ second
   in 
-  let print_op_xmm (dst:operand) (src:xmm) =
-    let first, second = p.op_order (print_operand dst p) (print_xmm src) in
-      first ^ ", " ^ second
-  in 
-  let print_op32_xmm (dst:operand) (src:xmm) =
-    let first, second = p.op_order (print_operand32 dst p) (print_xmm src) in
+  let print_xmm_op32 (dst:xmm) (src:operand) =
+    let first, second = p.op_order (print_xmm dst p) (print_operand32 src p) in
       first ^ ", " ^ second
   in
+  let print_op_xmm (dst:operand) (src:xmm) =
+    let first, second = p.op_order (print_operand dst p) (print_xmm src p) in
+      first ^ ", " ^ second
+  in 
   let print_xmms (dst:xmm) (src:xmm) =
-    let first, second = p.op_order (print_xmm dst) (print_xmm src) in
+    let first, second = p.op_order (print_xmm dst p) (print_xmm src p) in
       first ^ ", " ^ second
   in  
   match ins with
@@ -192,22 +193,22 @@ let print_ins (ins:ins) (p:printer) =
   | Pop dst       -> p.ins_name "  pop"  [dst] ^ print_operand dst p
   | Paddd dst src          -> "  paddd "      ^ print_xmms dst src
   | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
-  | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst) (string_of_int amt)
-  | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst) (string_of_int amt)
+  | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst p) (string_of_int amt)
+  | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst p) (string_of_int amt)
   | Pshufb dst src         -> "  pshufb "     ^ print_xmms dst src
-  | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count)
-  | Pextrq dst src index   -> "  pextrq "     ^ print_pair (print_op_xmm dst src) (print_imm8 index)
-  | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op dst src) (print_imm8 index)
-  | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index)
-  | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count)
+  | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count p)
+  | Pextrq dst src index   -> "  pextrq "     ^ print_pair (print_op_xmm dst src) (print_imm8 index p)
+  | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op32 dst src) (print_imm8 index p)
+  | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index p)
+  | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count p)
   | MOVDQU dst src         -> "  movdqu "     ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
-  | Pclmulqdq dst src imm  -> "  pclmulqdq "  ^ print_pair (print_xmms dst src) (string_of_int imm)
+  | Pclmulqdq dst src imm  -> "  pclmulqdq "  ^ print_pair (print_xmms dst src) (print_imm8 imm p)
   | AESNI_enc dst src      -> "  aesenc "     ^ print_xmms dst src
   | AESNI_enc_last dst src -> "  aesenclast " ^ print_xmms dst src
   | AESNI_dec dst src      -> "  aesdec "     ^ print_xmms dst src
   | AESNI_dec_last dst src -> "  aesdeclast " ^ print_xmms dst src
   | AESNI_imc dst src      -> "  aesimc "     ^ print_xmms dst src
-  | AESNI_keygen_assist dst src imm -> "  aeskeygenassist " ^ print_pair (print_xmms dst src) (print_imm8 imm)
+  | AESNI_keygen_assist dst src imm -> "  aeskeygenassist " ^ print_pair (print_xmms dst src) (print_imm8 imm p)
  
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =
