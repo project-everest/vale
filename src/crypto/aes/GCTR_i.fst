@@ -7,7 +7,36 @@ open FStar.Seq
 open AES_s
 open GCTR_s 
 open FStar.Math.Lemmas
+open Collections.Seqs_i
 
+let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
+  Tot (s':seq b { length s' == length s /\
+                  (forall j . {:pattern index s' j} 0 <= j /\ j < length s ==> index s' j == f (i + j) (index s j))
+                }) 
+      (decreases (length s))
+  =
+  if length s = 0 then createEmpty
+  else cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
+
+let rec test (icb_BE:quad32) (plain_LE:gctr_plain_internal_LE) 
+	 (alg:algorithm) (key:aes_key_LE alg) (i:int) :
+  Lemma (ensures
+     (let gctr_encrypt_block_curried (j:int) (p:quad32) = gctr_encrypt_block icb_BE p alg key j in
+     
+      gctr_encrypt_recursive icb_BE plain_LE alg key i == seq_map_i_indexed' gctr_encrypt_block_curried plain_LE i)) 
+     (decreases (length plain_LE))
+  = 
+  let gctr_encrypt_block_curried (j:int) (p:quad32) = gctr_encrypt_block icb_BE p alg key j in
+  let g = gctr_encrypt_recursive icb_BE plain_LE alg key i in
+  let s = seq_map_i_indexed' gctr_encrypt_block_curried plain_LE i in
+  if length plain_LE = 0 then (
+    assert(equal (g) (s));
+    ()
+  ) else (
+    test icb_BE (tail plain_LE) alg key (i+1);
+    assert (gctr_encrypt_recursive icb_BE (tail plain_LE) alg key (i+1) == seq_map_i_indexed' gctr_encrypt_block_curried (tail plain_LE) (i+1))
+  )
+  
 let aes_encrypt_BE (alg:algorithm) (key:aes_key_LE alg) (p_BE:quad32) =
   let p_LE = reverse_bytes_quad32 p_BE in
   aes_encrypt_LE alg key p_LE
