@@ -9,6 +9,7 @@ open GCTR_s
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
+(*
 let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
   Tot (s':seq b { length s' == length s /\
                   (forall j . {:pattern index s' j} 0 <= j /\ j < length s ==> index s' j == f (i + j) (index s j))
@@ -36,7 +37,8 @@ let rec test (icb_BE:quad32) (plain_LE:gctr_plain_internal_LE)
     test icb_BE (tail plain_LE) alg key (i+1);
     assert (gctr_encrypt_recursive icb_BE (tail plain_LE) alg key (i+1) == seq_map_i_indexed' gctr_encrypt_block_curried (tail plain_LE) (i+1))
   )
-  
+*)
+
 let aes_encrypt_BE (alg:algorithm) (key:aes_key_LE alg) (p_BE:quad32) =
   let p_LE = reverse_bytes_quad32 p_BE in
   aes_encrypt_LE alg key p_LE
@@ -46,7 +48,7 @@ logic let gctr_partial (bound:nat) (plain cipher:seq quad32) (key:aes_key_LE AES
   forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==>
     index cipher j == quad32_xor (index plain j) (aes_encrypt_BE AES_128 key (inc32 icb j))
   
-let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_LE)
+let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE)
                                       (alg:algorithm) (key:aes_key_LE alg) (i:int) : Lemma
   (requires True)
   (ensures length (gctr_encrypt_recursive icb plain alg key i) == length plain)
@@ -56,12 +58,20 @@ let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_LE)
   if length plain = 0 then ()
   else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
                           
-let rec gctr_encrypt_length (icb:quad32) (plain:seq quad32 { 256 * length plain < pow2_32 })
+let rec gctr_encrypt_length (icb:quad32) (plain:gctr_plain_LE)
                              (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(length (gctr_encrypt_LE icb plain alg key) == length plain)
   [SMTPat (length (gctr_encrypt_LE icb plain alg key))]
   =
-  gctr_encrypt_recursive_length icb plain alg key 0
+  let nExtra = (length plain) % 16 in
+  if nExtra = 0 then (
+    let plain_quads_LE = le_bytes_to_seq_quad32 plain in
+    gctr_encrypt_recursive_length icb plain_quads_LE alg key 0
+  ) else ( 
+    let padded_plain = pad_to_128_bits plain in
+    let plain_quads_LE = le_bytes_to_seq_quad32 padded_plain in
+    gctr_encrypt_recursive_length icb plain_quads_LE alg key 0
+  )
 
 #reset-options "--use_two_phase_tc true" // Needed so that indexing cipher and plain knows that their lengths are equal
 let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain_LE)
