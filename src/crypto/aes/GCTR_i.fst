@@ -74,7 +74,7 @@ let rec gctr_encrypt_length (icb:quad32) (plain:gctr_plain_LE)
   )
 
 #reset-options "--use_two_phase_tc true" // Needed so that indexing cipher and plain knows that their lengths are equal
-let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain_LE)
+let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain_internal_LE)
                             (alg:algorithm) (key:aes_key_LE alg) (i:int) : Lemma
   (requires True)
   (ensures (let cipher = gctr_encrypt_recursive icb plain alg key i in
@@ -98,12 +98,12 @@ let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain_LE)
       in
       FStar.Classical.forall_intro helper
 
-let rec gctr_indexed (icb:quad32) (plain:gctr_plain_LE)
+let rec gctr_indexed (icb:quad32) (plain:gctr_plain_internal_LE)
                      (alg:algorithm) (key:aes_key_LE alg) (cipher:seq quad32) : Lemma
   (requires  length cipher == length plain /\
              (forall i . {:pattern index cipher i} 0 <= i /\ i < length cipher ==>
              index cipher i == quad32_xor (index plain i) (aes_encrypt_BE alg key (inc32 icb i) )))
-  (ensures  cipher == gctr_encrypt_LE icb plain alg key)
+  (ensures  cipher == gctr_encrypt_recursive icb plain alg key 0)
 =
   gctr_indexed_helper icb plain alg key 0;
   let c = gctr_encrypt_recursive icb plain alg key 0 in
@@ -114,22 +114,28 @@ let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key_LE AES_128) (i
   (requires length plain == length cipher /\
             256 * (length plain) < pow2_32 /\
             gctr_partial (length cipher) plain cipher key icb)
-  (ensures cipher == gctr_encrypt_LE icb plain AES_128 key)
+  (ensures cipher == gctr_encrypt_recursive icb plain AES_128 key 0)
   =
   gctr_indexed icb plain AES_128 key cipher;
   ()
 
 let gctr_encrypt_one_block (icb plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
-  Lemma(gctr_encrypt_LE icb (create 1 plain) alg key =
-        (create 1 (quad32_xor plain (aes_encrypt_BE alg key icb)))) =
+  Lemma(gctr_encrypt_LE icb (le_quad32_to_bytes plain) alg key =
+        le_seq_quad32_to_bytes (create 1 (quad32_xor plain (aes_encrypt_BE alg key icb)))) =
   //assert(inc32 icb 0 == icb);
   let encrypted_icb = aes_encrypt_BE alg key icb in
-  let p = create 1 plain in
+  let p = le_quad32_bytes plain in
+  let p_seq = create 1 plain in
+
+  assert (length p == 16);
+  assert (equal (le_bytes_to_seq_quad32 p) p_seq);
+  admit()
+  
   //assert(length p == 1);
   //assert(tail p == createEmpty);
   //assert(length (tail p) == 0);
   //assert(head p == plain);
-  assert(gctr_encrypt_recursive icb (tail p) alg key 1 == createEmpty);   // OBSERVE
+  assert(gctr_encrypt_recursive icb (tail p_seq) alg key 1 == createEmpty);   // OBSERVE
   //assert(gctr_encrypt_LE icb p alg key == cons (quad32_xor plain encrypted_icb) createEmpty);
   let x = quad32_xor plain encrypted_icb in
   append_empty_r (create 1 x);                 // This is the missing piece

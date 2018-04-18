@@ -29,3 +29,13 @@ val seq_map_i (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) :
 val seq_map_internal_associative (#a:Type) (#b:eqtype) (f:int->a->b) (s:seq a) (pivot:int{0 <= pivot /\ pivot < length s}) :
   Lemma (let left,right = split s pivot in
          seq_map_i f s == seq_map_i_indexed f left 0 @| seq_map_i_indexed f right pivot )
+
+let seq_map_inverses (#a #b:Type) (f:a -> b) (g:b -> a) (s:seq a) : Lemma
+  (requires forall x . g (f x) == x)
+  (ensures seq_map g (seq_map f s) == s)
+  =
+  let mid = seq_map f s in
+  let final = seq_map g mid in
+  assert (equal s final);
+  ()
+  

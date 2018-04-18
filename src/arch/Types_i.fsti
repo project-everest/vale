@@ -6,6 +6,7 @@ open Collections.Seqs_i
 open Words_s
 open Words.Four_s
 open Words.Seq_s
+open Words.Seq_i
 open FStar.Seq
 open Words.Two_s
 
@@ -56,3 +57,18 @@ let hi64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 1)
 val push_pop_xmm (x y:quad32) : Lemma 
   (let x' = insert_nat64 (insert_nat64 y (hi64 x) 1) (lo64 x) 0 in
    x == x')
+
+#reset-options "--z3rlimit 50"
+let le_bytes_to_seq_quad32_to_bytes (b:quad32) :
+  Lemma (le_bytes_to_seq_quad32 (le_quad32_to_bytes b) = create 1 b)
+  =
+  let s4 = seq_map (nat_to_four 8) (four_to_seq_LE b) in
+  let s4wrapped = seq_to_seq_four_LE (seq_four_to_seq_LE s4) in
+  assert (s4wrapped == s4);
+  seq_map_inverses (nat_to_four 8) (four_to_nat 8) (four_to_seq_LE b);
+//  admit()
+  seq_to_seq_four_to_seq_LE (create 1 b);
+  //admit();
+  assert (seq_to_seq_four_LE (
+             (four_to_seq_LE b)) == create 1 b);
+  admit()
