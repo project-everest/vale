@@ -100,8 +100,8 @@ procedure {:quick} compute_ghash_incremental(
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
     ensures
-        len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
-        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ io == ghash_incremental(h, old(io), buffer128_as_seq(mem, in_b));
+//        len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
+//        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ io == ghash_incremental(h, old(io), buffer128_as_seq(mem, in_b));
 {
     if (len != 0) {
         Mov64(rdx, 0);
@@ -123,7 +123,7 @@ procedure {:quick} compute_ghash_incremental(
                 mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
                 //////////////////// Postcondition goals //////////////////////
-                rdx == 0 ==> io == old(io);
+                rdx == 0 ==> io == reverse_bytes_quad32(old(io));
                 rdx > 0 ==> reverse_bytes_quad32(io) == ghash_incremental(h, old(reverse_bytes_quad32(io)), slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
 
             decreases
