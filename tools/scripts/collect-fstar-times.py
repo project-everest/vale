@@ -12,7 +12,7 @@ from prettytable import PrettyTable # Install via: easy_install PrettyTable
 
 def find_fstar_output_files(directory):
     matches = []
-    extensions = ["vfsti", "vfst"]
+    extensions = ["fsti.verified", "fst.verified"]
 
     # Based on: https://stackoverflow.com/a/2186565
     for root, dirnames, filenames in os.walk(directory):
@@ -108,7 +108,7 @@ def display_diffs(times, diffs):
             delta = diffs[f]
             delta_percent = "%0.1f" % (delta / float(times[f]) * 100)
         tab.add_row([filename, times[f], delta, delta_percent, f])
-        if not times[f] is None:
+        if (not times[f] is None) and f in diffs:
             total_time += times[f]
             total_delta += delta
     
