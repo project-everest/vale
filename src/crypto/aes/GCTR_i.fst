@@ -58,7 +58,8 @@ let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE
   =
   if length plain = 0 then ()
   else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
-                          
+
+#reset-options "--z3rlimit 10"  // Oddly, this is needed on the commandline, but not in interactive mode
 let rec gctr_encrypt_length (icb:quad32) (plain:gctr_plain_LE)
                              (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(length (gctr_encrypt_LE icb plain alg key) == length plain)
@@ -73,6 +74,7 @@ let rec gctr_encrypt_length (icb:quad32) (plain:gctr_plain_LE)
     let plain_quads_LE = le_bytes_to_seq_quad32 padded_plain in
     gctr_encrypt_recursive_length icb plain_quads_LE alg key 0
   )
+#reset-options
 
 #reset-options "--use_two_phase_tc true" // Needed so that indexing cipher and plain knows that their lengths are equal
 let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain_internal_LE)
