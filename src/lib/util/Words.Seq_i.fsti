@@ -56,3 +56,26 @@ let four_to_nat_to_four_8 (x:natN (pow2_norm 32)) :
   assert_norm (four_to_nat 8 fourX == int_to_natN n4 (x0 + x1 * n1 + x2 * n2 + x3 * n3));  
   lemma_fundamental_div_mod_4 x;
   ()
+
+(*
+let seq_four_to_seq_LE (#a:Type) (x:seq (four a)) : seq a =
+  let f (n:nat{n < length x * 4}) = four_select (index x (n / 4)) (n % 4) in
+  init (length x * 4) f
+
+val four_to_seq_LE (#a:Type) (x:four a) : Pure (seq4 a)
+  (requires True)
+  (ensures fun s ->
+    index s 0 == x.lo0 /\
+    index s 1 == x.lo1 /\
+    index s 2 == x.hi2 /\
+    index s 3 == x.hi3
+  )
+*)
+
+let four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) : 
+  Lemma (four_to_seq_LE x == seq_four_to_seq_LE (create 1 x))
+  =
+  let s0 = four_to_seq_LE x  in
+  let s1 = seq_four_to_seq_LE (create 1 x) in
+  assert (equal s0 s1);
+  ()
