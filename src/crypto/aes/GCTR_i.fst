@@ -2,6 +2,7 @@ module GCTR_i
 
 open Words_s
 open Types_s
+open Types_i
 open FStar.Mul
 open FStar.Seq
 open AES_s
@@ -119,26 +120,34 @@ let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key_LE AES_128) (i
   gctr_indexed icb plain AES_128 key cipher;
   ()
 
-let gctr_encrypt_one_block (icb plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
-  Lemma(gctr_encrypt_LE icb (le_quad32_to_bytes plain) alg key =
-        le_seq_quad32_to_bytes (create 1 (quad32_xor plain (aes_encrypt_BE alg key icb)))) =
-  //assert(inc32 icb 0 == icb);
-  let encrypted_icb = aes_encrypt_BE alg key icb in
-  let p = le_quad32_bytes plain in
+let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
+  Lemma(gctr_encrypt_LE icb_BE (le_quad32_to_bytes plain) alg key =
+        le_seq_quad32_to_bytes (create 1 (quad32_xor plain (aes_encrypt_BE alg key icb_BE)))) =
+  assert(inc32 icb_BE 0 == icb_BE);
+  let encrypted_icb = aes_encrypt_BE alg key icb_BE in
+  let p = le_quad32_to_bytes plain in
+  let plain_quads_LE = le_bytes_to_seq_quad32 p in
   let p_seq = create 1 plain in
-
   assert (length p == 16);
-  assert (equal (le_bytes_to_seq_quad32 p) p_seq);
-  admit()
-  
-  //assert(length p == 1);
-  //assert(tail p == createEmpty);
-  //assert(length (tail p) == 0);
-  //assert(head p == plain);
-  assert(gctr_encrypt_recursive icb (tail p_seq) alg key 1 == createEmpty);   // OBSERVE
+  le_bytes_to_seq_quad32_to_bytes plain;
+  assert (p_seq == plain_quads_LE);
+  let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in  
+  assert (cipher_quads_LE == cons (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0) (gctr_encrypt_recursive icb_BE (tail plain_quads_LE) alg key (1)));
+  assert (head plain_quads_LE == plain);
+
+  assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == 
+          (let icb_LE = reverse_bytes_quad32 (inc32 icb_BE 0) in
+           quad32_xor (head plain_quads_LE) (aes_encrypt_LE alg key icb_LE)));
+  assert (quad32_xor plain (aes_encrypt_LE alg key (reverse_bytes_quad32 icb_BE))
+          ==
+          (let icb_LE = reverse_bytes_quad32 (inc32 icb_BE 0) in
+           quad32_xor (head plain_quads_LE) (aes_encrypt_LE alg key icb_LE)));
+  assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == quad32_xor plain (aes_encrypt_LE alg key (reverse_bytes_quad32 icb_BE)));
+  assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == quad32_xor plain (aes_encrypt_BE alg key icb_BE));
+  assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == quad32_xor plain encrypted_icb);
+  assert(gctr_encrypt_recursive icb_BE (tail p_seq) alg key 1 == createEmpty);   // OBSERVE
   //assert(gctr_encrypt_LE icb p alg key == cons (quad32_xor plain encrypted_icb) createEmpty);
   let x = quad32_xor plain encrypted_icb in
   append_empty_r (create 1 x);                 // This is the missing piece
-  //assert(cons x createEmpty == create 1 x);
   ()
-  
+ 

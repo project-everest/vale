@@ -24,14 +24,16 @@ let reverse_reverse_seq (#a:Type) (s:seq a) :
   =
   assert (equal (reverse_seq (reverse_seq s)) s)
 
+
 let rec seq_map_i_indexed (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
   Tot (s':seq b { length s' == length s /\
                   (forall j . {:pattern index s' j} 0 <= j /\ j < length s ==> index s' j == f (i + j) (index s j))
-                }) 
-      (decreases (length s))
+                })
+      (decreases %[(length s)])
   =
   if length s = 0 then createEmpty
-  else cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
+  else 
+     cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
 
 let seq_map_i (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) : 
   Tot (s':seq b { length s' == length s /\
@@ -49,4 +51,13 @@ let seq_map_internal_associative (#a:Type) (#b:eqtype) (f:int->a->b) (s:seq a) (
   let part1 = seq_map_i_indexed f left 0 in
   let part2 = seq_map_i_indexed f right pivot in
   assert (equal (seq_map_i f s) (seq_map_i_indexed f left 0 @| seq_map_i_indexed f right pivot));
+  ()
+
+let seq_map_inverses (#a #b:Type) (f:a -> b) (g:b -> a) (s:seq a) : Lemma
+  (requires forall x . g (f x) == x)
+  (ensures seq_map g (seq_map f s) == s)
+  =
+  let mid = seq_map f s in
+  let final = seq_map g mid in
+  assert (equal s final);
   ()
