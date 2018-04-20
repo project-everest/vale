@@ -8,6 +8,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
@@ -108,6 +109,7 @@ let build_decls (env:env) (ds:((loc * decl) * bool) list):decls =
         in
       List.map omitUnverified ds
     else ds
+  let ds = tc_decls ds in
   let (env, dss) = List_mapFoldFlip build_decl env ds in
   List.concat dss
 

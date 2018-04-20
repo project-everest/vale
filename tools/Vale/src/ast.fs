@@ -6,9 +6,14 @@ type loc = {loc_file:string; loc_line:int; loc_col:int; loc_pos:int}
 
 type id = Id of string | Reserved of string | Operator of string
 
+type bnd = Int of bigint | NegInf | Inf
 type typ =
 | TName of id
 | TApp of typ * typ list
+| TVar of id
+| TInt of bnd * bnd
+| TArrow of typ * typ
+// TODO: polytype and kind
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
@@ -68,6 +73,8 @@ type exp =
 | EOp of op * exp list
 | EApply of id * exp list
 | EBind of bindOp * exp list * formal list * triggers * exp
+| ECast of exp * typ
+
 and triggers = exp list list
 
 type attr = id * exp list
@@ -177,3 +184,13 @@ type include_decl = {inc_loc:loc; inc_attrs:attrs; inc_path:string}
 
 let expAt (l:loc) (e:exp):exp = ELoc (l, e)
 let stmtAt (l:loc) (s:stmt):stmt list = [SLoc (l, s)]
+
+type id_local = {local_in_param:bool; local_exp:exp; local_typ:typ option} // In parameters are read-only and refer to old(state)
+type id_info =
+| GhostLocal of mutability * typ option
+| ProcLocal of id_local
+| ThreadLocal of id_local
+| InlineLocal of typ option
+| OperandLocal of inout * typ
+| StateInfo of string * exp list * typ
+| OperandAlias of id * id_info
