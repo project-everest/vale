@@ -73,7 +73,7 @@ procedure {:quick} gctr_register(
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
-        create(1, io) == gctr_encrypt_LE(icb_BE, create(1, old(io)), AES_128, key);
+        le_seq_quad32_to_bytes(create(1, io)) == gctr_encrypt_LE(icb_BE, le_quad32_to_bytes(old(io)), AES_128, key);
 {
     Mov128(xmm0, icb_BE);
     InitPshufbMask(xmm2, r12);
@@ -86,7 +86,7 @@ procedure {:quick} gctr_register(
     gctr_encrypt_one_block(icb_BE, old(io), AES_128, key);
 }
 
-procedure {:quick} gctr_core(
+procedure {:quick} {:verify true} gctr_core(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -122,7 +122,7 @@ procedure {:quick} gctr_core(
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
-        buffer128_as_seq(mem, out_b) == gctr_encrypt_LE(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key);
+        buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
         icb == icb_BE.(lo0 := icb.lo0);
 {
     Mov64(rdx, 0);
