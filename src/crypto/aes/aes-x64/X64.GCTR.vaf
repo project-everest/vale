@@ -14,6 +14,7 @@ open AES_s
 open X64.AES
 open GCTR_s
 open GCTR_i
+open X64.Poly1305.Math_i
 open Words.Two_s
 open X64.Machine_s
 open X64.Vale.State_i
@@ -86,7 +87,7 @@ procedure {:quick} gctr_register(
     gctr_encrypt_one_block(icb_BE, old(io), AES_128, key);
 }
 
-procedure {:quick} {:verify true} gctr_core(
+procedure {:quick} gctr_core(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -111,7 +112,7 @@ procedure {:quick} {:verify true} gctr_core(
         validDstAddrs128(mem, out_ptr, out_b, len);
         in_ptr  + 16 * len < pow2_64;
         out_ptr + 16 * len < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -122,7 +123,9 @@ procedure {:quick} {:verify true} gctr_core(
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
-        buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+        //buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+        gctr_partial(len, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+
         icb == icb_BE.(lo0 := icb.lo0);
 {
     Mov64(rdx, 0);
@@ -185,6 +188,66 @@ procedure {:quick} {:verify true} gctr_core(
         inc32(icb, xmm4);
     }
 
-    // Call a helpful lemma
-    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+//    // Call a helpful lemma
+//    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+}
+
+
+procedure {:quick} gctr_bytes(
+    ghost icb_BE:quad32,
+    ghost in_b:buffer128,
+    ghost out_b:buffer128,
+    ghost key:aes_key_LE(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128
+    )
+    lets in_ptr @= rax; out_ptr @= rbx; num_bytes @= rcx; icb @= xmm7;
+
+    reads
+        r8; in_ptr; out_ptr; 
+
+    modifies
+        rdx; num_bytes; r9; r10; r11; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
+
+    requires
+        // GCTR reqs
+        icb == icb_BE;
+        buffers_disjoint128(in_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
+        validSrcAddrs128(mem, in_ptr, in_b, bytes_to_quad_size(num_bytes));
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+        in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32;
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys_LE(AES_128, key);
+        r8 == buffer_addr(keys_b);
+        validSrcAddrs128(mem, r8, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
+    ensures
+//        modifies_buffer128(out_b, old(mem), mem);
+//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+//        buffer128_as_seq(mem, out_b) == gctr_encrypt(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+//        icb == icb_BE.(lo0 := icb.lo0);
+{
+    lemma_poly_bits64();
+    Mov64(r11, num_bytes);
+    And64(r11, 15);
+    assert r11 == num_bytes % 16;
+    Shr64(num_bytes, 4);
+    assert num_bytes == old(num_bytes) / 16;
+
+    gctr_core(icb_BE, in_b, out_b, key, round_keys, keys_b);
+
+    if (r11 == 0) {
+        gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+        assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+        le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
+        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt(icb_BE, le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b)), AES_128, key);
+    } else {
+
+    }
+
 }

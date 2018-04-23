@@ -69,7 +69,7 @@ let push_pop_xmm (x y:quad32) : Lemma
 
 
 #reset-options "--z3rlimit 10 --max_fuel 0 --max_ifuel 0 --using_facts_from '* -FStar.Seq.Properties'"
-let le_bytes_to_seq_quad32_to_bytes (b:quad32) :
+let le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
   Lemma (le_bytes_to_seq_quad32 (le_quad32_to_bytes b) == create 1 b)
 (* This expands into showing:
    le_bytes_to_seq_quad32 (le_quad32_to_bytes b)
@@ -146,3 +146,23 @@ let le_bytes_to_seq_quad32_to_bytes (b:quad32) :
   admit();
   ()
 *)
+
+
+let le_bytes_to_seq_quad32_to_bytes (s:seq quad32) :
+  Lemma (le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes s) == s)
+(* This expands into showing:
+   le_bytes_to_seq_quad32 (le_quad32_to_bytes s)
+ == { definition of le_bytes_to_seq_quad32 }
+   seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE (le_seq_quad32_to_bytes s))
+ == { definition of le_seq_quad32_to_bytes }
+   seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE (seq_nat32_to_seq_nat8_LE (seq_four_to_seq_LE s)))
+ == { definition of seq_nat8_to_seq_nat32_LE }
+   seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE (seq_nat32_to_seq_nat8_LE (seq_four_to_seq_LE s))))
+ == { definition of seq_nat32_to_seq_nat8_LE }
+    seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE (seq_four_to_seq_LE (seq_map (nat_to_four 8) (seq_four_to_seq_LE s)))))
+ *)
+  =
+  seq_to_seq_four_to_seq_LE (seq_map (nat_to_four 8) (seq_four_to_seq_LE s));
+  seq_map_inverses (nat_to_four 8) (four_to_nat 8) (seq_four_to_seq_LE s);
+  seq_to_seq_four_to_seq_LE (s) ;
+  ()

@@ -58,5 +58,8 @@ val push_pop_xmm (x y:quad32) : Lemma
   (let x' = insert_nat64 (insert_nat64 y (hi64 x) 1) (lo64 x) 0 in
    x == x')
 
-val le_bytes_to_seq_quad32_to_bytes (b:quad32) :
+val le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
   Lemma (le_bytes_to_seq_quad32 (le_quad32_to_bytes b) == create 1 b)
+  
+val le_bytes_to_seq_quad32_to_bytes (s:seq quad32) :
+  Lemma (le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes s) == s)

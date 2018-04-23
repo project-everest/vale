@@ -10,6 +10,9 @@ open GCTR_s
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
+let bytes_to_quad_size (num_bytes:nat) =
+    ((num_bytes + 15) / 16)
+
 (*
 let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
   Tot (s':seq b { length s' == length s /\
@@ -131,7 +134,7 @@ let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE
   let plain_quads_LE = le_bytes_to_seq_quad32 p in
   let p_seq = create 1 plain in
   assert (length p == 16);
-  le_bytes_to_seq_quad32_to_bytes plain;
+  le_bytes_to_seq_quad32_to_bytes_one_quad plain;
   assert (p_seq == plain_quads_LE);
   let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in  
   assert (cipher_quads_LE == cons (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0) (gctr_encrypt_recursive icb_BE (tail plain_quads_LE) alg key (1)));
