@@ -1026,6 +1026,7 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
 
 # Include the SConscript files themselves
+SConscript('tools/ImportFStarTypes/SConscript')
 vale_tool_results = SConscript('tools/Vale/SConscript')
 vale_deps = vale_tool_results.dependencies;
 env['Z3'] = vale_tool_results.z3

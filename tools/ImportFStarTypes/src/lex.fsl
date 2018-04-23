@@ -1,0 +1,111 @@
+{
+module Lex
+
+open Microsoft.FSharp.Text.Lexing
+open Ast
+open Parse_util
+open Parse
+open System.Numerics
+
+let lexeme (lexbuf:LexBuffer<_>):(string) = System.Text.Encoding.ASCII.GetString lexbuf.Lexeme
+let next_line (lexbuf:LexBuffer<_>) = lexbuf.EndPos <- lexbuf.EndPos.NextLine
+
+}
+
+rule lextoken = parse
+| "\n\r" { next_line lexbuf; lextoken lexbuf }
+| "\r\n" { next_line lexbuf; lextoken lexbuf }
+| ['\n''\r'] { next_line lexbuf; lextoken lexbuf }
+| [' ''\t'] { lextoken lexbuf }
+| ";" { SEMI (curLoc lexbuf) }
+| "<" { LT (curLoc lexbuf) }
+| ">" { GT (curLoc lexbuf) }
+| "(" { LPAREN (curLoc lexbuf) }
+| ")" { RPAREN (curLoc lexbuf) }
+| "[" { LBRACKET (curLoc lexbuf) }
+| "]" { RBRACKET (curLoc lexbuf) }
+| "{" { LBRACE (curLoc lexbuf) }
+| "}" { RBRACE (curLoc lexbuf) }
+| "," { COMMA (curLoc lexbuf) }
+| ":" { COLON (curLoc lexbuf) }
+| " : " { SCOLON (curLoc lexbuf) }
+| ";" { SEMI (curLoc lexbuf) }
+| "+" { PLUS (curLoc lexbuf) }
+| "=" { EQ (curLoc lexbuf) }
+| "|" { BAR (curLoc lexbuf) }
+| "@" { AT (curLoc lexbuf) }
+| "$" { DOLLAR (curLoc lexbuf) }
+| "#" { HASH (curLoc lexbuf) }
+| "#." { HASHDOT (curLoc lexbuf) }
+| "->" { RARROW (curLoc lexbuf) }
+| "~>" { TILDERARROW (curLoc lexbuf) }
+| "$$" { DOLLARDOLLAR (curLoc lexbuf) }
+| "[@" { LBRACKETAT (curLoc lexbuf) }
+| "{:" { LBRACECOLON (curLoc lexbuf) }
+| "\\/" { BACKSLASHSLASH (curLoc lexbuf) }
+| "u#" { UNIVERSE (curLoc lexbuf) }
+| "<ascribed:" { ASCRIBED (curLoc lexbuf) }
+| "by" { BY (curLoc lexbuf) } (* part of ascribed *)
+| "effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
+| "new_effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
+| "sub_effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_pattern" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_named" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_labeled" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_desugared" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_monadic" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_monadic_lift" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Monadic-"['_''A'-'Z''a'-'z']+ { META (curLoc lexbuf, lexeme lexbuf) }
+| "MonadicLift-"['_''A'-'Z''a'-'z']+ { META (curLoc lexbuf, lexeme lexbuf) }
+| "assume" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "new" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "abstract" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "noeq" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "unopteq" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "visible" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "private" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "logic" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "inline" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "unfold" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "irreducible" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "type" { TYPE (curLoc lexbuf) }
+| "val" { VAL (curLoc lexbuf) }
+| "let" { LET (curLoc lexbuf) }
+| "rec" { REC (curLoc lexbuf) }
+| "and" { AND (curLoc lexbuf) }
+| "in" { IN (curLoc lexbuf) }
+| "fun" { FUN (curLoc lexbuf) }
+| "match" { MATCH (curLoc lexbuf) }
+| "with" { WITH (curLoc lexbuf) }
+| "datacon" { DATACON (curLoc lexbuf) }
+| "attributes" { ATTRIBUTES (curLoc lexbuf) }
+| "decreases" { DECREASES (curLoc lexbuf) }
+| "pattern" { PATTERN (curLoc lexbuf) }
+| "Type" { TTYPE (curLoc lexbuf) }
+
+(*
+*)
+| ['"'][^'"''\n''\r''\t']*['"'] { let s = lexeme lexbuf in STRING (curLoc lexbuf, s.Substring(1, s.Length - 2)) }
+| "0x"['0'-'9''a'-'f''A'-'F']['0'-'9''a'-'f''A'-'F''_']*
+  {
+    let s = lexeme lexbuf in
+    let s = s.Replace("_", "") in
+    let s = s.Substring(2, String.length s - 2) in
+    let explode (s:string) = [for c in s -> c] in
+    let digits = List.map (int << System.Char.ToLowerInvariant) (explode s) in
+    let rec hex digits n =
+      match digits with
+      | [] -> n
+      | h::t ->
+          let d = if h >= (int 'a') then h - (int 'a') + 10 else h - (int '0') in
+          hex t (bigint.Add (bigint d, bigint.Multiply (bigint 16, n))) in
+    LITINT ((curLoc lexbuf), hex digits bigint.Zero)
+  }
+| ['0'-'9']['0'-'9''_']* { LITINT ((curLoc lexbuf), bigint.Parse((lexeme lexbuf).Replace("_", ""))) }
+| ['0'-'9']+['.']['0'-'9']+ { LITREAL ((curLoc lexbuf), lexeme lexbuf) }
+| ['@']['0'-'9']+ { ID ((curLoc lexbuf), lexeme lexbuf) }
+| ['_''a'-'z''A'-'Z''\'']+['_''a'-'z''A'-'Z''0'-'9''\'''.''#''-''@']* { ID ((curLoc lexbuf), lexeme lexbuf) }
+| eof { EOF }
+| '\000' { EOF }
+| _ { parse_err ("cannot parse character: \"" ^ (lexeme lexbuf) ^ "\"" ^ "\n(ascii code " ^ (string (int ((lexeme lexbuf).Chars 0))) ^ ")") }
+

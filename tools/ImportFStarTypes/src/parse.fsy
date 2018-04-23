@@ -1,0 +1,225 @@
+%{
+
+open Microsoft.FSharp.Math
+open Ast
+open Parse_util
+
+let rlist_opt (es:raw_exp list):raw_exp =
+  match es with
+  | [e] -> e
+  | _ -> RList es
+
+%}
+
+%start start
+%type <raw_exp list> start
+
+%token <loc * string> ID
+%token <loc * bigint> LITINT
+%token <loc * string> LITREAL
+%token <loc * bool> LITBOOL
+%token <loc> LBRACKET RBRACKET LBRACE RBRACE LPAREN RPAREN LBRACECOLON
+%token <loc> AT COMMA DOT
+%token <loc> BANG
+%token <loc> LT GT EQ LE GE EQEQ NE
+%token <loc> PLUS MINUS STAR SLASH PERCENT
+%token <loc> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
+%token <loc> BAR RARROW TILDERARROW DOLLAR DOLLARDOLLAR HASH HASHDOT LBRACKETAT BACKSLASHSLASH
+%token <loc> COLONCOLON
+%token <loc> THEN ELSE LET IN FUN MATCH WITH
+%token <loc> TYPE TTYPE VAL REC AND DATACON VAR CONST AXIOM MODULE IMPORT
+%token <loc> IF ASSERT ASSUME DECREASES COLON COLONBAR SEMI
+%token <loc> REQUIRES ENSURES
+%token <loc> FORALL EXISTS
+%token <loc * string> STRING
+%token <loc * string> RESET_OPTIONS
+
+%token <loc * string> QUALIFIER EFFECT META
+%token <loc> ASCRIBED BY UNIVERSE ATTRIBUTES PATTERN
+%token <loc> SCOLON
+
+%token EOF
+
+%%
+
+start: decls EOF { $1 }
+
+any
+  : { [] }
+  | LET any { "let"::$2 }
+  | AND any { "and"::$2 }
+  | IN any { "in"::$2 }
+  | FUN any { "fun"::$2 }
+  | MATCH any { "match"::$2 }
+  | WITH any { "with"::$2 }
+  | DATACON any { "datacon"::$2 }
+  | ATTRIBUTES any { "attributes"::$2 }
+  | DECREASES any { "decreases"::$2 }
+  | LPAREN any { "("::$2 }
+  | RPAREN any { ")"::$2 }
+  | LBRACKET any { "["::$2 }
+  | RBRACKET any { "]"::$2 }
+  | LBRACE any { "{"::$2 }
+  | LBRACECOLON any { "{:"::$2 }
+  | RBRACE any { "}"::$2 }
+  | LT any { "<"::$2 }
+  | GT any { ">"::$2 }
+  | COMMA any { ","::$2 }
+  | COLON any { ":"::$2 }
+  | SCOLON any { ":"::$2 }
+  | SEMI any { ";"::$2 }
+  | PLUS any { "+"::$2 }
+  | EQ any { "="::$2 }
+  | BAR any { "|"::$2 }
+  | DOLLAR any { "$"::$2 }
+  | HASH any { "#"::$2 }
+  | HASHDOT any { "#."::$2 }
+  | RARROW any { "->"::$2 }
+  | TILDERARROW any { "~>"::$2 }
+  | DOLLARDOLLAR any { "$$"::$2 }
+  | BACKSLASHSLASH any { "\\/"::$2 }
+  | ASCRIBED any { "ASCRIBED"::$2 }
+  | TTYPE any { "TTYPE"::$2 }
+  | UNIVERSE any { "UNIVERSE"::$2 }
+  | STRING any { "STRING"::$2 }
+  | LITINT any { ((snd $1).ToString())::$2 }
+  | ID any { (snd $1)::$2 }
+
+exp
+  : exp1s { rlist_opt $1 }
+  | FUN binder1s RARROW exp { RList [RFun $1; RList $2; $4] }
+  | exp1s RARROW exp { RList [RArrow $2; rlist_opt $1; $3] }
+  | exp1s TILDERARROW exp { RList [RTildeArrow $2; rlist_opt $1; $3] }
+  | exp1 DOLLARDOLLAR exp1 exp1 exp1 { RList [RDollarDollar $2; $1; $3; $4; $5] }
+  | exp1 PLUS exp1 { RList [RPlus $2; $1; $3] }
+  | exp1 LBRACE exp RBRACE { RList [RRefine $2; $1; $3] }
+  | exp1 ASCRIBED exp1s { RList [RAscribed $2; $1; rlist_opt $3] }
+  | exp1 ASCRIBED LBRACKET exp RBRACKET exp1s { RList [RAscribed $2; $1; $4; rlist_opt $6] }
+  | DECREASES exp1 { RList [RDecreases $1; $2] }
+
+exp1
+  : exp2 { $1 }
+  | LET binder1 EQ exp IN exp1 { RList [RLet $1; $2; $4; $6] }
+  | exp2 LT exp1s GT { RList [RLtGt $2; $1; RList $3] }
+  | META LBRACE exp RBRACE { RMeta (fst $1) }
+  | META COLON exp1s LBRACE exp RBRACE { RMeta (fst $1) }
+  | META COLON exp1s LBRACE META exp RBRACE LBRACE exp RBRACE { RMeta (fst $1) }
+  | META COLON exp1s LBRACE META LPAREN exp1s AT exp RPAREN RBRACE LBRACE exp RBRACE { RMeta (fst $1) }
+  | COMMA { RComma $1 }
+  | LBRACECOLON PATTERN pat1 RBRACE exp1 { RList [RPattern $1; RList $3; $5] }
+  | LBRACECOLON exp RBRACE exp1 { RList [RAttribute $1; $2; $4] }
+  | DOLLAR exp1 { RList [RDollar $1; $2] }
+  | HASH exp1 { RList [RHash $1; $2] }
+  | HASHDOT exp1 { RList [RHashDot $1; $2] }
+  | exp2 COLON exp1 { RList [RColon $2; $1; $3] }
+
+exp2
+  : LPAREN exp RPAREN { match $2 with RList [] -> RUnitValue $1 | e -> e }
+  | LPAREN ATTRIBUTES exp1s RPAREN { RList [RAttributes $2; RList $3] }
+  | SCOLON { RSColon $1 } /* used in match and let */
+  | MATCH { RMatch $1 } /* used in match */
+  | WITH { RWith $1 } /* used in match */
+  | BAR { RBar $1 } /* used in match */
+  | TTYPE { RType $1 }
+  | TTYPE UNIVERSE exp2 { RList [RType $1; $3] }
+  | STRING { RString $1 }
+  | LITINT { RInt $1 }
+  | ID { RId $1 }
+
+exp1s
+  : { [] }
+  | exp1 exp1s { $1::$2 }
+
+pat1
+  : pat2 { [RList $1] }
+  | pat2 BACKSLASHSLASH pat1 { (RList $1)::$3 }
+
+pat2
+  : exp1 { [$1] }
+  | exp1 SEMI pat2 { $1::$3 }
+
+binder1
+  : LPAREN binder1 RPAREN { $2 }
+  | DOLLAR binder1 { RList [RDollar $1; $2] }
+  | HASH binder1 { RList [RHash $1; $2] }
+  | ID { RId $1 }
+  | ID LT GT SCOLON exp1 { RList [RColon $4; RId $1; $5] }
+  | ID COLON exp1 { RList [RColon $2; RId $1; $3] }
+
+binder1s
+  : { [] }
+  | binder1 binder1s { $1::$2 }
+
+ids_commas
+  : { [] }
+  | ID ids_commas { (snd $1)::$2 }
+  | COMMA ids_commas { $2 }
+
+attr
+  : LPAREN attr RPAREN { $2 }
+  | STRING { $1 }
+  | ID { $1 }
+  | ID attr { $1 }
+
+attrs
+  : attr { [$1] }
+  | attr SEMI attrs { $1::$3 }
+
+attrs_opt
+  : { [] }
+  | LBRACKETAT attrs RBRACKET { $2 }
+
+qualifier
+  : QUALIFIER { RQualifier $1 }
+  | LPAREN ids_commas RPAREN { RQualifier ($1, "()") }
+
+qualifiers
+  : { [] }
+  | qualifier qualifiers { $1::$2 }
+
+category
+  : LET { RDecl ($1, "let") }
+  | LET REC { RDecl ($1, "letrec") }
+  | VAL { RDecl ($1, "val") }
+  | TYPE { RDecl ($1, "type") }
+
+ids_comma
+  : ID { [RId $1] }
+  | ID COMMA ids_comma { (RId $1)::$3 }
+ids_comma_opt : { [] } | ids_comma { $1 }
+
+udecls
+  : { [] }
+  | LT ids_comma_opt GT { $2 }
+
+body_opt
+  : { RList [] }
+  | EQ exp1s { RList $2 }
+
+datacon
+  : DATACON udecls ID SCOLON exp1
+    {
+      RList [RList []; RDecl ($1, "datacon"); RId $3; RList $2; RList []; $5; RList []]
+    }
+
+datacons
+  : datacon { [$1] }
+  | datacon datacons { $1::$2 }
+
+decls
+  : attrs_opt qualifiers category ID udecls binder1s SCOLON exp1 body_opt
+    {
+      [RList [RList $2; $3; RId $4; RList $5; RList $6; $8; $9]]
+    }
+  | attrs_opt qualifiers category ID udecls binder1s SCOLON exp1 body_opt AND any
+    {
+      [RList [RList $2; $3; RId $4; RList $5; RList $6; $8; RList []]]
+    }
+  | attrs_opt qualifiers category ID udecls binder1s SCOLON exp1 datacons
+    {
+      [RList [RList $2; $3; RId $4; RList $5; RList $6; $8; RList []]] @ $9
+    }
+  | datacons { $1 }
+  | attrs_opt EFFECT any { [] }
+  | attrs_opt { [] }
+
