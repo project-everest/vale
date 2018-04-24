@@ -30,7 +30,7 @@ assume val addrs: addr_map
 let memcpy_code1 = Mov (OReg Rax) (OMem (MReg Rax 0))
 let memcpy_code2 = Mov (OMem (MReg Rbx 0)) (OReg Rax)
 
-#set-options "--z3rlimit 60"
+#set-options "--z3rlimit 100"
 
 let memcpy_vale (s:state{s.ok}) : (s':state{get_heap_value (eval_reg Rax s) s == get_heap_value (eval_reg Rbx s) s' /\ s'.ok}) = eval_ins memcpy_code2 (eval_ins memcpy_code1 s)
 
@@ -43,7 +43,7 @@ let post_v (s1:state) (s2:state) (src:buf) (dst:buf{disjoint src dst}) (m:HS.mem
   s2.ok /\
   post_cond (up_mem64 s1.mem addrs buffers m) (up_mem64 s2.mem addrs buffers m) src dst
 
-#set-options "--z3rlimit 200 --initial_fuel 2 --initial_ifuel 1"
+#set-options "--z3rlimit 300 --initial_fuel 2 --initial_ifuel 1"
 
 let correct_memcpy (s:state{s.ok}) (src:buf) (dst:buf{disjoint src dst}) 
   (m:HS.mem{live m src /\ live m dst}) : Lemma

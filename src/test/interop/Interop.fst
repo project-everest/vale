@@ -170,8 +170,14 @@ let frame_write_low_mem heap length addr (buf:(B.buffer UInt8.t){length = B.leng
     let rec aux (b : B.buffer UInt8.t{B.live mem b /\ B.disjoint b buf}) : Lemma (B.equal mem b new_mem b) =
       if B.as_addr b <> B.as_addr buf || B.frameOf b <> B.frameOf buf then ()
       else begin
-	ref_extensionality (Map.sel mem.HS.h (B.frameOf b)) (B.as_ref buf) (B.as_ref b);
-	assert (forall i. i + B.idx b - B.idx b = i);
+        let ty1 = B.lseq UInt8.t (B.max_length b) in
+        let ty2 = B.lseq UInt8.t (B.max_length buf) in
+        let t1 = Heap.mref ty1 (Heap.trivial_preorder _) in
+        let r1 : t1  = B.as_ref b in
+        let r2' : Heap.mref ty2 (Heap.trivial_preorder _) = B.as_ref buf in
+        let r2 : t1 = r2' in
+	ref_extensionality #ty1 #(Heap.trivial_preorder _)  (Map.sel mem.HS.h (B.frameOf b)) r1 r2;
+      	assert (forall i. i + B.idx b - B.idx b = i);
 	assert (Seq.equal (B.as_seq mem b) (B.as_seq new_mem b));
 	()
       end
