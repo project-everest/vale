@@ -12,7 +12,7 @@ type typ =
 | TApp of typ * typ list
 | TVar of id
 | TInt of bnd * bnd
-| TArrow of typ * typ
+| TArrow of typ list * typ
 // TODO: polytype and kind
 
 type ghost = Ghost | NotGhost
