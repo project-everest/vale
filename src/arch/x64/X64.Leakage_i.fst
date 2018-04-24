@@ -41,9 +41,12 @@ let eq_registers regs1 regs2 =
 val eq_taintStates: (ts1:taintState) -> (ts2:taintState) -> (b:bool{b <==> ts1 == ts2})
 
 let eq_taintStates ts1 ts2 =
-    eq_registers ts1.regTaint ts2.regTaint && ts1.flagsTaint = ts2.flagsTaint
+    eq_registers ts1.regTaint ts2.regTaint && ts1.flagsTaint = ts2.flagsTaint && ts1.cfFlagsTaint = ts2.cfFlagsTaint
 
-let taintstate_monotone ts ts' = ( forall r. Public? (ts'.regTaint r) ==> Public? (ts.regTaint r)) /\ (Public? (ts'.flagsTaint) ==> Public? (ts.flagsTaint))
+let taintstate_monotone ts ts' = 
+  ( forall r. Public? (ts'.regTaint r) ==> Public? (ts.regTaint r)) 
+  /\ (Public? (ts'.flagsTaint) ==> Public? (ts.flagsTaint)) 
+  /\ (Public? (ts'.cfFlagsTaint) ==> Public? (ts.cfFlagsTaint))
 
 val taintstate_monotone_trans: (ts1:taintState) -> (ts2:taintState) -> (ts3:taintState) ->
 Lemma (taintstate_monotone ts1 ts2 /\ taintstate_monotone ts2 ts3 ==> taintstate_monotone ts1 ts3)
@@ -67,7 +70,9 @@ let isExplicit_monotone2 ts ts1 ts2 code fuel s1 s2 = ()
 
 val combine_taint_states: (ts1:taintState) -> (ts2:taintState) -> (ts:taintState{taintstate_monotone ts1 ts /\ taintstate_monotone ts2 ts})
 let combine_taint_states (ts1:taintState) (ts2:taintState) =
-  TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) (merge_taint ts1.flagsTaint ts2.flagsTaint)
+  TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) 
+	     (merge_taint ts1.flagsTaint ts2.flagsTaint)
+	     (merge_taint ts1.cfFlagsTaint ts2.cfFlagsTaint)
 
 let count_public_register regs r = if Public? (regs r) then 1 else 0
 
@@ -91,9 +96,12 @@ let count_public_registers regs =
 
 let count_flagTaint ts = if Public? ts.flagsTaint then 1 else 0
 
+let count_cfFlagTaint ts = if Public? ts.cfFlagsTaint then 1 else 0
+
 let count_publics ts =
   count_public_registers ts.regTaint +
-  count_flagTaint ts
+  count_flagTaint ts +
+  count_cfFlagTaint ts
 
 val monotone_decreases_count: (ts:taintState) -> (ts':taintState) -> Lemma
   (requires taintstate_monotone ts ts' /\ not (eq_taintStates ts ts'))
@@ -102,7 +110,7 @@ val monotone_decreases_count: (ts:taintState) -> (ts':taintState) -> Lemma
 #set-options "--z3rlimit 50"
 let monotone_decreases_count ts ts' =
   assert (forall r. count_public_register ts'.regTaint r <= count_public_register ts.regTaint r);
-  if ts.flagsTaint <> ts'.flagsTaint then ()
+  if ts.flagsTaint <> ts'.flagsTaint || ts.cfFlagsTaint <> ts'.cfFlagsTaint then ()
   else
   assert (exists r. ts.regTaint r <> ts'.regTaint r);
   ()

@@ -43,7 +43,7 @@ let lemma_operand_obs ts dst s1 s2 = match dst with
 let set_taint (dst:operand) ts taint : Tot taintState =
   match dst with
   | OConst _ -> ts  (* Shouldn't actually happen *)
-  | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint
+  | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint ts.cfFlagsTaint
   | OMem m -> ts (* Ensured by taint semantics *)
 
 let rec operands_do_not_use_secrets ops ts = match ops with
@@ -96,12 +96,17 @@ let lemma_public_op_are_same2 ts op s1 s2 = ()
 
 val publicFlagValuesAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool{b <==> (Public? tsExpected.flagsTaint ==> Public? tsAnalysis.flagsTaint)}
 
+val publicCfFlagValuesAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool{b <==> (Public? tsExpected.cfFlagsTaint ==> Public? tsAnalysis.cfFlagsTaint)}
+
 val publicRegisterValuesAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool{b <==> (forall r. (Public? (tsExpected.regTaint r) ==> Public? (tsAnalysis.regTaint r)))}
 
 val publicTaintsAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool
 
 let publicFlagValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
   (tsExpected.flagsTaint = Public && tsAnalysis.flagsTaint = Public) || (tsExpected.flagsTaint = Secret)
+
+let publicCfFlagValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
+  (tsExpected.cfFlagsTaint = Public && tsAnalysis.cfFlagsTaint = Public) || (tsExpected.cfFlagsTaint = Secret)
 
 let registerAsExpected (r:reg) (tsAnalysis:taintState) (tsExpected:taintState) =
   (tsExpected.regTaint r = Public && tsAnalysis.regTaint r = Public) || (tsExpected.regTaint r = Secret)
@@ -126,4 +131,6 @@ let publicRegisterValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintS
 
 let publicTaintsAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
     publicFlagValuesAreAsExpected tsAnalysis tsExpected
+  && publicCfFlagValuesAreAsExpected tsAnalysis tsExpected
   && publicRegisterValuesAreAsExpected tsAnalysis tsExpected
+  

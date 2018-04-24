@@ -19,32 +19,38 @@ let check_if_ins_consumes_fixed_time ins ts =
   Classical.forall_intro_2 (fun x y -> lemma_operand_obs_list ts srcs x y);
   assert (fixedTime ==> (isConstantTime (Ins ins) ts));
   let taint = sources_taint srcs ts ins.t in
-  let taint = if AddCarry64? i then merge_taint taint ts.flagsTaint else taint in
+  let taint = if AddCarry64? i then merge_taint taint ts.cfFlagsTaint else taint in
   let ts' = set_taints dsts ts taint in
   let b, ts' = match i with
-    | Mov64 dst src -> begin
+    | Mov64 dst _ | AddLea64 dst _ _ -> begin
       match dst with
 	| OConst _ -> false, ts (* Should not happen *)
 	| OReg r -> fixedTime, ts'
 	| OMem m -> fixedTime, ts'
     end
-    | Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret)
+    | Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret Secret)
     | Xor64 dst src ->
         (* Special case for Xor : xor-ing an operand with itself erases secret data *)
         if dst = src then
 	  let ts' = set_taint dst ts' Public in
-	  fixedTime, TaintState ts'.regTaint Secret
+	  fixedTime, TaintState ts'.regTaint Secret Secret
         else
 	begin match dst with
-	  | OConst _ -> false, (TaintState ts'.regTaint Secret) (* Should not happen *)
-	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret)
-	  | OMem m -> fixedTime, (TaintState ts'.regTaint Secret)
+	  | OConst _ -> false, (TaintState ts'.regTaint Secret Secret) (* Should not happen *)
+	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret Secret)
+	  | OMem m -> fixedTime, (TaintState ts'.regTaint Secret Secret)
         end
+    | Add64 _ _ | AddCarry64 _ _ -> begin
+          match dsts with
+	| [OConst _] -> true, (TaintState ts'.regTaint Secret taint) (* Should not happen *)
+	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret taint)
+	| [OMem m] -> fixedTime, (TaintState ts'.regTaint Secret taint)
+    end
     | _ ->
       match dsts with
-	| [OConst _] -> true, (TaintState ts'.regTaint Secret) (* Should not happen *)
-	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret)
-	| [OMem m] -> fixedTime, (TaintState ts'.regTaint Secret)
+	| [OConst _] -> true, (TaintState ts'.regTaint Secret Secret) (* Should not happen *)
+	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret Secret)
+	| [OMem m] -> fixedTime, (TaintState ts'.regTaint Secret Secret)
   in
   b, ts'
 
