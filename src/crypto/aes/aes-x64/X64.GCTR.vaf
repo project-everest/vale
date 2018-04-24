@@ -193,7 +193,7 @@ procedure {:quick} gctr_core(
 }
 
 
-procedure {:quick} gctr_bytes(
+procedure {:quick}  gctr_bytes(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -218,7 +218,7 @@ procedure {:quick} gctr_bytes(
         validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
         in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32 /\ 4096 * num_bytes < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -244,8 +244,9 @@ procedure {:quick} gctr_bytes(
     if (r11 == 0) {
         gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
         assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
-        le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
-        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt(icb_BE, le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b)), AES_128, key);
+        //le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
+        gctr_partial_to_full_basic(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, buffer128_as_seq(mem, out_b));
+        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b))), AES_128, key);
     } else {
 
     }

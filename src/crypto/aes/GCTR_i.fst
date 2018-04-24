@@ -13,6 +13,9 @@ open Collections.Seqs_i
 let bytes_to_quad_size (num_bytes:nat) =
     ((num_bytes + 15) / 16)
 
+let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE = 
+  if 4096 * length p < pow2_32 then p else createEmpty
+
 (*
 let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
   Tot (s':seq b { length s' == length s /\
@@ -123,6 +126,19 @@ let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key_LE AES_128) (i
   (ensures cipher == gctr_encrypt_recursive icb plain AES_128 key 0)
   =
   gctr_indexed icb plain AES_128 key cipher;
+  ()
+
+let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (cipher:seq quad32) : Lemma
+  (requires (cipher == gctr_encrypt_recursive icb_BE plain alg key 0) /\
+            (4096 * (length plain) * 16 < pow2_32))
+  (ensures le_seq_quad32_to_bytes cipher == gctr_encrypt_LE icb_BE (le_seq_quad32_to_bytes plain) alg key)
+  =
+  let p = le_seq_quad32_to_bytes plain in
+  assert (length p % 16 == 0);
+  let plain_quads_LE = le_bytes_to_seq_quad32 p in
+  let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in
+  let cipher_bytes = le_seq_quad32_to_bytes cipher_quads_LE in
+  le_bytes_to_seq_quad32_to_bytes plain;
   ()
 
 let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
