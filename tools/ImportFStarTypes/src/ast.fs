@@ -52,13 +52,14 @@ type exp =
 | EId of id
 | EInt of bigint
 | EUnitValue
+| EProp
 | EType of univ
 | EComp of exp * exp * exp list
 | EApp of exp * (aqual * exp) list
 | EAppUnivs of exp * univ list
 | EArrow of aqual * id * exp * exp
-| ETyped of exp * exp
 | ERefine of id * exp * exp
+| ETyped of exp * exp
 | EAscribed of exp * exp
 | EPattern of exp list list * exp
 | ELet of binder * exp * exp
