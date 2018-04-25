@@ -174,6 +174,20 @@ let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm
   le_bytes_to_seq_quad32_to_bytes plain;
   ()
 
+
+let split_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
+  Lemma(split (le_seq_quad32_to_bytes s) (16 * n) == 
+        (let s0, s1 = split s n in
+         (le_seq_quad32_to_bytes s0), (le_seq_quad32_to_bytes s1)))
+  =
+  admit()
+
+// Want to show that:
+//   slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, out_b))) 0 num_bytes
+//   ==
+//   gctr_encrypt_LE icb_BE (slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, in_b))) 0 num_bytes) ...
+
+
 (*
 let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
   (requires (1 <= num_bytes /\ num_bytes < 16 * length plain /\
