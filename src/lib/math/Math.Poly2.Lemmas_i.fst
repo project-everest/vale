@@ -64,13 +64,16 @@ let lemma_reverse_degree a n =
   lemma_index a;
   lemma_reverse_define a n;
   lemma_degree (reverse a n)
-
+#set-options "--print_effect_args"
 let lemma_of_list_degree l =
   let len = List.length l in
   let s = of_list l in
   let a = of_seq s in
   lemma_of_list_length s l;
-  assert (forall (i:nat).{:pattern (index s i)} i < len ==> index s i == List.index l i);
+  let aux (i:nat{i < len}) : Lemma (index s i == List.index l i) =
+    Seq.lemma_of_list s l i
+  in
+  FStar.Classical.forall_intro aux; //Seq.lemma_of_list has a poor pattern
   lemma_index a;
   lemma_degree a;
   lemma_zero_define ();
