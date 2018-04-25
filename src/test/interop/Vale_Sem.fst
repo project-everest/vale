@@ -79,7 +79,7 @@ let update_heap (ptr:int) (v:nat64) (mem:heap) : heap =
 
 let frame_update_heap (ptr:int) (v:nat64) (mem:heap) : Lemma (
   let new_mem = update_heap ptr v mem in
-  forall j. j < ptr \/ j >= ptr + 8 ==> mem.[j] == new_mem.[j]) = ()
+  forall j. {:pattern (new_mem.[j]); (mem.[j])} j < ptr \/ j >= ptr + 8 ==> mem.[j] == new_mem.[j]) = ()
 
 let update_mem (ptr:int) (v:nat64) (s:state) : state =
   let mem = s.mem in
@@ -87,7 +87,8 @@ let update_mem (ptr:int) (v:nat64) (s:state) : state =
   {s with mem = mem}
 
 let correct_update_get (ptr:int) (v:nat64) (mem:heap) : Lemma (
-  get_heap_val ptr (update_heap ptr v mem) == v) = ()
+  get_heap_val ptr (update_heap ptr v mem) == v)
+  [SMTPat (get_heap_val ptr (update_heap ptr v mem))] = ()
 
 let update_dst (dst:dst_op) (v:nat64) (s:state) : state = match dst with
   | OReg r -> update_reg r v s

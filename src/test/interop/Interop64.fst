@@ -56,19 +56,8 @@ let rec frame_write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = 
       if i >= length then ()
       else begin
       let new_heap = update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap in
-      frame_update_heap (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap;
-      let helper(j:nat) : Lemma(0 <= j /\ j < i + 1 ==> j < FStar.Seq.Base.length contents /\ get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j)) =
-        if 0 <= j && j < i then assert (get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j))
-	else if j = i then begin
-	  correct_update_get (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap;
-	  assert (get_heap_val (addr + (i `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents i));
-	  ()
-	end
-	else ()
-      in
-      Classical.forall_intro helper;
-      let (new_heap : Vale_Sem.heap{(forall j. {:pattern (Seq.index contents j)} 0 <= j /\ j < i+1 ==> get_heap_val (addr + (j `op_Multiply` 8)) new_heap == UInt64.v (Seq.index contents j))}) = new_heap in
-      assert (sub length (i+1) < sub length i);
+      // The assertion is not needed for the proof to go through, but speed it up significatively
+      assert (forall j. {:pattern (curr_heap.[j])} j < addr \/ j >= addr + (length `op_Multiply` 8) ==> curr_heap.[j] = new_heap.[j]);
       frame_write_vale_mem64 contents length addr (i+1) new_heap
       end
 
@@ -179,10 +168,12 @@ let down_mem64 mem addrs ptrs =
     in
     aux ptrs [] heap 
 
+#set-options "--z3rlimit 100"
+
 let create_seq64 heap length addr : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
-  (forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) =
+  (forall j. {:pattern (Seq.index s' j)} 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) =
   let rec aux heap length addr (i:nat{i <= length}) (s:Seq.seq UInt64.t{Seq.length s = i /\ 
-    (forall j. 0 <= j /\ j < i ==> UInt64.v (Seq.index s j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
+    (forall j. {:pattern (Seq.index s j)} 0 <= j /\ j < i ==> UInt64.v (Seq.index s j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
     (forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val (addr + j `op_Multiply` 8) heap)}) (decreases %[sub length i]) =
   if i = length then s
     else
@@ -198,7 +189,6 @@ let write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.length 
   let s' = Seq.append lo (Seq.append modified hi) in
   HS.upd curr_mem (B.content buf) s'
 
-#set-options "--z3rlimit 100"
 
 let frame_write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.length buf}) (mem:HS.mem{B.live mem buf}) : Lemma
   (let new_mem = write_low_mem64 heap length addr buf mem in
@@ -224,8 +214,10 @@ let load_store_write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length 
   (let new_mem = write_low_mem64 heap length addr buf mem in
     forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index (B.as_seq new_mem buf) j) == get_heap_val (addr + j `op_Multiply` 8) heap) = ()
 
+#set-options "--z3rlimit 200"
+
 let invariant_write_low_mem64 heap length addr (b:(B.buffer UInt64.t){length = B.length b}) (mem:HS.mem{B.live mem b}) : Lemma
-  (requires (forall i. 0 <= i /\ i < B.length b ==> UInt64.v (Seq.index (B.as_seq mem b) i) == get_heap_val (addr + i `op_Multiply` 8) heap))
+  (requires (forall i. {:pattern (get_heap_val (addr + i `op_Multiply` 8) heap)} 0 <= i /\ i < B.length b ==> UInt64.v (Seq.index (B.as_seq mem b) i) == get_heap_val (addr + i `op_Multiply` 8) heap))
   (ensures (mem == write_low_mem64 heap length addr b mem)) 
   [SMTPat (mem == write_low_mem64 heap length addr b mem)]
   =
@@ -339,6 +331,8 @@ let rec invariant_up_mem64_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list
       invariant_write_low_mem64 heap length addr a m;
       invariant_up_mem64_aux heap addrs ptrs q (a::accu) new_mem
 
+#set-options "--z3rlimit 200"
+
 let rec liveness_up_mem64_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) (ps:list (B.buffer UInt64.t))
     (accu: list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu}) 
     (m:HS.mem{list_live m ps /\ list_live m accu /\ correct_up64 addrs accu m heap}) : Lemma
@@ -349,11 +343,10 @@ let rec liveness_up_mem64_aux (heap:Vale_Sem.heap) (addrs:addr_map) (ptrs: list 
       let length = B.length a in
       let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
       let new_mem = write_low_mem64 heap length addr a m in
-      load_store_write_low_mem64 heap length addr a m;
-      correct_up_p64_cancel heap addrs a m;
       correct_up_p64_frame heap addrs a m;      
       assert (forall p. List.memP p accu ==> disjoint_or_eq p a);      
-      liveness_up_mem64_aux heap addrs ptrs q (a::accu) new_mem
+      liveness_up_mem64_aux heap addrs ptrs q (a::accu) new_mem;
+      assert (up_mem64_aux heap addrs ptrs ps accu m == up_mem64_aux heap addrs ptrs q (a::accu) new_mem)
 
 
 val down_up_identity64: (mem:HS.mem) -> (addrs:addr_map) -> (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs /\ list_live mem ptrs }) -> Lemma 
