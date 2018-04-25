@@ -180,17 +180,6 @@ AddOption('--DUMPARGS',
   default=False,
   action='store_true',
   help="Print arguments that will be passed to the verification tools")
-#AddOption('--FSTARTEST',
-#  dest='fstar_test_dir',
-#  type='string',
-#  default=None,
-#  action='store',
-#  help="Bundle up files to add to F*'s test suite ")
-AddOption('--FSTARTEST',
-  dest='fstar_test',
-  default=False,
-  action='store_true',
-  help="Bundle up files to add to F*'s test suite.  Results go into fstar_test_suite ")
 AddOption('--FSTAR-EXTRACT',
   dest='fstar_extract',
   default=False,
@@ -201,6 +190,11 @@ AddOption('--NO-LEMMAS',
   default=False,
   action='store_true',
   help="Generate Vale code but no lemmas")
+AddOption('--MIN_TEST',
+  dest='min_test',
+  default=False,
+  action='store_true',
+  help="Only run on a minimal set of test files")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -222,6 +216,7 @@ no_lemmas = GetOption('no_lemmas')
 gen_hints = GetOption('gen_hints')
 single_vaf = GetOption('single_vaf')
 is_single_vaf = not (single_vaf is None)
+min_test = GetOption('min_test')
 env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else '-noLemmas' if no_lemmas else ''
 
 ####################################################################
@@ -579,11 +574,23 @@ def verify_dafny(env, targetfile, sourcefile):
 def add_dafny_verifier(env):
   env.AddMethod(verify_dafny, "Dafny")
 
+def on_black_list(f, list):
+  for entry in list:
+    if str(f).startswith(entry):
+      return True
+  return False
+
 def verify_fstar(env, targetfile, sourcefile):
   temptargetfiles = [targetfile + '.tmp']
   hintsfile = str(sourcefile) + '.hints'
   hhintsfile = to_hints_dir(hintsfile)
   outs = []
+  if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
+    print("Skipping %s because it is on the min_test_suite_blacklist defined in SConscript" % sourcefile)
+    return outs
+  else:
+    print("File %s is not on the blacklist" % str(sourcefile))
+
   if gen_hints:
     temptargetfiles.append(hintsfile)
   temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
@@ -1077,7 +1084,7 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'min_test_suite_blacklist'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
@@ -1150,31 +1157,5 @@ if GetOption('dump_args'):
   print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
   print(fstar_default_args)
   sys.exit(1)
-
-def make_copy(env, file, target_dir):
-  #print("Making a copy of %s" % file)
-  #env.AddMethod(Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE")), "Copy test file")
-  env.Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE"))
-
-def copy_fstar_test_files(env):
-  if GetOption('fstar_test'):
-    #print("Bundling")
-    #target_dir = GetOption('fstar_test_dir')
-    target_dir = 'fstar_test_suite' 
-    for f in fstar_test_suite: 
-      if f.endswith("fst") or f.endswith("fsti"):
-        make_copy(env, f, target_dir)
-      else:
-        files  = env.Glob(os.path.join(f, "*.fst"))
-        files += env.Glob(os.path.join(f, "*.fsti"))
-        files = ["%s" % f for f in files]
-
-        for f in files:
-          make_copy(env, f, target_dir)
-    warning = "Remember to run: cd fstar_test_suite; make deploy"
-    stars = "*" * len(warning)
-    print("\n%s\n%s\n%s\n" % (stars, warning, stars))
-
-copy_fstar_test_files(env)
 
 atexit.register(display_build_status)
