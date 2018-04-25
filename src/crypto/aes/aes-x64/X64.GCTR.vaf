@@ -75,13 +75,18 @@ procedure {:quick} gctr_register(
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         le_seq_quad32_to_bytes(create(1, io)) == gctr_encrypt_LE(icb_BE, le_quad32_to_bytes(old(io)), AES_128, key);
+        io == gctr_encrypt_block(icb_BE, old(io), AES_128, key, 0);
 {
+    assert inc32(icb_BE, 0) == icb_BE;
     Mov128(xmm0, icb_BE);
     InitPshufbMask(xmm2, r12);
     Pshufb(xmm0, xmm2);
     AES128EncryptBlock(reverse_bytes_quad32(icb_BE), key, round_keys, keys_b);
+    assert xmm0 == aes_encrypt_LE(AES_128, key, reverse_bytes_quad32(icb_BE));
 
     Pxor(xmm1, xmm0);
+
+    assert xmm1 == quad32_xor(old(xmm1), xmm0);
 
     // Call a helpful lemma
     gctr_encrypt_one_block(icb_BE, old(io), AES_128, key);
@@ -126,7 +131,9 @@ procedure {:quick} gctr_core(
         //buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
         gctr_partial(len, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
 
-        icb == icb_BE.(lo0 := icb.lo0);
+        icb == inc32(old(icb_BE), len);
+        r9 == in_ptr + 16 * len;
+        r10 == out_ptr + 16 * len;
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);
@@ -193,7 +200,8 @@ procedure {:quick} gctr_core(
 }
 
 
-procedure {:quick}  gctr_bytes(
+#reset-options "--z3rlimit 80"
+procedure {:quick} {:verify true} gctr_bytes(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -237,21 +245,41 @@ procedure {:quick}  gctr_bytes(
     And64(r11, 15);
     assert r11 == num_bytes % 16;
     Shr64(num_bytes, 4);
-    assert num_bytes == old(num_bytes) / 16;
+    ghost var num_blocks := old(num_bytes) / 16;
+    assert num_bytes == num_blocks;
 
     gctr_core(icb_BE, in_b, out_b, key, round_keys, keys_b);
+    assert icb == inc32(icb_BE, num_blocks);
 
     if (r11 == 0) {
-        gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
-        assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
-        //le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
-        gctr_partial_to_full_basic(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, buffer128_as_seq(mem, out_b));
-        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b))), AES_128, key);
+//        gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+//        assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+//        //le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
+//        gctr_partial_to_full_basic(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, buffer128_as_seq(mem, out_b));
+//        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b))), AES_128, key);
     } else {
+        /*
+        gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 
+                               slice_work_around(buffer128_as_seq(mem, out_b), num_blocks), 
+                               key, icb_BE);
+        */
+        // Grab the last quad
+//        assert r9 == in_ptr + 16 * num_blocks;
+//        extra_bytes_helper(old(num_bytes));
+//        assert r9 < in_ptr + 16*bytes_to_quad_size(old(num_bytes));
+//        assert validSrcAddrs128(mem, old(in_ptr), in_b, bytes_to_quad_size(old(num_bytes)));
+        Load128_buffer(xmm2, r9, 0, in_b, num_blocks);
+        ghost var final_quad_LE := xmm2;
 
-        //Load128_buffer(xmm2, r9, 0, in_b, rdx);
-        //Pxor(xmm2, xmm0);
-        //Store128_buffer(r10, xmm2, 0, out_b, rdx);
+        // Encrypt it
+        Mov128(xmm1, xmm2);
+        gctr_register(key, round_keys, keys_b);
+
+        assert xmm1 == gctr_encrypt_block(icb, final_quad_LE, AES_128, key, 0);
+        gctr_encrypt_block_offset(icb_BE, final_quad_LE, AES_128, key, num_blocks);
+        assert xmm1 == gctr_encrypt_block(icb_BE, final_quad_LE, AES_128, key, num_blocks);
+//
+//        // Write it back out
+//        Store128_buffer(r10, xmm1, 0, out_b, num_blocks);
     }
-
 }

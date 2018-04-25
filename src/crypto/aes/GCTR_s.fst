@@ -35,18 +35,24 @@ let pad_to_128_bits (p:seq nat8) : (q:seq nat8 { length q % 16 == 0 /\ length q 
   
 // little-endian, except for icb_BE
 let gctr_encrypt_LE (icb_BE:quad32) (plain:gctr_plain_LE) (alg:algorithm) (key:aes_key_LE alg) : seq nat8 =
-  let nExtra = (length plain) % 16 in
+  let num_extra = (length plain) % 16 in
 
-  if nExtra = 0 then
+  if num_extra = 0 then
     let plain_quads_LE = le_bytes_to_seq_quad32 plain in
     let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in
     le_seq_quad32_to_bytes cipher_quads_LE
   else
-    let padded_plain = pad_to_128_bits plain in
-    let plain_quads_LE = le_bytes_to_seq_quad32 padded_plain in
-    let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in
-    let cipher_bytes_LE = le_seq_quad32_to_bytes cipher_quads_LE in
-    if length plain < length cipher_bytes_LE then
-      slice cipher_bytes_LE 0 (length plain)   // Remove portions of ciphertext (if any) resulting from padding the plaintext
-    else 
-      cipher_bytes_LE
+    let full_bytes_len = (length plain) - num_extra in
+    let full_blocks, final_block = split plain full_bytes_len in
+    
+    let full_quads_LE = le_bytes_to_seq_quad32 full_blocks in
+    let final_quad_LE = le_bytes_to_quad32 (pad_to_128_bits final_block) in
+    
+    let cipher_quads_LE = gctr_encrypt_recursive icb_BE full_quads_LE alg key 0 in
+    let final_cipher_quad_LE = gctr_encrypt_block icb_BE final_quad_LE alg key (full_bytes_len / 16) in
+    
+    let cipher_bytes_full_LE = le_seq_quad32_to_bytes cipher_quads_LE in
+    let final_cipher_bytes_LE = slice (le_quad32_to_bytes final_cipher_quad_LE) 0 num_extra in
+
+    cipher_bytes_full_LE @| final_cipher_bytes_LE
+

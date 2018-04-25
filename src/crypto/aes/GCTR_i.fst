@@ -16,6 +16,22 @@ let bytes_to_quad_size (num_bytes:nat) =
 let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE = 
   if 4096 * length p < pow2_32 then p else createEmpty
 
+let slice_work_around (s:seq 'a) (i:int) =
+  if 0 <= i && i < length s then slice s 0 i 
+  else slice s 0 0
+
+let extra_bytes_helper (n:nat) : Lemma
+  (requires n % 16 <> 0)
+  (ensures bytes_to_quad_size n == n / 16 + 1)
+  =
+  ()
+
+let gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int) :
+  Lemma (gctr_encrypt_block icb_BE plain_LE alg key i ==
+         gctr_encrypt_block (inc32 icb_BE i) plain_LE alg key 0)
+  =
+  ()
+  
 (*
 let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
   Tot (s':seq b { length s' == length s /\
@@ -65,24 +81,41 @@ let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE
   if length plain = 0 then ()
   else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
 
-#reset-options "--z3rlimit 10"  // Oddly, this is needed on the commandline, but not in interactive mode
-let rec gctr_encrypt_length (icb:quad32) (plain:gctr_plain_LE)
+#reset-options "--z3rlimit 20" 
+let rec gctr_encrypt_length (icb_BE:quad32) (plain:gctr_plain_LE)
                              (alg:algorithm) (key:aes_key_LE alg) :
-  Lemma(length (gctr_encrypt_LE icb plain alg key) == length plain)
-  [SMTPat (length (gctr_encrypt_LE icb plain alg key))]
+  Lemma(length (gctr_encrypt_LE icb_BE plain alg key) == length plain)
+  [SMTPat (length (gctr_encrypt_LE icb_BE plain alg key))]
   =
-  let nExtra = (length plain) % 16 in
-  if nExtra = 0 then (
+  let num_extra = (length plain) % 16 in
+  let result = gctr_encrypt_LE icb_BE plain alg key in
+  if num_extra = 0 then (
     let plain_quads_LE = le_bytes_to_seq_quad32 plain in
-    gctr_encrypt_recursive_length icb plain_quads_LE alg key 0
+    gctr_encrypt_recursive_length icb_BE plain_quads_LE alg key 0
   ) else ( 
-    let padded_plain = pad_to_128_bits plain in
-    let plain_quads_LE = le_bytes_to_seq_quad32 padded_plain in
-    gctr_encrypt_recursive_length icb plain_quads_LE alg key 0
+    let full_bytes_len = (length plain) - num_extra in
+    let full_blocks, final_block = split plain full_bytes_len in
+    
+    let full_quads_LE = le_bytes_to_seq_quad32 full_blocks in
+    let final_quad_LE = le_bytes_to_quad32 (pad_to_128_bits final_block) in
+    
+    let cipher_quads_LE = gctr_encrypt_recursive icb_BE full_quads_LE alg key 0 in
+    let final_cipher_quad_LE = gctr_encrypt_block icb_BE final_quad_LE alg key (full_bytes_len / 16) in
+    
+    let cipher_bytes_full_LE = le_seq_quad32_to_bytes cipher_quads_LE in
+    let final_cipher_bytes_LE = slice (le_quad32_to_bytes final_cipher_quad_LE) 0 num_extra in
+    
+    gctr_encrypt_recursive_length icb_BE full_quads_LE alg key 0;
+    assert (length result == length cipher_bytes_full_LE + length final_cipher_bytes_LE);
+    assert (length cipher_quads_LE == length full_quads_LE);
+    assert (length cipher_bytes_full_LE == 16 * length cipher_quads_LE);
+    assert (16 * length full_quads_LE == length full_blocks);
+    assert (length cipher_bytes_full_LE == length full_blocks);
+    ()
   )
 #reset-options
 
-#reset-options "--use_two_phase_tc true" // Needed so that indexing cipher and plain knows that their lengths are equal
+//#reset-options "--use_two_phase_tc true" // Needed so that indexing cipher and plain knows that their lengths are equal
 let rec gctr_indexed_helper (icb:quad32) (plain:gctr_plain_internal_LE)
                             (alg:algorithm) (key:aes_key_LE alg) (i:int) : Lemma
   (requires True)
@@ -141,6 +174,7 @@ let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm
   le_bytes_to_seq_quad32_to_bytes plain;
   ()
 
+(*
 let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
   (requires (1 <= num_bytes /\ num_bytes < 16 * length plain /\
              16 * (length plain - 1) < num_bytes /\
@@ -163,7 +197,6 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algori
     =
     ()
     in
-
   //assert (equal full_bytes (slice plain_bytes 0 (full_blocks * 16)));
 (*
   let plain_quads = le_bytes_to_seq_quad32 (pad_to_128_bits plain_bytes) in
@@ -173,6 +206,7 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algori
     in
 *)
   admit()
+*)
 
 let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(gctr_encrypt_LE icb_BE (le_quad32_to_bytes plain) alg key =

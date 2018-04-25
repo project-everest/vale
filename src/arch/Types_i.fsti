@@ -63,3 +63,17 @@ val le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
   
 val le_bytes_to_seq_quad32_to_bytes (s:seq quad32) :
   Lemma (le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes s) == s)
+
+//seq_nat32_to_seq_nat8_LE (seq_four_to_seq_LE b)
+// seq_nat32_to_seq_nat8_LE = seq_four_to_seq_LE (seq_map (nat_to_four 8) x)
+(*
+let le_seq_quad32_to_bytes_index (b:seq quad32) : 
+  Lemma (let bytes = le_seq_quad32_to_bytes b in
+         length bytes == 16 * length b /\
+         forall i . 0 <= i /\ i < length bytes ==> index bytes i == 
+         four_select (index b ((4*i) / 4)) ((4*i) % 4)
+         
+         )
+  = 
+  ()
+*)
