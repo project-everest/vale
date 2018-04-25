@@ -252,17 +252,15 @@ procedure {:quick} {:verify true} gctr_bytes(
     assert icb == inc32(icb_BE, num_blocks);
 
     if (r11 == 0) {
-//        gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
-//        assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
-//        //le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
-//        gctr_partial_to_full_basic(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, buffer128_as_seq(mem, out_b));
-//        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b))), AES_128, key);
+        gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+        assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+        //le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
+        gctr_partial_to_full_basic(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, buffer128_as_seq(mem, out_b));
+        assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b))), AES_128, key);
     } else {
-        /*
         gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 
                                slice_work_around(buffer128_as_seq(mem, out_b), num_blocks), 
                                key, icb_BE);
-        */
         // Grab the last quad
 //        assert r9 == in_ptr + 16 * num_blocks;
 //        extra_bytes_helper(old(num_bytes));
@@ -278,8 +276,8 @@ procedure {:quick} {:verify true} gctr_bytes(
         assert xmm1 == gctr_encrypt_block(icb, final_quad_LE, AES_128, key, 0);
         gctr_encrypt_block_offset(icb_BE, final_quad_LE, AES_128, key, num_blocks);
         assert xmm1 == gctr_encrypt_block(icb_BE, final_quad_LE, AES_128, key, num_blocks);
-//
-//        // Write it back out
-//        Store128_buffer(r10, xmm1, 0, out_b, num_blocks);
+
+        // Write it back out
+        Store128_buffer(r10, xmm1, 0, out_b, num_blocks);
     }
 }
