@@ -588,8 +588,8 @@ def verify_fstar(env, targetfile, sourcefile):
   if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
     print("Skipping %s because it is on the min_test_suite_blacklist defined in SConscript" % sourcefile)
     return outs
-  else:
-    print("File %s is not on the blacklist" % str(sourcefile))
+#  else:
+#    print("File %s is not on the blacklist" % str(sourcefile))
 
   if gen_hints:
     temptargetfiles.append(hintsfile)
