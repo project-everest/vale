@@ -38,11 +38,13 @@ if sys.platform == 'win32':
   # Use kremlib.h without primitive support for uint128_t.
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
+  env['NUGET'] = 'nuget.exe'
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
   env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128'])
   env['MONO'] = 'mono'
+  env['NUGET'] = 'nuget'
 
 # Convert NUMBER_OF_PROCESSORS into '-j n'.
 #num_cpu = int(os.environ.get('NUMBER_OF_PROCESSORS', 1)) 

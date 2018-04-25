@@ -33,7 +33,12 @@ def add_fslexyacc(env):
   # probe for fslexyacc to ensure it is installed ahead of trying to use it to build
   fslexfile = File(FSLEX)
   if not os.path.isfile(str(fslexfile)) and not GetOption('clean'):
-    raise EnvironmentError('FsLexYacc missing.  Please install to: "%s"'%str(fslexfile))
+    packages_config = File('#tools/Vale/src/packages.config')
+    packages_dir = Dir('#tools/FsLexYacc')
+    if Execute('%s restore %s -PackagesDirectory %s' % (env['NUGET'], packages_config, packages_dir)):
+      print "Unable to run nuget in order to restore FsLexYacc.  See INSTALL.md for more details."
+      Exit(1)
+    #raise EnvironmentError('FsLexYacc missing.  Please install to: "%s"'%str(fslexfile))
     
   env['FSLEX'] = fslexfile
   fslex = Builder(action='$MONO $FSLEX $SOURCE -o $TARGET',
