@@ -57,9 +57,12 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
         {
           fname = name;
           fghost = NotGhost;
+          ftargs = [];
           fargs = fParams;
+          fret_name = None;
 //          fret = tCode;
           fret = tCodes;
+          fspecs = [];
 //          fbody = Some (rs b);
           fbody = Some (build_code_stmts env benv b);
           fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" benv.proc.pattrs;
@@ -426,8 +429,11 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
     {
       fname = benv.code_name "";
       fghost = NotGhost;
+      ftargs = [];
       fargs = fParams;
+      fret_name = None;
       fret = tCode;
+      fspecs = [];
       fbody =
         if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
         else Some (build_code_block env benv stmts);

@@ -160,8 +160,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     {
       fname = wp_X;
       fghost = NotGhost;
+      ftargs = [];
       fargs = fParams @ [(s0, Some tState); argContinue];
+      fret_name = None;
       fret = tType0;
+      fspecs = [];
       fbody = Some (hide_ifs wpBody);
       fattrs = [(Id "public", []); (Id "qattr", [])] @ attr_no_verify "lax" p.pattrs;
     }
@@ -249,8 +252,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     {
       fname = Reserved ("quick_" + (string_of_id p.pname));
       fghost = NotGhost;
+      ftargs = [];
       fargs = fParams;
+      fret_name = None;
       fret = tRetQuick;
+      fspecs = [];
       fbody = Some eQuick;
       fattrs = [(Id "public", []); (Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "lax" p.pattrs;
     }

@@ -5,6 +5,13 @@ open Ast_util
 open Parse_util
 open Microsoft.FSharp.Math
 
+let rec id_of_exp (e:exp):id =
+  match e with
+  | ELoc (_, e) -> id_of_exp e
+  | EVar x -> x
+  | EOp (FieldOp x, [e]) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
+  | _ -> parse_err "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
+
 let makeUop (op:uop) (loc:loc, (isCustom:bool, s:string)) (e:exp):exp =
   let op = if isCustom then UCustom s else op in
   ELoc (loc, EOp (Uop op, [e]))
@@ -49,8 +56,8 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * string> LITREAL
 %token <loc * bool> LITBOOL
 %token <loc * int> BV
-%token <loc> QLBRACKET LBRACKET RBRACKET LBRACE RBRACE LPAREN RPAREN LBRACECOLON
-%token <loc> AT COMMA DOT
+%token <loc> QLBRACKET HASHLBRACKET LBRACKET RBRACKET LBRACE RBRACE LPAREN RPAREN LBRACECOLON
+%token <loc> AT COMMA DOT HASH MINUSGT
 %token <loc * (bool * string)> BANG
 %token <loc * (bool * string)> LT GT EQ LE GE EQEQ NE
 %token <loc * (bool * string)> PLUS MINUS STAR SLASH PERCENT
@@ -58,10 +65,10 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
-%token <loc> TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
+%token <loc> TTYPE TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
 %token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
-%token <loc> FORALL EXISTS LAMBDA
+%token <loc> FORALL EXISTS LAMBDA FUN
 %token <loc> INCLUDE
 %token <loc * string> STRING
 %token <loc> VERBATIM
@@ -81,8 +88,8 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %left LT GT LE GE IS
 %left PLUS MINUS
 %left STAR SLASH PERCENT
-%right BANG
-%left LPAREN RPAREN QLBRACKET LBRACKET RBRACKET DOT
+%right BANG HASH
+%left LPAREN RPAREN HASHLBRACKET QLBRACKET LBRACKET RBRACKET DOT
 
 %%
 
@@ -95,14 +102,23 @@ Includes
   : { [] }
   | Include Includes { $1::$2 }
 
+Kind
+  : TTYPE LPAREN LITINT RPAREN { KType (snd $3) }
+
 Type
-  : AnyQualifiedId { TName $1 }
-  | Type LPAREN RPAREN { TApp ($1, []) }
-  | Type LPAREN TypeArgs RPAREN { TApp ($1, $3) }
-  | LPAREN Type RPAREN { $2 }
+  : Type1 { $1 }
+  | FUN LPAREN TypeArgsOpt RPAREN MINUSGT Type { TArrow ($3, $6) }
+Type1
+  : Type2 { $1 }
+  | Type1 LPAREN TypeArgsOpt RPAREN { TApp ($1, $3) }
+Type2
+  : LPAREN Type RPAREN { $2 }
+  | AnyQualifiedId { TName $1 }
+
 TypeArgs
   : Type { [$1] }
   | Type COMMA TypeArgs { $1::$3 }
+TypeArgsOpt : { [] } | TypeArgs { $1 }
 
 Triggers
   : { [] }
@@ -156,7 +172,9 @@ Exp1
   | OLD LBRACKET Exp RBRACKET LPAREN Exp RPAREN { expAt $1 (EOp (Bop BOldAt, [$3; $6])) }
   | CONST LPAREN Exp RPAREN { expAt $1 (EOp (Uop UConst, [$3])) }
   | THIS { expAt $1 (EVar (Reserved "this")) }
-  | AnyId LPAREN Exps RPAREN { expAt $2 (EApply ($1, $3)) }
+  | HASH Type2 LPAREN Exp RPAREN { expAt $1 (ECast ($4, $2))  }
+  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApplyTyped (id_of_exp $1, $3, $6)) }
+  | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, $3)) }
   | ID { expAt (fst $1) (EVar (Id (snd $1))) }
   | AT ID { expAt $1 (EOp (Uop UToOperand, [expAt (fst $2) (EVar (Id (snd $2)))])) }
 Exps1
@@ -198,7 +216,7 @@ OpToken
   | EQEQGT { $1 }
   | LTEQEQGT { $1 }
 AnyIdOrOp
-  : AnyId { $1 }
+  : AnyQualifiedId { $1 }
   | OPERATOR LPAREN OpToken RPAREN { let (_, (_, s)) = $3 in Operator s }
 CalcOp
   : LTEQEQGT { BEquiv }
@@ -347,6 +365,22 @@ Formals
   : { [] }
   | Formals1 { $1 }
 
+TFormal
+  : AnyId COLON Kind { ($1, $3, InferExplicit) }
+  | HASH AnyId COLON Kind { ($2, $4, InferImplicit) }
+TFormals1
+  : TFormal { [$1] }
+  | TFormal COMMA TFormals1 { $1::$3 }
+TFormals
+  : { [] }
+  | TFormals1 { $1 }
+TFormalsBracket
+  : { [] }
+  | HASHLBRACKET TFormals RBRACKET { $2 }
+TFormalsParen
+  : { [] }
+  | LPAREN TFormals RPAREN { $2 }
+
 InOut
   : { In }
   | OUT { Out }
@@ -408,6 +442,9 @@ Invariants
 
 Proc
   : GhostOpt PROCEDURE { ($2, $1) }
+FunRet
+  : Type { (None, $1) }
+  | LPAREN AnyId COLON Type RPAREN { (Some $2, $4) }
 ProcRet
   : { [] }
   | RETURNS LPAREN ProcFormals RPAREN { $3 }
@@ -418,13 +455,36 @@ Decl
     }
   | MODULE AnyQualifiedId { ($1, DPragma (ModuleName (string_of_id $2))) }
   | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
+  | TYPE AnyQualifiedId TFormalsParen COLON Kind EXTERN SEMI { ($1, DType ($2, $3, $5, None)) }
+  | TYPE AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($2, $3, $5, Some $7)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
-  | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type COLONEQ AnyId SEMI
-    { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = (Reserved "alias", [EVar $10])::$2}) }
-/*
-  | FUNCTION Attrs AnyIdOrOp LPAREN Formals RPAREN COLON Type
-    { ($1, DFun {fname = $3; fghost = Ghost; fargs = $5; fret = $8; fbody = None; fattrs = $2}) }
-*/
+  | CONST AnyQualifiedId COLON Type EXTERN SEMI { ($1, DConst ($2, $4)) }
+  | FUNCTION Attrs AnyIdOrOp TFormalsBracket LPAREN Formals RPAREN COLON FunRet COLONEQ AnyId SEMI
+    { ($1, DFun {
+        fname = $3;
+        fghost = Ghost;
+        ftargs = $4;
+        fargs = $6;
+        fret_name = fst $9;
+        fret = snd $9;
+        fspecs = [];
+        fbody = None;
+        fattrs = (Reserved "alias", [EVar $11])::$2}
+      )
+    }
+  | FUNCTION Attrs AnyIdOrOp TFormalsBracket LPAREN Formals RPAREN COLON FunRet Specs EXTERN SEMI
+    { ($1, DFun {
+        fname = $3;
+        fghost = Ghost;
+        ftargs = $4;
+        fargs = $6;
+        fret_name = fst $9;
+        fret = snd $9;
+        fspecs = $10;
+        fbody = None;
+        fattrs = $2}
+      )
+    }
   | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
     {
       (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = None; pattrs = $2})

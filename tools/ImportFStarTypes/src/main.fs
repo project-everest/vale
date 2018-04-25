@@ -656,11 +656,18 @@ let rec trees_of_comma_list (es:string_tree list):string_tree list =
   | [e] -> [e]
   | e::es -> (st_list [e; st_leaf ","])::(trees_of_comma_list es)
 
-let tree_of_vale_id (id:id):string_tree =
-  match id with
-  | {name = Some x} ->
+let rec tree_of_vale_name (x:string):string_tree =
+  let r = tree_of_vale_name in
+  match x with
+  | _ when x.EndsWith(".decreases") -> r (x.Replace(".decreases", "._decreases"))
+  | _ when x.EndsWith(".modifies") -> r (x.Replace(".modifies", "._modifies"))
+  | _ ->
       let x = if x.StartsWith("'") then "_" + x else x in
       st_leaf (x.Replace("#", "_"))
+
+let tree_of_vale_id (id:id):string_tree =
+  match id with
+  | {name = Some x} -> tree_of_vale_name x
   | _ -> err ("internal error: tree_of_vale_id: " + string_of_id id)
 
 let tree_of_vale_kind (e:exp):string_tree =
@@ -709,7 +716,7 @@ let rec tree_of_vale_exp (env:env) (e:exp):string_tree =
       let ss = List.map2 f ts (List.map snd aes) in
       st_paren [r e; st_paren (trees_of_comma_list ss)]
   | ELet ((_, x, Some t), e1, e2) ->
-      st_paren [st_list [st_leaf "let"; tree_of_vale_id x; st_leaf ":"; tree_of_vale_type t; st_leaf "="; r e1; st_leaf "in"]; r e2]
+      st_paren [st_list [st_leaf "let"; tree_of_vale_id x; st_leaf ":"; tree_of_vale_type t; st_leaf ":="; r e1; st_leaf "in"]; r e2]
   | _ -> err ("internal error: tree_of_vale_exp: " + string_of_exp e)
 
 // returns parameters, requires, ensures, return type
@@ -752,7 +759,7 @@ let tree_of_vale_decl (env:env) (d:decl):string_tree =
             [st_paren (trees_of_comma_list (List.map f bs))]
         in
       let typing = [st_leaf ":"; tree_of_vale_kind d.d_typ; st_leaf "extern"; st_leaf ";"] in
-      st_list ([st_leaf "type"; st_leaf d.d_name] @ ps @ typing)
+      st_list ([st_leaf "type"; tree_of_vale_name d.d_name] @ ps @ typing)
     )
   | "val" ->
     (
@@ -762,11 +769,13 @@ let tree_of_vale_decl (env:env) (d:decl):string_tree =
         match bs with
         | [] -> ("const", [])
         | _ ->
+            let (bst, bsv) = List.partition (fun (_, _, t) -> match t with Some (EType _) -> true | _ -> false) bs in
             let f (a, x, t) =
               let tree_a = match a with Explicit -> [] | _ -> [st_leaf "#"] in
               st_list (tree_a @ [tree_of_vale_id x; st_leaf ":"; tree_of_vale_type_kind (Option.get t)])
               in
-            ("function", [st_paren (trees_of_comma_list (List.map f bs))])
+            let tparams = match bst with [] -> [] | _ -> [make_st_list "#[" "]" (trees_of_comma_list (List.map f bst))] in
+            ("function", tparams @ [st_paren (trees_of_comma_list (List.map f bsv))])
         in
       let tree_req = List.map (fun e -> st_list [st_leaf "requires"; tree_of_vale_exp env e; st_leaf ";"]) reqs in
       let tree_t = tree_of_vale_type t in
@@ -777,7 +786,7 @@ let tree_of_vale_decl (env:env) (d:decl):string_tree =
             (st_paren [tree_of_vale_id x; st_leaf ":"; tree_t], [st_list [st_leaf "ensures"; tree_of_vale_exp env e; st_leaf ";"]])
         in
       let typing = [st_leaf ":"; tree_t] @ tree_req @ tree_ens @ [st_leaf "extern"; st_leaf ";"] in
-      st_list ([st_leaf prefix; st_leaf d.d_name] @ ps @ typing)
+      st_list ([st_leaf prefix; tree_of_vale_name d.d_name] @ ps @ typing)
     )
   | _ -> err ("internal error: tree_of_vale_decl: " + d.d_category)
 

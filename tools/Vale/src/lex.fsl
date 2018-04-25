@@ -140,6 +140,7 @@ and lextoken = parse
 | "(" { LPAREN (curLoc lexbuf) }
 | ")" { RPAREN (curLoc lexbuf) }
 | "?[" { QLBRACKET (curLoc lexbuf) }
+| "#[" { HASHLBRACKET (curLoc lexbuf) }
 | "[" { LBRACKET (curLoc lexbuf) }
 | "]" { RBRACKET (curLoc lexbuf) }
 | "{:" { LBRACECOLON (curLoc lexbuf) }
@@ -154,10 +155,12 @@ and lextoken = parse
     let op_tok s = 
       match (s, operatorToken s false s, Map.tryFind s !custom_tokens) with
       | ("@", _, _) -> AT loc
+      | ("#", _, _) -> HASH loc
       | (".", _, _) -> DOT loc
       | (":", _, _) -> COLON loc
       | (":|", _, _) -> COLONBAR loc
       | ("::", _, _) -> COLONCOLON loc
+      | ("->", _, _) -> MINUSGT loc
       | (_, None, None) -> parse_err ("unknown token '" + s + "'")
       | (_, None, Some f) -> f loc
       | (_, Some f, _) -> f loc
@@ -169,6 +172,7 @@ and lextoken = parse
       let s = s.Substring(0, s.Length - 2) in skip_line lexbuf; op_tok s
     | _ -> op_tok s
   }
+| "Type" { TTYPE (curLoc lexbuf) }
 | "type" { TYPE (curLoc lexbuf) }
 | "const" { CONST (curLoc lexbuf) }
 | "readonly" { READONLY (curLoc lexbuf) }
@@ -195,6 +199,7 @@ and lextoken = parse
 | "call" { CALL (curLoc lexbuf) }
 | "forall" { FORALL (curLoc lexbuf) }
 | "exists" { EXISTS (curLoc lexbuf) }
+| "fun" { FUN (curLoc lexbuf) }
 | "lambda" { LAMBDA (curLoc lexbuf) }
 | "old" { OLD (curLoc lexbuf) }
 | "this" { THIS (curLoc lexbuf) }

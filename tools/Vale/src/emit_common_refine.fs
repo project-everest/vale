@@ -933,8 +933,11 @@ let build_code (env:env) (benv:build_env) (stmts:stmt list):fun_decl =
   {
     fname = benv.code_name;
     fghost = NotGhost;
+    ftargs = [];
     fargs = fParams;
+    fret_name = None;
     fret = tCode;
+    fspecs = [];
     fbody =
       if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
       else Some (build_code_block env stmts);
@@ -1299,8 +1302,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       {
         fname = Reserved ("trigger_" + (string_of_id p.pname));
         fghost = Ghost;
+        ftargs = [];
         fargs = (Reserved "id", Some tInt)::ghostArgs;
+        fret_name = None;
         fret = tBool;
+        fspecs = [];
         fbody = Some (EBool true);
         fattrs = [];
       }
@@ -1314,8 +1320,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       {
         fname = Reserved ("triggerexists_" + (string_of_id p.pname));
         fghost = Ghost;
+        ftargs = [];
         fargs = ghostRets;
+        fret_name = None;
         fret = tBool;
+        fspecs = [];
         fbody = Some (EBool true);
         fattrs = [];
       }
@@ -1324,8 +1333,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       {
         fname = Reserved ("req_" + (string_of_id p.pname));
         fghost = Ghost;
+        ftargs = [];
         fargs = reqArgs (*@ paramMods*) @ reqMods;
+        fret_name = None;
         fret = tBool;
+        fspecs = [];
         fbody = Some (eReq false);
         fattrs = [(Id "opaque", [])];
       } in
@@ -1339,8 +1351,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       {
         fname = specId;
         fghost = Ghost;
+        ftargs = [];
         fargs = ensArgs (*@ paramModsInOut*) @ specModsInOut;
+        fret_name = None;
         fret = tBool;
+        fspecs = [];
         fbody = Some eSpec;
         fattrs = [(Id "opaque", [])];
       } in

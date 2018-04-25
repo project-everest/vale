@@ -165,9 +165,12 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
       {
         fname = id;
         fghost = Ghost;
+        ftargs = [];
         fargs = pParams;
+        fret_name = None;
 //        fret = TApp (TName (Reserved "quickCode"), [tUnit; tCodeApp]);
         fret = TApp (TName (Id "quickCodes"), [tUnit; tCodeApp]);
+        fspecs = [];
         fbody = Some (hide_ifs fBody);
         fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
       }
@@ -234,8 +237,11 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
     {
       fname = Reserved ("qcode_" + (string_of_id p.pname));
       fghost = NotGhost;
+      ftargs = [];
       fargs = qParams;
+      fret_name = None;
       fret = tRetQuick;
+      fspecs = [];
       fbody = Some (hide_ifs eQuick);
       fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
     }

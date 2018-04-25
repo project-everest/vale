@@ -190,8 +190,11 @@ PROGRAM ::= INCLUDE ... INCLUDE DECL ... DECL
 INCLUDE ::= include "STRING"
 
 DECL ::=
+  | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND <i>[</i>:= TYPE<i>]</i>
   | <a href="#state">var</a> x : TYPE ;
+  | const x : TYPE extern ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
+  | function f <i>[</i> #[ TFORMALS ] <i>]</i> ( FORMALS ) : FRET SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
@@ -199,6 +202,13 @@ DECL ::=
 
 FORMALS ::= FORMAL , ... , FORMAL
 FORMAL ::= x <i>[</i>: TYPE<i>]</i>
+
+FRET ::=
+  | TYPE
+  | ( x : TYPE )
+
+TFORMALS ::= TFORMAL , ... , TFORMAL
+TFORMAL ::= x : KIND
 
 PFORMALS ::= PFORMAL , ... , PFORMAL
 <a href="#parameters">PFORMAL</a> ::=
@@ -291,6 +301,8 @@ EXP ::=
   | @x
   | const(EXP)
   | f ( EXP , ... , EXP )
+  | f #[ TYPE , ... , TYPE ] ( EXP , ... , EXP )
+  | # TYPE ( EXP )
   | EXP [ EXP ]
   | EXP [ EXP := EXP ]
   | EXP ?[ EXP ]
@@ -322,7 +334,13 @@ TYPE ::=
   | t
   | TYPE ( TYPE , ... , TYPE )
   | tuple ( TYPE , ... , TYPE )
+  | fun ( TYPE , ... , TYPE ) -> TYPE
   | ( TYPE )
+
+KIND ::=
+  | Type ( 0 )
+  | Type ( 1 )
+  | ...
     </pre>
     </td>
     <td>
@@ -334,7 +352,10 @@ TYPE ::=
 
 
 
-function f(x:int, y:int):bool
+
+
+function f(x:int, y:int):bool;
+
       
 
 procedures p(ghost x:int) returns(ghost y:int)
@@ -344,6 +365,13 @@ procedures p(ghost x:int) returns(ghost y:int)
   ensures 
     x &lt;= y;
 { ... }
+
+
+
+
+
+
+
 
 
 
@@ -433,7 +461,9 @@ eax, (ghost var x:int), y := myProc(ebx, edx, z);
 
 
 
-
+list_append(list(10, 20), list(30, 40))
+list_append#[int](list(10, 20), list(30, 40))
+#(set(uint32))(x) // cast x to type set(uint32)
 
       
 m?[10] // Dafny only; like Dafny's "10 in m"
@@ -465,6 +495,12 @@ forall x, y {foo(x, y)} :: foo(x, y) || x == y
 uint32
 map(int, set(uint32))
 tuple(int, int, bool)
+fun(int, int) -> bool
+
+
+
+
+
 ---
     </pre>
     </td>

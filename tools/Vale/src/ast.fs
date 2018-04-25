@@ -6,6 +6,9 @@ type loc = {loc_file:string; loc_line:int; loc_col:int; loc_pos:int}
 
 type id = Id of string | Reserved of string | Operator of string
 
+type kind =
+| KType of bigint
+
 type bnd = Int of bigint | NegInf | Inf
 type typ =
 | TName of id
@@ -13,7 +16,7 @@ type typ =
 | TVar of id
 | TInt of bnd * bnd
 | TArrow of typ list * typ
-// TODO: polytype and kind
+// TODO: polytype
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
@@ -71,7 +74,8 @@ type exp =
 | EBool of bool
 | EString of string
 | EOp of op * exp list
-| EApply of id * exp list
+| EApply of id * exp list // TODO: change to exp * exp list
+| EApplyTyped of id * typ list * exp list // REVIEW: change to id * typ list
 | EBind of bindOp * exp list * formal list * triggers * exp
 | ECast of exp * typ
 
@@ -141,6 +145,9 @@ type spec =
 | Modifies of mod_kind * exp
 | SpecRaw of spec_raw
 
+type type_infer = InferExplicit | InferImplicit
+type tformal = id * kind * type_infer
+
 type inline_kind = Outline | Inline
 type inout = In | Out | InOut
 type pformal = id * typ * var_storage * inout * attrs
@@ -149,8 +156,11 @@ type fun_decl =
   {
     fname:id;
     fghost:ghost;
+    ftargs:tformal list;
     fargs:formal list;
+    fret_name:id option;
     fret:typ;
+    fspecs:(loc * spec) list;
     fbody:exp option;
     fattrs:attrs;
   }
@@ -172,7 +182,9 @@ type prag =
 | ResetOptions of string
 
 type decl =
+| DType of id * tformal list * kind * typ option
 | DVar of id * typ * var_storage * attrs
+| DConst of id * typ
 | DFun of fun_decl
 | DProc of proc_decl
 | DVerbatim of attrs * string list
