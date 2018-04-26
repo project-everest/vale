@@ -85,8 +85,19 @@ let lemma_of_list_degree l =
 let lemma_add_define a b =
   FStar.Classical.forall_intro (lemma_add_define_i a b)
 
+(* THIS WILL SOON BE IN FStar.Classical and we can remove it from here *)
+private
+let forall_intro_2_with_pat
+                   (#a:Type) (#b:(a -> Type))
+                   (#c: (x:a -> y:b x -> Type))
+                   (#p:(x:a -> b x -> GTot Type0))
+                   ($pat: (x:a -> y:b x -> Tot (c x y)))
+                   ($f: (x:a -> y:b x -> Lemma (p x y)))
+  : Lemma (forall (x:a) (y:b x).{:pattern (pat x y)} p x y)
+  = FStar.Classical.forall_intro_2 f
+
 let lemma_add_define_all () =
-  FStar.Classical.forall_intro_2 lemma_add_define
+  forall_intro_2_with_pat (fun a b -> (a +. b)) lemma_add_define
 
 let lemma_mul_distribute_left a b c =
   lemma_mul_commute (a +. b) c;
