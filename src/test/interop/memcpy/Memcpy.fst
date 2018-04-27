@@ -43,14 +43,14 @@ let post_v (s1:state) (s2:state) (src:buf) (dst:buf{disjoint src dst}) (m:HS.mem
   s2.ok /\
   post_cond (up_mem64 s1.mem addrs buffers m) (up_mem64 s2.mem addrs buffers m) src dst
 
-#set-options "--z3rlimit 300 --initial_fuel 2 --initial_ifuel 1"
+#set-options "--z3rlimit 300 --initial_fuel 4 --initial_ifuel 1"
 
 let correct_memcpy (s:state{s.ok}) (src:buf) (dst:buf{disjoint src dst}) 
   (m:HS.mem{live m src /\ live m dst}) : Lemma
   (requires (pre_v s src dst m) /\ addrs.[(as_addr src, idx src, length src)] = eval_reg Rax s /\ addrs.[(as_addr dst, idx dst, length dst)] == eval_reg Rbx s)
   (ensures (let s' = memcpy_vale s in post_v s s' src dst m)) =
   let s' = memcpy_vale s in
-  let (buffers: list (buffer UInt64.t){list_live m buffers /\ list_disjoint_or_eq buffers}) = [src; dst] in
+  let buffers = [src; dst] in
   up_mem_liveness64 s.mem s'.mem addrs buffers m;
   ()
 
