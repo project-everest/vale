@@ -15,30 +15,34 @@ let reset_type_vars() =
 let next_type_var() : typ =
   let tvar = "u" + string (!tvar_count) in
   incr tvar_count;
-  TVar (Id tvar)
+  TVar (Id tvar, None)
 
 type typ_constraints = (typ * typ) list
 type substitutions = Map<id, typ>
 
-type kind =
-| TYPE of int
-| KApp of kind list * kind
+type decl_type =
+  {
+    targs:typ list;
+    trets:typ list;
+    ret_name:id option;
+    specs:(loc * spec) list;
+    attrs:attrs;
+  }
 
 type name_info =
-| Info of typ * id_info
-| Func_decl of fun_decl
-| Proc_decl of (proc_decl * proc_decl option) // second proc_decl is for raw_proc
-| Name of string
-| Type_info of kind
+| Info of typ
+| Func_decl of decl_type
+| Proc_decl of decl_type // second proc_decl is for raw_proc
+| Type_info of (tformal list * kind * typ option)
 
 type scope_mod =
 | Open_module of string
 | Module_abbrev of (string * string)
-| Variable of (id * typ * id_info)
-| Func of (id * fun_decl)
-| Proc of (id * proc_decl * proc_decl option)
-| Type of (id * kind)
-| Symbol of string
+| Variable of (id * typ)
+| Func of (id * decl_type)
+| Proc of (id * decl_type)
+| Type of (id * tformal list * kind * typ option)
+| Const of (id * typ)
 
 type env = {
   curmodule: option<string>; (* name of the module being typechecked *)
@@ -77,11 +81,10 @@ let name_of_id x =
 let lookup_name (env:env) (x:id) (nameOnly:bool) =
   let (mn, sn) = name_of_id x in
   let find = function
-    | Variable (s, t, info) when s=x -> Some (Info (t, info))
+    | Variable (s, t) when s=x -> Some (Info t)
     | Func (s, decl) when s=x -> Some (Func_decl decl)
-    | Proc (s, decl, raw_decl) when s=x -> Some (Proc_decl (decl,raw_decl))
-    | Type (s, kind) when s=x -> Some (Type_info kind)
-    | Symbol s when (mn = "" && sn = s) -> Some (Name s)
+    | Proc (s, decl) when s=x -> Some (Proc_decl decl)
+    | Type (s, ts, kind, t) when s=x -> Some (Type_info (ts, kind, t))
     | _ -> None
   let rec aux = function
     | a :: q -> 
@@ -102,27 +105,24 @@ let base_typ t =
   | TName (Id "nat") -> TInt(Int bigint.Zero, Inf)
   | _ -> t
 
-let push_id env id t info =
+let push_id env id t =
   let t = base_typ t in
-  push_scope_mod env (Variable (id, t, info))
+  push_scope_mod env (Variable (id, t))
   
-let push_func env id func =
-  push_scope_mod env (Func (id, func))
+let push_func env id t =
+  push_scope_mod env (Func (id, t))
   
-let push_proc env id proc raw_proc =
-  push_scope_mod env (Proc (id, proc, raw_proc))
+let push_proc env id t =
+  push_scope_mod env (Proc (id, t))
 
-let param_info isRet (x, t, g, io, a) =
-  match g with
-  | (XAlias (AliasThread, e)) -> ThreadLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}
-  | (XAlias (AliasLocal, e)) -> ProcLocal {local_in_param = (io = In && (not isRet)); local_exp = e; local_typ = Some t}
-  | XInline -> InlineLocal (Some t)
-  | XOperand -> OperandLocal (io, t)
-  | XPhysical | XState _ -> err ("variable must be declared ghost, operand, {:local ...}, or {:register ...} " + (err_id x))
-  | XGhost -> GhostLocal ((if isRet then Mutable else Immutable), Some t)
-    
+let push_typ env id ts k t =
+  push_scope_mod env (Type (id, ts, k, t))
+
+let push_const env id t =
+  push_scope_mod env (Const (id, t))
+   
 let push_rets (env:env) (rets:pformal list):env =
-  {env with scope_mods = List.fold (fun s (x, t, g, io, a) -> Variable (x, t, (param_info true (x, t, g, io, a))):: s) env.scope_mods rets}
+  {env with scope_mods = List.fold (fun s (x, t, g, io, a) -> Variable (x, t):: s) env.scope_mods rets}
 
 let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):env =
   let arg_in_rets arg l = List.exists (fun elem -> elem = arg) l in
@@ -132,7 +132,7 @@ let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):e
     | a::q ->
     let (x, t, _, _, _) = a in
     let t = base_typ t in
-    let s = if arg_in_rets a rets then s else Variable (x, t, (param_info false a)):: s in
+    let s = if arg_in_rets a rets then s else Variable (x, t):: s in
     aux s q in
   {env with scope_mods = aux env.scope_mods args}
 
@@ -141,26 +141,53 @@ let push_lhss (env:env) (lhss:lhs list):env =
     match dOpt with 
     | Some (tOpt, _) -> 
       let t = match tOpt with Some t -> t | None -> next_type_var() in
-      Variable (x, t, (GhostLocal (Mutable, Some t)))::s
+      Variable (x, t)::s
     | None -> s
   {env with scope_mods = List.fold push_lhs env.scope_mods lhss }    
   
 let push_formals (env:env) (formals:formal list): env =
-  {env with scope_mods = List.fold (fun s (x, t) -> let t = match t with Some t-> t | _->next_type_var() in Variable (x, t, (GhostLocal (Immutable, Some t))):: s) env.scope_mods formals}
+  {env with scope_mods = List.fold (fun s (x, t) -> let t = match t with Some t-> t | _->next_type_var() in Variable (x, t):: s) env.scope_mods formals}
 
-let lookup_id (env:env) (x:id): (typ * id_info) = 
+let lookup_id (env:env) (x:id): typ = 
   match lookup_name env x false with
-  | Some (Info (t, info)) -> (t, info)
+  | Some (Info t) -> t
   | _ -> err ("cannot find id '" + (err_id x) + "'")
 
-let lookup_proc (env:env) (x:id): proc_decl =
+let compute_proc_typ p =
+  let args = List.map (fun (_, t, _, _, _) -> base_typ t) p.pargs in
+  let rets = List.map (fun (_, t, _, _, _) -> base_typ t) p.prets in
+  {targs=args; trets=rets; ret_name=None; specs=p.pspecs; attrs=p.pattrs}     
+
+let compute_func_typ f =
+  let targs = List.map (fun (id, kind, _) -> TVar (id, Some kind)) f.ftargs in
+  let rec replace_typ_arg t =
+    match t with
+    | TName id -> 
+      match List.tryFind (fun tv -> match tv with | TVar (x, _) -> id=x | _ -> false) targs with
+      | Some tv -> tv
+      | None -> t
+    | TApp (t, ts) -> TApp (replace_typ_arg t, List.map replace_typ_arg ts)
+    | TVar (_, _) -> err ("shouldn't have TVAR")
+    | TInt (_, _) -> t
+    | TList t -> TList (replace_typ_arg t)
+    | TTuple ts -> TTuple (List.map replace_typ_arg ts)
+    | TArrow (ts, t) -> TArrow (List.map replace_typ_arg ts, replace_typ_arg t)
+  let arg_typ targs t = 
+    let t = match t with | Some t -> base_typ t | None -> next_type_var() in
+    replace_typ_arg t
+  let args = List.map (fun (id, t) -> arg_typ f.ftargs t) f.fargs in
+  let rets = [replace_typ_arg f.fret] in
+  {targs=args; trets=rets; ret_name=f.fret_name; specs=f.fspecs; attrs=f.fattrs}     
+
+let lookup_proc (env:env) (x:id): decl_type =
   match lookup_name env x false with
-  | Some (Proc_decl (proc_decl, _)) -> proc_decl
-  | _ -> err ("cannot find proc '" + (err_id x) + "'")
+  | Some (Proc_decl t) -> t
+  | Some (Func_decl t) -> t
+  | _ -> err ("cannot find fun/proc '" + (err_id x) + "'")
 
 let lookup_type (env:env) (x:id): kind =
   match lookup_name env x false with
-  | Some (Type_info k) -> k
+  | Some (Type_info (ts, k, t)) -> k
   | _ -> err ("cannot find type '" + (err_id x) + "'")
 
 let compute_bound (l1:bigint) (h1:bigint) (l2:bigint) (h2:bigint) (op:bop): (bigint * bigint) =
@@ -221,6 +248,9 @@ let isLogicOp op = match op with | BEquiv | BImply | BExply | BAnd | BOr -> true
 let isIcmpOp op = match op with | BLt | BGt | BLe | BGe -> true | _ -> false
 
 let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * typ_constraints ) =  
+  let rec infer_arg_typ env (tl, ae, s) (e:exp) (t:typ option): (typ list * aexp list * typ_constraints) = 
+    let (t1, ae1, s1) = infer_exp env e t in
+    (tl@[t1], ae@[ae1], s@s1) in
   let (t, ae, s) = 
     match e with  
     | ELoc (loc, e) -> 
@@ -231,7 +261,7 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * ty
       let et = match expected_typ with | None -> t | Some t -> t
       (t, AEVar (Reserved "this", t, et), [])
     | EVar x -> 
-      let (t,_) = lookup_id env x in
+      let t = lookup_id env x in
       let et = match expected_typ with | None -> t | Some t -> t
       (t, AEVar (x, t, et), [])    
     | EInt i ->
@@ -319,18 +349,31 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * ty
       err ("missing typing rule for BCustom")
     | EOp (op, es) -> 
       err ("not implemented")
+    | EApply (Id "list", es) ->
+      let tv = next_type_var() in
+      let arg_typ = next_type_var() in
+      let (arg_typs, aes, s) = List.fold (fun (tl, ae, s) e -> infer_arg_typ env (tl, ae, s) e (Some arg_typ)) ([],[],[]) es in
+      let et = TList arg_typ in
+      let ae = AEApply (Id "list", aes, [tv], [et]) in
+      let s = List.fold (fun l t -> l@[(t, arg_typ)]) s arg_typs in
+      (tv, ae, [(tv, et)]@s)
+    | EApply (Id "tuple", es) ->
+      let tv = next_type_var() in
+      let (arg_typs, aes, s) = List.fold (fun (tl, ae, s) e -> infer_arg_typ env (tl, ae, s) e None) ([],[],[]) es in
+      let et = TTuple arg_typs in
+      let ae = AEApply (Id "tuple", aes, [tv], [et]) in
+      let s = s@[(tv, et)]
+      (tv, ae, s)
     | EApply (x, es) ->
       let p = lookup_proc env x in
-      if List.length p.pargs <> List.length es then err ("number of args doesn't match number of parameters");         
-      let param_typs = List.map (fun (_, t, _, _, _) -> base_typ t) p.pargs in
-      let (ret_typs, tvs) = List.fold (fun (l, s) (_, t, _, _, _) -> (l@[base_typ t], s@[next_type_var()])) ([],[]) p.prets in
-      let rec infer_arg_typ env (tl, ae, s) t e : (typ list * aexp list * typ_constraints) = 
-        let (t1, ae1, s1) = infer_exp env e (Some t) in
-        (tl@[t1], ae@[ae1], s@s1)
-      let (arg_typs, aes, s) = List.fold2 (fun (tl, ae, s) t e -> infer_arg_typ env (tl, ae, s) t e) ([],[],[]) param_typs es in
+      if List.length p.targs <> List.length es then err ("number of args doesn't match number of parameters");         
+      let param_typs = p.targs in
+      let ret_typs = p.trets in
+      let tvs = List.map (fun t -> next_type_var()) p.trets in
+      let (arg_typs, aes, s) = List.fold2 (fun (tl, ae, s) t e -> infer_arg_typ env (tl, ae, s) e (Some t)) ([],[],[]) param_typs es in
       let ae = AEApply (x, aes, tvs, ret_typs) in
       let s = List.fold2 (fun l t1 t2 -> l@[(t1, t2)]) s param_typs arg_typs in
-      let s = List.fold2 (fun l t1 t2 -> l@[(t1, t2)]) s ret_typs tvs in
+      let s = List.fold2 (fun l t1 t2 -> l@[(t1, t2)]) s ret_typs tvs in 
       if (List.length tvs <> 1) then err ("more than 1 function return types, not implemented")
       else (tvs.Head, ae, s)
     | EBind (b, es, fs, ts, e) -> 
@@ -342,19 +385,43 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * ty
       else err ("cast between types that does not have subtype relationship")
   (base_typ t, ae, s)
 
+let kind_equal k1 k2 =
+  match (k1, k2) with
+  | (KType i1, KType i2) -> i1=i2 
+
+let rec resolve_type env t:kind =
+  match t with 
+  | TName id -> lookup_type env id
+  | TApp (t, ts) -> resolve_type env t
+  | TArrow (ts, t) -> err ("not implemented")
+  | TInt(_, _) -> KType bigint.Zero
+  | _ -> err ("not implemented")
+and resolve_types env ts = List.map (resolve_type env) ts;
+
+let match_kind env (t:typ) (k:kind option) =
+  match k with
+  | Some k ->
+    kind_equal (resolve_type env t) k
+  | None -> true
+
 (* substitute all occurrences of x in t with s *)
-let rec subst (x:id) (s:typ) (t:typ): typ =
+let rec subst env (x:id) (s:typ) (t:typ): typ =
   match t with
-  | TVar y -> if x = y then s else t
-  | TApp (t, ts) -> TApp (subst x s t, subst_typs x s ts)
-  | TArrow (ts, t) -> TArrow (subst_typs x s ts, subst x s t)
+  | TVar (y, k) -> 
+    if x = y then 
+      if match_kind env s k then s else err "kind does not match" 
+    else t
+  | TApp (t, ts) -> TApp (subst env x s t, subst_typs env x s ts)
+  | TArrow (ts, t) -> TArrow (subst_typs env x s ts, subst env x s t)
+  | TList t -> TList (subst env x s t)
+  | TTuple ts -> TTuple (subst_typs env x s ts)
   | _ -> t
-and subst_typs (x:id) (s:typ) (ts:typ list): typ list =
-  List.fold (fun rs t -> rs@[subst x s t]) [] ts
+and subst_typs env (x:id) (s:typ) (ts:typ list): typ list =
+  List.fold (fun rs t -> rs@[subst env x s t]) [] ts
  
-let substitute (m:substitutions) (t:typ): typ =
+let substitute env (m:substitutions) (t:typ): typ =
   let s = Map.toList m in
-  List.foldBack (fun (x, s) t -> subst x s t) s t
+  List.foldBack (fun (x, s) t -> subst env x s t) s t
 
 let rec occurs (x : id) (t : typ) : bool =
   let rec aux (acc:bool) l = 
@@ -366,14 +433,14 @@ let rec occurs (x : id) (t : typ) : bool =
       else acc
     | _ -> acc in
   match t with
-  | TVar y -> x = y
+  | TVar (y, _) -> x = y
   | TApp (u, l) ->   occurs x u || aux false l
   | TArrow (l, u) -> aux false l || occurs x u
   | _ -> false
 
 let bind (m:substitutions) (x:id) (t:typ): substitutions =
   match t with
-  | TVar y -> if (x=y) then m else Map.add x t m
+  | TVar (y, k) -> if (x=y) then m else Map.add x t m
   | _ -> if occurs x t then err ("circular type constraint") else Map.add x t m
 
 let unify_lower_bound l1 l2 =
@@ -390,64 +457,64 @@ let unify_upper_bound l1 l2 =
 
 let bind_typ (m:substitutions) (s:typ) (t:typ):substitutions =
   match s with
-  | TVar x -> bind m x t
+  | TVar (x, _) -> bind m x t
   | _ -> m
 
-let rec unify_one (m:substitutions) (s:typ) (t:typ):substitutions =
-  let t1 = substitute m s in
-  let t2 = substitute m t in
+let rec unify_one env (m:substitutions) (s:typ) (t:typ):substitutions =
+  let t1 = substitute env m s in
+  let t2 = substitute env m t in
   match (t1, t2) with
-  | (TVar x, _) -> bind m x t2
-  | (_, TVar x) -> bind m x t1
+  | (TVar (x,_), _) -> bind m x t2
+  | (_, TVar (x,_)) -> bind m x t1
   | (TInt (l1, h1), TInt (l2, h2)) -> 
     let u = TInt(unify_lower_bound l1 l2, unify_upper_bound h1 h2) in
     let m = bind_typ m s u in bind_typ m t u
   | (TArrow (xs, y), TArrow (us, v)) -> 
     let tc = List.fold2 (fun l t1 t2 -> l@[(t1, t2)]) [] xs us in
-    unify m (tc@[(y, v)])
+    unify env m (tc@[(y, v)])
   | (TApp (x, ys), TApp (u, vs)) -> 
     let tc = List.fold2 (fun (l:typ_constraints) t1 t2 -> l@[(t1, t2)]) [] ys vs in
-    unify m ([(x, u)]@tc)
+    unify env m ([(x, u)]@tc)
   | (TName (Id x), TName (Id y)) -> 
     if x = y then m else err ("type mismatch ")
   | _ -> err ("type mismatch ")
 
-and unify (m:substitutions) (tc:typ_constraints):substitutions =
+and unify env (m:substitutions) (tc:typ_constraints):substitutions =
   match tc with
   | [] -> m
   | (x, y) :: t ->
-    let m = unify m t in
-    unify_one m x y in
+    let m = unify env m t in
+    unify_one env m x y in
 
 let insert_cast (e:exp) (t:typ) (et:typ) : exp =
   // cast from type 't' to 'et'
   // TODO: check the cast is legal
   ECast (e, et)
 
-let rec subst_exp (s:substitutions) (e:aexp) : exp =
+let rec subst_exp env (s:substitutions) (e:aexp) : exp =
   match e with
-  | AELoc (loc, ae) -> ELoc (loc, subst_exp s ae)
+  | AELoc (loc, ae) -> ELoc (loc, subst_exp env s ae)
   | AEVar (x, t, et) ->
-    let t = substitute s t in 
-    let et = substitute s et in
+    let t = substitute env s t in 
+    let et = substitute env s et in
     let e = EVar x in
     if (typ_equal t et) then e else insert_cast e t et
   | AEInt (i, t, et) ->
-    let t = substitute s t in 
-    let et = substitute s t in
+    let t = substitute env s t in 
+    let et = substitute env s t in
     let e = EInt i in
     if (typ_equal t et) then e else insert_cast e t et
   | AEReal (s, t) -> EReal s
   | AEBitVector (n, i, t) -> EBitVector (n, i)
   | AEBool (b, t, et) -> 
-    let et = substitute s t in
+    let et = substitute env s t in
     let e = EBool b in 
     if (typ_equal t et) then e else insert_cast e t et
   | AEString (s, t) -> EString s
   | AEOp (op, aes, t, et) ->
-    let es = List.map (fun ae -> subst_exp s ae) aes in
-    let t = substitute s t in 
-    let et = substitute s t in
+    let es = List.map (fun ae -> subst_exp env s ae) aes in
+    let t = substitute env s t in 
+    let et = substitute env s t in
     let op = 
       match op with 
       | Bop p -> 
@@ -465,38 +532,55 @@ let rec subst_exp (s:substitutions) (e:aexp) : exp =
       | _ -> op
     let e = EOp (op, es) in
     if (typ_equal t et) then e else insert_cast e t et
+  | AEApply (Id "list", aes, ts, ets) ->
+    let es = List.map (fun ae -> subst_exp env s ae) aes  in
+    let t = (List.map (fun t -> substitute env s t) ts).Head in 
+    let et = (List.map (fun t -> substitute env s t) ets).Head in
+    let e = EApply (Id "list", es) in
+    match (t, et) with
+    | (TList x, TList y) -> 
+      if typ_equal x y then
+        if (kind_equal (resolve_type env x) (KType bigint.Zero)) then e 
+        else err ("Only 'Type0' is allowed in list")
+      else 
+        err ("list type not match")
+    | _ -> err ("list type expected")
+  | AEApply (Id "tuple", aes, ts, ets) ->
+    let es = List.map (fun ae -> subst_exp env s ae) aes  in
+    let t = (List.map (fun t -> substitute env s t) ts).Head in 
+    let et = (List.map (fun t -> substitute env s t) ets).Head in
+    let e = EApply (Id "tuple", es) in
+    match (t, et) with
+    | (TTuple xs, TTuple ys) -> 
+      List.iter2 (fun t1 t2 -> if (not (typ_equal t1 t2)) then err "tuple types do not match") xs ys;
+      List.iter (fun t -> if (not (kind_equal (resolve_type env t) (KType bigint.Zero))) then err "Only 'Type0' is allowed in tuple") xs;
+      e
+    | _ -> err ("tuple type expected")
   | AEApply (x, aes, ts, ets) ->
-    let es = List.map (fun ae -> subst_exp s ae) aes  in
-    let t = List.map (fun t -> substitute s t) ts in 
-    let et = List.map (fun t -> substitute s t) ets in
+    let es = List.map (fun ae -> subst_exp env s ae) aes  in
+    let t = List.map (fun t -> substitute env s t) ts in 
+    let et = List.map (fun t -> substitute env s t) ets in
     let e = EApply (x, es) in
     let equal = List.fold2 (fun b t1 t2 -> b&&typ_equal t1 t2) true t et
     if equal then e else
       if(List.length t <> 1) then err ("cast for more than one return types not implemented");
       else insert_cast e t.Head et.Head
   | AEBind (bOp, aes, xs, ts, ae, t, et) ->
-    let es = List.map (fun ae -> subst_exp s ae) aes  in
-    let t = substitute s t in 
-    let et = substitute s t in
-    let e = subst_exp s ae in
+    let es = List.map (fun ae -> subst_exp env s ae) aes  in
+    let t = substitute env s t in 
+    let et = substitute env s t in
+    let e = subst_exp env s ae in
     let e = EBind(bOp, es, xs, ts, e) in
     if (typ_equal t et) then e else insert_cast e t et
   | AECast (ae, t) ->
-    ECast((subst_exp s ae), t)
+    ECast((subst_exp env s ae), t)
 
 let tc_exp (env:env) (e:exp): (typ * exp) = 
   let (t, ae, cl) = infer_exp env e None in
-  let s = unify Map.empty cl in
-  let t = substitute s t in
-  let es = subst_exp s ae in
+  let s = unify env Map.empty cl in
+  let t = substitute env s t in
+  let es = subst_exp env s ae in
   (t, es)
-
-let make_operand_alias (x:id) (env:env) =
-  let (_, info) = lookup_id env x in
-  match info with
-  | OperandLocal _ | StateInfo _ | OperandAlias _ -> OperandAlias (x, info)
-  | GhostLocal _ | ProcLocal _ | ThreadLocal _ | InlineLocal _ ->
-      err ("'" + (err_id x) + "' must be an operand or state member")
 
 let rec update_env_stmt (env:env) (s:stmt): env =
   match s with
@@ -504,20 +588,12 @@ let rec update_env_stmt (env:env) (s:stmt): env =
   | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SCalc _ -> env
   | SVar (x, t, m, g, a, eOpt) ->
     (
-      let info =
-        match g with
-        | XAlias (AliasThread, e) -> ThreadLocal {local_in_param = false; local_exp = e; local_typ = t}
-        | XAlias (AliasLocal, e) -> ProcLocal {local_in_param = false; local_exp = e; local_typ = t}
-        | XGhost -> GhostLocal (m, t)
-        | XInline -> InlineLocal t
-        | (XOperand | XPhysical | XState _) -> err ("variable must be declared ghost, {:local ...}, or {:register ...} " + (err_id x))
-        in
       let t = match t with Some t -> t | None -> next_type_var() in
-      push_id env x t info
+      push_id env x t
     )
   | SAlias (x, y) ->
       let t = next_type_var() in
-      push_id env x t (make_operand_alias y env)
+      push_id env x t
   | SAssign (xs, e) ->
       push_lhss env xs
   | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> env
@@ -531,32 +607,6 @@ let resolve_id env id:unit =
     match lookup_name env id true with
     | None -> err ("Identifier not found " + (err_id id))
     | Some r -> ()
-
-let rec kind_equal k1 k2 =
-  match (k1, k2) with
-  | (TYPE i1, TYPE i2) -> i1=i2
-  | (KApp (ks1, k1), KApp(ks2, k2)) ->
-    (List.fold2 (fun b k1 k2 -> b && (kind_equal k1 k2)) true ks1 ks2) && (kind_equal k1 k2)
-  
-let rec resolve_type env t:kind =
-  match t with 
-  | TName id -> lookup_type env id
-  | TApp (t, ts) -> 
-      let k = resolve_type env t in
-      tc_kind env k ts
-  | TArrow (ts, t) -> err ("not implemented")
-  | _ -> err ("not implemented")
-and tc_kind env k ts = 
-  let check env k t = 
-    if kind_equal k (resolve_type env t) then ()
-    else err ("kind of types not matching") in
-  match k with
-  | KApp (ks, k) ->
-    if (List.length ks <> List.length ts) then err ("number of parameters not match in type construct")
-    else List.iter2 (fun k t -> check env k t) ks ts;
-    k
-  | _ -> err ("wrong kind for the type")
-and resolve_types env ts = List.map (resolve_type env) ts;
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   match s with
@@ -589,7 +639,8 @@ and tc_stmts (env:env) (ss:stmt list):(env*stmt list) = List.fold (fun (env, l) 
 
 let tc_proc (env:env) (p:proc_decl): (env*proc_decl) =
   // TODO: typecheck requires/ensures etc.
-  let env = push_proc env p.pname p None in
+  let ptyp = compute_proc_typ p in
+  let env = push_proc env p.pname ptyp in
   let globals = ref env.scope_mods in 
   let env = push_params_without_rets env p.pargs p.prets in
   let env = push_rets env p.prets
@@ -604,21 +655,28 @@ let tc_proc (env:env) (p:proc_decl): (env*proc_decl) =
 let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool) =
   let ((l,d),b) = decl in
   match d with
+  | DType (x, ts, k, t) ->
+    let env = push_typ env x ts k t
+    (env, decl)
   | DVar (x, t, XAlias (AliasThread, e), _) ->
-      // TODO: type check t and e
-      let env = push_id env x t (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t}) in
-      (env, decl)
+    // TODO: type check t and e
+    let env = push_id env x t in
+    (env, decl)
   | DVar (x, t, XState e, _) ->
     ( 
       // TODO: type check t and e
       match skip_loc e with
       | EApply (Id id, es) ->
-          let env = push_id env x t (StateInfo (id, es, t)) in
+          let env = push_id env x t in
           (env, decl)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )
+  | DConst (x, t) ->
+    let env = push_const env x t in
+    (env, decl)
   | DFun ({fbody = None} as f) ->
-    let env = push_func env f.fname f in
+    let ftyp = compute_func_typ f
+    let env = push_func env f.fname ftyp in
     (env, decl)
   | DProc p ->
     let (env,p) = tc_proc env p in 

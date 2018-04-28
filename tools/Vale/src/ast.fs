@@ -13,10 +13,11 @@ type bnd = Int of bigint | NegInf | Inf
 type typ =
 | TName of id
 | TApp of typ * typ list
-| TVar of id
+| TVar of id * kind option
 | TInt of bnd * bnd
+| TList of typ
+| TTuple of typ list
 | TArrow of typ list * typ
-// TODO: polytype
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
