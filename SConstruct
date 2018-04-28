@@ -186,7 +186,7 @@ def vale_tool_dependency_Emitter(target, source, env):
   
 # add env.Vale(), to invoke Vale to compile a .vad to a .gen.dfy
 def add_vale_builder(env):
-  vale_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -in $SOURCE -out $TARGET $VALE_USER_ARGS",
+  vale_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -sourceFrom BASE src -destFrom BASE obj -in $SOURCE -out $TARGET $VALE_USER_ARGS",
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
                             emitter=vale_tool_dependency_Emitter)
