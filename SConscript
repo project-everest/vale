@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/

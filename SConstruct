@@ -260,7 +260,7 @@ if do_fstar and not stage1 and not stage2:
   # the user can always run "scons --STAGE1" and "scons --STAGE2" explicitly.
   #
   print("%s*** Running scons --STAGE1 ***%s" % (colors['yellow'], colors['end']))
-  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints') and not x.endswith('.ml')]
+  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints') and not x.endswith('.ml') and not x.endswith('.exe') and not x.endswith('.asm') and not x.endswith('.S') and not x.endswith('.obj')]
   subprocess.check_call(['python'] + args_stage1 + ['--STAGE1'])
   print("%s*** Running scons --STAGE2 ***%s" % (colors['yellow'], colors['end']))
   stage2 = True
@@ -604,16 +604,15 @@ def verify_fstar(env, targetfile, sourcefile):
     Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
   return outs
 
-def ml_name(sourcefile):
+def ml_out_name(sourcefile, suffix):
   base_name = os.path.splitext(str(sourcefile))[0]
   module_name = os.path.split(base_name)[1]
-  mlfile = 'obj/ml_out/' + module_name.replace('.', '_') + '.ml'
-  return mlfile
+  return 'obj/ml_out/' + module_name.replace('.', '_') + suffix
 
 def extract_fstar(env, sourcefile):
   base_name = os.path.splitext(str(sourcefile))[0]
   module_name = os.path.split(base_name)[1]
-  mlfile = ml_name(sourcefile)
+  mlfile = ml_out_name(sourcefile, '.ml')
   Depends(mlfile, base_name + '.fst.verified')
   env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces", ""))
   cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
@@ -713,6 +712,65 @@ def compile_vale_fstar(env, source_vaf):
   targets = env.ValeFStar(source=source_vaf, target=[target_s, target_si])
   return targets
 
+ml_out_deps = {}
+
+def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name):
+  # OCaml depends on many libraries and executables; we have to assume they are in the user's PATH:
+  ocaml_env = Environment(ENV = {'PATH' : os.environ['PATH'], 'OCAMLPATH' : env['FSTAR_PATH'] + '/bin'})
+  main_ml = ml_out_name(main_name, '.ml')
+  main_exe = ml_out_name(main_name, '.exe')
+  alg_ml = ml_out_name(alg_name, '.ml')
+  cmdline_ml = ml_out_name(cmdline_name, '.ml')
+  pointer_src = 'src/lib/util/FStar_Pointer_Base.ml'
+  pointer_ml = ml_out_name(pointer_src, '.ml')
+  pointer_cmx = ml_out_name(pointer_src, '.ml')
+  env.Command(pointer_ml, pointer_src, Copy("$TARGET", "$SOURCE"))
+  env.Command(cmdline_ml, cmdline_name, Copy("$TARGET", "$SOURCE"))
+  env.Command(main_ml, main_name, Copy("$TARGET", "$SOURCE"))
+  Depends(cmdline_ml, cmdline_name)
+  Depends(main_ml, cmdline_ml)
+  Depends(cmdline_ml, alg_ml)
+  Depends(main_ml, alg_ml)
+  done = set()
+  cmxs = []
+  def add_cmx(x_ml):
+    x_cmx = ml_out_name(x_ml, '.cmx')
+    Depends(x_cmx, pointer_cmx)
+    cmx = ocaml_env.Command(x_cmx, x_ml, "ocamlfind ocamlopt -c -package fstarlib -o $TARGET $SOURCE -I obj/ml_out")
+    cmxs.append(cmx[0])
+  def collect_cmxs_in_order(x_ml):
+    if not (x_ml in done):
+      done.add(x_ml)
+      for y_ml in ml_out_deps[x_ml]:
+        # if x depends on y, y must appear first in ocaml link step
+        Depends(ml_out_name(x_ml, '.cmx'), ml_out_name(y_ml, '.cmx'))
+        collect_cmxs_in_order(y_ml)
+      Depends(x_ml, pointer_ml)
+      add_cmx(x_ml)
+  add_cmx(pointer_ml)
+  collect_cmxs_in_order(alg_ml)
+  add_cmx(cmdline_ml)
+  add_cmx(main_ml)
+  cmxs_string = " ".join([str(cmx) for cmx in cmxs])
+  exe = ocaml_env.Command(main_exe, cmxs, "ocamlfind ocamlopt -linkpkg -package fstarlib " + cmxs_string + " -o $TARGET")
+
+  output_target_base = 'obj/' + output_base_name
+  masm_win = env.Command(output_target_base + '.asm', exe, '$SOURCE MASM Win > $TARGET')
+  gcc_win = env.Command(output_target_base + '-gcc.S', exe, '$SOURCE GCC Win > $TARGET')
+  gcc_linux = env.Command(output_target_base + '-linux.S', exe, '$SOURCE GCC Linux > $TARGET')
+  gcc_macos = env.Command(output_target_base + '-macos.S', exe, '$SOURCE GCC MacOS > $TARGET')
+  
+  if sys.platform.startswith('linux'):
+    return [gcc_linux, masm_win, gcc_win, gcc_macos]
+  elif sys.platform == 'win32':
+    return [masm_win, gcc_win, gcc_linux, gcc_macos]
+  elif sys.platform == 'cygwin':
+    return [gcc_win, masm_win, gcc_linux, gcc_macos]
+  elif sys.platform == 'darwin':
+    return [gcc_macos, gcc_win, masm_win, gcc_linux]
+  else:
+    print('Unsupported sys.platform value: ' + sys.platform)
+
 # Pseudo-builder that takes Vale code, a main .dfy, and generates a Vale EXE which then emits .asm files
 # Arguments:
 #  vads - a list of vad files to extract
@@ -786,6 +844,7 @@ def build_test(env, inputs, include_dir, output_base_name):
 
 # Add pseudobuilders to env.  
 def add_extract_code(env):
+  env.AddMethod(extract_vale_ocaml, "ExtractValeOCaml")
   env.AddMethod(extract_vale_code, "ExtractValeCode")
   env.AddMethod(extract_dafny_code, "ExtractDafnyCode")
   env.AddMethod(build_test, "BuildTest")
@@ -1010,10 +1069,15 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       targets_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
       Depends(targets_ver, sources_ver)
       if fstar_extract:
-        sources_ml = [ml_name(x) for x in sources if has_obj_dir(x)]
-        targets_ml = [ml_name(x) for x in targets if has_obj_dir(x)]
+        sources_ml = [ml_out_name(x, '.ml') for x in sources if has_obj_dir(x)]
+        targets_ml = [ml_out_name(x, '.ml') for x in targets if has_obj_dir(x)]
         sources_ml = [x for x in sources_ml if not (x in targets_ml)]
         Depends(targets_ml, sources_ml)
+        for t in targets_ml:
+          if not (t in ml_out_deps):
+            ml_out_deps[t] = set()
+          for s in sources_ml:
+            ml_out_deps[t].add(s)
   if fstar_deps_ok:
     # Save results in depsBackupFile
     with open(depsBackupFile, 'w') as myfile:
@@ -1047,7 +1111,7 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
+Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')
@@ -1105,6 +1169,18 @@ if do_fstar and stage2 and not is_single_vaf:
 
 # Verification
 env.VerifyFilesIn(verify_paths)
+
+#
+# build aesgcm
+#
+if fstar_extract and stage2:
+  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/aes-x64/Main.ml', 'src/crypto/aes/aes-x64/X64.GCMopt.vaf', 'src/lib/util/CmdLineParser.ml')
+  if env['TARGET_ARCH'] == 'amd64' and sys.platform == "win32": # x64-only; not yet tested on Linux
+    aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
+    aesgcmtest_src = 'src/crypto/aes/aes-x64/TestAesGcm.cpp'
+    aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
+    env.Command(aesgcmtest_cpp, aesgcmtest_src, Copy("$TARGET", "$SOURCE"))
+    aesgcmtest_exe = env.Program(source = [aesgcmasm_obj, aesgcmtest_cpp], target = 'obj/TestAesGcm.exe')
 
 # extract a string filename out of a build failure
 def bf_to_filename(bf):

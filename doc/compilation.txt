@@ -1,38 +1,4 @@
-
-########################################################
-#
-#  New version
-#
-########################################################
-
-scons --FSTAR-EXTRACT obj/ml_out/X64_GCMopt.ml
-cp src/crypto/aes/aes-x64/Main.ml     obj/ml_out/
-cp src/lib/util/CmdLineParser.ml      obj/ml_out/
-cp src/lib/util/FStar_Pointer_Base.ml obj/ml_out/
-
-# Must be an absolute path
-cd obj/ml_out;  OCAMLPATH="/Users/parno/git/Fstar/bin" ocamlbuild -use-ocamlfind -pkg fstarlib Main.native
-
-./Main.native GCC Linux > aes.S
-
-gcc -c aes.S -o aes.o -maes
-
-########################################################
-#
-#  Old version
-#
-########################################################
-
-make -C $FSTAR_HOME/ulib/ml
-#make -C $FSTAR_HOME/ulib install-fstar-tactics
-
-fstar.exe --smt /Users/parno/git/everest-project/z3-4.5.1.1f29cebd4df6-x64-osx-10.11.6/bin/z3 --include tools/Vale/test --include obj/Vale/test --include src/test --include obj/test --include src/arch/x64/ --include obj/arch/x64/ --include src/lib/collections/ --include src/lib/util --include src/crypto/poly1305/ --include src/crypto/poly1305/x64/ --include obj/thirdPartyPorts/OpenSSL/poly1305/x64/ --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped --max_fuel 1 --max_ifuel 1 --initial_ifuel 0 --hint_info --record_hints --use_hints --codegen OCaml --odir obj/thirdPartyPorts/OpenSSL/poly1305/x64/out obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst --lax --extract_all
-
-In X64_Vale_StrongPost_i.ml add, at line 164: 
-	type ('a, 'b, 'c) regs_match = unit
-https://github.com/FStarLang/FStar/issues/1317
-
-cp ../../../../../../src/lib/util/CmdlineParser.ml .
-cp ../../../../../../src/crypto/poly1305/x64/Main.ml .
-
-ocamlfind ocamlopt -package zarith,stdint,batteries -linkpkg -I $FSTAR_HOME/bin/fstarlib -I $FSTAR_HOME/ulib/ml/ -I $FSTAR_HOME/src/basic/ml/ -I $FSTAR_HOME/src/ocaml-output/ $FSTAR_HOME/bin/fstarlib/fstarlib.cmxa X64_Machine_s.ml X64_Semantics_s.ml X64_Vale_Regs_i.ml X64_Vale_State_i.ml X64_Vale_StateLemmas_i.ml X64_Vale_Lemmas_i.ml X64_Print_s.ml Opaque_i.ml X64_Vale_Decls.ml X64_Vale_StrongPost_i.ml Poly1305_Spec_s.ml X64_Poly1305.ml CmdlineParser.ml Main.ml
+# Make sure PATH is sufficient to run OCaml compiler before using --FSTAR-EXTRACT
+scons --FSTAR-EXTRACT obj/aesgcm.asm obj/aesgcm-gcc.S obj/aesgcm-linux.S obj/aesgcm-macos.S
+# On Windows, PLATFORM must be set to X64 to generate TestAesGcm.exe
+scons --FSTAR-EXTRACT obj/TestAesGcm.exe
