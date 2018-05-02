@@ -1175,7 +1175,7 @@ env.VerifyFilesIn(verify_paths)
 #
 if fstar_extract and stage2:
   aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/aes-x64/Main.ml', 'src/crypto/aes/aes-x64/X64.GCMopt.vaf', 'src/lib/util/CmdLineParser.ml')
-  if env['TARGET_ARCH'] == 'amd64' and sys.platform == "win32": # x64-only; not yet tested on Linux
+  if env['TARGET_ARCH'] == 'amd64': 
     aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
     aesgcmtest_src = 'src/crypto/aes/aes-x64/TestAesGcm.cpp'
     aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
