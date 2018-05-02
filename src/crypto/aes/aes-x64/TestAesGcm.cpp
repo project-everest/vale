@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <BaseTsd.h>
+#include <stdint.h>
 #include <chrono>
 
 typedef unsigned char byte;
@@ -7,9 +7,9 @@ typedef unsigned char byte;
 struct args
 {
     byte *plain_ptr;
-    UINT64 plain_len;
+    uint64_t plain_len;
     byte *auth_ptr;
-    UINT64 auth_len;
+    uint64_t auth_len;
     byte *iv_ptr;
     byte *expanded_key_ptr;
     byte *out_ptr;
@@ -38,7 +38,7 @@ void printbytes(char *label, byte *b, int len)
     printf("\n");
 }
 
-void main()
+int main()
 {
     printf("hello\n");
 
@@ -84,4 +84,5 @@ void main()
     printbytes("tag", tag, 16);
 
     printf("goodbye\n");
+    return 0;
 }
