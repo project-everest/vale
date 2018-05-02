@@ -122,7 +122,7 @@ let push_const env id t =
   push_scope_mod env (Const (id, t))
    
 let push_rets (env:env) (rets:pformal list):env =
-  {env with scope_mods = List.fold (fun s (x, t, g, io, a) -> Variable (x, t):: s) env.scope_mods rets}
+  {env with scope_mods = List.fold (fun s (x, t, g, io, a) -> Variable (x, (base_typ t)):: s) env.scope_mods rets}
 
 let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):env =
   let arg_in_rets arg l = List.exists (fun elem -> elem = arg) l in
@@ -300,6 +300,17 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * ty
       let (t, ae, s) = infer_exp env e (Some et) in
       let ae = AEOp (Uop UOld, [ae], tv, et) in
       (tv, ae, s@[(t, tv)])
+    | EOp (Uop (UIs x), [e]) ->
+      let x = Id ("uu___is_"+ (string_of_id x)) in
+      let e = EApply (x, [e]) in
+      let (t, ae, s) = infer_exp env e expected_typ in
+      let ae = 
+        match ae with 
+        | AEApply (x, es, [t], [et]) -> AEOp (Uop (UIs x), es, t, et)
+        | _ -> err ("expect apply expression") in
+      (t, ae, s)
+    | EOp (Uop op, _) ->
+      err ("unsupported Uop")
     | EOp (Bop op, [e1; e2]) when isArithmeticOp op ->
       // op in {+, -, *, /, %} 
       let tv = next_type_var() in
@@ -347,8 +358,61 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * ty
       (tv, ae, s1@s2@[(t1, TName(Id "state"));(t2, tv)])
     | EOp (Bop (BCustom op), l) ->
       err ("missing typing rule for BCustom")
+    | EOp (Subscript, [e1; e2]) ->
+      let e = EApply ((Id "subscript"), [e1; e2]) in
+      let (t, ae, s) = infer_exp env e expected_typ in
+      let ae = 
+        match ae with 
+        | AEApply (x, es, [t], [et]) -> AEOp (Subscript, es, t, et)
+        | _ -> err ("expect apply expression") in
+      (t, ae, s)
+    | EOp (Update, [e1; e2; e3]) -> 
+      let e = EApply ((Id "update"), [e1; e2; e3]) in
+      let (t, ae, s) = infer_exp env e expected_typ in
+      let ae = 
+        match ae with 
+        | AEApply (x, es, [t], [et]) -> AEOp (Update, es, t, et)
+        | _ -> err ("expect apply expression") in
+      (t, ae, s)
+    | EOp (Cond, [e1; e2; e3]) -> 
+      let tv = next_type_var() in
+      let et = match expected_typ with | None -> tv | Some t -> t in
+      let (t1, ae1, s1) = infer_exp env e1 None in
+      let (t2, ae2, s2) = infer_exp env e2 (Some et) in
+      let (t3, ae3, s3) = infer_exp env e3 (Some et) in
+      let ae = AEOp (Cond, [ae1; ae2; ae3], tv, et) in
+      (tv, ae, s1@s2@s3@[(t1, TName(Id "bool")); (t2, tv);(t3, tv)])
+    | EOp (FieldOp x, [e]) -> 
+      let (t1, _, _) = infer_exp env e None in
+      let (t, ae, s) = 
+        match (t1,x) with 
+        | (TName (Id t), (Id f)) ->
+          let s = "__proj" + t + "__item__" + f in
+          let e = EApply (Id s, [e]) in
+          infer_exp env e expected_typ
+        | _ -> err ("unknown field type") in
+      let ae = 
+        match ae with 
+        | AEApply (x, es, [t], [et]) -> AEOp (FieldOp x, es, t, et)
+        | _ -> err ("expect apply expression") in
+      (t, ae, s)
+    | EOp (FieldUpdate x, [e1; e2]) -> 
+      let (t1, _, _) = infer_exp env e1 None in
+      let (t2, ae2, s2) = infer_exp env e2 None in
+      let (t, ae, s) = 
+        match (t1,x) with 
+        | (TName (Id t), (Id f)) ->
+          let s = "__proj" + t + "__item__" + f in
+          let e = EApply (Id s, [e1]) in
+          infer_exp env e expected_typ
+        | _ -> err ("not implemented field op") in
+      let ae = 
+        match ae with 
+        | AEApply (x, es, [t], [et]) -> AEOp (FieldUpdate x, es@[ae2], t, et)
+        | _ -> err ("expect apply expression") in
+      (t, ae, s@s2@[(t2, t)])
     | EOp (op, es) -> 
-      err ("not implemented")
+      err ("unsupported Eop ") 
     | EApply (Id "list", es) ->
       let tv = next_type_var() in
       let arg_typ = next_type_var() in
@@ -376,8 +440,37 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ * aexp * ty
       let s = List.fold2 (fun l t1 t2 -> l@[(t1, t2)]) s ret_typs tvs in 
       if (List.length tvs <> 1) then err ("more than 1 function return types, not implemented")
       else (tvs.Head, ae, s)
-    | EBind (b, es, fs, ts, e) -> 
-      err ("infer for EBind not implemented")
+    | EApplyTyped (x, ts, es) ->
+      err ("not implememted")
+    | EBind (BindLet, [ex], [(x, t)], [], e) -> 
+      // TODO: x is not a local variable
+      // let x:t := ex in e
+      let tv = next_type_var() in
+      let (t1, ae1, s1) = infer_exp env ex t in
+      let (t2, ae2, s2) = infer_exp env e expected_typ in
+      let et = match expected_typ with | None -> tv | Some t -> t in
+      let ae = AEBind(BindLet, [ae1], [(x,t)], [], ae2, tv, et) in
+      let s = match t with | Some t -> [(t1, t)] | _ -> [] in
+      (tv, ae, s1@s2@s@[(tv, t2)])
+    | EBind (BindLet, [ex], xs, [], e) ->
+      // TODO: x1, x2 ... are distinct and not local variables
+      // let (x1:t1, x2:t2...) := ex in e
+      let tv = next_type_var() in
+      let (t1, ae1, s1) = infer_exp env ex None in  // TODO: expected type
+      let (t2, ae2, s2) = infer_exp env e expected_typ in
+      let et = match expected_typ with | None -> tv | Some t -> t in
+      let ae = AEBind(BindLet, [ae1], xs, [], ae2, tv, et) in
+      // TODO: xs types should match ex tpye.
+      //let s = match t with | Some t -> [(t1,t)] | _ -> [] in
+      let s = [] in
+      (tv, ae, s1@s2@s@[(tv, t2)])
+    | EBind (b, [], fs, ts, e) when b=Forall || b=Exists ->
+      // fs list of formals, that are distinct and are not local variables
+      // ts: triggers
+      // e: prop
+      let (t, ae, s) = infer_exp env e expected_typ in
+      let ae = AEBind(b, [], fs, ts, ae, t, TName(Id "prop")) in
+      (t, ae, s@[(t, TName (Id "prop"))])
     | ECast (e, tc) -> 
       let (t, ae, s) = infer_exp env e None in
       let ae = AECast (ae, tc) in
@@ -475,6 +568,10 @@ let rec unify_one env (m:substitutions) (s:typ) (t:typ):substitutions =
   | (TApp (x, ys), TApp (u, vs)) -> 
     let tc = List.fold2 (fun (l:typ_constraints) t1 t2 -> l@[(t1, t2)]) [] ys vs in
     unify env m ([(x, u)]@tc)
+  | (TName (Id "bool"), TName (Id "prop")) 
+  | (TName (Id "prop"), TName (Id "bool")) -> 
+    let u = TName (Id "prop") in
+    let m = bind_typ m s u in bind_typ m t u
   | (TName (Id x), TName (Id y)) -> 
     if x = y then m else err ("type mismatch ")
   | _ -> err ("type mismatch ")
