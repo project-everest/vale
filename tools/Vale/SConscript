@@ -36,7 +36,7 @@ def add_fslexyacc(env):
     packages_config = File('#tools/Vale/src/packages.config')
     packages_dir = Dir('#tools/FsLexYacc')
     if Execute('%s restore %s -PackagesDirectory %s' % (env['NUGET'], packages_config, packages_dir)):
-      print "Unable to run nuget in order to restore FsLexYacc.  See INSTALL.md for more details."
+      print("Unable to run nuget in order to restore FsLexYacc.  See INSTALL.md for more details.")
       Exit(1)
     #raise EnvironmentError('FsLexYacc missing.  Please install to: "%s"'%str(fslexfile))
     

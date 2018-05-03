@@ -993,7 +993,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   print(" ".join(cmd))
   try:
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
-  except subprocess.CalledProcessError, e:
+  except (subprocess.CalledProcessError) as e:
     print('%sF* dependency analysis: error: %s %s' % (colors['red'], e.output, colors['end']))
     raise e
   print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
