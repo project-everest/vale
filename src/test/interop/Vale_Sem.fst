@@ -6,7 +6,7 @@ open Machine_int
 open FStar.UInt
 open FStar.UInt8
 
-type heap = Map.t int uint8
+type heap = (m:Map.t int uint8{Map.domain m == Set.complement Set.empty})
 let op_String_Access = Map.sel
 let op_String_Assignment = Map.upd
 
@@ -37,7 +37,58 @@ let get_heap_value (ptr:int) (s:state) : nat64 =
     let mem = s.mem in
     get_heap_val ptr mem
 
+val mod_8: (n:nat64) -> uint8
 
+let mod_8 n =
+  UInt8.uint_to_t (n % 0x100)
+
+#set-options "--z3rlimit 20"
+
+private let aux0 (ptr:int) (mem:heap) : Lemma (mod_8 (get_heap_val ptr mem) == mem.[ptr]) = ()
+private let aux1 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x100) == mem.[ptr + 1]) = ()
+private let aux2 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x10000) == mem.[ptr + 2]) = ()
+
+#set-options "--z3rlimit 40"
+
+private let aux3 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x1000000) == mem.[ptr + 3]) = ()
+
+#set-options "--z3rlimit 200"
+
+private let aux4 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x100000000) == mem.[ptr + 4]) = ()
+    
+private let aux5 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x10000000000) == mem.[ptr + 5]) = ()
+
+private let aux6 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x1000000000000) == mem.[ptr + 6]) = ()    
+
+private let aux7 (ptr:int) (mem:heap) : Lemma 
+    (mod_8 ((get_heap_val ptr mem) `op_Division` 0x100000000000000) == mem.[ptr + 7]) = ()
+
+let same_mem_get_heap_val (ptr:int) (mem1 mem2:heap) : Lemma
+  (requires get_heap_val ptr mem1 == get_heap_val ptr mem2)
+  (ensures forall i. i >= ptr /\ i < ptr + 8 ==> mem1.[i] == mem2.[i]) =
+  aux0 ptr mem1;
+  aux0 ptr mem2;
+  aux1 ptr mem1;
+  aux1 ptr mem2;
+  aux2 ptr mem1;
+  aux2 ptr mem2;
+  aux3 ptr mem1;
+  aux3 ptr mem2;
+  aux4 ptr mem1;
+  aux4 ptr mem2;
+  aux5 ptr mem1;
+  aux5 ptr mem2;
+  aux6 ptr mem1;
+  aux6 ptr mem2;
+  aux7 ptr mem1;
+  aux7 ptr mem2;
+  ()
 
 let eval_operand (o:operand) (s:state) : nat64 = match o with
   | OConst n -> n
@@ -53,11 +104,6 @@ let valid_operand (o:operand) (s:state) : bool =
 
 let update_reg (r:reg) (v:nat64) (s:state) : state =
   { s with regs = fun r' -> if r' = r then v else s.regs r' }
-
-val mod_8: (n:nat64) -> uint8
-
-let mod_8 n =
-  UInt8.uint_to_t (n % 0x100)
 
 let update_heap (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr] <- (mod_8 v) in
@@ -75,6 +121,7 @@ let update_heap (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr+6] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+7] <- (mod_8 v) in
+  assert (Set.equal (Map.domain mem) (Set.complement Set.empty));
   mem
 
 let frame_update_heap (ptr:int) (v:nat64) (mem:heap) : Lemma (

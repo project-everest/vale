@@ -46,8 +46,12 @@ assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap
 let rec write_vale_mem contents (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
       (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Tot Vale_Sem.heap (decreases %[sub length i]) =
     if i >= length then curr_heap
-    else
-      write_vale_mem contents length addr (i+1) (curr_heap.[addr + i] <- FStar.Seq.index contents i)
+    else (
+      let heap = curr_heap.[addr + i] <- FStar.Seq.index contents i in
+      assert (Set.equal (Map.domain heap) (Set.complement Set.empty));
+      write_vale_mem contents length addr (i+1) heap
+    )
+
 
 let rec frame_write_vale_mem contents (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
       (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Lemma
@@ -56,8 +60,12 @@ let rec frame_write_vale_mem contents (length:nat{length = FStar.Seq.Base.length
       forall j. j < addr \/ j >= addr + length ==> curr_heap.[j] == new_heap.[j]))
       (decreases %[sub length i])=
       if i >= length then ()
-      else frame_write_vale_mem contents length addr (i+1) (curr_heap.[addr+i] <- Seq.index contents i)
-
+      else begin
+	let heap = curr_heap.[addr + i] <- FStar.Seq.index contents i in
+	assert (Set.equal (Map.domain heap) (Set.complement Set.empty));      
+	frame_write_vale_mem contents length addr (i+1) heap
+      end
+      
 let rec load_store_write_vale_mem contents (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
       (curr_heap:Vale_Sem.heap{forall j. 0 <= j /\ j < i ==> curr_heap.[addr + j] == Seq.index contents j}) : Lemma
       (requires True)
@@ -65,7 +73,11 @@ let rec load_store_write_vale_mem contents (length:nat{length = FStar.Seq.Base.l
       forall j. 0 <= j /\ j < length ==> Seq.index contents j == new_heap.[addr + j]))
       (decreases %[sub length i])=
       if i >= length then ()
-      else load_store_write_vale_mem contents length addr (i+1)  (curr_heap.[addr+i] <- Seq.index contents i)
+      else begin
+	let heap = curr_heap.[addr + i] <- FStar.Seq.index contents i in
+	assert (Set.equal (Map.domain heap) (Set.complement Set.empty));      
+	load_store_write_vale_mem contents length addr (i+1) heap
+      end
 
 let correct_down_p mem (addrs:addr_map) heap p =
   let length = B.length p in
@@ -96,7 +108,7 @@ let correct_down_p_cancel mem (addrs:addr_map) heap (p:B.buffer UInt8.t) : Lemma
   in
   Classical.forall_intro aux
       
-let correct_down_p_frame mem (addrs:addr_map) heap (p:B.buffer UInt8.t) : Lemma
+let correct_down_p_frame mem (addrs:addr_map) (heap:Vale_Sem.heap) (p:B.buffer UInt8.t) : Lemma
   (forall p'. B.disjoint p p' /\ correct_down_p mem addrs heap p' ==>       
       (let length = B.length p in
       let contents = B.as_seq mem p in
@@ -125,7 +137,9 @@ val down_mem: (mem:HS.mem) -> (addrs: addr_map) -> (ptrs:list (B.buffer UInt8.t)
 
 let down_mem mem addrs ptrs =
   (* Dummy heap *)
-  let heap : heap = FStar.Map.const (UInt8.uint_to_t 0) in
+  let heap = FStar.Map.const (UInt8.uint_to_t 0) in
+  assert (Set.equal (Map.domain heap) (Set.complement Set.empty));
+  let (heap : Vale_Sem.heap) = heap in
   let rec aux ps (accu:list (B.buffer UInt8.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
     (h:Vale_Sem.heap{correct_down mem addrs accu h}) : GTot (heap:Vale_Sem.heap{correct_down mem addrs ptrs heap}) = match ps with
     | [] -> h

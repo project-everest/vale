@@ -260,8 +260,39 @@ let store_buffer_down_mem (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
     forall j. j < base + 8 `op_Multiply` i \/ j >= base + 8 `op_Multiply` (i+1) ==>
       mem1.[j] == mem2.[j]) = admit()
 
+let store_buffer_aux_down_mem (ptr:int) (v:nat64) (s:low_state) : Lemma (
+  let mem1 = down_mem64 s.mem s.addrs s.ptrs in
+  let h1 = store_mem_aux ptr s.ptrs v s.addrs s.mem in
+  let mem2 = down_mem64 h1 s.addrs s.ptrs in
+  forall j. j < ptr \/ j >= ptr + 8 ==> mem1.[j] == mem2.[j]) =
+  admit()
+
+let store_buffer_aux_down_mem2 (ptr:int) (v:nat64) (s:low_state) : Lemma (
+  let h1 = store_mem_aux ptr s.ptrs v s.addrs s.mem in
+  let mem2 = down_mem64 h1 s.addrs s.ptrs in
+  M.get_heap_val ptr mem2 == v) =
+  admit()
+
+#set-options "--z3rlimit 60"
+
 let lemma_valid_state_store_mem i v s =
   let s' = store_mem i v s in
   assert (s.s.M.mem == down_mem64 s.mem s.addrs s.ptrs);
-  assert (s'.s == M.update_mem i v s.s);
-  assume (s'.s.M.mem == down_mem64 s'.mem s.addrs s.ptrs)
+  // assert (s'.s == M.update_mem i v s.s);
+  // assert (M.get_heap_value i s'.s == v);
+  M.frame_update_heap i v s.s.M.mem;
+  store_buffer_aux_down_mem i v s;
+  store_buffer_aux_down_mem2 i v s;
+  let mem1 = s'.s.M.mem in
+  let mem2 = down_mem64 s'.mem s.addrs s.ptrs in
+  // assert (M.get_heap_val i mem1 == v);
+  // assert (M.get_heap_val i mem2 == v);
+  M.same_mem_get_heap_val i mem1 mem2;
+  // assert (forall j. j < i \/ j >= i + 8 ==> mem1.[j] == mem2.[j]);
+  // assert (forall j. j >= i /\ j < i + 8 ==> mem1.[j] == mem2.[j]);
+  assume (forall j. mem1.[j] == mem2.[j]);
+  assert (Map.equal mem1 mem2);
+  assert (mem1 == mem2);
+//  assert (s'.s.M.mem == down_mem64 s'.mem s.addrs s.ptrs);
+  ()
+  

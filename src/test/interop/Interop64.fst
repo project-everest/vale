@@ -116,7 +116,9 @@ let correct_down_p64_cancel mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Le
   in
   Classical.forall_intro aux
 
-let correct_down_p64_frame mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Lemma
+#set-options "--z3rlimit 200"
+
+let correct_down_p64_frame mem (addrs:addr_map) (heap:heap) (p:B.buffer UInt64.t) : Lemma
   (forall (p':B.buffer UInt64.t). B.disjoint p p' /\ correct_down_p64 mem addrs heap p' ==>       
       (let length = B.length p in
       let contents = B.as_seq mem p in
@@ -151,7 +153,9 @@ val down_mem64: (mem:HS.mem) -> (addrs:addr_map) -> (ptrs:list (B.buffer UInt64.
 
 let down_mem64 mem addrs ptrs =
   (* Dummy heap *)
-  let heap : heap = FStar.Map.const (UInt8.uint_to_t 0) in
+  let heap = FStar.Map.const (UInt8.uint_to_t 0) in
+  assert (Set.equal (Map.domain heap) (Set.complement Set.empty));
+  let (heap:Vale_Sem.heap) = heap in
   let rec aux ps (accu:list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
     (h:Vale_Sem.heap{correct_down64 mem addrs accu h}) : GTot (heap:Vale_Sem.heap{correct_down64 mem addrs ptrs heap}) = match ps with
     | [] -> h
