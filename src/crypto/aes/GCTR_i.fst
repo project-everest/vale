@@ -183,11 +183,17 @@ let split_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
   admit()
 *)
 
-let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
+let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) (n':nat{ n <= n' /\ n' < length s}) :
+  Lemma(slice (le_seq_quad32_to_bytes s) (n * 16) (n' * 16) ==
+        le_seq_quad32_to_bytes (slice s n n'))
+  =
+  admit()
+
+let slice_commutes_le_seq_quad32_to_bytes0 (s:seq quad32) (n:nat{n < length s}) :
   Lemma(slice (le_seq_quad32_to_bytes s) 0 (n * 16) ==
         le_seq_quad32_to_bytes (slice s 0 n))
   =
-  admit()
+  slice_commutes_le_seq_quad32_to_bytes s 0 n
 
 (*
 Want to show that:
@@ -219,6 +225,7 @@ Internally gctr_encrypt_LE will compute:
   we end up with the same value
 *)
 
+
 let step1 (p:seq quad32) (num_bytes:nat{ num_bytes < 16 * length p }) : Lemma
   (let num_extra = num_bytes % 16 in
    let num_blocks = num_bytes / 16 in
@@ -235,7 +242,7 @@ let step1 (p:seq quad32) (num_bytes:nat{ num_bytes < 16 * length p }) : Lemma
   assert (length full_blocks == num_blocks * 16);
   assert (full_blocks == slice (slice (le_seq_quad32_to_bytes p) 0 num_bytes) 0 (num_blocks * 16));
   assert (full_blocks == slice (le_seq_quad32_to_bytes p) 0 (num_blocks * 16));
-  slice_commutes_le_seq_quad32_to_bytes p num_blocks;
+  slice_commutes_le_seq_quad32_to_bytes0 p num_blocks;
   assert (full_blocks == le_seq_quad32_to_bytes (slice p 0 num_blocks));
   le_bytes_to_seq_quad32_to_bytes (slice p 0 num_blocks);
   assert (full_quads_LE == (slice p 0 num_blocks));
@@ -288,8 +295,77 @@ let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:qua
     ();
   ()
 
+#reset-options "--z3rlimit 10" 
+let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
+  (requires (1 <= num_bytes /\ 
+             num_bytes < 16 * length plain /\
+             16 * (length plain - 1) < num_bytes /\
+             num_bytes % 16 <> 0 /\ 4096 * num_bytes < pow2_32 /\
+             length plain == length cipher /\
+             (let num_blocks = num_bytes / 16 in
+              slice cipher 0 num_blocks == gctr_encrypt_recursive icb_BE (slice plain 0 num_blocks) alg key 0 /\
+              index cipher num_blocks == gctr_encrypt_block icb_BE (index plain num_blocks) alg key num_blocks)))
+  (ensures (let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
+            let cipher_bytes = slice (le_seq_quad32_to_bytes cipher) 0 num_bytes in
+            cipher_bytes == gctr_encrypt_LE icb_BE plain_bytes alg key))
+  =
+  let num_blocks = num_bytes / 16 in
+  let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
+  let cipher_bytes = slice (le_seq_quad32_to_bytes cipher) 0 num_bytes in
+  step1 plain num_bytes;
+  let s = slice (le_seq_quad32_to_bytes plain) (num_blocks * 16) num_bytes in
+  let final_p = index plain num_blocks in
+  step2 s final_p icb_BE alg key num_blocks;
+
+  let num_extra = num_bytes % 16 in
+  let full_bytes_len = num_bytes - num_extra in
+  let full_blocks, final_block = split plain_bytes full_bytes_len in
+  assert (full_bytes_len % 16 == 0);
+  assert (length full_blocks == full_bytes_len);
+  let full_quads_LE = le_bytes_to_seq_quad32 full_blocks in
+  let final_quad_LE = le_bytes_to_quad32 (pad_to_128_bits final_block) in
+  let cipher_quads_LE = gctr_encrypt_recursive icb_BE full_quads_LE alg key 0 in
+  let final_cipher_quad_LE = gctr_encrypt_block icb_BE final_quad_LE alg key (full_bytes_len / 16) in
+  assert (cipher_quads_LE == slice cipher 0 num_blocks);   // LHS quads
+  let cipher_bytes_full_LE = le_seq_quad32_to_bytes cipher_quads_LE in
+  let final_cipher_bytes_LE = slice (le_quad32_to_bytes final_cipher_quad_LE) 0 num_extra in
+
+  assert (le_seq_quad32_to_bytes cipher_quads_LE == le_seq_quad32_to_bytes (slice cipher 0 num_blocks)); // LHS bytes
+
+  assert (length s == num_extra);
+  let q_prefix = slice (le_quad32_to_bytes final_p) 0 num_extra in
+assume (q_prefix == s); 
+  //admit();
+  assert(final_cipher_bytes_LE == slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra); // RHS bytes
+assume (slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra ==
+          slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes);
+
+  slice_commutes_le_seq_quad32_to_bytes0 cipher num_blocks;
+  assert (le_seq_quad32_to_bytes (slice cipher 0 num_blocks) == slice (le_seq_quad32_to_bytes cipher) 0 (num_blocks * 16));
+
+  assert (le_quad32_to_bytes (index cipher num_blocks) == le_seq_quad32_to_bytes (slice cipher num_blocks (length cipher)));
+
+  assert (slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra ==
+          slice (le_seq_quad32_to_bytes (slice cipher num_blocks (length cipher))) 0 num_extra);
+
+  slice_commutes_le_seq_quad32_to_bytes cipher num_blocks (length cipher);
+
+  assert (slice (le_seq_quad32_to_bytes (slice cipher num_blocks (length cipher))) 0 num_extra ==
+          slice (slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) (length cipher * 16)) 0 num_extra);
+  assert (slice (slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) (length cipher * 16)) 0 num_extra ==
+          slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes);
+
+
+  assert (slice (le_seq_quad32_to_bytes cipher) 0 (num_blocks * 16) @| 
+          slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes ==
+          slice (le_seq_quad32_to_bytes cipher) 0 num_bytes);
+  
+  assert (cipher_bytes == (le_seq_quad32_to_bytes (slice cipher 0 num_blocks)) @| slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra);
+  admit();
+  ()
+
 (*
-let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
+Let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
   (requires (1 <= num_bytes /\ num_bytes < 16 * length plain /\
              16 * (length plain - 1) < num_bytes /\
              num_bytes % 16 <> 0 /\ 4096 * num_bytes < pow2_32))
