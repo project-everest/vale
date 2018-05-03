@@ -174,19 +174,119 @@ let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm
   le_bytes_to_seq_quad32_to_bytes plain;
   ()
 
-
+(*
 let split_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
   Lemma(split (le_seq_quad32_to_bytes s) (16 * n) == 
         (let s0, s1 = split s n in
          (le_seq_quad32_to_bytes s0), (le_seq_quad32_to_bytes s1)))
   =
   admit()
+*)
 
-// Want to show that:
-//   slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, out_b))) 0 num_bytes
-//   ==
-//   gctr_encrypt_LE icb_BE (slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, in_b))) 0 num_bytes) ...
+let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
+  Lemma(slice (le_seq_quad32_to_bytes s) 0 (n * 16) ==
+        le_seq_quad32_to_bytes (slice s 0 n))
+  =
+  admit()
 
+(*
+Want to show that:
+   slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, out_b))) 0 num_bytes
+   ==
+   gctr_encrypt_LE icb_BE (slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, in_b))) 0 num_bytes) ...
+
+We know that 
+   slice (buffer128_as_seq(mem, out_b) 0 num_blocks
+   ==
+   gctr_encrypt_recursive icb_BE (slice buffer128_as_seq(mem, in_b) 0 num_blocks) ...
+
+And we know that:
+  get_mem out_b num_blocks 
+  ==
+  gctr_encrypt_block(icb_BE, (get_mem inb num_blocks), AES_128, key, num_blocks);
+
+
+Internally gctr_encrypt_LE will compute:
+  full_blocks, final_block = split (slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, in_b))) 0 num_bytes) (num_blocks * 16)
+
+  We'd like to show that
+  Step1:  le_bytes_to_seq_quad32 full_blocks == slice buffer128_as_seq(mem, in_b) 0 num_blocks
+    and 
+  Step2:  final_block == slice (le_quad32_to_bytes (get_mem inb num_blocks)) 0 num_extra
+
+  Then we need to break down the byte-level effects of gctr_encrypt_block to show that even though the
+  padded version of final_block differs from (get_mem inb num_blocks), after we slice it at the end,
+  we end up with the same value
+*)
+
+let step1 (p:seq quad32) (num_bytes:nat{ num_bytes < 16 * length p }) : Lemma
+  (let num_extra = num_bytes % 16 in
+   let num_blocks = num_bytes / 16 in
+   let full_blocks, final_block = split (slice (le_seq_quad32_to_bytes p) 0 num_bytes) (num_blocks * 16) in
+   let full_quads_LE = le_bytes_to_seq_quad32 full_blocks in
+   let p_prefix = slice p 0 num_blocks in
+   p_prefix == full_quads_LE)
+  =
+  let num_extra = num_bytes % 16 in
+  let num_blocks = num_bytes / 16 in
+  let full_blocks, final_block = split (slice (le_seq_quad32_to_bytes p) 0 num_bytes) (num_blocks * 16) in
+  let full_quads_LE = le_bytes_to_seq_quad32 full_blocks in
+  let p_prefix = slice p 0 num_blocks in
+  assert (length full_blocks == num_blocks * 16);
+  assert (full_blocks == slice (slice (le_seq_quad32_to_bytes p) 0 num_bytes) 0 (num_blocks * 16));
+  assert (full_blocks == slice (le_seq_quad32_to_bytes p) 0 (num_blocks * 16));
+  slice_commutes_le_seq_quad32_to_bytes p num_blocks;
+  assert (full_blocks == le_seq_quad32_to_bytes (slice p 0 num_blocks));
+  le_bytes_to_seq_quad32_to_bytes (slice p 0 num_blocks);
+  assert (full_quads_LE == (slice p 0 num_blocks));
+  ()
+
+let quad32_xor_bytewise (q q' r:quad32) (n:nat{ n <= 16 }) : Lemma
+  (requires (let q_bytes  = le_quad32_to_bytes q in
+             let q'_bytes = le_quad32_to_bytes q' in
+             slice q_bytes 0 n == slice q'_bytes 0 n))             
+  (ensures (let q_bytes  = le_quad32_to_bytes q in
+            let q'_bytes = le_quad32_to_bytes q' in
+            let qr_bytes  = le_quad32_to_bytes (quad32_xor q r) in 
+            let q'r_bytes = le_quad32_to_bytes (quad32_xor q' r) in                      
+            slice qr_bytes 0 n == slice q'r_bytes 0 n))
+  =
+  admit()
+
+
+let slice_pad_to_128_bits (s:seq nat8 {  0 < length s /\ length s < 16 }) :
+  Lemma(slice (pad_to_128_bits s) 0 (length s) == s)
+  =
+  assert (length s % 16 == length s);
+  assert (equal s (slice (pad_to_128_bits s) 0 (length s)));
+  ()
+
+let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int):
+  Lemma(let q_bytes = le_quad32_to_bytes q in
+        let q_bytes_prefix = slice q_bytes 0 (length s) in
+        let q_cipher = gctr_encrypt_block icb_BE q alg key i in
+        let q_cipher_bytes = slice (le_quad32_to_bytes q_cipher) 0 (length s) in
+        let s_quad = le_bytes_to_quad32 (pad_to_128_bits s) in
+        let s_cipher = gctr_encrypt_block icb_BE s_quad alg key i in
+        let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in       
+        s == q_bytes_prefix ==> s_cipher_bytes == q_cipher_bytes)
+  = 
+  let q_bytes = le_quad32_to_bytes q in
+  let q_bytes_prefix = slice q_bytes 0 (length s) in
+  //let q_cipher = gctr_encrypt_block icb_BE q alg key i in
+  //let q_cipher_bytes = slice (le_quad32_to_bytes q_cipher) 0 (length s) in
+  //let s_quad = le_bytes_to_quad32 (pad_to_128_bits s) in
+  //let s_cipher = gctr_encrypt_block icb_BE s_quad alg key i in
+  //let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in 
+  //let enc_ctr = aes_encrypt_LE alg key (reverse_bytes_quad32 (inc32 icb_BE i)) in
+  
+  if s = q_bytes_prefix then (
+    le_quad32_to_bytes_to_quad32 (pad_to_128_bits s);
+    slice_pad_to_128_bits s;
+    ()
+  ) else
+    ();
+  ()
 
 (*
 let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma

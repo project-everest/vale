@@ -166,3 +166,29 @@ let le_bytes_to_seq_quad32_to_bytes (s:seq quad32) :
   seq_map_inverses (nat_to_four 8) (four_to_nat 8) (seq_four_to_seq_LE s);
   seq_to_seq_four_to_seq_LE (s) ;
   ()
+
+(*
+le_quad32_to_bytes (le_bytes_to_quad32 s) 
+== { definition of le_quad32_to_bytes }
+seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE (le_bytes_to_quad32 s)))
+== { definition of le_bytes_to_quad32 }
+seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE (seq_to_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE s)))))
+*)
+
+let le_quad32_to_bytes_to_quad32 (s:seq nat8 { length s == 16 }) :
+  Lemma(le_quad32_to_bytes (le_bytes_to_quad32 s) == s)
+  =
+  let q = le_bytes_to_quad32 s in
+  let s' = le_quad32_to_bytes q in
+  if not (s = s') then (
+    four_to_seq_to_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE s));
+    let helper (x:four (natN (pow2_norm 8))) : Lemma (nat_to_four 8 (four_to_nat 8 x) == x) =
+      nat_to_four_to_nat x
+    in
+    FStar.Classical.forall_intro helper;  // Prove the inverse property needed for seq_map_inverses
+    seq_map_inverses (four_to_nat 8) (nat_to_four 8) (seq_to_seq_four_LE s);
+    seq_four_to_seq_to_seq_four_LE s;
+    ()
+  ) else (
+    assert (s == s')
+  )
