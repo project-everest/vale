@@ -124,7 +124,6 @@ min_test_suite_blacklist = [
   'obj/crypto/aes/aes-x64/X64.GCMopt.fst',
   'obj/crypto/aes/aes-x64/X64.GCM.fst',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
-  'obj/arch/x64/X64.Vale.InsVector.fst',
   'obj/crypto/aes/aes-x64/X64.GHash',
   'obj/crypto/aes/aes-x64/X64.GCTR.fst',
   'obj/crypto/aes/aes-x64/X64.AES.fst'

@@ -11,6 +11,8 @@ import SCons.Util
 import atexit
 import platform
 import fnmatch
+# import win32job
+# import win32api
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -26,6 +28,7 @@ if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machin
   target_x='64'
   sha_arch_dir='sha-x64'
   aes_arch_dir='aes-x64'
+  
 envDict = {'TARGET_ARCH':target_arch,
            'X':target_x,
            'ARCH':'src/arch/x$X',
@@ -39,6 +42,11 @@ if sys.platform == 'win32':
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
   env['NUGET'] = 'nuget.exe'
+  # hdl = win32job.CreateJobObject(None, "")
+  # win32job.AssignProcessToJobObject(hdl, win32api.GetCurrentProcess())
+  # extended_info = win32job.QueryInformationJobObject(self.hJob, win32job.JobObjectExtendedLimitInformation)
+  # extended_info['BasicLimitInformation']['LimitFlags'] = win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+  # win32job.SetInformationJobObject(hdl, win32job.JobObjectExtendedLimitInformation, extended_info)
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
@@ -578,7 +586,7 @@ def add_dafny_verifier(env):
 
 def on_black_list(f, list):
   for entry in list:
-    if str(f).startswith(entry):
+    if str(f).replace('\\','/').startswith(entry):
       return True
   return False
 
@@ -590,8 +598,8 @@ def verify_fstar(env, targetfile, sourcefile):
   if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
     print("Skipping %s because it is on the min_test_suite_blacklist defined in SConscript" % sourcefile)
     return outs
-#  else:
-#    print("File %s is not on the blacklist" % str(sourcefile))
+  # else:
+  #   print("File %s is not on the blacklist" % str(sourcefile))
 
   if gen_hints:
     temptargetfiles.append(hintsfile)
