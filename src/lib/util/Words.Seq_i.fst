@@ -5,20 +5,7 @@ open Words_s
 open Words.Four_s
 open Words.Seq_s
 open FStar.Mul
-
-(*
-let le_quad32_to_bytes (b:quad32) : seqn 16 nat8 =
-  seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE b))
-
-let le_bytes_to_seq_quad32 (b:seq nat8{length b % 16 == 0}) : seq quad32 =
-  seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE b)
-
-Goal: le_bytes_to_seq_quad32 ( le_quad32_to_bytes b) == b
-
-      seq_to_seq_four_LE (
-       seq_map (four_to_nat 8) (seq_to_seq_four_LE      
-			       (seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE b)))))  = b
-*)
+open Meta
 
 let seq_to_seq_four_to_seq_LE  (#a:Type) (x:seq (four a)) :
   Lemma (seq_to_seq_four_LE (seq_four_to_seq_LE x) == x)
@@ -27,12 +14,6 @@ let seq_to_seq_four_to_seq_LE  (#a:Type) (x:seq (four a)) :
   let bytes = seq_four_to_seq_LE x in
   let fours = seq_to_seq_four_LE bytes in
   assert (equal fours x);
-  ()
-
-let four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
-  Lemma (four_to_seq_LE (seq_to_four_LE x) == x)
-  =
-  assert (equal (four_to_seq_LE (seq_to_four_LE x)) x);
   ()
 
 let seq_four_to_seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) :
@@ -91,6 +72,13 @@ let nat_to_four_to_nat (x:four (natN (pow2_norm 8))) :
   ()
 
 
+let four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
+  Lemma (four_to_seq_LE (seq_to_four_LE x) == x)
+  =
+  assert (equal (four_to_seq_LE (seq_to_four_LE x)) x);
+  ()
+
+
 (*
 let seq_four_to_seq_LE (#a:Type) (x:seq (four a)) : seq a =
   let f (n:nat{n < length x * 4}) = four_select (index x (n / 4)) (n % 4) in
@@ -113,3 +101,39 @@ let four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) :
   let s1 = seq_four_to_seq_LE (create 1 x) in
   assert (equal s0 s1);
   ()
+
+(*
+let seq_four_to_seq_LE_injective () :
+  Lemma (forall (#a:eqtype) (x x':seq (four a)). seq_four_to_seq_LE x == seq_four_to_seq_LE x' ==> x == x')
+  =
+  let helper (a:eqtype) : Lemma (forall  (x x':seq (four a)) . seq_four_to_seq_LE x == seq_four_to_seq_LE x' ==> x == x')
+    =
+    (let s42s (x:seq (four a)) : (s:seq a{length s % 4 == 0}) = seq_four_to_seq_LE x in
+     generic_injective_proof (s42s) (seq_to_seq_four_LE #a) seq_to_seq_four_to_seq_LE)
+  in
+  FStar.Classical.forall_intro helper;
+  assert (forall (#a:eqtype) . forall (x x':seq (four a)) . seq_four_to_seq_LE x == seq_four_to_seq_LE x' ==> x == x');
+  ()
+  
+let seq_to_seq_four_LE_injective () :
+  Lemma (forall (#a:Type) (x:seq a{length x % 4 == 0}) (x':seq a{length x' % 4 == 0}) . seq_to_seq_four_LE x == seq_to_seq_four_LE x' ==> x == x')
+  =
+  generic_injective_proof seq_to_seq_four_LE seq_four_to_seq_LE seq_four_to_seq_to_seq_four_LE
+*)
+
+let four_to_nat_8_injective () : 
+  Lemma (forall (x x':four (natN (pow2_norm 8))) . four_to_nat 8 x == four_to_nat 8 x' ==> x == x')
+  =
+  generic_injective_proof (four_to_nat 8) (nat_to_four 8) nat_to_four_to_nat
+
+let nat_to_four_8_injective () : 
+  Lemma (forall (x x':natN (pow2_norm 32)) . nat_to_four 8 x == nat_to_four 8 x' ==> x == x')
+  =
+  generic_injective_proof (nat_to_four 8) (four_to_nat 8) four_to_nat_to_four_8
+
+(*
+let seq_to_four_LE_injective () :
+  Lemma (forall (#a:Type) (x x':seq4 a) . seq_to_four_LE x == seq_to_four_LE x' ==> x == x') 
+  =
+  generic_injective_proof seq_to_four_LE four_to_seq_LE four_to_seq_to_four_LE
+*)
