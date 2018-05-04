@@ -38,3 +38,6 @@ val seq_map_inverses (#a #b:Type) (f:a -> b) (g:b -> a) (s:seq a) : Lemma
 
 val slice_append_adds (#a:Type) (s:seq a) (i:nat) (j:nat{ i <= j /\ j <= length s }) :
   Lemma (slice s 0 i @| slice s i j == slice s 0 j)
+
+val slice_seq_map_commute (#a #b:Type) (f:a -> b) (s:seq a) (i:nat) (j:nat{ i <= j /\ j <= length s }) :
+  Lemma (slice (seq_map f s) i j == seq_map f (slice s i j))

@@ -68,3 +68,9 @@ let slice_append_adds (#a:Type) (s:seq a) (i:nat) (j:nat{ i <= j /\ j <= length 
   assert (equal (slice s 0 i @| slice s i j)
                 (slice s 0 j));
   ()
+
+let slice_seq_map_commute (#a #b:Type) (f:a -> b) (s:seq a) (i:nat) (j:nat{ i <= j /\ j <= length s }) :
+  Lemma (slice (seq_map f s) i j == seq_map f (slice s i j))
+  =
+  assert (equal (slice (seq_map f s) i j) (seq_map f (slice s i j)));
+  ()

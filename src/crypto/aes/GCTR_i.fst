@@ -174,26 +174,6 @@ let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm
   le_bytes_to_seq_quad32_to_bytes plain;
   ()
 
-(*
-let split_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
-  Lemma(split (le_seq_quad32_to_bytes s) (16 * n) == 
-        (let s0, s1 = split s n in
-         (le_seq_quad32_to_bytes s0), (le_seq_quad32_to_bytes s1)))
-  =
-  admit()
-*)
-
-let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :
-  Lemma(slice (le_seq_quad32_to_bytes s) (n * 16) (n' * 16) ==
-        le_seq_quad32_to_bytes (slice s n n'))
-  =
-  admit()
-
-let slice_commutes_le_seq_quad32_to_bytes0 (s:seq quad32) (n:nat{n <= length s}) :
-  Lemma(slice (le_seq_quad32_to_bytes s) 0 (n * 16) ==
-        le_seq_quad32_to_bytes (slice s 0 n))
-  =
-  slice_commutes_le_seq_quad32_to_bytes s 0 n
 
 (*
 Want to show that:
@@ -388,39 +368,6 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq
   assert (cipher_bytes == (le_seq_quad32_to_bytes (slice cipher 0 num_blocks)) @| slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra);
   ()
 
-(*
-Let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
-  (requires (1 <= num_bytes /\ num_bytes < 16 * length plain /\
-             16 * (length plain - 1) < num_bytes /\
-             num_bytes % 16 <> 0 /\ 4096 * num_bytes < pow2_32))
-  (ensures (let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
-            let cipher_bytes = gctr_encrypt_LE icb_BE plain_bytes alg key in
-            let cipher_quads = gctr_encrypt_recursive icb_BE plain alg key 0 in
-            let cipher_quads_bytes = le_seq_quad32_to_bytes cipher_quads in
-            cipher_bytes == slice cipher_quads_bytes 0 num_bytes))
-  =
-  let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
-  let cipher_bytes = gctr_encrypt_LE icb_BE plain_bytes alg key in
-  let cipher_quads = gctr_encrypt_recursive icb_BE plain alg key 0 in
-  let cipher_quads_bytes = le_seq_quad32_to_bytes cipher_quads in
-  let num_extra = num_bytes % 16 in
-  let full_blocks = (num_bytes - num_extra) / 16 in
-  let full_bytes = le_seq_quad32_to_bytes (slice plain 0 full_blocks) in
-  let plain_bytes_prefix = slice plain_bytes 0 (full_blocks * 16) in
-    let prefix_match (i:int) : Lemma (0 <= i /\ i < full_blocks * 16 ==> index full_bytes i == index plain_bytes_prefix i) 
-    =
-    ()
-    in
-  //assert (equal full_bytes (slice plain_bytes 0 (full_blocks * 16)));
-(*
-  let plain_quads = le_bytes_to_seq_quad32 (pad_to_128_bits plain_bytes) in
-    let plain_match (i:int) : Lemma (0 <= i /\ i < length plain - 1 ==> index plain_quads i == index plain i) 
-    =
-    ()
-    in
-*)
-  admit()
-*)
 
 let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(gctr_encrypt_LE icb_BE (le_quad32_to_bytes plain) alg key =
