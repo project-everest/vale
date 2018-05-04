@@ -66,7 +66,13 @@ val le_bytes_to_seq_quad32_to_bytes (s:seq quad32) :
 
 val le_quad32_to_bytes_to_quad32 (s:seq nat8 { length s == 16 }) :
   Lemma(le_quad32_to_bytes (le_bytes_to_quad32 s) == s)
- 
+
+let le_seq_quad32_to_bytes_of_singleton (q:quad32) :
+  Lemma (le_quad32_to_bytes q == le_seq_quad32_to_bytes (create 1 q))
+  =
+  four_to_seq_LE_is_seq_four_to_seq_LE q;
+  ()
+
 
 //seq_nat32_to_seq_nat8_LE (seq_four_to_seq_LE b)
 // seq_nat32_to_seq_nat8_LE = seq_four_to_seq_LE (seq_map (nat_to_four 8) x)

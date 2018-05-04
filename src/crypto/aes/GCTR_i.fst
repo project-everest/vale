@@ -183,13 +183,13 @@ let split_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) :
   admit()
 *)
 
-let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n < length s}) (n':nat{ n <= n' /\ n' < length s}) :
+let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :
   Lemma(slice (le_seq_quad32_to_bytes s) (n * 16) (n' * 16) ==
         le_seq_quad32_to_bytes (slice s n n'))
   =
   admit()
 
-let slice_commutes_le_seq_quad32_to_bytes0 (s:seq quad32) (n:nat{n < length s}) :
+let slice_commutes_le_seq_quad32_to_bytes0 (s:seq quad32) (n:nat{n <= length s}) :
   Lemma(slice (le_seq_quad32_to_bytes s) 0 (n * 16) ==
         le_seq_quad32_to_bytes (slice s 0 n))
   =
@@ -295,7 +295,39 @@ let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:qua
     ();
   ()
 
-#reset-options "--z3rlimit 10" 
+
+let le_seq_quad32_to_bytes_tail_prefix (s:seq quad32) (num_bytes:nat) : Lemma
+  (requires (1 <= num_bytes /\ 
+             num_bytes < 16 * length s /\
+             16 * (length s - 1) < num_bytes /\
+             num_bytes % 16 <> 0))
+  (ensures (let num_extra = num_bytes % 16 in
+            let num_blocks = num_bytes / 16 in
+            let x  = slice (le_seq_quad32_to_bytes s) (num_blocks * 16) num_bytes in
+            let x' = slice (le_quad32_to_bytes (index s num_blocks)) 0 num_extra in
+            x == x'))
+  =            
+  let num_extra = num_bytes % 16 in
+  let num_blocks = num_bytes / 16 in
+  let final = index s num_blocks in
+  let x  = slice (le_seq_quad32_to_bytes s) (num_blocks * 16) num_bytes in
+  let x' = slice (le_quad32_to_bytes final) 0 num_extra in
+  
+  le_seq_quad32_to_bytes_of_singleton final;
+  assert (le_quad32_to_bytes final == le_seq_quad32_to_bytes (create 1 final));
+  assert (equal (create 1 final) (slice s num_blocks (length s)));
+
+  assert (x' == slice (le_seq_quad32_to_bytes (slice s num_blocks (length s))) 0 num_extra);
+  slice_commutes_le_seq_quad32_to_bytes s num_blocks (length s);
+  assert (x' == slice (slice (le_seq_quad32_to_bytes s) (num_blocks * 16) (length s * 16)) 0 num_extra);
+  assert (x' == slice (le_seq_quad32_to_bytes s) (num_blocks * 16) num_bytes);
+  
+  assert (equal x' x);
+  ()
+
+#reset-options "--z3rlimit 30" 
+open FStar.Seq.Properties
+
 let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
   (requires (1 <= num_bytes /\ 
              num_bytes < 16 * length plain /\
@@ -334,34 +366,26 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq
 
   assert (length s == num_extra);
   let q_prefix = slice (le_quad32_to_bytes final_p) 0 num_extra in
-assume (q_prefix == s); 
-  //admit();
+  le_seq_quad32_to_bytes_tail_prefix plain num_bytes;
+  assert (q_prefix == s);
+
   assert(final_cipher_bytes_LE == slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra); // RHS bytes
-assume (slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra ==
+
+  le_seq_quad32_to_bytes_tail_prefix cipher num_bytes;
+  assert (slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra ==
           slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes);
 
   slice_commutes_le_seq_quad32_to_bytes0 cipher num_blocks;
   assert (le_seq_quad32_to_bytes (slice cipher 0 num_blocks) == slice (le_seq_quad32_to_bytes cipher) 0 (num_blocks * 16));
 
-  assert (le_quad32_to_bytes (index cipher num_blocks) == le_seq_quad32_to_bytes (slice cipher num_blocks (length cipher)));
 
-  assert (slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra ==
-          slice (le_seq_quad32_to_bytes (slice cipher num_blocks (length cipher))) 0 num_extra);
-
-  slice_commutes_le_seq_quad32_to_bytes cipher num_blocks (length cipher);
-
-  assert (slice (le_seq_quad32_to_bytes (slice cipher num_blocks (length cipher))) 0 num_extra ==
-          slice (slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) (length cipher * 16)) 0 num_extra);
   assert (slice (slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) (length cipher * 16)) 0 num_extra ==
           slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes);
-
-
+  slice_append_adds (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes;
   assert (slice (le_seq_quad32_to_bytes cipher) 0 (num_blocks * 16) @| 
           slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes ==
           slice (le_seq_quad32_to_bytes cipher) 0 num_bytes);
-  
   assert (cipher_bytes == (le_seq_quad32_to_bytes (slice cipher 0 num_blocks)) @| slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra);
-  admit();
   ()
 
 (*

@@ -35,3 +35,6 @@ val seq_map_internal_associative (#a:Type) (#b:eqtype) (f:int->a->b) (s:seq a) (
 val seq_map_inverses (#a #b:Type) (f:a -> b) (g:b -> a) (s:seq a) : Lemma
   (requires forall x . g (f x) == x)
   (ensures seq_map g (seq_map f s) == s)
+
+val slice_append_adds (#a:Type) (s:seq a) (i:nat) (j:nat{ i <= j /\ j <= length s }) :
+  Lemma (slice s 0 i @| slice s i j == slice s 0 j)

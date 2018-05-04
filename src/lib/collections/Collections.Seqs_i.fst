@@ -61,3 +61,10 @@ let seq_map_inverses (#a #b:Type) (f:a -> b) (g:b -> a) (s:seq a) : Lemma
   let final = seq_map g mid in
   assert (equal s final);
   ()
+
+let slice_append_adds (#a:Type) (s:seq a) (i:nat) (j:nat{ i <= j /\ j <= length s }) :
+  Lemma (slice s 0 i @| slice s i j == slice s 0 j)
+  =
+  assert (equal (slice s 0 i @| slice s i j)
+                (slice s 0 j));
+  ()
