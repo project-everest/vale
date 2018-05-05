@@ -42,7 +42,7 @@ val mod_8: (n:nat64) -> uint8
 let mod_8 n =
   UInt8.uint_to_t (n % 0x100)
 
-#set-options "--z3rlimit 20"
+#set-options "--z3rlimit 60"
 
 private let aux0 (ptr:int) (mem:heap) : Lemma (mod_8 (get_heap_val ptr mem) == mem.[ptr]) = ()
 private let aux1 (ptr:int) (mem:heap) : Lemma 
@@ -50,12 +50,10 @@ private let aux1 (ptr:int) (mem:heap) : Lemma
 private let aux2 (ptr:int) (mem:heap) : Lemma 
     (mod_8 ((get_heap_val ptr mem) `op_Division` 0x10000) == mem.[ptr + 2]) = ()
 
-#set-options "--z3rlimit 40"
 
 private let aux3 (ptr:int) (mem:heap) : Lemma 
     (mod_8 ((get_heap_val ptr mem) `op_Division` 0x1000000) == mem.[ptr + 3]) = ()
 
-#set-options "--z3rlimit 200"
 
 private let aux4 (ptr:int) (mem:heap) : Lemma 
     (mod_8 ((get_heap_val ptr mem) `op_Division` 0x100000000) == mem.[ptr + 4]) = ()

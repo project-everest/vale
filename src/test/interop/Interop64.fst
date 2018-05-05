@@ -172,6 +172,21 @@ let down_mem64 mem addrs ptrs =
     in
     aux ptrs [] heap 
 
+val same_unspecified_down: 
+  (mem1: HS.mem) -> 
+  (mem2: HS.mem) -> 
+  (addrs:addr_map) ->
+  (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) ->
+  Lemma (
+    let heap1 = down_mem64 mem1 addrs ptrs in
+    let heap2 = down_mem64 mem2 addrs ptrs in
+    forall i. (forall (b:B.buffer UInt64.t{List.memP b ptrs}). 
+      let base = addrs.[(B.as_addr b, B.idx b, B.length b)] in
+      i < base \/ i >= base + 8 `op_Multiply` B.length b) ==>
+      heap1.[i] == heap2.[i])
+
+let same_unspecified_down mem1 mem2 addrs ptrs = admit()
+
 #set-options "--z3rlimit 100"
 
 let create_seq64 heap length addr : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
