@@ -18,12 +18,20 @@ let buffer_read (b:buffer64) (i:nat{i < B.length b}) (mem:HS.mem) : GTot nat64 =
   UInt64.v (Seq.index contents i)
 
 val buffer_write: b:buffer64 -> (n:nat{n < B.length b}) -> v:nat64 -> (h0:HS.mem{B.live h0 b}) -> GTot
- (h1:HS.mem{B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n (UInt64.uint_to_t v)})
- 
+ (h1:HS.mem{B.as_seq h1 b == Seq.upd (B.as_seq h0 b) n (UInt64.uint_to_t v) /\ B.modifies_1 b h0 h1})
+
+// Proven but private in FStar.Buffer
+assume private val lemma_aux: b:buffer64 -> n:nat{n < B.length b} -> z:UInt64.t
+  -> h0:HS.mem -> Lemma
+  (requires (B.live h0 b))
+  (ensures (B.live h0 b
+    /\ B.modifies_1 b h0 (HS.upd h0 (B.content b) (Seq.upd (B.sel h0 b) (B.idx b + n) z)) ))
+
 let buffer_write b n v h0 =
  let s0 = B.sel h0 b in
  let s = Seq.upd s0 (B.idx b + n) (UInt64.uint_to_t v) in
  let h1 = HS.upd h0 (B.content b) s in
+ lemma_aux b n (UInt64.uint_to_t v) h0;
  h1
 
 noeq type low_state_p = {
@@ -299,6 +307,44 @@ let written_buffer_down (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
     aux1 0 mem1 mem2;
     aux2 (i+1) mem1 mem2
 
+let same_mem_get_heap_val_buf (base n:int) (mem1 mem2:M.heap) : Lemma
+  (requires (forall i. 0 <= i /\ i < n ==> 
+    M.get_heap_val (base + 8 `op_Multiply` i) mem1 == M.get_heap_val (base + 8 `op_Multiply` i) mem2))
+  (ensures (forall i. i >= base /\ i < base + n `op_Multiply` 8 ==> mem1.[i] == mem2.[i])) =
+  let rec aux (k:nat) : Lemma
+  (requires (forall i. i >= base /\ i < base + k `op_Multiply` 8 ==> mem1.[i] == mem2.[i]) /\
+   (forall i. 0 <= i /\ i < n ==> 
+    M.get_heap_val (base + 8 `op_Multiply` i) mem1 == M.get_heap_val (base + 8 `op_Multiply` i) mem2) 
+  )
+  (ensures (forall i. i >= base /\ i < base + n `op_Multiply` 8 ==> mem1.[i] == mem2.[i]))
+  (decreases %[n-k]) =
+  if k >= n then ()
+  else begin
+    M.same_mem_get_heap_val (base + k `op_Multiply` 8) mem1 mem2;
+    aux (k+1)
+  end
+  in aux 0
+
+let rec unwritten_buffer_down_aux (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
+  (ps: list buffer64{list_disjoint_or_eq ps /\ List.memP b ps})
+  (h0:HS.mem{list_live h0 ps}) 
+  (addrs:addr_map) (a:buffer64{a =!= b /\ List.memP a ps})  : 
+  Lemma (let base = buffer_addr a addrs in
+    let mem1 = down_mem64 h0 addrs ps in
+    let h1 = buffer_write b i v h0 in
+    let mem2 = down_mem64 h1 addrs ps in
+    forall j. j >= base /\ j < base + (B.length a) `op_Multiply` 8 ==> mem1.[j] == mem2.[j]) =
+    let mem1 = down_mem64 h0 addrs ps in
+    let h1 = buffer_write b i v h0 in
+    let mem2 = down_mem64 h1 addrs ps in
+    let base = buffer_addr a addrs in    
+    let s0 = B.as_seq h0 a in
+    assert (disjoint_or_eq a b);
+    // We need this to help z3
+    assert (forall j. 0 <= j /\ j < B.length a ==> UInt64.v (Seq.index s0 j) == M.get_heap_val (base + (j `op_Multiply` 8)) mem1 );
+    same_mem_get_heap_val_buf base (B.length a) mem1 mem2
+
+
 let unwritten_buffer_down (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
   (ps: list buffer64{list_disjoint_or_eq ps /\ List.memP b ps}) (h0:HS.mem{list_live h0 ps}) (addrs:addr_map) : Lemma (
     let mem1 = down_mem64 h0 addrs ps in
@@ -310,17 +356,14 @@ let unwritten_buffer_down (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
     let h1 = buffer_write b i v h0 in
     let mem2 = down_mem64 h1 addrs ps in   
     let fintro (a:buffer64{List.memP a ps /\ a =!= b}) 
-      (j:int) : Lemma 
-      (let base = buffer_addr a addrs in 
+      : Lemma 
+      (forall j. let base = buffer_addr a addrs in 
       j >= base /\ j < base + (B.length a) `op_Multiply` 8 ==> 
 	mem1.[j] == mem2.[j]) =
       let base = buffer_addr a addrs in
-      let rec aux (k:nat) (mem1:M.heap) (mem2:M.heap) : Lemma (
-	forall j. j >= base /\ j < base + (B.length a) `op_Multiply` 8 ==>
-	  mem1.[j] == mem2.[j]) = admit()
-      in aux 0 mem1 mem2
+      unwritten_buffer_down_aux b i v ps h0 addrs a
     in
-    Classical.forall_intro_2 fintro
+    Classical.forall_intro fintro
 
 let store_buffer_down_mem (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
   (ps: list buffer64{list_disjoint_or_eq ps /\ List.memP b ps}) (h0:HS.mem{list_live h0 ps}) (addrs:addr_map) :
