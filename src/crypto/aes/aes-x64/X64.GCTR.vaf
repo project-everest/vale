@@ -109,22 +109,22 @@ procedure {:quick} gctr_core(
         rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
 
     requires
-        // GCTR reqs
-        icb == icb_BE;
-        buffers_disjoint128(in_b, out_b);
-        buffers_disjoint128(keys_b, out_b);
-        validSrcAddrs128(mem, in_ptr, in_b, len);
-        validDstAddrs128(mem, out_ptr, out_b, len);
-        in_ptr  + 16 * len < pow2_64;
-        out_ptr + 16 * len < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
-
-        // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
-        r8 == buffer_addr(keys_b);
-        validSrcAddrs128(mem, r8, keys_b, 11);
-        buffer128_as_seq(mem, keys_b) == round_keys;
+//        // GCTR reqs
+//        icb == icb_BE;
+//        buffers_disjoint128(in_b, out_b);
+//        buffers_disjoint128(keys_b, out_b);
+//        validSrcAddrs128(mem, in_ptr, in_b, len);
+//        validDstAddrs128(mem, out_ptr, out_b, len);
+//        in_ptr  + 16 * len < pow2_64;
+//        out_ptr + 16 * len < pow2_64;
+//        buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
+//
+//        // AES reqs
+//        length(round_keys) == 11;
+//        round_keys == key_to_round_keys_LE(AES_128, key);
+//        r8 == buffer_addr(keys_b);
+//        validSrcAddrs128(mem, r8, keys_b, 11);
+//        buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
@@ -199,9 +199,101 @@ procedure {:quick} gctr_core(
 //    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
 }
 
+#reset-options "--z3rlimit 80"
+procedure {:quick} {:verify true} gctr_bytes_extra(
+    ghost icb_BE:quad32,
+    ghost in_b:buffer128,
+    ghost out_b:buffer128,
+    ghost key:aes_key_LE(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128,
+    ghost orig_in_ptr:nat64,
+    ghost orig_out_ptr:nat64,
+    ghost num_bytes:nat
+    )
+    lets in_ptr @= r9; out_ptr @= r10; icb @= xmm7;
+    reads
+        r8; in_ptr; out_ptr; 
+
+    modifies
+        rdx; r11; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
+
+    requires
+        // GCTR reqs
+        buffers_disjoint128(in_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
+        validSrcAddrs128(mem, orig_in_ptr, in_b, bytes_to_quad_size(num_bytes));
+        validDstAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
+        orig_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        orig_out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32 /\ 4096 * num_bytes < pow2_32;
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys_LE(AES_128, key);
+        r8 == buffer_addr(keys_b);
+        validSrcAddrs128(mem, r8, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
+
+        // Extra reqs
+        let num_blocks := num_bytes / 16;
+        num_bytes % 16 != 0;
+        in_ptr  == orig_in_ptr  + 16 * num_blocks;
+        out_ptr == orig_out_ptr + 16 * num_blocks;
+        rcx == num_bytes;
+        gctr_partial(num_blocks, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
+        icb == inc32(icb_BE, num_blocks);
+    ensures
+//        modifies_buffer128(out_b, old(mem), mem);
+//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+//        buffer128_as_seq(mem, out_b) == gctr_encrypt(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
+//        icb == icb_BE.(lo0 := icb.lo0);
+{
+    ghost var num_blocks := num_bytes / 16;
+
+    gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 
+                           slice_work_around(buffer128_as_seq(mem, out_b), num_blocks), 
+                           key, icb_BE);
+    // Grab the last quad
+//        assert r9 == in_ptr + 16 * num_blocks;
+//        extra_bytes_helper(old(num_bytes));
+//        assert r9 < in_ptr + 16*bytes_to_quad_size(old(num_bytes));
+//        assert validSrcAddrs128(mem, old(in_ptr), in_b, bytes_to_quad_size(old(num_bytes)));
+    Load128_buffer(xmm2, r9, 0, in_b, num_blocks);
+    ghost var final_quad_LE := xmm2;
+
+    // Encrypt it
+    Mov128(xmm1, xmm2);
+    gctr_register(key, round_keys, keys_b);
+
+    assert xmm1 == gctr_encrypt_block(icb, final_quad_LE, AES_128, key, 0);
+    gctr_encrypt_block_offset(icb_BE, final_quad_LE, AES_128, key, num_blocks);
+    assert xmm1 == gctr_encrypt_block(icb_BE, final_quad_LE, AES_128, key, num_blocks);
+
+    // Write it back out
+    Store128_buffer(r10, xmm1, 0, out_b, num_blocks);
+
+    ghost var plain  := slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(old(num_bytes)));
+    ghost var cipher := slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(old(num_bytes)));
+
+    assert 1 <= old(num_bytes) < 16 * length(plain);
+    assert 16 * (length(plain) - 1) < old(num_bytes);
+    assert old(num_bytes) % 16 != 0;
+//    assert 4096 * old(num_bytes) < pow2_32;
+//    assert length(plain) == length(cipher);
+//
+//    assert slice_work_around(cipher, num_blocks) == gctr_encrypt_recursive(icb_BE, slice_work_around(plain, num_blocks), AES_128, key, 0);
+//        assert index(cipher, num_blocks) == gctr_encrypt_block(icb_BE, index(plain, num_blocks), AES_128, key, num_blocks);
+//        gctr_partial_to_full_advanced(icb_BE, 
+//                slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(old(num_bytes))),
+//                slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(old(num_bytes))),
+//                AES_128, key, old(num_bytes));
+
+}
+
 
 #reset-options "--z3rlimit 80"
-procedure {:quick} {:verify true} gctr_bytes(
+procedure {:quick} gctr_bytes(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -252,32 +344,51 @@ procedure {:quick} {:verify true} gctr_bytes(
     assert icb == inc32(icb_BE, num_blocks);
 
     if (r11 == 0) {
+        assume false;
+        /*
         gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
         assert buffer128_as_seq(mem, out_b) == gctr_encrypt_recursive(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
         //le_bytes_to_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b));
         gctr_partial_to_full_basic(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, buffer128_as_seq(mem, out_b));
         assert le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)) == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), in_b))), AES_128, key);
+        */
     } else {
-        gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 
-                               slice_work_around(buffer128_as_seq(mem, out_b), num_blocks), 
-                               key, icb_BE);
-        // Grab the last quad
-//        assert r9 == in_ptr + 16 * num_blocks;
-//        extra_bytes_helper(old(num_bytes));
-//        assert r9 < in_ptr + 16*bytes_to_quad_size(old(num_bytes));
-//        assert validSrcAddrs128(mem, old(in_ptr), in_b, bytes_to_quad_size(old(num_bytes)));
-        Load128_buffer(xmm2, r9, 0, in_b, num_blocks);
-        ghost var final_quad_LE := xmm2;
-
-        // Encrypt it
-        Mov128(xmm1, xmm2);
-        gctr_register(key, round_keys, keys_b);
-
-        assert xmm1 == gctr_encrypt_block(icb, final_quad_LE, AES_128, key, 0);
-        gctr_encrypt_block_offset(icb_BE, final_quad_LE, AES_128, key, num_blocks);
-        assert xmm1 == gctr_encrypt_block(icb_BE, final_quad_LE, AES_128, key, num_blocks);
-
-        // Write it back out
-        Store128_buffer(r10, xmm1, 0, out_b, num_blocks);
+//        gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 
+//                               slice_work_around(buffer128_as_seq(mem, out_b), num_blocks), 
+//                               key, icb_BE);
+//        // Grab the last quad
+////        assert r9 == in_ptr + 16 * num_blocks;
+////        extra_bytes_helper(old(num_bytes));
+////        assert r9 < in_ptr + 16*bytes_to_quad_size(old(num_bytes));
+////        assert validSrcAddrs128(mem, old(in_ptr), in_b, bytes_to_quad_size(old(num_bytes)));
+//        Load128_buffer(xmm2, r9, 0, in_b, num_blocks);
+//        ghost var final_quad_LE := xmm2;
+//
+//        // Encrypt it
+//        Mov128(xmm1, xmm2);
+//        gctr_register(key, round_keys, keys_b);
+//
+//        assert xmm1 == gctr_encrypt_block(icb, final_quad_LE, AES_128, key, 0);
+//        gctr_encrypt_block_offset(icb_BE, final_quad_LE, AES_128, key, num_blocks);
+//        assert xmm1 == gctr_encrypt_block(icb_BE, final_quad_LE, AES_128, key, num_blocks);
+//
+//        // Write it back out
+//        Store128_buffer(r10, xmm1, 0, out_b, num_blocks);
+//
+//        ghost var plain  := slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(old(num_bytes)));
+//        ghost var cipher := slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(old(num_bytes)));
+//
+//        assert 1 <= old(num_bytes) < 16 * length(plain);
+//        assert 16 * (length(plain) - 1) < old(num_bytes);
+//        assert old(num_bytes) % 16 != 0;
+//        assert 4096 * old(num_bytes) < pow2_32;
+//        assert length(plain) == length(cipher);
+//
+//        assert slice_work_around(cipher, num_blocks) == gctr_encrypt_recursive(icb_BE, slice_work_around(plain, num_blocks), AES_128, key, 0);
+////        assert index(cipher, num_blocks) == gctr_encrypt_block(icb_BE, index(plain, num_blocks), AES_128, key, num_blocks);
+////        gctr_partial_to_full_advanced(icb_BE, 
+////                slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(old(num_bytes))),
+////                slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(old(num_bytes))),
+////                AES_128, key, old(num_bytes));
     }
 }
