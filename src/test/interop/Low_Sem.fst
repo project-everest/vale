@@ -136,6 +136,8 @@ let lemma_valid_mem b i s =
   let addr = base + 8 `op_Multiply` i in
   valid_mem_aux_lemma addr s.ptrs s.addrs b
 
+#set-options "--z3rlimit 15"
+
 val lemma_load_mem: b:buffer64
   -> i:nat
   -> s:low_state
@@ -255,6 +257,48 @@ let lemma_valid_store_mem i v s = ()
 
 #set-options "--z3rlimit 40"
 
+let rec written_buffer_down_aux1 (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
+      (ps:list buffer64{list_disjoint_or_eq ps /\ List.memP b ps})
+      (h0:HS.mem{list_live h0 ps}) (addrs:addr_map)
+      (base:nat{base == buffer_addr b addrs})
+      (k:nat) (h1:HS.mem{h1 == buffer_write b i v h0}) 
+      (mem1:M.heap{correct_down64 h0 addrs ps mem1}) 
+      (mem2:M.heap{
+      (correct_down64 h1 addrs ps mem2) /\
+      (forall j. base <= j /\ j < base + k `op_Multiply` 8 ==> mem1.[j] == mem2.[j])}) : 
+      Lemma (requires True)
+      (ensures (forall j. j >= base /\ j < base + 8 `op_Multiply` i ==> mem1.[j] == mem2.[j]))
+      (decreases %[i-k]) =
+    if k >= i then ()
+    else begin
+      assert (Seq.index (B.as_seq h0 b) k == Seq.index (B.as_seq h1 b) k);
+      M.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
+      written_buffer_down_aux1 b i v ps h0 addrs base (k+1) h1 mem1 mem2
+    end
+
+let rec written_buffer_down_aux2 (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
+      (ps:list buffer64{list_disjoint_or_eq ps /\ List.memP b ps})
+      (h0:HS.mem{list_live h0 ps}) (addrs:addr_map)
+      (base:nat{base == buffer_addr b addrs})
+      (n:nat{n == B.length b})
+      (k:nat{k > i}) (h1:HS.mem{h1 == buffer_write b i v h0}) 
+      (mem1:M.heap{correct_down64 h0 addrs ps mem1}) 
+      (mem2:M.heap{
+      (correct_down64 h1 addrs ps mem2) /\
+      (forall j. base + 8 `op_Multiply` (i+1) <= j /\ j < base + k `op_Multiply` 8 ==>
+      mem1.[j] == mem2.[j])}) :
+      Lemma 
+      (requires True)
+      (ensures (forall j. j >= base + 8 `op_Multiply` (i+1) /\ j < base + 8 `op_Multiply` n ==> 
+	mem1.[j] == mem2.[j]))
+      (decreases %[n-k]) =
+    if k >= n then ()
+    else begin
+      assert (Seq.index (B.as_seq h0 b) k == Seq.index (B.as_seq h1 b) k);
+      M.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
+      written_buffer_down_aux2 b i v ps h0 addrs base n (k+1) h1 mem1 mem2
+    end
+    
 let written_buffer_down (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
   (ps: list buffer64{list_disjoint_or_eq ps /\ List.memP b ps}) (h0:HS.mem{list_live h0 ps}) (addrs:addr_map) :
   Lemma (
@@ -271,41 +315,8 @@ let written_buffer_down (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
     let mem2 = down_mem64 h1 addrs ps in	 
     let base = buffer_addr b addrs in
     let n = B.length b in
-    let rec aux1 (k:nat) (mem1:M.heap{correct_down64 h0 addrs ps mem1}) 
-      (mem2:M.heap{
-      (correct_down64 h1 addrs ps mem2) /\
-      (forall j. base <= j /\ j < base + k `op_Multiply` 8 ==> mem1.[j] == mem2.[j])}) : 
-      Lemma (requires True)
-      (ensures (forall j. j >= base /\ j < base + 8 `op_Multiply` i ==> mem1.[j] == mem2.[j]))
-      (decreases %[i-k]) =
-    if k >= i then ()
-    else begin
-      assert (Seq.index (B.as_seq h0 b) k == Seq.index (B.as_seq h1 b) k);
-      M.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
-      aux1 (k+1) mem1 mem2
-    end
-    in
-    
-    let rec aux2 (k:nat{k > i}) (mem1:M.heap{correct_down64 h0 addrs ps mem1})
-    (mem2:M.heap{
-      (correct_down64 h1 addrs ps mem2) /\
-      (forall j. base + 8 `op_Multiply` (i+1) <= j /\ j < base + k `op_Multiply` 8 ==>
-      mem1.[j] == mem2.[j])}) :
-      Lemma 
-      (requires True)
-      (ensures (forall j. j >= base + 8 `op_Multiply` (i+1) /\ j < base + 8 `op_Multiply` n ==> 
-	mem1.[j] == mem2.[j]))
-      (decreases %[n-k]) =
-    if k >= n then ()
-    else begin
-      assert (Seq.index (B.as_seq h0 b) k == Seq.index (B.as_seq h1 b) k);
-      M.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
-      aux2 (k+1) mem1 mem2
-    end
-    in      
-    
-    aux1 0 mem1 mem2;
-    aux2 (i+1) mem1 mem2
+    written_buffer_down_aux1 b i v ps h0 addrs base 0 h1 mem1 mem2;
+    written_buffer_down_aux2 b i v ps h0 addrs base n (i+1) h1 mem1 mem2
 
 let same_mem_get_heap_val_buf (base n:int) (mem1 mem2:M.heap) : Lemma
   (requires (forall i. 0 <= i /\ i < n ==> 

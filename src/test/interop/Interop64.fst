@@ -151,27 +151,67 @@ val down_mem64: (mem:HS.mem) -> (addrs:addr_map) -> (ptrs:list (B.buffer UInt64.
 
 #set-options "--z3rlimit 40"
 
+let rec down_mem64_aux (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs})
+  (addrs:addr_map) (mem:HS.mem)  ps (accu:list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
+  (h:Vale_Sem.heap{correct_down64 mem addrs accu h}) : GTot (heap:Vale_Sem.heap{correct_down64 mem addrs ptrs heap}) = match ps with
+  | [] -> h
+  | a::q ->
+    let length = B.length a in
+    let contents = B.as_seq mem a in
+    let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+    let new_heap = write_vale_mem64 contents length addr 0 h in
+    load_store_write_vale_mem64 contents length addr 0 h;
+    correct_down_p64_cancel mem addrs h a;
+    correct_down_p64_frame mem addrs h a;
+    assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
+    down_mem64_aux ptrs addrs mem q (a::accu) new_heap
+
 let down_mem64 mem addrs ptrs =
   (* Dummy heap *)
   let heap = FStar.Map.const (UInt8.uint_to_t 0) in
   assert (Set.equal (Map.domain heap) (Set.complement Set.empty));
   let (heap:Vale_Sem.heap) = heap in
-  let rec aux ps (accu:list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
-    (h:Vale_Sem.heap{correct_down64 mem addrs accu h}) : GTot (heap:Vale_Sem.heap{correct_down64 mem addrs ptrs heap}) = match ps with
-    | [] -> h
-    | a::q ->
-      let length = B.length a in
-      let contents = B.as_seq mem a in
-      let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
-      let new_heap = write_vale_mem64 contents length addr 0 h in
-      load_store_write_vale_mem64 contents length addr 0 h;
-      correct_down_p64_cancel mem addrs h a;
-      correct_down_p64_frame mem addrs h a;
-      assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
-      aux q (a::accu) new_heap
-    in
-    aux ptrs [] heap 
+  down_mem64_aux ptrs addrs mem ptrs [] heap 
 
+val unspecified_down: 
+  (mem: HS.mem) -> 
+  (addrs:addr_map) ->
+  (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs}) ->
+  Lemma (
+    let heap = down_mem64 mem addrs ptrs in
+    forall i. (forall (b:B.buffer UInt64.t{List.memP b ptrs}). 
+      let base = addrs.[(B.as_addr b, B.idx b, B.length b)] in
+      i < base \/ i >= base + 8 `op_Multiply` B.length b) ==>
+      heap.[i] == UInt8.uint_to_t 0)
+
+private let rec frame_down_mem64_aux  (ptrs:list (B.buffer UInt64.t){list_disjoint_or_eq ptrs})
+  (addrs:addr_map) (mem:HS.mem)  ps (accu:list (B.buffer UInt64.t){forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
+  (h:Vale_Sem.heap{correct_down64 mem addrs accu h}) : 
+  Lemma (let heap = down_mem64_aux ptrs addrs mem ps accu h in
+    forall i. (forall (b:B.buffer UInt64.t{List.memP b ps}).
+      let base = addrs.[(B.as_addr b, B.idx b, B.length b)] in
+      i < base \/ i >= base + 8 `op_Multiply` B.length b) ==>
+      heap.[i] == h.[i]) =
+  match ps with
+  | [] -> ()
+  | a::q -> 
+    let length = B.length a in
+    let contents = B.as_seq mem a in
+    let addr = addrs.[(B.as_addr a, B.idx a, B.length a)] in
+    let new_heap = write_vale_mem64 contents length addr 0 h in
+    frame_write_vale_mem64 contents length addr 0 h;
+    correct_down_p64_cancel mem addrs h a;
+    correct_down_p64_frame mem addrs h a;    
+    assert (forall p. List.memP p accu ==> disjoint_or_eq p a);
+    frame_down_mem64_aux ptrs addrs mem q (a::accu) new_heap;
+    ()
+
+let unspecified_down mem addrs ptrs =
+  let heap = Map.const (UInt8.uint_to_t 0) in
+  assert (Set.equal (Map.domain heap) (Set.complement Set.empty));
+  let (heap:Vale_Sem.heap) = heap in      
+  frame_down_mem64_aux ptrs addrs mem ptrs [] heap
+  
 val same_unspecified_down: 
   (mem1: HS.mem) -> 
   (mem2: HS.mem) -> 
@@ -185,7 +225,9 @@ val same_unspecified_down:
       i < base \/ i >= base + 8 `op_Multiply` B.length b) ==>
       heap1.[i] == heap2.[i])
 
-let same_unspecified_down mem1 mem2 addrs ptrs = admit()
+let same_unspecified_down mem1 mem2 addrs ptrs =
+  unspecified_down mem1 addrs ptrs;
+  unspecified_down mem2 addrs ptrs
 
 #set-options "--z3rlimit 100"
 
