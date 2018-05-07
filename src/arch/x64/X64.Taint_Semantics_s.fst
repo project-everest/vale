@@ -46,7 +46,8 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | Shr64 dst amt -> [dst], [dst; amt]
   | Shl64 dst amt -> [dst], [dst; amt]
   | MOVDQU dst src -> mem128_to_op dst, mem128_to_op src
-  | Pinsrd _ src _ -> [], [src]
+  | Pinsrd _ src _ | Pinsrq _ src _ -> [], [src]
+  | Pextrq dst _ _ -> [dst], []
   | _ -> [], []
   
 type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
