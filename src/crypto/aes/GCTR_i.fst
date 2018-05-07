@@ -17,8 +17,12 @@ let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE =
   if 4096 * length p < pow2_32 then p else createEmpty
 
 let slice_work_around (s:seq 'a) (i:int) =
-  if 0 <= i && i < length s then slice s 0 i 
+  if 0 <= i && i <= length s then slice s 0 i 
   else slice s 0 0
+
+let index_work_around_quad32 (s:seq quad32) (i:int) =
+  if 0 <= i && i < length s then index s i
+  else Mkfour 0 0 0 0
 
 let extra_bytes_helper (n:nat) : Lemma
   (requires n % 16 <> 0)
@@ -400,3 +404,13 @@ let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE
   append_empty_r (create 1 x);                 // This is the missing piece
   ()
  
+let index_helper (s:seq quad32) (num_bytes:int) : Lemma
+  (requires 1 <= num_bytes /\ 
+             num_bytes < 16 * length s /\
+             16 * (length s - 1) < num_bytes /\
+             num_bytes % 16 <> 0 /\
+             length s == bytes_to_quad_size num_bytes)
+  (ensures (let num_blocks = num_bytes / 16 in
+            index s num_blocks == index_work_around_quad32 (slice_work_around s (bytes_to_quad_size num_bytes)) num_blocks))
+  =
+  ()

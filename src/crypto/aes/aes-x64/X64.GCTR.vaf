@@ -200,7 +200,7 @@ procedure {:quick} gctr_core(
 }
 
 #reset-options "--z3rlimit 20"
-procedure {:quick} {:verify true} gctr_bytes_extra_work(
+procedure {:quick} gctr_bytes_extra_work(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -273,7 +273,7 @@ procedure {:quick} {:verify true} gctr_bytes_extra_work(
 }
 
 #reset-options "--z3rlimit 20"
-procedure {:quick} gctr_bytes_extra(
+procedure {:quick} {:verify true} gctr_bytes_extra(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -311,14 +311,20 @@ procedure {:quick} gctr_bytes_extra(
         // Extra reqs
         let num_blocks := num_bytes / 16;
         num_bytes % 16 != 0;
+        0 < num_bytes < 16 * bytes_to_quad_size(num_bytes);
+        16 * (bytes_to_quad_size(num_bytes) - 1) < num_bytes;
         in_ptr  == orig_in_ptr  + 16 * num_blocks;
         out_ptr == orig_out_ptr + 16 * num_blocks;
         rcx == num_bytes;
         gctr_partial(num_blocks, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
         icb == inc32(icb_BE, num_blocks);
     ensures
-//        modifies_buffer128(out_b, old(mem), mem);
+//        let num_blocks := num_bytes / 16;
 //        validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
+//        modifies_buffer128(out_b, old(mem), mem);
+//            slice_work_around(buffer128_as_seq(mem, out_b), num_blocks) == 
+//        old(slice_work_around(buffer128_as_seq(mem, out_b), num_blocks));
+//        buffer128_read(out_b, num_blocks, mem) == gctr_encrypt_block(icb_BE, buffer128_read(in_b, num_blocks, mem), AES_128, key, num_blocks);
 //        buffer128_as_seq(mem, out_b) == gctr_encrypt(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
 //        icb == icb_BE.(lo0 := icb.lo0);
 {
@@ -329,23 +335,33 @@ procedure {:quick} gctr_bytes_extra(
 
     gctr_bytes_extra_work(icb_BE, in_b, out_b, key, round_keys, keys_b, orig_in_ptr, orig_out_ptr, num_bytes);
 
+    assert length(buffer128_as_seq(mem, in_b)) == bytes_to_quad_size(num_bytes);    // Verifies
+    assert slice_work_around(buffer128_as_seq(mem, in_b), bytes_to_quad_size(num_bytes)) == buffer128_as_seq(mem, in_b);    // Verifies
+    /*
 
-    ghost var plain  := slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(old(num_bytes)));
-    ghost var cipher := slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(old(num_bytes)));
+    ghost var plain  := slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(num_bytes));
+    ghost var cipher := slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(num_bytes));
 
+    assert length(plain) == bytes_to_quad_size(num_bytes);
     assert 1 <= num_bytes < 16 * length(plain);
     assert 16 * (length(plain) - 1) < num_bytes;
     assert num_bytes % 16 != 0;
-//    assert 4096 * num_bytes < pow2_32;
-//    assert length(plain) == length(cipher);
-//
-//    assert slice_work_around(cipher, num_blocks) == gctr_encrypt_recursive(icb_BE, slice_work_around(plain, num_blocks), AES_128, key, 0);
-//        assert index(cipher, num_blocks) == gctr_encrypt_block(icb_BE, index(plain, num_blocks), AES_128, key, num_blocks);
-//        gctr_partial_to_full_advanced(icb_BE, 
-//                slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(old(num_bytes))),
-//                slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(old(num_bytes))),
-//                AES_128, key, old(num_bytes));
+    assert 4096 * num_bytes < pow2_32;
+    assert length(plain) == length(cipher);
 
+    assert slice_work_around(cipher, num_blocks) == gctr_encrypt_recursive(icb_BE, slice_work_around(plain, num_blocks), AES_128, key, 0);
+    assert buffer128_read(out_b, num_blocks, mem) == gctr_encrypt_block(icb_BE, buffer128_read(in_b, num_blocks, mem), AES_128, key, num_blocks);
+
+    index_helper(cipher, num_bytes);
+    assert buffer128_read(out_b, num_blocks, mem) == index_work_around_quad32(cipher, num_blocks);
+    index_helper(plain, num_bytes);
+    assert buffer128_read(in_b, num_blocks, mem) == index_work_around_quad32(plain, num_blocks);        // Fails
+    //assert index_work_around_quad32(cipher, num_blocks) == gctr_encrypt_block(icb_BE, index_work_around_quad32index(plain, num_blocks), AES_128, key, num_blocks);
+//        gctr_partial_to_full_advanced(icb_BE, 
+//                slice_work_around(buffer128_as_seq(mem, in_b),  bytes_to_quad_size(num_bytes)),
+//                slice_work_around(buffer128_as_seq(mem, out_b), bytes_to_quad_size(num_bytes)),
+//                AES_128, key, old(num_bytes));
+    */
 }
 
 
