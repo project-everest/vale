@@ -10,6 +10,7 @@ import pdb
 import SCons.Util
 import atexit
 import platform
+import fnmatch
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -37,11 +38,13 @@ if sys.platform == 'win32':
   # Use kremlib.h without primitive support for uint128_t.
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
+  env['NUGET'] = 'nuget.exe'
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
   env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128'])
   env['MONO'] = 'mono'
+  env['NUGET'] = 'nuget'
 
 # Convert NUMBER_OF_PROCESSORS into '-j n'.
 #num_cpu = int(os.environ.get('NUMBER_OF_PROCESSORS', 1)) 
@@ -179,17 +182,21 @@ AddOption('--DUMPARGS',
   default=False,
   action='store_true',
   help="Print arguments that will be passed to the verification tools")
-#AddOption('--FSTARTEST',
-#  dest='fstar_test_dir',
-#  type='string',
-#  default=None,
-#  action='store',
-#  help="Bundle up files to add to F*'s test suite ")
-AddOption('--FSTARTEST',
-  dest='fstar_test',
+AddOption('--FSTAR-EXTRACT',
+  dest='fstar_extract',
   default=False,
   action='store_true',
-  help="Bundle up files to add to F*'s test suite.  Results go into fstar_test_suite ")
+  help="Extract .ml files from F* files")
+AddOption('--NO-LEMMAS',
+  dest='no_lemmas',
+  default=False,
+  action='store_true',
+  help="Generate Vale code but no lemmas")
+AddOption('--MIN_TEST',
+  dest='min_test',
+  default=False,
+  action='store_true',
+  help="Only run on a minimal set of test files")
 
 env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
@@ -206,10 +213,13 @@ stage1 = GetOption('stage1')
 stage2 = GetOption('stage2')
 fstar_my_version = GetOption('fstar_my_version')
 fstar_z3_my_version = GetOption('fstar_z3_my_version')
+fstar_extract = GetOption('fstar_extract')
+no_lemmas = GetOption('no_lemmas')
 gen_hints = GetOption('gen_hints')
 single_vaf = GetOption('single_vaf')
 is_single_vaf = not (single_vaf is None)
-env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else ''
+min_test = GetOption('min_test')
+env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else '-noLemmas' if no_lemmas else ''
 
 ####################################################################
 #
@@ -250,7 +260,7 @@ if do_fstar and not stage1 and not stage2:
   # the user can always run "scons --STAGE1" and "scons --STAGE2" explicitly.
   #
   print("%s*** Running scons --STAGE1 ***%s" % (colors['yellow'], colors['end']))
-  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints')]
+  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints') and not x.endswith('.ml') and not x.endswith('.exe') and not x.endswith('.asm') and not x.endswith('.S') and not x.endswith('.obj')]
   subprocess.check_call(['python'] + args_stage1 + ['--STAGE1'])
   print("%s*** Running scons --STAGE2 ***%s" % (colors['yellow'], colors['end']))
   stage2 = True
@@ -290,7 +300,8 @@ fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1' \
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
   + ' --hint_info' \
   + ('' if is_single_vaf else ' --use_hints') \
-  + (' --record_hints' if gen_hints else ' --cache_checked_modules')
+  + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
+  + (' --use_extracted_interfaces')
 fstar_default_args = fstar_default_args_nosmtencoding \
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
 
@@ -405,7 +416,7 @@ def vale_tool_dependency_Emitter(target, source, env):
   
 # add env.Vale*(), to invoke Vale to compile a .vad to a .gen.dfy or a .vaf to a .fst
 def add_vale_builders(env):
-  vale_dafny_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -in $SOURCE -out $TARGET $VALE_USER_ARGS",
+  vale_dafny_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -sourceFrom BASE src -destFrom BASE obj -in $SOURCE -out $TARGET $VALE_USER_ARGS",
                             suffix = '.gen.dfy',
                             src_suffix = '.vad',
                             emitter = vale_tool_dependency_Emitter)
@@ -507,6 +518,9 @@ def get_build_options(srcpath):
   if srcpath in verify_options:
     return verify_options[srcpath]
   else:
+    for key in verify_options:
+      if fnmatch.fnmatch (srcpath, key):
+        return verify_options[key]
     ext = os.path.splitext(srcpath)[1]
     if ext in verify_options:
       return verify_options[ext]
@@ -562,11 +576,23 @@ def verify_dafny(env, targetfile, sourcefile):
 def add_dafny_verifier(env):
   env.AddMethod(verify_dafny, "Dafny")
 
+def on_black_list(f, list):
+  for entry in list:
+    if str(f).startswith(entry):
+      return True
+  return False
+
 def verify_fstar(env, targetfile, sourcefile):
   temptargetfiles = [targetfile + '.tmp']
   hintsfile = str(sourcefile) + '.hints'
   hhintsfile = to_hints_dir(hintsfile)
   outs = []
+  if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
+    print("Skipping %s because it is on the min_test_suite_blacklist defined in SConscript" % sourcefile)
+    return outs
+#  else:
+#    print("File %s is not on the blacklist" % str(sourcefile))
+
   if gen_hints:
     temptargetfiles.append(hintsfile)
   temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
@@ -578,9 +604,28 @@ def verify_fstar(env, targetfile, sourcefile):
     Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
   return outs
 
+def ml_out_name(sourcefile, suffix):
+  base_name = os.path.splitext(str(sourcefile))[0]
+  module_name = os.path.split(base_name)[1]
+  return 'obj/ml_out/' + module_name.replace('.', '_') + suffix
+
+def extract_fstar(env, sourcefile):
+  base_name = os.path.splitext(str(sourcefile))[0]
+  module_name = os.path.split(base_name)[1]
+  mlfile = ml_out_name(sourcefile, '.ml')
+  Depends(mlfile, base_name + '.fst.verified')
+  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces", ""))
+  cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
+  cmd_line += " --odir obj/ml_out --codegen OCaml --extract_module " + module_name
+  return env.Command(mlfile, sourcefile, cmd_line)
+
 # Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
 def add_fstar_verifier(env):
   env.AddMethod(verify_fstar, "FStar")
+
+# Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
+def add_fstar_extract(env):
+  env.AddMethod(extract_fstar, "FStarExtract")
 
 # Add env.DafnyCompile(), to compile without verification, a .dfy file into a .exe
 def add_dafny_compiler(env):
@@ -667,6 +712,65 @@ def compile_vale_fstar(env, source_vaf):
   targets = env.ValeFStar(source=source_vaf, target=[target_s, target_si])
   return targets
 
+ml_out_deps = {}
+
+def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name):
+  # OCaml depends on many libraries and executables; we have to assume they are in the user's PATH:
+  ocaml_env = Environment(ENV = {'PATH' : os.environ['PATH'], 'OCAMLPATH' : env['FSTAR_PATH'] + '/bin'})
+  main_ml = ml_out_name(main_name, '.ml')
+  main_exe = ml_out_name(main_name, '.exe')
+  alg_ml = ml_out_name(alg_name, '.ml')
+  cmdline_ml = ml_out_name(cmdline_name, '.ml')
+  pointer_src = 'src/lib/util/FStar_Pointer_Base.ml'
+  pointer_ml = ml_out_name(pointer_src, '.ml')
+  pointer_cmx = ml_out_name(pointer_src, '.ml')
+  env.Command(pointer_ml, pointer_src, Copy("$TARGET", "$SOURCE"))
+  env.Command(cmdline_ml, cmdline_name, Copy("$TARGET", "$SOURCE"))
+  env.Command(main_ml, main_name, Copy("$TARGET", "$SOURCE"))
+  Depends(cmdline_ml, cmdline_name)
+  Depends(main_ml, cmdline_ml)
+  Depends(cmdline_ml, alg_ml)
+  Depends(main_ml, alg_ml)
+  done = set()
+  cmxs = []
+  def add_cmx(x_ml):
+    x_cmx = ml_out_name(x_ml, '.cmx')
+    Depends(x_cmx, pointer_cmx)
+    cmx = ocaml_env.Command(x_cmx, x_ml, "ocamlfind ocamlopt -c -package fstarlib -o $TARGET $SOURCE -I obj/ml_out")
+    cmxs.append(cmx[0])
+  def collect_cmxs_in_order(x_ml):
+    if not (x_ml in done):
+      done.add(x_ml)
+      for y_ml in ml_out_deps[x_ml]:
+        # if x depends on y, y must appear first in ocaml link step
+        Depends(ml_out_name(x_ml, '.cmx'), ml_out_name(y_ml, '.cmx'))
+        collect_cmxs_in_order(y_ml)
+      Depends(x_ml, pointer_ml)
+      add_cmx(x_ml)
+  add_cmx(pointer_ml)
+  collect_cmxs_in_order(alg_ml)
+  add_cmx(cmdline_ml)
+  add_cmx(main_ml)
+  cmxs_string = " ".join([str(cmx) for cmx in cmxs])
+  exe = ocaml_env.Command(main_exe, cmxs, "ocamlfind ocamlopt -linkpkg -package fstarlib " + cmxs_string + " -o $TARGET")
+
+  output_target_base = 'obj/' + output_base_name
+  masm_win = env.Command(output_target_base + '.asm', exe, '$SOURCE MASM Win > $TARGET')
+  gcc_win = env.Command(output_target_base + '-gcc.S', exe, '$SOURCE GCC Win > $TARGET')
+  gcc_linux = env.Command(output_target_base + '-linux.S', exe, '$SOURCE GCC Linux > $TARGET')
+  gcc_macos = env.Command(output_target_base + '-macos.S', exe, '$SOURCE GCC MacOS > $TARGET')
+  
+  if sys.platform.startswith('linux'):
+    return [gcc_linux, masm_win, gcc_win, gcc_macos]
+  elif sys.platform == 'win32':
+    return [masm_win, gcc_win, gcc_linux, gcc_macos]
+  elif sys.platform == 'cygwin':
+    return [gcc_win, masm_win, gcc_linux, gcc_macos]
+  elif sys.platform == 'darwin':
+    return [gcc_macos, gcc_win, masm_win, gcc_linux]
+  else:
+    print('Unsupported sys.platform value: ' + sys.platform)
+
 # Pseudo-builder that takes Vale code, a main .dfy, and generates a Vale EXE which then emits .asm files
 # Arguments:
 #  vads - a list of vad files to extract
@@ -740,6 +844,7 @@ def build_test(env, inputs, include_dir, output_base_name):
 
 # Add pseudobuilders to env.  
 def add_extract_code(env):
+  env.AddMethod(extract_vale_ocaml, "ExtractValeOCaml")
   env.AddMethod(extract_vale_code, "ExtractValeCode")
   env.AddMethod(extract_dafny_code, "ExtractDafnyCode")
   env.AddMethod(build_test, "BuildTest")
@@ -772,6 +877,9 @@ def verify_fstar_files(env, files):
       if stage2:
         target = o + '.verified'
         options.env.FStar(target, o)
+        if fstar_extract:
+          if os.path.splitext(o)[1] == '.fst':
+            options.env.FStarExtract(o)
 
 # Verify a set of Vale files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -801,6 +909,8 @@ def verify_vale_fstar_files(env, files):
         targeti = s + '.fsti.verified'
         fstar_gen_options.env.FStar(target, fsts[0])
         fstari_gen_options.env.FStar(targeti, fsts[1])
+        if fstar_extract:
+          fstar_gen_options.env.FStarExtract(fsts[0])
 
 def recursive_glob(env, pattern, strings=False):
   matches = []
@@ -934,7 +1044,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
   print(" ".join(cmd))
   try:
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
-  except subprocess.CalledProcessError, e:
+  except (subprocess.CalledProcessError) as e:
     print('%sF* dependency analysis: error: %s %s' % (colors['red'], e.output, colors['end']))
     raise e
   print('%sF* dependency analysis: done%s' % (colors['cyan'], colors['end']))
@@ -955,9 +1065,19 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       targets, sources = line.split(': ', 1) # ': ', not ':', because of Windows drive letters
       sources = sources.split()
       targets = targets.split()
-      sources = [to_obj_dir(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x))) for x in sources if has_obj_dir(x)]
-      targets = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
-      Depends(targets, sources)
+      sources_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x))) for x in sources if has_obj_dir(x)]
+      targets_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
+      Depends(targets_ver, sources_ver)
+      if fstar_extract:
+        sources_ml = [ml_out_name(x, '.ml') for x in sources if has_obj_dir(x)]
+        targets_ml = [ml_out_name(x, '.ml') for x in targets if has_obj_dir(x)]
+        sources_ml = [x for x in sources_ml if not (x in targets_ml)]
+        Depends(targets_ml, sources_ml)
+        for t in targets_ml:
+          if not (t in ml_out_deps):
+            ml_out_deps[t] = set()
+          for s in sources_ml:
+            ml_out_deps[t].add(s)
   if fstar_deps_ok:
     # Save results in depsBackupFile
     with open(depsBackupFile, 'w') as myfile:
@@ -973,6 +1093,7 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
 ####################################################################
 add_dafny_verifier(env)
 add_fstar_verifier(env)
+add_fstar_extract(env)
 add_dafny_compiler(env)
 add_dafny_kremlin(env)
 add_vale_builders(env)
@@ -990,7 +1111,7 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
+Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')
@@ -1029,7 +1150,7 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'fstar_test_suite'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'min_test_suite_blacklist'])
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
@@ -1048,6 +1169,18 @@ if do_fstar and stage2 and not is_single_vaf:
 
 # Verification
 env.VerifyFilesIn(verify_paths)
+
+#
+# build aesgcm
+#
+if fstar_extract and stage2:
+  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/aes-x64/Main.ml', 'src/crypto/aes/aes-x64/X64.GCMopt.vaf', 'src/lib/util/CmdLineParser.ml')
+  if env['TARGET_ARCH'] == 'amd64': 
+    aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
+    aesgcmtest_src = 'src/crypto/aes/aes-x64/TestAesGcm.cpp'
+    aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
+    env.Command(aesgcmtest_cpp, aesgcmtest_src, Copy("$TARGET", "$SOURCE"))
+    aesgcmtest_exe = env.Program(source = [aesgcmasm_obj, aesgcmtest_cpp], target = 'obj/TestAesGcm.exe')
 
 # extract a string filename out of a build failure
 def bf_to_filename(bf):
@@ -1102,31 +1235,5 @@ if GetOption('dump_args'):
   print_env_options(['VERIFIER_FLAGS', 'FSTAR_Z3_PATH', 'FSTAR_NO_VERIFY', 'FSTAR_INCLUDES', 'FSTAR_USER_ARGS'])
   print(fstar_default_args)
   sys.exit(1)
-
-def make_copy(env, file, target_dir):
-  #print("Making a copy of %s" % file)
-  #env.AddMethod(Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE")), "Copy test file")
-  env.Command(os.path.join(target_dir, os.path.basename(file)), file, Copy("$TARGET", "$SOURCE"))
-
-def copy_fstar_test_files(env):
-  if GetOption('fstar_test'):
-    #print("Bundling")
-    #target_dir = GetOption('fstar_test_dir')
-    target_dir = 'fstar_test_suite' 
-    for f in fstar_test_suite: 
-      if f.endswith("fst") or f.endswith("fsti"):
-        make_copy(env, f, target_dir)
-      else:
-        files  = env.Glob(os.path.join(f, "*.fst"))
-        files += env.Glob(os.path.join(f, "*.fsti"))
-        files = ["%s" % f for f in files]
-
-        for f in files:
-          make_copy(env, f, target_dir)
-    warning = "Remember to run: cd fstar_test_suite; make deploy"
-    stars = "*" * len(warning)
-    print("\n%s\n%s\n%s\n" % (stars, warning, stars))
-
-copy_fstar_test_files(env)
 
 atexit.register(display_build_status)

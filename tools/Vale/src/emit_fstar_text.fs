@@ -123,7 +123,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Update, [e1; e2; e3]) -> (r prec (vaApp "update" [e1; e2; e3]), prec)
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
-    | EOp (FieldUpdate x, [e1; e2]) -> ("{" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "}", 90)
+    | EOp (FieldUpdate x, [e1; e2]) -> ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
     | EApply (x, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
     | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)

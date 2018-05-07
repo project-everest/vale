@@ -12,8 +12,8 @@ let lemma_to_of_quad32 q =
   reveal_of_quad32 q;
   reveal_to_quad32 (of_quad32 q);
   let a = of_quad32 q in
-  let Quad32 q0 q1 q2 q3 = q in
-  let Quad32 q0' q1' q2' q3' = to_quad32 a in
+  let Mkfour q0 q1 q2 q3 = q in
+  let Mkfour q0' q1' q2' q3' = to_quad32 a in
   lemma_index a;
   lemma_reverse_define_all ();
   let s0 = UInt.to_vec #32 q0 in
@@ -107,6 +107,10 @@ let lemma_gf128_constant_rev q =
   lemma_zero_nth 32;
   lemma_reverse_define h 127;
   lemma_index h;
+  let Mkfour a b c _ = to_quad32 rh in
+  assert (equal (UInt.to_vec #32 a) (UInt.to_vec #32 0));
+  assert (equal (UInt.to_vec #32 b) (UInt.to_vec #32 0));
+  assert (equal (UInt.to_vec #32 c) (UInt.to_vec #32 0));
   let s = to_seq (reverse rh 127) 128 in
   let s0_32 = slice s 0 32 in
   let s0_8 = slice s0_32 0 8 in
@@ -123,7 +127,7 @@ let lemma_gf128_constant_rev q =
   UInt.from_vec_propriety #32 s0_32 8;
   assert_norm (pow2 24 == 0x1000000);
   assert (UInt.from_vec #32 s0_32 == 0xe1000000);
-  lemma_quad32_vec_equal (to_quad32 rh) (Quad32 0 0 0 0xe1000000)
+  lemma_quad32_vec_equal (to_quad32 rh) (Mkfour 0 0 0 0xe1000000)
 
 let lemma_quad32_double_hi_rev a =
   let ra = reverse a 127 in

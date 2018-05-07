@@ -23,18 +23,18 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-include{:verbatim} "../../../../arch/arm/globals.s.dfy"
-include{:verbatim} "../../../../arch/arm/print.s.dfy"
-include{:verbatim} "../../../../arch/arm/vale.i.dfy"
-include{:verbatim} "../../../../lib/util/words_and_bytes.s.dfy"
-include{:verbatim} "../../../../lib/util/dafny_wrappers.i.dfy"
+include{:verbatim}{:from BASE} "arch/arm/globals.s.dfy"
+include{:verbatim}{:from BASE} "arch/arm/print.s.dfy"
+include{:verbatim}{:from BASE} "arch/arm/vale.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/words_and_bytes.s.dfy"
+include{:verbatim}{:from BASE} "lib/util/dafny_wrappers.i.dfy"
 
-include{:verbatim} "../../../../crypto/hashing/sha256.i.dfy"
-include{:verbatim} "../../../../crypto/hashing/sha256_helpers.i.dfy"
-include{:verbatim} "../../../../crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy"
-include{:verbatim} "../../../../crypto/hashing/sha-arm/sha256-arm-helpers.i.dfy"
-include{:verbatim} "../../../../crypto/hashing/sha-arm/sha256-invariants.i.dfy"
-include "../../../../arch/arm/decls.vad"
+include{:verbatim}{:from BASE} "crypto/hashing/sha256.i.dfy"
+include{:verbatim}{:from BASE} "crypto/hashing/sha256_helpers.i.dfy"
+include{:verbatim}{:from BASE} "crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy"
+include{:verbatim}{:from BASE} "crypto/hashing/sha-arm/sha256-arm-helpers.i.dfy"
+include{:verbatim}{:from BASE} "crypto/hashing/sha-arm/sha256-invariants.i.dfy"
+include{:from BASE} "arch/arm/decls.vad"
 
 #verbatim
 

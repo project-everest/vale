@@ -1,7 +1,7 @@
 include{:verbatim} "../aes_lemmas.i.dfy"
-include{:verbatim} "../../../lib/util/dafny_wrappers.i.dfy"
-include{:verbatim} "../../../arch/x64/vale.i.dfy"
-include "../../../arch/x64/decls.vad"
+include{:verbatim}{:from BASE} "lib/util/dafny_wrappers.i.dfy"
+include{:verbatim}{:from BASE} "arch/x64/vale.i.dfy"
+include{:from BASE} "arch/x64/decls.vad"
 
 #verbatim
 module aes_vale {

@@ -27,7 +27,7 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
 	//assert (i >= 0 ==> precedes (kk - i) (k-i));
 	//assert (i < 0 ==> precedes (kk - i) (k-i));
 	let hh = poly1305_heap_blocks' h pad r s kk in
-        modp((hh + pad + nat64_max * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
+        modp((hh + pad + pow2_64 * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
 
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : int
 

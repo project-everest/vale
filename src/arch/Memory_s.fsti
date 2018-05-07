@@ -25,7 +25,7 @@ val tuint8 : (t:typ{type_of_typ t == UInt8.t})
 val tuint16 : (t:typ{type_of_typ t == UInt16.t})
 val tuint32 : (t:typ{type_of_typ t == UInt32.t})
 val tuint64 : (t:typ{type_of_typ t == UInt64.t})
-val tuint128 : (t:typ{type_of_typ t == UInt128.t})
+//val tuint128 : (t:typ{type_of_typ t == UInt128.t})
 
 val loc_readable (h:mem) (s:loc) : GTot Type0
 

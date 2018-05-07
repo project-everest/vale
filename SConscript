@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
@@ -49,6 +49,7 @@ fstar_include_paths = [
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  env['FSTAR_PATH'] + '/examples/tactics/'
 ]
 Export('fstar_include_paths')
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
@@ -83,14 +84,6 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
   'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
-  # .fst/.fsti files default to this set of options
-  '.fst': BuildOptions(fstar_default_args),
-  '.fsti': BuildOptions(fstar_default_args),
-
-  # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
-  '.vad': BuildOptions(dafny_default_args_larith),
-  '.vaf': BuildOptions(fstar_default_args),
-
   # Disable verification by adding 'filename': None
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
@@ -103,8 +96,19 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
+
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
-  
+
+  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+
+  # .fst/.fsti files default to this set of options
+  '.fst': BuildOptions(fstar_default_args),
+  '.fsti': BuildOptions(fstar_default_args),
+
+  # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
+  '.vad': BuildOptions(dafny_default_args_larith),
+  '.vaf': BuildOptions(fstar_default_args),  
 }
 if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None
@@ -113,26 +117,21 @@ if env['TARGET_ARCH'] != 'x86':
 Export('verify_options')
 
 #
-# Table of files we export to F*'s test suite
+# Table of files we exclude from the minimal test suite
+# (typically for performance reasons)
+# Note that the entries below are prefixes of blacklisted files
 #
-fstar_test_suite = [
-  'src/arch/x64/',
-  'src/crypto/poly1305/x64/',
-  'src/lib/util/',
-  'src/lib/collections/',
-  'obj/thirdPartyPorts/OpenSSL/poly1305/',
-  'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
-  'obj/arch/x64/X64.Vale.InsAes.fst',
-  'obj/arch/x64/X64.Vale.InsBasic.fst',
-  'obj/arch/x64/X64.Vale.InsMem.fst',
+min_test_suite_blacklist = [
+  'obj/crypto/aes/aes-x64/X64.GCMopt.fst',
+  'obj/crypto/aes/aes-x64/X64.GCM.fst',
+  'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
   'obj/arch/x64/X64.Vale.InsVector.fst',
-  'obj/arch/x64/X64.Vale.InsAes.fsti',
-  'obj/arch/x64/X64.Vale.InsBasic.fsti',
-  'obj/arch/x64/X64.Vale.InsMem.fsti',
-  'obj/arch/x64/X64.Vale.InsVector.fsti',
+  'obj/crypto/aes/aes-x64/X64.GHash',
+  'obj/crypto/aes/aes-x64/X64.GCTR.fst',
+  'obj/crypto/aes/aes-x64/X64.AES.fst'
 ]
 
-Export('fstar_test_suite')
+Export('min_test_suite_blacklist')
 
 #
 # build sha256-exe

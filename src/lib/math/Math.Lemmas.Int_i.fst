@@ -24,20 +24,20 @@ let lt_multiple_is_equal (a:nat) (b:nat) (x:int) (n:pos) =
 let add_div_mod_1 (a:int) (n:pos) : Lemma ((a + n) % n == a % n /\ (a + n) / n == a / n + 1) =
   lemma_div_mod a n;
   lemma_div_mod (a + n) n;
-  assert (((a + n) % n) == a % n + (a / n) * n + n - ((a + n) / n) * n);
+  // ((a + n) % n) == a % n + (a / n) * n + n - ((a + n) / n) * n
   FStar.Math.Lemmas.distributivity_add_left (a / n) 1 n;
   FStar.Math.Lemmas.distributivity_sub_left (a / n + 1) ((a + n) / n) n;
-  assert (((a + n) % n) == a % n + (a / n + 1 - (a + n) / n) * n);
+  // (((a + n) % n) == a % n + (a / n + 1 - (a + n) / n) * n
   lt_multiple_is_equal ((a + n) % n) (a % n) (a / n + 1 - (a + n) / n) n;
   ()
 
 let sub_div_mod_1 (a:int) (n:pos) : Lemma ((a - n) % n == a % n /\ (a - n) / n == a / n - 1) =
   lemma_div_mod a n;
   lemma_div_mod (a - n) n;
-  assert (((a - n) % n) == a % n - n + (a / n) * n - ((a - n) / n) * n);
+  // ((a - n) % n) == a % n - n + (a / n) * n - ((a - n) / n) * n
   FStar.Math.Lemmas.distributivity_add_left (a / n) 1 n;
   FStar.Math.Lemmas.distributivity_sub_left (a / n - 1) ((a - n) / n) n;
-  assert (((a - n) % n) == a % n + (a / n - 1 - (a - n) / n) * n);
+  // ((a - n) % n) == a % n + (a / n - 1 - (a - n) / n) * n
   lt_multiple_is_equal ((a - n) % n) (a % n) (a / n - 1 - (a - n) / n) n;
   ()
 
@@ -77,43 +77,47 @@ let mod_add_both (a:int) (b:int) (x:int) (n:pos) =
   lemma_div_mod b n;
   lemma_div_mod (a + x) n;
   lemma_div_mod (b + x) n;
-  lt_multiple_is_equal ((a + x) % n) ((b + x) % n) ((b + x) / n - (a + x) / n - b / n + a / n) n
+  let xx = (b + x) / n - (a + x) / n - b / n + a / n in
+  FStar.Math.Lemmas.distributivity_sub_left ((b + x) / n) ((a + x) / n) n;
+  FStar.Math.Lemmas.distributivity_sub_left ((b + x) / n - (a + x) / n) (b / n) n;
+  FStar.Math.Lemmas.distributivity_add_left ((b + x) / n - (a + x) / n - b / n) (a / n) n;
+  lt_multiple_is_equal ((a + x) % n) ((b + x) % n) xx n
 
 let lemma_mod_add_distr (a:int) (b:int) (n:pos) =
   lemma_div_mod b n;
-  assert ((a + b) % n == (a + (b % n) + (b / n) * n) % n);
+  // (a + b) % n == (a + (b % n) + (b / n) * n) % n
   lemma_mod_plus (a + (b % n)) (b / n) n
 
 let lemma_mod_sub_distr (a:int) (b:int) (n:pos) =
   lemma_div_mod b n;
-  assert ((a - b) % n == (a - (b % n) - (b / n) * n) % n);
+  FStar.Math.Lemmas.distributivity_sub_left 0 (b / n) n;
+  // (a - b) % n == (a - (b % n) - (b / n) * n) % n
   lemma_mod_plus (a - (b % n)) (-(b / n)) n
 
-let rec lemma_mod_mul_distr_l (a:int) (b:int) (n:pos)
-//: Lemma
-//  (requires True)
-//  (ensures (a * b) % n = ((a % n) * b) % n)
-//  (decreases (if b >= 0 then b else -b))
-  =
+let rec lemma_mod_mul_distr_l (a:int) (b:int) (n:pos) =
   if b = 0 then
   (
-    assert ((a * 0) == 0 /\ ((a % n) * 0) == 0);
+    assert (a * 0 == 0 /\ ((a % n) * 0) == 0);
     small_mod 0 n
   )
   else if b > 0 then
   (
     lemma_mod_mul_distr_l a (b - 1) n;
-    assert ((a * b - a) % n == ((a % n) * b - (a % n)) % n);
+    FStar.Math.Lemmas.distributivity_sub_right a b 1;
+    FStar.Math.Lemmas.distributivity_sub_right (a % n) b 1;
+    // (a * b - a) % n == ((a % n) * b - (a % n)) % n
     lemma_mod_sub_distr ((a % n) * b) a n;
-    assert ((a * b - a) % n = ((a % n) * b - a) % n);
+    // (a * b - a) % n = ((a % n) * b - a) % n
     mod_add_both (a * b - a) ((a % n) * b - a) a n
   )
   else
   (
     lemma_mod_mul_distr_l a (b + 1) n;
-    assert ((a * b + a) % n == ((a % n) * b + (a % n)) % n);
+    FStar.Math.Lemmas.distributivity_add_right a b 1;
+    FStar.Math.Lemmas.distributivity_add_right (a % n) b 1;
+    // (a * b + a) % n == ((a % n) * b + (a % n)) % n
     lemma_mod_add_distr ((a % n) * b) a n;
-    assert ((a * b + a) % n = ((a % n) * b + a) % n);
+    // (a * b + a) % n = ((a % n) * b + a) % n
     mod_add_both (a * b + a) ((a % n) * b + a) (-a) n
   )
 
@@ -126,7 +130,7 @@ let lemma_mod_spec (a:int) (n:pos) =
   lemma_div_mod (a - (a % n)) n;
   small_mod 0 n;
   lemma_mod_sub_distr a a n; // (a - a % n) % n = (a - a) % n = 0 % n = 0
-  assert ((a / n) * n == ((a - a % n) / n) * n);
+  // (a / n) * n == ((a - a % n) / n) * n
   cancel_mul_div (a / n) n;
   cancel_mul_div ((a - a % n) / n) n
 
@@ -146,6 +150,7 @@ let division_propriety (a:int) (n:pos) = lemma_div_mod a n
 
 let division_definition (a:int) (n:pos) (m:int) =
   lemma_div_mod a n;
+  FStar.Math.Lemmas.distributivity_sub_left (a / n) m n;
   bounded_multiple_is_zero (a / n - m) n
 
 let multiple_division_lemma (a:int) (n:pos) = cancel_mul_div a n
@@ -161,7 +166,7 @@ let mod_mult_exact (a:int) (n:pos) (q:pos) =
   lemma_div_mod a (n * q);
   let k = a / (n * q) in
   FStar.Math.Lemmas.paren_mul_right k q n;
-  assert (a == (k * q) * n);
+  // a == (k * q) * n
   cancel_mul_mod (k * q) n
 
 let mod_mul_div_exact (a:int) (b:pos) (n:pos) =
@@ -169,9 +174,9 @@ let mod_mul_div_exact (a:int) (b:pos) (n:pos) =
   lemma_div_mod a (b * n);
   let k = a / (b * n) in
   FStar.Math.Lemmas.paren_mul_right k n b;
-  assert (a == (k * n) * b);
+  // a == (k * n) * b
   cancel_mul_div (k * n) b;
-  assert (a / b = k * n);
+  // a / b = k * n
   cancel_mul_mod k n
 
 #reset-options "--initial_fuel 1 --max_fuel 1 --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped"
@@ -191,21 +196,24 @@ let division_multiplication_lemma (a:int) (b:pos) (c:pos) =
   let k2 = a - (a / (b * c)) * (b * c) in // k2 = a % (b * c)
   FStar.Math.Lemmas.distributivity_sub_left (a / b) (((a / b) / c) * c) b;
   FStar.Math.Lemmas.paren_mul_right ((a / b) / c) c b;
-  assert (k1 * b == (a / b) * b - ((a / b) / c) * (b * c));
-  assert (k1 * b - k2 == (a / (b * c) - (a / b) / c) * (b * c) - a % b);
+  FStar.Math.Lemmas.swap_mul b c;
+  // k1 * b == (a / b) * b - ((a / b) / c) * (b * c)
+  // k1 * b - k2 == (a / (b * c) - (a / b) / c) * (b * c) - a % b
   FStar.Math.Lemmas.lemma_mult_le_right b 0 k1;
   FStar.Math.Lemmas.lemma_mult_le_right b k1 (c - 1);
-  assert (0 <= k1 /\ k1 <= (c - 1));
-  assert (0 <= k1 * b /\ k1 * b <= (c - 1) * b);
-  assert (0 <= k2 /\ k2 < b * c);
-  assert (1 - b * c <= k1 * b - k2 /\ k1 * b - k2 <= b * c - b);
+  FStar.Math.Lemmas.distributivity_sub_left c 1 b;
+  // 0 <= k1 <= (c - 1)
+  // 0 <= k1 * b <= (c - 1) * b
+  // 0 <= k2 < b * c
+  // 1 - b * c <= k1 * b - k2 <= b * c - b
+  FStar.Math.Lemmas.distributivity_sub_left (a / (b * c)) ((a / b) / c) (b * c);
   bounded_multiple_is_zero (a / (b * c) - (a / b) / c) (b * c)
 
 let modulo_modulo_lemma (a:int) (b:pos) (c:pos) =
   FStar.Math.Lemmas.pos_times_pos_is_pos b c;
   lemma_div_mod a (b * c);
   FStar.Math.Lemmas.paren_mul_right (a / (b * c)) c b;
-  assert (((a / (b * c)) * c) * b == (a / (b * c)) * (b * c));
+  FStar.Math.Lemmas.swap_mul b c;
   lemma_mod_plus (a % (b * c)) ((a / (b * c)) * c) b
 
 let lemma_mod_plus_injective (n:pos) (a:int) (b:nat) (c:nat) =

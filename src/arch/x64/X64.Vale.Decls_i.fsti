@@ -14,6 +14,9 @@ open Types_s
 unfold let quad32 = quad32
 
 val cf : (flags:int) -> bool
+val overflow (flags:int) : bool
+val update_cf (flags:int) (new_cf:bool) : (new_flags:int)
+val update_of (flags:int) (new_of:bool) : (new_flags:int)
 
 //unfold let va_subscript = Map.sel
 unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
@@ -22,6 +25,10 @@ unfold let va_make_opaque = Opaque_i.make_opaque
 unfold let va_reveal_opaque = Opaque_i.reveal_opaque
 unfold let va_hd = Cons?.hd
 //unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
+
+// hide 'if' so that x and y get fully normalized
+let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
+  if b then x () else y ()
 
 (* Type aliases *)
 unfold let va_bool = bool
@@ -65,6 +72,7 @@ unfold let modifies_mem (s:M.loc) (h1 h2:mem) : GTot Type0 = M.modifies s h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
+unfold let loc_union = M.loc_union
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -83,6 +91,8 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 [@va_qattr] unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
 [@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
+[@va_qattr] unfold let va_coerce_reg_opr64_to_dst_opr64 (o:va_operand_reg_opr64) : va_operand_dst_opr64 = o
+[@va_qattr] unfold let va_coerce_reg_opr64_to_opr64 (o:va_operand_reg_opr64) : va_operand_opr64 = o
 [@va_qattr] unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
 [@va_qattr] unfold let va_coerce_opr64_to_cmp (o:va_operand) : va_cmp = o
 [@va_qattr] unfold let va_op_register (r:reg) : va_register = r
@@ -127,6 +137,7 @@ let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buf
 [@va_qattr] unfold let va_is_dst_reg (r:reg) (s:va_state) = True
 [@va_qattr] unfold let va_is_src_shift_amt64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
 [@va_qattr] unfold let va_is_src_reg_opr64 (o:operand) (s:va_state) = OReg? o
+[@va_qattr] unfold let va_is_dst_reg_opr64 (o:operand) (s:va_state) = OReg? o /\ not (Rsp? (OReg?.r o))
 [@va_qattr] unfold let va_is_src_xmm (x:xmm) (s:va_state) = True
 [@va_qattr] unfold let va_is_dst_xmm (x:xmm) (s:va_state) = True
 
@@ -137,12 +148,20 @@ let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:buf
 [@va_qattr] unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
 [@va_qattr] unfold let va_get_mem (s:va_state) : mem = s.mem
 
+[@va_qattr] let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
+[@va_qattr] let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
+[@va_qattr] let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
+[@va_qattr] let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
+[@va_qattr] let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
+
 (* Framing: va_update_foo means the two states are the same except for foo *)
-[@va_qattr] let va_update_ok (sM:va_state) (sK:va_state) : va_state = { sK with ok = sM.ok }
-[@va_qattr] let va_update_flags (sM:va_state) (sK:va_state) : va_state = { sK with flags = sM.flags }
-[@va_qattr] let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
-  update_reg r (eval_reg r sM) sK
-[@va_qattr] let va_update_mem (sM:va_state) (sK:va_state) : va_state = { sK with mem = sM.mem }
+[@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = va_upd_ok sM.ok sK
+[@va_qattr] unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = va_upd_flags sM.flags sK
+[@va_qattr] unfold let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
+  va_upd_reg r (eval_reg r sM) sK
+[@va_qattr] unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = va_upd_mem sM.mem sK
+[@va_qattr] unfold let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
+  va_upd_xmm x (eval_xmm x sM) sK
 
 [@va_qattr]
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
@@ -168,21 +187,17 @@ let va_update_register (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
 [@va_qattr] unfold
-let va_update_operand_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
-  update_xmm x (eval_xmm x sM) sK
+let va_update_operand_reg_opr64 (o:operand) (sM:va_state) (sK:va_state) : va_state =
+  va_update_dst_operand o sM sK
 
 [@va_qattr] unfold
-let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
+let va_update_operand_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
   update_xmm x (eval_xmm x sM) sK
 
 unfold let va_value_opr64 = nat64
 unfold let va_value_dst_opr64 = nat64
+unfold let va_value_reg_opr64 = nat64
 unfold let va_value_xmm = quad32
-[@va_qattr] unfold let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
-[@va_qattr] unfold let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
-[@va_qattr] unfold let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
-[@va_qattr] unfold let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
-[@va_qattr] unfold let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
 
 [@va_qattr]
 let va_upd_operand_xmm (x:xmm) (v:quad32) (s:state) : state =
@@ -194,9 +209,18 @@ let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
   | OConst n -> s
   | OReg r -> update_reg r v s
   | OMem m -> s // TODO: support destination memory operands
+
+[@va_qattr]
+let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) =
+  match o with
+  | OConst n -> s
+  | OReg r -> update_reg r v s
+  | OMem m -> s 
+  
 let va_lemma_upd_update (sM:state) : Lemma
   (
     (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
+    (forall (sK:state) (o:operand).{:pattern (va_update_operand_reg_opr64 o sM sK)} va_is_dst_reg_opr64 o sK ==> va_update_operand_reg_opr64 o sM sK == va_upd_operand_reg_opr64 o (eval_operand o sM) sK) /\
     (forall (sK:state) (x:xmm).{:pattern (va_update_operand_xmm x sM sK)} va_update_operand_xmm x sM sK == va_upd_operand_xmm x (eval_xmm x sM) sK)
   )
   = ()
@@ -230,12 +254,6 @@ type map (key:eqtype) (value:Type) = Map.t key value
 let op_String_Access     = Map.sel
 let op_String_Assignment = Map.upd
 
-(** Work around syntax mismatches between Vale and F* (and F*'s odd type resolution for destructors) **)
-unfold let get_lo_bits (b:bits_of_byte)     = Bits_of_Byte?.lo     b
-unfold let get_mid_lo_bits (b:bits_of_byte) = Bits_of_Byte?.mid_lo b
-unfold let get_mid_hi_bits (b:bits_of_byte) = Bits_of_Byte?.mid_hi b
-unfold let get_hi_bits (b:bits_of_byte)     = Bits_of_Byte?.hi     b
-
 (** Memory framing **)
 
 (*
@@ -260,6 +278,7 @@ let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) 
     | b :: l'  -> buffer_readable h b /\ buffers_readable h l'
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
+unfold let modifies_buffer_2 (b1 b2:buffer64) (h1 h2:mem) =modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 unfold let modifies_buffer128 (b:buffer128) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 unfold let modifies_buffer128_2 (b1 b2:buffer128) (h1 h2:mem) = modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 
@@ -267,6 +286,9 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b == addr
+
+unfold 
+let validDstAddrs64 = validSrcAddrs64
 
 let validSrcAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
     buffer_readable m b /\
@@ -277,6 +299,14 @@ let validDstAddrs128 (m:mem) (addr:int) (b:buffer128) (len:int) =
     buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b == addr
+
+let valid_stack_slots (m:mem) (rsp:int) (b:buffer64) (num_slots:int) =
+    buffer_readable m b /\
+    num_slots <= buffer_length b /\
+    (let open FStar.Mul in
+     rsp == buffer_addr b + 8 * num_slots /\
+     0 <= rsp - 8 * num_slots /\ 
+     rsp < pow2_64)
 
 let modifies_buffer_specific128 (b:buffer128) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer128 b h1 h2 /\

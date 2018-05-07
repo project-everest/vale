@@ -162,7 +162,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       fghost = NotGhost;
       fargs = fParams @ [(s0, Some tState); argContinue];
       fret = tType0;
-      fbody = Some wpBody;
+      fbody = Some (hide_ifs wpBody);
       fattrs = [(Id "public", []); (Id "qattr", [])] @ attr_no_verify "lax" p.pattrs;
     }
     in

@@ -3,13 +3,14 @@ module X64.Machine_s
 module M = Memory_i_s
 
 irreducible let va_qattr = ()
-unfold let nat32_max = Types_s.nat32_max
-unfold let nat64_max = Types_s.nat64_max
-unfold let nat128_max = Types_s.nat128_max
+unfold let pow2_32 = Words_s.pow2_32
+unfold let pow2_64 = Words_s.pow2_64
+unfold let pow2_128 = Words_s.pow2_128
 
 unfold let nat64 = Types_s.nat64
-assume val int_to_nat64 : i:int -> n:nat64{0 <= i && i < nat64_max ==> i == n}
-unfold let nat128 = Types_s.nat128
+let int_to_nat64 (i:int) : n:nat64{0 <= i && i < pow2_64 ==> i == n} =
+  Words_s.int_to_natN pow2_64 i
+unfold let nat128 = Words_s.nat128
 unfold let quad32 = Types_s.quad32
 
 type reg =
@@ -42,7 +43,7 @@ type operand =
   | OMem: m:maddr -> operand
 
 type imm8 = i:int { 0 <= i && i < 256}
-type xmm = i:int{ 0 <= i /\ i < 8 }
+type xmm = i:int{ 0 <= i /\ i < 16 }
 
 type mov128_op =   
   | Mov128Xmm: x:xmm -> mov128_op

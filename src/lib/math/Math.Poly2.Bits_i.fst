@@ -29,7 +29,7 @@ let lemma_quad32_double a =
 
 let lemma_quad32_double_shift a =
   let q = to_quad32 a in
-  let Quad32 q0 q1 q2 q3 = to_quad32 a in
+  let Mkfour q0 q1 q2 q3 = to_quad32 a in
   let n = monomial 64 in
   reveal_to_quad32 a;
   reveal_to_quad32 (a /. n);
@@ -41,7 +41,7 @@ let lemma_quad32_double_shift a =
   lemma_reverse_define_all ();
   lemma_index_all ();
   lemma_zero_nth 32;
-  lemma_quad32_vec_equal (Quad32 0 0 q0 q1) (to_quad32 ((a %. n) *. n));
-  lemma_quad32_vec_equal (Quad32 q2 q3 0 0) (to_quad32 (a /. n));
+  lemma_quad32_vec_equal (Mkfour 0 0 q0 q1) (to_quad32 ((a %. n) *. n));
+  lemma_quad32_vec_equal (Mkfour q2 q3 0 0) (to_quad32 (a /. n));
   ()
 

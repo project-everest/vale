@@ -152,6 +152,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
   let funs = ref ([]:decls) in
   let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
   let fParams = make_fun_params p.prets p.pargs in
+  let pParams = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
+  let pArgs = List.map (fun (x, _) -> EVar x) pParams in
   let gen_quick_block env info outs args ss =
     let id = Reserved ("qcode_" + info.qsym + "_" + (string_of_id p.pname)) in
     let cid = Reserved ("code_" + info.qsym + "_" + (string_of_id p.pname)) in
@@ -163,10 +165,10 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
       {
         fname = id;
         fghost = Ghost;
-        fargs = fParams;
+        fargs = pParams;
 //        fret = TApp (TName (Reserved "quickCode"), [tUnit; tCodeApp]);
         fret = TApp (TName (Id "quickCodes"), [tUnit; tCodeApp]);
-        fbody = Some fBody;
+        fbody = Some (hide_ifs fBody);
         fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
       }
       in
@@ -178,7 +180,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
         (fun (sN:state) (sN':state) -> va_get_reg Rax sN == va_get_reg Rax sN' /\ va_get_flags sN == va_get_flags sN')
     *)
     let eCode = EApply (cid, fArgs) in
-    let eQCode = EApply (id, fArgs) in
+    let eQCode = EApply (id, pArgs) in
     let s0 = Reserved "s0" in
     let sM = Reserved "sM" in
     let sN = Reserved "sN" in
@@ -234,7 +236,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
       fghost = NotGhost;
       fargs = qParams;
       fret = tRetQuick;
-      fbody = Some eQuick;
+      fbody = Some (hide_ifs eQuick);
       fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
     }
     in
@@ -254,7 +256,7 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   let qCodes_X = Reserved ("qcode_" + (string_of_id p.pname)) in
   let ghostRets = List.collect (fun (x, t, g, _, _) -> match g with XGhost -> [(x, t)] | _ -> []) p.prets in
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
-  let letGs = EBind (BindLet, [EVar g], gAssigns, [], ens) in
+  let letGs = EBind (BindLet, [EVar g], gAssigns, [], hide_ifs ens) in
   let funCont = EBind (Lambda, [], [(s0, None); (sM, None); (g, None)], [], letGs) in
   let eWpSound = EApply (wpSound_X, [code; EApply (qCodes_X, args); EVar s0; funCont]) in
   let sWpSound = SAssign ([(sM, None); (fM, None); (g, None)], eWpSound) in

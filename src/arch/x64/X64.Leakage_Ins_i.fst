@@ -107,8 +107,8 @@ let lemma_add_same_public ts ins s1 s2 fuel =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12) % nat64_max in
-	  let v2 = (v21 + v22) % nat64_max in
+	  let v1 = (v11 + v12) % pow2_64 in
+	  let v2 = (v21 + v22) % pow2_64 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
@@ -138,8 +138,8 @@ let lemma_sub_same_public ts ins s1 s2 fuel =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 - v12) % nat64_max in
-	  let v2 = (v21 - v22) % nat64_max in
+	  let v1 = (v11 - v12) % pow2_64 in
+	  let v2 = (v21 - v22) % pow2_64 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
@@ -231,8 +231,8 @@ let lemma_addlea_same_public ts ins s1 s2 fuel =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12) % nat64_max in
-	  let v2 = (v21 + v22) % nat64_max in
+	  let v1 = (v11 + v12) % pow2_64 in
+	  let v2 = (v21 + v22) % pow2_64 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
@@ -264,8 +264,8 @@ let lemma_addcarry_same_public ts ins s1 s2 fuel =
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12 + c1) % nat64_max in
-	  let v2 = (v21 + v22 + c2) % nat64_max in
+	  let v1 = (v11 + v12 + c1) % pow2_64 in
+	  let v2 = (v21 + v22 + c2) % pow2_64 in
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;

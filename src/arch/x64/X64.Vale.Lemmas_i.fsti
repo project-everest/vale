@@ -10,6 +10,9 @@ unfold let ocmp = S.ocmp
 unfold let fuel = nat
 
 let cf (flags:int) : bool = S.cf (int_to_nat64 flags)
+let overflow (flags:int) : bool = S.overflow (int_to_nat64 flags)
+let update_cf (flags:int) (new_cf:bool) = S.update_cf (int_to_nat64 flags) new_cf
+let update_of (flags:int) (new_of:bool) = S.update_of (int_to_nat64 flags) new_of
 
 let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : Type0 =
   Some (state_to_S s1) == S.eval_code c f0 (state_to_S s0)

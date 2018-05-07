@@ -8,13 +8,16 @@ module S = X64.Semantics_s
 module P = X64.Print_s
 
 #reset-options "--z3cliopt smt.arith.nl=true"
-let lemma_mul_in_bounds (x y:nat64) : Lemma (requires x `op_Multiply` y < nat64_max) (ensures FStar.UInt.mul_mod #64 x y == x `op_Multiply` y) = ()
+let lemma_mul_in_bounds (x y:nat64) : Lemma (requires x `op_Multiply` y < pow2_64) (ensures FStar.UInt.mul_mod #64 x y == x `op_Multiply` y) = ()
 
 #reset-options "--z3cliopt smt.arith.nl=true --using_facts_from Prims --using_facts_from FStar.Math"
 let lemma_mul_nat (x:nat) (y:nat) : Lemma (ensures 0 <= (x `op_Multiply` y)) = ()
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
 let cf = Lemmas_i.cf
+let overflow = Lemmas_i.overflow
+let update_cf = Lemmas_i.update_cf
+let update_of = Lemmas_i.update_of
 let ins = S.ins
 type ocmp = S.ocmp
 type va_fuel = nat

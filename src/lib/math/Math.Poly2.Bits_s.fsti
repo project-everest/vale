@@ -1,4 +1,5 @@
 module Math.Poly2.Bits_s
+open Words_s
 open Types_s
 open Math.Poly2_s
 open FStar.Seq
@@ -17,12 +18,12 @@ let of_uint (n:pos) (u:uint_t n) : poly =
 
 let to_double32_def (a:poly) : double32 =
   let s = to_seq (reverse a 63) 64 in
-  Double32
+  Mktwo
     (from_vec #32 (slice s 32 64)) // lo word contains a.[31] .. a.[0]
     (from_vec #32 (slice s 0 32)) // hi word contains a.[63] .. a.[32]
 
 let of_double32_def (d:double32) : poly =
-  let Double32 d0 d1 = d in
+  let Mktwo d0 d1 = d in
   let s = (append (
     (to_vec #32 d1))
     (to_vec #32 d0))
@@ -31,14 +32,14 @@ let of_double32_def (d:double32) : poly =
 
 let to_quad32_def (a:poly) : quad32 =
   let s = to_seq (reverse a 127) 128 in
-  Quad32
+  Mkfour
     (from_vec #32 (slice s 96 128)) // lo word contains a.[31] .. a.[0]
     (from_vec #32 (slice s 64 96))
     (from_vec #32 (slice s 32 64))
     (from_vec #32 (slice s 0 32)) // hi word contains a.[127] .. a.[96]
 
 let of_quad32_def (q:quad32) : poly =
-  let Quad32 q0 q1 q2 q3 = q in
+  let Mkfour q0 q1 q2 q3 = q in
   let s = (append (append (append (
     (to_vec #32 q3))
     (to_vec #32 q2))

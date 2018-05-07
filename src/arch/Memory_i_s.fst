@@ -13,7 +13,7 @@ let m_of_typ (t:typ) : M.typ =
   | TBase TUInt16 -> M.tuint16
   | TBase TUInt32 -> M.tuint32
   | TBase TUInt64 -> M.tuint64
-  | TBase TUInt128 -> M.tuint128
+  | TBase TUInt128 -> admit () // M.tuint128
 
 let v_of_typ (t:typ) (v:type_of_typ t) : M.type_of_typ (m_of_typ t) =
   match t with
@@ -110,15 +110,15 @@ let default_of_typ (t:typ) : type_of_typ t =
   | TBase TUInt16 -> 0
   | TBase TUInt32 -> 0
   | TBase TUInt64 -> 0
-  | TBase TUInt128 -> Types_s.Quad32 0  0 0 0
+  | TBase TUInt128 -> Words_s.Mkfour #nat32 0 0 0 0
 
 let buffer_read #t b i h =
-  if i < 0 || i >= Types_s.nat32_max then default_of_typ t else
+  if i < 0 || i >= Words_s.pow2_32 then default_of_typ t else
   let v = M.buffer_read b (UInt32.uint_to_t i) h in
   v_to_typ t v
 
 let buffer_write #t b i v h =
-  if i < 0 || i >= Types_s.nat32_max then h else
+  if i < 0 || i >= Words_s.pow2_32 then h else
   let vu = v_of_typ t v in
   let h' = M.buffer_write b (UInt32.uint_to_t i) vu h in
   assert (v_to_typ t vu == v); // v_to_typ (v_of_typ v)

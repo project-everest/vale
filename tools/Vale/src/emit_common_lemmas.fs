@@ -606,6 +606,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           if isQuick then
             Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
-        fCodes @ quickDecls @ (gen_quick_block_funs ()) @ [(loc, DProc pLemma)]
+        fCodes @ (if !no_lemmas then [] else quickDecls @ (gen_quick_block_funs ()) @ [(loc, DProc pLemma)])
     in
   bodyDecls //@ blockLemmaDecls

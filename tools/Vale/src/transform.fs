@@ -889,6 +889,20 @@ let resolve_overload_spec (envIn:env) (envOut:env) (s:spec):spec =
   | Modifies (m, e) -> Modifies (m, resolve_overload_expr envOut e)
   | SpecRaw _ -> internalErr "resolve_overload_spec"
 
+let check_no_duplicates (es:(loc * exp) list):unit =
+  let sls = List.map (fun (l, e) -> (Emit_vale_text.string_of_exp e, one_loc_of_exp l e)) es in
+  let ss = List.map fst sls in
+  let ss = List.sort ss in
+  let rec f ss =
+    match ss with
+    | [] -> ()
+    | h1::h2::_ when h1 = h2 ->
+        let err = Err ("duplicate read/modify declaration: " + h1) in
+        raise (LocErr (List_assoc h1 (List.rev sls), err))
+    | _::t -> f t
+    in
+  f ss
+
 ///////////////////////////////////////////////////////////////////////////////
 // Add extra asserts for p's ensures clauses and for called procedures' requires clauses,
 // to produce better error messages.
@@ -1204,7 +1218,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_enter_body; spec_precedes];
             pbody = Some (sInits @ b);
-            pattrs = p.pattrs;
+            pattrs = (Id "already_has_mod_ok", [])::p.pattrs;
           }
           in
         let p_while =
@@ -1216,7 +1230,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_exit];
             pbody = Some (sInits @ [sWhile]);
-            pattrs = [(Id "quick", [EVar (Id "exportOnly")])];
+            pattrs = [(Id "quick", [EVar (Id "exportOnly")]); (Id "already_has_mod_ok", [])];
           }
           in
         hoisted := (DProc p_while)::(DProc p_body)::!hoisted;
@@ -1247,6 +1261,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let isFrame = attrs_get_bool (Id "frame") true p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
+  let isAlreadyModOk = List_mem_assoc (Id "already_has_mod_ok") p.pattrs in
   let isQuick = is_quick_body p.pattrs in
   let preserveSpecs =
     List.collect
@@ -1262,7 +1277,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let ok = EVar (Id "ok") in
   let okMod = SpecRaw (RawSpec (RModifies Preserve, [(loc, SpecExp ok)])) in
   let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
-  let okSpecs = [(loc, okMod); (loc, okReqEns)] in
+  let okSpecs = (if isAlreadyModOk then [] else [(loc, okMod)]) @ [(loc, okReqEns)] in
   let pspecs = if isRefined || isFrame then okSpecs @ p.pspecs else p.pspecs in
   let pspecs = match preserveSpecs with [] -> pspecs | _ -> pspecs @ [(loc, SpecRaw (RawSpec (REnsures Unrefined, preserveSpecs)))] in
   let addParam isRet ids (x, t, g, io, a) =
@@ -1322,6 +1337,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let p = {p with pbody = body; pspecs = pspecs} in
   // Compute mods list and final environment for body
   let mods = List.collect (fun (loc, s) -> match s with Modifies (m, e) -> [(loc, m, e)] | _ -> []) pspecs in
+  check_no_duplicates (List.map (fun (_, _, e) -> (loc, e)) mods);
   let envpIn = {envpIn with mods = Map.ofList (List.map (mod_id envpIn) mods)} in
   let envpIn = {envpIn with abstractOld = true} in
   let envp = envpIn in

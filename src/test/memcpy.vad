@@ -1,4 +1,4 @@
-include "../arch/x86/decls.vad"
+include{:from BASE} "arch/x86/decls.vad"
 
 #verbatim
 import opened x86def_s_temp = x86_def_s

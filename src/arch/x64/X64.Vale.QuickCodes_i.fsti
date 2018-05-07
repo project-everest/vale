@@ -12,12 +12,12 @@ unfold let fuel = va_fuel
 unfold let eval = eval_code
 
 [@va_qattr "opaque_to_smt"]
-let labeled_wrap (r:range) (msg:string) (p:Type0) = labeled r msg p
+let labeled_wrap (r:range) (msg:string) (p:Type0) : GTot Type0 = labeled r msg p
 
 // REVIEW: when used inside a function definition, 'labeled' can show up in an SMT query
 // as an uninterpreted function.  Make a wrapper around labeled that is interpreted:
 [@va_qattr "opaque_to_smt"]
-let label (r:range) (msg:string) (p:Type0) : Pure Type (requires True) (ensures fun q -> q <==> p) =
+let label (r:range) (msg:string) (p:Type0) : Ghost Type (requires True) (ensures fun q -> q <==> p) =
   assert_norm (labeled_wrap r msg p <==> p);
   labeled_wrap r msg p
 
@@ -27,7 +27,7 @@ val lemma_label_bool (r:range) (msg:string) (b:bool) : Lemma
   [SMTPat (label r msg b)]
 
 // wrap "precedes" and LexCons to avoid issues with label (precedes ...)
-let precedes_wrap (a:lex_t) (b:lex_t) = precedes a b
+let precedes_wrap (a:lex_t) (b:lex_t) : GTot Type0 = precedes a b
 let lexCons (#a:Type) (h:a) (t:lex_t) : lex_t = LexCons h t
 
 [@va_qattr]
@@ -56,6 +56,8 @@ let wp_Bind_t (a:Type0) = state -> a -> Type0
 [@va_qattr]
 let range1 = mk_range "" 0 0 0 0
 
+let guard_false = False
+
 [@va_qattr]
 let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
   Tot Type0 (decreases %[cs; 0; qcs])
@@ -75,9 +77,9 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
       // REVIEW: rather than just applying 'pre' directly to k,
       // we define this in a roundabout way so that:
       // - it works even if 'pre' isn't known to be monotonic
-      // - F*'s error reporting uses 'guard_free' and 'False <===>' to process labels inside (wp cs qcs k s0)
+      // - F*'s error reporting uses 'guard_free' and 'guard_False <==>' to process labels inside (wp cs qcs k s0)
       (forall (p:unit -> GTot Type0).//{:pattern (pre p)}
-        (forall (u:unit).{:pattern (guard_free (p u))} False <==> (wp cs qcs k s0) /\ ~(p ()))
+        (forall (u:unit).{:pattern (guard_free (p u))} guard_false <==> (wp cs qcs k s0) /\ ~(p ()))
         ==>
         label r msg (pre p))
   | QLemma r msg pre post l qcs ->
@@ -263,7 +265,7 @@ let rec xmms_match (xmms:list xmm) (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0 =
 [@va_qattr]
 let all_xmms_match (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0
   =
-  let xmms = [0; 1; 2; 3; 4; 5; 6; 7] in
+  let xmms = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15] in
   xmms_match xmms r0 r1
 
 [@va_qattr]

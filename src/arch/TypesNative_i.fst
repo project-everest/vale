@@ -8,8 +8,8 @@ let lemma_zero_nth n =
   FStar.Classical.forall_intro f //(UInt.zero_nth_lemma #n)
 
 let lemma_quad32_vec_equal a b =
-  let Quad32 a0 a1 a2 a3 = a in
-  let Quad32 b0 b1 b2 b3 = b in
+  let Mkfour a0 a1 a2 a3 = a in
+  let Mkfour b0 b1 b2 b3 = b in
   UInt.to_vec_lemma_2 #32 a0 b0;
   UInt.to_vec_lemma_2 #32 a1 b1;
   UInt.to_vec_lemma_2 #32 a2 b2;
