@@ -5,13 +5,12 @@ open X64.Taint_Semantics_s
 open X64.Leakage_s
 open X64.Leakage_Helpers_i
 
-open FStar.Tactics
-
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
-
+let rec has_mem_operand = function
+  | [] -> false
+  | a::q -> if OMem? a then true else has_mem_operand q
 
 val check_if_ins_consumes_fixed_time: (ins:tainted_ins{not (is_xmm_ins ins)}) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 40"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 60"
 
 
 let check_if_ins_consumes_fixed_time ins ts =
@@ -24,36 +23,43 @@ let check_if_ins_consumes_fixed_time ins ts =
   Classical.forall_intro_2 (fun x y -> lemma_operand_obs_list ts srcs x y);
   assert (fixedTime ==> (isConstantTime (Ins ins) ts));
   let taint = sources_taint srcs ts ins.t in
-  let taint = if AddCarry64? i then merge_taint taint ts.flagsTaint else taint in
+  let taint = if AddCarry64? i then merge_taint taint ts.cfFlagsTaint else taint in
+  if has_mem_operand dsts && taint <> ins.t then false, ts
+  else
   let ts' = set_taints dsts ts taint in
   let b, ts' = match i with
-    | Mov64 dst src -> begin
+    | Mov64 dst _ | AddLea64 dst _ _ -> begin
       match dst with
 	| OConst _ -> false, ts (* Should not happen *)
 	| OReg r -> fixedTime, ts'
-	| OMem m -> (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), ts'
+	| OMem m -> fixedTime, ts'
     end
-    | Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret ts'.xmmTaint)
+    | Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+    
     | Xor64 dst src ->
         (* Special case for Xor : xor-ing an operand with itself erases secret data *)
         if dst = src then
-	  let ts' = set_taint dst ts' Public in
-	  fixedTime, TaintState ts'.regTaint Secret ts'.xmmTaint
+    	  let ts' = set_taint dst ts' Public in
+    	  fixedTime, TaintState ts'.regTaint Secret Secret ts'.xmmTaint
         else
-	begin match dst with
-	  | OConst _ -> false, (TaintState ts'.regTaint Secret ts'.xmmTaint) (* Should not happen *)
-	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret ts'.xmmTaint)
-	  | OMem m -> (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), (TaintState ts'.regTaint Secret ts'.xmmTaint)
+    	begin match dst with
+    	  | OConst _ -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
+    	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+    	  | OMem m -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
         end
+    | Push _ | Pop _ | Adcx64 _ _ | Adox64 _ _ | Mulx64 _ _ _ -> false, ts (* Unhandled yet *)
     | _ ->
       match dsts with
-	| [OConst _] -> false, (TaintState ts'.regTaint Secret ts'.xmmTaint) (* Should not happen *)
-	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret ts'.xmmTaint)
-	| [OMem m] ->  (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), (TaintState ts'.regTaint Secret ts'.xmmTaint)
+    	| [OConst _] -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
+    	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+    	| [OMem m] ->  fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
   in
   b, ts'
 
-val lemma_public_flags_same: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> Lemma (forall s1 s2. publicFlagValuesAreSame ts s1 s2 ==> publicFlagValuesAreSame (snd (check_if_ins_consumes_fixed_time ins ts)) (taint_eval_ins ins s1) (taint_eval_ins ins s2))
+val lemma_public_flags_same: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> Lemma (forall s1 s2.
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  b2t b ==>
+publicFlagValuesAreSame ts s1 s2 ==> publicFlagValuesAreSame (snd (check_if_ins_consumes_fixed_time ins ts)) (taint_eval_ins ins s1) (taint_eval_ins ins s2))
 
 let lemma_public_flags_same ts ins = ()
 
@@ -403,6 +409,7 @@ let lemma_ins_same_public ts ins s1 s2 fuel = let i, _, _ = ins.ops in
   | AddCarry64 _ _ -> lemma_addcarry_same_public ts ins s1 s2 fuel
   | Shl64 _ _ -> lemma_shl_same_public ts ins s1 s2 fuel
   | Shr64 _ _ -> lemma_shr_same_public ts ins s1 s2 fuel
+  | _ -> ()
 
 val lemma_ins_leakage_free: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> Lemma
  (let b, ts' = check_if_ins_consumes_fixed_time ins ts in

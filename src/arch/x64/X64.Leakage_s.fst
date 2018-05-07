@@ -5,11 +5,15 @@ open X64.Semantics_s
 open X64.Taint_Semantics_s
 
 noeq type taintState = 
-  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> xmmTaint: (xmm -> taint) -> taintState
+  | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> cfFlagsTaint: taint ->
+  xmmTaint: (xmm -> taint) -> taintState
 
 let publicFlagValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
   ts.flagsTaint = Public ==> (s1.state.flags = s2.state.flags)
-  
+
+let publicCfFlagValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
+Public? ts.cfFlagsTaint ==> (cf s1.state.flags = cf s2.state.flags)
+
 let publicRegisterValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
   forall r.
       ts.regTaint r = Public
@@ -26,6 +30,7 @@ let publicXmmValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
 let publicValuesAreSame (ts:taintState) (s1:traceState) (s2:traceState) =
    publicRegisterValuesAreSame ts s1 s2
   /\ publicFlagValuesAreSame ts s1 s2
+  /\ publicCfFlagValuesAreSame ts s1 s2
   /\ publicMemValuesAreSame s1 s2
   /\ publicXmmValuesAreSame ts s1 s2
 

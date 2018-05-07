@@ -11,19 +11,20 @@ let merge_taint t1 t2 =
   else
     Public
 
-let operand_taint (op:operand) ts =
+(* Also pass the taint of the instruction *)
+let operand_taint (op:operand) ts taint =
   match op with
     | OConst _ -> Public
     | OReg reg -> ts.regTaint reg
-    | OMem _ -> Public
+    | OMem _ -> taint
 
 let maddr_does_not_use_secrets addr ts =
   match addr with
     | MConst _ -> true
-    | MReg r _ -> Public? (operand_taint (OReg r) ts)
+    | MReg r _ -> Public? (operand_taint (OReg r) ts Public)
     | MIndex base _ index _ ->
-        let baseTaint = operand_taint (OReg base) ts in
-	let indexTaint = operand_taint (OReg index) ts in
+        let baseTaint = operand_taint (OReg base) ts Public in
+	let indexTaint = operand_taint (OReg index) ts Public in
 	(Public? baseTaint) && (Public? indexTaint)
 
 let operand_does_not_use_secrets op ts =
@@ -33,16 +34,16 @@ let operand_does_not_use_secrets op ts =
 
 val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -> (s2:traceState) -> Lemma ((operand_does_not_use_secrets dst ts) /\ publicValuesAreSame ts s1 s2 ==> (operand_obs s1 dst) = (operand_obs s2 dst))
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 20"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 20"
 let lemma_operand_obs ts dst s1 s2 = match dst with
   | OConst _ | OReg _ -> ()
   | OMem m -> ()
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 5"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 5"
   
 let set_taint (dst:operand) ts taint : Tot taintState =
   match dst with
   | OConst _ -> ts  (* Shouldn't actually happen *)
-  | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint ts.xmmTaint
+  | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint ts.cfFlagsTaint ts.xmmTaint
   | OMem m -> ts (* Ensured by taint semantics *)
 
 let rec operands_do_not_use_secrets ops ts = match ops with
@@ -65,7 +66,7 @@ let rec lemma_operand_obs_list ts ops s1 s2 = match ops with
 
 let rec sources_taint srcs ts taint = match srcs with
   | [] -> taint
-  | hd :: tl -> merge_taint (operand_taint hd ts) (sources_taint tl ts taint)
+  | hd :: tl -> merge_taint (operand_taint hd ts taint) (sources_taint tl ts taint)
 
 let rec set_taints dsts ts taint = match dsts with
   | [] -> ts
@@ -77,17 +78,25 @@ let ins_consumes_fixed_time (ins : tainted_ins) (ts:taintState) (res:bool*taintS
 
 val lemma_taint_sources: (ins:tainted_ins) -> (ts:taintState) -> Lemma
 (let i, d, s = ins.ops in
-forall src. List.Tot.Base.mem src s /\ Public? (sources_taint s ts ins.t) ==> Public? (operand_taint src ts))
+forall src. List.Tot.Base.mem src s /\ Public? (sources_taint s ts ins.t) ==> Public? (operand_taint src ts ins.t))
 
 let lemma_taint_sources ins ts = ()
 
 val lemma_public_op_are_same: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
-(requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
+(requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts Public) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
 (ensures eval_operand op s1.state == eval_operand op s2.state)
 
 let lemma_public_op_are_same ts op s1 s2 = ()
 
+val lemma_public_op_are_same2: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
+(requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts Secret) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
+(ensures eval_operand op s1.state == eval_operand op s2.state)
+
+let lemma_public_op_are_same2 ts op s1 s2 = ()
+
 val publicFlagValuesAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool{b <==> (Public? tsExpected.flagsTaint ==> Public? tsAnalysis.flagsTaint)}
+
+val publicCfFlagValuesAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool{b <==> (Public? tsExpected.cfFlagsTaint ==> Public? tsAnalysis.cfFlagsTaint)}
 
 val publicRegisterValuesAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState) -> b:bool{b <==> (forall r. (Public? (tsExpected.regTaint r) ==> Public? (tsAnalysis.regTaint r)))}
 
@@ -95,6 +104,9 @@ val publicTaintsAreAsExpected: (tsAnalysis:taintState) -> (tsExpected:taintState
 
 let publicFlagValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
   (tsExpected.flagsTaint = Public && tsAnalysis.flagsTaint = Public) || (tsExpected.flagsTaint = Secret)
+
+let publicCfFlagValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
+  (tsExpected.cfFlagsTaint = Public && tsAnalysis.cfFlagsTaint = Public) || (tsExpected.cfFlagsTaint = Secret)
 
 let registerAsExpected (r:reg) (tsAnalysis:taintState) (tsExpected:taintState) =
   (tsExpected.regTaint r = Public && tsAnalysis.regTaint r = Public) || (tsExpected.regTaint r = Secret)
@@ -119,4 +131,5 @@ let publicRegisterValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintS
 
 let publicTaintsAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
     publicFlagValuesAreAsExpected tsAnalysis tsExpected
-  && publicRegisterValuesAreAsExpected tsAnalysis tsExpected
+  && publicCfFlagValuesAreAsExpected tsAnalysis tsExpected
+&& publicRegisterValuesAreAsExpected tsAnalysis tsExpected

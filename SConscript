@@ -88,12 +88,12 @@ verify_options = {
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
-  'src/arch/x64/X64.Taint_Semantics_s.fst': None,
-  'src/arch/x64/X64.Leakage_s.fst': None,
-  'src/arch/x64/X64.Leakage_Ins_i.fst': None,
-  'src/arch/x64/X64.Leakage_Ins_Xmm_i.fst': None,
-  'src/arch/x64/X64.Leakage_i.fst': None,
-  'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
+ # 'src/arch/x64/X64.Taint_Semantics_s.fst': None,
+ # 'src/arch/x64/X64.Leakage_s.fst': None,
+ # 'src/arch/x64/X64.Leakage_Ins_i.fst': None,
+ # 'src/arch/x64/X64.Leakage_Ins_Xmm_i.fst': None,
+ # 'src/arch/x64/X64.Leakage_i.fst': None,
+ # 'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
 
@@ -101,6 +101,12 @@ verify_options = {
 
   'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
   'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/arch/x64/X64.Taint_Semantics_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
+  'src/arch/x64/X64.Leakage_Helpers_i.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
+  'src/arch/x64/X64.Leakage_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
+  'src/arch/x64/X64.Leakage_i.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
+  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
+  'src/arch/x64/X64.Leakage_Ins_Xmm_i.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),

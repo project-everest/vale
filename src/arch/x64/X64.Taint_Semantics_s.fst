@@ -173,7 +173,8 @@ let is_xmm_ins (ins:tainted_ins) =
   let i, _, _ = ins.ops in
   match i with
     | Paddd _ _ | Pxor _ _ | Pslld _ _ | Psrld _ _ | Pshufb _ _ 
-    | Pshufd _ _ _ | Pinsrd _ _ _ | VPSLLDQ _ _ _ | MOVDQU _ _
+    | Pshufd _ _ _ | Pextrq _ _ _ | Pinsrd _ _ _ | Pinsrq _ _ _
+    | VPSLLDQ _ _ _ | MOVDQU _ _
     | Pclmulqdq _ _ _ | AESNI_enc _ _ | AESNI_enc_last _ _ 
     | AESNI_dec _ _ | AESNI_dec_last _ _ | AESNI_imc _ _ 
     | AESNI_keygen_assist _ _ _ -> true

@@ -55,16 +55,26 @@ let eq_xmms xmms1 xmms2 =
     xmms1 4 = xmms2 4 &&
     xmms1 5 = xmms2 5 &&
     xmms1 6 = xmms2 6 &&
-    xmms1 7 = xmms2 7 in    
+    xmms1 7 = xmms2 7 &&
+    xmms1 8 = xmms2 8 &&
+    xmms1 9 = xmms2 9 &&
+    xmms1 10 = xmms2 10 &&
+    xmms1 11 = xmms2 11 &&
+    xmms1 12 = xmms2 12 &&
+    xmms1 13 = xmms2 13 &&
+    xmms1 14 = xmms2 14 &&
+    xmms1 15 = xmms2 15 
+  in    
   assert (FStar.FunctionalExtensionality.feq xmms1 xmms2 <==> b);
   b
   
 val eq_taintStates: (ts1:taintState) -> (ts2:taintState) -> (b:bool{b <==> ts1 == ts2})
 
 let eq_taintStates ts1 ts2 =
-    eq_registers ts1.regTaint ts2.regTaint && ts1.flagsTaint = ts2.flagsTaint && eq_xmms ts1.xmmTaint ts2.xmmTaint
+    eq_registers ts1.regTaint ts2.regTaint && ts1.flagsTaint = ts2.flagsTaint && ts1.cfFlagsTaint = ts2.cfFlagsTaint && eq_xmms ts1.xmmTaint ts2.xmmTaint
 
 let taintstate_monotone ts ts' = ( forall r. Public? (ts'.regTaint r) ==> Public? (ts.regTaint r)) /\ (Public? (ts'.flagsTaint) ==> Public? (ts.flagsTaint)) /\
+  (Public? (ts'.cfFlagsTaint) ==> Public? (ts.cfFlagsTaint)) /\
   (forall x. Public? (ts'.xmmTaint x) ==> Public? (ts.xmmTaint x))
 
 val taintstate_monotone_trans: (ts1:taintState) -> (ts2:taintState) -> (ts3:taintState) ->
@@ -89,7 +99,10 @@ let isExplicit_monotone2 ts ts1 ts2 code fuel s1 s2 = ()
 
 val combine_taint_states: (ts1:taintState) -> (ts2:taintState) -> (ts:taintState{taintstate_monotone ts1 ts /\ taintstate_monotone ts2 ts})
 let combine_taint_states (ts1:taintState) (ts2:taintState) =
-  TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) (merge_taint ts1.flagsTaint ts2.flagsTaint) (combine_xmm_taints ts1.xmmTaint ts2.xmmTaint)
+  TaintState (combine_reg_taints ts1.regTaint ts2.regTaint) 
+    (merge_taint ts1.flagsTaint ts2.flagsTaint)
+    (merge_taint ts1.cfFlagsTaint ts2.cfFlagsTaint)
+    (combine_xmm_taints ts1.xmmTaint ts2.xmmTaint)
 
 let count_public_register regs r = if Public? (regs r) then 1 else 0
 
@@ -113,6 +126,8 @@ let count_public_registers regs =
 
 let count_flagTaint ts = if Public? ts.flagsTaint then 1 else 0
 
+let count_cfFlagTaint ts = if Public? ts.cfFlagsTaint then 1 else 0
+
 let count_public_xmm xmms x = if Public? (xmms x) then 1 else 0
 
 let count_public_xmms (xmms:xmm->taint) =
@@ -123,11 +138,20 @@ let count_public_xmms (xmms:xmm->taint) =
   count_public_xmm xmms 4 +
   count_public_xmm xmms 5 +
   count_public_xmm xmms 6 +
-  count_public_xmm xmms 7
+  count_public_xmm xmms 7 +
+  count_public_xmm xmms 8 +
+  count_public_xmm xmms 9 +
+  count_public_xmm xmms 10 +
+  count_public_xmm xmms 11 +
+  count_public_xmm xmms 12 +
+  count_public_xmm xmms 13 +
+  count_public_xmm xmms 14 +
+  count_public_xmm xmms 15
   
 let count_publics ts =
   count_public_registers ts.regTaint +
   count_flagTaint ts +
+  count_cfFlagTaint ts +
   count_public_xmms ts.xmmTaint
 
 val monotone_decreases_count: (ts:taintState) -> (ts':taintState) -> Lemma
@@ -138,7 +162,9 @@ val monotone_decreases_count: (ts:taintState) -> (ts':taintState) -> Lemma
 let monotone_decreases_count ts ts' =
   assert (forall r. count_public_register ts'.regTaint r <= count_public_register ts.regTaint r);
   assert (forall r. count_public_xmm ts'.xmmTaint r <= count_public_xmm ts.xmmTaint r);
-  if ts.flagsTaint <> ts'.flagsTaint then ()
+  assert (count_cfFlagTaint ts' <= count_cfFlagTaint ts);
+  assert (count_flagTaint ts' <= count_flagTaint ts);
+  if ts.flagsTaint <> ts'.flagsTaint || ts.cfFlagsTaint <> ts'.cfFlagsTaint then ()
   else
   assert ((exists r. ts.regTaint r <> ts'.regTaint r) \/ (exists x. ts.xmmTaint x <> ts'.xmmTaint x));
   ()
@@ -148,7 +174,7 @@ val check_if_block_consumes_fixed_time: (block:tainted_codes) -> (ts:taintState)
 val check_if_code_consumes_fixed_time: (code:tainted_code) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[code; count_publics ts; 1])
 val check_if_loop_consumes_fixed_time: (code:tainted_code{While? code}) -> (ts:taintState) -> Tot (bool * taintState) (decreases %[code; count_publics ts; 0])
 
-#set-options "--z3refresh --z3rlimit 500"
+#set-options "--z3refresh --z3rlimit 600"
 let rec check_if_block_consumes_fixed_time (block:tainted_codes) (ts:taintState) : bool * taintState =
   match block with
   | [] -> true, ts
@@ -166,8 +192,8 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
 
   | IfElse ifCond ifTrue ifFalse ->
     let cond_taint = ifCond.ot in
-    let o1 = operand_taint (get_fst_ocmp ifCond.o) ts in
-    let o2 = operand_taint (get_snd_ocmp ifCond.o) ts in
+    let o1 = operand_taint (get_fst_ocmp ifCond.o) ts Public in
+    let o2 = operand_taint (get_snd_ocmp ifCond.o) ts Public in
     let predTaint = merge_taint (merge_taint o1 o2) cond_taint in
     if (Secret? predTaint) then (false, ts)
     else
@@ -190,10 +216,9 @@ and check_if_code_consumes_fixed_time (code:tainted_code) (ts:taintState) : bool
 and check_if_loop_consumes_fixed_time c (ts:taintState) : (bool * taintState) =
   let While pred body = c in
   let cond_taint = pred.ot in
-  let o1 = operand_taint (get_fst_ocmp pred.o) ts in
-  let o2 = operand_taint (get_snd_ocmp pred.o) ts in
+  let o1 = operand_taint (get_fst_ocmp pred.o) ts Public in
+  let o2 = operand_taint (get_snd_ocmp pred.o) ts Public in
   let predTaint = merge_taint (merge_taint o1 o2) cond_taint in
-
   if (Secret? predTaint) then false, ts
   else
     let o1Public = operand_does_not_use_secrets (get_fst_ocmp pred.o) ts in
@@ -290,9 +315,9 @@ val lemma_loop_taintstate_monotone: (ts:taintState) -> (code:tainted_code{While?
 (requires True)
 (ensures (let _, ts' = check_if_loop_consumes_fixed_time code ts in
   taintstate_monotone ts ts'))
-(decreases %[count_publics ts; code])
+(decreases %[count_publics ts])
 
-#reset-options "--initial_ifuel 0 --max_ifuel 1 --initial_fuel 1 --max_fuel 1 --z3rlimit 100"
+#reset-options "--initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2 --z3rlimit 600"
 let rec lemma_loop_taintstate_monotone ts code =
   let While pred body = code in
   let b, ts' = check_if_code_consumes_fixed_time body ts in
@@ -300,11 +325,12 @@ let rec lemma_loop_taintstate_monotone ts code =
   if eq_taintStates combined_ts ts then ()
   else (
     monotone_decreases_count ts combined_ts;
-    lemma_loop_taintstate_monotone combined_ts code;
     let _, ts_fin = check_if_loop_consumes_fixed_time code combined_ts in
+    lemma_loop_taintstate_monotone combined_ts code;
     taintstate_monotone_trans ts combined_ts ts_fin
   )
-  
+
+#reset-options "--initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2 --z3rlimit 60"
 val lemma_code_explicit_leakage_free: (ts:taintState) -> (code:tainted_code) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
  (requires True)
  (ensures (let b, ts' = check_if_code_consumes_fixed_time code ts in
@@ -323,7 +349,7 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
   (b2t b ==> isConstantTimeGivenStates code fuel ts s1 s2 /\ isExplicitLeakageFreeGivenStates code fuel ts ts' s1 s2)))
  (decreases %[fuel; code; 0])
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 1 --max_fuel 2 --z3rlimit 150"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 1 --max_fuel 2 --z3rlimit 300"
  let rec lemma_code_explicit_leakage_free ts code s1 s2 fuel = match code with
   | Ins ins -> if is_xmm_ins ins then () else lemma_ins_leakage_free ts ins
   | Block block -> lemma_block_explicit_leakage_free ts block s1 s2 fuel
@@ -342,7 +368,7 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
     monotone_ok_eval ifFalse fuel st2;
     lemma_code_explicit_leakage_free ts ifFalse st1 st2 fuel;
     ()
-  | While _ _ -> lemma_loop_explicit_leakage_free ts code s1 s2 fuel
+  | While _ _ -> admit() //lemma_loop_explicit_leakage_free ts code s1 s2 fuel
 
 and lemma_block_explicit_leakage_free ts block s1 s2 fuel = match block with
   | [] -> ()
@@ -368,6 +394,7 @@ and lemma_loop_explicit_leakage_free ts code s1 s2 fuel =
   let While cond body = code in
   let (st1, b1) = taint_eval_ocmp s1 cond in
   let (st2, b2) = taint_eval_ocmp s2 cond in
+
   assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> b1 = b2);
   assert (b2t b_fin ==> constTimeInvariant ts s1 s2 /\ st1.state.ok /\ st2.state.ok ==> constTimeInvariant ts st1 st2);
   if not b1 || not b2 then
