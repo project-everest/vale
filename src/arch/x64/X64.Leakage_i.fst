@@ -317,7 +317,7 @@ val lemma_loop_taintstate_monotone: (ts:taintState) -> (code:tainted_code{While?
   taintstate_monotone ts ts'))
 (decreases %[count_publics ts])
 
-#reset-options "--initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2 --z3rlimit 600"
+#reset-options "--initial_ifuel 1 --max_ifuel 1 --initial_fuel 2 --max_fuel 2 --z3rlimit 1000"
 let rec lemma_loop_taintstate_monotone ts code =
   let While pred body = code in
   let b, ts' = check_if_code_consumes_fixed_time body ts in
@@ -368,7 +368,7 @@ val lemma_loop_explicit_leakage_free: (ts:taintState) -> (code:tainted_code{Whil
     monotone_ok_eval ifFalse fuel st2;
     lemma_code_explicit_leakage_free ts ifFalse st1 st2 fuel;
     ()
-  | While _ _ -> admit() //lemma_loop_explicit_leakage_free ts code s1 s2 fuel
+  | While _ _ -> lemma_loop_explicit_leakage_free ts code s1 s2 fuel
 
 and lemma_block_explicit_leakage_free ts block s1 s2 fuel = match block with
   | [] -> ()
