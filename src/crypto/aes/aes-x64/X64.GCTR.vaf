@@ -199,7 +199,7 @@ procedure {:quick} gctr_core(
 //    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
 }
 
-#reset-options "--z3rlimit 200"
+#reset-options "--z3rlimit 20"
 procedure {:quick} {:verify true} gctr_bytes_extra_work(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
@@ -245,19 +245,15 @@ procedure {:quick} {:verify true} gctr_bytes_extra_work(
         icb == inc32(icb_BE, num_blocks);
     ensures
         let num_blocks := num_bytes / 16;
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+        validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         modifies_buffer128(out_b, old(mem), mem);
-//            slice_work_around(buffer128_as_seq(mem, out_b), num_blocks) == 
-//        old(slice_work_around(buffer128_as_seq(mem, out_b), num_blocks));
+            slice_work_around(buffer128_as_seq(mem, out_b), num_blocks) == 
+        old(slice_work_around(buffer128_as_seq(mem, out_b), num_blocks));
         buffer128_read(out_b, num_blocks, mem) == gctr_encrypt_block(icb_BE, buffer128_read(in_b, num_blocks, mem), AES_128, key, num_blocks);
 {
     ghost var num_blocks := num_bytes / 16;
 
     // Grab the last quad
-//        assert r9 == in_ptr + 16 * num_blocks;
-//        extra_bytes_helper(old(num_bytes));
-//        assert r9 < in_ptr + 16*bytes_to_quad_size(old(num_bytes));
-//        assert validSrcAddrs128(mem, old(in_ptr), in_b, bytes_to_quad_size(old(num_bytes)));
     Load128_buffer(xmm2, r9, 0, in_b, num_blocks);
     assert xmm2 == buffer128_read(in_b, num_blocks, mem);
     ghost var final_quad_LE := xmm2;
@@ -322,7 +318,7 @@ procedure {:quick} gctr_bytes_extra(
         icb == inc32(icb_BE, num_blocks);
     ensures
 //        modifies_buffer128(out_b, old(mem), mem);
-//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+//        validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
 //        buffer128_as_seq(mem, out_b) == gctr_encrypt(icb_BE, buffer128_as_seq(old(mem), in_b), AES_128, key, 0);
 //        icb == icb_BE.(lo0 := icb.lo0);
 {
