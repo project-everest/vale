@@ -14,7 +14,7 @@ let xmm_taint (ts:taintState) (x:xmm) = ts.xmmTaint x
 let set_xmm_taint (ts:taintState) (xmm:xmm) (taint:taint) : taintState =
   TaintState ts.regTaint ts.flagsTaint ts.cfFlagsTaint (fun x -> if x = xmm then taint else ts.xmmTaint x)
 
-#set-options "--z3rlimit 20"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 80"
   
 val quad32_xor_lemma: (x:quad32) -> Lemma (quad32_xor x x == Mkfour 0 0 0 0) 
 
