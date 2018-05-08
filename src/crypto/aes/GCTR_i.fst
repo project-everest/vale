@@ -30,6 +30,14 @@ let extra_bytes_helper (n:nat) : Lemma
   =
   ()
 
+let no_extra_bytes_helper (s:seq quad32) (num_bytes:int) : Lemma
+  (requires 0 <= num_bytes /\
+            num_bytes % 16 == 0 /\
+            length s == bytes_to_quad_size num_bytes)
+  (ensures slice (le_seq_quad32_to_bytes s) 0 num_bytes == le_seq_quad32_to_bytes s)
+  =
+  ()
+
 let gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int) :
   Lemma (gctr_encrypt_block icb_BE plain_LE alg key i ==
          gctr_encrypt_block (inc32 icb_BE i) plain_LE alg key 0)
