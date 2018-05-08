@@ -319,9 +319,13 @@ procedure {:quick} {:verify true} gctr_bytes_extra(
         gctr_partial(num_blocks, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
         icb == inc32(icb_BE, num_blocks);
     ensures
-//        let num_blocks := num_bytes / 16;
-//        validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
-//        modifies_buffer128(out_b, old(mem), mem);
+        validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
+        modifies_buffer128(out_b, old(mem), mem);
+        let plain  := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem,  in_b)), 0, num_bytes);
+        let cipher := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), 0, num_bytes);
+        cipher == gctr_encrypt_LE(icb_BE, plain, AES_128, key);
+
+
 //            slice_work_around(buffer128_as_seq(mem, out_b), num_blocks) == 
 //        old(slice_work_around(buffer128_as_seq(mem, out_b), num_blocks));
 //        buffer128_read(out_b, num_blocks, mem) == gctr_encrypt_block(icb_BE, buffer128_read(in_b, num_blocks, mem), AES_128, key, num_blocks);
