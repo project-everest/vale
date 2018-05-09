@@ -250,7 +250,7 @@ let main (argv) =
             let suffixFalse = List.exists (fun a ->
               match a with (Id "suffix", [EBool false]) -> true | _ -> false) attrs in
             let useSuffix = match suffixMap with [] -> false | _::_ -> isInputFile && not suffixFalse in
-            let rec resuffix map s =
+            let rec resuffix (map : list<(string * string)>) (s : string) : string =
               match map with
               | [] -> err ("could not find matching suffix for path \"" + s + "; use 'include{:suffix false} to suppress this feature")
               | (s1, s2)::t when s.EndsWith(s1) -> s.Substring(0, s.Length - s1.Length) + s2
