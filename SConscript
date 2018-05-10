@@ -104,6 +104,8 @@ verify_options = {
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),
   '.fsti': BuildOptions(fstar_default_args),
+  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
+  'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_larith),
