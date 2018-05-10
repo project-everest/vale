@@ -7,13 +7,13 @@ val mem : Type u#1 // FStar.HyperStack.mem
 // Definitions from FStar.Pointer.Base
 //////////////////////////////////////////////////////////////////////////////
 
-val typ : Type0
+let typ = Type0
 val type_of_typ : typ -> Type0
 val buffer (t:typ) : Type0
 val buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : GTot (Seq.seq (type_of_typ t))
 val buffer_readable (#t:typ) (h:mem) (b:buffer t) : GTot Type0 // for now, using just buffer_readable, not buffer_live
 val buffer_length (#t:typ) (b:buffer t) : GTot UInt32.t
-val loc : Type u#0
+val loc : Type u#1
 val loc_none : loc
 val loc_union (s1 s2:loc) : GTot loc
 val loc_buffer (#t:typ) (b:buffer t) : GTot loc
