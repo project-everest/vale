@@ -193,10 +193,12 @@ let print_ins (ins:ins) (p:printer) =
   | Pop dst       -> p.ins_name "  pop"  [dst] ^ print_operand dst p
   | Paddd dst src          -> "  paddd "      ^ print_xmms dst src
   | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
-  | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst p) (string_of_int amt)
-  | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst p) (string_of_int amt)
+  | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
+  | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
+  | Psrldq dst amt         -> "  psrldq "     ^ print_pair (print_xmm dst p) (print_imm8 amt p)
   | Pshufb dst src         -> "  pshufb "     ^ print_xmms dst src
   | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count p)
+  | Pcmpeqd dst src        -> "  pcmpeqd "    ^ print_xmms dst src
   | Pextrq dst src index   -> "  pextrq "     ^ print_pair (print_op_xmm dst src) (print_imm8 index p)
   | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op32 dst src) (print_imm8 index p)
   | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index p)
