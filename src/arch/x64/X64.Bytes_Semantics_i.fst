@@ -25,7 +25,7 @@ let aux6 (ptr:int) (mem:heap) : Lemma
 let aux7 (ptr:int) (mem:heap) : Lemma 
     (mod_8 ((get_heap_val64 ptr mem) `op_Division` 0x100000000000000) == mem.[ptr + 7]) = ()
 
-let same_mem_get_heap_val64 (ptr:int) (mem1 mem2:heap) =
+let same_mem_get_heap_val (ptr:int) (mem1 mem2:heap) =
   aux0 ptr mem1;
   aux0 ptr mem2;
   aux1 ptr mem1;

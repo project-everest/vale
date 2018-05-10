@@ -11,6 +11,8 @@ open X64.Machine_s
 open X64.Bytes_Semantics_s
 open X64.Bytes_Semantics_i
 
+#reset-options "--max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
+
 let op_String_Access = Map.sel
 let op_String_Assignment = Map.upd
 
