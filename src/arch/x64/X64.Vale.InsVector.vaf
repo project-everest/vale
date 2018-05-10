@@ -83,6 +83,17 @@ procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout ds
 {
 }
 
+procedure{:instruction Ins(S.Psrldq(dst, amt))}{:quick exportOnly} Psrldq(inout dst:xmm, inline amt:int)
+    requires
+        0 <= amt < 16;
+    ensures
+        let src_bytes := le_quad32_to_bytes(old(dst));
+        let zero_pad := Seq.create(amt, 0); 
+        let remaining_bytes := Seq.slice(src_bytes, amt, Seq.length(src_bytes));
+        dst == le_bytes_to_quad32(Seq.append(zero_pad, remaining_bytes));
+{
+}
+
 procedure{:instruction Ins(S.Pshufb(dst, src))}{:quick exportOnly}
           Pshufb(inout dst:xmm, src:xmm)
     requires
@@ -101,6 +112,17 @@ procedure{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
             select_word(src, byte_to_twobits(permutation).lo1),
             select_word(src, byte_to_twobits(permutation).hi2),
             select_word(src, byte_to_twobits(permutation).hi3)));
+{
+}
+
+procedure{:instruction Ins(S.Pcmpeqd(dst, src))}{:quick exportOnly}
+          Pcmpeqd(inout dst:xmm, src:xmm)
+    ensures
+        dst == old(Mkfour(
+            if src.lo0 = dst.lo0 then 0xFFFFFFFF else 0,
+            if src.lo1 = dst.lo1 then 0xFFFFFFFF else 0,
+            if src.hi2 = dst.hi2 then 0xFFFFFFFF else 0,
+            if src.hi3 = dst.hi3 then 0xFFFFFFFF else 0));
 {
 }
 
