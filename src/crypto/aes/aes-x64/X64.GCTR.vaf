@@ -404,7 +404,7 @@ procedure {:quick} gctr_bytes_no_extra(
 
 
 #reset-options "--z3rlimit 20"
-procedure {:quick} {:verify true} gctr_bytes(
+procedure {:quick} gctr_bytes(
     ghost icb_BE:quad32,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
