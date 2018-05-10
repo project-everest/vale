@@ -11,8 +11,8 @@ import SCons.Util
 import atexit
 import platform
 import fnmatch
-# import win32job
-# import win32api
+import win32job
+import win32api
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -42,11 +42,11 @@ if sys.platform == 'win32':
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
   env['NUGET'] = 'nuget.exe'
-  # hdl = win32job.CreateJobObject(None, "")
-  # win32job.AssignProcessToJobObject(hdl, win32api.GetCurrentProcess())
-  # extended_info = win32job.QueryInformationJobObject(self.hJob, win32job.JobObjectExtendedLimitInformation)
-  # extended_info['BasicLimitInformation']['LimitFlags'] = win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-  # win32job.SetInformationJobObject(hdl, win32job.JobObjectExtendedLimitInformation, extended_info)
+  hdl = win32job.CreateJobObject(None, "")
+  win32job.AssignProcessToJobObject(hdl, win32api.GetCurrentProcess())
+  extended_info = win32job.QueryInformationJobObject(None, win32job.JobObjectExtendedLimitInformation)
+  extended_info['BasicLimitInformation']['LimitFlags'] = win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+  win32job.SetInformationJobObject(hdl, win32job.JobObjectExtendedLimitInformation, extended_info)
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
