@@ -1,6 +1,6 @@
 module X64.Bytes_Semantics_i
 
-#set-options "--z3rlimit 60"
+#reset-options "--z3rlimit 100 --max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
 
 let aux0 (ptr:int) (mem:heap) : Lemma (mod_8 (get_heap_val64 ptr mem) == mem.[ptr]) = ()
 let aux1 (ptr:int) (mem:heap) : Lemma 

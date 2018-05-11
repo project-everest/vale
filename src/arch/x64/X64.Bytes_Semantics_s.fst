@@ -5,7 +5,6 @@ open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
-module M = Memory_i_s
 
 type uint64 = UInt64.t
 
@@ -181,11 +180,10 @@ let update_mem (ptr:int) (v:nat64) (s:state) : state =
 let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
   { s with mem = update_heap128 ptr v s.mem }
 
-let valid_maddr (m:maddr) (s:state) : bool =
-  0 <= (eval_maddr m s) && (eval_maddr m s) < pow2_64
 
-let valid_maddr128 (m:maddr) (s:state) : bool =
-  0 <= (eval_maddr m s) && (eval_maddr m s) < pow2_64
+assume val valid_maddr (m:maddr) (s:state) : bool
+
+assume val valid_maddr128 (m:maddr) (s:state) : bool
 
 let valid_operand (o:operand) (s:state) : bool =
   match o with

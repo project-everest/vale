@@ -1,13 +1,13 @@
 module X64.Semantics_s
 
 open X64.Machine_s
+open X64.Memory_s
 open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
 module M = Memory_i_s
 module S = X64.Bytes_Semantics_s
-module I = Interop64
 
 type uint64 = UInt64.t
 
@@ -17,15 +17,6 @@ type ocmp = S.ocmp
 
 type code = S.code
 type codes = S.codes
-
-noeq type state' = {
-  state: S.state;
-  addrs: I.addr_map;
-  ptrs: list buffer64;
-  mem: mem;
-}
-
-type state = (s:state'{s.state.S.mem == I.down_mem64 s.mem s.addrs s.ptrs})
 
 //let u (i:int{FStar.UInt.fits i 64}) : uint64 = FStar.UInt64.uint_to_t i
 //let v (u:uint64) : nat64 = FStar.UInt64.v u
@@ -497,6 +488,14 @@ and eval_while b c fuel s0 =
     | Some s1 ->
       if s1.state.S.ok then eval_while b c (fuel - 1) s1  // success: continue to next iteration
       else Some s1  // failure: propagate failure immediately
+
+assume val bytes_valid (m:maddr) (s:state) : Lemma
+  (valid_maddr m s ==> S.valid_maddr m s.state)
+  [SMTPat valid_maddr m s]
+
+assume val bytes_valid128 (m:maddr) (s:state) : Lemma
+  (valid_maddr128 m s ==> S.valid_maddr128 m s.state)
+  [SMTPat valid_maddr128 m s]
 
 
 // This verifies but is very slow
