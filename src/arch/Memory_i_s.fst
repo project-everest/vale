@@ -3,7 +3,6 @@ module Memory_i_s
 module M = Memory_s
 
 let heap = M.heap
-let mem = M.mem
 
 let coerce (#a:Type0) (b:Type0{a == b}) (x:a) : b = x
 

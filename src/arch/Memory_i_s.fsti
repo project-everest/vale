@@ -10,7 +10,7 @@ unfold let nat64 = Words_s.nat64
 unfold let quad32 = Types_s.quad32
 
 val heap : Type u#1
-val mem : Type u#1
+type mem = Memory_s.mem
 
 type base_typ = 
 | TUInt8
