@@ -250,7 +250,7 @@ let quad32_xor_bytewise (q q' r:quad32) (n:nat{ n <= 16 }) : Lemma
             let q'r_bytes = le_quad32_to_bytes (quad32_xor q' r) in                      
             slice qr_bytes 0 n == slice q'r_bytes 0 n))
   =
-  admit()
+  admit()       //////////////////////////////////////////////////////////////////////////////// TODO!!!
 
 
 let slice_pad_to_128_bits (s:seq nat8 {  0 < length s /\ length s < 16 }) :
@@ -421,4 +421,91 @@ let index_helper (s:seq quad32) (num_bytes:int) : Lemma
   (ensures (let num_blocks = num_bytes / 16 in
             index s num_blocks == index_work_around_quad32 (slice_work_around s (bytes_to_quad_size num_bytes)) num_blocks))
   =
+  ()
+
+
+let pad_to_128_bits_multiples (b:seq nat8) : Lemma
+  (let full_blocks = (length b) / 16 * 16 in
+   let full_bytes, partial_bytes = split b full_blocks in
+   pad_to_128_bits b == full_bytes @| pad_to_128_bits partial_bytes)
+  =
+  let full_blocks = (length b) / 16 * 16 in
+  let full_bytes, partial_bytes = split b full_blocks in
+  if length b < 16 then (
+    assert (full_bytes == createEmpty);
+    assert (partial_bytes == b);
+    append_empty_l(pad_to_128_bits partial_bytes);
+    ()
+  ) else (
+    assert (length full_bytes + length partial_bytes == length b);
+    assert (length full_bytes % 16 == 0);
+    let num_extra_bytes = length b % 16 in
+    assert (num_extra_bytes == (length partial_bytes) % 16);
+    if num_extra_bytes = 0 then (
+      lemma_split b full_blocks;
+      assert (b == full_bytes @| partial_bytes);
+      ()
+    ) else (
+      let pad = create (16 - num_extra_bytes) 0 in
+      assert (equal (b @| pad) (full_bytes @| (partial_bytes @| pad)));
+      ()
+    );
+    ()
+  )
+
+let pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) : Lemma
+  (requires 1 <= num_bytes /\ 
+             num_bytes < 16 * length s /\
+             16 * (length s - 1) < num_bytes /\
+             num_bytes % 16 <> 0 /\
+             length s == bytes_to_quad_size num_bytes)
+  (ensures (let num_blocks = num_bytes / 16 in
+            let full_quads,final_quads = split s num_blocks in
+            length final_quads == 1 /\
+            (let final_quad = index final_quads 0 in
+             pad_to_128_bits (slice (le_seq_quad32_to_bytes s) 0 num_bytes)
+             ==
+             le_seq_quad32_to_bytes full_quads @| pad_to_128_bits (slice (le_quad32_to_bytes final_quad) 0 (num_bytes % 16)))))
+  =
+  let num_extra = num_bytes % 16 in
+  let num_blocks = num_bytes / 16 in
+  let full_quads,final_quads = split s num_blocks in
+  assert(length final_quads == 1);
+  let final_quad = index final_quads 0 in
+  let b = slice (le_seq_quad32_to_bytes s) 0 num_bytes in
+  pad_to_128_bits_multiples b; // ==>  pad_to_128_bits b == full_bytes @| pad_to_128_bits partial_bytes
+  let full_blocks = (length b) / 16 * 16 in
+  let full_bytes, partial_bytes = split b full_blocks in
+  // Need to show that full_bytes == le_seq_quad32_to_bytes full_quads
+  // Need to show that le_quad32_to_bytes final_quad == partial_bytes
+
+  // full_bytes == slice (slice (le_seq_quad32_to_bytes s) 0 num_bytes) 0 full_blocks
+  // This should be from slice_slice
+  //            == slice (le_seq_quad32_bot_bytes s) 0 full_blocks
+  //            == slice (le_seq_quad32_bot_bytes s) 0 (num_blocks * 16)
+  //    This follows from slice_commutes_le_seq_quad32_to_bytes0
+  // le_seq_quad32_to_bytes full_quads == le_seq_quad32_to_bytes (slice s 0 num_blocks)
+
+  slice_commutes_le_seq_quad32_to_bytes0 s num_blocks;  
+  // ==>
+  (*
+    assert (slice (le_seq_quad32_to_bytes s) 0 (num_blocks * 16) ==
+            le_seq_quad32_to_bytes (slice s 0 num_blocks));
+  *)
+  slice_slice (le_seq_quad32_to_bytes s) 0 num_bytes 0 full_blocks;
+  assert (full_bytes == le_seq_quad32_to_bytes full_quads);
+
+  // slice (le_quad32_to_bytes final_quad) 0 num_extra == slice (le_quad32_to_bytes (index (slice s num_blocks (length s)) 0)) 0 num_extra
+  // F* believes assert (final_quad == index s num_blocks), so we have:
+  //               == slice (le_quad32_to_bytes (index s num_blocks)) 0 num_extra
+  //
+  //               == slice (le_quad32_to_bytes (index s num_blocks)) 0 num_extra 
+  // from le_seq_quad32_to_bytes_tail_prefix
+  //               == slice (le_seq_quad32_to_bytes s) (num_blocks * 16) num_bytes
+  //               == slice (le_seq_quad32_to_bytes s) full_blocks num_bytes
+  //  From slice_slice
+  // partial_bytes == slice (slice (le_seq_quad32_to_bytes s) 0 num_bytes) full_blocks num_bytes 
+  
+  slice_slice (le_seq_quad32_to_bytes s) 0 num_bytes full_blocks num_bytes;
+  le_seq_quad32_to_bytes_tail_prefix s num_bytes;
   ()
