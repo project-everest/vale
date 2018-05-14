@@ -52,7 +52,7 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 ///////////////////////////
 // GCM
 ///////////////////////////
-procedure {:quick} {:verify true} gcm_one_pass(
+procedure {:quick} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
     ghost key:aes_key_LE(AES_128),

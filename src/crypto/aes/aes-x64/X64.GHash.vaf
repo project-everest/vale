@@ -15,6 +15,7 @@ open GHash_s
 open GHash_i
 open GF128_s
 open GF128_i
+open GCTR_s
 open GCM_helpers_i
 open Math.Poly2_s
 open X64.GF128_Mul
@@ -36,11 +37,11 @@ let get_last_slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
   else
     Mkfour 0 0 0 0 
 
-let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
-  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
-    slice s start_pos end_pos
-  else
-    create 1 (Mkfour 0 0 0 0)
+//let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
+//  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
+//    slice s start_pos end_pos
+//  else
+//    create 1 (Mkfour 0 0 0 0)
 #endverbatim
 
 #reset-options "--z3rlimit 40"
@@ -124,7 +125,7 @@ procedure {:quick} compute_ghash_incremental(
 
                 //////////////////// Postcondition goals //////////////////////
                 rdx == 0 ==> io == old(io);
-                rdx > 0 ==> io == ghash_incremental(h, old(io), slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
+                rdx > 0 ==> io == ghash_incremental(h, old(io), slice_work_around(buffer128_as_seq(mem, in_b), rdx));
 
             decreases
                 len - rdx;
@@ -143,7 +144,7 @@ procedure {:quick} compute_ghash_incremental(
     }
 }
 
-procedure {:quick} {:verify true} compute_ghash_incremental_partial(
+procedure {:quick} compute_ghash_incremental_partial(
     ghost in_b:buffer128
     )
     lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11; 
@@ -167,7 +168,7 @@ procedure {:quick} {:verify true} compute_ghash_incremental_partial(
 
     ensures
         len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
-        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ io == ghash_incremental(h, old(io), slice_workaround(buffer128_as_seq(mem, in_b), 0, len));
+        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ io == ghash_incremental(h, old(io), slice_work_around(buffer128_as_seq(mem, in_b), len));
 {
     if (len != 0) {
         Mov64(rdx, 0);
@@ -189,7 +190,7 @@ procedure {:quick} {:verify true} compute_ghash_incremental_partial(
 
                 //////////////////// Postcondition goals //////////////////////
                 rdx == 0 ==> io == old(io);
-                rdx > 0 ==> io == ghash_incremental(h, old(io), slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
+                rdx > 0 ==> io == ghash_incremental(h, old(io), slice_work_around(buffer128_as_seq(mem, in_b), rdx));
 
             decreases
                 len - rdx;
@@ -206,6 +207,112 @@ procedure {:quick} {:verify true} compute_ghash_incremental_partial(
             Add64(r9, 16);
         }
     }
+}
+
+#reset-options "--z3rlimit 5"
+procedure {:quick exportOnly} {:verify true} ghash_incremental_bytes_no_extra(
+    ghost in_b:buffer128,
+    ghost old_io:quad32
+    )
+    lets in_ptr @= rax; num_bytes @= r11; io @= xmm1; mask @= xmm8; h @= xmm11;
+
+    reads
+        in_ptr; num_bytes; h; mask; mem;
+
+    modifies
+        rcx; rdx; r9; r12;
+        io; efl; 
+
+        // ReduceMul128_LE touches almost everything
+        xmm2; xmm3; xmm4; xmm5; xmm6;
+
+    requires
+        // GHash reqs
+        num_bytes > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, bytes_to_quad_size(num_bytes));
+        num_bytes > 0 ==> in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        buffer_length(in_b) == bytes_to_quad_size(num_bytes);
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+
+        //len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
+        let input := slice_work_around(buffer128_as_seq(mem, in_b), num_bytes / 16);
+        num_bytes > 0 ==> length(input) > 0 /\ io == ghash_incremental(h, old_io, input);
+
+        num_bytes % 16 == 0;
+    ensures
+        let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
+        let padded_bytes := pad_to_128_bits(input_bytes);
+        let input_quads := le_bytes_to_seq_quad32(padded_bytes);
+        num_bytes > 0 ==> length(input_quads) > 0 /\ 
+                          io == ghash_incremental(h, old(io), input_quads);
+{
+    ghost var num_blocks := num_bytes / 16;
+    ghost var input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
+    ghost var padded_bytes := pad_to_128_bits(input_bytes);
+    ghost var input_quads := le_bytes_to_seq_quad32(padded_bytes);
+
+    no_extra_bytes_helper(buffer128_as_seq(mem, in_b), num_bytes);
+        // ==> slice (le_seq_quad32_to_bytes s) 0 num_bytes == le_seq_quad32_to_bytes s
+    assert input_bytes == le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b));
+    assert pad_to_128_bits(input_bytes) == input_bytes;
+    assert input_quads == le_bytes_to_seq_quad32(input_bytes);
+
+    slice_commutes_le_seq_quad32_to_bytes0(buffer128_as_seq(mem, in_b), num_blocks);
+
+//    assert input_quads == le_bytes_to_seq_quad32(le_seq_quad32_to_bytes(slice_work_around(buffer128_as_seq(mem, in_b), num_blocks)));
+    le_bytes_to_seq_quad32_to_bytes(slice_work_around(buffer128_as_seq(mem, in_b), num_blocks));
+
+    // We want input_quads == slice_work_around(buffer128_as_seq(mem, in_b), num_blocks)
+}
+
+#reset-options "--z3rlimit 20"
+procedure {:quick} ghash_incremental_bytes(
+    ghost in_b:buffer128
+    )
+    lets in_ptr @= rax; num_bytes @= r11; io @= xmm1; mask @= xmm8; h @= xmm11;
+
+    reads
+        in_ptr; num_bytes; h; mask; mem;
+
+    modifies
+        rcx; rdx; r9; r12;
+        io; efl; 
+
+        // ReduceMul128_LE touches almost everything
+        xmm2; xmm3; xmm4; xmm5; xmm6;
+
+    requires
+        // GHash reqs
+        num_bytes > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, bytes_to_quad_size(num_bytes));
+        num_bytes > 0 ==> in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        num_bytes > 0 ==> buffer_length(in_b) == bytes_to_quad_size(num_bytes);
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+
+    ensures
+        num_bytes == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
+        num_bytes > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ 
+            io == ghash_incremental(h, old(io), 
+                    le_bytes_to_seq_quad32(pad_to_128_bits(
+                            slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes))));
+{
+    ghost var num_blocks := old(num_bytes) / 16;
+
+    lemma_poly_bits64();
+
+    Mov64(rcx, num_bytes);
+    Shr64(rcx, 4);
+    assert rcx == num_blocks;
+ 
+    compute_ghash_incremental_partial(in_b);
+
+    Mov64(rcx, num_bytes);
+    And64(rcx, 15);
+    assert rcx == num_bytes % 16;
+
+    if (rcx == 0) {
+        ghash_incremental_bytes_no_extra(in_b, old(io));
+    } else {
+    }
+
 }
 
 
