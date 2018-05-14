@@ -52,7 +52,7 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 ///////////////////////////
 // GCM
 ///////////////////////////
-procedure {:quick} gcm_one_pass(
+procedure {:quick} {:verify true} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
     ghost key:aes_key_LE(AES_128),
@@ -89,14 +89,13 @@ procedure {:quick} gcm_one_pass(
         validSrcAddrs128(mem, out_ptr, out_b, len);
 
         // GCTR
-        buffer128_as_seq(mem, out_b) == gctr_encrypt_LE(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
-        icb.lo1 == old(icb.lo1);
-        icb.hi2 == old(icb.hi2);
-        icb.hi3 == old(icb.hi3);
+        //buffer128_as_seq(mem, out_b) == gctr_encrypt_LE(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
+        gctr_partial(len, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+        icb == inc32(old(icb), old(len));
 
         // GHash
         len == 0 ==> hash == old(hash); 
-        len > 0 ==> length(buffer128_as_seq(mem, out_b)) > 0 /\ hash == ghash_incremental(h, old(hash), buffer128_as_seq(mem, out_b));
+        len > 0 ==> length(buffer128_as_seq(mem, out_b)) > 0 /\ hash == ghash_incremental(h, old(hash), slice_workaround(buffer128_as_seq(mem, out_b), 0, len));
 {
     Mov64(rdx, 0);
     Mov64(r9, in_ptr);
@@ -171,8 +170,9 @@ procedure {:quick} gcm_one_pass(
 //    assert 256 * length(buffer128_as_seq(mem, in_b)) < pow2_32;
 //    assert gctr_partial(length(buffer128_as_seq(mem, out_b)), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 //    
-    // Call a helpful lemma
-    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+
+//// Call a helpful lemma
+//    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
 procedure {:quick} gcm_core(
@@ -400,11 +400,11 @@ procedure {:quick} callee_restore_registers(
     }
 }
 
-#verbatim{:interface}
-let mk_gctr_plain (p:seq quad32) : gctr_plain_LE =
-  let open FStar.Mul in
-  if 256 * length p < pow2_32 then p else createEmpty
-#endverbatim
+//#verbatim{:interface}
+//let mk_gctr_plain (p:seq quad32) : gctr_plain_LE =
+//  let open FStar.Mul in
+//  if 256 * length p < pow2_32 then p else createEmpty
+//#endverbatim
 
 
 procedure {:quick} gcm_stdcall_inner(
@@ -477,7 +477,7 @@ procedure {:quick} gcm_stdcall_inner(
         256 * buffer_length(plain_b) < pow2_32;
         256 * buffer_length(auth_b) < pow2_32;
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+        //create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 {
     Load64_buffer(r14, r9,  0, args_b, 0);
     Load64_buffer(r13, r9,  8, args_b, 1);
@@ -581,7 +581,7 @@ procedure {:quick} gcm_stdcall(
         256 * buffer_length(plain_b) < pow2_32;
         256 * buffer_length(auth_b) < pow2_32;
         buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+//        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
 
         // Calling convention for caller/callee saved registers
         rsp == old(rsp);
