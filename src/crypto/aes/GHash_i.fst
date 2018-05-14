@@ -48,6 +48,20 @@ let rec lemma_hash_append (h:quad32) (y_prev:quad32) (a b:ghash_plain_LE) :
 let ghash_incremental0 (h:quad32) (y_prev:quad32) (x:seq quad32) : quad32 =
   if length x > 0 then ghash_incremental h y_prev x else y_prev
 
+let lemma_hash_append2 (h y_init y_mid y_final:quad32) (s1:seq quad32) (q:quad32) : Lemma
+  (requires y_mid = ghash_incremental0 h y_init s1 /\
+            y_final = ghash_incremental h y_mid (create 1 q))
+  (ensures  y_final == ghash_incremental h y_init (s1 @| (create 1 q)))
+  =
+  let qs = create 1 q in
+  let s12 = s1 @| qs in
+  if length s1 = 0 then (
+    assert(equal s12 qs)
+  ) else (
+    lemma_hash_append h y_init s1 qs
+  );
+  ()
+
 let lemma_hash_append3 (h y_init y_mid1 y_mid2 y_final:quad32) (s1 s2 s3:seq quad32) : Lemma
   (requires y_init = Mkfour 0 0 0 0 /\
             y_mid1 = ghash_incremental0 h y_init s1 /\

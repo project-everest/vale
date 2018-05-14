@@ -80,6 +80,25 @@ procedure {:quick} compute_Y0()
     lemma_quad32_xor();
 }
 
+procedure {:quick} compute_ghash_incremental_register()
+    lets input @= xmm2; io @= xmm1; mask @= xmm8; h @= xmm11;
+    requires mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+    reads
+        h; mask;
+    modifies
+        io; efl; r12;
+        xmm2; xmm3; xmm4; xmm5; xmm6;
+    ensures
+        io == ghash_incremental(h, old(io), create(1, old(input)));
+{
+    Pxor(io, input);    // Y_i := Y_{i-1} ^ x_i
+    Mov128(xmm2, h);    // Move h into the register that ReduceMul128_LE expects
+
+    lemma_to_of_quad32(reverse_bytes_quad32(io));   // Help satisfy precondition
+    lemma_to_of_quad32(reverse_bytes_quad32(h));    // Help satisfy precondition
+    ReduceMul128_LE(gf128_of_quad32(reverse_bytes_quad32(io)), gf128_of_quad32(reverse_bytes_quad32(h)));    // io := Y_i * H
+}
+
 procedure {:quick} compute_ghash_incremental(
     ghost in_b:buffer128
     )
@@ -269,7 +288,7 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
 
 #reset-options "--z3rlimit 40"
 procedure {:quick} compute_pad_to_128_bits()
-    lets io @= xmm3; num_bytes @= r11; tmp @= rax; mask @= rdx;
+    lets io @= xmm2; num_bytes @= r11; tmp @= rax; mask @= rdx;
 
     reads num_bytes;
     modifies io; tmp; mask; efl;
@@ -324,7 +343,8 @@ procedure {:quick} compute_pad_to_128_bits()
     }
 }
 
-procedure {:quick exportOnly} ghash_incremental_bytes_extra(
+#reset-options "--z3rlimit 10"
+procedure {:quick} {:verify true} ghash_incremental_bytes_extra(
     ghost in_b:buffer128,
     ghost orig_in_ptr:nat64,
     ghost old_io:quad32
@@ -332,10 +352,10 @@ procedure {:quick exportOnly} ghash_incremental_bytes_extra(
     lets in_ptr @= rax; num_bytes @= r11; io @= xmm1; mask @= xmm8; h @= xmm11;
 
     reads
-        in_ptr; num_bytes; h; mask; mem;
+        num_bytes; h; mask; mem;
 
     modifies
-        rcx; rdx; r9; r12;
+        rax; rcx; rdx; r9; r12;
         io; efl; 
 
         // ReduceMul128_LE touches almost everything
@@ -343,28 +363,28 @@ procedure {:quick exportOnly} ghash_incremental_bytes_extra(
 
     requires
         // GHash reqs
-        num_bytes > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, bytes_to_quad_size(num_bytes));
-        num_bytes > 0 ==> in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        num_bytes > 0 ==> validSrcAddrs128(mem, orig_in_ptr, in_b, bytes_to_quad_size(num_bytes));
+        num_bytes > 0 ==> orig_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         buffer_length(in_b) == bytes_to_quad_size(num_bytes);
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         //len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
         let input := slice_work_around(buffer128_as_seq(mem, in_b), num_bytes / 16);
-        num_bytes > 0 ==> length(input) > 0 /\ io == ghash_incremental(h, old_io, input);
+        io == ghash_incremental0(h, old_io, input);
 
         // Extra reqs
         let num_blocks := num_bytes / 16;
-        num_bytes % 16 != 0;
+        num_bytes % 16 != 0;        // Note: This implies num_bytes > 0
         0 < num_bytes < 16 * bytes_to_quad_size(num_bytes);
         16 * (bytes_to_quad_size(num_bytes) - 1) < num_bytes;
         in_ptr  == orig_in_ptr  + 16 * num_blocks;
 
     ensures
-        let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
-        let padded_bytes := pad_to_128_bits(input_bytes);
-        let input_quads := le_bytes_to_seq_quad32(padded_bytes);
-        num_bytes > 0 ==> length(input_quads) > 0 /\ 
-                          io == ghash_incremental(h, old(io), input_quads);
+//        let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
+//        let padded_bytes := pad_to_128_bits(input_bytes);
+//        let input_quads := le_bytes_to_seq_quad32(padded_bytes);
+//        num_bytes > 0 ==> length(input_quads) > 0 /\ 
+//                          io == ghash_incremental(h, old(io), input_quads);
 {
     ghost var num_blocks := num_bytes / 16;
     ghost var input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
@@ -372,9 +392,9 @@ procedure {:quick exportOnly} ghash_incremental_bytes_extra(
     ghost var input_quads := le_bytes_to_seq_quad32(padded_bytes);
 
 
-    slice_commutes_le_seq_quad32_to_bytes0(buffer128_as_seq(mem, in_b), num_blocks);
+    slice_commutes_le_seq_quad32_to_bytes0(buffer128_as_seq(mem, in_b), if num_blocks >= 0 then num_blocks else 0);
 
-    le_bytes_to_seq_quad32_to_bytes(slice_work_around(buffer128_as_seq(mem, in_b), num_blocks));
+    le_bytes_to_seq_quad32_to_bytes(slice_work_around(buffer128_as_seq(mem, in_b), if num_blocks >= 0 then num_blocks else 0));
 
     pad_to_128_bits_le_quad32_to_bytes(buffer128_as_seq(mem, in_b), num_bytes);
         //  pad_to_128_bits (slice (le_seq_quad32_to_bytes s) 0 num_bytes)
@@ -385,7 +405,14 @@ procedure {:quick exportOnly} ghash_incremental_bytes_extra(
 
     // Need to compute pad_to_128_bits (slice (le_quad32_to_bytes final_quad) 0 (num_bytes % 16)))))
     Load128_buffer(xmm2, in_ptr, 0, in_b, num_blocks);  // xmm2 == final_quad
-    Pcmpeqd(xmm3, xmm3);    // All 1s
+
+    compute_pad_to_128_bits();
+    ghost var padded_quad := xmm2;
+
+    compute_ghash_incremental_register();
+//
+//    ghost var input := slice_work_around(buffer128_as_seq(mem, in_b), num_bytes / 16);
+//    lemma_hash_append2(h, old_io, old(io), io, input, padded_quad);
 
 }
 
@@ -443,25 +470,6 @@ procedure {:quick} ghash_incremental_bytes(
 
 }
 
-
-procedure {:quick} compute_ghash_incremental_register()
-    lets input @= xmm2; io @= xmm1; mask @= xmm8; h @= xmm11;
-    requires mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-    reads
-        h; mask;
-    modifies
-        io; efl; r12;
-        xmm2; xmm3; xmm4; xmm5; xmm6;
-    ensures
-        io == ghash_incremental(h, old(io), create(1, old(input)));
-{
-    Pxor(io, input);    // Y_i := Y_{i-1} ^ x_i
-    Mov128(xmm2, h);    // Move h into the register that ReduceMul128_LE expects
-
-    lemma_to_of_quad32(reverse_bytes_quad32(io));   // Help satisfy precondition
-    lemma_to_of_quad32(reverse_bytes_quad32(h));    // Help satisfy precondition
-    ReduceMul128_LE(gf128_of_quad32(reverse_bytes_quad32(io)), gf128_of_quad32(reverse_bytes_quad32(h)));    // io := Y_i * H
-}
 
 
 procedure {:quick} ghash_core(
