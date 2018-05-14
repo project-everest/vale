@@ -18,6 +18,7 @@ open GF128_i
 open GCTR_s
 open GCM_helpers_i
 open Math.Poly2_s
+open X64.Poly1305.Math_i
 open X64.GF128_Mul
 open X64.Machine_s
 open X64.Vale.State_i
@@ -168,7 +169,8 @@ procedure {:quick} compute_ghash_incremental_partial(
 
     ensures
         len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
-        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ io == ghash_incremental(h, old(io), slice_work_around(buffer128_as_seq(mem, in_b), len));
+        let input := slice_work_around(buffer128_as_seq(mem, in_b), len);
+        len > 0 ==> length(input) > 0 /\ io == ghash_incremental(h, old(io), input);
 {
     if (len != 0) {
         Mov64(rdx, 0);
@@ -265,7 +267,51 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
     // We want input_quads == slice_work_around(buffer128_as_seq(mem, in_b), num_blocks)
 }
 
-procedure {:quick exportOnly} {:verify true} ghash_incremental_bytes_extra(
+procedure {:quick} {:verify true} compute_pad_to_128_bits()
+    lets io @= xmm3; num_bytes @= r11; tmp @= rax; mask @= rdx;
+
+    reads num_bytes;
+    modifies io; tmp; mask; efl;
+    requires 0 < num_bytes < 16;
+    //ensures io == le_bytes_to_quad32(pad_to_128_bits(slice(le_quad32_to_bytes(old(io)), 0, num_bytes)));
+{
+    lemma_poly_bits64();
+    if (num_bytes < 8) {
+        // Zero out the top 64-bits
+        PinsrqImm(io, 0, 1, tmp);
+
+        // Grab the lower 64 bits and zero-out 1-7 of the bytes
+        Mov64(tmp, num_bytes);
+        Shl64(tmp, 3);      // tmp == 8 (bits/byte) * num_bytes 
+        lemma_bytes_shift_power2(num_bytes);
+        assert tmp == 8 * num_bytes;
+        Mov64(mask, 1);
+        Shl64(mask, tmp);
+        Sub64(mask, 1);
+        Pextrq(tmp, io, 0);     
+        And64(tmp, mask);
+
+        // Restore the lower 64 bits
+        Pinsrq(io, tmp, 0);
+    } else {
+        // Grab the upper 64 bits and zero-out 1-7 of the bytes
+        Mov64(tmp, num_bytes);
+        Sub64(tmp, 8);      // Don't count the lower 64 bits
+        Shl64(tmp, 3);      // tmp == 8 (bits/byte) * (num_bytes - 8)
+        lemma_bytes_shift_power2(num_bytes - 8);
+        assert tmp == 8 * (num_bytes - 8);
+        Mov64(mask, 1);
+        Shl64(mask, tmp);
+        Sub64(mask, 1);
+        Pextrq(tmp, io, 1);     
+        And64(tmp, mask);
+
+        // Restore the upper 64 bits
+        Pinsrq(io, tmp, 1);
+    }
+}
+
+procedure {:quick exportOnly} ghash_incremental_bytes_extra(
     ghost in_b:buffer128,
     ghost orig_in_ptr:nat64,
     ghost old_io:quad32
@@ -356,10 +402,12 @@ procedure {:quick} ghash_incremental_bytes(
 
     ensures
         num_bytes == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
-        num_bytes > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ 
-            io == ghash_incremental(h, old(io), 
-                    le_bytes_to_seq_quad32(pad_to_128_bits(
-                            slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes))));
+
+        let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
+        let padded_bytes := pad_to_128_bits(input_bytes);
+        let input_quads := le_bytes_to_seq_quad32(padded_bytes);
+        num_bytes > 0 ==> length(input_quads) > 0 /\ 
+            io == ghash_incremental(h, old(io), input_quads);
 {
     ghost var num_blocks := old(num_bytes) / 16;
 
