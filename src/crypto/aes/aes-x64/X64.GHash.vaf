@@ -391,39 +391,21 @@ procedure {:quick} {:verify true} ghash_incremental_bytes_extra(
         in_ptr  == orig_in_ptr  + 16 * num_blocks;
 
     ensures
-//        let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), orig_num_bytes);
-//        let padded_bytes := pad_to_128_bits(input_bytes);
-//        let input_quads := le_bytes_to_seq_quad32(padded_bytes);
-//        orig_num_bytes > 0 ==> length(input_quads) > 0 /\ 
-//                          io == ghash_incremental(h, old(io), input_quads);
+        let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), orig_num_bytes);
+        let padded_bytes := pad_to_128_bits(input_bytes);
+        let input_quads := le_bytes_to_seq_quad32(padded_bytes);
+        orig_num_bytes > 0 ==> length(input_quads) > 0 /\ 
+                          io == ghash_incremental(h, old_io, input_quads);
 {
     ghost var num_blocks := orig_num_bytes / 16;
-//    ghost var input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), orig_num_bytes);
-//    ghost var padded_bytes := pad_to_128_bits(input_bytes);
-//    ghost var input_quads := le_bytes_to_seq_quad32(padded_bytes);
 
-
-//    slice_commutes_le_seq_quad32_to_bytes0(buffer128_as_seq(mem, in_b), if num_blocks >= 0 then num_blocks else 0);
-//
-//    le_bytes_to_seq_quad32_to_bytes(slice_work_around(buffer128_as_seq(mem, in_b), if num_blocks >= 0 then num_blocks else 0));
-
-//    pad_to_128_bits_le_quad32_to_bytes(buffer128_as_seq(mem, in_b), orig_num_bytes);
-        //  pad_to_128_bits (slice (le_seq_quad32_to_bytes s) 0 orig_num_bytes)
-        //     ==
-        //  le_seq_quad32_to_bytes full_quads @| pad_to_128_bits (slice (le_quad32_to_bytes final_quad) 0 (orig_num_bytes % 16)))))
-    // ==>
-    //  io == ghash_incremental(h, old_io, full_quads)
-
-    // Need to compute pad_to_128_bits (slice (le_quad32_to_bytes final_quad) 0 (orig_num_bytes % 16)))))
-    Load128_buffer(xmm2, in_ptr, 0, in_b, num_blocks);  // xmm2 == final_quad
+    Load128_buffer(xmm2, in_ptr, 0, in_b, num_blocks);  
     ghost var final_quad := xmm2;
+
     compute_pad_to_128_bits();
     ghost var final_quad_padded := xmm2;
 
     compute_ghash_incremental_register();
-//
-//    ghost var input := slice_work_around(buffer128_as_seq(mem, in_b), orig_num_bytes / 16);
-//    lemma_hash_append2(h, old_io, old(io), io, input, padded_quad);
     
     lemma_ghash_incremental_bytes_extra_helper(h, old_io, old(io), io, buffer128_as_seq(mem, in_b), final_quad, final_quad_padded, orig_num_bytes);
 }
