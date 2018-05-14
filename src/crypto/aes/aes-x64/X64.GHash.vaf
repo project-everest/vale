@@ -15,6 +15,7 @@ open GHash_s
 open GHash_i
 open GF128_s
 open GF128_i
+open GCM_helpers_i
 open Math.Poly2_s
 open X64.GF128_Mul
 open X64.Machine_s
