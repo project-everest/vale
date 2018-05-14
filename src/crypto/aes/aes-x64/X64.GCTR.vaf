@@ -109,22 +109,22 @@ procedure {:quick} gctr_core(
         rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
 
     requires
-//        // GCTR reqs
-//        icb == icb_BE;
-//        buffers_disjoint128(in_b, out_b);
-//        buffers_disjoint128(keys_b, out_b);
-//        validSrcAddrs128(mem, in_ptr, in_b, len);
-//        validDstAddrs128(mem, out_ptr, out_b, len);
-//        in_ptr  + 16 * len < pow2_64;
-//        out_ptr + 16 * len < pow2_64;
-//        buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
-//
-//        // AES reqs
-//        length(round_keys) == 11;
-//        round_keys == key_to_round_keys_LE(AES_128, key);
-//        r8 == buffer_addr(keys_b);
-//        validSrcAddrs128(mem, r8, keys_b, 11);
-//        buffer128_as_seq(mem, keys_b) == round_keys;
+        // GCTR reqs
+        icb == icb_BE;
+        buffers_disjoint128(in_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
+        validSrcAddrs128(mem, in_ptr, in_b, len);
+        validDstAddrs128(mem, out_ptr, out_b, len);
+        in_ptr  + 16 * len < pow2_64;
+        out_ptr + 16 * len < pow2_64;
+        buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys_LE(AES_128, key);
+        r8 == buffer_addr(keys_b);
+        validSrcAddrs128(mem, r8, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
         validSrcAddrs128(mem, out_ptr, out_b, len);
