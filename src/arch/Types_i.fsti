@@ -70,6 +70,23 @@ val le_quad32_to_bytes_to_quad32 (s:seq nat8 { length s == 16 }) :
 val le_seq_quad32_to_bytes_of_singleton (q:quad32) :
   Lemma (le_quad32_to_bytes q == le_seq_quad32_to_bytes (create 1 q))
 
+(*
+let seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) : seq (four a) =
+  let f (n:nat{n < length x / 4}) = Mkfour
+    (index x (n * 4)) (index x (n * 4 + 1)) (index x (n * 4 + 2)) (index x (n * 4 + 3))
+    in
+  init (length x / 4) f
+
+let seq_to_four_LE (#a:Type) (s:seq4 a) : four a =
+  Mkfour (index s 0) (index s 1) (index s 2) (index s 3)
+*)  
+let le_bytes_to_seq_quad_of_singleton (q:quad32) (b:seq nat8 { length b == 16 }) : Lemma 
+  (requires q == le_bytes_to_quad32 b)
+  (ensures create 1 q == le_bytes_to_seq_quad32 b)
+  =
+  // q == seq_to_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE b))
+  // le_bytes_to_seq_quad32 b == seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE b)
+  ()
 
 open FStar.Mul
 val slice_commutes_seq_four_to_seq_LE (#a:Type) (s:seq (four a)) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :
@@ -83,3 +100,9 @@ val slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n <= length s}) 
 val slice_commutes_le_seq_quad32_to_bytes0 (s:seq quad32) (n:nat{n <= length s}) :
   Lemma(slice (le_seq_quad32_to_bytes s) 0 (n * 16) ==
         le_seq_quad32_to_bytes (slice s 0 n))
+
+let append_commutes_le_bytes_to_seq_quad32 (s1:seq nat8 { length s1 % 16 == 0 }) (s2:seq nat8 { length s2 % 16 == 0 }) :
+  Lemma(le_bytes_to_seq_quad32 (s1 @| s2) == (le_bytes_to_seq_quad32 s1) @| (le_bytes_to_seq_quad32 s2))
+  =
+  assert (equal (le_bytes_to_seq_quad32 (s1 @| s2)) ((le_bytes_to_seq_quad32 s1) @| (le_bytes_to_seq_quad32 s2)));
+  ()
