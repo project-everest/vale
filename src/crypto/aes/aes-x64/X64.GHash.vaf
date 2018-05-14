@@ -142,6 +142,71 @@ procedure {:quick} compute_ghash_incremental(
     }
 }
 
+procedure {:quick} {:verify true} compute_ghash_incremental_partial(
+    ghost in_b:buffer128
+    )
+    lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11; 
+    reads
+        in_ptr; len; h; mask;
+        mem;
+
+    modifies
+        rdx; r9; r12;
+        io; efl;
+
+        // ReduceMul128_LE touches almost everything
+        xmm2; xmm3; xmm4; xmm5; xmm6;
+
+    requires
+        // GHash reqs
+        len > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, len);
+        len > 0 ==> in_ptr  + 16 * len < pow2_64;
+        len > 0 ==> buffer_length(in_b) >= len;
+        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+
+    ensures
+        len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
+        len > 0 ==> length(buffer128_as_seq(mem, in_b)) > 0 /\ io == ghash_incremental(h, old(io), slice_workaround(buffer128_as_seq(mem, in_b), 0, len));
+{
+    if (len != 0) {
+        Mov64(rdx, 0);
+        Mov64(r9, in_ptr);
+
+        while (rdx != len)
+            invariant
+                //////////////////// Basic indexing //////////////////////
+                0 <= rdx <= len;
+                r9 == in_ptr + 16 * rdx;
+                
+                //////////////////// From requires //////////////////////
+                // GHash reqs
+                validSrcAddrs128(mem, in_ptr, in_b, len);
+                in_ptr  + 16 * len < pow2_64;
+                len > 0;
+                buffer_length(in_b) >= len;
+                mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
+
+                //////////////////// Postcondition goals //////////////////////
+                rdx == 0 ==> io == old(io);
+                rdx > 0 ==> io == ghash_incremental(h, old(io), slice_workaround(buffer128_as_seq(mem, in_b), 0, rdx));
+
+            decreases
+                len - rdx;
+        {
+            Load128_buffer(xmm2, r9, 0, in_b, rdx);
+            Pxor(io, xmm2);        // Y_i := Y_{i-1} ^ x_i
+            Mov128(xmm2, h);       // xmm2 := H
+
+            lemma_to_of_quad32(reverse_bytes_quad32(xmm1));   // Help satisfy precondition
+            lemma_to_of_quad32(reverse_bytes_quad32(xmm2));   // Help satisfy precondition
+            ReduceMul128_LE(gf128_of_quad32(reverse_bytes_quad32(xmm1)), gf128_of_quad32(reverse_bytes_quad32(xmm2)));  // io := Y_i * H
+
+            Add64(rdx, 1);
+            Add64(r9, 16);
+        }
+    }
+}
+
 
 procedure {:quick} compute_ghash_incremental_register()
     lets input @= xmm2; io @= xmm1; mask @= xmm8; h @= xmm11;
