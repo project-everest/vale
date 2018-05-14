@@ -286,6 +286,15 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
     // We want input_quads == slice_work_around(buffer128_as_seq(mem, in_b), num_blocks)
 }
 
+
+/*   
+ * Note: More efficient options would be:
+ *  a) Write a routine to build 16 masks for Pshufb, each of which implements a shift by 0-16 bytes. 
+ *     Ask GCM caller to pass in that buffer.  
+ *  b) Write a 16-way switch statement using Psrldq with immediates
+ *     Note that a switch statement will likely be much more efficient than a 16-way if/else,
+ *     but Vale currently doesn't support switch statements
+ */ 
 #reset-options "--z3rlimit 40"
 procedure {:quick} compute_pad_to_128_bits()
     lets io @= xmm2; num_bytes @= r11; tmp @= rax; mask @= rdx;
