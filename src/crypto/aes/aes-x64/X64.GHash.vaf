@@ -267,13 +267,16 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
     // We want input_quads == slice_work_around(buffer128_as_seq(mem, in_b), num_blocks)
 }
 
-procedure {:quick} {:verify true} compute_pad_to_128_bits()
+#reset-options "--z3rlimit 40"
+procedure {:quick} compute_pad_to_128_bits()
     lets io @= xmm3; num_bytes @= r11; tmp @= rax; mask @= rdx;
 
     reads num_bytes;
     modifies io; tmp; mask; efl;
     requires 0 < num_bytes < 16;
-    //ensures io == le_bytes_to_quad32(pad_to_128_bits(slice(le_quad32_to_bytes(old(io)), 0, num_bytes)));
+    ensures 
+        let padded_bytes := pad_to_128_bits(slice_work_around(le_quad32_to_bytes(old(io)), num_bytes));
+        length(padded_bytes) = 16 && io = le_bytes_to_quad32(padded_bytes);
 {
     lemma_poly_bits64();
     if (num_bytes < 8) {
@@ -283,17 +286,23 @@ procedure {:quick} {:verify true} compute_pad_to_128_bits()
         // Grab the lower 64 bits and zero-out 1-7 of the bytes
         Mov64(tmp, num_bytes);
         Shl64(tmp, 3);      // tmp == 8 (bits/byte) * num_bytes 
-        lemma_bytes_shift_power2(num_bytes);
+        lemma_bytes_shift_power2(num_bytes); // ==>
         assert tmp == 8 * num_bytes;
         Mov64(mask, 1);
         Shl64(mask, tmp);
         Sub64(mask, 1);
         Pextrq(tmp, io, 0);     
+        ghost var old_lower128 := tmp;
         And64(tmp, mask);
+        lemma_bytes_and_mod(old_lower128, num_bytes); // ==>
+        assert tmp == old_lower128 % (pow2(num_bytes * 8));
 
         // Restore the lower 64 bits
         Pinsrq(io, tmp, 0);
+
+        pad_to_128_bits_lower(old(io), num_bytes);
     } else {
+        assert num_bytes - 8 >= 0;      // TODO: Shouldn't need this with the new type checker
         // Grab the upper 64 bits and zero-out 1-7 of the bytes
         Mov64(tmp, num_bytes);
         Sub64(tmp, 8);      // Don't count the lower 64 bits
@@ -304,10 +313,14 @@ procedure {:quick} {:verify true} compute_pad_to_128_bits()
         Shl64(mask, tmp);
         Sub64(mask, 1);
         Pextrq(tmp, io, 1);     
+        ghost var old_upper128 := tmp;
         And64(tmp, mask);
+        lemma_bytes_and_mod(old_upper128, num_bytes - 8); // ==>
+        assert num_bytes - 8 >= 0 /\ tmp == old_upper128 % (pow2((num_bytes - 8) * 8));
 
         // Restore the upper 64 bits
         Pinsrq(io, tmp, 1);
+        pad_to_128_bits_upper(old(io), num_bytes);
     }
 }
 
