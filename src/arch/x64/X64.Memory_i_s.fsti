@@ -56,8 +56,6 @@ unfold let buffer128 = buffer (TBase TUInt128)
 //TODO : Review, we may want to do this through expose interface
 noeq type state' = {
   state: S.state;
-  addrs: I.addr_map;
-  ptrs: list buffer64;
   mem: mem;
 }
 
@@ -213,88 +211,88 @@ val buffer_write (#t:typ) (b:buffer t) (i:int) (v:type_of_typ t) (h:mem) : Ghost
   ))
 
 
-val buffer_addr : #t:typ -> b:buffer t -> s:state -> GTot int
+val buffer_addr : #t:typ -> b:buffer t -> h:mem -> GTot int
 
-val valid_mem64 : ptr:int -> s:state -> GTot bool // is there a 64-bit word at address ptr?
-val load_mem64 : ptr:int -> s:state -> GTot nat64 // the 64-bit word at ptr (if valid_mem64 holds)
-val store_mem64 : ptr:int -> v:nat64 -> s:state -> GTot state
+val valid_mem64 : ptr:int -> h:mem -> GTot bool // is there a 64-bit word at address ptr?
+val load_mem64 : ptr:int -> h:mem -> GTot nat64 // the 64-bit word at ptr (if valid_mem64 holds)
+val store_mem64 : ptr:int -> v:nat64 -> h:mem -> GTot mem
 
-val valid_mem128 (ptr:int) (s:state) : bool
-val load_mem128  (ptr:int) (s:state) : quad32 
-val store_mem128 (ptr:int) (v:quad32) (s:state) : state
+val valid_mem128 (ptr:int) (h:mem) : bool
+val load_mem128  (ptr:int) (h:mem) : quad32 
+val store_mem128 (ptr:int) (v:quad32) (h:mem) : mem
 
-val lemma_valid_mem64 : b:buffer64 -> i:nat -> s:state -> Lemma
+val lemma_valid_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma
   (requires
-    i < Seq.length (buffer_as_seq s.mem b) /\
-    buffer_readable s.mem b
+    i < Seq.length (buffer_as_seq h b) /\
+    buffer_readable h b
   )
   (ensures
-    valid_mem64 (buffer_addr b s + 8 `op_Multiply` i) s
+    valid_mem64 (buffer_addr b h + 8 `op_Multiply` i) h
   )
 
-val lemma_load_mem64 : b:buffer64 -> i:int -> s:state -> Lemma
+val lemma_load_mem64 : b:buffer64 -> i:int -> h:mem -> Lemma
   (requires
-    i < Seq.length (buffer_as_seq s.mem b) /\
-    buffer_readable s.mem b
+    i < Seq.length (buffer_as_seq h b) /\
+    buffer_readable h b
   )
   (ensures
-    load_mem64 (buffer_addr b s + 8 `op_Multiply` i) s == buffer_read b i s.mem
+    load_mem64 (buffer_addr b h + 8 `op_Multiply` i) h == buffer_read b i h
   )
 
-val lemma_store_mem64 : b:buffer64 -> i:int -> v:nat64 -> s:state -> Lemma
+val lemma_store_mem64 : b:buffer64 -> i:int -> v:nat64 -> h:mem -> Lemma
   (requires
-    i < Seq.length (buffer_as_seq s.mem b) /\
-    buffer_readable s.mem b
+    i < Seq.length (buffer_as_seq h b) /\
+    buffer_readable h b
   )
   (ensures
-    (store_mem64 (buffer_addr b s + 8 `op_Multiply` i) v s).mem == buffer_write b i v s.mem
+    store_mem64 (buffer_addr b h + 8 `op_Multiply` i) v h == buffer_write b i v h
   )
 
-val lemma_valid_mem128 : b:buffer128 -> i:nat -> s:state -> Lemma
+val lemma_valid_mem128 : b:buffer128 -> i:nat -> h:mem -> Lemma
   (requires
-    i < Seq.length (buffer_as_seq s.mem b) /\
-    buffer_readable s.mem b
+    i < Seq.length (buffer_as_seq h b) /\
+    buffer_readable h b
   )
   (ensures
-    valid_mem128 (buffer_addr b s + 16 `op_Multiply` i) s
+    valid_mem128 (buffer_addr b h + 16 `op_Multiply` i) h
   )
 
-val lemma_load_mem128 : b:buffer128 -> i:int -> s:state -> Lemma
+val lemma_load_mem128 : b:buffer128 -> i:int -> h:mem -> Lemma
   (requires
-    i < Seq.length (buffer_as_seq s.mem b) /\
-    buffer_readable s.mem b
+    i < Seq.length (buffer_as_seq h b) /\
+    buffer_readable h b
   )
   (ensures
-    load_mem128 (buffer_addr b s + 16 `op_Multiply` i) s == buffer_read b i s.mem
+    load_mem128 (buffer_addr b h + 16 `op_Multiply` i) h == buffer_read b i h
   )
 
-val lemma_store_mem128 : b:buffer128 -> i:int -> v:quad32 -> s:state -> Lemma
+val lemma_store_mem128 : b:buffer128 -> i:int -> v:quad32 -> h:mem -> Lemma
   (requires
-    i < Seq.length (buffer_as_seq s.mem b) /\
-    buffer_readable s.mem b
+    i < Seq.length (buffer_as_seq h b) /\
+    buffer_readable h b
   )
   (ensures
-    (store_mem128 (buffer_addr b s + 16 `op_Multiply` i) v s).mem == buffer_write b i v s.mem
+    store_mem128 (buffer_addr b h + 16 `op_Multiply` i) v h == buffer_write b i v h
   )
 
-val lemma_store_load_mem64 : ptr:int -> v:nat64 -> s:state -> Lemma
-  (load_mem64 ptr (store_mem64 ptr v s) = v)
+val lemma_store_load_mem64 : ptr:int -> v:nat64 -> h:mem -> Lemma
+  (load_mem64 ptr (store_mem64 ptr v h) = v)
 
-val lemma_frame_store_mem64: i:int -> v:nat64 -> s:state -> Lemma (
-  let s' = store_mem64 i v s in
-  forall i'. i' <> i /\ valid_mem64 i s /\ valid_mem64 i' s ==> load_mem64 i' s = load_mem64 i' s')
+val lemma_frame_store_mem64: i:int -> v:nat64 -> h:mem -> Lemma (
+  let h' = store_mem64 i v h in
+  forall i'. i' <> i /\ valid_mem64 i h /\ valid_mem64 i' h ==> load_mem64 i' h = load_mem64 i' h')
 
-val lemma_valid_store_mem64: i:int -> v:nat64 -> s:state -> Lemma (
-  let s' = store_mem64 i v s in
-  forall j. valid_mem64 j s <==> valid_mem64 j s')
+val lemma_valid_store_mem64: i:int -> v:nat64 -> h:mem -> Lemma (
+  let h' = store_mem64 i v h in
+  forall j. valid_mem64 j h <==> valid_mem64 j h')
 
-val lemma_store_load_mem128 : ptr:int -> v:quad32 -> s:state -> Lemma
-  (load_mem128 ptr (store_mem128 ptr v s) = v)
+val lemma_store_load_mem128 : ptr:int -> v:quad32 -> h:mem -> Lemma
+  (load_mem128 ptr (store_mem128 ptr v h) = v)
 
-val lemma_frame_store_mem128: i:int -> v:quad32 -> s:state -> Lemma (
-  let s' = store_mem128 i v s in
-  forall i'. i' <> i /\ valid_mem128 i s /\ valid_mem128 i' s ==> load_mem128 i' s = load_mem128 i' s')
+val lemma_frame_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
+  let h' = store_mem128 i v h in
+  forall i'. i' <> i /\ valid_mem128 i h /\ valid_mem128 i' h ==> load_mem128 i' h = load_mem128 i' h')
 
-val lemma_valid_store_mem128: i:int -> v:quad32 -> s:state -> Lemma (
-  let s' = store_mem128 i v s in
-  forall j. valid_mem128 j s <==> valid_mem128 j s')
+val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
+  let h' = store_mem128 i v h in
+  forall j. valid_mem128 j h <==> valid_mem128 j h')

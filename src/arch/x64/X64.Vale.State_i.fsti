@@ -3,15 +3,23 @@ module X64.Vale.State_i
 
 open X64.Machine_s
 open X64.Vale
-module M = Memory_i_s
+module M = X64.Memory_i_s
+// TODO: Shouldn't refer to Interop64, only needed for addr_map type definition
+module I = Interop64
 
-noeq type state = {
+noeq type state' = {
   ok: bool;
   regs: Regs_i.t;
   xmms: Xmms_i.t;
   flags: nat64;
-  mem: mem;
+  addrs: I.addr_map;
+  ptrs: list M.buffer64;
+  mem: M.mem;
 }
+
+val valid_state: s:state' -> Type0
+
+type state = (s:state'{valid_state s})
 
 let reg_to_int (r:reg) : int =
   match r with
@@ -32,12 +40,13 @@ let reg_to_int (r:reg) : int =
   | R14 -> 14
   | R15 -> 15
 
+
 [@va_qattr]
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 [@va_qattr]
 unfold let eval_xmm (x:xmm) (s:state) : Types_s.quad32 = s.xmms x
 [@va_qattr]
-unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
+unfold let eval_mem (ptr:int) (s:state) : nat64 = M.load_mem64 ptr s
 
 [@va_qattr]
 let eval_maddr (m:maddr) (s:state) : int =
