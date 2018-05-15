@@ -276,7 +276,8 @@ val lemma_store_mem128 : b:buffer128 -> i:nat -> v:quad32 -> h:mem -> Lemma
   )
 
 val lemma_store_load_mem64 : ptr:int -> v:nat64 -> h:mem -> Lemma
-  (load_mem64 ptr (store_mem64 ptr v h) = v)
+  (requires valid_mem64 ptr h)
+  (ensures (load_mem64 ptr (store_mem64 ptr v h) = v))
 
 val lemma_frame_store_mem64: i:int -> v:nat64 -> h:mem -> Lemma (
   let h' = store_mem64 i v h in

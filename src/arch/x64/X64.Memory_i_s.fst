@@ -214,8 +214,22 @@ let rec valid_mem_aux addr ps (h:mem) : GTot (b:bool{
 
 let valid_mem64 ptr h = valid_mem_aux ptr h.ptrs h
 
-// TODO: Probably a similar approach baser on buffer_read?
-let load_mem64 ptr s = admit() //S.get_heap_val64 ptr s.state.S.mem
+let rec load_mem_aux addr (ps:list buffer64) (h:mem{forall x. List.memP x ps ==> List.memP x h.ptrs }) : 
+  GTot nat64 =
+  match ps with
+  | [] -> 0
+  | a::q ->
+    let base = buffer_addr a h in
+    let n = B.length a in
+    if addr_in_ptr addr a h then
+    begin
+      buffer_read a (get_addr_in_ptr n base addr 0) h
+    end
+    else load_mem_aux addr q h
+
+let load_mem64 ptr h =
+  if not (valid_mem64 ptr h) then 0
+  else load_mem_aux ptr h.ptrs h
 
 let rec store_mem_aux addr (ps:list buffer64) (v:nat64) (h:mem{forall x. List.memP x ps ==> List.memP x h.ptrs }) : 
   GTot (h1:mem{h.addrs == h1.addrs /\ h.ptrs == h1.ptrs /\ (forall (b:buffer64). B.live h.hs b <==> B.live h1.hs b)}) =
@@ -374,11 +388,6 @@ let rec store_mem_aux addr (ps:list buffer64) (v:nat64) (h:mem{forall x. List.me
 //     written_buffer_down b i v ps h;
 //     ()
 
-// let rec get_addr_ptr (ptr:int) (h:mem) (ps:list buffer64{valid_mem_aux ptr ps h}) : 
-//   GTot (b:buffer64{List.memP b ps /\ addr_in_ptr ptr b h}) =
-//   match ps with
-//   // The list cannot be empty because of the mem predicate
-//   | a::q -> if addr_in_ptr ptr a h then a else get_addr_ptr ptr h q
 
 // let store_buffer_aux_down_mem (ptr:int) (v:nat64) (h:mem{valid_mem64 ptr h}) : Lemma (
 //   let mem1 = I.down_mem64 h.hs h.addrs h.ptrs in
@@ -435,7 +444,25 @@ let store_mem128 ptr v h = admit()
 let lemma_valid_mem64 b i h = ()
 
 // TODO: Load lemma
-let lemma_load_mem64 b i h = admit()
+let lemma_load_mem64 b i h =
+  let addr = buffer_addr b h + 8 `op_Multiply` i in
+  lemma_valid_mem64 b i h;
+  let rec aux (ps:list buffer64{I.list_disjoint_or_eq ps})
+    (h0:mem{h == h0 /\ (forall x. List.memP x ps ==> List.memP x h0.ptrs)}) :  
+    Lemma (requires (List.memP b ps /\ i < B.length b) )
+    (ensures (load_mem_aux addr ps h0 == buffer_read b i h0)) = 
+    match ps with
+    | [] -> ()
+    | a::q ->
+      if addr_in_ptr addr a h0 then begin
+  	assert (I.disjoint_or_eq a b);
+  	()
+      end
+      else begin
+        assert (b =!= a);
+  	aux q h0
+      end
+  in aux h.ptrs h  
 
 let lemma_store_mem64 b i v h =
   let addr = buffer_addr b h + 8 `op_Multiply` i in
@@ -462,10 +489,14 @@ let lemma_valid_mem128 b i h = admit()
 let lemma_load_mem128 b i h = admit()
 let lemma_store_mem128 b i v h = admit()
 
+let rec get_addr_ptr (ptr:int) (h:mem) (ps:list buffer64{valid_mem_aux ptr ps h}) : 
+  GTot (b:buffer64{List.memP b ps /\ addr_in_ptr ptr b h}) =
+  match ps with
+  // The list cannot be empty because of the mem predicate
+  | a::q -> if addr_in_ptr ptr a h then a else get_addr_ptr ptr h q
+
 let lemma_store_load_mem64 ptr v h = admit()
-
 let lemma_frame_store_mem64 i v h = admit()
-
 let lemma_valid_store_mem64 i v h = ()
 
 let lemma_store_load_mem128 ptr v h = admit()
