@@ -137,3 +137,9 @@ let seq_to_four_LE_injective () :
   =
   generic_injective_proof seq_to_four_LE four_to_seq_LE four_to_seq_to_four_LE
 *)
+
+let append_distributes_seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) (y:seq a{length y % 4 == 0}) :
+  Lemma (seq_to_seq_four_LE (x @| y) == seq_to_seq_four_LE x @| seq_to_seq_four_LE y)
+  =
+  assert (equal (seq_to_seq_four_LE (x @| y)) (seq_to_seq_four_LE x @| seq_to_seq_four_LE y));
+  ()

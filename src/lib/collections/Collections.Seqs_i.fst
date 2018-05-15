@@ -74,3 +74,10 @@ let slice_seq_map_commute (#a #b:Type) (f:a -> b) (s:seq a) (i:nat) (j:nat{ i <=
   =
   assert (equal (slice (seq_map f s) i j) (seq_map f (slice s i j)));
   ()
+
+let append_distributes_seq_map (#a #b:Type) (f:a -> b) (s1 s2:seq a) : 
+  Lemma (seq_map f (s1 @| s2) == seq_map f s1 @| seq_map f s2)
+  =
+  assert (equal (seq_map f (s1 @| s2)) (seq_map f s1 @| seq_map f s2));
+  ()
+  

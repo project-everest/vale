@@ -199,6 +199,40 @@ let le_seq_quad32_to_bytes_of_singleton (q:quad32) :
   four_to_seq_LE_is_seq_four_to_seq_LE q;
   ()
 
+(*
+
+let seq_to_four_LE (#a:Type) (s:seq4 a) : four a =
+  Mkfour (index s 0) (index s 1) (index s 2) (index s 3)
+  
+let seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) : seq (four a) =
+  let f (n:nat{n < length x / 4}) = Mkfour
+    (index x (n * 4)) (index x (n * 4 + 1)) (index x (n * 4 + 2)) (index x (n * 4 + 3))
+    in
+  init (length x / 4) f
+
+let seq_nat8_to_seq_nat32_LE (x:seq nat8{length x % 4 == 0}) : seq nat32 =
+  seq_map (four_to_nat 8) (seq_to_seq_four_LE x)
+
+*)  
+let seq_to_four_LE_is_seq_to_seq_four_LE (#a:Type) (s:seq4 a) : Lemma
+  (create 1 (seq_to_four_LE s) == seq_to_seq_four_LE s)
+  =
+  assert (equal (create 1 (seq_to_four_LE s)) (seq_to_seq_four_LE s));
+  ()
+
+let le_bytes_to_seq_quad_of_singleton (q:quad32) (b:seq nat8 { length b == 16 }) : Lemma 
+  (requires q == le_bytes_to_quad32 b)
+  (ensures create 1 q == le_bytes_to_seq_quad32 b)
+  =
+  seq_to_four_LE_is_seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE b));
+  // q == le_bytes_to_quad32 b
+  //   == seq_to_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE b))
+  //  
+
+  //     == seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE b))
+  // le_bytes_to_seq_quad32 b == seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE b)
+  ()
+
 open FStar.Mul
 let slice_commutes_seq_four_to_seq_LE (#a:Type) (s:seq (four a)) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :
   Lemma(slice (seq_four_to_seq_LE s) (n * 4) (n' * 4) ==
@@ -232,3 +266,31 @@ let slice_commutes_le_seq_quad32_to_bytes0 (s:seq quad32) (n:nat{n <= length s})
         le_seq_quad32_to_bytes (slice s 0 n))
   =
   slice_commutes_le_seq_quad32_to_bytes s 0 n
+
+(*
+let seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) : seq (four a) =
+  let f (n:nat{n < length x / 4}) = Mkfour
+    (index x (n * 4)) (index x (n * 4 + 1)) (index x (n * 4 + 2)) (index x (n * 4 + 3))
+    in
+  init (length x / 4) f
+
+let seq_nat8_to_seq_nat32_LE (x:seq nat8{length x % 4 == 0}) : seq nat32 =
+  seq_map (four_to_nat 8) (seq_to_seq_four_LE x)
+*)  
+let rec append_distributes_le_bytes_to_seq_quad32 (s1:seq nat8 { length s1 % 16 == 0 }) (s2:seq nat8 { length s2 % 16 == 0 }) :
+  Lemma(le_bytes_to_seq_quad32 (s1 @| s2) == (le_bytes_to_seq_quad32 s1) @| (le_bytes_to_seq_quad32 s2))
+  =
+  let s1' = seq_nat8_to_seq_nat32_LE s1 in
+  let s2' = seq_nat8_to_seq_nat32_LE s2 in
+  // (le_bytes_to_seq_quad32 s1) @| (le_bytes_to_seq_quad32 s2)) 
+  // =  { Definition of le_bytes_to_seq_quad32 }
+  // seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE s1) @| seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE s2)  
+  append_distributes_seq_to_seq_four_LE s1' s2';
+  // = 
+  // seq_to_seq_four_LE ((seq_nat8_to_seq_nat32_LE s1) @| (seq_nat8_to_seq_nat32_LE s2))
+  append_distributes_seq_map (four_to_nat 8) (seq_to_seq_four_LE s1) (seq_to_seq_four_LE s2);
+  // seq_to_seq_four_LE (seq_map (four_to_nat 8) ((seq_to_seq_four_LE s1) @| (seq_to_seq_four_LE s2)))
+  append_distributes_seq_to_seq_four_LE s1 s2;
+  // seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE (s1 @| s2)))
+  // le_bytes_to_seq_quad32 (s1 @| s2)
+  ()
