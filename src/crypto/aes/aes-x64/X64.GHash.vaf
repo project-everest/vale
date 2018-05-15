@@ -232,28 +232,21 @@ procedure {:quick} compute_ghash_incremental_partial(
 }
 
 #reset-options "--z3rlimit 5"
+// Purely proof work to show that when there are no extra bytes, there's no work left to do
 procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
     ghost in_b:buffer128,
-    ghost old_io:quad32
+    ghost old_io:quad32,
+    ghost old_in_ptr:nat64,
+    ghost num_bytes:nat64,
+    ghost io:quad32,
+    ghost h:quad32
     )
-    lets in_ptr @= rax; num_bytes @= r11; io @= xmm1; mask @= xmm8; h @= xmm11;
-
-    reads
-        in_ptr; num_bytes; h; mask; mem;
-
-    modifies
-        rcx; rdx; r9; r12;
-        io; efl; 
-
-        // ReduceMul128_LE touches almost everything
-        xmm2; xmm3; xmm4; xmm5; xmm6;
-
+    reads mem;
     requires
         // GHash reqs
-        num_bytes > 0 ==> validSrcAddrs128(mem, in_ptr, in_b, bytes_to_quad_size(num_bytes));
-        num_bytes > 0 ==> in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        num_bytes > 0 ==> validSrcAddrs128(mem, old_in_ptr, in_b, bytes_to_quad_size(num_bytes));
+        num_bytes > 0 ==> old_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         buffer_length(in_b) == bytes_to_quad_size(num_bytes);
-        mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         //len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
         let input := slice_work_around(buffer128_as_seq(mem, in_b), num_bytes / 16);
@@ -469,7 +462,7 @@ procedure {:quick} ghash_incremental_bytes(
         assert rcx == num_bytes % 16;
 
         if (rcx == 0) {
-            ghash_incremental_bytes_no_extra(in_b, old(io));
+            ghash_incremental_bytes_no_extra(in_b, old(io), old(in_ptr), old(num_bytes), io, h);
         } else {
             ghash_incremental_bytes_extra(in_b, old(in_ptr), old(io), old(num_bytes)); 
         }

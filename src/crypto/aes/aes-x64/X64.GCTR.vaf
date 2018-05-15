@@ -217,7 +217,7 @@ procedure {:quick} gctr_bytes_extra_work(
         r8; in_ptr; out_ptr; icb; 
 
     modifies
-        rdx; r11; r12; xmm0; xmm1; xmm2; xmm4; mem; efl;
+        rdx; r12; xmm0; xmm1; xmm2; xmm4; mem; efl;
 
     requires
         // GCTR reqs
@@ -251,6 +251,7 @@ procedure {:quick} gctr_bytes_extra_work(
             slice_work_around(buffer128_as_seq(mem, out_b), num_blocks) == 
         old(slice_work_around(buffer128_as_seq(mem, out_b), num_blocks));
         buffer128_read(out_b, num_blocks, mem) == gctr_encrypt_block(icb_BE, buffer128_read(in_b, num_blocks, mem), AES_128, key, num_blocks);
+        xmm1 == buffer128_read(out_b, num_blocks, mem);
 {
     ghost var num_blocks := num_bytes / 16;
 
@@ -290,7 +291,7 @@ procedure {:quick} gctr_bytes_extra(
         r8; in_ptr; out_ptr; 
 
     modifies
-        rdx; r11; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
+        rdx; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
 
     requires
         // GCTR reqs
@@ -320,11 +321,13 @@ procedure {:quick} gctr_bytes_extra(
         gctr_partial(num_blocks, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
         icb == inc32(icb_BE, num_blocks);
     ensures
+        let num_blocks := num_bytes / 16;
         validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         modifies_buffer128(out_b, old(mem), mem);
         let plain  := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem,  in_b)), 0, num_bytes);
         let cipher := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), 0, num_bytes);
         cipher == gctr_encrypt_LE(icb_BE, plain, AES_128, key);
+        xmm1 == buffer128_read(out_b, num_blocks, mem);
 {
     ghost var num_blocks := num_bytes / 16;
     gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 
@@ -349,14 +352,10 @@ procedure {:quick} gctr_bytes_no_extra(
     ghost keys_b:buffer128,
     ghost orig_in_ptr:nat64,
     ghost orig_out_ptr:nat64,
-    ghost num_bytes:nat
+    ghost num_bytes:nat,
+    ghost icb:quad32
     )
-    lets in_ptr @= r9; out_ptr @= r10; icb @= xmm7;
-    reads
-        r8; in_ptr; out_ptr; 
-
-    modifies
-        rdx; r11; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
+    reads mem;
 
     requires
         // GCTR reqs
@@ -371,15 +370,13 @@ procedure {:quick} gctr_bytes_no_extra(
         // AES reqs
         length(round_keys) == 11;
         round_keys == key_to_round_keys_LE(AES_128, key);
-        r8 == buffer_addr(keys_b);
-        validSrcAddrs128(mem, r8, keys_b, 11);
-        buffer128_as_seq(mem, keys_b) == round_keys;
+//        r8 == buffer_addr(keys_b);
+//        validSrcAddrs128(mem, r8, keys_b, 11);
+//        buffer128_as_seq(mem, keys_b) == round_keys;
 
         // Extra reqs
         let num_blocks := num_bytes / 16;
         num_bytes % 16 == 0;
-        in_ptr  == orig_in_ptr  + 16 * num_blocks;
-        out_ptr == orig_out_ptr + 16 * num_blocks;
         gctr_partial(num_blocks, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
         icb == inc32(icb_BE, num_blocks);
     ensures
@@ -465,7 +462,7 @@ procedure {:quick} gctr_bytes(
     assert icb == inc32(icb_BE, num_blocks);
 
     if (r11 == 0) {
-        gctr_bytes_no_extra(icb_BE, in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
+        gctr_bytes_no_extra(icb_BE, in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes), icb);
     } else {
         gctr_bytes_extra(icb_BE, in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
     }

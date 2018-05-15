@@ -134,7 +134,7 @@ let lemma_ghash_incremental_bytes_extra_helper (h y_init y_mid y_final:quad32) (
   assert (padded_bytes' == le_seq_quad32_to_bytes full_blocks @| padded_bytes);
 
   // Start deconstructing input_quads
-  append_commutes_le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes full_blocks) padded_bytes; // Distribute the le_bytes_to_seq_quad32
+  append_distributes_le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes full_blocks) padded_bytes; // Distribute the le_bytes_to_seq_quad32
   assert (input_quads == (le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes full_blocks)) @| (le_bytes_to_seq_quad32 padded_bytes));
   le_bytes_to_seq_quad32_to_bytes (slice_work_around input num_blocks);
   assert (input_quads == full_blocks @| (le_bytes_to_seq_quad32 padded_bytes));
