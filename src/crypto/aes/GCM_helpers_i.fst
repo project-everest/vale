@@ -31,7 +31,8 @@ let no_extra_bytes_helper (s:seq quad32) (num_bytes:int) : Lemma
   (requires 0 <= num_bytes /\
             num_bytes % 16 == 0 /\
             length s == bytes_to_quad_size num_bytes)
-  (ensures slice (le_seq_quad32_to_bytes s) 0 num_bytes == le_seq_quad32_to_bytes s)
+  (ensures slice (le_seq_quad32_to_bytes s) 0 num_bytes == le_seq_quad32_to_bytes s /\
+           slice_work_around s (num_bytes / 16) == s)
   =
   ()
 
