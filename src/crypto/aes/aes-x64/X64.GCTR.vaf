@@ -301,7 +301,7 @@ procedure {:quick} gctr_bytes_extra(
         validDstAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         orig_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         orig_out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32 /\ 4096 * num_bytes < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32;// /\ 4096 * num_bytes < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -365,7 +365,7 @@ procedure {:quick} gctr_bytes_no_extra(
         validDstAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         orig_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         orig_out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32 /\ 4096 * num_bytes < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32; // /\ 4096 * num_bytes < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;

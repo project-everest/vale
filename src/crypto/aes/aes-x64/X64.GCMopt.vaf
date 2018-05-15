@@ -77,7 +77,7 @@ procedure {:quick} gcm_one_pass_blocks(
         validDstAddrs128(mem, out_ptr, out_b, len);
         in_ptr  + 16 * len < pow2_64;
         out_ptr + 16 * len < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len /\ 256 * buffer_length(in_b) < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         // AES reqs
@@ -126,7 +126,7 @@ procedure {:quick} gcm_one_pass_blocks(
             validDstAddrs128(mem, out_ptr, out_b, len);
             in_ptr  + 16 * len < pow2_64;
             out_ptr + 16 * len < pow2_64;
-            buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == len; 
+            buffer_length(in_b) == buffer_length(out_b); 
 
             // AES reqs
             length(round_keys) == 11;
@@ -180,7 +180,8 @@ procedure {:quick} gcm_one_pass_blocks(
 //    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
-procedure {:quick}  gcm_one_pass(
+#reset-options "--z3rlimit 20"
+procedure {:quick} {:verify true} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
     ghost key:aes_key_LE(AES_128),
@@ -193,7 +194,7 @@ procedure {:quick}  gcm_one_pass(
         r8; out_ptr; mask; h;
 
     modifies
-        in_ptr; num_bytes; rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
+        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -203,7 +204,9 @@ procedure {:quick}  gcm_one_pass(
         validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
         in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32;
+        buffer_length(in_b)  == buffer_length(out_b) /\ 
+        buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 
+        256 * buffer_length(in_b) < pow2_32;
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         // AES reqs
@@ -213,30 +216,30 @@ procedure {:quick}  gcm_one_pass(
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
-        modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
-
-        // GCTR
-        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
-        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)), old(num_bytes));
-        cipher == gctr_encrypt_LE(old(icb), plain, AES_128, key);
-
-        //gctr_partial(bytes_to_quad_size(num_bytes), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
-        icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
-
-        // GHash
-        num_bytes == 0 ==> hash == old(hash); 
-
-        let cipher_padded_bytes := pad_to_128_bits(cipher);
-        let cipher_padded_quads := le_bytes_to_seq_quad32(cipher_padded_bytes);
-        num_bytes > 0 ==> length(cipher_padded_quads) > 0 /\ 
-            hash == ghash_incremental(h, old(hash), cipher_padded_quads);
+//        modifies_buffer128(out_b, old(mem), mem);
+//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+//
+//        // GCTR
+//        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
+//        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)), old(num_bytes));
+//        cipher == gctr_encrypt_LE(old(icb), make_gctr_plain_LE(plain), AES_128, key);
+//
+//        //gctr_partial(bytes_to_quad_size(num_bytes), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+//        icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
+//
+//        // GHash
+//        num_bytes == 0 ==> hash == old(hash); 
+//
+//        let cipher_padded_bytes := pad_to_128_bits(cipher);
+//        let cipher_padded_quads := le_bytes_to_seq_quad32(cipher_padded_bytes);
+//        num_bytes > 0 ==> length(cipher_padded_quads) > 0 /\ 
+//            hash == ghash_incremental(h, old(hash), cipher_padded_quads);
 {
     if (num_bytes > 0) {
         lemma_poly_bits64();
-        Mov64(r12, num_bytes);
-        And64(r12, 15);
-        assert r12 == num_bytes % 16;
+        Mov64(rsi, num_bytes);
+        And64(rsi, 15);
+        assert rsi == num_bytes % 16;
         Shr64(num_bytes, 4);
         ghost var num_blocks := old(num_bytes) / 16;
         assert rcx == num_blocks;
@@ -244,12 +247,14 @@ procedure {:quick}  gcm_one_pass(
         gcm_one_pass_blocks(in_b, out_b, key, round_keys, keys_b);
         assert icb == inc32(old(icb), num_blocks);
 
-        if (r12 == 0) {
+        if (rsi == 0) {
             gctr_bytes_no_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes), icb);
-            ghash_incremental_bytes_no_extra(out_b, old(hash), old(in_ptr), old(num_bytes), hash, h);
+            ghash_incremental_bytes_no_extra(out_b, old(hash), old(out_ptr), old(num_bytes), hash, h);
         } else {
             gctr_bytes_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
-            ghash_incremental_bytes_extra(out_b, old(in_ptr), old(hash), old(num_bytes)); 
+            Mov64(rcx, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rcx
+            Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
+            ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes)); 
         }
     }
 }
@@ -272,7 +277,7 @@ procedure {:quick} gcm_core(
         out_ptr; plain_ptr; keys_ptr; plain_num_bytes; auth_num_bytes; 
 
     modifies
-        rax; rcx; rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
+        rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
         mem; efl; 
 
@@ -501,7 +506,7 @@ procedure {:quick} gcm_stdcall_inner(
     ghost keys_b:buffer128
     )
     modifies
-        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
+        rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
         mem; efl; 
     lets
         args_ptr := r9;
