@@ -77,7 +77,7 @@ assume val havoc : state -> ins -> nat64
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 
-let get_heap_val64 (ptr:int) (mem:heap) =
+let get_heap_val64 (ptr:int) (mem:heap) : nat64 =
     (mem.[ptr]) + 
     (mem.[ptr+1]) `op_Multiply` 0x100 + 
     (mem.[ptr+2]) `op_Multiply` 0x10000 +
@@ -87,7 +87,7 @@ let get_heap_val64 (ptr:int) (mem:heap) =
     (mem.[ptr+6]) `op_Multiply` 0x1000000000000 +
     (mem.[ptr+7]) `op_Multiply` 0x100000000000000
 
-let get_heap_val32 (ptr:int) (mem:heap) =
+let get_heap_val32 (ptr:int) (mem:heap) : nat32 =
     (mem.[ptr]) + 
     (mem.[ptr+1]) `op_Multiply` 0x100 + 
     (mem.[ptr+2]) `op_Multiply` 0x10000 +
