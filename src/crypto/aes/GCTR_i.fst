@@ -69,7 +69,7 @@ let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE
   if length plain = 0 then ()
   else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
 
-#reset-options "--z3rlimit 30" 
+#reset-options "--z3rlimit 40" 
 let rec gctr_encrypt_length (icb_BE:quad32) (plain:gctr_plain_LE)
                              (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(length (gctr_encrypt_LE icb_BE plain alg key) == length plain)
