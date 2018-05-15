@@ -230,7 +230,7 @@ val lemma_valid_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma
     valid_mem64 (buffer_addr b h + 8 `op_Multiply` i) h
   )
 
-val lemma_load_mem64 : b:buffer64 -> i:int -> h:mem -> Lemma
+val lemma_load_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma
   (requires
     i < Seq.length (buffer_as_seq h b) /\
     buffer_readable h b
@@ -239,7 +239,7 @@ val lemma_load_mem64 : b:buffer64 -> i:int -> h:mem -> Lemma
     load_mem64 (buffer_addr b h + 8 `op_Multiply` i) h == buffer_read b i h
   )
 
-val lemma_store_mem64 : b:buffer64 -> i:int -> v:nat64 -> h:mem -> Lemma
+val lemma_store_mem64 : b:buffer64 -> i:nat-> v:nat64 -> h:mem -> Lemma
   (requires
     i < Seq.length (buffer_as_seq h b) /\
     buffer_readable h b
@@ -257,7 +257,7 @@ val lemma_valid_mem128 : b:buffer128 -> i:nat -> h:mem -> Lemma
     valid_mem128 (buffer_addr b h + 16 `op_Multiply` i) h
   )
 
-val lemma_load_mem128 : b:buffer128 -> i:int -> h:mem -> Lemma
+val lemma_load_mem128 : b:buffer128 -> i:nat -> h:mem -> Lemma
   (requires
     i < Seq.length (buffer_as_seq h b) /\
     buffer_readable h b
@@ -266,7 +266,7 @@ val lemma_load_mem128 : b:buffer128 -> i:int -> h:mem -> Lemma
     load_mem128 (buffer_addr b h + 16 `op_Multiply` i) h == buffer_read b i h
   )
 
-val lemma_store_mem128 : b:buffer128 -> i:int -> v:quad32 -> h:mem -> Lemma
+val lemma_store_mem128 : b:buffer128 -> i:nat -> v:quad32 -> h:mem -> Lemma
   (requires
     i < Seq.length (buffer_as_seq h b) /\
     buffer_readable h b
