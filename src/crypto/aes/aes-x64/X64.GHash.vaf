@@ -190,10 +190,11 @@ procedure {:quick} compute_ghash_incremental_partial(
         len == 0 ==> rdx == old(rdx) /\ r9 == old(r9) /\ xmm1 == old(xmm1) /\ io == old(io);
         let input := slice_work_around(buffer128_as_seq(mem, in_b), len);
         len > 0 ==> length(input) > 0 /\ io == ghash_incremental(h, old(io), input);
+        r9 == in_ptr + 16 * len;
 {
+    Mov64(r9, in_ptr);
     if (len != 0) {
         Mov64(rdx, 0);
-        Mov64(r9, in_ptr);
 
         while (rdx != len)
             invariant
@@ -265,7 +266,7 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
         let padded_bytes := pad_to_128_bits(input_bytes);
         let input_quads := le_bytes_to_seq_quad32(padded_bytes);
         num_bytes > 0 ==> length(input_quads) > 0 /\ 
-                          io == ghash_incremental(h, old(io), input_quads);
+                          io == ghash_incremental(h, old_io, input_quads);
 {
     ghost var num_blocks := num_bytes / 16;
     ghost var input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
@@ -297,7 +298,7 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
  */ 
 #reset-options "--z3rlimit 40"
 procedure {:quick} compute_pad_to_128_bits()
-    lets io @= xmm2; num_bytes @= r11; tmp @= rax; mask @= rdx;
+    lets io @= xmm2; num_bytes @= rcx; tmp @= rax; mask @= rdx;
 
     reads num_bytes;
     modifies io; tmp; mask; efl;
@@ -353,19 +354,19 @@ procedure {:quick} compute_pad_to_128_bits()
 }
 
 #reset-options "--z3rlimit 10"
-procedure {:quick} {:verify true} ghash_incremental_bytes_extra(
+procedure {:quick} ghash_incremental_bytes_extra(
     ghost in_b:buffer128,
     ghost orig_in_ptr:nat64,
     ghost old_io:quad32,
     ghost orig_num_bytes:nat64
     )
-    lets in_ptr @= rax; num_bytes @= r11; io @= xmm1; mask @= xmm8; h @= xmm11;
+    lets in_ptr @= r9; num_bytes @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11;
 
     reads
-        num_bytes; h; mask; mem;
+        num_bytes; h; mask; mem; in_ptr;
 
     modifies
-        rax; rcx; rdx; r9; r12;
+        rax; rdx; r12;
         io; efl; 
 
         // ReduceMul128_LE touches almost everything
@@ -411,17 +412,17 @@ procedure {:quick} {:verify true} ghash_incremental_bytes_extra(
 }
 
 
-#reset-options "--z3rlimit 20"
-procedure {:quick} ghash_incremental_bytes(
+#reset-options "--z3rlimit 10"
+procedure {:quick} {:verify true} ghash_incremental_bytes(
     ghost in_b:buffer128
     )
     lets in_ptr @= rax; num_bytes @= r11; io @= xmm1; mask @= xmm8; h @= xmm11;
 
     reads
-        in_ptr; num_bytes; h; mask; mem;
+        num_bytes; h; mask; mem;
 
     modifies
-        rcx; rdx; r9; r12;
+        in_ptr; rcx; rdx; r9; r12;
         io; efl; 
 
         // ReduceMul128_LE touches almost everything
@@ -447,21 +448,23 @@ procedure {:quick} ghash_incremental_bytes(
 
     lemma_poly_bits64();
 
-    Mov64(rcx, num_bytes);
-    Shr64(rcx, 4);
-    assert rcx == num_blocks;
- 
-    compute_ghash_incremental_partial(in_b);
+    if (num_bytes > 0) {
+        Mov64(rcx, num_bytes);
+        Shr64(rcx, 4);
+        assert rcx == num_blocks;
+     
+        compute_ghash_incremental_partial(in_b);
 
-    Mov64(rcx, num_bytes);
-    And64(rcx, 15);
-    assert rcx == num_bytes % 16;
+        Mov64(rcx, num_bytes);
+        And64(rcx, 15);
+        assert rcx == num_bytes % 16;
 
-    if (rcx == 0) {
-        ghash_incremental_bytes_no_extra(in_b, old(io));
-    } else {
+        if (rcx == 0) {
+            ghash_incremental_bytes_no_extra(in_b, old(io));
+        } else {
+            ghash_incremental_bytes_extra(in_b, old(in_ptr), old(io), old(num_bytes)); 
+        }
     }
-
 }
 
 
