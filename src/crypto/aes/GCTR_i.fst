@@ -19,7 +19,29 @@ let gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) 
          gctr_encrypt_block (inc32 icb_BE i) plain_LE alg key 0)
   =
   ()
-  
+
+let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algorithm) (key:aes_key_LE alg) : 
+  Lemma (let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
+         let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
+         cipher = gctr_encrypt_LE icb_BE (make_gctr_plain_LE plain) alg key)
+  =
+  let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
+  let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
+  assert (plain == createEmpty);
+  assert (cipher == createEmpty);
+  assert (length plain == 0);
+  assert (make_gctr_plain_LE plain == createEmpty);
+  let num_extra = (length (make_gctr_plain_LE plain)) % 16 in
+  assert (num_extra == 0);
+  let plain_quads_LE = le_bytes_to_seq_quad32 plain in
+  let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in
+  assert (equal plain_quads_LE createEmpty);     // OBSERVE
+  assert (plain_quads_LE == createEmpty);
+  assert (cipher_quads_LE == createEmpty);
+  assert (equal (le_seq_quad32_to_bytes cipher_quads_LE) createEmpty);  // OBSERVE
+  //admit();
+  ()
+
 (*
 let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
   Tot (s':seq b { length s' == length s /\
