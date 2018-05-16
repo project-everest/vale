@@ -107,7 +107,7 @@ verify_options = {
   '.fsti': BuildOptions(fstar_default_args),
 #  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
   'src/arch/x64/Interop64.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
-  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','') + ' --use_two_phase_tc true'),
+  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces', '')),
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti

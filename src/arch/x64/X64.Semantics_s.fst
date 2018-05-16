@@ -65,10 +65,16 @@ let update_xmm' (x:xmm) (v:quad32) (s:state) : state = {s with state = S.update_
 
 // TODO: Mem operations
 let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
-  { s with mem = store_mem64 ptr v s.mem }
+  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
+  else s.state; mem = store_mem64 ptr v s.mem } in
+  valid_state_store_mem64 ptr v s;
+  s'
 
 let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
-  { s with mem = store_mem128 ptr v s.mem }
+  let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state
+    else s.state ; mem = store_mem128 ptr v s.mem } in
+ valid_state_store_mem128 ptr v s;
+ s'
 
 let valid_maddr (m:maddr) (s:state) : GTot bool =
   valid_mem64 (eval_maddr m s) s.mem
@@ -153,14 +159,14 @@ let update_of (flags:nat64) (new_of:bool) : (new_flags:nat64{overflow new_flags 
       flags
 
 (* Define a stateful monad to simplify defining the instruction semantics *)
-let st (a:Type) = state -> a * state
+let st (a:Type) = state -> GTot (a * state)
 
 unfold
-let return (#a:Type) (x:a) : st a =
+let return (#a:Type) (x:a) : GTot (st a) =
   fun s -> x, s
 
 unfold
-let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :GTot (st b) =
+let bind (#a:Type) (#b:Type) (m:st a) (f:a -> GTot (st b)) :GTot (st b) =
 fun s0 ->
   let x, s1 = m s0 in
   let y, s2 = f x s1 in
@@ -186,7 +192,7 @@ let check_imm (valid:bool) : GTot (st unit) =
     fail
 
 unfold
-let check (valid: state -> bool) : GTot (st unit) =
+let check (valid: state -> GTot bool) : GTot (st unit) =
   s <-- get;
   if valid s then
     return ()
@@ -198,47 +204,47 @@ let run (f:st unit) (s:state) : GTot state = snd (f s)
 
 (* Monadic update operations *)
 unfold
-let update_operand_preserve_flags (dst:operand) (v:nat64) :st unit =
+let update_operand_preserve_flags (dst:operand) (v:nat64) :GTot (st unit) =
   check (valid_dst_operand dst);;
   s <-- get;
   set (update_operand_preserve_flags' dst v s)
 
 unfold
-let update_mov128_op_preserve_flags (dst:mov128_op) (v:quad32) :st unit =
+let update_mov128_op_preserve_flags (dst:mov128_op) (v:quad32) : GTot (st unit) =
   check (valid_mov128_op dst);;
   s <-- get;
   set (update_mov128_op_preserve_flags' dst v s)
 
 // Default version havocs flags
 unfold
-let update_operand (dst:operand) (ins:ins) (v:nat64) :st unit =
+let update_operand (dst:operand) (ins:ins) (v:nat64) :GTot (st unit) =
   check (valid_dst_operand dst);;
   s <-- get;
   set (update_operand' dst ins v s)
 
-let update_reg (r:reg) (v:nat64) :st unit =
+let update_reg (r:reg) (v:nat64) : GTot (st unit) =
   s <-- get;
   set (update_reg' r v s)
 
-let update_xmm (x:xmm)  (ins:ins) (v:quad32) :st unit =
+let update_xmm (x:xmm)  (ins:ins) (v:quad32) : GTot (st unit) =
   s <-- get;
   let s' = update_xmm' x v s in
   set (  { s' with state = {s'.state with S.flags = havoc s ins } } )
 
-let update_xmm_preserve_flags (x:xmm) (v:quad32) :st unit =
+let update_xmm_preserve_flags (x:xmm) (v:quad32) : GTot (st unit) =
   s <-- get;
   set ( update_xmm' x v s )
 
-let update_flags (new_flags:nat64) :st unit =
+let update_flags (new_flags:nat64) : GTot (st unit) =
   s <-- get;
   set ( { s with state = {s.state with S.flags = new_flags } } )
 
-let update_cf_of (new_cf new_of:bool) :st unit =
+let update_cf_of (new_cf new_of:bool) : GTot (st unit) =
   s <-- get;
   set ( { s with state = {s.state with S.flags = update_cf (update_of s.state.S.flags new_of) new_cf } } )
 
 (* Core definition of instruction semantics *)
-let eval_ins (ins:ins) : st unit =
+let eval_ins (ins:ins) : GTot (st unit) =
   s <-- get;
   match ins with
   | S.Mov64 dst src ->
@@ -458,9 +464,9 @@ let eval_ins (ins:ins) : st unit =
  * None case arises when the while loop runs out of fuel
  *)
 // TODO: IfElse and While should havoc the flags
-val eval_code:  c:code           -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
-val eval_codes: l:codes          -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; l])
-val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
+val eval_code:  c:code           -> fuel:nat -> s:state -> GTot (option state) (decreases %[fuel; c])
+val eval_codes: l:codes          -> fuel:nat -> s:state -> GTot (option state) (decreases %[fuel; l])
+val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> GTot (option state) (decreases %[fuel; c])
 
 let rec eval_code c fuel s =
   match c with
@@ -490,11 +496,11 @@ and eval_while b c fuel s0 =
 
 assume val bytes_valid (m:maddr) (s:state) : Lemma
   (valid_maddr m s ==> S.valid_maddr m s.state)
-  [SMTPat valid_maddr m s]
+  [SMTPat (valid_maddr m s)]
 
 assume val bytes_valid128 (m:maddr) (s:state) : Lemma
   (valid_maddr128 m s ==> S.valid_maddr128 m s.state)
-  [SMTPat valid_maddr128 m s]
+  [SMTPat (valid_maddr128 m s)]
 
 
 // This verifies but is very slow

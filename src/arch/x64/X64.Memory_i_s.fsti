@@ -61,6 +61,11 @@ noeq type state' = {
 
 val valid_state (s:state') : Type0
 
+val frame_valid (s1:state') : Lemma 
+   (forall s2. s1.state.S.mem == s2.state.S.mem /\ s1.mem == s2.mem ==>
+     (valid_state s1 <==> valid_state s2))
+   [SMTPat (valid_state s1)]
+
 type state = (s:state'{valid_state s})
 
 val loc_readable (h:mem) (s:loc) : GTot Type0
@@ -297,3 +302,13 @@ val lemma_frame_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
 val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
   let h' = store_mem128 i v h in
   forall j. valid_mem128 j h <==> valid_mem128 j h')
+
+val valid_state_store_mem64: ptr:int -> v:nat64 -> s:state -> Lemma (
+  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
+  else s.state; mem = store_mem64 ptr v s.mem } in
+  valid_state s')
+
+val valid_state_store_mem128: ptr:int -> v:quad32 -> s:state -> Lemma (
+  let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state 
+  else s.state; mem = store_mem128 ptr v s.mem } in
+  valid_state s')
