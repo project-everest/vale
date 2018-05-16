@@ -4,6 +4,7 @@ module X64.Print_s
 
 open X64.Machine_s
 open X64.Semantics_s
+open X64.Bytes_Semantics_s
 open FStar.IO
 
 noeq type printer = {

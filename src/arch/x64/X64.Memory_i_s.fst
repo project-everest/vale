@@ -92,6 +92,10 @@ let valid_state s = s.state.S.mem == I.down_mem64 s.mem.hs s.mem.addrs s.mem.ptr
 
 let frame_valid s = ()
 
+let get_heap h = I.down_mem64 h.hs h.addrs h.ptrs
+
+let same_heap s1 s2 = ()
+
 let loc_readable h s = unit // admit()
 let loc_readable_none = admit()
 let loc_readable_union = admit()

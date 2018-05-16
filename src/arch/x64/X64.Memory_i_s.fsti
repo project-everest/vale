@@ -68,6 +68,12 @@ val frame_valid (s1:state') : Lemma
 
 type state = (s:state'{valid_state s})
 
+val get_heap: (h:mem) -> GTot (m:S.heap{forall s. 
+  s.state.S.mem == m /\ s.mem == h ==> valid_state s})
+
+val same_heap: (s1:state) -> (s2:state) -> Lemma (
+  s1.mem == s2.mem ==> s1.state.S.mem == s2.state.S.mem)
+
 val loc_readable (h:mem) (s:loc) : GTot Type0
 
 val loc_readable_none (h:mem) : Lemma
