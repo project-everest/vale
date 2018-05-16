@@ -328,6 +328,12 @@ procedure {:quick} gctr_bytes_extra(
         let cipher := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), 0, num_bytes);
         cipher == gctr_encrypt_LE(icb_BE, plain, AES_128, key);
         xmm1 == buffer128_read(out_b, num_blocks, mem);
+
+// TODO: Prove this inside gctr_bytes_extra_work
+        // We modified out_b, but we didn't disrupt the work that was previously done
+        let     cipher_blocks := slice_work_around(buffer128_as_seq(mem,      out_b), num_blocks);
+        let old_cipher_blocks := slice_work_around(buffer128_as_seq(old(mem), out_b), num_blocks);
+        cipher_blocks == old_cipher_blocks;
 {
     ghost var num_blocks := num_bytes / 16;
     gctr_partial_completed(slice_work_around(buffer128_as_seq(mem, in_b),  num_blocks), 

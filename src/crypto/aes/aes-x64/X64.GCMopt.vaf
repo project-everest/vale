@@ -251,14 +251,19 @@ procedure {:quick} {:verify true} gcm_one_pass(
             gctr_bytes_no_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes), icb);
             ghash_incremental_bytes_no_extra(out_b, old(hash), old(out_ptr), old(num_bytes), hash, h);
         } else {
+            Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
             gctr_bytes_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
             Mov64(rcx, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rcx
             Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
+            Mov128(hash, xmm3);
+            // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
+            //       and reading from xmm1 directly.  It's probably still in cache though
             ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes)); 
         }
     }
 }
 
+/*
 procedure {:quick} gcm_core(
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
@@ -705,3 +710,4 @@ procedure {:quick} gcm_stdcall(
     gcm_stdcall_inner(args_b, iv_BE, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
     callee_restore_registers(win, stack_b, old(xmm6), old(xmm7), old(xmm8), old(xmm10), old(xmm11));
 }
+*/
