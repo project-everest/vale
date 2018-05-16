@@ -7,6 +7,8 @@ module M = FStar.Modifies
 module S = X64.Bytes_Semantics_s
 module H = FStar.Heap
 
+#reset-options "--initial_fuel 2 --max_fuel 2 --initial_ifuel 1 --max_ifuel 1"
+
 let heap = H.heap
 noeq type mem' = {
   addrs : I.addr_map;

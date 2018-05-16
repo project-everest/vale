@@ -105,7 +105,7 @@ let correct_down_p64_cancel mem (addrs:addr_map) heap (p:B.buffer UInt64.t) : Le
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_heap = write_vale_mem64 contents length addr 0 heap in
       correct_down_p64 mem addrs new_heap p')) = 
-  let rec aux (p':B.buffer UInt64.t) : Lemma 
+  let aux (p':B.buffer UInt64.t) : Lemma 
     (p == p'  ==> (let length = B.length p in
       let contents = B.as_seq mem p in
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
@@ -128,7 +128,7 @@ let correct_down_p64_frame mem (addrs:addr_map) (heap:heap) (p:B.buffer UInt64.t
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_heap = write_vale_mem64 contents length addr 0 heap in
       correct_down_p64 mem addrs new_heap p')) = 
-  let rec aux (p':B.buffer UInt64.t) : Lemma 
+  let aux (p':B.buffer UInt64.t) : Lemma 
     (B.disjoint p p' /\ correct_down_p64 mem addrs heap p' ==> (let length = B.length p in
       let contents = B.as_seq mem p in
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
@@ -234,16 +234,18 @@ let same_unspecified_down mem1 mem2 addrs ptrs =
 
 #set-options "--z3rlimit 100"
 
-let create_seq64 heap length addr : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
-  (forall j. {:pattern (Seq.index s' j)} 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val64 (addr + j `op_Multiply` 8) heap)}) =
-  let rec aux heap length addr (i:nat{i <= length}) (s:Seq.seq UInt64.t{Seq.length s = i /\ 
+private let rec create_seq64_aux heap length addr (i:nat{i <= length}) 
+  (s:Seq.seq UInt64.t{Seq.length s = i /\ 
     (forall j. {:pattern (Seq.index s j)} 0 <= j /\ j < i ==> UInt64.v (Seq.index s j) == get_heap_val64 (addr + j `op_Multiply` 8) heap)}) : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
     (forall j. 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val64 (addr + j `op_Multiply` 8) heap)}) (decreases %[sub length i]) =
   if i = length then s
     else
     let s' = Seq.append s (Seq.create 1 (UInt64.uint_to_t (get_heap_val64 (addr + i `op_Multiply` 8) heap))) in
-    aux heap length addr (i+1) s'
-  in aux heap length addr 0 Seq.createEmpty
+    create_seq64_aux heap length addr (i+1) s'
+
+let create_seq64 heap length addr : Tot (s':Seq.seq UInt64.t{Seq.length s' = length /\ 
+  (forall j. {:pattern (Seq.index s' j)} 0 <= j /\ j < length ==> UInt64.v (Seq.index s' j) == get_heap_val64 (addr + j `op_Multiply` 8) heap)}) =
+  create_seq64_aux heap length addr 0 Seq.createEmpty
 
 let write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.length buf}) (curr_mem:HS.mem{B.live curr_mem buf}) : GTot HS.mem = 
   let s = B.sel curr_mem buf in
@@ -328,7 +330,7 @@ let correct_up_p64_cancel heap (addrs:addr_map) (p:B.buffer UInt64.t) (mem:HS.me
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_mem = write_low_mem64 heap length addr p mem in
       correct_up_p64 addrs new_mem heap p')) = 
-  let rec aux (p':B.buffer UInt64.t) : Lemma 
+  let aux (p':B.buffer UInt64.t) : Lemma 
     (p == p'  ==> (let length = B.length p in
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_mem = write_low_mem64 heap length addr p mem in
@@ -346,7 +348,7 @@ let correct_up_p64_frame heap (addrs:addr_map) (p:B.buffer UInt64.t) (mem:HS.mem
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_mem = write_low_mem64 heap length addr p mem in
       correct_up_p64 addrs new_mem heap p')) = 
-  let rec aux (p':B.buffer UInt64.t) : Lemma 
+  let aux (p':B.buffer UInt64.t) : Lemma 
     (B.live mem p' /\ B.disjoint p p' /\ correct_up_p64 addrs mem heap p' ==> (let length = B.length p in
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_mem = write_low_mem64 heap length addr p mem in
@@ -435,4 +437,4 @@ val up_mem_liveness64: (heap:heap) -> (heap':X64.Bytes_Semantics_s.heap) -> (add
 
 let up_mem_liveness64 heap heap' addrs ptrs mem = 
   liveness_up_mem64_aux heap addrs ptrs ptrs [] mem;
-liveness_up_mem64_aux heap' addrs ptrs ptrs [] mem
+  liveness_up_mem64_aux heap' addrs ptrs ptrs [] mem

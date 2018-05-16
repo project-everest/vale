@@ -1,12 +1,11 @@
 module X64.Semantics_s
 
 open X64.Machine_s
-open X64.Memory_s
+open X64.Memory_i_s
 open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
-module M = Memory_i_s
 module S = X64.Bytes_Semantics_s
 
 type uint64 = UInt64.t
@@ -29,8 +28,8 @@ let havoc s ins = S.havoc s.state ins
 unfold let eval_reg (r:reg) (s:state) : nat64 = S.eval_reg r s.state
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = S.eval_xmm i s.state
 
-unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
-unfold let eval_mem128 (ptr:int) (s:state) : quad32 = load_mem128 ptr s.mem
+unfold let eval_mem (ptr:int) (s:state) : GTot nat64 = load_mem64 ptr s.mem
+unfold let eval_mem128 (ptr:int) (s:state) : GTot quad32 = load_mem128 ptr s.mem
 
 [@va_qattr]
 let eval_maddr (m:maddr) (s:state) : int =
@@ -40,18 +39,18 @@ let eval_maddr (m:maddr) (s:state) : int =
     | MReg reg offset -> (eval_reg reg s) + offset
     | MIndex base scale index offset -> (eval_reg base s) + scale * (eval_reg index s) + offset
 
-let eval_operand (o:operand) (s:state) : nat64 =
+let eval_operand (o:operand) (s:state) : GTot nat64 =
   match o with
   | OConst n -> int_to_nat64 n
   | OReg r -> eval_reg r s
   | OMem m -> eval_mem (eval_maddr m s) s
 
-let eval_mov128_op (o:mov128_op) (s:state) : quad32 =
+let eval_mov128_op (o:mov128_op) (s:state) : GTot quad32 =
   match o with 
   | Mov128Xmm i -> eval_xmm i s
   | Mov128Mem m -> eval_mem128 (eval_maddr m s) s
 
-let eval_ocmp (s:state) (c:ocmp) :bool =
+let eval_ocmp (s:state) (c:ocmp) : GTot bool =
   match c with
   | S.OEq o1 o2 -> eval_operand o1 s = eval_operand o2 s
   | S.ONe o1 o2 -> eval_operand o1 s <> eval_operand o2 s
@@ -65,19 +64,19 @@ let update_reg' (r:reg) (v:nat64) (s:state) : state = {s with state = S.update_r
 let update_xmm' (x:xmm) (v:quad32) (s:state) : state = {s with state = S.update_xmm' x v s.state}
 
 // TODO: Mem operations
-let update_mem (ptr:int) (v:nat64) (s:state) : state =
+let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
   { s with mem = store_mem64 ptr v s.mem }
 
 let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
   { s with mem = store_mem128 ptr v s.mem }
 
-let valid_maddr (m:maddr) (s:state) : bool =
+let valid_maddr (m:maddr) (s:state) : GTot bool =
   valid_mem64 (eval_maddr m s) s.mem
 
 let valid_maddr128 (m:maddr) (s:state) : bool =
   valid_mem128 (eval_maddr m s) s.mem
 
-let valid_operand (o:operand) (s:state) : bool =
+let valid_operand (o:operand) (s:state) : GTot bool =
   match o with
   | OConst n -> true
   | OReg r -> true
@@ -88,10 +87,10 @@ let valid_mov128_op (o:mov128_op) (s:state) : bool =
   | Mov128Xmm i -> true (* We leave it to the printer/assembler to object to invalid XMM indices *)
   | Mov128Mem m -> valid_maddr128 m s
 
-let valid_shift_operand (o:operand) (s:state) : bool =
+let valid_shift_operand (o:operand) (s:state) : GTot bool =
   valid_operand o s && (eval_operand o s) < 64
   
-let valid_ocmp (c:ocmp) (s:state) :bool =
+let valid_ocmp (c:ocmp) (s:state) : GTot bool =
   match c with
   | S.OEq o1 o2 -> valid_operand o1 s && valid_operand o2 s
   | S.ONe o1 o2 -> valid_operand o1 s && valid_operand o2 s
@@ -100,10 +99,10 @@ let valid_ocmp (c:ocmp) (s:state) :bool =
   | S.OLt o1 o2 -> valid_operand o1 s && valid_operand o2 s
   | S.OGt o1 o2 -> valid_operand o1 s && valid_operand o2 s
 
-let valid_dst_operand (o:operand) (s:state) : bool =
+let valid_dst_operand (o:operand) (s:state) : GTot bool =
   valid_operand o s && valid_dst o
 
-let update_operand_preserve_flags' (o:operand) (v:nat64) (s:state) : state =
+let update_operand_preserve_flags' (o:operand) (v:nat64) (s:state) : GTot state =
   match o with
   | OConst _ -> {s with state = {s.state with S.ok = false}}
   | OReg r -> update_reg' r v s
@@ -115,7 +114,7 @@ let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : state 
   | Mov128Mem m -> update_mem128 (eval_maddr m s) v s
 
 // Default version havocs flags 
-let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : state =
+let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : GTot state =
   let s' = update_operand_preserve_flags' o v s in
   { s' with state = {s'.state with S.flags = havoc s ins } }
 
@@ -157,37 +156,37 @@ let update_of (flags:nat64) (new_of:bool) : (new_flags:nat64{overflow new_flags 
 let st (a:Type) = state -> a * state
 
 unfold
-let return (#a:Type) (x:a) :st a =
+let return (#a:Type) (x:a) : st a =
   fun s -> x, s
 
 unfold
-let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :st b =
+let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :GTot (st b) =
 fun s0 ->
   let x, s1 = m s0 in
   let y, s2 = f x s1 in
   y, {s2 with state = {s2.state with S.ok=s0.state.S.ok && s1.state.S.ok && s2.state.S.ok} }
 
 unfold
-let get :st state =
+let get : st state =
   fun s -> s, s
 
 unfold
-let set (s:state) :st unit =
+let set (s:state) : GTot (st unit) =
   fun _ -> (), s
 
 unfold
-let fail :st unit =
+let fail : (st unit) =
   fun s -> (), {s with state = {s.state with S.ok=false} }
 
 unfold
-let check_imm (valid:bool) : st unit =
+let check_imm (valid:bool) : GTot (st unit) =
   if valid then
     return ()
   else
     fail
 
 unfold
-let check (valid: state -> bool) : st unit =
+let check (valid: state -> bool) : GTot (st unit) =
   s <-- get;
   if valid s then
     return ()
@@ -195,7 +194,7 @@ let check (valid: state -> bool) : st unit =
     fail
 
 unfold
-let run (f:st unit) (s:state) : state = snd (f s)
+let run (f:st unit) (s:state) : GTot state = snd (f s)
 
 (* Monadic update operations *)
 unfold
