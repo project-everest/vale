@@ -11,6 +11,8 @@ import SCons.Util
 import atexit
 import platform
 import fnmatch
+import win32job
+import win32api
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -26,6 +28,7 @@ if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machin
   target_x='64'
   sha_arch_dir='sha-x64'
   aes_arch_dir='aes-x64'
+  
 envDict = {'TARGET_ARCH':target_arch,
            'X':target_x,
            'ARCH':'src/arch/x$X',
@@ -39,6 +42,11 @@ if sys.platform == 'win32':
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
   env['NUGET'] = 'nuget.exe'
+  hdl = win32job.CreateJobObject(None, "")
+  win32job.AssignProcessToJobObject(hdl, win32api.GetCurrentProcess())
+  extended_info = win32job.QueryInformationJobObject(None, win32job.JobObjectExtendedLimitInformation)
+  extended_info['BasicLimitInformation']['LimitFlags'] = win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+  win32job.SetInformationJobObject(hdl, win32job.JobObjectExtendedLimitInformation, extended_info)
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
@@ -301,7 +309,7 @@ fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1' \
   + ' --hint_info' \
   + ('' if is_single_vaf else ' --use_hints') \
   + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
-  + (' --use_extracted_interfaces')
+  + (' --use_extracted_interfaces true')
 fstar_default_args = fstar_default_args_nosmtencoding \
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
 
@@ -578,7 +586,7 @@ def add_dafny_verifier(env):
 
 def on_black_list(f, list):
   for entry in list:
-    if str(f).startswith(entry):
+    if str(f).replace('\\','/').startswith(entry):
       return True
   return False
 
@@ -590,8 +598,8 @@ def verify_fstar(env, targetfile, sourcefile):
   if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
     print("Skipping %s because it is on the min_test_suite_blacklist defined in SConscript" % sourcefile)
     return outs
-#  else:
-#    print("File %s is not on the blacklist" % str(sourcefile))
+  # else:
+  #   print("File %s is not on the blacklist" % str(sourcefile))
 
   if gen_hints:
     temptargetfiles.append(hintsfile)
@@ -614,7 +622,7 @@ def extract_fstar(env, sourcefile):
   module_name = os.path.split(base_name)[1]
   mlfile = ml_out_name(sourcefile, '.ml')
   Depends(mlfile, base_name + '.fst.verified')
-  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces", ""))
+  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces true", ""))
   cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
   cmd_line += " --odir obj/ml_out --codegen OCaml --extract_module " + module_name
   return env.Command(mlfile, sourcefile, cmd_line)
