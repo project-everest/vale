@@ -358,8 +358,7 @@ procedure {:quick} gctr_bytes_no_extra(
     ghost keys_b:buffer128,
     ghost orig_in_ptr:nat64,
     ghost orig_out_ptr:nat64,
-    ghost num_bytes:nat,
-    ghost icb:quad32
+    ghost num_bytes:nat
     )
     reads mem;
 
@@ -384,7 +383,7 @@ procedure {:quick} gctr_bytes_no_extra(
         let num_blocks := num_bytes / 16;
         num_bytes % 16 == 0;
         gctr_partial(num_blocks, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
-        icb == inc32(icb_BE, num_blocks);
+        //icb == inc32(icb_BE, num_blocks);
     ensures
         validSrcAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         modifies_buffer128(out_b, old(mem), mem);
@@ -468,7 +467,7 @@ procedure {:quick} gctr_bytes(
     assert icb == inc32(icb_BE, num_blocks);
 
     if (r11 == 0) {
-        gctr_bytes_no_extra(icb_BE, in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes), icb);
+        gctr_bytes_no_extra(icb_BE, in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
     } else {
         gctr_bytes_extra(icb_BE, in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
     }

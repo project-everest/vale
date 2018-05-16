@@ -180,7 +180,7 @@ procedure {:quick} gcm_one_pass_blocks(
 //    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
-#reset-options "--z3rlimit 20"
+#reset-options "--z3rlimit 60"
 procedure {:quick} {:verify true} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -224,7 +224,6 @@ procedure {:quick} {:verify true} gcm_one_pass(
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)), old(num_bytes));
         cipher == gctr_encrypt_LE(old(icb), make_gctr_plain_LE(plain), AES_128, key);
 
-        //gctr_partial(bytes_to_quad_size(num_bytes), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
         icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
 
         // GHash
@@ -236,32 +235,33 @@ procedure {:quick} {:verify true} gcm_one_pass(
             hash == ghash_incremental(h, old(hash), cipher_padded_quads);
 {
     if (num_bytes > 0) {
-//        lemma_poly_bits64();
-//        Mov64(rsi, num_bytes);
-//        And64(rsi, 15);
-//        assert rsi == num_bytes % 16;
-//        Shr64(num_bytes, 4);
-//        ghost var num_blocks := old(num_bytes) / 16;
-//        assert rcx == num_blocks;
-//
-//        gcm_one_pass_blocks(in_b, out_b, key, round_keys, keys_b);
-//        assert icb == inc32(old(icb), num_blocks);
-//
-//        if (rsi == 0) {
-//            gctr_bytes_no_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes), icb);
-//            ghash_incremental_bytes_no_extra(out_b, old(hash), old(out_ptr), old(num_bytes), hash, h);
-//        } else {
-//            assume false;
-////            Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
-////            gctr_bytes_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
-////            Mov64(rcx, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rcx
-////            Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
-////            Mov128(hash, xmm3);
-////            // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
-////            //       and reading from xmm1 directly.  It's probably still in cache though
-////            ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes)); 
-//        }
-        assume false;
+        lemma_poly_bits64();
+        Mov64(rsi, num_bytes);
+        And64(rsi, 15);
+        assert rsi == num_bytes % 16;
+        Shr64(num_bytes, 4);
+        ghost var num_blocks := old(num_bytes) / 16;
+        assert rcx == num_blocks;
+
+        gcm_one_pass_blocks(in_b, out_b, key, round_keys, keys_b);
+        assert icb == inc32(old(icb), num_blocks);
+
+        if (rsi == 0) {
+            gctr_bytes_no_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
+            ghash_incremental_bytes_no_extra(out_b, old(hash), old(out_ptr), old(num_bytes), hash, h);
+            bytes_to_quad_size_no_extra_bytes(old(num_bytes));
+            //assert icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
+        } else {
+            assume false;
+//            Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
+//            gctr_bytes_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
+//            Mov64(rcx, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rcx
+//            Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
+//            Mov128(hash, xmm3);
+//            // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
+//            //       and reading from xmm1 directly.  It's probably still in cache though
+//            ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes)); 
+        }
     } 
 
     // Handle the else case:

@@ -27,6 +27,12 @@ let extra_bytes_helper (n:nat) : Lemma
   =
   ()
 
+let bytes_to_quad_size_no_extra_bytes (num_bytes:nat) : Lemma 
+  (requires num_bytes % 16 == 0)
+  (ensures bytes_to_quad_size num_bytes = num_bytes / 16)
+  =
+  ()
+
 let no_extra_bytes_helper (s:seq quad32) (num_bytes:int) : Lemma
   (requires 0 <= num_bytes /\
             num_bytes % 16 == 0 /\
