@@ -107,6 +107,10 @@ let lemma_gf128_constant_rev q =
   lemma_zero_nth 32;
   lemma_reverse_define h 127;
   lemma_index h;
+  let Mkfour a b c _ = to_quad32 rh in
+  assert (equal (UInt.to_vec #32 a) (UInt.to_vec #32 0));
+  assert (equal (UInt.to_vec #32 b) (UInt.to_vec #32 0));
+  assert (equal (UInt.to_vec #32 c) (UInt.to_vec #32 0));
   let s = to_seq (reverse rh 127) 128 in
   let s0_32 = slice s 0 32 in
   let s0_8 = slice s0_32 0 8 in

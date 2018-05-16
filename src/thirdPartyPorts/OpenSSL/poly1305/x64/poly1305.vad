@@ -21,13 +21,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_math.i.dfy"
-include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_util.i.dfy"
-include{:verbatim} "../../../../crypto/poly1305/x64/poly1305_bitvectors.i.dfy"
-include{:verbatim} "../../../../arch/x64/vale.i.dfy"
-include{:verbatim} "../../../../lib/util/operations.i.dfy"
-include "../../../../arch/x64/decls.vad"
-include "../../../../arch/x64/decls64.vad"
+include{:verbatim}{:from BASE} "crypto/poly1305/x64/poly1305_math.i.dfy"
+include{:verbatim}{:from BASE} "crypto/poly1305/x64/poly1305_util.i.dfy"
+include{:verbatim}{:from BASE} "crypto/poly1305/x64/poly1305_bitvectors.i.dfy"
+include{:verbatim}{:from BASE} "arch/x64/vale.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/operations.i.dfy"
+include{:from BASE} "arch/x64/decls.vad"
+include{:from BASE} "arch/x64/decls64.vad"
 
 #verbatim
 module x64_poly
