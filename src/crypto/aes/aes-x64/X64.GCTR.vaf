@@ -288,10 +288,10 @@ procedure {:quick} gctr_bytes_extra(
     )
     lets in_ptr @= r9; out_ptr @= r10; icb @= xmm7;
     reads
-        r8; in_ptr; out_ptr; 
+        r8; in_ptr; out_ptr; icb; 
 
     modifies
-        rdx; r12; xmm0; xmm1; xmm2; xmm4; icb; mem; efl;
+        rdx; r12; xmm0; xmm1; xmm2; xmm4; mem; efl;
 
     requires
         // GCTR reqs
