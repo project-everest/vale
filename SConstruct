@@ -11,8 +11,6 @@ import SCons.Util
 import atexit
 import platform
 import fnmatch
-import win32job
-import win32api
 
 # TODO:
 #  - switch over to Dafny/Vale tools for dependency generation, rather than regex
@@ -37,6 +35,8 @@ envDict = {'TARGET_ARCH':target_arch,
 
 env = Environment(**envDict)
 if sys.platform == 'win32':
+  import win32job
+  import win32api
   env.Replace(CCPDBFLAGS='/Zi /Fd${TARGET.base}.pdb')
   # Use kremlib.h without primitive support for uint128_t.
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
