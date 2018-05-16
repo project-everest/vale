@@ -98,16 +98,16 @@ verify_options = {
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
-  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
-  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/*/*.fst': BuildOptions(fstar_default_args),
+  'src/*/*.fsti': BuildOptions(fstar_default_args),
 
   # .fst/.fsti files default to this set of options
-  '.fst': BuildOptions(fstar_default_args),
-  '.fsti': BuildOptions(fstar_default_args),
+  '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
+  '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_larith),
-  '.vaf': BuildOptions(fstar_default_args),  
+  '.vaf': BuildOptions(fstar_default_args  + ' --use_two_phase_tc false'),
 }
 if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None

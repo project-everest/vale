@@ -309,7 +309,7 @@ fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1' \
   + ' --hint_info' \
   + ('' if is_single_vaf else ' --use_hints') \
   + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
-  + (' --use_extracted_interfaces')
+  + (' --use_extracted_interfaces true')
 fstar_default_args = fstar_default_args_nosmtencoding \
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
 
@@ -623,7 +623,7 @@ def extract_fstar(env, sourcefile):
   module_name = os.path.split(base_name)[1]
   mlfile = ml_name(sourcefile)
   Depends(mlfile, base_name + '.fst.verified')
-  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces", ""))
+  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces true", ""))
   cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
   cmd_line += " --odir obj/ml_out --codegen OCaml --extract_module " + module_name
   return env.Command(mlfile, sourcefile, cmd_line)
