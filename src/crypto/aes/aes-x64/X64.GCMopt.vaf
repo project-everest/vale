@@ -180,7 +180,7 @@ procedure {:quick} gcm_one_pass_blocks(
 //    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
-#reset-options "--z3rlimit 80"
+#reset-options "--z3rlimit 200"
 procedure {:quick} {:verify true} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -217,20 +217,21 @@ procedure {:quick} {:verify true} gcm_one_pass(
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
-//        modifies_buffer128(out_b, old(mem), mem);
-//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
-//
-//        // GCTR
-//        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
-        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)), old(num_bytes));
-//        cipher == gctr_encrypt_LE(old(icb), make_gctr_plain_LE(plain), AES_128, key);
+        modifies_buffer128(out_b, old(mem), mem);
+        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
 
-//        //icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
-//        icb.lo1 == old(icb.lo1);
-//        icb.hi2 == old(icb.hi2);
-//        icb.hi3 == old(icb.hi3);
+        // GCTR
+        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
+        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)), old(num_bytes));
+        cipher == gctr_encrypt_LE(old(icb), make_gctr_plain_LE(plain), AES_128, key);
+
+        //icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
+        icb.lo1 == old(icb.lo1);
+        icb.hi2 == old(icb.hi2);
+        icb.hi3 == old(icb.hi3);
+
         // GHash
-//        num_bytes == 0 ==> hash == old(hash); 
+        old(num_bytes) == 0 ==> hash == old(hash); 
 
         let cipher_padded_bytes := pad_to_128_bits(cipher);
         let cipher_padded_quads := le_bytes_to_seq_quad32(cipher_padded_bytes);
