@@ -181,7 +181,7 @@ procedure {:quick} gcm_one_pass_blocks(
 }
 
 #reset-options "--z3rlimit 400"
-procedure {:quick} {:verify true} gcm_one_pass(
+procedure {:quick} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
     ghost key:aes_key_LE(AES_128),
@@ -279,8 +279,8 @@ procedure {:quick} {:verify true} gcm_one_pass(
 
 }
 
-/*
-procedure {:quick} gcm_core(
+#reset-options "--z3rlimit 20"
+procedure {:quick} {:verify true} gcm_core(
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
@@ -315,8 +315,11 @@ procedure {:quick} gcm_core(
         plain_ptr + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
         auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
         out_ptr   + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
-        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(plain_num_bytes) /\ 256 * buffer_length(plain_b) < pow2_32;
+        buffer_length(plain_b) == buffer_length(out_b);
+        buffer_length(out_b) == bytes_to_quad_size(plain_num_bytes);
         buffer_length(auth_b) == bytes_to_quad_size(auth_num_bytes);
+        256 * buffer_length(plain_b) < pow2_32;
+        4096 * plain_num_bytes < pow2_32;
 
         // To simplify length calculations, restrict auth and plain length further
         256 * bytes_to_quad_size(auth_num_bytes)  < pow2_32;
@@ -328,12 +331,12 @@ procedure {:quick} gcm_core(
         validSrcAddrs128(mem, keys_ptr, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
-        modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes));
-        256 * buffer_length(plain_b) < pow2_32;
-        256 * buffer_length(auth_b) < pow2_32;
-        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-        create(1, xmm1) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+//        modifies_buffer128(out_b, old(mem), mem);
+//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes));
+//        256 * buffer_length(plain_b) < pow2_32;
+//        256 * buffer_length(auth_b) < pow2_32;
+//        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+//        create(1, xmm1) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 {
     // let h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
     ZeroXmm(xmm0);
@@ -356,6 +359,13 @@ procedure {:quick} gcm_core(
     // assert xmm1 == y_0;
     ghash_incremental_bytes(auth_b);
     ghost var y_auth := xmm1;
+
+    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, auth_b)), auth_num_bytes);
+    ghost var auth_padded_bytes := pad_to_128_bits(auth_bytes);
+    ghost var auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
+
+    assert y_0 == Mkfour(0,0,0,0);
+    assert y_auth   == ghash_incremental0(h, y_0, auth_padded_quads);
 
     // let c = gctr_encrypt_LE (inc32 j0 1) p alg key in
     Mov64(rax, plain_ptr);
@@ -381,11 +391,30 @@ procedure {:quick} gcm_core(
     ghost var y_final := xmm1;
 
     // Invoke lemma showing that incremental hashing works
+
+
+//    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, auth_b)), auth_num_bytes);
+//    ghost var auth_padded_bytes := pad_to_128_bits(auth_bytes);
+//    ghost var auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
+//
+    ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));
+    ghost var cipher_padded_bytes := pad_to_128_bits(cipher);
+    ghost var cipher_padded_quads := le_bytes_to_seq_quad32(cipher_padded_bytes);
+
+//    assert y_0 == Mkfour(0,0,0,0);
+//    assert y_auth   == ghash_incremental0(h, y_0, auth_padded_quads);
+//    assert y_cipher == ghash_incremental0(h, y_auth, cipher_padded_quads);
+//    assert y_final  == ghash_incremental0(h, y_cipher, create(1, length_quad32));
+//
+
     lemma_hash_append3(h, y_0, y_auth, y_cipher, y_final,
-                       buffer128_as_seq(mem, auth_b),
-                       buffer128_as_seq(mem, out_b),
+                       auth_padded_quads, //buffer128_as_seq(mem, auth_b),
+                       cipher_padded_quads, //buffer128_as_seq(mem, out_b),
                        create(1, length_quad32)); 
     // assert xmm1 == ghash_LE(h, append(buffer128_as_seq(mem, auth_b), append(buffer128_as_seq(mem, out_b), create(1, length_quad32)))); 
+
+
+
     ghost var hash := xmm1;
 
     PinsrdImm(iv, 1, 0, r12);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo0)
@@ -396,6 +425,7 @@ procedure {:quick} gcm_core(
     // assert create(1, xmm1) == gctr_encrypt_LE(iv_BE.(lo0 := 1), create(1, hash), AES_128, key);
 }
 
+/*
 procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64)
     requires 
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
