@@ -66,10 +66,12 @@ unfold let valid_dst_addr (#t:M.typ) (m:M.mem) (b:M.buffer t) (i:int) : Type0 =
   0 <= i /\ i < buffer_length b /\ buffer_readable m b
 unfold let buffer64_read (b:M.buffer64) (i:int) (m:M.mem) : GTot nat64 = M.buffer_read b i m
 unfold let buffer64_write (b:M.buffer64) (i:int) (v:nat64) (m:M.mem) : GTot M.mem = 
-  if buffer_readable m b then M.buffer_write b i v m else m
+  if FStar.StrongExcludedMiddle.strong_excluded_middle (buffer_readable m b) then 
+    M.buffer_write b i v m else m 
 unfold let buffer128_read (b:M.buffer128) (i:int) (m:M.mem) : GTot quad32 = M.buffer_read b i m
 unfold let buffer128_write (b:M.buffer128) (i:int) (v:quad32) (m:M.mem) : GTot M.mem = 
-  if buffer_readable m b then M.buffer_write b i v m else m
+  if FStar.StrongExcludedMiddle.strong_excluded_middle (buffer_readable m b) then
+    M.buffer_write b i v m else m
 unfold let modifies_mem (s:M.loc) (h1 h2:M.mem) : GTot Type0 = M.modifies s h1 h2
 //unfold let loc_buffer = M.loc_buffer
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b

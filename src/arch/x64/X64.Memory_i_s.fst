@@ -286,6 +286,8 @@ let lemma_load_mem64 b i h =
       end
   in aux h.ptrs h  
 
+#set-options "--z3rlimit 20"
+
 let lemma_store_mem64 b i v h =
   let addr = buffer_addr b h + 8 `op_Multiply` i in
   let s' = store_mem64 addr v h in
@@ -408,7 +410,7 @@ let same_mem_get_heap_val_buf (base n:int) (mem1 mem2:S.heap) : Lemma
   end
   in aux 0
 
-let rec unwritten_buffer_down_aux (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
+let unwritten_buffer_down_aux (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
   (ps: list buffer64{I.list_disjoint_or_eq ps /\ List.memP b ps})
   (h:mem{forall x. List.memP x ps ==> List.memP x h.ptrs})
   (a:buffer64{a =!= b /\ List.memP a ps})  : 
@@ -422,10 +424,13 @@ let rec unwritten_buffer_down_aux (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
     let mem2 = I.down_mem64 h1.hs h.addrs ps in
     let base = buffer_addr a h in    
     let s0 = B.as_seq h.hs a in
+    let s1 = B.as_seq h1.hs a in
     assert (I.disjoint_or_eq a b);
+    assert (Seq.equal s0 s1);
     // We need this to help z3
     assert (forall j. 0 <= j /\ j < B.length a ==> UInt64.v (Seq.index s0 j) == S.get_heap_val64 (base + (j `op_Multiply` 8)) mem1 );
     same_mem_get_heap_val_buf base (B.length a) mem1 mem2
+    
 
 let unwritten_buffer_down (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
   (ps: list buffer64{I.list_disjoint_or_eq ps /\ List.memP b ps}) 
@@ -513,21 +518,19 @@ let store_buffer_aux_down_mem2 (ptr:int) (v:nat64) (h:mem{valid_mem64 ptr h}) : 
   assert (UInt64.v (Seq.index (B.as_seq h1.hs b) i) == v);
   ()
 
-#set-options "--z3rlimit 60"
-
 let valid_state_store_mem64 i v (s:state) =
   if not (valid_mem64 i s.mem) then ()
   else
   let s' = S.update_mem i v s.state in
   let h1 = store_mem_aux i s.mem.ptrs v s.mem in
   let s' = {s with state = s'; mem = h1} in
-  Bytes_Semantics_i.frame_update_heap i v s.state.S.mem;
   store_buffer_aux_down_mem i v s.mem;
   store_buffer_aux_down_mem2 i v s.mem;
   let mem1 = s'.state.S.mem in
   let mem2 = I.down_mem64 s'.mem.hs s.mem.addrs s.mem.ptrs in
   Bytes_Semantics_i.same_mem_get_heap_val i mem1 mem2;
   Bytes_Semantics_i.correct_update_get i v s.state.S.mem;
+  Bytes_Semantics_i.frame_update_heap i v s.state.S.mem;
   assert (forall j. mem1.[j] == mem2.[j]);
   assert (Map.equal mem1 mem2);
   ()

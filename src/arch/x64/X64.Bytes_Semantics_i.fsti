@@ -9,7 +9,7 @@ val same_mem_get_heap_val (ptr:int) (mem1 mem2:heap) : Lemma
 
 val frame_update_heap (ptr:int) (v:nat64) (mem:heap) : Lemma (
   let new_mem = update_heap64 ptr v mem in
-  forall j. {:pattern (new_mem.[j]); (mem.[j])} j < ptr \/ j >= ptr + 8 ==> 
+  forall j. j < ptr \/ j >= ptr + 8 ==> 
     mem.[j] == new_mem.[j]) 
 
 val correct_update_get (ptr:int) (v:nat64) (mem:heap) : Lemma (
