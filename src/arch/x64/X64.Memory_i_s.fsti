@@ -74,13 +74,15 @@ val get_heap: (h:mem) -> GTot (m:S.heap{forall s.
 val same_heap: (s1:state) -> (s2:state) -> Lemma (
   s1.mem == s2.mem ==> s1.state.S.mem == s2.state.S.mem)
 
+val buffer_addr : #t:typ -> b:buffer t -> h:mem -> GTot int
+
 val loc_readable (h:mem) (s:loc) : GTot Type0
 
 val loc_readable_none (h:mem) : Lemma
   (ensures (loc_readable h loc_none))
   [SMTPat (loc_readable h loc_none)]
 
-val loc_readable_union (h:mem) (s1 s2:loc) : Lemma
+ val loc_readable_union (h:mem) (s1 s2:loc) : Lemma
   (requires (loc_readable h s1 /\ loc_readable h s2))
   (ensures (loc_readable h (loc_union s1 s2)))
   [SMTPat (loc_readable h (loc_union s1 s2))]
@@ -127,8 +129,16 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   )
   [SMTPatOr [
     [SMTPat (modifies p h h'); SMTPat (buffer_readable h' b)];
-    [SMTPat (modifies p h h'); SMTPat (buffer_as_seq h' b)]
+    [SMTPat (modifies p h h'); SMTPat (buffer_as_seq h' b)];
   ]]
+
+val modifies_buffer_addr (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
+  (requires
+    loc_readable h' p /\
+    modifies p h h'
+  )
+  (ensures buffer_addr b h == buffer_addr b h')
+  [SMTPat (modifies p h h'); SMTPat (buffer_addr b h')]
 
 val loc_disjoint_none_r (s:loc) : Lemma
   (ensures (loc_disjoint s loc_none))
@@ -221,8 +231,6 @@ val buffer_write (#t:typ) (b:buffer t) (i:int) (v:type_of_typ t) (h:mem) : Ghost
     buffer_as_seq h' b == Seq.upd (buffer_as_seq h b) i v
   ))
 
-
-val buffer_addr : #t:typ -> b:buffer t -> h:mem -> GTot int
 
 val valid_mem64 : ptr:int -> h:mem -> GTot bool // is there a 64-bit word at address ptr?
 val load_mem64 : ptr:int -> h:mem -> GTot nat64 // the 64-bit word at ptr (if valid_mem64 holds)

@@ -96,6 +96,10 @@ let get_heap h = I.down_mem64 h.hs h.addrs h.ptrs
 
 let same_heap s1 s2 = ()
 
+let buffer_addr #t b h =
+  let addrs = h.addrs in
+  addrs.[(B.as_addr b, B.idx b, B.length b)]
+
 let loc_readable h s = unit // admit()
 let loc_readable_none = admit()
 let loc_readable_union = admit()
@@ -133,6 +137,8 @@ let modifies_buffer_elim #t1 b p h h' =
     assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
     ()
   )
+
+let modifies_buffer_addr #t b p h h' = ()
 
 let loc_disjoint_none_r s = M.loc_disjoint_none_r s
 let loc_disjoint_union_r s s1 s2 = M.loc_disjoint_union_r s s1 s2
@@ -185,10 +191,6 @@ let buffer_write #t b i v h =
  assert (Seq.equal (buffer_as_seq h' b) (Seq.upd (buffer_as_seq h b) i v));
  h'
  end
-
-let buffer_addr #t b h =
-  let addrs = h.addrs in
-  addrs.[(B.as_addr b, B.idx b, B.length b)]
 
 val addr_in_ptr: (addr:int) -> (ptr:buffer64) -> (h:mem) ->
   GTot (b:bool{ not b <==> (forall i. 0 <= i /\ i < B.length ptr ==> 
@@ -425,7 +427,7 @@ let unwritten_buffer_down_aux (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
     let base = buffer_addr a h in    
     let s0 = B.as_seq h.hs a in
     let s1 = B.as_seq h1.hs a in
-    assert (I.disjoint_or_eq a b);
+    assert (B.disjoint a b);
     assert (Seq.equal s0 s1);
     // We need this to help z3
     assert (forall j. 0 <= j /\ j < B.length a ==> UInt64.v (Seq.index s0 j) == S.get_heap_val64 (base + (j `op_Multiply` 8)) mem1 );
