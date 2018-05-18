@@ -341,16 +341,18 @@ procedure {:quick} {:verify true} gcm_core(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
-        // TODO: First two clauses work around Vale's type limitations
+//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
-        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+//        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+        le_seq_quad32_to_bytes(create(1, xmm1)) == snd(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 
 
 //        256 * buffer_length(plain_b) < pow2_32;
 //        256 * buffer_length(auth_b) < pow2_32;
 //        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
 //        create(1, xmm1) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
+
 {
     // let h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
     ZeroXmm(xmm0);
@@ -446,15 +448,15 @@ procedure {:quick} {:verify true} gcm_core(
 
     ghost var auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
     ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
-
-    assert cipher == gctr_encrypt_LE(icb_enc, make_gctr_plain_LE(plain), AES_128, key);
-    assert 4096 * length(plain) < pow2_32;
-    assert 4096 * length(auth) < pow2_32;
-    assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     // Passes
+//
+//    assert cipher == gctr_encrypt_LE(icb_enc, make_gctr_plain_LE(plain), AES_128, key);
+//    assert 4096 * length(plain) < pow2_32;
+//    assert 4096 * length(auth) < pow2_32;
+//    assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     // Passes
     gcm_encrypt_LE_fst_helper(icb_enc, iv_BE, plain, auth, cipher, AES_128, key);
-    assert 4096 * length(plain) < pow2_32 /\ 
-           4096 * length(auth) < pow2_32 /\
-           cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+//    assert 4096 * length(plain) < pow2_32 /\ 
+//           4096 * length(auth) < pow2_32 /\
+//           cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 }
 
 /*
