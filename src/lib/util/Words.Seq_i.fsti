@@ -20,7 +20,7 @@ val four_to_nat_to_four_8 (x:natN (pow2_norm 32)) :
 
 val nat_to_four_to_nat (x:four (natN (pow2_norm 8))) :
   Lemma (nat_to_four 8 (four_to_nat 8 x) == x)
-  [SMTPat (nat_to_four 8 (four_to_nat 8 x) == x)]
+  [SMTPat (nat_to_four 8 (four_to_nat 8 x))]
 
 
 val four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
@@ -28,6 +28,10 @@ val four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
 
 val four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) : 
   Lemma (four_to_seq_LE x == seq_four_to_seq_LE (create 1 x))
+
+val seq_nat8_to_seq_nat32_to_seq_nat8_LE (x:seq nat32) :
+  Lemma (seq_nat8_to_seq_nat32_LE (seq_nat32_to_seq_nat8_LE x) == x)
+  [SMTPat (seq_nat8_to_seq_nat32_LE (seq_nat32_to_seq_nat8_LE x))]
 
 (*
 val seq_four_to_seq_LE_injective: unit ->

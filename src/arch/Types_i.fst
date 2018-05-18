@@ -233,6 +233,20 @@ let le_bytes_to_seq_quad_of_singleton (q:quad32) (b:seq nat8 { length b == 16 })
   // le_bytes_to_seq_quad32 b == seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE b)
   ()
 
+let be_bytes_to_quad32 (b:seqn 16 nat8) : quad32 =
+  seq_to_four_BE (seq_map (four_to_nat 8) (seq_to_seq_four_BE b))
+
+// let be_quad32_to_bytes (q:quad32) : seqn 16 nat8 =
+//   seq_four_to_seq_BE (seq_map (nat_to_four 8) (four_to_seq_BE q))
+
+let be_bytes_to_quad32_to_bytes (q:quad32) : 
+  Lemma (be_bytes_to_quad32 (be_quad32_to_bytes q) == q)
+  =
+  let q':quad32 = be_bytes_to_quad32 (be_quad32_to_bytes q) in
+//  assert (equal (be_bytes_to_quad32 (be_quad32_to_bytes q)) q);
+ // assert (q' == q);
+  admit()
+
 open FStar.Mul
 let slice_commutes_seq_four_to_seq_LE (#a:Type) (s:seq (four a)) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :
   Lemma(slice (seq_four_to_seq_LE s) (n * 4) (n' * 4) ==

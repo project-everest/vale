@@ -11,11 +11,13 @@ module X64.GCMopt
 #verbatim{:interface}{:implementation}
 open FStar.Seq
 open Words_s
+open Words.Seq_s
 open Types_s
 open Types_i
 open AES_s
 open GCTR_s
 open GCTR_i
+open GCM_i
 open GHash_s
 open GHash_i
 open GCM_s
@@ -279,7 +281,7 @@ procedure {:quick} gcm_one_pass(
 
 }
 
-#reset-options "--z3rlimit 20"
+#reset-options "--z3rlimit 50"
 procedure {:quick} {:verify true} gcm_core(
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
@@ -320,6 +322,7 @@ procedure {:quick} {:verify true} gcm_core(
         buffer_length(auth_b) == bytes_to_quad_size(auth_num_bytes);
         256 * buffer_length(plain_b) < pow2_32;
         4096 * plain_num_bytes < pow2_32;
+        4096 * auth_num_bytes < pow2_32;
 
         // To simplify length calculations, restrict auth and plain length further
         256 * bytes_to_quad_size(auth_num_bytes)  < pow2_32;
@@ -331,8 +334,19 @@ procedure {:quick} {:verify true} gcm_core(
         validSrcAddrs128(mem, keys_ptr, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
-//        modifies_buffer128(out_b, old(mem), mem);
-//        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes));
+        modifies_buffer128(out_b, old(mem), mem);
+        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes));
+
+        let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
+        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
+        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
+
+        // TODO: First two clauses work around Vale's type limitations
+        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(auth) < pow2_32 /\
+        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+
+
 //        256 * buffer_length(plain_b) < pow2_32;
 //        256 * buffer_length(auth_b) < pow2_32;
 //        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
@@ -371,6 +385,9 @@ procedure {:quick} {:verify true} gcm_core(
     Mov64(rax, plain_ptr);
     //Mov64(rbx, out_ptr);
     Mov64(rcx, plain_num_bytes);
+    ghost var icb_enc := iv;
+
+    assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     // Passes -- REVIEW: Seems to be necessary for it to pass at the end of the procedure; unclear why that could possibly be the case
     gcm_one_pass(plain_b, out_b, key, round_keys, keys_b);
     ghost var y_cipher := xmm1;
 
@@ -423,6 +440,21 @@ procedure {:quick} {:verify true} gcm_core(
     // Encrypt the hash value with gctr_register 
     gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
     // assert create(1, xmm1) == gctr_encrypt_LE(iv_BE.(lo0 := 1), create(1, hash), AES_128, key);
+
+    // seq_nat8_to_seq_nat32_to_seq_nat8_LE(key);
+//    be_bytes_to_quad32_to_bytes(iv_BE);
+
+    ghost var auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
+    ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
+
+    assert cipher == gctr_encrypt_LE(icb_enc, make_gctr_plain_LE(plain), AES_128, key);
+    assert 4096 * length(plain) < pow2_32;
+    assert 4096 * length(auth) < pow2_32;
+    assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     // Passes
+    gcm_encrypt_LE_fst_helper(icb_enc, iv_BE, plain, auth, cipher, AES_128, key);
+    assert 4096 * length(plain) < pow2_32 /\ 
+           4096 * length(auth) < pow2_32 /\
+           cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 }
 
 /*

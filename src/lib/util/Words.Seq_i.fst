@@ -102,6 +102,13 @@ let four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) :
   assert (equal s0 s1);
   ()
 
+
+let seq_nat8_to_seq_nat32_to_seq_nat8_LE (x:seq nat32) :
+  Lemma (seq_nat8_to_seq_nat32_LE (seq_nat32_to_seq_nat8_LE x) == x)
+  =
+  assert (equal (seq_nat8_to_seq_nat32_LE (seq_nat32_to_seq_nat8_LE x)) x);
+  ()
+
 (*
 let seq_four_to_seq_LE_injective () :
   Lemma (forall (#a:eqtype) (x x':seq (four a)). seq_four_to_seq_LE x == seq_four_to_seq_LE x' ==> x == x')

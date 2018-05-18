@@ -78,6 +78,13 @@ val le_bytes_to_seq_quad_of_singleton (q:quad32) (b:seq nat8 { length b == 16 })
   (requires q == le_bytes_to_quad32 b)
   (ensures create 1 q == le_bytes_to_seq_quad32 b)
 
+let be_quad32_to_bytes (q:quad32) : seqn 16 nat8 =
+  seq_four_to_seq_BE (seq_map (nat_to_four 8) (four_to_seq_BE q))
+
+val be_bytes_to_quad32_to_bytes (q:quad32) : 
+  Lemma (be_bytes_to_quad32 (be_quad32_to_bytes q) == q)
+  [SMTPat (be_bytes_to_quad32 (be_quad32_to_bytes q))]
+
 open FStar.Mul
 val slice_commutes_seq_four_to_seq_LE (#a:Type) (s:seq (four a)) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :
   Lemma(slice (seq_four_to_seq_LE s) (n * 4) (n' * 4) ==
