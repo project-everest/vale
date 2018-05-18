@@ -18,6 +18,7 @@ open GF128_i
 open Math.Poly2_s
 open X64.GF128_Mul
 open X64.Machine_s
+open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -192,7 +193,8 @@ procedure {:quick} ghash_core(
     if (len != 0) {
         compute_Y0();
         compute_ghash_incremental(in_b);
-        ghash_incremental_to_ghash(old(h), buffer128_as_seq(mem, in_b));
+        ghost var in_seq:ghash_plain_LE := to_ghash_plain_LE(buffer128_as_seq(mem, in_b));
+        ghash_incremental_to_ghash(old(h), in_seq);
     }
 }
 

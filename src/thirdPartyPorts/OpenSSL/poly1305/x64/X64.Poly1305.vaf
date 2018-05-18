@@ -29,9 +29,9 @@ module X64.Poly1305
 #reset-options "--z3rlimit 30"
 
 #verbatim{:interface}{:implementation}
-module M = Memory_i_s
 open Types_s
 open X64.Machine_s
+open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -314,7 +314,7 @@ procedure{:quick} poly1305_blocks(
 
             r15 != 0 ==> 8*(word_index + 1) <= length;
             16 * r15 + 8 * word_index == length;
-            inp + 0 /* offset */ == buffer_addr(inp_b) + 8 * word_index;
+            inp + 0 /* offset */ == buffer_addr(inp_b, mem) + 8 * word_index;
 
             r15 * 16 <= length;    // Not needed with Dafny version
             padbit < 2;            // Not needed with Dafny version 

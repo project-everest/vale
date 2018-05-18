@@ -8,6 +8,8 @@ open Collections.Seqs_s
 open Collections.Seqs_i
 open FStar.Seq
 
+let to_ghash_plain_LE (x:seq quad32) : ghash_plain_LE = if length x > 0 then x else Seq.create 1 (Mkfour 0 0 0 0)
+
 #reset-options "--use_two_phase_tc true"
 let rec ghash_incremental (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
   let y_i_minus_1 =
