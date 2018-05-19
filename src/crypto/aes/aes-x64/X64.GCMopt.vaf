@@ -277,7 +277,7 @@ procedure {:quick} gcm_one_pass(
 
 }
 
-#reset-options "--z3rlimit 200"
+#reset-options "--z3rlimit 1000"
 procedure {:quick} {:verify true} gcm_core(
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
@@ -373,15 +373,15 @@ procedure {:quick} {:verify true} gcm_core(
     ghash_incremental_bytes(auth_b);
     ghost var y_auth := xmm1;
 
-    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, auth_b)), auth_num_bytes);
-    ghost var auth_padded_bytes := pad_to_128_bits(auth_bytes);
-    ghost var auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
+//    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, auth_b)), auth_num_bytes);
+//    ghost var auth_padded_bytes := pad_to_128_bits(auth_bytes);
+//    ghost var auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
     ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
     ghost var auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
-
-    assert y_0 == Mkfour(0,0,0,0);
-    assert y_auth   == ghash_incremental0(h, y_0, auth_padded_quads);
-
+//
+//    assert y_0 == Mkfour(0,0,0,0);
+//    assert y_auth   == ghash_incremental0(h, y_0, auth_padded_quads);
+//
     // let c = gctr_encrypt_LE (inc32 j0 1) p alg key in
     Mov64(rax, plain_ptr);
     //Mov64(rbx, out_ptr);
@@ -400,9 +400,10 @@ procedure {:quick} {:verify true} gcm_core(
     Mov64(rax, auth_num_bytes);
     IMul64(rax, 8);
     Pinsrd(xmm2, rax, 2);
-    ghost var num_bits_plain:nat32 := nat32_workaround(8 * length(plain));
-    ghost var num_bits_auth:nat32  := nat32_workaround(8 * length(auth));
-    assert xmm2 == Mkfour(num_bits_plain, 0, num_bits_auth, 0);
+//    ghost var num_bits_plain:nat32 := nat32_workaround(8 * length(plain));
+//    ghost var num_bits_auth:nat32  := nat32_workaround(8 * length(auth));
+    //assert xmm2 == Mkfour(num_bits_plain, 0, num_bits_auth, 0);     // Passes when ghost vars above are removed
+
     //InitPshufbMask(xmm0, r12);
     Pshufb(xmm2, xmm8);
     //assert xmm2 == reverse_bytes_quad32(Mkfour(num_bits_plain, 0, num_bits_auth, 0));
@@ -412,18 +413,16 @@ procedure {:quick} {:verify true} gcm_core(
 //    assert 0 <= num_plain_bits /\ num_plain_bits < pow2_32 /\ 
 //           0 <= num_auth_bits  /\ num_auth_bits  < pow2_32 /\
 //           length_quad32 == reverse_bytes_quad32(Mkfour(num_plain_bits, 0, num_auth_bits, 0));
-    assume false;
-/*
     compute_ghash_incremental_register();
     ghost var y_final := xmm1;
 
     // Invoke lemma showing that incremental hashing works
 
 
-//    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, auth_b)), auth_num_bytes);
-//    ghost var auth_padded_bytes := pad_to_128_bits(auth_bytes);
-//    ghost var auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
-//
+    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, auth_b)), auth_num_bytes);
+    ghost var auth_padded_bytes := pad_to_128_bits(auth_bytes);
+    ghost var auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
+
     ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));
     ghost var cipher_padded_bytes := pad_to_128_bits(cipher);
     ghost var cipher_padded_quads := le_bytes_to_seq_quad32(cipher_padded_bytes);
@@ -440,8 +439,6 @@ procedure {:quick} {:verify true} gcm_core(
                        create(1, length_quad32)); 
     //assert y_final == ghash_LE(h, append(auth_padded_bytes, append(cipher_padded_bytes, create(1, length_quad32))));
     // assert xmm1 == ghash_LE(h, append(buffer128_as_seq(mem, auth_b), append(buffer128_as_seq(mem, out_b), create(1, length_quad32)))); 
-
-
 
     ghost var hash := xmm1;
 
@@ -465,12 +462,11 @@ procedure {:quick} {:verify true} gcm_core(
 //           4096 * length(auth) < pow2_32 /\
 //           cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 
-    assert length_quad32 == reverse_bytes_quad32(Mkfour(num_plain_bits, 0, num_auth_bits, 0));
+//    assert length_quad32 == reverse_bytes_quad32(Mkfour(num_plain_bits, 0, num_auth_bits, 0));
 //    assert y_final == ghash_LE(h, append(auth_padded_bytes, append(cipher_padded_bytes, create(1, length_quad32))));
 //    assert le_quad32_to_bytes(xmm1) == gctr_encrypt_LE(Mkfour(1, iv_BE.lo1, iv_BE.hi2, iv_BE.hi3), le_quad32_to_bytes(y_final), AES_128, key);
 
-    //gcm_encrypt_LE_snd_helper(icb_enc, iv_BE, length_quad32, y_final, xmm1, plain, auth, cipher, AES_128, key);
-*/
+    gcm_encrypt_LE_snd_helper(icb_enc, iv_BE, length_quad32, y_final, xmm1, plain, auth, cipher, AES_128, key);
 }
 
 /*
