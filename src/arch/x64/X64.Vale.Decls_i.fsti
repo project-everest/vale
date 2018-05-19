@@ -116,8 +116,9 @@ unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
   | OReg r -> OMem (MReg r offset)
   | _ -> OConst 42
 
-let va_opr_lemma_Mem (s:va_state) (base:operand{OReg? base}) (offset:int) (b:M.buffer64) (index:int) : Lemma
+let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (index:int) : Lemma
   (requires
+    OReg? base /\
     valid_src_addr s.mem b index /\
     eval_operand base s + offset == M.buffer_addr b s.mem + 8 `op_Multiply` index
   )
