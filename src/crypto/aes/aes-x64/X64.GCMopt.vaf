@@ -669,7 +669,7 @@ procedure {:quick} callee_restore_registers(
 //#endverbatim
 
 #reset-options "--z3rlimit 40"
-procedure {:quick} {:verify true} gcm_stdcall_inner(
+procedure {:quick} gcm_stdcall_inner(
     ghost args_b:buffer64,
     ghost iv_BE:quad32,
 
@@ -768,7 +768,7 @@ procedure {:quick} {:verify true} gcm_stdcall_inner(
     Store128_buffer(r15, xmm1, 0, tag_b, 0);
 }
 
-/*
+#reset-options "--z3rlimit 100"
 procedure {:quick} gcm_stdcall(
     inline win:bool,
     ghost args_b:buffer64,
@@ -793,9 +793,9 @@ procedure {:quick} gcm_stdcall(
         args_ptr := if win then rcx else rdi;
 
         plain_ptr         := buffer64_read(args_b, 0, mem);
-        plain_len         := buffer64_read(args_b, 1, mem);
+        plain_num_bytes   := buffer64_read(args_b, 1, mem);
         auth_ptr          := buffer64_read(args_b, 2, mem);
-        auth_len          := buffer64_read(args_b, 3, mem);
+        auth_num_bytes    := buffer64_read(args_b, 3, mem);
         iv_ptr            := buffer64_read(args_b, 4, mem);
         expanded_key_ptr  := buffer64_read(args_b, 5, mem);
         out_ptr           := buffer64_read(args_b, 6, mem);
@@ -818,25 +818,29 @@ procedure {:quick} gcm_stdcall(
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(tag_b)));
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(keys_b)));
 
-        validSrcAddrs128(mem, plain_ptr, plain_b, plain_len);
-        validSrcAddrs128(mem, auth_ptr, auth_b, auth_len);
+        validSrcAddrs128(mem, plain_ptr, plain_b, bytes_to_quad_size(plain_num_bytes));
+        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes));
         validSrcAddrs128(mem, iv_ptr, iv_b, 1);
-        validDstAddrs128(mem, out_ptr, out_b, plain_len);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes));
         validDstAddrs128(mem, tag_ptr, tag_b, 1);
 
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
 
-        plain_ptr + 16 * plain_len < pow2_64;
-        auth_ptr + 16 * auth_len < pow2_64;
-        out_ptr + 16 * plain_len < pow2_64;
-        buffer_length(plain_b) == buffer_length(out_b) /\ buffer_length(out_b) == plain_len /\ 256 * buffer_length(plain_b) < pow2_32;
-        buffer_length(auth_b) == auth_len;
+        plain_ptr + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
+        auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
+        out_ptr   + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
+        buffer_length(plain_b) == buffer_length(out_b);
+        buffer_length(out_b) == bytes_to_quad_size(plain_num_bytes);
+        buffer_length(auth_b) == bytes_to_quad_size(auth_num_bytes);
+        256 * buffer_length(plain_b) < pow2_32;
+        4096 * plain_num_bytes < pow2_32;
+        4096 * auth_num_bytes < pow2_32;
 
         iv_BE == reverse_bytes_quad32(buffer128_read(iv_b, 0, mem));
 
         // To simplify length calculations, restrict auth and plain length further
-        256 * auth_len < pow2_32;
-        256 * plain_len < pow2_32;
+        256 * bytes_to_quad_size(auth_num_bytes)  < pow2_32;
+        256 * bytes_to_quad_size(plain_num_bytes) < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -847,13 +851,18 @@ procedure {:quick} gcm_stdcall(
     ensures
         modifies_mem(loc_union(loc_union(loc_buffer(stack_b), loc_buffer(out_b)), loc_buffer(tag_b)), old(mem), mem);
 
-        validSrcAddrs128(mem, old(out_ptr), out_b, plain_len);
+        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(plain_num_bytes));
         validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
 
-        256 * buffer_length(plain_b) < pow2_32;
-        256 * buffer_length(auth_b) < pow2_32;
-        buffer128_as_seq(mem, out_b) == fst(gcm_encrypt_LE(AES_128, key, iv_BE, buffer128_as_seq(old(mem), plain_b), buffer128_as_seq(old(mem), auth_b)));
-//        create(1, buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, key, iv_BE, mk_gctr_plain(buffer128_as_seq(old(mem), plain_b)), mk_gctr_plain(buffer128_as_seq(old(mem), auth_b))));
+        let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
+        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
+        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
+
+//        // TODO: First two clauses work around Vale's type limitations
+        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(auth) < pow2_32 /\
+        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
+        le_quad32_to_bytes(xmm1) == snd(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 
         // Calling convention for caller/callee saved registers
         rsp == old(rsp);
@@ -893,4 +902,3 @@ procedure {:quick} gcm_stdcall(
     gcm_stdcall_inner(args_b, iv_BE, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
     callee_restore_registers(win, stack_b, old(xmm6), old(xmm7), old(xmm8), old(xmm10), old(xmm11));
 }
-*/
