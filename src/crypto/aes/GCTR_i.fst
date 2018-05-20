@@ -76,7 +76,7 @@ let aes_encrypt_BE (alg:algorithm) (key:aes_key_LE alg) (p_BE:quad32) =
   let p_LE = reverse_bytes_quad32 p_BE in
   aes_encrypt_LE alg key p_LE
 
-logic let gctr_partial (bound:nat) (plain cipher:seq quad32) (key:aes_key_LE AES_128) (icb:quad32) =
+let gctr_partial (bound:nat) (plain cipher:seq quad32) (key:aes_key_LE AES_128) (icb:quad32) =
   let bound = min bound (min (length plain) (length cipher)) in
   forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==>
     index cipher j == quad32_xor (index plain j) (aes_encrypt_BE AES_128 key (inc32 icb j))
