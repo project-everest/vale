@@ -239,13 +239,26 @@ let be_bytes_to_quad32 (b:seqn 16 nat8) : quad32 =
 // let be_quad32_to_bytes (q:quad32) : seqn 16 nat8 =
 //   seq_four_to_seq_BE (seq_map (nat_to_four 8) (four_to_seq_BE q))
 
+// be_bytes_to_quad32 (be_quad32_to_bytes q)
+//   { definition of be_bytes_to_quad32 }
+// seq_to_four_BE (seq_map (four_to_nat 8) (seq_to_seq_four_BE (be_quad32_to_bytes q)))
+//   { definition of be_quad32_to_bytes }
+// seq_to_four_BE (seq_map (four_to_nat 8) (seq_to_seq_four_BE (seq_four_to_seq_BE (seq_map (nat_to_four 8) (four_to_seq_BE q)))))
+//    { seq_to_seq_four_to_seq_BE (seq_map (nat_to_four 8) (seq_four_to_seq_BE q)); }
+// seq_to_four_BE (seq_map (four_to_nat 8) (seq_map (nat_to_four 8) (four_to_seq_BE q)))
+//    { seq_map_inverses  (four_to_nat 8) (nat_to_four 8) (four_to_seq_BE q); }
+// seq_to_four_BE (four_to_seq_BE q)
+//    { seq_to_four_to_seq_BE q }
+//  q
+
 let be_bytes_to_quad32_to_bytes (q:quad32) : 
   Lemma (be_bytes_to_quad32 (be_quad32_to_bytes q) == q)
   =
   let q':quad32 = be_bytes_to_quad32 (be_quad32_to_bytes q) in
-//  assert (equal (be_bytes_to_quad32 (be_quad32_to_bytes q)) q);
- // assert (q' == q);
-  admit()
+  seq_to_seq_four_to_seq_BE (seq_map (nat_to_four 8) (four_to_seq_BE q));
+  seq_map_inverses (nat_to_four 8) (four_to_nat 8) (four_to_seq_BE q);
+  seq_to_four_to_seq_BE q;
+  ()
 
 open FStar.Mul
 let slice_commutes_seq_four_to_seq_LE (#a:Type) (s:seq (four a)) (n:nat{n <= length s}) (n':nat{ n <= n' /\ n' <= length s}) :

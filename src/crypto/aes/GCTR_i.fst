@@ -38,8 +38,7 @@ let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algo
   assert (equal plain_quads_LE createEmpty);     // OBSERVE
   assert (plain_quads_LE == createEmpty);
   assert (cipher_quads_LE == createEmpty);
-  assert (equal (le_seq_quad32_to_bytes cipher_quads_LE) createEmpty);  // OBSERVE
-  //admit();
+  assert (equal (le_seq_quad32_to_bytes cipher_quads_LE) createEmpty);  // OBSERVEs
   ()
 
 (*

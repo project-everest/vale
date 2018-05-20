@@ -10,6 +10,10 @@ val seq_to_seq_four_to_seq_LE  (#a:Type) (x:seq (four a)) :
   Lemma (seq_to_seq_four_LE (seq_four_to_seq_LE x) == x)
   [SMTPat (seq_to_seq_four_LE (seq_four_to_seq_LE x))]
 
+val seq_to_seq_four_to_seq_BE  (#a:Type) (x:seq (four a)) :
+  Lemma (seq_to_seq_four_BE (seq_four_to_seq_BE x) == x)
+  [SMTPat (seq_to_seq_four_BE (seq_four_to_seq_BE x))]
+
 val seq_four_to_seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) :
   Lemma (seq_four_to_seq_LE (seq_to_seq_four_LE x) == x)
   [SMTPat (seq_four_to_seq_LE (seq_to_seq_four_LE x))]
@@ -25,6 +29,12 @@ val nat_to_four_to_nat (x:four (natN (pow2_norm 8))) :
 
 val four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
   Lemma (four_to_seq_LE (seq_to_four_LE x) == x)
+
+val four_to_seq_to_four_BE (#a:Type) (x:seq4 a) :
+  Lemma (four_to_seq_BE (seq_to_four_BE x) == x)
+
+val seq_to_four_to_seq_BE (#a:Type) (x:four a) :
+  Lemma (seq_to_four_BE (four_to_seq_BE x) == x)
 
 val four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) : 
   Lemma (four_to_seq_LE x == seq_four_to_seq_LE (create 1 x))

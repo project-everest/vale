@@ -16,6 +16,14 @@ let seq_to_seq_four_to_seq_LE  (#a:Type) (x:seq (four a)) :
   assert (equal fours x);
   ()
 
+let seq_to_seq_four_to_seq_BE  (#a:Type) (x:seq (four a)) :
+  Lemma (seq_to_seq_four_BE (seq_four_to_seq_BE x) == x)
+  [SMTPat (seq_to_seq_four_BE (seq_four_to_seq_BE x))]
+  =
+  assert True;
+  assert(equal (seq_to_seq_four_BE (seq_four_to_seq_BE x)) x);
+  ()
+
 let seq_four_to_seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) :
   Lemma (seq_four_to_seq_LE (seq_to_seq_four_LE x) == x)
   =
@@ -78,7 +86,17 @@ let four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
   assert (equal (four_to_seq_LE (seq_to_four_LE x)) x);
   ()
 
+let four_to_seq_to_four_BE (#a:Type) (x:seq4 a) :
+  Lemma (four_to_seq_BE (seq_to_four_BE x) == x)
+  =
+  assert (equal (four_to_seq_BE (seq_to_four_BE x)) x);
+  ()
 
+let seq_to_four_to_seq_BE (#a:Type) (x:four a) :
+  Lemma (seq_to_four_BE (four_to_seq_BE x) == x)
+  = 
+  ()
+  
 (*
 let seq_four_to_seq_LE (#a:Type) (x:seq (four a)) : seq a =
   let f (n:nat{n < length x * 4}) = four_select (index x (n / 4)) (n % 4) in
