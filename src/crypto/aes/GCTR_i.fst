@@ -269,16 +269,24 @@ let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:qua
   = 
   let q_bytes = le_quad32_to_bytes q in
   let q_bytes_prefix = slice q_bytes 0 (length s) in
-  //let q_cipher = gctr_encrypt_block icb_BE q alg key i in
-  //let q_cipher_bytes = slice (le_quad32_to_bytes q_cipher) 0 (length s) in
-  //let s_quad = le_bytes_to_quad32 (pad_to_128_bits s) in
-  //let s_cipher = gctr_encrypt_block icb_BE s_quad alg key i in
-  //let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in 
-  //let enc_ctr = aes_encrypt_LE alg key (reverse_bytes_quad32 (inc32 icb_BE i)) in
+  let q_cipher = gctr_encrypt_block icb_BE q alg key i in
+  let q_cipher_bytes = slice (le_quad32_to_bytes q_cipher) 0 (length s) in
+  let s_quad = le_bytes_to_quad32 (pad_to_128_bits s) in
+  let s_cipher = gctr_encrypt_block icb_BE s_quad alg key i in
+  let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in 
+  let enc_ctr = aes_encrypt_LE alg key (reverse_bytes_quad32 (inc32 icb_BE i)) in
+  let icb_LE = reverse_bytes_quad32 (inc32 icb_BE i) in
   
   if s = q_bytes_prefix then (
+     //  s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s)
+     //                 = slice (le_quad32_to_bytes (gctr_encrypt_block icb_BE s_quad alg key i)) 0 (length s)
+     //                 = slice (le_quad32_to_bytes (gctr_encrypt_block icb_BE (le_bytes_to_quad32 (pad_to_128_bits s)) alg key i)) 0 (length s)
+
+     // q_cipher_bytes  = gctr_encrypt_block icb_BE q alg key i
     le_quad32_to_bytes_to_quad32 (pad_to_128_bits s);
     slice_pad_to_128_bits s;
+    quad32_xor_bytewise q (le_bytes_to_quad32 (pad_to_128_bits s)) (aes_encrypt_LE alg key icb_LE) (length s);
+    //assert (equal s_cipher_bytes q_cipher_bytes);
     ()
   ) else
     ();

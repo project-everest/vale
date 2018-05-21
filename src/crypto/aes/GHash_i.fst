@@ -94,6 +94,7 @@ let lemma_hash_append3 (h y_init y_mid1 y_mid2 y_final:quad32) (s1 s2 s3:seq qua
     ()
   )
 
+#reset-options "--z3rlimit 30"
 open FStar.Mul
 let lemma_ghash_incremental_bytes_extra_helper (h y_init y_mid y_final:quad32) (input:seq quad32) (final final_padded:quad32) (num_bytes:nat) : Lemma
   (requires (1 <= num_bytes /\ 

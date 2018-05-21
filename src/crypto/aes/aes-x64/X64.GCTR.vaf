@@ -301,7 +301,7 @@ procedure {:quick} gctr_bytes_extra(
         validDstAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         orig_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         orig_out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32;// /\ 4096 * num_bytes < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32 /\ 4096 * num_bytes < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -326,7 +326,7 @@ procedure {:quick} gctr_bytes_extra(
         modifies_buffer128(out_b, old(mem), mem);
         let plain  := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem,  in_b)), 0, num_bytes);
         let cipher := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), 0, num_bytes);
-        cipher == gctr_encrypt_LE(icb_BE, plain, AES_128, key);
+        cipher == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(plain), AES_128, key);
         xmm1 == buffer128_read(out_b, num_blocks, mem);
 
 // TODO: Prove this inside gctr_bytes_extra_work
@@ -370,7 +370,7 @@ procedure {:quick} gctr_bytes_no_extra(
         validDstAddrs128(mem, orig_out_ptr, out_b, bytes_to_quad_size(num_bytes));
         orig_in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         orig_out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
-        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32; // /\ 4096 * num_bytes < pow2_32;
+        buffer_length(in_b) == buffer_length(out_b) /\ buffer_length(out_b) == bytes_to_quad_size(num_bytes) /\ 256 * buffer_length(in_b) < pow2_32 /\ 4096 * num_bytes < pow2_32;
 
         // AES reqs
         length(round_keys) == 11;
@@ -389,7 +389,7 @@ procedure {:quick} gctr_bytes_no_extra(
         modifies_buffer128(out_b, old(mem), mem);
         let plain  := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem,  in_b)), 0, num_bytes);
         let cipher := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), 0, num_bytes);
-        cipher == gctr_encrypt_LE(icb_BE, plain, AES_128, key);
+        cipher == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(plain), AES_128, key);
 {
     ghost var num_blocks := num_bytes / 16;
     gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, icb_BE);
