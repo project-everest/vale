@@ -292,7 +292,7 @@ if 'KREMLIN_HOME' in os.environ:
   kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
-env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
+env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf')) + ' -include ' + str(File('src/lib/util/types.vaf'))
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'

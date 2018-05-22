@@ -34,6 +34,7 @@ type name_info =
 | Func_decl of decl_type
 | Proc_decl of decl_type // second proc_decl is for raw_proc
 | Type_info of (tformal list * kind * typ option)
+| Name of id
 
 type scope_mod =
 | Open_module of string
@@ -43,6 +44,7 @@ type scope_mod =
 | Proc of (id * decl_type)
 | Type of (id * id * tformal list * kind * typ option)
 | Const of (id * id* typ)
+| Unsupported of (id * id)
 
 type env = {
   curmodule: option<string>; (* name of the module being typechecked *)
@@ -90,6 +92,7 @@ let lookup_name (env:env) (x:id) (nameOnly:bool) =
     | Proc (s, decl) when s=x -> Some (Proc_decl decl)
     | Type (s, m, ts, kind, t) when (s=x && (mn = (Id "") || m = mn)) -> Some (Type_info (ts, kind, t))
     | Const (s, m, t) when (s=x && (mn = (Id "") || m = mn)) -> Some (Info t)
+    | Unsupported (s, m) when (s=x && (mn = (Id "") || m = mn)) -> Some (Name s)
     | _ -> None
   let rec aux = function
     | a :: q -> 
@@ -105,14 +108,31 @@ let push_scope_mod env scope_mod =
 
 let base_typ t =
   match t with
-  | TName (Id "Prims.int") -> TInt(NegInf, Inf)
+  | TName (Id "Prims.int") 
+  | TName (Id "Prims.nat") 
+  | TName (Id "Prims.pos")
+  | TName (Id "pos") -> TInt(NegInf, Inf)
+  | TName (Id "Prims.bool") -> TName(Id "bool")
   | TName (Id "int") -> TInt(NegInf, Inf)
   | TName (Id "unit") -> TInt (Int bigint.Zero, Inf)
   | TName (Id "nat") -> TInt(Int bigint.Zero, Inf)
   | TName (Id "reg") -> TInt(NegInf, Inf)
-  | TName (Id "opr64") -> TInt(NegInf, Inf)  // int64
-  | TName (Id "dst_opr64") -> TInt(NegInf, Inf) // int64
+  | TName (Id "opr64")   // opr64
+  | TName (Id "dst_opr64") 
+  | TName (Id "reg_opr64") -> TInt(NegInf, Inf) // int64
+  | TName (Id "nat64") -> TInt(Int bigint.Zero, Int (bigint 63))
+  | TName (Id "nat128") -> TInt(Int bigint.Zero, Int (bigint 127))
+  | TName (Id "X64.Machine_s.nat64")
+  | TName (Id "Types_s.nat64") 
+  | TName (Id "Types_s.nat32") -> TInt(NegInf, Inf)  // nat64
+  | TName (Id "xmm") -> TName(Id "quad32")
+  | TName (Id "imm8") -> TInt(Int bigint.Zero, Int (bigint 255))
+  | TName (Id "Types_s.twobits") -> TInt (Int bigint.Zero, Int (bigint 3))
   | _ -> t
+
+let push_unsupported env id =
+  let (mn, sn) = name_of_id id in
+  push_scope_mod env (Unsupported (sn, mn))
 
 let push_id env id t =
   let t = base_typ t in
@@ -164,6 +184,7 @@ let push_formals (env:env) (formals:formal list): env =
 let try_lookup_id (env:env) (x:id): typ option = 
   match lookup_name env x false with
   | Some (Info t) -> Some t
+  | Some (Name x) -> unsupported ("unsupported '" + (err_id x) + "'")
   | _ -> None
 
 let lookup_id (env:env) (x:id): typ = 
@@ -173,8 +194,9 @@ let lookup_id (env:env) (x:id): typ =
 
 let compute_proc_typ p =
   let args = List.map (fun (_, t, _, _, _) -> base_typ t) p.pargs in
+  let outs = List.fold (fun l (_, t, _, io, _) -> match io with | Out | InOut -> l@[(base_typ t)] | _ -> l) [] p.pargs in
   let rets = List.map (fun (_, t, _, _, _) -> base_typ t) p.prets in
-  {targs=args; trets=rets; ret_name=None; specs=p.pspecs; attrs=p.pattrs}     
+  {targs=args; trets=outs@rets; ret_name=None; specs=p.pspecs; attrs=p.pattrs}     
 
 let compute_func_typ f =
   let targs = List.map (fun (id, kind, _) -> TVar (id, Some kind)) f.ftargs in
@@ -190,17 +212,19 @@ let compute_func_typ f =
     | TList t -> TList (replace_typ_arg t)
     | TTuple ts -> TTuple (List.map replace_typ_arg ts)
     | TArrow (ts, t) -> TArrow (List.map replace_typ_arg ts, replace_typ_arg t)
-  let arg_typ targs t = 
-    let t = match t with | Some t -> base_typ t | None -> next_type_var() in
-    replace_typ_arg t
-  let args = List.map (fun (id, t) -> arg_typ f.ftargs t) f.fargs in
-  let rets = [replace_typ_arg f.fret] in
+  let arg_typ l t = 
+    match t with 
+    | TName (Id "Prims.unit") -> l
+    | _ -> l@[replace_typ_arg t]
+  let args = List.fold (fun l (id, t) -> let t = match t with | Some t -> base_typ t | None -> next_type_var() in arg_typ l t) [] f.fargs in
+  let rets = arg_typ [] f.fret in
   {targs=args; trets=rets; ret_name=f.fret_name; specs=f.fspecs; attrs=f.fattrs}     
 
 let lookup_proc (env:env) (x:id): decl_type =
   match lookup_name env x false with
   | Some (Proc_decl t) -> t
   | Some (Func_decl t) -> t
+  | Some (Name x) -> unsupported ("unsupported '" + (err_id x) + "'")
   | _ -> err ("cannot find fun/proc '" + (err_id x) + "'")
 
 let lookup_type (env:env) (x:id): kind =
@@ -243,8 +267,19 @@ let bnd_equal b1 b2 =
   | _ -> false
 
 let rec typ_equal t1 t2 = 
+  let t1 = base_typ t1 in
+  let t2 = base_typ t2 in
   match (t1, t2) with
-  | (TName (Id x), TName (Id y)) -> x = y
+  | (TName (Id "Words_s.four(uva_1114)"), TName (Id "quad32")) ->
+    // ISSUE:
+    true
+  | (TName (Id "bool"), TName(Id "Words_s.nat1")) ->
+    // ISSUE: Types_s.insert_nat64 has type "nat1" while it should be "bool"
+    true
+  | (TName x, TName y) -> 
+    let (mx, x) = name_of_id x in
+    let (my, y) = name_of_id y in
+    if ((x = y) && (mx = Id "" || my = Id "" || mx = my)) then true else false
   | (TApp (t1, ts1), TApp (t2, ts2)) ->
     (typ_equal t1 t2) && List.fold2 (fun b t1 t2 -> b && typ_equal t2 t2) true ts1 ts2
   | (TVar _, TVar _) -> false
@@ -317,6 +352,12 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
       let t = neg_int_bound t in
       let ae = AEOp (Uop UNeg, [ae], tv, et) in
       ([tv], ae, s@[(t, tv)])
+    | EOp (Uop UNot, [e]) ->
+      let tv = next_type_var() in
+      let et = match expected_typ with | None -> tv | Some t -> t in 
+      let (t, ae, s) = infer_exp_one env e (Some et) in
+      let ae = AEOp (Uop UNot, [ae], tv, et) in
+      ([tv], ae, s@[(t, tv)])
     | EOp (Uop UOld, [e]) ->
       let tv = next_type_var() in
       let et = match expected_typ with | None -> tv | Some t -> t in
@@ -341,6 +382,9 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
         | AEApply (x, es, [t], [et]) -> AEOp (Uop (UCustom op), es, t, et)
         | _ -> err ("'UCustom' should be converted to 'EApply' first before typechecking") in
       ([t], ae, s)
+    | EOp (Uop UToOperand, _) ->
+      // TODO: typing rule for UToOperand
+      unsupported (sprintf "unchecked Uop UToOperand")
     | EOp (Uop op, _) ->
       err (sprintf  "unsupported Uop '%A' in typechecker" op)
     | EOp (Bop op, [e1; e2]) when isArithmeticOp op ->
@@ -434,10 +478,13 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
       let (t, ae, s) = 
         match (t1,x) with 
         | (TName (Id t), (Id f)) ->
-          let s = "__proj" + t + "__item__" + f in
+          // ISSUE: link quad32 to Mkfour
+          let t = if t = "quad32" then "Mkfour" else t in
+          let s = "__proj__" + t + "__item__" + f in
           let e = EApply (Id s, [e]) in
           infer_exp_one env e expected_typ
-        | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
+        // ISSUE: need to change "unsupported" to "err"
+        | _ -> unsupported (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
       let ae = 
         match ae with 
         | AEApply (x, es, [t], [et]) -> AEOp (FieldOp x, es, t, et)
@@ -493,35 +540,43 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
       // let x:t := ex in e
       let tv = next_type_var() in
       let (t1, ae1, s1) = infer_exp_one env ex t in
+      let xt = match t with | Some t -> t | _ -> next_type_var() in
+      let env = push_id env x xt in
       let (t2, ae2, s2) = infer_exp_one env e expected_typ in
       let et = match expected_typ with | None -> tv | Some t -> t in
       let ae = AEBind(BindLet, [ae1], [(x,t)], [], ae2, tv, et) in
-      let s = match t with | Some t -> [(t1, t)] | _ -> [] in
-      ([tv], ae, s1@s2@s@[(tv, t2)])
+      ([tv], ae, s1@s2@[(t1,xt)]@[(tv, t2)])
     | EBind (BindLet, [ex], xs, [], e) ->
       // TODO: x1, x2 ... are distinct and not local variables
       // let (x1:t1, x2:t2...) := ex in e
       let tv = next_type_var() in
-      let (t1, ae1, s1) = infer_exp_one env ex None in  // TODO: expected type
+      let (ts, ae1, s1) = infer_exp env ex None in
       let (t2, ae2, s2) = infer_exp_one env e expected_typ in
       let et = match expected_typ with | None -> tv | Some t -> t in
       let ae = AEBind(BindLet, [ae1], xs, [], ae2, tv, et) in
-      // TODO: xs types should match ex tpye.
-      //let s = match t with | Some t -> [(t1,t)] | _ -> [] in
-      let s = [] in
+      if (List.length ts <> List.length xs) then err (sprintf "BindLet type mismatch");
+      let s = List.fold2 (fun l et (x, t) -> let t = match t with | Some t -> t | _ -> next_type_var() in l@[(t, et)]) [] ts xs in
       ([tv], ae, s1@s2@s@[(tv, t2)])
     | EBind (b, [], fs, ts, e) when b=Forall || b=Exists ->
       // fs list of formals, that are distinct and are not local variables
       // ts: triggers
       // e: prop
+      let env = List.fold(fun env (x, t) -> let t = match t with Some t -> t | None -> next_type_var() in push_id env x t) env fs in
       let (t, ae, s) = infer_exp_one env e expected_typ in
       let ae = AEBind(b, [], fs, ts, ae, t, TName(Id "prop")) in
       ([t], ae, s@[(t, TName (Id "prop"))])
+    | EBind (Lambda, [], xs, ts, e) ->
+      let tv = next_type_var() in
+      let (t, ae, s) = infer_exp_one env e expected_typ in
+      let et = match expected_typ with | None -> tv | Some t -> t in
+      let ae = AEBind(Lambda, [], xs, ts, ae, t, et) in
+      ([tv], ae, s@[(tv, t)])
     | ECast (e, tc) -> 
       let (t, ae, s) = infer_exp_one env e None in
       let ae = AECast (ae, tc) in
       if (is_subtype t tc || is_subtype tc t) then ([tc], ae, s)
-      else err (sprintf "cannot cast between types %A and %A that do not have subtype relationship" t tc) in
+      else err (sprintf "cannot cast between types %A and %A that do not have subtype relationship" t tc)
+    | _ -> err (sprintf "missing typechecker for exp %A" e) in
   let ts = List.map base_typ ts in
   (ts, ae, s)
 and infer_exp_one (env:env) (e:exp) (et:typ option) : (typ * aexp * typ_constraints ) = 
@@ -539,7 +594,8 @@ let rec resolve_type env t:kind =
   | TApp (t, ts) -> resolve_type env t
   | TArrow (ts, t) -> err ("not implemented")
   | TInt(_, _) -> KType bigint.Zero
-  | _ -> err ("not implemented")
+  | TVar(_, Some k) -> k
+  | _ -> err (sprintf "cannot find the kind of the type '%A'" t)
 and resolve_types env ts = List.map (resolve_type env) ts;
 
 let rec string_of_type t =
@@ -566,7 +622,10 @@ let rec string_of_type t =
 let match_kind env (t:typ) (k:kind option) =
   match k with
   | Some k ->
-    kind_equal (resolve_type env t) k
+    match t with
+    | TVar (_, None) -> true
+    | _ -> 
+      kind_equal (resolve_type env t) k
   | None -> true
 
 (* substitute all occurrences of x in t with s *)
@@ -641,8 +700,8 @@ let bind_typ (m:substitutions) (s:typ) (t:typ):substitutions =
   | _ -> m
 
 let rec unify_one env (m:substitutions) (s:typ) (t:typ):substitutions =
-  let t1 = substitute env m s in
-  let t2 = substitute env m t in
+  let t1 = base_typ (substitute env m s) in
+  let t2 = base_typ (substitute env m t) in
   match (t1, t2) with
   | (TVar (x,_), _) -> bind m x t2
   | (_, TVar (x,_)) -> bind m x t1
@@ -659,7 +718,27 @@ let rec unify_one env (m:substitutions) (s:typ) (t:typ):substitutions =
   | (TName (Id "prop"), TName (Id "bool")) -> 
     let u = TName (Id "prop") in
     let m = bind_typ m s u in bind_typ m t u
-  | (TName (Id x), TName (Id y)) when x = y -> m
+  | (TApp(TName (Id "Words_s.four"),_), TName (Id "quad32")) ->
+    // ISSUE:
+    m
+  | (TName (Id "bool"), TName(Id "Words_s.nat1")) ->
+    // ISSUE: Types_s.insert_nat64 has type "nat1" while it should be "bool"
+    m
+  //| (TName (Id "quad32"), TInt(NegInf, Inf)) ->
+  | (TName (Id "quad32"), TInt (_, _)) ->
+    // ISSUE:
+    m
+  | (TName (Id "X64.Vale.Decls_i.va_state"), TName (Id "state")) 
+  | (TName (Id "X64.Vale.Decls_i.va_operand"), TName (Id "X64.Machine_s.operand"))
+  | (TName (Id "shift_amt64"), TInt(_,_)) 
+  | (TName (Id "pos"), TInt(_,_)) ->
+    // ISSUE:
+    m
+  | (TName x, TName y) -> 
+    let (my, x) = name_of_id x in
+    let (mx, y) = name_of_id y in
+    if (x=y && (mx = (Id "") || my = (Id "") || mx = my)) then m
+    else err ("cannot unify type \"" + string_of_type t1 + "\" and \"" + string_of_type t2 + "\"")
   | _ -> err ("cannot unify type \"" + string_of_type t1 + "\" and \"" + string_of_type t2 + "\"")
 
 and unify env (m:substitutions) (tc:typ_constraints):substitutions =
@@ -707,7 +786,11 @@ let rec subst_exp env (s:substitutions) (e:aexp) : exp =
       | Bop p -> 
         if isArithmeticOp p then
           // make sure t is TInt
-          match t with | TInt (_, _) -> op | _ -> err (sprintf "%A expected int type" op)
+          match t with 
+          | TInt (_, _) -> op 
+          // TODO: type still unknown due to unsupported types
+          | TVar (_, _) -> unsupported (sprintf "unknown type")
+          | _ -> err (sprintf "%A expected int type, got %A" op t)
         else if isLogicOp p then
           // make sure t is bool or prop, if t is prop, swap in "/\" "\/" for "&&" "||"
           match t with 
@@ -716,6 +799,11 @@ let rec subst_exp env (s:substitutions) (e:aexp) : exp =
             match p with | BAnd -> Bop BLand | BOr -> Bop BLor | _-> op
           | _ -> err (sprintf "%A expected bool/prop type" op)
         else op
+      | Uop UNot ->
+        match t with
+        | TName (Id "bool") 
+        | TName (Id "prop") -> op
+        | _ -> err (sprintf "Uop UNot expected bool type, got %A" t)
       | _ -> op
     let e = EOp (op, es) in
     if (typ_equal t et) then e else insert_cast e t et
@@ -769,7 +857,9 @@ let tc_exp (env:env) (e:exp) (et: typ option): (typ list * exp) =
     let ts = List.map (fun t-> substitute env s t) ts in
     let es = subst_exp env s ae in
     (ts, es)
-  with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
+  with
+    | UnsupportedErr s -> printfn "%s" s; ([], e)
+    | err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
 
 let rec update_env_stmt (env:env) (s:stmt): env =
   match s with
@@ -781,13 +871,16 @@ let rec update_env_stmt (env:env) (s:stmt): env =
       push_id env x t
     )
   | SAlias (x, y) ->
-      let t = lookup_id env y in
-      push_id env x t
+    let t = lookup_id env y in
+    push_id env x t
   | SAssign (xs, e) ->
-      push_lhss env xs
+    push_lhss env xs
   | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> env
-  | SForall (xs, ts, ex, e, b) -> env
-  | SExists (xs, ts, e) -> env
+  | SForall (xs, ts, ex, e, b) ->
+    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> next_type_var() in push_id env x t) env xs 
+  | SExists (xs, ts, e) -> 
+    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> next_type_var() in push_id env x t) env xs 
+  
       
 let resolve_id env id:unit =
   match id with
@@ -854,40 +947,53 @@ and tc_calc_content (env:env) (cc:calcContents):calcContents =
   {calc_exp = e; calc_op = oop; calc_hints = hints}
 and tc_calc_contents (env:env) (contents:calcContents list):calcContents list = List.map (fun c -> tc_calc_content env c) contents
 
-let tc_spec (envIn:env) (envOut:env) (s:spec):spec =
+let tc_spec (env:env) (loc:loc, s:spec):(env * (loc * spec) list) =
   match s with
-  | Requires (r, e) -> let (t, e) = tc_exp envIn e None in Requires (r, e)
-  | Ensures (r, e) -> let (t, e) = tc_exp envOut e None in Ensures (r, e)
-  | Modifies (m, e) -> let (t, e) = tc_exp envOut e None in Modifies (m, e)
+  | Requires (r, e) -> let (t, e) = tc_exp env e None in (env, [(loc, Requires (r, e))])
+  | Ensures (r, e) -> let (t, e) = tc_exp env e None in (env, [(loc, Ensures (r, e))])
+  | Modifies (m, e) -> let (t, e) = tc_exp env e None in (env, [(loc, Modifies (m, e))])
   | SpecRaw (RawSpec (r, es)) ->
-    let rec tc_spec_exp es = 
+    let rec tc_spec_exp (env:env) (es:(loc * spec_exp) list) : (env * (loc * spec_exp) list) = 
       match es with
-      | [] -> []
-      | (loc, SpecExp e)::es -> let (t, e) = tc_exp envIn e None in (loc, SpecExp e)::tc_spec_exp es
+      | [] -> (env, [])
+      | (loc, SpecExp e)::es -> 
+        let (t, e) = tc_exp env e None in
+        let (env, es) = tc_spec_exp env es in
+        (env, (loc, SpecExp e) :: es)
       | (loc, SpecLet (x, t, e))::es ->
-        // TODO: push x
-        let (tc, e) = tc_exp envIn e t in
-        (loc, SpecLet (x, t, e))::tc_spec_exp es
-    let es = tc_spec_exp es in
-    SpecRaw (RawSpec (r, es))
+        let typ = match t with Some t -> t | None -> next_type_var() in
+        let env = push_id env x typ in
+        let (tc, e) = tc_exp env e t in
+        let (env, es) = tc_spec_exp env es in
+        (env, (loc, SpecLet (x, t, e)) :: es)
+    let (env, es) = tc_spec_exp env es in
+    (env, [(loc, SpecRaw (RawSpec (r, es)))])
   | SpecRaw (Lets ls) -> 
-    let tc_spec_let (loc:loc, l:lets) =
+    let tc_spec_let (env: env) (loc:loc, l:lets) : (env * (loc * lets)) =
       match l with
       | LetsVar (x, t, e) -> 
-        // TODO: push x
-        let (tc, e) = tc_exp envIn e t in (loc,  LetsVar (x, t, e))
-      | LetsAlias (x, y) -> (loc, LetsAlias (x, y)) in
-    let ls = List.map tc_spec_let ls in
-    SpecRaw (Lets ls)
+        let typ = match t with Some t -> t | None -> next_type_var() in
+        let env = push_id env x typ in
+        let (tc, e) = tc_exp env e t in (env, (loc,  LetsVar (x, t, e)))
+      | LetsAlias (x, y) ->
+        let t = lookup_id env y in
+        let env = push_id env x t in
+        (env, (loc, LetsAlias (x, y))) in
+    let (env, ls) = List.fold (fun (env, lets) l -> let (env, l) = tc_spec_let env l in (env, lets@[l])) (env,[]) ls in
+    (env, [(loc, SpecRaw (Lets ls))])
+
+let tc_specs (env:env) (specs:(loc * spec) list):(env * (loc * spec) list) =
+  let (env, specs) = List_mapFoldFlip tc_spec env specs in
+  (env, List.concat specs)
 
 let tc_proc (env:env) (p:proc_decl): (env*proc_decl) =
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let ptyp = compute_proc_typ p in
   let env = if isRecursive then push_proc env p.pname ptyp else env in
   let globals = ref env.scope_mods in 
-  let envIn = push_params_without_rets env p.pargs p.prets in
-  let env = push_rets envIn p.prets in
-  let pspecs = List_mapSnd (tc_spec envIn env) p.pspecs in
+  let env = push_params_without_rets env p.pargs p.prets in
+  let env = push_rets env p.prets in
+  let (env, pspecs) = tc_specs env p.pspecs in
   let (env, body) = 
     match p.pbody with
     | None -> (env, None)
@@ -923,8 +1029,14 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool)
     let env = push_func env f.fname ftyp in
     (env, decl)
   | DProc p ->
+    match p.pname with
+    | Id "gctr_core" -> printfn "found it"
+    | _ -> ();
     let (env,p) = tc_proc env p in 
     (env, ((l, DProc(p)), b))
+  | DUnsupported x ->
+    let env = push_unsupported env x in
+    (env, decl)
   | _ -> (env, decl)
 
 let tc_decls (ds:((loc * decl) * bool) list) : ((loc * decl) * bool) list = 

@@ -188,6 +188,7 @@ type decl =
 | DConst of id * typ
 | DFun of fun_decl
 | DProc of proc_decl
+| DUnsupported of id
 | DVerbatim of attrs * string list
 | DPragma of prag
 

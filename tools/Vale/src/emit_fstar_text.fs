@@ -135,6 +135,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
+    | ECast (e, t) -> (r prec e, prec) // TODO: add type conversion
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ret (x:id, t:typ option) = match t with None -> internalErr (sprintf "string_of_ret: %A" x) | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
@@ -501,6 +502,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p
+    | _ -> ()
   with err -> raise (LocErr (loc, err))
 
 let emit_decls (ps:print_state) (ds:decls):unit =

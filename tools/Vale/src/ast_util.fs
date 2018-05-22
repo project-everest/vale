@@ -29,9 +29,11 @@ let list_of_opt (opt:'a option):'a list = match opt with None -> [] | Some a -> 
 exception Err of string
 exception InternalErr of string
 exception LocErr of loc * exn
+exception UnsupportedErr of string
 let err (s:string):'a = raise (Err s)
 let internalErr (s:string):'a = raise (InternalErr s)
 let notImplemented (s:string):'a = raise (InternalErr ("not implemented: " + s))
+let unsupported (s:string):'a = raise (UnsupportedErr s)
 
 let string_of_loc (loc:loc):string =
   "line " + (string loc.loc_line) + " column " + (string loc.loc_col) + " of file " + loc.loc_file
@@ -112,6 +114,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EBind (b, es, fs, ts, e) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
     | EApply (x, es) -> EApply (x, List.map r es)
+    | ECast(e, t) -> ECast(r e, t)
   )
 
 let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
@@ -123,6 +126,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     | EBind (b, es, fs, ts, e) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
     | EOp (op, es) -> List.map r es
     | EApply (x, es) -> List.map r es
+    | ECast (e, t) -> [r e]
   in f e children
 
 let gather_attrs (f:exp -> 'a list -> 'a) (attrs:attrs):'a list =

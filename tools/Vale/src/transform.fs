@@ -141,6 +141,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         EBind (b, es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
     | EApply (x, es) -> EApply (x, List.map r es)
+    | ECast (e, t) -> ECast (r e, t)
   )
 
 let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
@@ -309,11 +310,13 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
       in
     let p_rmods = List.collect collect_p_mods p.pspecs in
     // TODO: process mrets
-    let collect_operand (pp, ea):(mod_kind * id) list =
+    let rec collect_operand (pp, ea):(mod_kind * id) list =
       match pp with
       | (_, _, XOperand, io, _) ->
         (
           match skip_loc ea with
+          | ECast (e, _) ->
+            collect_operand (pp, e)
           | EVar x ->
             (
               let x = resolve_alias env1 x in
@@ -707,6 +710,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         | _ -> err ("memory operand must have the form mem[base + offset] where mem is a variable")
       )
 *)
+    | (NotGhost, ECast(e, t)) -> Unchanged  // TODO: need to rewrite e
     | (NotGhost, _) ->
         err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)'; if the expression is intended as a non-const operand, try declaring operand procedures)"
         // Replace (codeLemma e)

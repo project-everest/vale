@@ -66,6 +66,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TTYPE TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
+%token <loc> UNSUPPORTED
 %token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS LAMBDA FUN
@@ -457,6 +458,7 @@ Decl
   | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
   | TYPE AnyQualifiedId TFormalsParen COLON Kind EXTERN SEMI { ($1, DType ($2, $3, $5, None)) }
   | TYPE AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($2, $3, $5, Some $7)) }
+	| UNSUPPORTED COLON AnyQualifiedId { ($1, DUnsupported ($3)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | CONST AnyQualifiedId COLON Type EXTERN SEMI { ($1, DConst ($2, $4)) }
   | FUNCTION Attrs AnyIdOrOp TFormalsBracket LPAREN Formals RPAREN COLON FunRet COLONEQ AnyId SEMI
