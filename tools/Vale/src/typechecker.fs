@@ -1029,10 +1029,8 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool)
     let env = push_func env f.fname ftyp in
     (env, decl)
   | DProc p ->
-    match p.pname with
-    | Id "gctr_core" -> printfn "found it"
-    | _ -> ();
-    let (env,p) = tc_proc env p in 
+    let isTypeChecked = attrs_get_bool (Id "typecheck") false p.pattrs in
+    let (env,p) = if isTypeChecked then tc_proc env p else (env, p) in 
     (env, ((l, DProc(p)), b))
   | DUnsupported x ->
     let env = push_unsupported env x in
