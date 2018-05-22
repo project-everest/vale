@@ -59,6 +59,51 @@ let lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   reveal_reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s);
   assert (equal (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s)) s)
 
+let lemma_equality_check_helper_two_to_nat_32 (n:two nat32) :
+  Lemma ( ((n.lo == 0 /\ n.hi == 0) ==> two_to_nat 32 n == 0) /\
+          ( ~(n.lo == 0) \/ (~(n.hi == 0))) ==> ~(two_to_nat 32 n == 0) /\
+          ((n.lo == 0xFFFFFFFF /\ n.hi == 0xFFFFFFFF) <==> two_to_nat 32 n == 0xFFFFFFFFFFFFFFFF))
+  =
+  let open FStar.Mul in
+  if n.lo == 0 /\ n.hi == 0 then (
+    assert (int_to_natN pow2_64 (n.lo + pow2_32 * n.hi) == 0);
+    ()
+  ) else (
+    ()
+  );
+  ()
+
+let lemma_equality_check_helper_lo (q:quad32) : 
+  Lemma ((q.lo0 == 0 /\ q.lo1 == 0 ==> lo64 q == 0) /\ 
+         ((not (q.lo0 = 0) \/ not (q.lo1 = 0)) ==> not (lo64 q = 0)) /\
+         (q.lo0 == 0xFFFFFFFF /\ q.lo1 == 0xFFFFFFFF <==> lo64 q == 0xFFFFFFFFFFFFFFFF))
+  =
+  assert (lo64 q == two_to_nat 32 (Mktwo q.lo0 q.lo1));
+  lemma_equality_check_helper_two_to_nat_32 (Mktwo q.lo0 q.lo1);  
+  ()
+
+let lemma_equality_check_helper_hi (q:quad32) : 
+  Lemma ((q.hi2 == 0 /\ q.hi3 == 0 ==> hi64 q == 0) /\ 
+         ((~(q.hi2 = 0) \/ ~(q.hi3 = 0)) ==> ~(hi64 q = 0)) /\
+         (q.hi2 == 0xFFFFFFFF /\ q.hi3 == 0xFFFFFFFF <==> hi64 q == 0xFFFFFFFFFFFFFFFF))
+  =
+  assert (hi64 q == two_to_nat 32 (Mktwo q.hi2 q.hi3));
+  lemma_equality_check_helper_two_to_nat_32 (Mktwo q.hi2 q.hi3);
+  ()
+
+let lemma_equality_check_helper (q:quad32) :
+  Lemma ((q.lo0 == 0 /\ q.lo1 == 0 ==> lo64 q == 0) /\ 
+         ((not (q.lo0 = 0) \/ not (q.lo1 = 0)) ==> not (lo64 q = 0)) /\
+         (q.hi2 == 0 /\ q.hi3 == 0 ==> hi64 q == 0) /\ 
+         ((~(q.hi2 = 0) \/ ~(q.hi3 = 0)) ==> ~(hi64 q = 0)) /\
+         (q.lo0 == 0xFFFFFFFF /\ q.lo1 == 0xFFFFFFFF <==> lo64 q == 0xFFFFFFFFFFFFFFFF) /\
+         (q.hi2 == 0xFFFFFFFF /\ q.hi3 == 0xFFFFFFFF <==> hi64 q == 0xFFFFFFFFFFFFFFFF)
+         )
+  =
+  lemma_equality_check_helper_lo q;
+  lemma_equality_check_helper_hi q;
+  ()
+
 
 let push_pop_xmm (x y:quad32) : Lemma 
   (let x' = insert_nat64 (insert_nat64 y (hi64 x) 1) (lo64 x) 0 in
@@ -120,7 +165,6 @@ let le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
                   (seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_map (nat_to_four 8) (four_to_seq_LE b)))));
                   *)
   //assert (equal (le_bytes_to_seq_quad32 (le_quad32_to_bytes b)) (create 1 b));
-  //admit();
   *)
   ()
  
@@ -140,10 +184,8 @@ let le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
   assert (equal (seq_nat8_to_seq_nat32_LE (le_quad32_to_bytes b)) 
                 (seq_nat8_to_seq_nat32_LE (seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE b)))));
   *)
-  admit();
   assert (equal (seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE (le_quad32_to_bytes b)))
           (seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE (seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE b))))));
-  admit();
   ()
 *)
 

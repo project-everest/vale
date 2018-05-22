@@ -81,3 +81,30 @@ let append_distributes_seq_map (#a #b:Type) (f:a -> b) (s1 s2:seq a) :
   assert (equal (seq_map f (s1 @| s2)) (seq_map f s1 @| seq_map f s2));
   ()
   
+let seq_map_injective (#a #b:eqtype) (f:a -> b) :
+  Lemma (forall s s' . (forall a a' . f a == f a' ==> a == a') ==> (seq_map f s == seq_map f s' ==> s == s'))
+  =
+  let helper (s s':seq a) : Lemma ((forall a a' . f a == f a' ==> a == a') ==> (seq_map f s == seq_map f s' ==> s == s'))
+  =
+    if  (forall a a' . f a == f a' ==> a == a') then (
+      if seq_map f s == seq_map f s' then (
+        assert (equal (seq_map f s) (seq_map f s'));
+        assert (length (seq_map f s) == length s);
+        assert (length (seq_map f s') == length s');
+        assert (length s == length s');
+        let helper2 (i) : Lemma ( 0 <= i /\ i < length s ==> index s i == index s' i) =
+          if index s i == index s' i then ()
+          else (
+            assert (index (seq_map f s) i == f (index s i));
+            assert (index (seq_map f s') i == f (index s' i));
+            ()
+          )
+        in
+        FStar.Classical.forall_intro helper2;
+        assert (equal s s');
+        ()       
+      ) else ()
+    ) else ();
+    ()
+  in
+  FStar.Classical.forall_intro_2 helper

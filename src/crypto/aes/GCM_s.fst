@@ -39,3 +39,14 @@ let gcm_encrypt_LE (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plain:se
   let t = gctr_encrypt_LE j0_BE (le_quad32_to_bytes s_LE) alg key_LE in
 
   (c, t)
+
+let gcm_decrypt_LE (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (cipher:seq nat8) (auth:seq nat8) (tag:seq nat8) :
+  Pure (tuple2 (seq nat8) (bool))
+    (requires
+      4096 * length cipher < pow2_32 /\
+      4096 * length auth < pow2_32
+    )
+    (ensures fun (c, t) -> True)
+  = 
+  let (plain, computed_tag) = gcm_encrypt_LE alg key iv cipher auth in
+  (plain, computed_tag = tag)

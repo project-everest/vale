@@ -1,1 +1,1 @@
-let _ = CmdLineParser.parse_cmdline [("aes_key_expansion",  X64_AES.va_code_KeyExpansionStdcall); ("gcm_encrypt", X64_GCMopt.va_code_gcm_stdcall)]
+let _ = CmdLineParser.parse_cmdline [("aes_key_expansion",  X64_AES.va_code_KeyExpansionStdcall); ("gcm_encrypt", X64_GCMencrypt.va_code_gcm_encrypt_stdcall); ("gcm_decrypt", X64_GCMencrypt.va_code_gcm_decrypt_stdcall)]

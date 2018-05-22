@@ -44,3 +44,6 @@ val slice_seq_map_commute (#a #b:Type) (f:a -> b) (s:seq a) (i:nat) (j:nat{ i <=
 
 val append_distributes_seq_map (#a #b:Type) (f:a -> b) (s1 s2:seq a) : 
   Lemma (seq_map f (s1 @| s2) == seq_map f s1 @| seq_map f s2)
+
+val seq_map_injective (#a #b:eqtype) (f:a -> b) :
+  Lemma (forall s s' . (forall a a' . f a == f a' ==> a == a') ==> (seq_map f s == seq_map f s' ==> s == s'))

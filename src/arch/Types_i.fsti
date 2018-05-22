@@ -35,7 +35,7 @@ val xor_lemmas (_:unit) : Lemma
 val lemma_quad32_xor (_:unit) : Lemma (forall q . {:pattern quad32_xor q q} quad32_xor q q == Mkfour 0 0 0 0)
 
 let quad32_double_lo (q:quad32) : double32 = (four_to_two_two q).lo
-let quad32_double_hi (q:quad32) : double32 = (four_to_two_two q).hi
+let quad32_double_hi (q:quad32) : double32 = (four_to_two_two q).hi  
 
 val lemma_reverse_reverse_bytes_nat32 (n:nat32) :
   Lemma (reverse_bytes_nat32 (reverse_bytes_nat32 n) == n)
@@ -54,6 +54,15 @@ unfold let quad32_to_seq (q:quad32) = four_to_seq_LE q
 let lo64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 0)
 let hi64 (q:quad32) : nat64 = two_to_nat 32 (two_select (four_to_two_two q) 1)
 
+val lemma_equality_check_helper (q:quad32) :
+  Lemma ((q.lo0 == 0 /\ q.lo1 == 0 ==> lo64 q == 0) /\ 
+         ((not (q.lo0 = 0) \/ not (q.lo1 = 0)) ==> not (lo64 q = 0)) /\
+         (q.hi2 == 0 /\ q.hi3 == 0 ==> hi64 q == 0) /\ 
+         ((~(q.hi2 = 0) \/ ~(q.hi3 = 0)) ==> ~(hi64 q = 0)) /\
+         (q.lo0 == 0xFFFFFFFF /\ q.lo1 == 0xFFFFFFFF <==> lo64 q == 0xFFFFFFFFFFFFFFFF) /\
+         (q.hi2 == 0xFFFFFFFF /\ q.hi3 == 0xFFFFFFFF <==> hi64 q == 0xFFFFFFFFFFFFFFFF)
+         )
+         
 val push_pop_xmm (x y:quad32) : Lemma 
   (let x' = insert_nat64 (insert_nat64 y (hi64 x) 1) (lo64 x) 0 in
    x == x')
@@ -70,7 +79,27 @@ val le_quad32_to_bytes_to_quad32 (s:seq nat8 { length s == 16 }) :
 val le_seq_quad32_to_bytes_of_singleton (q:quad32) :
   Lemma (le_quad32_to_bytes q == le_seq_quad32_to_bytes (create 1 q))
 
-
+let le_quad32_to_bytes_injective ():
+  Lemma (forall b b' . le_quad32_to_bytes b == le_quad32_to_bytes b' ==> b == b')
+  =
+  let helper (b b':quad32) : Lemma (le_quad32_to_bytes b == le_quad32_to_bytes b' ==> b == b') =
+    if le_quad32_to_bytes b = le_quad32_to_bytes b' then (
+      let b1  = seq_map (nat_to_four 8) (four_to_seq_LE b) in
+      let b1' = seq_map (nat_to_four 8) (four_to_seq_LE b') in
+      assert (le_quad32_to_bytes b == seq_four_to_seq_LE b1);
+      assert (le_quad32_to_bytes b' == seq_four_to_seq_LE b1');
+      seq_four_to_seq_LE_injective_specific b1 b1';
+      assert (b1 == b1');
+      seq_map_injective (nat_to_four 8);
+      nat_to_four_8_injective();
+      assert ((four_to_seq_LE b) == (four_to_seq_LE b'));
+      four_to_seq_LE_injective nat32;
+      ()
+    ) else
+    ()
+  in 
+  FStar.Classical.forall_intro_2 helper
+  
 val seq_to_four_LE_is_seq_to_seq_four_LE (#a:Type) (s:seq4 a) : Lemma
   (create 1 (seq_to_four_LE s) == seq_to_seq_four_LE s)
 

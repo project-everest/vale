@@ -297,3 +297,28 @@ procedure {:quick exportOnly} InitPshufbMask(inout dst:xmm, out tmp:reg_opr64)
     PinsrqImm(dst, 0x08090A0B0C0D0E0F, 0, tmp);
     PinsrqImm(dst, 0x0001020304050607, 1, tmp);
 }
+
+#reset-options "--z3rlimit 20"
+// TODO: Lots of room to optimize this using bitwise operations
+procedure {:quick exportOnly} XmmEqual(inout x1:xmm, x2:xmm, out tmp:reg_opr64, out result:reg_opr64)
+    modifies efl;
+    ensures 
+        if old(x1 = x2) then result = 0 else result > 0;
+{
+    Pcmpeqd(x1, x2);
+    Pextrq(tmp, x1, 0);
+    lemma_equality_check_helper(x1);
+    if (tmp == 0xFFFFFFFFFFFFFFFF) {
+        Mov64(result, 0);
+    } 
+    else {
+        Mov64(result, 1);
+    }
+    Pextrq(tmp, x1, 1);
+    if (tmp == 0xFFFFFFFFFFFFFFFF) {
+        Mov64(tmp, 0);
+    } else {
+        Mov64(tmp, 1);
+    }
+    Add64(result, tmp);
+}
