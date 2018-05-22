@@ -223,9 +223,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
 
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-
         validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(old(plain_num_bytes)));
-        //validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
 
         let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
@@ -241,7 +239,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     
     assert validDstAddrs128(mem, r15, tag_b, 1);
 
-//    // Auth tag is in xmm1; compare it to the value in memory
+    // Auth tag is in xmm1; compare it to the value in memory
     Load128_buffer(xmm0, r15, 0, tag_b, 0);
     assert xmm0 == buffer128_read(tag_b, 0, mem);       // OBSERVE?
     assert xmm0 == buffer128_read(tag_b, 0, old(mem));  // OBSERVE?
@@ -251,6 +249,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     XmmEqual();
     ghost var auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
     ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
+    decrypt_helper(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth, rax, alleged_tag_quad, computed_tag); 
 }
 
 #reset-options "--z3rlimit 400"

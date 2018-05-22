@@ -70,21 +70,7 @@ let decrypt_helper (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plain:se
   assert (b = (ct = (le_quad32_to_bytes alleged_tag_quad)));
   assert (ct == le_quad32_to_bytes computed_tag);
   assert (b == (le_quad32_to_bytes computed_tag = le_quad32_to_bytes alleged_tag_quad));
-  (*
-  if b then (
-   ()
-  ) else (
-    admit()
-  );
-  *)  
-//  assert (b = (snd (gcm_encrypt_LE alg key iv plain auth) = (le_quad32_to_bytes alleged_tag_quad)));
   le_quad32_to_bytes_injective_specific alleged_tag_quad computed_tag;
   assert (b == (computed_tag = alleged_tag_quad));
-//  assert (alleged_tag_quad = computed_tag ==> rax = 0);
-//  assert (~(rax = 0) ==> ~(alleged_tag_quad == computed_tag));
-//  assert (~(alleged_tag_quad == computed_tag) ==> rax > 0);
-//  assert (~(alleged_tag_quad == computed_tag) ==> not (rax = 0));
   assert ((rax = 0) == (computed_tag = alleged_tag_quad));
-  
-  admit();
   ()
