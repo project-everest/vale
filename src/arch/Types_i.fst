@@ -241,6 +241,32 @@ let le_seq_quad32_to_bytes_of_singleton (q:quad32) :
   four_to_seq_LE_is_seq_four_to_seq_LE q;
   ()
 
+let le_quad32_to_bytes_injective ():
+  Lemma (forall b b' . le_quad32_to_bytes b == le_quad32_to_bytes b' ==> b == b')
+  =
+  let helper (b b':quad32) : Lemma (le_quad32_to_bytes b == le_quad32_to_bytes b' ==> b == b') =
+    if le_quad32_to_bytes b = le_quad32_to_bytes b' then (
+      let b1  = seq_map (nat_to_four 8) (four_to_seq_LE b) in
+      let b1' = seq_map (nat_to_four 8) (four_to_seq_LE b') in
+      assert (le_quad32_to_bytes b == seq_four_to_seq_LE b1);
+      assert (le_quad32_to_bytes b' == seq_four_to_seq_LE b1');
+      seq_four_to_seq_LE_injective_specific b1 b1';
+      assert (b1 == b1');
+      seq_map_injective (nat_to_four 8);
+      nat_to_four_8_injective();
+      assert ((four_to_seq_LE b) == (four_to_seq_LE b'));
+      four_to_seq_LE_injective nat32;
+      ()
+    ) else
+    ()
+  in 
+  FStar.Classical.forall_intro_2 helper
+
+let le_quad32_to_bytes_injective_specific (b b':quad32) : 
+  Lemma (le_quad32_to_bytes b == le_quad32_to_bytes b' ==> b == b')
+  =
+  le_quad32_to_bytes_injective()
+
 (*
 
 let seq_to_four_LE (#a:Type) (s:seq4 a) : four a =

@@ -1,6 +1,7 @@
 module GCM_helpers_i
 
 open Words_s
+open Words.Seq_s
 open Types_s
 open Types_i
 open FStar.Mul
@@ -168,7 +169,6 @@ let pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) : Lemma
   slice_slice (le_seq_quad32_to_bytes s) 0 num_bytes full_blocks num_bytes;
   le_seq_quad32_to_bytes_tail_prefix s num_bytes;
   ()
-
 
 let pad_to_128_bits_lower (q:quad32) (num_bytes:int) : Lemma
   (requires 1 <= num_bytes /\ num_bytes < 8)

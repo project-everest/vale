@@ -54,3 +54,37 @@ let gcm_encrypt_LE_snd_helper (iv_BE length_quad32 hash mac:quad32) (plain auth 
   //be_bytes_to_quad32_to_bytes iv_BE;
   //let t = snd (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth) in
   ()
+
+
+let decrypt_helper (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plain:seq nat8) (auth:seq nat8)
+                   (rax:nat64) (alleged_tag_quad computed_tag:quad32) : Lemma
+  (requires 4096 * length plain < pow2_32 /\
+            4096 * length auth < pow2_32 /\
+            (if alleged_tag_quad = computed_tag then rax = 0 else rax > 0) /\
+            le_quad32_to_bytes computed_tag == snd (gcm_encrypt_LE alg key iv plain auth)
+  )
+  (ensures  (rax = 0) == snd (gcm_decrypt_LE alg key iv plain auth (le_quad32_to_bytes alleged_tag_quad)))
+  = 
+  let b = snd (gcm_decrypt_LE alg key iv plain auth (le_quad32_to_bytes alleged_tag_quad)) in
+  let (_, ct) = gcm_encrypt_LE alg key iv plain auth in
+  assert (b = (ct = (le_quad32_to_bytes alleged_tag_quad)));
+  assert (ct == le_quad32_to_bytes computed_tag);
+  assert (b == (le_quad32_to_bytes computed_tag = le_quad32_to_bytes alleged_tag_quad));
+  (*
+  if b then (
+   ()
+  ) else (
+    admit()
+  );
+  *)  
+//  assert (b = (snd (gcm_encrypt_LE alg key iv plain auth) = (le_quad32_to_bytes alleged_tag_quad)));
+  le_quad32_to_bytes_injective_specific alleged_tag_quad computed_tag;
+  assert (b == (computed_tag = alleged_tag_quad));
+//  assert (alleged_tag_quad = computed_tag ==> rax = 0);
+//  assert (~(rax = 0) ==> ~(alleged_tag_quad == computed_tag));
+//  assert (~(alleged_tag_quad == computed_tag) ==> rax > 0);
+//  assert (~(alleged_tag_quad == computed_tag) ==> not (rax = 0));
+  assert ((rax = 0) == (computed_tag = alleged_tag_quad));
+  
+  admit();
+  ()

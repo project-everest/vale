@@ -55,7 +55,107 @@ let make_ghash_plain_LE (s:seq quad32) : ghash_plain_LE = if length s = 0 then c
 // GCM
 ///////////////////////////
 
-#reset-options "--z3rlimit 80"
+#reset-options "--z3rlimit 30"
+procedure {:quick} gcm_decrypt_stdcall_inner_inner(
+    ghost args_b:buffer64,
+    ghost iv_BE:quad32,
+
+    ghost plain_b:buffer128,
+    ghost auth_b:buffer128,
+    ghost iv_b:buffer128,
+    ghost out_b:buffer128,
+    ghost tag_b:buffer128,
+
+    ghost key:aes_key_LE(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128
+    )
+    modifies
+        rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
+        mem; efl; 
+    lets
+        args_ptr := r9;
+
+        plain_ptr         := buffer64_read(args_b, 0, mem);
+        plain_num_bytes   := buffer64_read(args_b, 1, mem);
+        auth_ptr          := buffer64_read(args_b, 2, mem);
+        auth_num_bytes    := buffer64_read(args_b, 3, mem);
+        iv_ptr            := buffer64_read(args_b, 4, mem);
+        expanded_key_ptr  := buffer64_read(args_b, 5, mem);
+        out_ptr           := buffer64_read(args_b, 6, mem);
+        tag_ptr           := buffer64_read(args_b, 7, mem);
+
+    requires
+        validSrcAddrs64(mem, args_ptr, args_b, 8);
+
+        buffers_disjoint128(plain_b, out_b);
+        buffers_disjoint128(auth_b, out_b);
+        buffers_disjoint128(keys_b, out_b);
+        buffers_disjoint128(out_b, tag_b);
+        
+        validSrcAddrs128(mem, plain_ptr, plain_b, bytes_to_quad_size(plain_num_bytes));
+        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes));
+        validSrcAddrs128(mem, iv_ptr, iv_b, 1);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes));
+        validDstAddrs128(mem, tag_ptr, tag_b, 1);
+
+        plain_ptr + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
+        auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
+        out_ptr   + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
+        buffer_length(plain_b) == buffer_length(out_b);
+        buffer_length(out_b) == bytes_to_quad_size(plain_num_bytes);
+        buffer_length(auth_b) == bytes_to_quad_size(auth_num_bytes);
+        256 * buffer_length(plain_b) < pow2_32;
+        4096 * plain_num_bytes < pow2_32;
+        4096 * auth_num_bytes < pow2_32;
+
+        iv_BE == reverse_bytes_quad32(buffer128_read(iv_b, 0, mem));
+
+        // To simplify length calculations, restrict auth and plain length further
+        256 * bytes_to_quad_size(auth_num_bytes)  < pow2_32;
+        256 * bytes_to_quad_size(plain_num_bytes) < pow2_32;
+
+        // AES reqs
+        length(round_keys) == 11;
+        round_keys == key_to_round_keys_LE(AES_128, key);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
+        buffer128_as_seq(mem, keys_b) == round_keys;
+
+    ensures
+        modifies_buffer128(out_b, old(mem), mem);
+
+        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(old(plain_num_bytes)));
+        //validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
+
+        let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
+        let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
+        let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
+
+//        // TODO: First two clauses work around Vale's type limitations
+        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(auth) < pow2_32 /\
+        cipher == fst(gcm_decrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth, le_quad32_to_bytes(buffer128_read(tag_b, 0, old(mem))))) /\
+        le_quad32_to_bytes(xmm1) == snd(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+        r15 == old(buffer64_read(args_b, 7, mem));
+{
+    Load64_buffer(r14, r9,  0, args_b, 0);
+    Load64_buffer(r13, r9,  8, args_b, 1);
+    Load64_buffer(rax, r9, 16, args_b, 2);
+    Load64_buffer(r11, r9, 24, args_b, 3);
+    Load64_buffer(r10, r9, 32, args_b, 4);
+    Load64_buffer(r8,  r9, 40, args_b, 5);
+    Load64_buffer(rbx, r9, 48, args_b, 6);
+    Load64_buffer(r15, r9, 56, args_b, 7);
+
+    // Load the IV into its XMM register
+    Load128_buffer(xmm7, r10, 0, iv_b, 0);
+
+    gcm_core(iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
+}
+
+
+
+#reset-options "--z3rlimit 20"
 procedure {:quick} gcm_decrypt_stdcall_inner(
     ghost args_b:buffer64,
     ghost iv_BE:quad32,
@@ -137,24 +237,20 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
         cipher == fst(gcm_decrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth, le_quad32_to_bytes(buffer128_read(tag_b, 0, old(mem))))) /\
         (rax = 0) == snd(gcm_decrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth, le_quad32_to_bytes(buffer128_read(tag_b, 0, old(mem)))));
 {
-    Load64_buffer(r14, r9,  0, args_b, 0);
-    Load64_buffer(r13, r9,  8, args_b, 1);
-    Load64_buffer(rax, r9, 16, args_b, 2);
-    Load64_buffer(r11, r9, 24, args_b, 3);
-    Load64_buffer(r10, r9, 32, args_b, 4);
-    Load64_buffer(r8,  r9, 40, args_b, 5);
-    Load64_buffer(rbx, r9, 48, args_b, 6);
-    Load64_buffer(r15, r9, 56, args_b, 7);
+    gcm_decrypt_stdcall_inner_inner(args_b, iv_BE, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
+    
+    assert validDstAddrs128(mem, r15, tag_b, 1);
 
-    // Load the IV into its XMM register
-    Load128_buffer(xmm7, r10, 0, iv_b, 0);
-
-    gcm_core(iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
-
-    // Auth tag is in xmm1; compare it to the value in memory
+//    // Auth tag is in xmm1; compare it to the value in memory
     Load128_buffer(xmm0, r15, 0, tag_b, 0);
-    XmmEqual(xmm0, xmm1, rdx, rax);
-    le_quad32_to_bytes_injective();
+    assert xmm0 == buffer128_read(tag_b, 0, mem);       // OBSERVE?
+    assert xmm0 == buffer128_read(tag_b, 0, old(mem));  // OBSERVE?
+    ghost var alleged_tag_quad := xmm0;
+    ghost var computed_tag := xmm1;
+
+    XmmEqual();
+    ghost var auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
+    ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
 }
 
 #reset-options "--z3rlimit 400"
