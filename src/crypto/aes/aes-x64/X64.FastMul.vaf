@@ -41,7 +41,7 @@ let my_bool_to_nat (b:bool) : nat = if b then 1 else 0
 
 #reset-options "--z3rlimit 30"
 
-procedure{:quick exportOnly} fast_multiply(
+procedure{:quick exportOnly} {:verify true} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -136,9 +136,9 @@ procedure{:quick exportOnly} fast_multiply(
 //    assert pow2_64 * a0b0_hi + d0 == a0 * b0;
 //    assert pow2_64 * r11 + a0b1_lo == a0 * b1;
 //    assert r10 == add_wrap(add_wrap(a0b1_lo, a0b0_hi), 0);
-//    assert overflow(efl) == (a0b1_lo + a0b0_hi >= pow2_64);
-//    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
-//    assert a0b0b1 == a0 * (b0 + pow2_64 * b1); // FAILS:
+//    assert overflow(efl) == (a0b1_lo + a0b0_hi >= nat64_max);
+    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
+    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
 
 //    assert_by_tactic(a0b0b1 == a0 * (b0 + pow2_64 * b1), int_canon); // FAILS:
     // user tactic failed: apply_lemma: Cannot instantiate lemma CanonCommSemiring.semiring_reflect CanonCommSemiring.const_last
