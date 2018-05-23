@@ -170,6 +170,20 @@ let pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) : Lemma
   le_seq_quad32_to_bytes_tail_prefix s num_bytes;
   ()
 
+
+(*
+let slice_le_quad32_to_bytes_is_mod (q:quad32) (num_bytes:int) : Lemma
+  (requires 1 <= num_bytes /\ num_bytes < 16)
+  (ensures four_to_nat 32 (slice (le_quad32_to_bytes q) 0 num_bytes) == (four_to_nat 32 q) % (pow2 (8*num_bytes)))
+  =
+  ()
+      
+let insert_0_is_padding (q:quad32) : 
+  Lemma (let q' = insert_nat64 q 0 1 in
+         q' == le_bytes_to_quad32 (pad_to_128_bits (slice (le_quad32_to_bytes q) 0 8)))
+  =
+  ()
+*)
 let pad_to_128_bits_lower (q:quad32) (num_bytes:int) : Lemma
   (requires 1 <= num_bytes /\ num_bytes < 8)
   (ensures (let new_lo = (lo64 q) % pow2 (num_bytes * 8) in
