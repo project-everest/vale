@@ -121,8 +121,8 @@ Export('verify_options')
 # Note that the entries below are prefixes of blacklisted files
 #
 min_test_suite_blacklist = [
-  'obj/crypto/aes/aes-x64/X64.GCMopt.fst',
-  'obj/crypto/aes/aes-x64/X64.GCM.fst',
+  'obj/crypto/aes/aes-x64/X64.GCMencrypt.fst',
+  'obj/crypto/aes/aes-x64/X64.GCMdecrypt.fst',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
   'obj/crypto/aes/aes-x64/X64.GHash',
   'obj/crypto/aes/aes-x64/X64.GCTR.fst',

@@ -624,7 +624,7 @@ def extract_fstar(env, sourcefile):
   Depends(mlfile, base_name + '.fst.verified')
   env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces true", ""))
   cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
-  cmd_line += " --odir obj/ml_out --codegen OCaml --extract_module " + module_name
+  cmd_line += " --odir obj/ml_out --codegen OCaml --admit_smt_queries true --extract_module " + module_name
   return env.Command(mlfile, sourcefile, cmd_line)
 
 # Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
@@ -1182,7 +1182,7 @@ env.VerifyFilesIn(verify_paths)
 # build aesgcm
 #
 if fstar_extract and stage2:
-  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/aes-x64/Main.ml', 'src/crypto/aes/aes-x64/X64.GCMopt.vaf', 'src/lib/util/CmdLineParser.ml')
+  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/aes-x64/Main.ml', 'src/crypto/aes/aes-x64/X64.GCMdecrypt.vaf', 'src/lib/util/CmdLineParser.ml')
   if env['TARGET_ARCH'] == 'amd64': 
     aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
     aesgcmtest_src = 'src/crypto/aes/aes-x64/TestAesGcm.cpp'
