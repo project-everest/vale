@@ -111,6 +111,8 @@ let lemma_bench1 (s0:state) : Ghost (state * fuel)
 let rec self_int (i:int) : int = if i <= 0 then i else 1 + self_int (i - 1)
 #endverbatim
 
+function self_int (i:int) : int extern;
+
 #verbatim
 let rec lemma_self_int (i:int) : Lemma
   (requires 0 <= i)
@@ -121,6 +123,8 @@ let rec lemma_self_int (i:int) : Lemma
 let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
 let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
 #endverbatim
+
+function lemma_self_int (i:int) : Lemma extern;
 
 procedure{:quick exportOnly} Add64Ghosts(
         inout dst:dst_opr64,

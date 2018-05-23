@@ -46,6 +46,8 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 
 #endverbatim
 
+function slice_workaround (s:(seq (quad32)), start_pos:int, end_pos:int) : (seq (quad32)) extern;
+
 
 ///////////////////////////
 //  Useful helper steps
@@ -357,6 +359,7 @@ let mk_gctr_plain (p:seq quad32) : gctr_plain =
   if 256 * length p < pow2_32 then p else createEmpty
 #endverbatim
 
+function mk_gctr_plain (p:(seq (quad32))) : gctr_plain  extern;
 
 procedure {:quick} gcm_stdcall_inner(
     ghost args_b:buffer64,

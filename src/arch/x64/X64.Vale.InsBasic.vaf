@@ -132,6 +132,8 @@ let lemma_fundamental_div_mod (a b:nat64) :
   ()
 #endverbatim
 
+function lemma_fundamental_div_mod (a:nat64, b:nat64) : Prims.unit extern;
+
 procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} Mul64Wrap(src: opr64)
     modifies
         efl;

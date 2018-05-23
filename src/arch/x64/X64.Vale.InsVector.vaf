@@ -17,6 +17,10 @@ open X64.Vale.InsMem
 let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
 #endverbatim
 
+function nat64_to_nat32 (n:nat64) : nat32
+ requires n < pow2_32;
+ extern;
+
 #verbatim
 open Types_s
 open X64.Machine_s

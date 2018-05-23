@@ -42,6 +42,9 @@ let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
     create 1 (Mkfour 0 0 0 0)
 #endverbatim
 
+function get_last_slice_workaround (s:(seq (quad32)), start_pos:int, end_pos:int) : (seq (quad32)) extern;
+function slice_workaround (s:(seq (quad32)), start_pos:int, end_pos:int) : (seq (quad32)) extern;
+
 #reset-options "--z3rlimit 40"
 
 ///////////////////////////

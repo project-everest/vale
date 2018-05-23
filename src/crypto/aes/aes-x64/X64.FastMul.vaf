@@ -39,6 +39,13 @@ let my_bool_to_nat (b:bool) : nat = if b then 1 else 0
 
 #endverbatim
 
+const pow2_192: int extern;
+const pow2_256: int extern;
+const pow2_320: int extern;
+const pow2_384: int extern;
+const pow2_448: int extern;
+function my_bool_to_nat (b:bool) : nat extern;
+
 #reset-options "--z3rlimit 30"
 
 procedure{:quick exportOnly} fast_multiply(

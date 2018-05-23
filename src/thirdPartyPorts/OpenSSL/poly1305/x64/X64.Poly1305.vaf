@@ -528,6 +528,9 @@ let reveal_logand128 (x y:nat128) : Lemma
   = TypesNative_s.reveal_iand 128 x y
 #endverbatim
 
+function reveal_logand128 (x:nat128, y:nat128) : Lemma 
+  extern;
+
 procedure{:quick} poly1305_impl(
     ghost key_r:nat128,
     ghost key_s:nat128,

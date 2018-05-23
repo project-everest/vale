@@ -169,10 +169,7 @@ let double (x:int):int = x + x
 let opaque_double = make_opaque double
 #endverbatim
 
-
-
-
-
+function double (x:int) : int extern;
 
 procedure{:terminates} Imm(out x:reg, inline y:int)
     ensures

@@ -13093,8 +13093,7 @@ unsupported: X64.GF128_Mul.va_wpProof_ReduceMulRev128 //(reason: X64.Vale.QuickC
 
 unsupported: X64.GF128_Mul.va_quick_ReduceMulRev128 //(reason: X64.Vale.QuickCode_i.va_quickCode)
 
-// from verbatim
-unsupported: lemma_fundamental_div_mod
+// from X64.Vale.Decls_i.fst
 unsupported: X64.Vale.Decls_i.lemma_mul_nat
 unsupported: X64.Vale.Decls_i.lemma_mul_in_bounds
 
@@ -13112,9 +13111,6 @@ unsupported: sub_word
 unsupported: expand_key_128
 unsupported: lemma_simd_round_key
 unsupported: lemma_expand_key_128
-
-// from X64.FastMul.vaf
-unsupported: pow2_192
 
 // from GCTR_i.fst
 unsupported: gctr_encrypt_one_block
@@ -13153,9 +13149,6 @@ unsupported: poly1305_hash
 // need to transform to va_opr_code_Mem first
 unsupported: Mem
 
-// X64.Poly1305.vaf
-unsupported: reveal_logand128
-
 // can't find
 unsupported: ghash_incremental
 unsupported: ghash_incremental_to_ghash
@@ -13171,13 +13164,3 @@ unsupported: lowerUpper128_opaque
 unsupported: lowerUpper192_opaque
 unsupported: lemma_bytes_shift_power2
 unsupported: lemma_bytes_and_mod
-
-//forall.vaf
-unsupported: opaque_double
-
-//fstar1ifc.vaf
-unsupported: double
-
-//quick.vaf
-unsupported: self_int
-unsupported: lemma_self_int
