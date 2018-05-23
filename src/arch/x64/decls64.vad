@@ -1,6 +1,6 @@
 include{:verbatim} "vale.i.dfy"
 include{:verbatim} "vale64.i.dfy"
-include{:verbatim} "../../lib/util/operations.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/operations.i.dfy"
 include "decls.vad"
 
 #verbatim

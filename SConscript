@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
@@ -98,16 +98,16 @@ verify_options = {
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
-  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
-  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/*/*.fst': BuildOptions(fstar_default_args),
+  'src/*/*.fsti': BuildOptions(fstar_default_args),
 
   # .fst/.fsti files default to this set of options
-  '.fst': BuildOptions(fstar_default_args),
-  '.fsti': BuildOptions(fstar_default_args),
+  '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
+  '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_larith),
-  '.vaf': BuildOptions(fstar_default_args),  
+  '.vaf': BuildOptions(fstar_default_args  + ' --use_two_phase_tc false'),
 }
 if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None
@@ -124,7 +124,6 @@ min_test_suite_blacklist = [
   'obj/crypto/aes/aes-x64/X64.GCMopt.fst',
   'obj/crypto/aes/aes-x64/X64.GCM.fst',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
-  'obj/arch/x64/X64.Vale.InsVector.fst',
   'obj/crypto/aes/aes-x64/X64.GHash',
   'obj/crypto/aes/aes-x64/X64.GCTR.fst',
   'obj/crypto/aes/aes-x64/X64.AES.fst'

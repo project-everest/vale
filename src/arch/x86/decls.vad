@@ -1,7 +1,7 @@
 include{:verbatim} "vale.i.dfy"
-include{:verbatim} "../../lib/util/dafny_wrappers.i.dfy"
-include{:verbatim} "../../lib/util/words_and_bytes.i.dfy"
-include{:verbatim} "../../lib/util/operations.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/dafny_wrappers.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/words_and_bytes.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/operations.i.dfy"
 
 #verbatim
 module x86_decls_i {

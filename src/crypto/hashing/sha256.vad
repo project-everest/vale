@@ -1,8 +1,8 @@
-include "../../arch/x86/decls.vad"
-include{:verbatim} "../../arch/x86/vale.i.dfy"
-include{:verbatim} "../../arch/x86/print.s.dfy"
+include{:from BASE} "arch/x86/decls.vad"
+include{:verbatim}{:from BASE} "arch/x86/vale.i.dfy"
+include{:verbatim}{:from BASE} "arch/x86/print.s.dfy"
 include{:verbatim} "sha256.i.dfy"
-include{:verbatim} "../../lib/util/heaplets.i.dfy"
+include{:verbatim}{:from BASE} "lib/util/heaplets.i.dfy"
 
 #verbatim
 module sha256_vale {
