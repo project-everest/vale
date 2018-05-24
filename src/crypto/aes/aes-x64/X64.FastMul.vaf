@@ -41,7 +41,7 @@ let my_bool_to_nat (b:bool) : nat = if b then 1 else 0
 
 #reset-options "--z3rlimit 30"
 
-procedure{:quick exportOnly} {:verify true} fast_multiply(
+procedure{:quick} {:verify true} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -109,38 +109,31 @@ procedure{:quick exportOnly} {:verify true} fast_multiply(
     Mulx64( r9,  r8, Mem(inB_ptr,  0, inB_b, 0));  /* A[0]*B[0] */ Xor64(r10, r10);         Store64_buffer(dst_ptr,  r8, 0, dst_b, 0);
 
     assert overflow(efl) == false;
-    ghost var old_efl := efl;
-    ghost var a0b0_hi := r9;
-//    assert r10 == 0;  // Passes
-//    ghost var d0 := buffer64_read(dst_b, 0, mem);
-//    assert d0 == a0 * b0 % pow2_64;     // Passes
-//    assert not(overflow(efl));            // Passes
     lemma_load_mem64(inB_b, 1, mem);
-    Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ ghost var a0b1_lo := r10; Adox64Wrap(r10,  r9);    Store64_buffer(dst_ptr, r10, 8, dst_b, 1);
-//    ghost var carry := a0b1_lo + r9 + 0 >= pow2_64;
-//    assert efl == update_of(old_efl, carry);
-//    assert overflow(efl) == carry;
+    Mulx64(r11, r10, Mem(inB_ptr,  8, inB_b, 1));  /* A[0]*B[1] */ 
+    
+    ghost var a0b0_hi := r9;
+    ghost var a0b1_lo := r10; 
+    ghost var old_efl := efl;
+    Adox64Wrap(r10,  r9);    
+    Store64_buffer(dst_ptr, r10, 8, dst_b, 1);
 
     ghost var d0 := buffer64_read(dst_b, 0, mem);
-    ghost var d1 := buffer64_read(dst_b, 1, mem);
+    ghost var d1 := buffer64_read(dst_b, 1, mem);       // r10
 
-
-    ghost var carry := if overflow(efl) then 1 else 0;          // BUG: With this version, the tactic fails to unify, perhaps due to the if-else
-    //ghost var carry := my_bool_to_nat(overflow(efl));         // BUG: With this version, we get: (Error 230) Variable "__fname__mem#303637" not found
-
-
-    //assume overflow(efl);
-    //ghost var carry := 1;
+    ghost var carry := if overflow(efl) then 1 else 0;
     ghost var a0b0b1 := d0 + pow2_64 * d1 + pow2_128 * (r11 + carry);
 
-//    assert pow2_64 * a0b0_hi + d0 == a0 * b0;
-//    assert pow2_64 * r11 + a0b1_lo == a0 * b1;
-//    assert r10 == add_wrap(add_wrap(a0b1_lo, a0b0_hi), 0);
-//    assert overflow(efl) == (a0b1_lo + a0b0_hi >= nat64_max);
-    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
-    assert a0b0b1 == a0 * (b0 + nat64_max * b1); // FAILS:
 
-//    assert_by_tactic(a0b0b1 == a0 * (b0 + pow2_64 * b1), int_canon); // FAILS:
+//    assert efl == update_of(old_efl, a0b1_lo + a0b0_hi + (if overflow(old_efl) then 1 else 0) >= pow2_64); 
+    assert overflow(efl) == a0b1_lo + a0b0_hi + (if overflow(old_efl) then 1 else 0) >= pow2_64; 
+    assert overflow(efl) == a0b1_lo + a0b0_hi >= pow2_64;
+
+//    simple_helper(a0, b0, b1, d0, a0b0_hi, a0b1_lo, r11, r10, overflow(efl));
+//    assert a0b0b1 == a0 * (b0 + pow2_64 * b1); // FAILS:
+
+
+    assert_by_tactic(a0b0b1 == a0 * (b0 + pow2_64 * b1), int_canon); // FAILS:
     // user tactic failed: apply_lemma: Cannot instantiate lemma CanonCommSemiring.semiring_reflect CanonCommSemiring.const_last
 
 /*

@@ -103,7 +103,7 @@ procedure{:instruction Ins(S.Adox64(dst, src))}{:fast_instruction}{:quick export
         efl;
     ensures
         dst == old(add_wrap(add_wrap(dst, src), (if overflow(efl) then 1 else 0)));
-        efl == update_of(old(efl), old(dst + src + (if overflow(efl) then 1 else 0)) >= pow2_64);
+        efl == old(update_of(efl, dst + src + (if overflow(efl) then 1 else 0) >= pow2_64));
 {
 }
 
