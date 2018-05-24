@@ -46,19 +46,11 @@ let lemma_expand_key_256_0 (key:aes_key_LE AES_256) : Lemma
   (equal key (expand_key AES_256 key 8))
   = ()
 
-#reset-options "--initial_fuel 1 --max_fuel 1 --max_ifuel 0 --z3rlimit 10"
 open FStar.Mul
-
-let mod_helper (i n:int) : Lemma
-  (requires 1 < i /\ i < 14 /\ i % 2 == 1 /\ n == 4 * i)
-  (ensures  ~(n % 8 == 0))
-  =
-  ()
-
 #reset-options "--initial_fuel 1 --max_fuel 1 --max_ifuel 0 --z3rlimit 30"
 let lemma_expand_key_256_i (key:aes_key_LE AES_256) (i:nat) : Lemma
   (requires
-    1 < i /\ i < 14
+    1 < i /\ i < 15
   )
   (ensures (
     let m = 4 * (i - 2) in
@@ -77,9 +69,12 @@ let lemma_expand_key_256_i (key:aes_key_LE AES_256) (i:nat) : Lemma
   let _ = expand_key AES_256 key (n + 2) in
   let _ = expand_key AES_256 key (n + 3) in
   let _ = expand_key AES_256 key (n + 4) in
-  let _ = expand_key AES_256 key (n + 5) in
-  let _ = expand_key AES_256 key (n + 6) in
-  let _ = expand_key AES_256 key (n + 7) in
+  if i < 14 then (
+    let _ = expand_key AES_256 key (n + 5) in
+    let _ = expand_key AES_256 key (n + 6) in
+    let _ = expand_key AES_256 key (n + 7) in
+    ()
+  ) else ();
   ()
 #reset-options
 
@@ -91,7 +86,28 @@ let rec lemma_expand_append (key:aes_key_LE AES_256) (size1:nat) (size2:nat) : L
   =
   if size1 < size2 then lemma_expand_append key size1 (size2 - 1)
 
-#reset-options "--z3rlimit 10"
+//#reset-options "--initial_fuel 8 --max_fuel 8 --max_ifuel 0"
+let lemma_expand_key_256_0_corollary (key:aes_key_LE AES_256) : Lemma
+  ((let s = key_schedule_to_round_keys 1 (expand_key AES_256 key 60) in
+    expand_key_256 key 0 == s.[0]) /\
+   (let s = key_schedule_to_round_keys 2 (expand_key AES_256 key 60) in
+    expand_key_256 key 1 == s.[1]))
+  =
+  lemma_expand_key_256_0 key;
+  //let s = key_schedule_to_round_keys 1 (expand_key AES_256 key 60) in
+  //let s' = expand_key_256 key 0 in
+  //assert (s' == Mkfour key.[0] key.[1] key.[2] key.[3]);
+  //let e = expand_key AES_256 key 60 in
+  //assert (s == append createEmpty (create 1 (Mkfour e.[0] e.[1] e.[2] e.[3])));
+  //append_empty_l (create 1 (Mkfour e.[0] e.[1] e.[2] e.[3]));
+  //assert (s == create 1 (Mkfour e.[0] e.[1] e.[2] e.[3]));
+  lemma_expand_append key 8 60;
+  //append_empty_l (create 1 (index key 0));
+  //  assert (s' == s.[0]);
+  ()
+
+
+#reset-options "--z3rlimit 30"
 // quad32 key expansion is equivalent to nat32 key expansion
 let rec lemma_expand_key_256 (key:aes_key_LE AES_256) (size:nat) : Lemma
   (requires size <= 15)
@@ -107,8 +123,15 @@ let rec lemma_expand_key_256 (key:aes_key_LE AES_256) (size:nat) : Lemma
     let i = size - 1 in
     lemma_expand_append key (4 * i) 60;
     lemma_expand_key_256 key i;
-    if i = 0 then lemma_expand_key_256_0 key
-    else lemma_expand_key_256_i key i
+    (if i = 0 || i = 1 then (lemma_expand_key_256_0_corollary key)
+     else (
+       lemma_expand_key_256_i key i;
+       let s = key_schedule_to_round_keys size (expand_key AES_256 key 60) in
+       assert (equal (expand_key AES_256 key (4 * i)) (slice (expand_key AES_256 key 60) 0 (4 * i)));
+       //admit();
+       ()
+     )
+    )     
   )
 #reset-options
 
