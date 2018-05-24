@@ -71,14 +71,7 @@ let lemma_expand_key_256_i (key:aes_key_LE AES_256) (i:nat) : Lemma
     r0 == w.[n + 0] /\ r1 == w.[n + 1] /\ r2 == w.[n + 2] /\ r3 == w.[n + 3]  // NextQuad == Next 4 words
   ))
   =
-    let m = 4 * (i - 2) in
-    let n = 4 * i in
-    let v = expand_key AES_256 key n in          // Current
-    let w = expand_key AES_256 key (n + 4) in    // Next 4 words
-    let prev0 = Mkfour v.[m + 0] v.[m + 1] v.[m + 2] v.[m + 3] in  // Penultimate 4 words in Current
-    let prev1 = Mkfour v.[m + 4] v.[m + 5] v.[m + 6] v.[m + 7] in  // Ultimate 4 words in Current
-    let Mkfour r0 r1 r2 r3 = round_key_256 prev0 prev1 i in        // Calc NextQuad from quads at end of Current
-  //let n = 4 * i in
+  let n = 4 * i in
   // unfold expand_key 8 times (could use fuel, but that unfolds everything):
   let _ = expand_key AES_256 key (n + 1) in
   let _ = expand_key AES_256 key (n + 2) in
@@ -87,69 +80,6 @@ let lemma_expand_key_256_i (key:aes_key_LE AES_256) (i:nat) : Lemma
   let _ = expand_key AES_256 key (n + 5) in
   let _ = expand_key AES_256 key (n + 6) in
   let _ = expand_key AES_256 key (n + 7) in
-
-
-(*
-  if i % 2 = 0 then (
-  (*
-    let r = aes_rcon (i / 2 - 1) in
-  let Mkfour v0 v1 v2 v3 = prev0 in
-  let Mkfour v4 v5 v6 v7 = prev1 in  
-  let w0 = v0 *^ (sub_word (rot_word_LE v7) *^ r) in
-  let w1 = v1 *^ w0 in
-  let w2 = v2 *^ w1 in
-  let w3 = v3 *^ w2 in    
-  *)
-//    assert (n % nk AES_256 == 0);   // OBSERVE
-(*
-    assert (round_key_256 prev0 prev1 i == Mkfour w0 w1 w2 w3); 
-    //assert (w.[n] == w.[n - 8] *^ ((sub_word (rot_word_LE w.[n-1])) *^ (aes_rcon((n / (nk AES_256)) - 1))));
-    //assert (w.[n] == nat32_xor (index w (n - (nk AES_256))) (nat32_xor (sub_word (rot_word_LE (index w (n-1)))) (aes_rcon ((n / (nk AES_256)) - 1))));
-    assert (w.[n] == w.[n - 8] *^ ( (sub_word (rot_word_LE w.[n-1])) *^ (aes_rcon ((n / (nk AES_256)) - 1)) ));
-    //assert (2 * (n / (nk AES_256)) == i);  // If i = 2, then n = 8, but 8 / 8 == 1
-                                     // If i = 4 (b/c i % 2 == 0), then n = 16, but 16 / 8 = 2
-    //assert ( i / 2 - 1 == n / 8 - 1);                                     
-
-    assert (i / 2 - 1 == ((n / (nk AES_256)) - 1));
-    
-    assert (w.[n] == w.[n - 8] *^ ( (sub_word (rot_word_LE w.[n-1])) *^ r));
-
-    assert (w.[n - 8] == v0);
-    assert (w.[n - 1] == v7);
-    assert (w.[n] == w0);
-    assert (w.[n + 1] == w1);
-    assert (w.[n + 2] == w2);
-    assert (w.[n + 3] == w3);
-*)
-    admit();
-    ()
-  ) else (  
-  (*
-  admit();
-    mod_helper i n;
-    assert_norm (nk AES_256 == 8);
-    assert (~(n % nk AES_256 == 0));
-
-
-    let r = aes_rcon (i / 2 - 1) in
-//    assert (round_key_256 prev0 prev1 i == snd (round_key_256_rcon prev0 prev1 r));
-  let Mkfour v0 v1 v2 v3 = prev0 in
-  let Mkfour v4 v5 v6 v7 = prev1 in    // In this case, prev1 and w0-w3 below overlap, so using v4 to calculate w4 doesn't go back far enough
-  let w0 = v0 *^ (sub_word (rot_word_LE v7) *^ r) in
-  let w1 = v1 *^ w0 in
-  let w2 = v2 *^ w1 in
-  let w3 = v3 *^ w2 in
-
-    assert (v4 == v.[m + 4]);
-    assert (v.[m + 4] == v.[4 * (i - 2) + 4]);
-    assert (v.[m + 4] == v.[4 * i - 4]);
-    assert (v.[m + 4] == v.[n - 4]);
-//    assert (v4 == w.[n-8]);
-    admit();
-    *)
-    ()
-  );
-  *)
   ()
 #reset-options
 
