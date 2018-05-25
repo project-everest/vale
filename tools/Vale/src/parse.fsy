@@ -120,7 +120,7 @@ Type2
 	
 IntType
   : INT { TInt (NegInf, Inf) }
-	| INT LPAREN LITINT COMMA LITINT RPAREN { TInt (Int (snd $3), Int(snd $5))}
+  | INT LPAREN LITINT COMMA LITINT RPAREN { TInt (Int (snd $3), Int(snd $5))}
 
 TypeArgs
   : Type { [$1] }
