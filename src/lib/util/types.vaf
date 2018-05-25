@@ -1,5 +1,7 @@
 module Types
 
+type Prims.prop : Type(1) extern ;
+
 type Prims.attribute : Type(0) extern ;
 
 const Prims.cps : Prims.attribute extern ;
@@ -8,7 +10,7 @@ function Prims.hasEq #[uu____254 : Type(0)] () : prop extern ;
 
 type Prims.eqtype : Type(1) extern ;
 
-type Prims.bool : Type(0) extern ;
+type Prims.bool : Type(0) extern;
 
 unsupported: Prims.HasEq_bool //(reason: Prims.hasEq)
 
@@ -4515,21 +4517,21 @@ const Words_s.pow2_128 : Prims.int extern ;
 
 function Words_s.natN (n_7709 : Prims.nat) : prop extern ;
 
-type Words_s.nat1 : Type(0) extern ;
+type Words_s.nat1 : Type(0) := int(0, 1);
 
-type Words_s.nat2 : Type(0) extern ;
+type Words_s.nat2 : Type(0) := int(0, 3);
 
-type Words_s.nat4 : Type(0) extern ;
+type Words_s.nat4 : Type(0) := int(0, 0xf);
 
-type Words_s.nat8 : Type(0) extern ;
+type Words_s.nat8 : Type(0) := int(0, 0xff) ;
 
-type Words_s.nat16 : Type(0) extern ;
+type Words_s.nat16 : Type(0) := int(0, 0xffff) ;
 
-type Words_s.nat32 : Type(0) extern ;
+type Words_s.nat32 : Type(0) := int(0, 0xffffffff) ;
 
-type Words_s.nat64 : Type(0) extern ;
+type Words_s.nat64 : Type(0) := int(0, 0xffffffffffffffff) ;
 
-type Words_s.nat128 : Type(0) extern ;
+type Words_s.nat128 : Type(0) := int(0, 0xffffffffffffffffffffffffffffffff) ;
 
 unsupported: Words_s.int_to_natN //(reason: Words_s.natN)
 
@@ -4711,13 +4713,13 @@ unsupported: Words.Seq_s.seq_nat32_to_seq_nat8_LE //(reason: FStar.Seq.Base.seq)
 
 unsupported: Words.Seq_s.seq_nat32_to_seq_nat8_BE //(reason: FStar.Seq.Base.seq)
 
-type Types_s.nat8 : Type(0) extern ;
+type Types_s.nat8 : Type(0) := Words_s.nat8 ;
 
-type Types_s.nat16 : Type(0) extern ;
+type Types_s.nat16 : Type(0) := Words_s.nat16;
 
-type Types_s.nat32 : Type(0) extern ;
+type Types_s.nat32 : Type(0) := Words_s.nat32 ;
 
-type Types_s.nat64 : Type(0) extern ;
+type Types_s.nat64 : Type(0) := Words_s.nat64 ;
 
 unsupported: Types_s.add_wrap //(reason: Words_s.natN)
 
@@ -4741,15 +4743,15 @@ function
   extern
   ;
 
-type Types_s.twobits : Type(0) extern ;
+type Types_s.twobits : Type(0) := int(0, 3) ;
 
-type Types_s.bits_of_byte : Type(0) extern ;
+type Types_s.bits_of_byte : Type(0) := Words_s.four(Types_s.twobits) ;
 
 function Types_s.byte_to_twobits (b_745 : Types_s.nat8) : Types_s.bits_of_byte extern ;
 
 type Types_s.double32 : Type(0) extern ;
 
-type Types_s.quad32 : Type(0) extern ;
+type Types_s.quad32 : Type(0) := Words_s.four (Types_s.nat32);
 
 function
   Types_s.quad32_xor
@@ -4828,15 +4830,15 @@ unsupported: Types_s.reverse_bytes_nat32_seq //(reason: FStar.Seq.Base.seq)
 
 unsupported: Types_s.reveal_reverse_bytes_nat32_seq //(reason: FStar.Seq.Base.seq)
 
-type Memory_i_s.nat8 : Type(0) extern ;
+type Memory_i_s.nat8 : Type(0) := Words_s.nat8 ;
 
-type Memory_i_s.nat16 : Type(0) extern ;
+type Memory_i_s.nat16 : Type(0) := Words_s.nat16 ;
 
-type Memory_i_s.nat32 : Type(0) extern ;
+type Memory_i_s.nat32 : Type(0) := Words_s.nat32 ;
 
-type Memory_i_s.nat64 : Type(0) extern ;
+type Memory_i_s.nat64 : Type(0) := Words_s.nat64 ;
 
-type Memory_i_s.quad32 : Type(0) extern ;
+type Memory_i_s.quad32 : Type(0) := Types_s.quad32 ;
 
 type Memory_i_s.heap : Type(1) extern ;
 
@@ -5250,7 +5252,7 @@ const X64.Machine_s.pow2_64 : Prims.int extern ;
 
 const X64.Machine_s.pow2_128 : Prims.int extern ;
 
-type X64.Machine_s.nat64 : Type(0) extern ;
+type X64.Machine_s.nat64 : Type(0) := Types_s.nat64 ;
 
 function
   X64.Machine_s.int_to_nat64
@@ -5277,9 +5279,9 @@ function
   extern
   ;
 
-type X64.Machine_s.nat128 : Type(0) extern ;
+type X64.Machine_s.nat128 : Type(0) := Words_s.nat128 ;
 
-type X64.Machine_s.quad32 : Type(0) extern ;
+type X64.Machine_s.quad32 : Type(0) := Types_s.quad32 ;
 
 type X64.Machine_s.reg : Type(0) extern ;
 
@@ -5557,7 +5559,7 @@ function
   extern
   ;
 
-type X64.Machine_s.imm8 : Type(0) extern ;
+type X64.Machine_s.imm8 : Type(0) := int(0, 255) ;
 
 type X64.Machine_s.xmm : Type(0) extern ;
 
@@ -6459,7 +6461,7 @@ function
   extern
   ;
 
-type X64.Vale.Decls_i.quad32 : Type(0) extern ;
+type X64.Vale.Decls_i.quad32 : Type(0) := Types_s.quad32;
 
 function X64.Vale.Decls_i.cf (flags_479 : Prims.int) : Prims.bool extern ;
 
@@ -6554,9 +6556,9 @@ type X64.Vale.Decls_i.va_state : Type(1) extern ;
 
 type X64.Vale.Decls_i.va_fuel : Type(0) extern ;
 
-type X64.Vale.Decls_i.va_operand : Type(0) extern ;
+type X64.Vale.Decls_i.va_operand : Type(0) := X64.Machine_s.operand ;
 
-type X64.Vale.Decls_i.va_operand_opr64 : Type(0) extern ;
+type X64.Vale.Decls_i.va_operand_opr64 : Type(0) := X64.Machine_s.operand ;
 
 type X64.Vale.Decls_i.va_reg_operand : Type(0) extern ;
 

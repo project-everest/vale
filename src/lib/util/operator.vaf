@@ -28,7 +28,7 @@ Note that <, >, <=, >= may be chained together: 0 <= i < n turns into 0 <= i && 
 #token /\ precedence &&
 #token \/ precedence ||
 
-function operator(~) (x:Type0):Type0 := l_not;
-function operator(<>) (x:Type0, y:Type0):Type0 := op_disEquality;
-function operator(/\) (x:Type0, y:Type0):Type0 := l_and;
-function operator(\/) (x:Type0, y:Type0):Type0 := l_or;
+function operator(~) #[# a : Type(0)](x:a):a := l_not;
+function operator(<>) #[# a : Type(0)] (x:a, y:a):a := op_disEquality;
+function operator(/\) #[# a : Type(0)](x:a, y:a):a := l_and;
+function operator(\/) #[# a : Type(0)] (x:a, y:a):a := l_or;

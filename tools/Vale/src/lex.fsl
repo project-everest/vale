@@ -243,6 +243,8 @@ and lextoken = parse
           hex t (bigint.Add (bigint d, bigint.Multiply (bigint 16, n))) in
     LITINT ((curLoc lexbuf), hex digits bigint.Zero)
   }
+| "int" { INT (curLoc lexbuf) }
+| "Prims.int" { ID ((curLoc lexbuf), lexeme lexbuf) }
 | ['0'-'9']['0'-'9''_']* { LITINT ((curLoc lexbuf), bigint.Parse((lexeme lexbuf).Replace("_", ""))) }
 | ['0'-'9']+['.']['0'-'9']+ { LITREAL ((curLoc lexbuf), lexeme lexbuf) }
 | ['_''a'-'z''A'-'Z']+['_''a'-'z''A'-'Z''0'-'9''\'']* { ID ((curLoc lexbuf), lexeme lexbuf) }

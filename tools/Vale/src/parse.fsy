@@ -56,6 +56,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * string> LITREAL
 %token <loc * bool> LITBOOL
 %token <loc * int> BV
+%token <loc> INT
 %token <loc> QLBRACKET HASHLBRACKET LBRACKET RBRACKET LBRACE RBRACE LPAREN RPAREN LBRACECOLON
 %token <loc> AT COMMA DOT HASH MINUSGT
 %token <loc * (bool * string)> BANG
@@ -108,6 +109,7 @@ Kind
 
 Type
   : Type1 { $1 }
+  | IntType { $1 }
   | FUN LPAREN TypeArgsOpt RPAREN MINUSGT Type { TArrow ($3, $6) }
 Type1
   : Type2 { $1 }
@@ -115,6 +117,10 @@ Type1
 Type2
   : LPAREN Type RPAREN { $2 }
   | AnyQualifiedId { TName $1 }
+	
+IntType
+  : INT { TInt (NegInf, Inf) }
+	| INT LPAREN LITINT COMMA LITINT RPAREN { TInt (Int (snd $3), Int(snd $5))}
 
 TypeArgs
   : Type { [$1] }

@@ -24,6 +24,8 @@ procedure p()
 let double (x:int):int = x + x
 #endverbatim
 
+function double (x:int):int extern;
+
 procedure Calls()
     requires 
         rax < 7;

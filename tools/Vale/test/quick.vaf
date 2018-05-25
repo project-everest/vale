@@ -156,6 +156,9 @@ procedure{:quick exportOnly} Add64Ghosts(
 #verbatim
 let ghostId (x:int) : GTot int = x
 #endverbatim
+
+function ghostId (x:int) : int extern;
+
 //#reset-options "--debug Quick --debug_level SMTQuery"
 procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
