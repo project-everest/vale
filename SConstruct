@@ -193,27 +193,28 @@ def add_vale_builder(env):
 
   env.Append(BUILDERS = {'Vale' : vale_builder})
 
-vale_dfy_include_re = re.compile(r'include verbatim\s+"(\S+)"', re.M)
-vale_vad_include_re = re.compile(r'include\s+"(\S+)"', re.M)
+# match 'include {:attr1} ... {:attrn} "filename"'
+# where attr may be 'verbatim' or 'from BASE'
+vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\}\s*)*)"(\S+)"', re.M)
+vale_verbatim_re = re.compile(r'\{\:\s*verbatim\s*\}')
+vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
 
 def vale_file_scan(node, env, path):
     contents = node.get_text_contents()
     dirname =  os.path.dirname(str(node))
 
-    dfy_includes = vale_dfy_include_re.findall(contents)
-    vad_includes = vale_vad_include_re.findall(contents)
+    includes = vale_include_re.findall(contents)
 
     v_dfy_includes = []
     v_vad_includes = []
-    for i in dfy_includes:
-      f = os.path.join(dirname, i)
-      v_dfy_includes.append(f)
-      v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(i)[0] + '.vdfy')
-      env.Dafny(v, f)
-    for i in vad_includes:
-      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
-      f = os.path.join(dirname, i)
-      v_vad_includes.append(f)
+    for (attrs, inc) in includes:
+      f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+      if vale_verbatim_re.search(attrs):
+        v_dfy_includes.append(f)
+        #v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(inc)[0] + '.vdfy')
+      else:
+        #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+        v_vad_includes.append(f)
 
     files = env.File(v_dfy_includes + v_vad_includes) 
     return files
