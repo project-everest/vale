@@ -99,8 +99,8 @@ verify_options = {
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
-  'src/*/*.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
-  'src/*/*.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc true'),
+  'src/*/*.fst': BuildOptions(fstar_default_args),
+  'src/*/*.fsti': BuildOptions(fstar_default_args),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args),
@@ -109,10 +109,13 @@ verify_options = {
   'src/arch/x64/Interop64.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
   'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
+  'obj/crypto/aes/aes-x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
+
+
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_larith),
-  '.vaf': BuildOptions(fstar_default_args),  
+  '.vaf': BuildOptions(fstar_default_args  + ' --use_two_phase_tc false'),
 }
 if env['TARGET_ARCH'] != 'x86':
  verify_options['src/test/memcpy.vad'] = None
@@ -129,7 +132,6 @@ min_test_suite_blacklist = [
   'obj/crypto/aes/aes-x64/X64.GCMopt.fst',
   'obj/crypto/aes/aes-x64/X64.GCM.fst',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
-  'obj/arch/x64/X64.Vale.InsVector.fst',
   'obj/crypto/aes/aes-x64/X64.GHash',
   'obj/crypto/aes/aes-x64/X64.GCTR.fst',
   'obj/crypto/aes/aes-x64/X64.AES.fst'
