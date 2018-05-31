@@ -195,29 +195,29 @@ def add_vale_builder(env):
 
 # match 'include {:attr1} ... {:attrn} "filename"'
 # where attr may be 'verbatim' or 'from BASE'
-vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\}\s*)*)"(\S+)"', re.M)
+vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\})*)\s*"(\S+)"', re.M)
 vale_verbatim_re = re.compile(r'\{\:\s*verbatim\s*\}')
 vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
 
 def vale_file_scan(node, env, path):
-    contents = node.get_text_contents()
-    dirname =  os.path.dirname(str(node))
+  contents = node.get_text_contents()
+  dirname =  os.path.dirname(str(node))
 
-    includes = vale_include_re.findall(contents)
+  includes = vale_include_re.findall(contents)
 
-    v_dfy_includes = []
-    v_vad_includes = []
-    for (attrs, inc) in includes:
-      f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
-      if vale_verbatim_re.search(attrs):
-        v_dfy_includes.append(f)
-        #v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(inc)[0] + '.vdfy')
-      else:
-        #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
-        v_vad_includes.append(f)
+  v_dfy_includes = []
+  v_vad_includes = []
+  for (attrs, inc) in includes:
+    f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+    if vale_verbatim_re.search(attrs):
+      v_dfy_includes.append(f)
+      #v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(inc)[0] + '.vdfy')
+    else:
+      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+      v_vad_includes.append(f)
 
-    files = env.File(v_dfy_includes + v_vad_includes) 
-    return files
+  files = env.File(v_dfy_includes + v_vad_includes) 
+  return files
 
 vale_scan = Scanner(function = vale_file_scan,
                      skeys = ['.vad'])
