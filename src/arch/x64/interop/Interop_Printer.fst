@@ -35,17 +35,35 @@ let print_low_basety = function
   | TUInt128 -> "UInt128.t"
 
 let print_low_ty = function
-  | TBuffer ty -> "buffer " ^ print_low_basety ty
+  | TBuffer ty -> "B.buffer " ^ print_low_basety ty
   | TBase ty -> print_low_basety ty
 
 let print_explicit_basety = function
   | TUInt8 -> "#UInt8.t "
-  | TUInt64 -> "#UInt64.t"
-  | TUInt128 -> "#UInt128.t"
+  | TUInt64 -> "#UInt64.t "
+  | TUInt128 -> "#UInt128.t "
 
 let rec print_low_args = function
   | [] -> "STL unit"
   | (a, ty)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args q
+
+let rec print_low_args_and = function
+  | [] -> ""
+  | (a, ty)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args_and q
+
+let rec print_args_list = function
+  | [] -> ""
+  | (a,ty)::q -> "(" ^ a ^ ":" ^ print_low_ty ty ^ ") " ^ print_args_list q
+
+let rec print_args_names = function
+  | [] -> ""
+  | (a, _)::q -> a ^ " " ^ print_args_names q  
+
+let rec print_buffers_list = function
+  | [] -> "[]"
+  | (a,ty)::q -> 
+    (if TBuffer? ty then a ^ "::" else "") ^
+    print_buffers_list q
 
 let is_buffer arg =
   let _, ty = arg in TBuffer? ty
@@ -74,12 +92,38 @@ let rec disjoint args =
 
 let translate_lowstar (func:func_ty) =
   let name, args = func in
-  let separator1 = if (List.Tot.Base.length (List.Tot.Base.filter is_buffer args) <= 1) then "" else " /\\ " in
+  let separator1 = if (List.Tot.Base.length (List.Tot.Base.filter is_buffer args) <= 1) then "" else " /\\ " in  
   "module " ^ name ^
-  "\n\nopen FStar.Buffer\nopen FStar.HyperStack.ST\n\n" ^
-  "assume val " ^ name ^ ": " ^ (print_low_args args) ^
-  "\n\t(requires (fun h -> " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ "))\n\t" ^
-  "(ensures (fun h0 _ h1 -> " ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ "))\n"
+  "\n\nopen FStar.Buffer\nmodule B = FStar.Buffer\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop64\nopen Words_s\nopen Types_s\nmodule S = X64.Bytes_Semantics_s\nopen X64.Machine_s\nopen X64.Memory_i_s\n#set-options \"--z3rlimit 40\"\n\n" ^
+  "assume val st_put (h:HS.mem) (f:HS.mem -> GTot HS.mem) : ST unit (fun h0 -> True) (fun h0 _ h1 -> h == h1 /\ f h0 == h)\n\n" ^
+  "// TODO: Complete with your pre- and post-conditions\n" ^
+  "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ "\n" ^
+  "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
+    ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ "\n\n" ^
+  "//The map from buffers to addresses in the heap, that remains abstract\n" ^
+  "assume val addrs: addr_map\n\n" ^
+  "val " ^ name ^ ": " ^ (print_low_args args) ^
+  "\n\t(requires (fun h -> pre_cond h " ^ (print_args_names args) ^ "))\n\t" ^
+  "(ensures (fun h0 _ h1 -> post_cond h0 h1 " ^ (print_args_names args) ^ "))\n\n" ^
+  "val ghost_" ^ name ^ ": " ^ (print_low_args_and args) ^ 
+    "(h0:HS.mem{pre_cond h0 " ^ (print_args_names args) ^ 
+    "}) -> GTot (h1:HS.mem{post_cond h0 h1 " ^ (print_args_names args) ^ "})\n\n" ^
+  "#set-options \"--initial_fuel 4 --max_fuel 4 --initial_ifuel 2 --max_ifuel 2\"\n" ^
+  "let ghost_" ^ name ^ " " ^ (print_args_names args) ^ "h0 =\n" ^
+  "  let buffers = " ^ print_buffers_list args ^ " in\n" ^
+  "  let s0_heap = down_mem64 h0 addrs buffers in\n" ^
+  "  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in\n" ^
+  "  let n:nat64 = 0 in\n" ^    
+  // TODO : Calling conventions for regs
+  "  let regs = fun r -> n in\n" ^
+  "  let n:nat32 = 0 in\n" ^  
+  "  let xmms = fun x -> Mkfour n n n n in\n" ^
+  "  let bytes_s0 = {S.ok = true; S.regs = regs; S.xmms = xmms; S.flags = 0; S.mem = s0_heap} in\n" ^
+  "  let s0 = {state = bytes_s0; mem = mem} in\n" ^
+  "  admit()\n\n" ^
+  "let " ^ name ^ " " ^ (print_args_names args) ^ " =\n" ^
+  "  let h0 = get() in\n" ^
+  "  st_put h0 (fun h -> if FStar.StrongExcludedMiddle.strong_excluded_middle (pre_cond h " ^ (print_args_names args) ^ ") then ghost_" ^ name ^ " " ^ (print_args_names args) ^ "h else h)\n"
   
 let print_vale_bufferty = function
   | TUInt8 -> "buffer8"
@@ -135,7 +179,7 @@ let print_vale_reads os target (args: list arg{supported os target args}) =
 let translate_vale os target (func:func_ty{supported_func os target func}) =
   let name, args = func in
   "#verbatim interface implementation\nmodule "^ name ^
-  "\nmodule M = Memory_i_s\nopen X64.Machine_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls\n#set-options \"--z3rlimit 20\"\n#end verbatim\n\n" ^
+  "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls\n#set-options \"--z3rlimit 20\"\n#end verbatim\n\n" ^
   "procedure " ^ name ^ "(inline t:taint" ^ print_vale_args args ^")\n" ^
   "    requires/ensures\n" ^
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
