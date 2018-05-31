@@ -1,0 +1,1 @@
+fstar.exe --expose_interfaces X64.Memory_i_s.fst interop/memcpy/Memcpy.fst --include ../../lib/math/ --include ../../lib/collections/ --include ../../lib/util/ --include ../ --include ../../crypto/aes/ --query_stats --admit_except Memcpy.correct_memcpy
