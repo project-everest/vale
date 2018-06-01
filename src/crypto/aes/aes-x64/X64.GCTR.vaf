@@ -54,7 +54,7 @@ procedure {:quick exportOnly} init_pshufb_mask(inout dst:xmm)
     Pinsrd(dst, 0x00010203, 3);
 }
 
-procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
+procedure {:quick exportOnly} Inc32(inout dst:xmm, one:xmm)
     requires
         one == Mkfour(1, 0, 0, 0);
     modifies 

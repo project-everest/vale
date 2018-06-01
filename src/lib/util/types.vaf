@@ -4779,7 +4779,7 @@ function
 
 function
   Types_s.insert_nat64
-  (q_1322 : Types_s.quad32 , n_1323 : Types_s.nat64 , i_1324 : Words_s.nat1)
+  (q_1322 : Types_s.quad32 , n_1323 : Types_s.nat64 , i_1324 : Prims.bool)
   :
   Types_s.quad32
   extern

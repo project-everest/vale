@@ -134,10 +134,9 @@ let base_typ env t =
   let t = match t with
   | TName (Id "Prims.int") -> TInt(NegInf, Inf)
   | TName (Id "Prims.nat") 
+  | TName (Id "nat") -> TInt(Int bigint.Zero, Inf)
   | TName (Id "Prims.pos")
-  | TName (Id "nat")
-  | TName (Id "pos") -> TInt(Int bigint.Zero, Inf)
-  | TName (Id "Words_s.nat1") -> TName (Id "bool")
+  | TName (Id "pos") -> TInt(Int bigint.One, Inf)
   | TName (Id "Prims.bool") -> TName(Id "bool")
   // those below are due to argument not transformed yet.
   | TName (Id "reg")
@@ -283,9 +282,6 @@ let rec typ_equal env t1 t2 =
   let t1 = base_typ env t1 in
   let t2 = base_typ env t2 in
   match (t1, t2) with
-  | (TName (Id "bool"), TName(Id "Words_s.nat1")) ->
-    // ISSUE: Types_s.insert_nat64 has type "nat1" while it should be "bool"
-    true
   | (TName x, TName y) -> 
     let (mx, x) = name_of_id x in
     let (my, y) = name_of_id y in
@@ -374,6 +370,16 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
       let (t, ae, s) = infer_exp_one env e (Some et) in
       let ae = AEOp (Uop UOld, [ae], tv, et) in
       ([tv], ae, s@[(t, tv)])
+    | EOp (Uop UReveal, [e]) ->
+      let (t, ae, s) = 
+        match e with 
+        | EVar x ->
+          lookup_proc env x;
+          ([], AEVar(x, TName (Id "unit"), TName (Id "unit")), [])
+        | EApply (x, es) ->
+          infer_exp env e None;
+      let ae = AEOp (Uop UReveal, [ae], TName (Id "unit"), TName (Id "unit")) in
+      ([], ae, [])
     | EOp (Uop (UIs x), [e]) ->
       let x = Id ("uu___is_"+ (string_of_id x)) in
       let e = EApply (x, [e]) in
@@ -725,9 +731,6 @@ let rec unify_one env (m:substitutions) (s:typ) (t:typ):substitutions =
   | (TName (Id "prop"), TName (Id "bool")) -> 
     let u = TName (Id "prop") in
     let m = bind_typ m s u in bind_typ m t u
-  | (TName (Id "bool"), TName(Id "Words_s.nat1")) ->
-    // ISSUE: Types_s.insert_nat64 has type "nat1" while it should be "bool"
-    m
   | (TName (Id "X64.Vale.Decls_i.va_state"), TName (Id "state")) 
   | (TName (Id "X64.Vale.Decls_i.va_operand"), TName (Id "X64.Machine_s.operand"))
   | (TName (Id "shift_amt64"), TInt(_,_)) 

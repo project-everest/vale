@@ -90,6 +90,12 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
           inline_call x xs es
       | EApply (x, es) ->
           lemma_call x xs es
+      | EOp (Uop UReveal, es) ->
+          let x = "reveal_opaque" in
+          if Map.containsKey (Id x) env.procs then
+             inline_call x xs es
+          else
+             lemma_call (Id x) xs es
       | _ -> err ()
     )
   | SVar (x, tOpt, _, XGhost, _, Some e) -> assign_or_var false x tOpt e
