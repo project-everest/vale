@@ -121,7 +121,7 @@ let print_low_calling_args os target (args:list arg{supported os target args}) =
   match regs, args with
     | _, [] -> "    | _ -> n"
     | r1::rn, (a, ty)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
-      (if TBuffer? ty then "addrs.[(as_addr " ^ a ^ ", idx " ^ a ^ ", length " ^ a ^ ")]" else a) ^ 
+      (if TBuffer? ty then "addr_" ^ a else a) ^ 
       "\n" ^ aux rn q
   in aux (calling_registers os target) args
 
@@ -131,11 +131,17 @@ let print_low_callee_saved os target =
     | a::q -> "  assert(s0.regs " ^ (reg_to_low a) ^ " == s1.regs " ^ (reg_to_low a) ^ ");\n" ^ aux q
   in aux (callee_saved os target)
 
+let rec generate_low_addrs = function
+  | [] -> ""
+  | (a, TBuffer _)::q -> "  let addr_" ^ a ^ " = addrs.[(as_addr " ^ a ^ ", idx " ^ a ^ ", length " ^ a ^ ")] in\n" ^ generate_low_addrs q
+  | _::q -> generate_low_addrs q
+
 let translate_lowstar os target (func:func_ty{supported_func os target func}) =
   let name, args = func in
   let separator1 = if (List.Tot.Base.length (List.Tot.Base.filter is_buffer args) <= 1) then "" else " /\\ " in  
   "module " ^ name ^
   "\n\nopen FStar.Buffer\nmodule B = FStar.Buffer\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop64\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 40\"\n\n" ^
+  "open Vale_" ^ name ^ "\n\n" ^
   "assume val st_put (h:HS.mem) (f:HS.mem -> GTot HS.mem) : ST unit (fun h0 -> True) (fun h0 _ h1 -> h == h1 /\ f h0 == h)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ "\n" ^
@@ -153,7 +159,8 @@ let translate_lowstar os target (func:func_ty{supported_func os target func}) =
   "let ghost_" ^ name ^ " " ^ (print_args_names args) ^ "h0 =\n" ^
   "  let buffers = " ^ print_buffers_list args ^ " in\n" ^
   "  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in\n" ^
-  "  let n:nat64 = 0 in\n" ^    
+  "  let n:nat64 = 0 in\n" ^
+  generate_low_addrs args ^
   "  let regs = fun r -> begin match r with\n" ^
   (print_low_calling_args os target args) ^
   " end in\n" ^
@@ -181,11 +188,15 @@ let print_vale_ty = function
   | TUInt8 -> "uint8"
   | TUInt64 -> "uint64"  
   | TUInt128 -> "uint128"
-  
+
+let print_vale_arg = function
+  | (a, TBuffer ty) -> "ghost " ^ a ^ ":" ^ print_vale_bufferty ty
+  | (a, TBase ty) -> a ^ ":" ^ print_vale_ty ty
+
 let rec print_vale_args = function
   | [] -> ""
-  | (a, TBuffer ty)::q -> ", ghost " ^ a ^ ":" ^ print_vale_bufferty ty ^ print_vale_args q
-  | (a, TBase ty)::q -> ", " ^a^ ":" ^ print_vale_ty ty ^ print_vale_args q
+  | [arg] -> print_vale_arg arg
+  | arg::q -> print_vale_arg arg ^ ", " ^ print_vale_args q
 
 let rec print_vale_loc_buff = function
   | [] -> ""
@@ -218,19 +229,18 @@ let print_vale_reads os target (args: list arg{supported os target args}) =
 
 let translate_vale os target (func:func_ty{supported_func os target func}) =
   let name, args = func in
-  "#verbatim interface implementation\nmodule "^ name ^
-  "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls\n#set-options \"--z3rlimit 20\"\n#end verbatim\n\n" ^
-  "procedure " ^ name ^ "(inline t:taint" ^ print_vale_args args ^")\n" ^
+  "module Vale_" ^ name ^
+  "\n#verbatim{:interface}{:implementation}\n" ^ 
+  "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^
+  "procedure " ^ name ^ "(" ^ print_vale_args args ^")\n" ^
   "    requires/ensures\n" ^
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
   print_buff_readable args ^
   print_calling_args os target args ^
   "    ensures\n" ^ print_callee_saved os target ^ 
-  "    reads\n" ^
-  "        " ^ print_vale_reads os target args ^
   "    modifies\n" ^
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^
-  "        mem; memTaint; trace;\n"^
+  "        mem;\n"^
   "{\n\n}\n"
 
 
