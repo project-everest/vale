@@ -5,13 +5,15 @@ open FStar.HyperStack.ST
 module HS = FStar.Monotonic.HyperStack
 
 open Interop64
-open X64.Semantics_s
-module S = X64.Bytes_Semantics_s
 open X64.Machine_s
 open X64.Memory_i_s
 open Words_s
 open Types_s
 module B = FStar.Buffer
+module S = X64.Bytes_Semantics_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+
 
 let buf = B.buffer UInt64.t
 
@@ -35,14 +37,14 @@ assume val addrs: addr_map
 let memcpy_code1 = Ins (S.Mov64 (OReg Rax) (OMem (MReg Rax 0)))
 let memcpy_code2 = Ins (S.Mov64 (OMem (MReg Rbx 0)) (OReg Rax))
 
-let pre_vale s (src:buffer64) (dst:buffer64) = 
+let pre_vale (s:state) (src:buffer64) (dst:buffer64) = 
   buffer_readable s.mem src /\
   buffer_readable s.mem dst /\
   buffer_length src == 1 /\
   buffer_length dst == 1 /\
   eval_reg Rax s == buffer_addr src s.mem /\
   eval_reg Rbx s == buffer_addr dst s.mem /\
-  s.state.S.ok
+  s.ok
 
 let post_vale s s' (src:buffer64) (dst:buffer64) =
   buffer_readable s.mem src /\
@@ -52,7 +54,7 @@ let post_vale s s' (src:buffer64) (dst:buffer64) =
   buffer_length src == 1 /\
   buffer_length dst == 1 /\
   buffer_read src 0 s'.mem == buffer_read dst 0 s'.mem /\
-  s'.state.S.ok
+  s'.ok
 
 assume val memcpy_vale (src:buffer64) (dst:buffer64) (s:state{pre_vale s src dst}) : GTot (s':state{post_vale s s' src dst})
 
@@ -62,12 +64,12 @@ let pre_v (s:state) (src:buf) (dst:buf{disjoint src dst}) =
  
 let post_v (s1:state) (s2:state) (src:buf) (dst:buf{disjoint src dst}) = 
   let buffers = [src; dst] in
-  s2.state.S.ok /\
+  s2.ok /\
   post_cond s1.mem.hs s2.mem.hs src dst
 
 #set-options "--z3rlimit 40 --initial_fuel 2 --initial_ifuel 2"
 
-let correct_memcpy (s:state{s.state.S.ok}) 
+let correct_memcpy (s:state{s.ok}) 
   (src:buf{buffer_readable #(TBase TUInt64) s.mem src}) 
   (dst:buf{disjoint src dst /\ buffer_readable #(TBase TUInt64) s.mem dst}) : Lemma
   (requires (pre_v s src dst) /\ 
@@ -81,16 +83,18 @@ let correct_memcpy (s:state{s.state.S.ok})
 // Memcpy at the low* level. Should ideally use type ST/STL
 let low_memcpy (src:buf) (dst:buf) (h0:HS.mem{pre_cond h0 src dst}) : GTot (h1:HS.mem{post_cond h0 h1 src dst}) =
   let buffers = [src; dst] in
-  let s0_heap = down_mem64 h0 addrs buffers in
   let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in 
   let addr1 = addrs.[(as_addr src, idx src, length src)] in
   let addr2 = addrs.[(as_addr dst, idx dst, length dst)] in  
   // Not following calling conventions, but good for reduced semantics used here
-  let regs = fun x -> if x = Rax then addr1 else addr2 in
+  let n:nat64 = 0 in
+  let regs = fun x -> begin match x with
+    | Rax -> addr1 
+    | Rbx -> addr2 
+    | _ -> n end in
   let n:nat32 = 0 in
   let xmms = fun x -> Mkfour n n n n in
-  let bytes_s0 = {S.ok = true; S.regs = regs; S.xmms = xmms; S.flags = 0; S.mem = s0_heap} in
-  let s0 = {state = bytes_s0; mem = mem} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
 
 //  down_up_identity64 h0 addrs buffers;
 // down_up gives us the following assertion
