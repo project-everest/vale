@@ -434,27 +434,28 @@ def add_vale_builders(env):
   env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})
   env.Append(BUILDERS = {'ValeFStar' : vale_fstar_builder})
 
-vale_verbatim_include_re = re.compile(r'^\s*include verbatim\s+"(\S+)"', re.M)
-vale_vale_include_re = re.compile(r'^\s*include\s+"(\S+)"', re.M)
+# match 'include {:attr1} ... {:attrn} "filename"'
+# where attr may be 'verbatim' or 'from BASE'
+vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\})*)\s*"(\S+)"', re.M)
+vale_verbatim_re = re.compile(r'\{\:\s*verbatim\s*\}')
+vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
 
 def vale_dafny_file_scan(node, env, path):
   contents = node.get_text_contents()
   dirname =  os.path.dirname(str(node))
 
-  dfy_includes = vale_verbatim_include_re.findall(contents)
-  vad_includes = vale_vale_include_re.findall(contents)
+  includes = vale_include_re.findall(contents)
 
   v_dfy_includes = []
   v_vad_includes = []
-  for i in dfy_includes:
-    f = os.path.join(dirname, i)
-    v_dfy_includes.append(f)
-    v = os.path.join(to_obj_dir(dirname), os.path.splitext(i)[0] + '.vdfy')
-    env.Dafny(v, f)
-  for i in vad_includes:
-    #v = to_obj_dir(os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy'))
-    f = os.path.join(dirname, i)
-    v_vad_includes.append(f)
+  for (attrs, inc) in includes:
+    f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+    if vale_verbatim_re.search(attrs):
+      v_dfy_includes.append(f)
+      #v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(inc)[0] + '.vdfy')
+    else:
+      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
+      v_vad_includes.append(f)
 
   files = env.File(v_dfy_includes + v_vad_includes) 
   return files
@@ -463,20 +464,21 @@ def vale_fstar_file_scan(node, env, path):
   contents = node.get_text_contents()
   dirname =  os.path.dirname(str(node))
 
-  vaf_includes = vale_vale_include_re.findall(contents)
+  includes = vale_include_re.findall(contents)
 
   v_vaf_includes = []
-  for i in vaf_includes:
-    f = os.path.join(dirname, i)
-    v_vaf_includes.append(f)
-    # if A.vaf includes B.vaf, then manually establish these dependencies:
-    #   A.fst.verified  depends on B.fsti
-    #   A.fsti.verified depends on B.fsti
-    # note that A.fst.verified and A.fsti.verified may also have other dependencies; we rely on F*'s dependency analysis for these
-    f_fsti = os.path.splitext(to_obj_dir(os.path.normpath(f)))[0] + '.fsti.verified'
-    node_o = to_obj_dir(str(node))
-    node_o_base = os.path.splitext(node_o)[0]
-    Depends([node_o_base + '.fst.verified.tmp', node_o_base + '.fsti.verified.tmp'], f_fsti)
+  for (attrs, inc) in includes:
+    f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+    if not vale_verbatim_re.search(attrs):
+      v_vaf_includes.append(f)
+      # if A.vaf includes B.vaf, then manually establish these dependencies:
+      #   A.fst.verified  depends on B.fsti
+      #   A.fsti.verified depends on B.fsti
+      # note that A.fst.verified and A.fsti.verified may also have other dependencies; we rely on F*'s dependency analysis for these
+      f_fsti = os.path.splitext(to_obj_dir(os.path.normpath(f)))[0] + '.fsti.verified'
+      node_o = to_obj_dir(str(node))
+      node_o_base = os.path.splitext(node_o)[0]
+      Depends([node_o_base + '.fst.verified.tmp', node_o_base + '.fsti.verified.tmp'], f_fsti)
 
   files = env.File(v_vaf_includes) 
   return files
