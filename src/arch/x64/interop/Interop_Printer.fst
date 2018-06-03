@@ -34,9 +34,14 @@ let print_low_basety = function
   | TUInt64 -> "UInt64.t"
   | TUInt128 -> "UInt128.t"
 
+let print_low_nat_ty = function
+  | TUInt8 -> "nat8"
+  | TUInt64 -> "nat64"
+  | TUInt128 -> "nat128"
+
 let print_low_ty = function
   | TBuffer ty -> "B.buffer " ^ print_low_basety ty
-  | TBase ty -> print_low_basety ty
+  | TBase ty -> print_low_nat_ty ty
 
 let print_explicit_basety = function
   | TUInt8 -> "#UInt8.t "
@@ -242,9 +247,3 @@ let translate_vale os target (func:func_ty{supported_func os target func}) =
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^
   "        mem;\n"^
   "{\n\n}\n"
-
-
-let memcpy = ("memcpy", [("src", TBuffer TUInt64); ("dest", TBuffer TUInt64)])
-
-let _ = translate_lowstar Linux X86 memcpy
-let _ = translate_vale Linux X86 memcpy

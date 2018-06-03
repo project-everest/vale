@@ -1,5 +1,7 @@
 open Interop_Printer
 
-let _ = print_string (translate_vale Linux X86 memcpy)
+let poly = ("poly", [("ctx", TBuffer TUInt64); ("inp", TBuffer TUInt64); ("len", TBase TUInt64)])
+
+let _ = print_string (translate_vale Linux X86 poly)
 let _ = print_newline()
-let _ = print_string (translate_lowstar Linux X86 memcpy)
+let _ = print_string (translate_lowstar Linux X86 poly)
