@@ -72,7 +72,7 @@ procedure{:quick} KeyExpansionRoundEven256(
 }
 
 // Given round key for round, generate round key for round + 1
-procedure{:quick} {:verify true} KeyExpansionRoundOdd256(
+procedure{:quick} KeyExpansionRoundOdd256(
     inline round:nat64,
     inline rcon:imm8,
     ghost dst:buffer128,
@@ -110,34 +110,47 @@ procedure{:quick} {:verify true} KeyExpansionRoundOdd256(
     lemma_round_key_256_rcon_odd(old(xmm3), old(xmm1), 0, round + 1);
 }
 
-/*
-procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive256(
+//#reset-options "--z3rlimit 40"
+procedure{:quick exportOnly}{:recursive}{:decrease n}{:verify true}  KeyExpansionRoundUnrolledRecursive256(
     ghost key:aes_key_LE(AES_256),
     ghost dst:buffer128,
     inline n:int)
     reads
         rdx;
     modifies
-        mem; xmm1; xmm2; xmm3; efl;
+        mem; xmm1; xmm2; xmm3; xmm4; efl;
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 15);
     requires
-        0 <= n <= 14;
-        key == quad32_to_seq(xmm1);
+        0 < n <= 14;
+        xmm1 == expand_key_256(key, 0);
+        xmm3 == expand_key_256(key, 1);
+//        key == quad32_to_seq(xmm1);
+//        key == quad32_to_seq(xmm3);
         xmm1 == buffer128_read(dst, 0, mem);
+        xmm3 == buffer128_read(dst, 1, mem);
         rdx == buffer_addr(dst);
     ensures
         modifies_buffer128(dst, old(mem), mem);
-        xmm1 == buffer128_read(dst, n, mem);
+        buffer128_read(dst, n, mem) == (if (n % 2 = 0) then xmm1 else xmm3);
+        buffer128_read(dst, n - 1, mem) == (if ((n-1) % 2 = 0) then xmm1 else xmm3);
         forall j {buffer128_read(dst, j, mem)} :: 0 <= j <= n ==>
             buffer128_read(dst, j, mem) == expand_key_256(key, j);
 {
-    inline if (0 < n <= 14) {
+    inline if (1 < n <= 14) {
         KeyExpansionRoundUnrolledRecursive256(key, dst, n - 1);
-        KeyExpansionRound256(n - 1, aes_rcon(n - 1), dst, key);
-    }
+        ghost var old_mem := mem;
+        inline if (n % 2 = 0) { 
+            KeyExpansionRoundEven256(n - 1, aes_rcon(n / 2 - 1), dst, key);
+        }  else {
+            KeyExpansionRoundOdd256(n - 1, aes_rcon(n / 2 - 1), dst, key);
+        }
+        assert forall j {buffer128_read(dst, j, mem)} :: 0 <= j < n ==>
+            buffer128_read(dst, j, mem) == buffer128_read(dst, j, old_mem);
+    } 
 }
 
+/*
 procedure{:quick} KeyExpansion256Stdcall(
     inline win:bool,
     ghost input_key_b:buffer128,
