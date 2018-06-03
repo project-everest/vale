@@ -200,3 +200,9 @@ let lemma_simd_round_key (prev0 prev1:quad32) (rcon:nat32) (round:int) : Lemma
   =
   commute_rot_word_sub_word prev1.hi3;
   Types_i.xor_lemmas ()
+
+let lemma_round_key_256_rcon_odd (prev0 prev1:quad32) (rcon:nat32) (round:int) : Lemma
+  (requires ~(round % 2 == 0))
+  (ensures round_key_256_rcon prev0 prev1 rcon round == round_key_256_rcon prev0 prev1 0 round)
+  =
+  ()
