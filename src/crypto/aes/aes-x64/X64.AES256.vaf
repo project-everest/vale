@@ -110,8 +110,7 @@ procedure{:quick} KeyExpansionRoundOdd256(
     lemma_round_key_256_rcon_odd(old(xmm3), old(xmm1), 0, round + 1);
 }
 
-//#reset-options "--z3rlimit 40"
-procedure{:quick exportOnly}{:recursive}{:decrease n}{:verify true}  KeyExpansionRoundUnrolledRecursive256(
+procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive256(
     ghost key:aes_key_LE(AES_256),
     ghost dst:buffer128,
     inline n:int)
@@ -125,8 +124,6 @@ procedure{:quick exportOnly}{:recursive}{:decrease n}{:verify true}  KeyExpansio
         0 < n <= 14;
         xmm1 == expand_key_256(key, 0);
         xmm3 == expand_key_256(key, 1);
-//        key == quad32_to_seq(xmm1);
-//        key == quad32_to_seq(xmm3);
         xmm1 == buffer128_read(dst, 0, mem);
         xmm3 == buffer128_read(dst, 1, mem);
         rdx == buffer_addr(dst);
@@ -150,8 +147,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n}{:verify true}  KeyExpansio
     } 
 }
 
-/*
-procedure{:quick} KeyExpansion256Stdcall(
+procedure{:quick} {:verify true}  KeyExpansion256Stdcall(
     inline win:bool,
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
@@ -159,14 +155,14 @@ procedure{:quick} KeyExpansion256Stdcall(
         rcx; rsi; rdi;
     modifies
         rdx;
-        mem; xmm1; xmm2; xmm3; efl;
+        mem; xmm1; xmm2; xmm3; xmm4; efl;
     lets
         key_ptr := if win then rcx else rdi;
         key_expansion_ptr := if win then rdx else rsi;
-        key := quad32_to_seq(buffer128_read(input_key_b, 0, mem));
+        key := make_AES256_key(buffer128_read(input_key_b, 0, mem), buffer128_read(input_key_b, 1, mem));
     requires/ensures
         buffers_disjoint128(input_key_b, output_key_expansion_b); 
-        validSrcAddrs128(mem, key_ptr, input_key_b, 1);
+        validSrcAddrs128(mem, key_ptr, input_key_b, 2);
         validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, 15);
     ensures
         modifies_buffer128(output_key_expansion_b, old(mem), mem);
@@ -176,23 +172,28 @@ procedure{:quick} KeyExpansion256Stdcall(
     inline if (win)
     {
         Load128_buffer(xmm1, rcx, 0, input_key_b, 0);
+        Load128_buffer(xmm3, rcx, 16, input_key_b, 1);
     }
     else
     {
         Load128_buffer(xmm1, rdi, 0, input_key_b, 0);
+        Load128_buffer(xmm3, rdi, 16, input_key_b, 1);
         Mov64(rdx, rsi);
     }
 
     Store128_buffer(rdx, xmm1, 0, output_key_expansion_b, 0);
-    KeyExpansionRoundUnrolledRecursive(key, output_key_expansion_b, 14);
+    Store128_buffer(rdx, xmm3, 16, output_key_expansion_b, 1);
+    KeyExpansionRoundUnrolledRecursive256(key, output_key_expansion_b, 14);
     lemma_expand_key_256(key, 15);
 
     // Clear secrets out of registers
     Pxor(xmm1, xmm1);
     Pxor(xmm2, xmm2);
     Pxor(xmm3, xmm3);
+    Pxor(xmm4, xmm4);
 }
 
+/*
 ///////////////////////////
 // ENCRYPTION
 ///////////////////////////

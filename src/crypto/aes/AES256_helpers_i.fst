@@ -1,6 +1,7 @@
 module AES256_helpers_i
 
 open Words_s
+open Types_i
 open Types_s
 open FStar.Seq
 open AES_s
@@ -18,6 +19,9 @@ unfold let ( *^^ ) = quad32_xor
 let quad32_shl32 (q:quad32) : quad32 =
   let Mkfour v0 v1 v2 v3 = q in
   Mkfour 0 v0 v1 v2
+
+let make_AES256_key (k0 k1:quad32) : aes_key_LE (AES_256) =
+  append (quad32_to_seq k0) (quad32_to_seq k1)
 
 
 // Redefine key expansion in terms of quad32 values rather than nat32 values,
