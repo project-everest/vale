@@ -23,7 +23,6 @@ let quad32_shl32 (q:quad32) : quad32 =
 let make_AES256_key (k0 k1:quad32) : aes_key_LE (AES_256) =
   append (quad32_to_seq k0) (quad32_to_seq k1)
 
-
 // Redefine key expansion in terms of quad32 values rather than nat32 values,
 // then prove both definitions are equivalent.
 
@@ -111,7 +110,7 @@ let lemma_expand_key_256_0_corollary (key:aes_key_LE AES_256) : Lemma
   ()
 
 
-#reset-options "--z3rlimit 30 --initial_fuel 4 --max_fuel 4 --max_ifuel 0"
+#reset-options "--z3rlimit 30 --initial_fuel 5 --max_fuel 5 --max_ifuel 0"
 // quad32 key expansion is equivalent to nat32 key expansion
 let rec lemma_expand_key_256 (key:aes_key_LE AES_256) (size:nat) : Lemma
   (requires size <= 15)

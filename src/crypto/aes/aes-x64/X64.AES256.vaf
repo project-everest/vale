@@ -147,7 +147,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
     } 
 }
 
-procedure{:quick} {:verify true}  KeyExpansion256Stdcall(
+procedure{:quick} KeyExpansion256Stdcall(
     inline win:bool,
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
@@ -193,7 +193,6 @@ procedure{:quick} {:verify true}  KeyExpansion256Stdcall(
     Pxor(xmm4, xmm4);
 }
 
-/*
 ///////////////////////////
 // ENCRYPTION
 ///////////////////////////
@@ -256,6 +255,10 @@ procedure{:quick} AES256EncryptBlock(
     AES256EncryptRound(7, init, round_keys, keys_buffer);
     AES256EncryptRound(8, init, round_keys, keys_buffer);
     AES256EncryptRound(9, init, round_keys, keys_buffer);
+    AES256EncryptRound(10, init, round_keys, keys_buffer);
+    AES256EncryptRound(11, init, round_keys, keys_buffer);
+    AES256EncryptRound(12, init, round_keys, keys_buffer);
+    AES256EncryptRound(13, init, round_keys, keys_buffer);
     commute_sub_bytes_shift_rows(xmm0);
     Load128_buffer(xmm2, r8, 16 * 14, keys_buffer, 14);
     AESNI_enc_last(xmm0, xmm2);
@@ -315,7 +318,4 @@ procedure{:quick} AES256EncryptBlockStdcall(
         Store128_buffer(rdi, xmm0, 0, output_buffer, 0);
     }
 }
-*/
-
-
 
