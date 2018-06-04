@@ -80,6 +80,36 @@ procedure{:quick} KeyExpansionStdcall(
 // ENCRYPTION
 ///////////////////////////
 
+procedure{:quick} AESEncryptBlock(
+    inline alg:algorithm,
+    ghost input:quad32,
+    ghost key:aes_key_LE(alg),
+    ghost round_keys:seq(quad32),
+    ghost keys_buffer:buffer128
+    )
+    reads
+        r8; mem;
+    modifies
+        xmm0; xmm2; efl;
+    requires
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
+        xmm0 == input;
+        r8 == buffer_addr(keys_buffer);
+        validSrcAddrs128(mem, r8, keys_buffer, nr(alg) + 1);
+        forall i:int :: 0 <= i < nr(alg) + 1 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
+    ensures
+        xmm0 == aes_encrypt_LE(alg, key, input);
+{
+    inline if (alg = AES_128) {
+        assert {:quick_type} alg == AES_128;
+        AES128EncryptBlock(input, key, round_keys, keys_buffer);
+    } else {
+        assert {:quick_type} alg == AES_256;
+        AES256EncryptBlock(input, key, round_keys, keys_buffer);
+    }
+}
 
 procedure{:quick} AESEncryptBlockStdcall(
     inline win:bool,
