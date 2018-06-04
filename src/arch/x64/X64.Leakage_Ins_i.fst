@@ -1,153 +1,99 @@
 module X64.Leakage_Ins_i
 open X64.Machine_s
+open X64.Memory_i_s
 open X64.Semantics_s
+module S = X64.Bytes_Semantics_s
 open X64.Taint_Semantics_s
 open X64.Leakage_s
 open X64.Leakage_Helpers_i
 
-open FStar.Tactics
+let rec has_mem_operand = function
+  | [] -> false
+  | a::q -> if OMem? a then true else has_mem_operand q
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics'"
+val check_if_ins_consumes_fixed_time: (ins:tainted_ins{not (is_xmm_ins ins)}) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 80"
 
-let merge_taint t1 t2 =
-  if Secret? t1 || Secret? t2 then
-    Secret
-  else
-    Public
 
-let operand_taint (op:operand) ts =
-  match op with
-    | OConst _ -> Public
-    | OReg reg -> ts.regTaint reg
-    | OMem _ -> Public
-
-let maddr_does_not_use_secrets addr ts =
-  match addr with
-    | MConst _ -> true
-    | MReg r _ -> Public? (operand_taint (OReg r) ts)
-    | MIndex base _ index _ ->
-        let baseTaint = operand_taint (OReg base) ts in
-	let indexTaint = operand_taint (OReg index) ts in
-	(Public? baseTaint) && (Public? indexTaint)
-
-let operand_does_not_use_secrets op ts =
-  match op with
-  | OConst _ | OReg _ -> true
-  | OMem m -> maddr_does_not_use_secrets m ts
-
-val lemma_operand_obs:  (ts:taintState) ->  (dst:operand) -> (s1 : traceState) -> (s2:traceState) -> Lemma
- (requires (operand_does_not_use_secrets dst ts) /\ publicValuesAreSame ts s1 s2)
-(ensures (operand_obs s1 dst) = (operand_obs s2 dst))
-
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 20"
-let lemma_operand_obs ts dst s1 s2 = match dst with
-  | OConst _ | OReg _ -> ()
-  | OMem m -> ()
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 5"
-  
-let set_taint (dst:operand) ts taint =
-  match dst with
-  | OConst _ -> ts  (* Shouldn't actually happen *)
-  | OReg r -> TaintState (fun x -> if x = r then taint else ts.regTaint x) ts.flagsTaint
-  | OMem m -> ts (* Ensured by taint semantics *)
-
-let rec operands_do_not_use_secrets ops ts = match ops with
-  | [] -> true
-  | hd :: tl -> operand_does_not_use_secrets hd ts && (operands_do_not_use_secrets tl ts)
-
-val lemma_operands_imply_op: (ts:taintState) -> (ops:list operand{Cons? ops}) -> Lemma
-(requires (operands_do_not_use_secrets ops ts))
-(ensures (operand_does_not_use_secrets (List.Tot.Base.hd ops) ts))
-
-let lemma_operands_imply_op ts ops = match ops with
-| hd :: tl -> ()
-
-val lemma_operand_obs_list: (ts:taintState) -> (ops:list operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
-(requires (operands_do_not_use_secrets ops ts /\ publicValuesAreSame ts s1 s2))
-(ensures  (operand_obs_list s1 ops) == (operand_obs_list s2 ops))
-
-let rec lemma_operand_obs_list ts ops s1 s2 = match ops with
-  | [] -> ()
-  | hd :: tl -> assert (operand_does_not_use_secrets hd ts); assert_by_tactic (operand_obs s1 hd = operand_obs s2 hd) (apply_lemma (quote (lemma_operand_obs ts))); lemma_operand_obs_list ts tl s1 s2
-
-let rec sources_taint srcs ts taint = match srcs with
-  | [] -> taint
-  | hd :: tl -> merge_taint (operand_taint hd ts) (sources_taint tl ts taint)
-
-let rec set_taints dsts ts taint = match dsts with
-  | [] -> ts
-  | hd :: tl -> set_taints tl (set_taint hd ts taint) taint
-
-let ins_consumes_fixed_time (ins : tainted_ins) (fuel:nat) (ts:taintState) (res:bool*taintState) =
-  let b, ts' = res in
-  ((b2t b) ==> isConstantTime (Ins ins) fuel ts)
-
-val check_if_ins_consumes_fixed_time: (ins:tainted_ins) -> (fuel:nat) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins fuel ts res})
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 30"
-
-val lemma_taint_sources: (ins:tainted_ins) -> (ts:taintState) -> Lemma
-(let i, d, s = ins.ops in
-forall src. List.Tot.Base.mem src s /\ Public? (sources_taint s ts ins.t) ==> Public? (operand_taint src ts))
-
-let lemma_taint_sources ins ts = ()
-
-val lemma_public_op_are_same: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
-(requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
-(ensures eval_operand op s1.state == eval_operand op s2.state)
-
-let lemma_public_op_are_same ts op s1 s2 = ()
-
-let check_if_ins_consumes_fixed_time ins fuel ts =
+let check_if_ins_consumes_fixed_time ins ts =
   let i, dsts, srcs = ins.ops in
   let ftSrcs = operands_do_not_use_secrets srcs ts in
   let ftDsts = operands_do_not_use_secrets dsts ts in
   let fixedTime = ftSrcs && ftDsts in
 
-  assert_by_tactic (forall s1 s2. {:pattern (publicValuesAreSame ts s1 s2)} (operands_do_not_use_secrets dsts ts /\ publicValuesAreSame ts s1 s2) ==>
-    (operand_obs_list s1 dsts) == (operand_obs_list s2 dsts)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts dsts))); 
-
-  assert_by_tactic (forall s1 s2. (operands_do_not_use_secrets srcs ts /\ publicValuesAreSame ts s1 s2) ==> (operand_obs_list s1 srcs) == (operand_obs_list s2 srcs)) (s1 <-- forall_intro; s2 <-- forall_intro; h <-- implies_intro; apply_lemma (quote (lemma_operand_obs_list ts srcs)));
-  assert (fixedTime ==> (isConstantTime (Ins ins) fuel ts));
+  Classical.forall_intro_2 (fun x y -> lemma_operand_obs_list ts dsts x y);
+  Classical.forall_intro_2 (fun x y -> lemma_operand_obs_list ts srcs x y);
+  assert (fixedTime ==> (isConstantTime (Ins ins) ts));
+  if S.Mulx64? i then begin
+    let S.Mulx64 dst_hi dst_lo src = i in
+    let taint = sources_taint srcs ts ins.t in
+    if has_mem_operand dsts && taint <> ins.t then false, ts
+    else let ts' = set_taint dst_lo ts taint in
+    if operand_does_not_use_secrets dst_hi ts' then fixedTime, (set_taint dst_hi ts' taint)
+    else false, ts
+  end
+  else
   let taint = sources_taint srcs ts ins.t in
-  let taint = if AddCarry64? i then merge_taint taint ts.flagsTaint else taint in
+  let taint = if S.AddCarry64? i || S.Adcx64? i then merge_taint taint ts.cfFlagsTaint else taint in
+  if has_mem_operand dsts && taint <> ins.t then false, ts
+  else
   let ts' = set_taints dsts ts taint in
   let b, ts' = match i with
-    | Mov64 dst src -> begin
+    | S.Mov64 dst _ | S.AddLea64 dst _ _ -> begin
       match dst with
 	| OConst _ -> false, ts (* Should not happen *)
 	| OReg r -> fixedTime, ts'
-	| OMem m -> (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), ts'
+	| OMem m -> fixedTime, ts'
     end
-    | Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret)
-    | Xor64 dst src -> 
+     | S.Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+    
+    | S.Xor64 dst src ->
         (* Special case for Xor : xor-ing an operand with itself erases secret data *)
         if dst = src then
-	  let ts' = set_taint dst ts' Public in
-	  fixedTime, TaintState ts'.regTaint Secret
-        else begin match dst with
-	  | OConst _ -> false, ts (* Should not happen *)
-	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret)
-	  | OMem m -> (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), (TaintState ts'.regTaint Secret)
+    	  let ts' = set_taint dst ts' Public in
+    	  fixedTime, TaintState ts'.regTaint Secret Secret ts'.xmmTaint
+        else
+    	begin match dst with
+    	  | OConst _ -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
+    	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+    	  | OMem m -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
         end
-    | _ -> 
+    | S.Push _ | S.Pop _ | S.Adox64 _ _ -> false, ts (* Unhandled yet *)
+   | S.Add64 _ _ | S.AddCarry64 _ _ | S.Adcx64 _ _  -> begin
+          match dsts with
+	| [OConst _] -> true, (TaintState ts'.regTaint Secret taint ts'.xmmTaint) (* Should not happen *)
+	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret taint ts'.xmmTaint)
+	| [OMem m] -> fixedTime, (TaintState ts'.regTaint Secret taint ts'.xmmTaint)    
+    end
+    | _ ->
       match dsts with
-	| [OConst _] -> false, ts (* Should not happen *)
-	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret)
-	| [OMem m] ->  (fixedTime && (not (Secret? taint && Public? (operand_taint (OMem m) ts)))), (TaintState ts'.regTaint Secret)
+    	| [OConst _] -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
+    	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+    	| [OMem m] ->  fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
   in
   b, ts'
 
-//val lemma_public_flags_same: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins) -> Lemma (forall s1 s2. publicFlagValuesAreSame ts s1 s2 ==> publicFlagValuesAreSame (snd (check_if_ins_consumes_fixed_time ins fuel ts)) (taint_eval_ins ins s1) (taint_eval_ins ins s2))
+val lemma_public_flags_same: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> Lemma (forall s1 s2.
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  b2t b ==>
+publicFlagValuesAreSame ts s1 s2 ==> publicFlagValuesAreSame (snd (check_if_ins_consumes_fixed_time ins ts)) (taint_eval_ins ins s1) (taint_eval_ins ins s2))
 
-//let lemma_public_flags_same ts fuel ins = ()
+let lemma_public_flags_same ts ins =
+  let i, _, _ = ins.ops in
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  if S.Mulx64? i then begin
+    assert (forall s. s.state.X64.Memory_i_s.state.S.flags == (taint_eval_ins ins s).state.X64.Memory_i_s.state.S.flags);
+    ()
+  end
+  else ()
 
-val lemma_mov_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mov64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_mov_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Mov64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 80"
-let lemma_mov_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 80"
+let lemma_mov_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -161,21 +107,23 @@ let lemma_mov_same_public ts fuel ins s1 s2 =
 	| [src] -> 
 	  let v1 = eval_operand src s1.state in
 	  let v2 = eval_operand src s2.state in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-          assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2) 
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_add_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Add64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_add_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Add64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#reset-options "--z3cliopt smt.CASE_SPLIT=3 --initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 100"
-let lemma_add_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 100"
+let lemma_add_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -193,20 +141,119 @@ let lemma_add_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = (v11 + v12) % pow2_64 in
 	  let v2 = (v21 + v22) % pow2_64 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_sub_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Sub64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+
+val lemma_mulx_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Mulx64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_sub_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_mulx_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let i, dsts, srcs = ins.ops in
+  let r1 = taint_eval_ins ins s1 in
+  let r2 = taint_eval_ins ins s2 in
+  match dsts with
+    | [OMem m1; OMem m2] ->
+      let ptr1_hi = eval_maddr m1 s1.state in
+      let ptr2_hi = eval_maddr m1 s2.state in
+      let ptr1_lo = eval_maddr m2 s1.state in
+      let ptr2_lo = eval_maddr m2 s2.state in
+      begin match srcs with
+      | [src1; src2] ->
+      let v11 = eval_operand src1 s1.state in
+      let v12 = eval_operand src2 s1.state in
+      let v21 = eval_operand src1 s2.state in
+      let v22 = eval_operand src2 s2.state in
+      let v1_hi = FStar.UInt.mul_div #64 v11 v12 in
+      let v1_lo = FStar.UInt.mul_mod #64 v11 v12 in
+      let v2_hi = FStar.UInt.mul_div #64 v21 v22 in
+      let v2_lo = FStar.UInt.mul_mod #64 v21 v22 in
+      let s1' = update_operand_preserve_flags' (OMem m2) v1_lo s1.state in
+      let s2' = update_operand_preserve_flags' (OMem m2) v2_lo s2.state in
+      if not (valid_mem64 ptr1_hi s1'.mem) || not (valid_mem64 ptr2_hi s2'.mem) 
+	|| not (valid_mem64 ptr1_lo s1.state.mem) || not (valid_mem64 ptr2_lo s2.state.mem) then ()
+      else begin
+      lemma_store_load_mem64 ptr1_hi v1_hi s1'.mem;
+      lemma_store_load_mem64 ptr2_hi v2_hi s2'.mem;
+      lemma_valid_store_mem64 ptr1_hi v1_hi s1'.mem;
+      lemma_valid_store_mem64 ptr2_hi v2_hi s2'.mem;
+      lemma_frame_store_mem64 ptr1_hi v1_hi s1'.mem;
+      lemma_frame_store_mem64 ptr2_hi v2_hi s2'.mem;
+      lemma_store_load_mem64 ptr1_lo v1_lo s1.state.mem;
+      lemma_store_load_mem64 ptr2_lo v2_lo s2.state.mem;
+      lemma_valid_store_mem64 ptr1_lo v1_lo s1.state.mem;
+      lemma_valid_store_mem64 ptr2_lo v2_lo s2.state.mem;
+      lemma_frame_store_mem64 ptr1_lo v1_lo s1.state.mem;
+      lemma_frame_store_mem64 ptr2_lo v2_lo s2.state.mem;
+      assert (b2t b ==> publicValuesAreSame ts s1 s2 /\ r1.state.X64.Memory_i_s.state.S.ok /\ r2.state.X64.Memory_i_s.state.S.ok /\ Public? ins.t ==> v1_hi == v2_hi);
+      ()
+      end
+      end
+    | [OMem m1; o] ->
+      begin match srcs with
+      | [src1; src2] ->
+      let v11 = eval_operand src1 s1.state in
+      let v12 = eval_operand src2 s1.state in
+      let v21 = eval_operand src1 s2.state in
+      let v22 = eval_operand src2 s2.state in
+      let v1_hi = FStar.UInt.mul_div #64 v11 v12 in
+      let v1_lo = FStar.UInt.mul_mod #64 v11 v12 in
+      let v2_hi = FStar.UInt.mul_div #64 v21 v22 in
+      let v2_lo = FStar.UInt.mul_mod #64 v21 v22 in
+      let s1' = update_operand_preserve_flags' o v1_lo s1.state in
+      let s2' = update_operand_preserve_flags' o v2_lo s2.state in      
+      let ptr1_hi = eval_maddr m1 s1' in
+      let ptr2_hi = eval_maddr m1 s2' in
+      if not (valid_mem64 ptr1_hi s1.state.mem) || not (valid_mem64 ptr2_hi s2.state.mem) then ()
+      else begin
+      lemma_store_load_mem64 ptr1_hi v1_hi s1'.mem;
+      lemma_store_load_mem64 ptr2_hi v2_hi s2'.mem;
+      lemma_valid_store_mem64 ptr1_hi v1_hi s1'.mem;
+      lemma_valid_store_mem64 ptr2_hi v2_hi s2'.mem;
+      lemma_frame_store_mem64 ptr1_hi v1_hi s1'.mem;
+      lemma_frame_store_mem64 ptr2_hi v2_hi s2'.mem
+      end
+      end
+    | [o; OMem m2] ->
+      begin match srcs with
+      | [src1; src2] ->
+      let v11 = eval_operand src1 s1.state in
+      let v12 = eval_operand src2 s1.state in
+      let v21 = eval_operand src1 s2.state in
+      let v22 = eval_operand src2 s2.state in
+      let v1_hi = FStar.UInt.mul_div #64 v11 v12 in
+      let v1_lo = FStar.UInt.mul_mod #64 v11 v12 in
+      let v2_hi = FStar.UInt.mul_div #64 v21 v22 in
+      let v2_lo = FStar.UInt.mul_mod #64 v21 v22 in
+      let ptr1_lo = eval_maddr m2 s1.state in
+      let ptr2_lo = eval_maddr m2 s2.state in
+      if not (valid_mem64 ptr1_lo s1.state.mem) || not (valid_mem64 ptr2_lo s2.state.mem) then ()
+      else begin
+      lemma_store_load_mem64 ptr1_lo v1_lo s1.state.mem;
+      lemma_store_load_mem64 ptr2_lo v2_lo s2.state.mem;
+      lemma_valid_store_mem64 ptr1_lo v1_lo s1.state.mem;
+      lemma_valid_store_mem64 ptr2_lo v2_lo s2.state.mem;
+      lemma_frame_store_mem64 ptr1_lo v1_lo s1.state.mem;
+      lemma_frame_store_mem64 ptr2_lo v2_lo s2.state.mem      
+      end
+      end
+    | _ -> ()
+
+val lemma_sub_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Sub64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
+
+let lemma_sub_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -224,20 +271,22 @@ let lemma_sub_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = (v11 - v12) % pow2_64 in
 	  let v2 = (v21 - v22) % pow2_64 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_imul_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in IMul64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_imul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.IMul64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_imul_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_imul_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -255,20 +304,22 @@ let lemma_imul_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = FStar.UInt.mul_mod #64 v11 v12 in
 	  let v2 = FStar.UInt.mul_mod #64 v21 v22 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_and_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in And64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_and_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.And64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_and_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_and_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -286,20 +337,22 @@ let lemma_and_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = Types_s.iand v11 v12 in
 	  let v2 = Types_s.iand v21 v22 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_addlea_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in AddLea64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_addlea_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.AddLea64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_addlea_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_addlea_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -317,20 +370,22 @@ let lemma_addlea_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = (v11 + v12) % pow2_64 in
 	  let v2 = (v21 + v22) % pow2_64 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_addcarry_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in AddCarry64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_addcarry_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.AddCarry64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_addcarry_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_addcarry_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -342,39 +397,73 @@ let lemma_addcarry_same_public ts fuel ins s1 s2 =
       let ptr2 = eval_maddr m s2.state in
       match srcs with
 	| [src1; src2] ->
-	  let c1 = if cf(s1.state.flags) then 1 else 0 in
-	  let c2 = if cf(s2.state.flags) then 1 else 0 in
+	  let c1 = if cf(s1.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+	  let c2 = if cf(s2.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
 	  let v11 = eval_operand src1 s1.state in
 	  let v12 = eval_operand src2 s1.state in
 	  let v21 = eval_operand src1 s2.state in
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = (v11 + v12 + c1) % pow2_64 in
 	  let v2 = (v21 + v22 + c2) % pow2_64 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_mul_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Mul64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_adcx_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Adcx64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_mul_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 150"
+
+let lemma_adcx_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
-  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+  match dsts with
+    | [OConst _] -> ()
+    | [OReg _] ->  ()
+    | [OMem m] -> 
+      let ptr1 = eval_maddr m s1.state in
+      let ptr2 = eval_maddr m s2.state in
+      match srcs with
+	| [src1; src2] ->
+	  let c1 = if cf(s1.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+	  let c2 = if cf(s2.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+	  let v11 = eval_operand src1 s1.state in
+	  let v12 = eval_operand src2 s1.state in
+	  let v21 = eval_operand src1 s2.state in
+	  let v22 = eval_operand src2 s2.state in	  
+	  let v1 = (v11 + v12 + c1) % pow2_64 in
+	  let v2 = (v21 + v22 + c2) % pow2_64 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
+ 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_shr_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Shr64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_mul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Mul64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_shr_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_mul_same_public ts ins s1 s2 fuel = ()
+
+val lemma_shr_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Shr64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
+
+let lemma_shr_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -392,20 +481,22 @@ let lemma_shr_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = Types_s.ishr v11 v12 in
 	  let v2 = Types_s.ishr v21 v22 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_shl_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Shl64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_shl_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Shl64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_shl_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_shl_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
@@ -423,30 +514,32 @@ let lemma_shl_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = Types_s.ishl v11 v12 in
 	  let v2 = Types_s.ishl v21 v22 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-val lemma_xor_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins{let i, _, _ = ins.ops in Xor64? i}) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+val lemma_xor_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Xor64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
 val lemma_aux_xor: (x:nat64) -> Lemma (Types_s.ixor x x = 0)
 
-let lemma_aux_xor x =
+let lemma_aux_xor x = 
   TypesNative_s.reveal_ixor 64 x x;
   FStar.UInt.logxor_self #64 x
 
-let lemma_xor_same_public ts fuel ins s1 s2 =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+let lemma_xor_same_public ts ins s1 s2 fuel =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   let i, dsts, srcs = ins.ops in
   let r1 = taint_eval_ins ins s1 in
   let r2 = taint_eval_ins ins s2 in
-  assert_by_tactic (forall (v:nat64). Types_s.ixor v v = 0) (v <-- forall_intro; apply_lemma (quote lemma_aux_xor));
+  Classical.forall_intro lemma_aux_xor;
   match dsts with
     | [OConst _] -> ()
     | [OReg _] -> ()
@@ -461,40 +554,45 @@ let lemma_xor_same_public ts fuel ins s1 s2 =
 	  let v22 = eval_operand src2 s2.state in	  
 	  let v1 = Types_s.ixor v11 v12 in
 	  let v2 = Types_s.ixor v21 v22 in
+	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+	  else begin
  	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
 	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
 	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
 	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
 	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem;
-	  assert (b2t b /\ r1.state.ok /\ r2.state.ok /\ publicValuesAreSame ts s1 s2 ==> publicValuesAreSame ts' r1 r2)
+	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+	  end
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --using_facts_from '* -FStar.Reflection -FStar.Tactics' --z3rlimit 20"
-val lemma_ins_same_public: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins) -> (s1:traceState) -> (s2:traceState) -> Lemma
-(let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 20"
+val lemma_ins_same_public: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
+(let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_ins_same_public ts fuel ins s1 s2 = let i, _, _ = ins.ops in
+let lemma_ins_same_public ts ins s1 s2 fuel = let i, _, _ = ins.ops in
   match i with
-  | Mov64 _ _ -> lemma_mov_same_public ts fuel ins s1 s2
-  | Add64 _ _ -> lemma_add_same_public ts fuel ins s1 s2
-  | AddLea64 _ _ _ -> lemma_addlea_same_public ts fuel ins s1 s2
-  | Sub64 _ _ -> lemma_sub_same_public ts fuel ins s1 s2
-  | IMul64 _ _ -> lemma_imul_same_public ts fuel ins s1 s2
-  | And64 _ _ -> lemma_and_same_public ts fuel ins s1 s2
-  | Mul64 _ -> lemma_mul_same_public ts fuel ins s1 s2
-  | Xor64 _ _ -> lemma_xor_same_public ts fuel ins s1 s2
-  | AddCarry64 _ _ -> lemma_addcarry_same_public ts fuel ins s1 s2
-  | Shl64 _ _ -> lemma_shl_same_public ts fuel ins s1 s2
-  | Shr64 _ _ -> lemma_shr_same_public ts fuel ins s1 s2
+  | S.Mov64 _ _ -> lemma_mov_same_public ts ins s1 s2 fuel
+  | S.Add64 _ _ -> lemma_add_same_public ts ins s1 s2 fuel
+  | S.AddLea64 _ _ _ -> lemma_addlea_same_public ts ins s1 s2 fuel
+  | S.Sub64 _ _ -> lemma_sub_same_public ts ins s1 s2 fuel
+  | S.IMul64 _ _ -> lemma_imul_same_public ts ins s1 s2 fuel
+  | S.And64 _ _ -> lemma_and_same_public ts ins s1 s2 fuel
+  | S.Mul64 _ -> lemma_mul_same_public ts ins s1 s2 fuel
+  | S.Mulx64 _ _ _ -> lemma_mulx_same_public ts ins s1 s2 fuel
+  | S.Xor64 _ _ -> lemma_xor_same_public ts ins s1 s2 fuel
+  | S.AddCarry64 _ _ -> lemma_addcarry_same_public ts ins s1 s2 fuel
+  | S.Adcx64 _ _ -> lemma_adcx_same_public ts ins s1 s2 fuel
+  | S.Shl64 _ _ -> lemma_shl_same_public ts ins s1 s2 fuel
+  | S.Shr64 _ _ -> lemma_shr_same_public ts ins s1 s2 fuel
+  | _ -> ()
 
-val lemma_ins_leakage_free: (ts:taintState) -> (fuel:nat) -> (ins:tainted_ins) -> Lemma
- (let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
-  (b2t b ==> isConstantTime (Ins ins) fuel ts /\ isLeakageFree (Ins ins) fuel ts ts'))
+val lemma_ins_leakage_free: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> Lemma
+ (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
-let lemma_ins_leakage_free ts fuel ins =
-  let b, ts' = check_if_ins_consumes_fixed_time ins fuel ts in
-  let p s1 s2 = b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2 in
-  let my_lemma s1 s2 : Lemma(p s1 s2) = lemma_ins_same_public ts fuel ins s1 s2 in
+let lemma_ins_leakage_free ts ins =
+  let b, ts' = check_if_ins_consumes_fixed_time ins ts in
+  let p s1 s2 fuel = b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2 in
+  let my_lemma s1 s2 fuel : Lemma(p s1 s2 fuel) = lemma_ins_same_public ts ins s1 s2 fuel in
   let open FStar.Classical in
-  forall_intro_2 my_lemma
+  forall_intro_3 my_lemma

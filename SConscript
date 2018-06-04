@@ -81,21 +81,23 @@ verify_options = {
   '.dfy': BuildOptions(dafny_default_args_larith),
 
   # Special treatment for sensitive modules
-  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
+  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '')),
   'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # Disable verification by adding 'filename': None
   'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
   'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
-  'src/arch/x64/X64.Taint_Semantics_s.fst': None,
-  'src/arch/x64/X64.Leakage_s.fst': None,
-  'src/arch/x64/X64.Leakage_Ins_i.fst': None,
-  'src/arch/x64/X64.Leakage_i.fst': None,
-  'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
+  #'src/arch/x64/X64.Taint_Semantics_s.fst': None,
+  #'src/arch/x64/X64.Leakage_s.fst': None,
+  #'src/arch/x64/X64.Leakage_Ins_i.fst': None,
+  #'src/arch/x64/X64.Leakage_i.fst': None,
+  #'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
   'src/arch/x64/interop/memcpy/Memcpy.fst': None,
+  'src/arch/x64/interop/Memcpy.fst': None,
+  'src/arch/x64/interop/Poly.fst': None,
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 

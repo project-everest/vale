@@ -4,7 +4,9 @@ open FStar.BaseTypes
 open FStar.List.Tot.Base
 
 open X64.Machine_s
+open X64.Memory_i_s
 open X64.Semantics_s
+module S = X64.Bytes_Semantics_s
 
 // syntax for map accesses, m.[key] and m.[key] <- value
 let map (key:eqtype) (value:Type) = Map.t key value
@@ -26,20 +28,32 @@ noeq type traceState = {
   memTaint: map int taint;
 }
 
+// TODO : Add the next address also, since we're the heap addresses 64-bit values
+let mem128_to_op = function
+  | Mov128Xmm _ -> []
+  | Mov128Mem addr -> [OMem addr]
+  
 // Extract a list of destinations written to and a list of sources read from
 let extract_operands (i:ins) : (list operand * list operand) =
   match i with
-  | Mov64 dst src -> [dst], [src]
-  | Add64 dst src -> [dst], [dst; src]
-  | AddLea64 dst src1 src2 -> [dst], [dst; src1; src2]
-  | AddCarry64 dst src -> [dst], [dst; src]
-  | Sub64 dst src -> [dst], [dst; src]
-  | Mul64 src -> [OReg Rax; OReg Rdx], [OReg Rax; src]
-  | IMul64 dst src -> [dst], [dst; src]
-  | Xor64 dst src -> [dst], [dst; src]
-  | And64 dst src -> [dst], [dst; src]
-  | Shr64 dst amt -> [dst], [dst; amt]
-  | Shl64 dst amt -> [dst], [dst; amt]
+  | S.Mov64 dst src -> [dst], [src]
+  | S.Add64 dst src -> [dst], [dst; src]
+  | S.AddLea64 dst src1 src2 -> [dst], [dst; src1; src2]
+  | S.AddCarry64 dst src -> [dst], [dst; src]
+  | S.Adcx64 dst src -> [dst], [dst; src]
+  | S.Adox64 dst src -> [dst], [dst; src]
+  | S.Sub64 dst src -> [dst], [dst; src]
+  | S.Mul64 src -> [OReg Rax; OReg Rdx], [OReg Rax; src]
+  | S.Mulx64 dst_hi dst_lo src -> [dst_hi; dst_lo], [OReg Rdx; src]
+  | S.IMul64 dst src -> [dst], [dst; src]
+  | S.Xor64 dst src -> [dst], [dst; src]
+  | S.And64 dst src -> [dst], [dst; src]
+  | S.Shr64 dst amt -> [dst], [dst; amt]
+  | S.Shl64 dst amt -> [dst], [dst; amt]
+  | S.MOVDQU dst src -> mem128_to_op dst, mem128_to_op src
+  | S.Pinsrd _ src _ | S.Pinsrq _ src _ -> [], [src]
+  | S.Pextrq dst _ _ -> [dst], []
+  | _ -> [], []
   
 type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
                                 -> t:taint -> tainted_ins
@@ -85,11 +99,20 @@ let rec update_taint_list memTaint (dst:list operand) t s = match dst with
   | [] -> memTaint
   | hd :: tl -> update_taint_list (update_taint memTaint hd t s) tl t s
 
-let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
+let taint_eval_ins (ins:tainted_ins) (ts: traceState) : GTot traceState =
   let t = ins.t in
   let i, dsts, srcs = ins.ops in
   let s = run (check (taint_match_list srcs t ts.memTaint)) ts.state in
-  let memTaint = update_taint_list ts.memTaint dsts t s in
+  let memTaint =
+    if S.Mulx64? i then
+    begin
+    let S.Mulx64 dst_hi dst_lo src = i in
+    let lo = FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
+    let s' = update_operand_preserve_flags' dst_lo lo s in
+    let memTaint = update_taint ts.memTaint dst_lo t s in
+    update_taint memTaint dst_hi t s'
+    end
+    else update_taint_list ts.memTaint dsts t s in
   (* Execute the instruction *)
   let s = run (eval_ins i) s in
   {state = s; trace = ts.trace; memTaint = memTaint}
@@ -97,12 +120,12 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : traceState =
 type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:taint -> tainted_ocmp
 
 let get_fst_ocmp (o:ocmp) = match o with
-  | OEq o1 _ | ONe o1 _ | OLe o1 _ | OGe o1 _ | OLt o1 _ | OGt o1 _ -> o1
+  | S.OEq o1 _ | S.ONe o1 _ | S.OLe o1 _ | S.OGe o1 _ | S.OLt o1 _ | S.OGt o1 _ -> o1
 
 let get_snd_ocmp (o:ocmp) = match o with
-  | OEq _ o2 | ONe _ o2 | OLe _ o2 | OGe _ o2 | OLt _ o2 | OGt _ o2 -> o2
+  | S.OEq _ o2 | S.ONe _ o2 | S.OLe _ o2 | S.OGe _ o2 | S.OLt _ o2 | S.OGt _ o2 -> o2
 
-let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
+let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : GTot (traceState * bool) =
   let t = c.ot in
   let s = run (check (valid_ocmp c.o);; check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
     {ts with state = s}, eval_ocmp s c.o
@@ -110,11 +133,11 @@ let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : traceState * bool =
 type tainted_code = precode tainted_ins tainted_ocmp
 type tainted_codes = list tainted_code
 
-val taint_eval_code: c:tainted_code -> fuel:nat -> s:traceState -> Tot (option traceState)
+val taint_eval_code: c:tainted_code -> fuel:nat -> s:traceState -> GTot (option traceState)
 (decreases %[fuel; c; 1])
-val taint_eval_codes: l:tainted_codes -> fuel:nat -> s:traceState -> Tot (option traceState)
+val taint_eval_codes: l:tainted_codes -> fuel:nat -> s:traceState -> GTot (option traceState)
 (decreases %[fuel; l])
-val taint_eval_while: c:tainted_code{While? c} -> fuel:nat -> s:traceState -> Tot (option traceState)
+val taint_eval_while: c:tainted_code{While? c} -> fuel:nat -> s:traceState -> GTot (option traceState)
 (decreases %[fuel; c; 0])
 
 (* Adds the observations to the eval_code.
@@ -157,5 +180,18 @@ and taint_eval_while c fuel s0 =
     let s_opt = taint_eval_code body (fuel - 1) s0 in
     match s_opt with
     | None -> None
-    | Some s1 -> if not s1.state.ok then Some s1
+    | Some s1 -> if not (s1.state).X64.Memory_i_s.state.S.ok then Some s1
       else taint_eval_while c (fuel - 1) s1
+
+(* Used to split the analysis between instructions added for xmm, and other insns *)
+let is_xmm_ins (ins:tainted_ins) =
+  let i, _, _ = ins.ops in
+  match i with
+    | S.Paddd _ _ | S.Pxor _ _ | S.Pslld _ _ | S.Psrld _ _ | S.Pshufb _ _ 
+    | S.Pshufd _ _ _ | S.Pextrq _ _ _ | S.Pinsrd _ _ _ | S.Pinsrq _ _ _
+    | S.VPSLLDQ _ _ _ | S.MOVDQU _ _
+    | S.Pclmulqdq _ _ _ | S.AESNI_enc _ _ | S.AESNI_enc_last _ _ 
+    | S.AESNI_dec _ _ | S.AESNI_dec_last _ _ | S.AESNI_imc _ _ 
+    | S.AESNI_keygen_assist _ _ _ -> true
+    | _ -> false
+  
