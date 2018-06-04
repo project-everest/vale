@@ -2,6 +2,7 @@
 
 module X64.Vale.QuickCodes_i
 open X64.Machine_s
+open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -12,12 +13,12 @@ unfold let fuel = va_fuel
 unfold let eval = eval_code
 
 [@va_qattr "opaque_to_smt"]
-let labeled_wrap (r:range) (msg:string) (p:Type0) = labeled r msg p
+let labeled_wrap (r:range) (msg:string) (p:Type0) : GTot Type0 = labeled r msg p
 
 // REVIEW: when used inside a function definition, 'labeled' can show up in an SMT query
 // as an uninterpreted function.  Make a wrapper around labeled that is interpreted:
 [@va_qattr "opaque_to_smt"]
-let label (r:range) (msg:string) (p:Type0) : Pure Type (requires True) (ensures fun q -> q <==> p) =
+let label (r:range) (msg:string) (p:Type0) : Ghost Type (requires True) (ensures fun q -> q <==> p) =
   assert_norm (labeled_wrap r msg p <==> p);
   labeled_wrap r msg p
 
@@ -27,7 +28,7 @@ val lemma_label_bool (r:range) (msg:string) (b:bool) : Lemma
   [SMTPat (label r msg b)]
 
 // wrap "precedes" and LexCons to avoid issues with label (precedes ...)
-let precedes_wrap (a:lex_t) (b:lex_t) = precedes a b
+let precedes_wrap (a:lex_t) (b:lex_t) : GTot Type0 = precedes a b
 let lexCons (#a:Type) (h:a) (t:lex_t) : lex_t = LexCons h t
 
 [@va_qattr]
@@ -183,7 +184,7 @@ let valid_cmp (c:cmp) (s:state) : Type0 =
   | Cmp_gt o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
 
 [@va_qattr]
-let eval_cmp (s:state) (c:cmp) : bool =
+let eval_cmp (s:state) (c:cmp) : GTot bool =
   match c with
   | Cmp_eq o1 o2 -> va_eval_opr64 s o1 =  va_eval_opr64 s o2
   | Cmp_ne o1 o2 -> va_eval_opr64 s o1 <> va_eval_opr64 s o2

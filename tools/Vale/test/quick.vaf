@@ -5,6 +5,7 @@ module Quick
 #verbatim{:interface}{:implementation}
 open Words_s
 open X64.Machine_s
+open X64.Memory_i_s
 open X64.Vale
 open X64.Vale.State_i
 open X64.Vale.Decls_i

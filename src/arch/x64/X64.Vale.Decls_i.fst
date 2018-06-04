@@ -6,6 +6,7 @@ open X64.Vale.StateLemmas_i
 open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s
+module BS = X64.Bytes_Semantics_s
 
 #reset-options "--z3cliopt smt.arith.nl=true"
 let lemma_mul_in_bounds (x y:nat64) : Lemma (requires x `op_Multiply` y < pow2_64) (ensures FStar.UInt.mul_mod #64 x y == x `op_Multiply` y) = ()
@@ -23,12 +24,12 @@ type ocmp = S.ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
-let va_cmp_eq o1 o2 = S.OEq o1 o2
-let va_cmp_ne o1 o2 = S.ONe o1 o2
-let va_cmp_le o1 o2 = S.OLe o1 o2
-let va_cmp_ge o1 o2 = S.OGe o1 o2
-let va_cmp_lt o1 o2 = S.OLt o1 o2
-let va_cmp_gt o1 o2 = S.OGt o1 o2
+let va_cmp_eq o1 o2 = BS.OEq o1 o2
+let va_cmp_ne o1 o2 = BS.ONe o1 o2
+let va_cmp_le o1 o2 = BS.OLe o1 o2
+let va_cmp_ge o1 o2 = BS.OGe o1 o2
+let va_cmp_lt o1 o2 = BS.OLt o1 o2
+let va_cmp_gt o1 o2 = BS.OGt o1 o2
 
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv

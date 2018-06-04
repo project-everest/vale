@@ -26,7 +26,7 @@ let quad32_shl32 (q:quad32) : quad32 =
 
 let round_key_128_rcon (prev:quad32) (rcon:nat32) : quad32 =
   let Mkfour v0 v1 v2 v3 = prev in
-  let w0 = v0 *^ (sub_word (rot_word v3) *^ rcon) in
+  let w0 = v0 *^ (sub_word (rot_word_LE v3) *^ rcon) in
   let w1 = v1 *^ w0 in
   let w2 = v2 *^ w1 in
   let w3 = v3 *^ w2 in
@@ -35,17 +35,17 @@ let round_key_128_rcon (prev:quad32) (rcon:nat32) : quad32 =
 let round_key_128 (prev:quad32) (round:nat) : quad32 =
   round_key_128_rcon prev (aes_rcon (round - 1))
 
-let rec expand_key_128 (key:aes_key AES_128) (round:nat) : quad32 =
+let rec expand_key_128 (key:aes_key_LE AES_128) (round:nat) : quad32 =
   if round = 0 then Mkfour key.[0] key.[1] key.[2] key.[3]
   else round_key_128 (expand_key_128 key (round - 1)) round
 
 #reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0"
-let lemma_expand_key_128_0 (key:aes_key AES_128) : Lemma
+let lemma_expand_key_128_0 (key:aes_key_LE AES_128) : Lemma
   (equal key (expand_key AES_128 key 4))
   = ()
 
 #reset-options "--initial_fuel 1 --max_fuel 1 --max_ifuel 0 --z3rlimit 10"
-let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
+let lemma_expand_key_128_i (key:aes_key_LE AES_128) (i:nat) : Lemma
   (requires
     0 < i /\ i < 11
   )
@@ -68,7 +68,7 @@ let lemma_expand_key_128_i (key:aes_key AES_128) (i:nat) : Lemma
 #reset-options
 
 // expand_key for large 'size' argument agrees with expand_key for smaller 'size' argument
-let rec lemma_expand_append (key:aes_key AES_128) (size1:nat) (size2:nat) : Lemma
+let rec lemma_expand_append (key:aes_key_LE AES_128) (size1:nat) (size2:nat) : Lemma
   (requires size1 <= size2 /\ size2 <= 44)
   (ensures equal (expand_key AES_128 key size1) (slice (expand_key AES_128 key size2) 0 size1))
   (decreases size2)
@@ -77,7 +77,7 @@ let rec lemma_expand_append (key:aes_key AES_128) (size1:nat) (size2:nat) : Lemm
 
 #reset-options "--z3rlimit 10"
 // quad32 key expansion is equivalent to nat32 key expansion
-let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
+let rec lemma_expand_key_128 (key:aes_key_LE AES_128) (size:nat) : Lemma
   (requires size <= 11)
   (ensures (
     let s = key_schedule_to_round_keys size (expand_key AES_128 key 44) in
@@ -98,7 +98,7 @@ let rec lemma_expand_key_128 (key:aes_key AES_128) (size:nat) : Lemma
 
 // Refine round_key_128 to a SIMD computation
 let simd_round_key_128 (prev:quad32) (rcon:nat32) : quad32 =
-  let r = rot_word (sub_word prev.hi3) *^ rcon in
+  let r = rot_word_LE (sub_word prev.hi3) *^ rcon in
   let q = prev in
   let q = q *^^ quad32_shl32 q in
   let q = q *^^ quad32_shl32 q in

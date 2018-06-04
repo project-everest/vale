@@ -12,7 +12,7 @@ from prettytable import PrettyTable # Install via: easy_install PrettyTable
 
 def find_fstar_output_files(directory):
     matches = []
-    extensions = ["vfsti", "vfst"]
+    extensions = ["fsti.verified", "fst.verified"]
 
     # Based on: https://stackoverflow.com/a/2186565
     for root, dirnames, filenames in os.walk(directory):
@@ -49,7 +49,7 @@ def collect_times(directories):
         times.update(collect_times_dir(d))
     return times
 
-def display_times(times):
+def display_times(times, sort_times):
     tab = PrettyTable(["Filename", "Time", "Full Path"])
     tab.align["Filename"] = "l"
     tab.align["Time"] = "r"
@@ -57,7 +57,14 @@ def display_times(times):
 
     total_time = 0
 
-    for f in sorted(times.keys()):
+    keys = None
+    if sort_times:
+        keys = sorted(times.keys(), key=lambda k : times[k], reverse=True)
+    else:
+        keys = sorted(times.keys())
+
+
+    for f in keys:
         filename = os.path.basename(f)
         tab.add_row([filename, times[f], f])
         if not times[f] is None:
@@ -108,7 +115,7 @@ def display_diffs(times, diffs):
             delta = diffs[f]
             delta_percent = "%0.1f" % (delta / float(times[f]) * 100)
         tab.add_row([filename, times[f], delta, delta_percent, f])
-        if not times[f] is None:
+        if (not times[f] is None) and f in diffs:
             total_time += times[f]
             total_delta += delta
     
@@ -166,15 +173,22 @@ def main():
     parser = argparse.ArgumentParser(description= 'Collect and summarize F* verification times')
     parser.add_argument('--dir', action='append', required=False, help='Collect all results in this folder and its subfolders')
     parser.add_argument('--label', action='store', required=False, help='Label for file containing the results')
+    parser.add_argument('--t', action='store', required=False, help='Display a previously collected file of times')
     parser.add_argument('--t1', action='store', required=False, help='File of times to compare to t2')
     parser.add_argument('--t2', action='store', required=False, help='File of times to compare to t1')
+    parser.add_argument('--sort_time', action='store_true', default=False, required=False, help='Sort results by time')
     parser.add_argument('--times', action='store', nargs='*', help='Compare many time files')
 
     args = parser.parse_args()
 
+    if (not args.t is None):
+        times = load_times(args.t)
+        display_times(times, args.sort_time)
+        sys.exit(0)
+
     if (not args.dir is None) and (not args.label is None):
         times = collect_times(args.dir)
-        display_times(times)
+        display_times(times, args.sort_time)
         store_times(times, args.label)
         sys.exit(0)
 

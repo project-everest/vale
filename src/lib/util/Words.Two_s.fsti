@@ -36,7 +36,7 @@ let two_select (#a:Type) (x:two a) (selector:nat1) : a =
   | 1 -> x.hi
 
 let two_insert (#a:Type) (x:two a) (y:a) (selector:nat1) : two a =
-  match selector with 
+  match selector with
   | 0 -> Mktwo y x.hi
   | 1 -> Mktwo x.lo y
 

@@ -4,15 +4,17 @@ open X64.Vale.State_i
 open FStar.FunctionalExtensionality
 module S = X64.Semantics_s
 module M = TransparentMap
+module BS = X64.Bytes_Semantics_s
+module ME = X64.Memory_i_s
 
-unfold let ok' = S.Mkstate?.ok
-unfold let regs' = S.Mkstate?.regs
-unfold let xmms' = S.Mkstate?.xmms
-unfold let flags' = S.Mkstate?.flags
-unfold let mem' = S.Mkstate?.mem
+unfold let ok' s = s.ME.state.BS.ok
+unfold let regs' s = s.ME.state.BS.regs
+unfold let xmms' s = s.ME.state.BS.xmms
+unfold let flags' s = s.ME.state.BS.flags
+unfold let mem' = ME.Mkstate'?.mem
 
-val state_to_S : s:state -> S.state
-val state_of_S : s:S.state -> state
+val state_to_S : s:state -> GTot ME.state
+val state_of_S : s:ME.state -> state
 
 val lemma_to_ok : s:state -> Lemma
   (ensures s.ok == ok' (state_to_S s))
@@ -50,7 +52,7 @@ val lemma_of_to : s:state -> Lemma
   (ensures s == state_of_S (state_to_S s))
   [SMTPat (state_of_S (state_to_S s))]
 
-val lemma_to_of : s:S.state -> Lemma
+val lemma_to_of : s:ME.state -> Lemma
   (ensures s == state_to_S (state_of_S s))
   [SMTPat (state_to_S (state_of_S s))]
 

@@ -10,12 +10,21 @@ let is_it_win b =
   then print_endline "Yep, we have a win here"
   else print_endline "Nope, not a win"
 *)
+
+let proc_name : string -> platform -> string =
+  fun name plat ->
+    let prefix = 
+      match plat with
+        | MacOS -> "_"
+        | _ -> ""
+    in
+    prefix ^ name
+     
 let parse_cmdline :
-  string -> (Prims.bool -> 
-    (X64_Vale_Decls_i.ins,X64_Vale_Decls_i.ocmp) X64_Machine_s.precode) -> unit
+  (string * (Prims.bool -> 
+    (X64_Vale_Decls_i.ins,X64_Vale_Decls_i.ocmp) X64_Machine_s.precode)) list -> unit
   = 
-  fun name ->
-  fun code ->
+  fun l  ->
   let argc = Array.length Sys.argv in
   if argc < 3
   then
@@ -48,5 +57,9 @@ let parse_cmdline :
     in
     let windows = platform_choice = Win in
     X64_Vale_Decls_i.print_header printer;
-    X64_Vale_Decls_i.print_proc name (code windows) (Prims.parse_int "0") printer;
+    List.iter (fun (name, code) -> 
+                 X64_Vale_Decls_i.print_proc (proc_name name platform_choice) 
+                                             (code windows) 
+                                             (Prims.parse_int "0") printer) 
+              l;
     X64_Vale_Decls_i.print_footer printer

@@ -21,6 +21,8 @@ let main (argv) =
   let suffixMap_rev = ref ([]:(string * string) list) in
   let sourceDir = ref "." in
   let destDir = ref "." in
+  let sourceFroms = ref (Map.empty:Map<id, string>)
+  let destFroms = ref (Map.empty:Map<id, string>)
   let outfile = ref (None:string option) in
   let outfile_i = ref (None:string option) in
   let dafnyDirect = ref false in
@@ -89,6 +91,14 @@ let main (argv) =
           match l with
           | x :: l -> destDir := x; match_args l
           | _ -> failwith "Specify destination directory (to be prepended to -out file)"
+        | "-sourceFrom" :: l ->
+          match l with
+          | x :: y :: l -> sourceFroms := Map.add (Id x) y !sourceFroms; match_args l
+          | _ -> failwith "Specify identifier and path"
+        | "-destFrom" :: l ->
+          match l with
+          | x :: y :: l -> destFroms := Map.add (Id x) y !destFroms; match_args l
+          | _ -> failwith "Specify identifier and path"
         | "-includeSuffix" :: l ->
           match l with
           | src :: dst :: l -> suffixMap_rev := (src, dst)::(!suffixMap_rev); match_args l
@@ -179,13 +189,27 @@ let main (argv) =
       let relPathOk = try (resultPath () = xabs) with _ -> false in
       if relPathOk then relPath else xabs
       in
-    let processSuffixInclude (includerRaw:string) (x:string):unit =
-      let x = if !dafnyDirect then Path.GetFullPath (Path.Combine (!destDir, Path.GetDirectoryName includerRaw, x)) else x in
+    let processSuffixInclude (isFrom:bool) (includerDirRaw:bool -> string) (x:string):unit =
+      let x =
+        if !dafnyDirect then
+          if isFrom then
+            Path.GetFullPath (Path.Combine (includerDirRaw true, x))
+          else
+            Path.GetFullPath (Path.Combine (!destDir, includerDirRaw true, x))
+        else
+          if isFrom then
+            let xabs = Path.GetFullPath (Path.Combine (includerDirRaw true, x)) in
+            match !outfile with
+            | None -> xabs
+            | Some o -> rebaseFile o xabs
+          else
+            x
+        in
       (if debugIncludes then printfn "adding generated include to %A" x);
       includes_rev := x::!includes_rev
       in
-    let processVerbatimInclude (source:string) (x:string):unit =
-      let xabs = Path.GetFullPath (Path.Combine (Path.GetDirectoryName source, x)) in
+    let processVerbatimInclude (sourceDir:string) (x:string):unit =
+      let xabs = Path.GetFullPath (Path.Combine (sourceDir, x)) in
       if not (Set.contains xabs !processedFiles) then
         processedFiles := Set.add xabs !processedFiles;
         let path =
@@ -193,7 +217,7 @@ let main (argv) =
           | None -> xabs
           | Some o -> rebaseFile o xabs
           in
-        (if debugIncludes then printfn "adding include from %A: %A --> %A --> %A" source x xabs path);
+        (if debugIncludes then printfn "adding include from %A: %A --> %A --> %A" sourceDir x xabs path);
         includes_rev := path::!includes_rev
       in
     let rec processFile (xRaw:string, isInputFile:bool):((loc * decl) * bool) list =
@@ -207,8 +231,17 @@ let main (argv) =
       let processInclude {inc_loc = loc; inc_attrs = attrs; inc_path = incPath} =
         try
           let attrs = skip_locs_attrs attrs in
+          let from_opt = attrs_get_id_opt (Id "from") attrs in
+          let incBaseRaw (isDest:bool):string =
+            let froms = if isDest then !destFroms else !sourceFroms in
+            match from_opt with
+            | None -> Path.GetDirectoryName xRaw
+            | Some p when Map.containsKey p froms -> Map.find p froms
+            | Some p -> err ("directory for " + (err_id p) + " not specified; use -" + (if isDest then "destFrom " else "sourceFrom ") + (err_id p) + " <path> command line option to specify")
+            in
+          let incBase (isDest:bool):string = Path.Combine (!sourceDir, incBaseRaw isDest) in
           if attrs_get_bool (Id "verbatim") false attrs then
-            (if isInputFile then processVerbatimInclude x incPath);
+            (if isInputFile then processVerbatimInclude (incBase false) incPath);
             []
           else
             let suffixMap = List.collect (fun a ->
@@ -223,8 +256,8 @@ let main (argv) =
               | (s1, s2)::t when s.EndsWith(s1) -> s.Substring(0, s.Length - s1.Length) + s2
               | _::t -> resuffix t s
               in
-            (if useSuffix then processSuffixInclude xRaw (resuffix suffixMap incPath));
-            processFile (Path.Combine (Path.GetDirectoryName x, incPath), false)
+            (if useSuffix then processSuffixInclude (Option.isSome from_opt) incBaseRaw (resuffix suffixMap incPath));
+            processFile (Path.Combine (incBase false, incPath), false)
         with err -> raise (LocErr (loc, err))
         in
       (List.collect processInclude incs) @ ds

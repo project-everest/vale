@@ -46,7 +46,7 @@ procedure{:quick} ShiftLeft128_1(ghost a:poly)
 
 procedure{:quick} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
     modifies
-        efl;
+        efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5;
     requires
         degree(hi) < 127;
@@ -82,7 +82,7 @@ procedure{:quick} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
     VPSLLDQ4(xmm4, xmm4);
 
     // ra3 := ra >> 96
-    Pinsrd(xmm3, 0, 0);
+    PinsrdImm(xmm3, 0, 0, r12);
     Pshufd(xmm3, xmm3, 0x03); // (hi) 0 0 0 3 (lo)
 
     // ra3_rb012 := ra3 + rb012
@@ -117,28 +117,28 @@ procedure{:quick} ClmulRev64(ghost a:poly, ghost b:poly, inline dstHi:bool, inli
 
 procedure{:quick exportOnly} High64ToLow(out dst:xmm, ghost a:poly)
     modifies
-        efl;
+        efl; r12;
     requires
         degree(a) <= 127;
         dst == to_quad32(a);
     ensures
         dst == to_quad32(div(a, monomial(64)));
 {
-    Pinsrd(dst, 0, 0);
+    PinsrdImm(dst, 0, 0, r12);
     Pshufd(dst, dst, 0x0e); // (hi) 0 0 3 2 (lo)
     lemma_quad32_double_shift(a);
 }
 
 procedure{:quick exportOnly} Low64ToHigh(out dst:xmm, ghost a:poly)
     modifies
-        efl;
+        efl; r12;
     requires
         degree(a) <= 127;
         dst == to_quad32(a);
     ensures
         dst == to_quad32(mul(mod(a, monomial(64)), monomial(64)));
 {
-    Pinsrd(dst, 0, 3);
+    PinsrdImm(dst, 0, 3, r12);
     Pshufd(dst, dst, 0x4f); // (hi) 1 0 3 3 (lo)
     lemma_quad32_double_shift(a);
 }
@@ -160,7 +160,7 @@ procedure{:quick exportOnly} AddPoly(out dst:xmm, src:xmm, ghost a:poly, ghost b
 
 procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, ghost hi:poly)
     modifies
-        efl;
+        efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5;
     requires
         degree(ab) <= 127;
@@ -229,7 +229,7 @@ procedure{:quick} Clmul128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, 
 
 procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost lo:poly, ghost hi:poly)
     modifies
-        efl;
+        efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5;
     requires
         degree(ab) <= 127;
@@ -256,18 +256,18 @@ procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost lo:pol
 
 procedure{:quick exportOnly} Gf128ModulusRev(inout dst:xmm)
     modifies
-        efl;
+        efl; r12;
     ensures
         dst == to_quad32(reverse(gf128_modulus_low_terms, 127));
 {
     lemma_gf128_constant_rev(dst);
     Pxor(dst, dst);
-    Pinsrd(dst, 0xe100_0000, 3);
+    PinsrdImm(dst, 0xe100_0000, 3, r12);
 }
 
 procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
     modifies
-        efl;
+        efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5; xmm6;
     requires
         degree(a) <= 127;
