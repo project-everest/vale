@@ -49,7 +49,7 @@ let print_explicit_basety = function
   | TUInt128 -> "#UInt128.t "
 
 let rec print_low_args = function
-  | [] -> "STL unit"
+  | [] -> "ST unit"
   | (a, ty)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args q
 
 let rec print_low_args_and = function
@@ -124,7 +124,7 @@ let reg_to_low = function
 let print_low_calling_args os target (args:list arg{supported os target args}) =
   let rec aux regs (args:list arg{List.Tot.Base.length args <= List.Tot.Base.length regs}) =
   match regs, args with
-    | _, [] -> "    | _ -> n"
+    | _, [] -> "    | _ -> init_regs r"
     | r1::rn, (a, ty)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
       (if TBuffer? ty then "addr_" ^ a else a) ^ 
       "\n" ^ aux rn q
@@ -147,13 +147,16 @@ let translate_lowstar os target (func:func_ty{supported_func os target func}) =
   "module " ^ name ^
   "\n\nopen FStar.Buffer\nmodule B = FStar.Buffer\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop64\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 40\"\n\n" ^
   "open Vale_" ^ name ^ "\n\n" ^
-  "assume val st_put (h:HS.mem) (f:HS.mem -> GTot HS.mem) : ST unit (fun h0 -> True) (fun h0 _ h1 -> h == h1 /\ f h0 == h)\n\n" ^
+  "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : ST unit (fun h0 -> p h0) (fun h0 _ h1 -> h == h1 /\ f h0 == h)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ "\n" ^
   "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
     ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ "\n\n" ^
   "//The map from buffers to addresses in the heap, that remains abstract\n" ^
   "assume val addrs: addr_map\n\n" ^
+  "//The initial registers and xmms\n" ^
+  "assume val init_regs:reg -> nat64\n" ^
+  "assume val init_xmms:xmm -> quad32\n\n" ^
   "val " ^ name ^ ": " ^ (print_low_args args) ^
   "\n\t(requires (fun h -> pre_cond h " ^ (print_args_names args) ^ "))\n\t" ^
   "(ensures (fun h0 _ h1 -> post_cond h0 h1 " ^ (print_args_names args) ^ "))\n\n" ^
@@ -164,13 +167,11 @@ let translate_lowstar os target (func:func_ty{supported_func os target func}) =
   "let ghost_" ^ name ^ " " ^ (print_args_names args) ^ "h0 =\n" ^
   "  let buffers = " ^ print_buffers_list args ^ " in\n" ^
   "  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in\n" ^
-  "  let n:nat64 = 0 in\n" ^
   generate_low_addrs args ^
   "  let regs = fun r -> begin match r with\n" ^
   (print_low_calling_args os target args) ^
   " end in\n" ^
-  "  let n:nat32 = 0 in\n" ^  
-  "  let xmms = fun x -> Mkfour n n n n in\n" ^
+  "  let xmms = init_xmms in\n" ^
   "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in\n" ^
   "  let s1, f1 = va_lemma_" ^ name ^ " (va_code_" ^ name ^ " ()) s0 " ^ print_args_names args ^ " in\n" ^
   "  // Ensures that the Vale execution was correct\n" ^
@@ -182,7 +183,7 @@ let translate_lowstar os target (func:func_ty{supported_func os target func}) =
   "  s1.mem.hs\n\n" ^
   "let " ^ name ^ " " ^ (print_args_names args) ^ " =\n" ^
   "  let h0 = get() in\n" ^
-  "  st_put h0 (fun h -> if FStar.StrongExcludedMiddle.strong_excluded_middle (pre_cond h " ^ (print_args_names args) ^ ") then ghost_" ^ name ^ " " ^ (print_args_names args) ^ "h else h)\n"
+  "  st_put h0 (fun h -> pre_cond h " ^ (print_args_names args) ^ ") (ghost_" ^ name ^ " " ^ (print_args_names args) ^ ")\n"
   
 let print_vale_bufferty = function
   | TUInt8 -> "buffer8"

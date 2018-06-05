@@ -19,7 +19,8 @@ open X64.Poly1305
 
 open Vale_poly
 
-assume val st_put (h:HS.mem) (f:HS.mem -> GTot HS.mem) : ST unit (fun h0 -> True) (fun h0 _ h1 -> h == h1 /\ f h0 == h)
+assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : ST unit (fun h0 -> p h0) (fun h0 _ h1 -> h == h1 /\ f h0 == h)
+
 
 let readable_words (len:nat) =
     ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
@@ -48,9 +49,12 @@ length ctx == 24 /\ length inp == readable_words len /\
  let key_s = (lowerUpper128_opaque key_s0 key_s1) in
  let inp_mem = seqTo128 (seq_uint_to_nat (as_seq h1 inp)) in
  h == poly1305_hash key_r key_s inp_mem len)
- 
 
-val poly: ctx:B.buffer UInt64.t -> inp:B.buffer UInt64.t -> len:nat64 -> STL unit
+//The initial registers and xmms
+assume val init_regs:reg -> nat64
+assume val init_xmms:xmm -> quad32
+
+val poly: ctx:B.buffer UInt64.t -> inp:B.buffer UInt64.t -> len:nat64 -> ST unit
 	(requires (fun h -> pre_cond h ctx inp len ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 ctx inp len ))
 
@@ -60,16 +64,14 @@ val ghost_poly: ctx:B.buffer UInt64.t -> inp:B.buffer UInt64.t -> len:nat64 -> (
 let ghost_poly ctx inp len h0 =
   let buffers = ctx::inp::[] in
   let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
-  let n:nat64 = 0 in
   let addr_ctx = addrs.[(as_addr ctx, idx ctx, length ctx)] in
   let addr_inp = addrs.[(as_addr inp, idx inp, length inp)] in
   let regs = fun r -> begin match r with
     | Rdi -> addr_ctx
     | Rsi -> addr_inp
     | Rdx -> len
-    | _ -> n end in
-  let n:nat32 = 0 in
-  let xmms = fun x -> Mkfour n n n n in
+    | _ -> init_regs r end in
+  let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
   let s1, f1 = va_lemma_poly (va_code_poly ()) s0 ctx inp len  in
   // Ensures that the Vale execution was correct
@@ -86,9 +88,9 @@ let ghost_poly ctx inp len h0 =
   // This assertion was manually added
   assert (FStar.FunctionalExtensionality.feq 
     (seqTo128 (buffer64_as_seq s1.mem inp)) 
-    (seqTo128 (seq_uint_to_nat (as_seq s1.mem.hs inp))));
+    (seqTo128 (seq_uint_to_nat (as_seq s1.mem.hs inp))));  
   s1.mem.hs
 
 let poly ctx inp len  =
   let h0 = get() in
-  st_put h0 (fun h -> if FStar.StrongExcludedMiddle.strong_excluded_middle (pre_cond h ctx inp len ) then ghost_poly ctx inp len h else h)
+  st_put h0 (fun h -> pre_cond h ctx inp len ) (ghost_poly ctx inp len )
