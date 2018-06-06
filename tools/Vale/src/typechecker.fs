@@ -1052,7 +1052,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool)
       let env = push_func env f.fname ftyp in
       (env, decl)
     | DProc p ->
-      let isTypeChecked = attrs_get_bool (Id "typecheck") true p.pattrs in
+      let isTypeChecked = attrs_get_bool (Id "typecheck") false p.pattrs in
       let (env,p) = if isTypeChecked then tc_proc env p else (env, p) in 
       (env, ((l, DProc(p)), b))
     | DUnsupported x ->
