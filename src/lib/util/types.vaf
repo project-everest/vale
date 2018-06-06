@@ -1,3 +1,20 @@
+include{:fstar}{:open} "Prims"
+include{:fstar} "FStar.Pervasives.Native"
+include{:fstar} "FStar.Pervasives"
+include{:fstar} "FStar.Seq.Base"
+include{:fstar} "Words_s"
+include{:fstar} "Types_s"
+include{:fstar} "Memory_i_s"
+include{:fstar} "X64.Machine_s"
+include{:fstar} "FStar.Monotonic.Heap"
+include{:fstar} "FStar.ST"
+include{:fstar} "X64.Vale.State_i"
+include{:fstar} "X64.Vale.Decls_i"
+include{:fstar} "X64.Vale.QuickCodes_i"
+include{:fstar} "Math.Poly2.Defs_s"
+include{:fstar} "Math.Poly2_s"
+include{:fstar} "AES_s"
+
 module Types
 
 type Prims.prop : Type(1) extern ;

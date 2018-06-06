@@ -19,6 +19,7 @@ let main (argv) =
   let in_files_rev = ref ([]:(string * bool) list) in
   let includes_rev = ref ([]:string list) in
   let suffixMap_rev = ref ([]:(string * string) list) in
+  let include_modules = ref (Map.empty:Map<string, bool>)
   let sourceDir = ref "." in
   let destDir = ref "." in
   let sourceFroms = ref (Map.empty:Map<id, string>)
@@ -220,6 +221,9 @@ let main (argv) =
         (if debugIncludes then printfn "adding include from %A: %A --> %A --> %A" sourceDir x xabs path);
         includes_rev := path::!includes_rev
       in
+    let processFStarInclude (x:string) (opened:bool) :unit =
+        include_modules := Map.add x opened !include_modules
+      in 
     let rec processFile (xRaw:string, isInputFile:bool):((loc * decl) * bool) list =
       let x = if isInputFile then Path.Combine (!sourceDir, xRaw) else xRaw in
       (if debugIncludes then printfn "processing file %A" x);
@@ -242,6 +246,10 @@ let main (argv) =
           let incBase (isDest:bool):string = Path.Combine (!sourceDir, incBaseRaw isDest) in
           if attrs_get_bool (Id "verbatim") false attrs then
             (if isInputFile then processVerbatimInclude (incBase false) incPath);
+            []
+          else if attrs_get_bool (Id "fstar") false attrs then
+            let opened = attrs_get_bool (Id "open") false attrs in
+            processFStarInclude incPath opened;
             []
           else
             let suffixMap = List.collect (fun a ->
@@ -307,7 +315,7 @@ let main (argv) =
       if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
       precise_opaque := !emitFStarText;
       fstar := !emitFStarText;
-      let decls = build_decls empty_env decls in
+      let decls = build_decls empty_env !include_modules decls in
       (match !reprint_file with
         | None -> ()
         | Some filename ->
@@ -323,7 +331,7 @@ let main (argv) =
             rstream.Close ()
         );
       if !emitFStarText then
-        Emit_fstar_text.emit_decls ps decls
+        Emit_fstar_text.emit_decls ps decls (Map.fold (fun l key value -> if value then l@[key] else l) [] !include_modules)
       else
         if !dafnyDirect then
           // Initialize Dafny objects

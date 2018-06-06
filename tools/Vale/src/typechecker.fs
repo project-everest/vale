@@ -17,6 +17,8 @@ let next_type_var() : typ =
   incr tvar_count;
   TVar (Id tvar, None)
 
+let includes = ref (Map.empty:Map<string, bool>)
+
 type typ_constraints = (typ * typ) list
 type substitutions = Map<id, typ>
 
@@ -84,15 +86,32 @@ let name_of_id x =
   | Reserved _ -> (Reserved mn, Reserved sn)
   | Operator _ -> (Operator mn, Operator sn)
 
-let lookup_name (env:env) (x:id) =
-  let (mn, x) = name_of_id x in
+let check_include (m:id) (x:id) (isQualified:bool) =
+  let s = string_of_id m in
+  match Map.tryFind s !includes with
+  | Some b ->
+    if b || isQualified then ()
+    else 
+      err (sprintf "module '%s' needs to be open for unqualified reference '%s'" s (string_of_id x))
+  | _ -> err (sprintf "module '%s' needs to be included to reference its member '%s'" s (string_of_id x))
+    
+let lookup_name (env:env) (name:id) =
+  let (mn, x) = name_of_id name in
   let find = function
     | Variable (s, t) when s=x -> Some (Info t)
-    | Func (s, m, decl) when (s=x && (mn = (Id "") || m = mn)) -> Some (Func_decl decl)
+    | Func (s, m, decl) when (s=x && (mn = (Id "") || m = mn)) ->
+      check_include m name (if mn = (Id "") then false else true);
+      Some (Func_decl decl)
     | Proc (s, decl) when s=x -> Some (Proc_decl decl)
-    | Type (s, m, ts, kind, t) when (s=x && (mn = (Id "") || m = mn)) -> Some (Type_info (ts, kind, t))
-    | Const (s, m, t) when (s=x && (mn = (Id "") || m = mn)) -> Some (Info t)
-    | Unsupported (s, m) when (s=x && (mn = (Id "") || m = mn)) -> Some (Name s)
+    | Type (s, m, ts, kind, t) when (s=x && (mn = (Id "") || m = mn)) ->
+      check_include m name (if mn = (Id "") then false else true);
+      Some (Type_info (ts, kind, t))
+    | Const (s, m, t) when (s=x && (mn = (Id "") || m = mn)) ->
+      check_include m name (if mn = (Id "") then false else true);
+      Some (Info t)
+    | Unsupported (s, m) when (s=x && (mn = (Id "") || m = mn)) ->
+      check_include m name (if mn = (Id "") then false else true);
+      Some (Name s)
     | _ -> None
   let rec aux = function
     | a :: q -> 
@@ -1008,38 +1027,42 @@ let tc_proc (env:env) (p:proc_decl): (env*proc_decl) =
 
 let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool) =
   let ((l,d),b) = decl in
-  match d with
-  | DType (x, ts, k, t) ->
-    let env = push_typ env x ts k t
-    (env, decl)
-  | DVar (x, t, XAlias (AliasThread, e), _) ->
-    // TODO: type check t and e
-    let env = push_id env x t in
-    (env, decl)
-  | DVar (x, t, XState e, _) ->
-    ( 
-      match skip_loc e with
-      | EApply (Id id, es) ->
-          let env = push_id env x t in
-          (env, decl)
-      | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
-    )
-  | DConst (x, t) ->
-    let env = push_const env x t in
-    (env, decl)
-  | DFun ({fbody = None} as f) ->
-    let ftyp = compute_func_typ env f
-    let env = push_func env f.fname ftyp in
-    (env, decl)
-  | DProc p ->
-    let isTypeChecked = attrs_get_bool (Id "typecheck") false p.pattrs in
-    let (env,p) = if isTypeChecked then tc_proc env p else (env, p) in 
-    (env, ((l, DProc(p)), b))
-  | DUnsupported x ->
-    let env = push_unsupported env x in
-    (env, decl)
-  | _ -> (env, decl)
+  try 
+    match d with
+    | DType (x, ts, k, t) ->
+      let env = push_typ env x ts k t
+      (env, decl)
+    | DVar (x, t, XAlias (AliasThread, e), _) ->
+      // TODO: type check t and e
+      let env = push_id env x t in
+      (env, decl)
+    | DVar (x, t, XState e, _) ->
+      ( 
+        match skip_loc e with
+        | EApply (Id id, es) ->
+            let env = push_id env x t in
+            (env, decl)
+        | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
+      )
+    | DConst (x, t) ->
+      let env = push_const env x t in
+      (env, decl)
+    | DFun ({fbody = None} as f) ->
+      let ftyp = compute_func_typ env f
+      let env = push_func env f.fname ftyp in
+      (env, decl)
+    | DProc p ->
+      let isTypeChecked = attrs_get_bool (Id "typecheck") true p.pattrs in
+      let (env,p) = if isTypeChecked then tc_proc env p else (env, p) in 
+      (env, ((l, DProc(p)), b))
+    | DUnsupported x ->
+      let env = push_unsupported env x in
+      (env, decl)
+    | _ -> (env, decl)
+  with
+    | err -> raise (LocErr (l, err))
 
-let tc_decls (ds:((loc * decl) * bool) list) : ((loc * decl) * bool) list = 
+let tc_decls (include_modules: Map<string, bool>) (ds:((loc * decl) * bool) list) : ((loc * decl) * bool) list =
+  includes := include_modules;
   let (env,dss) = List.fold (fun (env:env,l:((loc * decl) * bool) list) d -> let (env, d) = tc_decl env d in (env, l@[d])) (empty_env,[]) ds in
   dss

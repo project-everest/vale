@@ -479,7 +479,11 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         )
   )
 
-let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
+let emit_open (ps:print_state) (s:string):unit =
+  ps.PrintLine ("open " + s)
+  match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("open " + s)
+
+let emit_decl (ps:print_state) (opens: string list) (loc:loc, d:decl):unit =
   try
     match d with
     | DVerbatim (attrs, lines) ->
@@ -496,7 +500,8 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
       )
     | DPragma (ModuleName s) ->
         ps.PrintLine ("module " + s);
-        match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("module " + s)
+        match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("module " + s);
+        List.iter (emit_open ps) opens
     | DPragma (ResetOptions s) ->
         resetOptions := s;
         prevResetOptionsPs := s;
@@ -507,6 +512,6 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | _ -> ()
   with err -> raise (LocErr (loc, err))
 
-let emit_decls (ps:print_state) (ds:decls):unit =
-  List.iter (emit_decl ps) ds
+let emit_decls (ps:print_state) (ds:decls) (opens: string list):unit =
+  List.iter (emit_decl ps opens) ds
 

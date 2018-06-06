@@ -78,7 +78,7 @@ let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
     (env, ds)
   with err -> raise (LocErr (loc, err))
 
-let build_decls (env:env) (ds:((loc * decl) * bool) list):decls =
+let build_decls (env:env) (includes: Map<string, bool>) (ds:((loc * decl) * bool) list):decls =
   let ds =
     if !disable_verify && !omit_unverified then
       // omit any declarations not verified and not referenced by verified declaration
@@ -109,7 +109,7 @@ let build_decls (env:env) (ds:((loc * decl) * bool) list):decls =
         in
       List.map omitUnverified ds
     else ds
-  let ds = tc_decls ds in
+  let ds = tc_decls includes ds in
   let (env, dss) = List_mapFoldFlip build_decl env ds in
   List.concat dss
 
