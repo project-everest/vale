@@ -147,7 +147,7 @@ let translate_lowstar os target (func:func_ty{supported_func os target func}) =
   "module " ^ name ^
   "\n\nopen FStar.Buffer\nmodule B = FStar.Buffer\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop64\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 40\"\n\n" ^
   "open Vale_" ^ name ^ "\n\n" ^
-  "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : ST unit (fun h0 -> p h0) (fun h0 _ h1 -> h == h1 /\ f h0 == h)\n\n" ^
+  "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : ST unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ "\n" ^
   "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 

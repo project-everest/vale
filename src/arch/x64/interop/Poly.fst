@@ -19,7 +19,7 @@ open X64.Poly1305
 
 open Vale_poly
 
-assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : ST unit (fun h0 -> p h0) (fun h0 _ h1 -> h == h1 /\ f h0 == h)
+assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : ST unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)
 
 
 let readable_words (len:nat) =
