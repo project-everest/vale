@@ -1,5 +1,6 @@
 module X64.Memory_i_s
 
+open Prop_s
 open X64.Machine_s
 module S = X64.Bytes_Semantics_s
 module I = Interop64
@@ -37,15 +38,15 @@ let type_of_typ (t:typ) : Tot Type0 =
 
 val buffer (t:typ) : Type0
 val buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : GTot (Seq.seq (type_of_typ t))
-val buffer_readable (#t:typ) (h:mem) (b:buffer t) : GTot Type0
+val buffer_readable (#t:typ) (h:mem) (b:buffer t) : GTot prop0
 val buffer_length (#t:typ) (b:buffer t) : GTot nat
 val loc : Type u#1
 val loc_none : loc
 val loc_union (s1 s2:loc) : GTot loc
 val loc_buffer (#t:typ) (b:buffer t) : GTot loc
-val loc_disjoint (s1 s2:loc) : GTot Type0
-val loc_includes (s1 s2:loc) : GTot Type0
-val modifies (s:loc) (h1 h2:mem) : GTot Type0
+val loc_disjoint (s1 s2:loc) : GTot prop0
+val loc_includes (s1 s2:loc) : GTot prop0
+val modifies (s:loc) (h1 h2:mem) : GTot prop0
 
 unfold let buffer8 = buffer (TBase TUInt8)
 unfold let buffer16 = buffer (TBase TUInt16)
@@ -59,7 +60,7 @@ noeq type state' = {
   mem: mem;
 }
 
-val valid_state (s:state') : Type0
+val valid_state (s:state') : prop0
 
 val frame_valid (s1:state') : Lemma 
    (forall s2. s1.state.S.mem == s2.state.S.mem /\ s1.mem == s2.mem ==>
@@ -76,7 +77,7 @@ val same_heap: (s1:state) -> (s2:state) -> Lemma (
 
 val buffer_addr : #t:typ -> b:buffer t -> h:mem -> GTot int
 
-val loc_readable (h:mem) (s:loc) : GTot Type0
+val loc_readable (h:mem) (s:loc) : GTot prop0
 
 val loc_readable_none (h:mem) : Lemma
   (ensures (loc_readable h loc_none))
@@ -92,21 +93,21 @@ val loc_readable_buffer (#t:typ) (h:mem) (b:buffer t) : Lemma
   (ensures (loc_readable h (loc_buffer b)))
   [SMTPat (loc_readable h (loc_buffer b))]
 
-let rec loc_locs_disjoint_rec (l:loc) (ls:list loc) : Type0 =
+let rec loc_locs_disjoint_rec (l:loc) (ls:list loc) : prop0 =
   match ls with
   | [] -> True
   | h::t -> loc_disjoint l h /\ loc_disjoint h l /\ loc_locs_disjoint_rec l t
 
-let rec locs_disjoint_rec (ls:list loc) : Type0 =
+let rec locs_disjoint_rec (ls:list loc) : prop0 =
   match ls with
   | [] -> True
   | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
 
 unfold
-let locs_disjoint (ls:list loc) : Type0 = normalize (locs_disjoint_rec ls)
+let locs_disjoint (ls:list loc) : prop0 = normalize (locs_disjoint_rec ls)
 
 // equivalent to modifies; used to prove modifies clauses via modifies_goal_directed_trans
-val modifies_goal_directed (s:loc) (h1 h2:mem) : GTot Type0
+val modifies_goal_directed (s:loc) (h1 h2:mem) : GTot prop0
 val lemma_modifies_goal_directed (s:loc) (h1 h2:mem) : Lemma
   (modifies s h1 h2 == modifies_goal_directed s h1 h2)
 

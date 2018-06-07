@@ -1,4 +1,5 @@
 module X64.Vale.Lemmas_i
+open Prop_s
 open X64.Machine_s
 open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
@@ -15,7 +16,7 @@ let overflow (flags:int) : bool = S.overflow (int_to_nat64 flags)
 let update_cf (flags:int) (new_cf:bool) = S.update_cf (int_to_nat64 flags) new_cf
 let update_of (flags:int) (new_of:bool) = S.update_of (int_to_nat64 flags) new_of
 
-let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : Type0 =
+let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : prop0 =
   Some (state_to_S s1) == S.eval_code c f0 (state_to_S s0)
 
 let eval_ins (c:code) (s0:state) : Ghost ((sM:state) * (f0:fuel))
@@ -125,7 +126,7 @@ val lemma_ifElseFalse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) 
     eval_code (IfElse ifb ct cf) s0 f0 sM
   )
 
-val eval_while_inv (c:code) (s0:state) (fW:fuel) (sW:state) : Type0
+val eval_while_inv (c:code) (s0:state) (fW:fuel) (sW:state) : prop0
 
 val lemma_while_total (b:ocmp) (c:code) (s0:state) : Ghost ((s1:state) * (f1:fuel))
   (requires True)

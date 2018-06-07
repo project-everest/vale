@@ -6,7 +6,7 @@ unfold let quad32 = Types_s.quad32
 
 type t = xmm -> quad32
 
-val equal : xmms1:t -> xmms2:t -> Type0
+val equal : xmms1:t -> xmms2:t -> Prop_s.prop0
 
 val lemma_equal_intro : xmms1:t -> xmms2:t -> Lemma
   (requires forall x. xmms1 x == xmms2 x)

@@ -5,7 +5,7 @@ open X64.Machine_s
 
 type t = reg -> nat64
 
-val equal : regs1:t -> regs2:t -> Type0
+val equal : regs1:t -> regs2:t -> Prop_s.prop0
 
 val lemma_equal_intro : regs1:t -> regs2:t -> Lemma
   (requires forall r. regs1 r == regs2 r)

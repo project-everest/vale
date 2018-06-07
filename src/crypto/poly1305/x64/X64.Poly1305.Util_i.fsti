@@ -1,5 +1,6 @@
 module X64.Poly1305.Util_i
 
+open Prop_s
 open FStar.Mul
 open Poly1305.Spec_s
 open X64.Machine_s
@@ -64,7 +65,7 @@ let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buf
   =
   assume False
 
-let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
+let rec buffers_readable (h: mem) (l: list buffer64) : GTot prop0 (decreases l) =
 match l with
 | [] -> True
 | b :: l'  -> buffer_readable h b /\ buffers_readable h l'
@@ -76,7 +77,7 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     len <= buffer_length b /\
     buffer_addr b m == addr
 
-let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
+let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot prop0 =
     modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (Seq.index (buffer_as_seq h2 b) i)}

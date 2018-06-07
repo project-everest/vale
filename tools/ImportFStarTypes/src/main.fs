@@ -493,11 +493,11 @@ let rec universe0_univ_int (u:univ):bigint =
 let universe0_univ (u:univ):univ =
   UInt (universe0_univ_int u)
 
-let rec universe0_exp (typelike_ids:Set<id>) (e:exp):exp =
-  let r = universe0_exp typelike_ids in
+let rec universe0_exp (e:exp):exp =
+  let r = universe0_exp in
   match e with
+  | EId {name = Some ("Prop_s.prop0" | "Prims.logical")} -> EProp
   | EId _ | EInt _ | EUnitValue | EProp | EUnsupported _ -> e
-  | EType (UInt i) when i.Equals(bigint.Zero) -> EProp
   | EType u -> EType (universe0_univ u)
   | EComp (e1, e2, es) -> EComp (r e1, r e2, List.map r es)
   | EApp (e, aes) -> EApp (r e, List.map (fun (a, e) -> (a, r e)) aes)
@@ -507,24 +507,17 @@ let rec universe0_exp (typelike_ids:Set<id>) (e:exp):exp =
   | ETyped (e1, e2) -> ETyped (r e1, r e2)
   | EAscribed (e1, e2) -> EAscribed (r e1, r e2)
   | EPattern (pats, e) -> EPattern (List.map (List.map r) pats, r e)
-  | ELet (b, e1, e2) -> ELet (universe0_binder typelike_ids b, r e1, r e2)
-  | EFun (bs, e) -> EFun (List.map (universe0_binder typelike_ids) bs, r e)
-and universe0_binder (typelike_ids:Set<id>) (b:binder):binder =
+  | ELet (b, e1, e2) -> ELet (universe0_binder b, r e1, r e2)
+  | EFun (bs, e) -> EFun (List.map universe0_binder bs, r e)
+and universe0_binder (b:binder):binder =
   match b with
-  | (a, x, Some (EType (UInt i))) when i.Equals(bigint.Zero) && Set.contains x typelike_ids ->
-      (a, x, Some (EType (UInt i))) // don't convert to EProp in this case
   | (a, x, e_opt) ->
-      (a, x, Option.map (universe0_exp typelike_ids) e_opt)
+      (a, x, Option.map universe0_exp e_opt)
 
 let universe0_decl (d:decl):decl =
   let (++) = Set.union in
-  let typelike_ids =
-    Set.unionMany (List.map add_typelike_vars_binder d.d_binders) ++
-    add_typelike_vars_exp true d.d_typ ++
-    (match d.d_body with None -> Set.empty | Some e -> add_typelike_vars_exp false e)
-    in
-  let bs = List.map (universe0_binder typelike_ids) d.d_binders in
-  let body = Option.map (universe0_exp typelike_ids) d.d_body in
+  let bs = List.map universe0_binder d.d_binders in
+  let body = Option.map universe0_exp d.d_body in
   let t =
     // more sketchy Type(0) vs prop heuristics:
     match (d.d_typ, body) with
@@ -532,11 +525,11 @@ let universe0_decl (d:decl):decl =
     | (EType (UInt i), Some e) when i.Equals(bigint.Zero) ->
       (
         match e with
-        | EApp (EId {name = Some "Prims.squash"}, _) -> universe0_exp typelike_ids d.d_typ
+        | EApp (EId {name = Some "Prims.squash"}, _) -> universe0_exp d.d_typ
         | EId _ | EApp _ | ERefine _ -> d.d_typ
-        | _ -> universe0_exp typelike_ids d.d_typ
+        | _ -> universe0_exp d.d_typ
       )
-    | _ -> universe0_exp typelike_ids d.d_typ
+    | _ -> universe0_exp d.d_typ
     in
   {d with d_udecls = []; d_binders = bs; d_typ = t; d_body = body}
 
@@ -674,7 +667,7 @@ let rec trees_of_comma_list (es:string_tree list):string_tree list =
 let rec tree_of_vale_name (x:string):string_tree =
   let r = tree_of_vale_name in
   match x with
-  | "Prims.logical" -> st_leaf "prop"
+  | ("Prop_s.prop0" | "Prims.prop" | "Prims.logical") -> st_leaf "prop"
   | _ when x.EndsWith(".decreases") -> r (x.Replace(".decreases", "._decreases"))
   | _ when x.EndsWith(".modifies") -> r (x.Replace(".modifies", "._modifies"))
   | _ ->
@@ -694,7 +687,6 @@ let tree_of_vale_kind (e:exp):string_tree =
 let rec tree_of_vale_type (e:exp):string_tree =
   let r = tree_of_vale_type in
   match e with
-  | EId {name = Some "Prims.prop"} -> st_leaf "prop"
   | EId id -> tree_of_vale_id id
   | EProp -> st_leaf "prop"
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
