@@ -322,6 +322,21 @@ let filter_decls (ds:decl list):decl list =
   let ds = List.map abstract_decl ds in
   ds
 
+// Move a:Type _ from d_typ into d_binders
+let decl_lift_type_binders (d:decl):decl =
+  let rec f (d:decl):decl option =
+    match (d.d_typ, d.d_body) with
+    // TODO: handle body
+    | (EArrow (a, x, ((EType _) as k), EApp (EAppUnivs (EId {name = Some ("Prims.Tot" | "Prims.GTot" | "Tot" | "GTot")}, _), [(_, t)])), None)
+    | (EArrow (a, x, ((EType _) as k), EApp (EId {name = Some ("Prims.Tot" | "Prims.GTot" | "Tot" | "GTot")}, [(_, t)])), None)
+    | (EArrow (a, x, ((EType _) as k), t), None) ->
+        let d = {d with d_binders = d.d_binders @ [(a, x, Some k)]; d_typ = t} in
+        f d
+    | (EType _, None) -> Some d
+    | _ -> None
+    in
+  match f d with None -> d | Some d -> d
+
 let rec unsupported (e:exp):string option =
   match e with
   | EId x -> None
@@ -888,6 +903,7 @@ let main (argv:string array) =
       in
     let ds = List.collect parse_block blocks in
     let ds = filter_decls ds in
+    let ds = List.map decl_lift_type_binders ds in
     let ds = List.map decl_unsupported ds in
     let ds = List.map index_to_var_decl ds in
     let (env, envs_ds_rev) = List.fold to_vale_decl (Map.empty, []) ds in

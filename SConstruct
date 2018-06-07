@@ -268,7 +268,7 @@ if do_fstar and not stage1 and not stage2:
   # the user can always run "scons --STAGE1" and "scons --STAGE2" explicitly.
   #
   print("%s*** Running scons --STAGE1 ***%s" % (colors['yellow'], colors['end']))
-  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints') and not x.endswith('.ml') and not x.endswith('.exe') and not x.endswith('.asm') and not x.endswith('.S') and not x.endswith('.obj')]
+  args_stage1 = [x for x in sys.argv if not x.endswith('.verified') and not x.endswith('.hints') and not x.endswith('.ml') and not x.endswith('.exe') and not x.endswith('.asm') and not x.endswith('.S') and not x.endswith('.obj') and not x.endswith('.dump') and not x.endswith('.types.vaf')]
   subprocess.check_call(['python'] + args_stage1 + ['--STAGE1'])
   print("%s*** Running scons --STAGE2 ***%s" % (colors['yellow'], colors['end']))
   stage2 = True
@@ -621,10 +621,12 @@ def verify_fstar(env, targetfile, sourcefile):
     temptargetfiles.append(hintsfile)
   temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
   temptarget = temptargets[0]
-  outs.append(env.CopyAs(source = temptarget, target = targetfile))
+  vtarget = env.CopyAs(source = temptarget, target = targetfile)
+  outs.append(vtarget)
   dump_module_flag = "--dump_module " + path_module_name(sourcefile)
   dump_flags = "--print_implicits --print_universes --print_effect_args --print_full_names --print_bound_var_types --ugly " + dump_module_flag
   dumptargets = env.Command(dumptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS " + dump_flags + " 1>$TARGET 2>&1")
+  Depends(dumptargets[0], vtarget)
   outs.append(dumptargets[0])
   if gen_hints:
     outs.append(env.CopyAs(source = temptargets[1], target = hhintsfile))
