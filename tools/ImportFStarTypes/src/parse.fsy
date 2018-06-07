@@ -83,6 +83,7 @@ any
   | UNIVERSE any { "UNIVERSE"::$2 }
   | STRING any { "STRING"::$2 }
   | LITINT any { ((snd $1).ToString())::$2 }
+  | META any { "META"::$2 }
   | ID any { (snd $1)::$2 }
 
 exp
@@ -100,6 +101,7 @@ exp
 exp1
   : exp2 { $1 }
   | LET binder1 EQ exp IN exp1 { RList [RLet $1; $2; $4; $6] }
+  | LET REC binder1 EQ exp IN exp1 { RList [RLet $1; $3; $5; $7] }
   | exp2 LT exp1s GT { RList [RLtGt $2; $1; RList $3] }
   | META LBRACE exp RBRACE { RMeta (fst $1) }
   | META COLON exp1s LBRACE exp RBRACE { RMeta (fst $1) }
@@ -156,14 +158,14 @@ ids_commas
   | COMMA ids_commas { $2 }
 
 attr
-  : LPAREN attr RPAREN { $2 }
-  | STRING { $1 }
-  | ID { $1 }
-  | ID attr { $1 }
+  : LPAREN attrs RPAREN { $2 }
+  | STRING { [$1] }
+  | SEMI { [($1, ";")] }
+  | ID { [$1] }
 
 attrs
-  : attr { [$1] }
-  | attr SEMI attrs { $1::$3 }
+  : { [] }
+  | attr attrs { $1 @ $2 }
 
 attrs_opt
   : { [] }

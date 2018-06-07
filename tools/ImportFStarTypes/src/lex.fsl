@@ -17,6 +17,9 @@ rule lextoken = parse
 | "\r\n" { next_line lexbuf; lextoken lexbuf }
 | ['\n''\r'] { next_line lexbuf; lextoken lexbuf }
 | [' ''\t'] { lextoken lexbuf }
+| "(* Sig_bundle *)" { lextoken lexbuf }
+| "[[FStar.Tactics.Effect.TAC.reflect]]" { lextoken lexbuf }
+| "`" { lextoken lexbuf }
 | ";" { SEMI (curLoc lexbuf) }
 | "<" { LT (curLoc lexbuf) }
 | ">" { GT (curLoc lexbuf) }
@@ -52,9 +55,13 @@ rule lextoken = parse
 | "Meta_pattern" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_named" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_labeled" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_labeled(Patterns are incomplete, "[^'(']*'('[^')']*"))" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_labeled(could not prove post-condition, "[^'(']*'('[^')']*"))" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_desugared" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_monadic" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_monadic_lift" { META (curLoc lexbuf, lexeme lexbuf) }
+| "MonadicLift-Tm_quoted (static)" { META (curLoc lexbuf, lexeme lexbuf) }
+| "MonadicLift-Tm_quoted (dynamic)" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Monadic-"['_''A'-'Z''a'-'z']+ { META (curLoc lexbuf, lexeme lexbuf) }
 | "MonadicLift-"['_''A'-'Z''a'-'z']+ { META (curLoc lexbuf, lexeme lexbuf) }
 | "assume" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
@@ -63,6 +70,7 @@ rule lextoken = parse
 | "noeq" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "unopteq" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "visible" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
+| "noextract" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "private" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "logic" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "inline" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
@@ -85,7 +93,7 @@ rule lextoken = parse
 
 (*
 *)
-| ['"'][^'"''\n''\r''\t']*['"'] { let s = lexeme lexbuf in STRING (curLoc lexbuf, s.Substring(1, s.Length - 2)) }
+| ['"'][^'"']*['"'] { let s = lexeme lexbuf in STRING (curLoc lexbuf, s.Substring(1, s.Length - 2)) }
 | "0x"['0'-'9''a'-'f''A'-'F']['0'-'9''a'-'f''A'-'F''_']*
   {
     let s = lexeme lexbuf in

@@ -133,6 +133,7 @@ let main (argv) =
         | "-disableVerify" :: l -> disable_verify := true; match_args l
         | "-omitUnverified" :: l -> omit_unverified := true; match_args l
         | "-noLemmas" :: l -> no_lemmas := true ; match_args l
+        | "-typecheck=false" :: l -> do_typecheck := false; match_args l
         | f :: l ->
           if f.[0] = '-' then
             failwith ("Unrecognized argument: " + f + "\n")

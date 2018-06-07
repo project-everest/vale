@@ -268,9 +268,8 @@ and parse_aqual_exp (e:raw_exp):(aqual * exp) =
 and parse_comma_exps (es:raw_exp list):exp list =
   match es with
   | [] -> []
-  | [e] -> [parse_exp e]
-  | e::(RComma _)::es -> (parse_exp e)::(parse_comma_exps es)
-  | _ -> err ("parse_comma_exps: " + string_of_raw_exp (RList es))
+  | (RComma _)::es -> parse_comma_exps es
+  | e::es -> (parse_exp e)::(parse_comma_exps es)
 and parse_binder (e:raw_exp):binder = parse_binder_a Explicit e
 and parse_binder_a (a:aqual) (e:raw_exp):binder =
   match e with
@@ -511,7 +510,7 @@ let universe0_decl (d:decl):decl =
     in
   let bs = List.map (universe0_binder typelike_ids) d.d_binders in
   let body = Option.map (universe0_exp typelike_ids) d.d_body in
-  let t = 
+  let t =
     // more sketchy Type(0) vs prop heuristics:
     match (d.d_typ, body) with
     | (EType (UInt i), None) when i.Equals(bigint.Zero) -> d.d_typ
@@ -581,6 +580,7 @@ let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:exp):bool =
   | _ -> set_reason ("not vale type: " + string_of_exp e); false
 and is_vale_type_id (env:env) (e:exp):bool =
   match e with
+  | EId {name = Some "Prims.logical"} -> true
   | EId {name = Some x} ->
     (
       match Map.tryFind x env with
@@ -659,6 +659,7 @@ let rec trees_of_comma_list (es:string_tree list):string_tree list =
 let rec tree_of_vale_name (x:string):string_tree =
   let r = tree_of_vale_name in
   match x with
+  | "Prims.logical" -> st_leaf "prop"
   | _ when x.EndsWith(".decreases") -> r (x.Replace(".decreases", "._decreases"))
   | _ when x.EndsWith(".modifies") -> r (x.Replace(".modifies", "._modifies"))
   | _ ->
@@ -825,31 +826,46 @@ let main (argv:string array) =
       in
     parse_argv (List.tail arg_list);
     let in_files = List.rev (!in_files_rev) in
-    let read_file (name:string) =
+    let read_file (name:string):string list =
+      let rec splitWhereRec (f:'a -> bool) (in1:'a list) (out1:'a list) (outn:'a list list):'a list list =
+        match (in1, out1) with
+        | ([], []) -> outn
+        | ([], _::_) -> out1::outn
+        | (h::t, []) when f h -> splitWhereRec f t [h] outn
+        | (h::t, _::_) when f h -> splitWhereRec f t [h] (out1::outn)
+        | (h::t, _) -> splitWhereRec f t (h::out1) outn
+        in
+      let splitWhere (f:'a -> bool) (l:'a list):'a list list =
+        List.rev (List.map List.rev (splitWhereRec f l [] []))
+        in
       let lines = Array.toList (System.IO.File.ReadAllLines(name)) in
-      let rec get_block (lines:string list):(string list * string list) =
-        match lines with
-        | [] -> ([], [])
-        | h::t when h.Trim() = "" -> ([], lines)
-        | h::t when h.StartsWith("#") -> ([], lines)
-        | h::t ->
-            let (b, lines) = get_block t in
-            (h::b, lines)
+      let sModule = "Module after type checking:" in
+      let line_is_new_module (x:string):bool = (x = sModule || x.StartsWith("Verified ") || x.StartsWith("All verification")) in
+      let modules = splitWhere line_is_new_module lines in
+      let modules = List.filter (fun (x:string list) -> match x with s::_ when s = sModule -> true | _ -> false) modules in
+      let get_module_blocks (lines:string list):string list list =
+        let lines = List.filter (fun (x:string) -> not (x.StartsWith("#") || x.Contains("): (Warning "))) lines in
+        match splitWhere (fun (x:string) -> x = "Exports:") lines with
+        | [_; (_::lines)] ->
+            splitWhere
+              (fun (x:string) ->
+                // REVIEW: this is to break Sig_bundle or other groups apart; this could be better
+                x.StartsWith("(* Sig_bundle *)") ||
+                x.StartsWith("[@") ||
+                x.StartsWith("val ") ||
+                x.StartsWith("assume ") ||
+                x.StartsWith("datacon<") ||
+                x.StartsWith("unfold let ") ||
+                x.StartsWith("sub_effect ") ||
+                x.StartsWith("(Discriminator ") ||
+                x.StartsWith("visible (Discriminator "))
+              lines
+        | _ -> []
         in
-      let rec get_blocks (lines:string list) (blocks_rev:string list):string list =
-        match lines with
-        | [] -> List.rev blocks_rev
-        | line::lines ->
-            if line.StartsWith("Checked: ") then
-              if line.Trim() = "Checked:" then get_blocks lines blocks_rev else
-              let line = line.Substring("Checked: ".Length) in
-              let (block, lines) = get_block (line::lines) in
-              let block = String.concat " " block in
-              get_blocks lines (block::blocks_rev)
-            else
-              get_blocks lines blocks_rev
-        in
-      get_blocks lines []
+      let module_blocks = List.map get_module_blocks modules in
+      let all_blocks = List.concat module_blocks in
+      let all_blocks = List.map (List.map (fun (x:string) -> x.Replace("[set_options \"--z3rlimit 20\"]", "[set_options '--z3rlimit 20']"))) all_blocks in // HACK
+      List.map (String.concat "\n") all_blocks
       in
     let blocks = List.collect read_file in_files in
     let parse_block (s:string):decl list =

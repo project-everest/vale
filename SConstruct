@@ -297,6 +297,7 @@ if 'KREMLIN_HOME' in os.environ:
   kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
+env['IMPORT_FSTAR_TYPES'] = File('bin/importFStarTypes.exe')
 env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf')) + ' -include ' + str(File('src/lib/util/types.vaf'))
 
 # Useful Dafny command lines
@@ -437,6 +438,7 @@ def add_vale_builders(env):
 # match 'include {:attr1} ... {:attrn} "filename"'
 # where attr may be 'verbatim' or 'from BASE'
 vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\})*)\s*"(\S+)"', re.M)
+vale_fstar_re = re.compile(r'\{\:\s*fstar\s*\}')
 vale_verbatim_re = re.compile(r'\{\:\s*verbatim\s*\}')
 vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
 
@@ -469,7 +471,7 @@ def vale_fstar_file_scan(node, env, path):
   v_vaf_includes = []
   for (attrs, inc) in includes:
     f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
-    if not vale_verbatim_re.search(attrs):
+    if not vale_fstar_re.search(attrs):
       v_vaf_includes.append(f)
       # if A.vaf includes B.vaf, then manually establish these dependencies:
       #   A.fst.verified  depends on B.fsti
@@ -592,8 +594,21 @@ def on_black_list(f, list):
       return True
   return False
 
+def path_base_name(sourcefile):
+  base_name = os.path.splitext(str(sourcefile))[0]
+  return os.path.split(base_name)[1]
+
+def path_module_name(sourcefile):
+  name = path_base_name(sourcefile)
+  return name[:1].upper() + name[1:]
+
+def ml_out_name(sourcefile, suffix):
+  module_name = path_base_name(sourcefile)
+  return 'obj/ml_out/' + module_name.replace('.', '_') + suffix
+
 def verify_fstar(env, targetfile, sourcefile):
   temptargetfiles = [targetfile + '.tmp']
+  dumptargetfiles = [re.sub('\.verified$', '.dump', targetfile)]
   hintsfile = str(sourcefile) + '.hints'
   hhintsfile = to_hints_dir(hintsfile)
   outs = []
@@ -602,22 +617,20 @@ def verify_fstar(env, targetfile, sourcefile):
     return outs
   # else:
   #   print("File %s is not on the blacklist" % str(sourcefile))
-
   if gen_hints:
     temptargetfiles.append(hintsfile)
   temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
   temptarget = temptargets[0]
   outs.append(env.CopyAs(source = temptarget, target = targetfile))
+  dump_module_flag = "--dump_module " + path_module_name(sourcefile)
+  dump_flags = "--print_implicits --print_universes --print_effect_args --print_full_names --print_bound_var_types --ugly " + dump_module_flag
+  dumptargets = env.Command(dumptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS " + dump_flags + " 1>$TARGET 2>&1")
+  outs.append(dumptargets[0])
   if gen_hints:
     outs.append(env.CopyAs(source = temptargets[1], target = hhintsfile))
   elif os.path.isfile(hhintsfile):
     Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
   return outs
-
-def ml_out_name(sourcefile, suffix):
-  base_name = os.path.splitext(str(sourcefile))[0]
-  module_name = os.path.split(base_name)[1]
-  return 'obj/ml_out/' + module_name.replace('.', '_') + suffix
 
 def extract_fstar(env, sourcefile):
   base_name = os.path.splitext(str(sourcefile))[0]
@@ -723,6 +736,7 @@ def compile_vale_fstar(env, source_vaf):
   return targets
 
 ml_out_deps = {}
+dump_deps = {}
 
 def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name):
   # OCaml depends on many libraries and executables; we have to assume they are in the user's PATH:
@@ -957,6 +971,24 @@ def verify_files_in(env, directories):
         files = recursive_glob(env, d+'/*.vaf', strings=True)
         verify_vale_fstar_files(env, files)
     
+def compute_module_types(env, source_dump):
+  source_vaf = re.sub('\.dump$', '.types.vaf', source_dump)
+  done = set()
+  dumps = []
+  def collect_dumps_in_order(x):
+    if not (x in done):
+      done.add(x)
+      for y in dump_deps[x]:
+        # if x depends on y, y must appear first
+        collect_dumps_in_order(y)
+      x_vaf = re.sub('\.dump$', '.types.vaf', x)
+      Depends(source_vaf, x)
+      dumps.append(x)
+  collect_dumps_in_order(source_dump)
+  dumps_string = " ".join(['-in ' + str(x) for x in dumps])
+  Depends(source_vaf, env["IMPORT_FSTAR_TYPES"])
+  env.Command(source_vaf, dumps, '$MONO $IMPORT_FSTAR_TYPES ' + dumps_string + ' > $TARGET')
+
 def check_fstar_z3_version(fstar_z3):
   import subprocess
   z3_version_file = ".fstar_z3_version"
@@ -1066,6 +1098,9 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       fstar_deps_ok = False
     if len(line) == 0:
       pass
+    elif '(Warning ' in line:
+      # example: "(Warning 307) logic qualifier is deprecated"
+      pass
     else:
       # lines are of the form:
       #   a1.fst a2.fst ... : b1.fst b2.fst ...
@@ -1078,6 +1113,28 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       sources_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x))) for x in sources if has_obj_dir(x)]
       targets_ver = [to_obj_dir(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x))) for x in targets if has_obj_dir(x)]
       Depends(targets_ver, sources_ver)
+      # Computing types from F* files
+      # Dump F* types for for each of a1.fst a2.fst ... into a1.fst.dump, a2.fst.dump, ...
+      # Targets that we don't verify go in obj/external
+      for t in targets:
+        if has_obj_dir(t):
+          dumptargetfile = to_obj_dir(t + '.dump')
+        else:
+          # Compute types of an external module, assuming it was compiled with default arguments
+          dumptargetfile = 'obj/external/' + os.path.split(t)[1] + '.dump'
+          dump_module_flag = "--dump_module " + path_module_name(t)
+          dump_flags = "--print_implicits --print_universes --print_effect_args --print_full_names --print_bound_var_types --ugly " + dump_module_flag
+          if os.path.split(t)[0].endswith('tactics'):
+            dump_flags += " --include " + fstar_default_path + "/examples/tactics --admit_smt_queries true"
+          dumptargets = env.Command(dumptargetfile, t, "$FSTAR $SOURCE $FSTAR_Z3_PATH " + dump_flags + " 1>$TARGET 2>&1")
+        if not (dumptargetfile in dump_deps):
+          dump_deps[dumptargetfile] = set()
+        for s in sources:
+          if has_obj_dir(s):
+            dump_deps[dumptargetfile].add(to_obj_dir(s + '.dump'))
+          else:
+            dump_deps[dumptargetfile].add('obj/external/' + os.path.split(s)[1] + '.dump')
+      # ML Extraction
       if fstar_extract:
         sources_ml = [ml_out_name(x, '.ml') for x in sources if has_obj_dir(x)]
         targets_ml = [ml_out_name(x, '.ml') for x in targets if has_obj_dir(x)]
@@ -1177,6 +1234,8 @@ if do_fstar and stage2 and not is_single_vaf:
     source = manual_dependencies[target]
     Depends(target, source)
   predict_fstar_deps(env, verify_options, verify_paths, fstar_include_paths)
+  for x in dump_deps:
+    compute_module_types(env, x)
 
 # Verification
 env.VerifyFilesIn(verify_paths)
