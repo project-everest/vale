@@ -325,14 +325,19 @@ let filter_decls (ds:decl list):decl list =
 // Move a:Type _ from d_typ into d_binders
 let decl_lift_type_binders (d:decl):decl =
   let rec f (d:decl):decl option =
-    match (d.d_typ, d.d_body) with
-    // TODO: handle body
-    | (EArrow (a, x, ((EType _) as k), EApp (EAppUnivs (EId {name = Some ("Prims.Tot" | "Prims.GTot" | "Tot" | "GTot")}, _), [(_, t)])), None)
-    | (EArrow (a, x, ((EType _) as k), EApp (EId {name = Some ("Prims.Tot" | "Prims.GTot" | "Tot" | "GTot")}, [(_, t)])), None)
-    | (EArrow (a, x, ((EType _) as k), t), None) ->
-        let d = {d with d_binders = d.d_binders @ [(a, x, Some k)]; d_typ = t} in
+    match d.d_typ with
+    | EArrow (a, x, k, EApp (EAppUnivs (EId {name = Some ("Prims.Tot" | "Prims.GTot" | "Tot" | "GTot")}, _), [(_, t)]))
+    | EArrow (a, x, k, EApp (EId {name = Some ("Prims.Tot" | "Prims.GTot" | "Tot" | "GTot")}, [(_, t)]))
+    | EArrow (a, x, k, t) ->
+        let (body, x) =
+          match d.d_body with
+          | Some (EFun ([(_, x, _)], e)) -> (Some e, x)
+          | Some (EFun ((_, x, _)::bs, e)) -> (Some (EFun (bs, e)), x)
+          | _ -> (None, x)
+          in
+        let d = {d with d_binders = d.d_binders @ [(a, x, Some k)]; d_typ = t; d_body = body} in
         f d
-    | (EType _, None) -> Some d
+    | EType _ -> Some d
     | _ -> None
     in
   match f d with None -> d | Some d -> d
@@ -456,31 +461,6 @@ let index_to_var_decl (d:decl):decl =
   | :? System.ArgumentException ->
       {d with d_binders = []; d_typ = EUnsupported "bad variable index"; d_body = None}
 
-// very sketchy heuristic to guess intended usage of Type0: Type0 = Type(0) vs. Type0 = prop
-// if x is ever used like a type, guess x:Type0 = x:Type(0), not x:Type0 = x:prop
-let rec add_typelike_vars_exp (used_like_a_type:bool) (e:exp):Set<id> =
-  let r = add_typelike_vars_exp used_like_a_type in
-  let re = add_typelike_vars_exp false in
-  let rt = add_typelike_vars_exp true in
-  let (++) = Set.union in
-  match e with
-  | EId x when used_like_a_type -> new Set<id>([x])
-  | EId _ | EInt _ | EUnitValue | EProp | EType _ | EUnsupported _ -> Set.empty
-  | EComp (e1, e2, es) -> rt e1 ++ rt e2 ++ Set.unionMany (List.map re es)
-  | EApp (e, aes) -> r e ++ Set.unionMany (List.map (snd >> r) aes)
-  | EAppUnivs (e, us) -> r e
-  | EArrow (_, _, e1, e2) -> rt e1 ++ rt e2
-  | ERefine (_, e1, e2) -> rt e1 ++ re e2
-  | ETyped (e1, e2) -> r e1 ++ rt e2
-  | EAscribed (e1, e2) -> r e1 ++ rt e2
-  | EPattern (pats, e) -> Set.unionMany (List.map (List.map re >> Set.unionMany) pats) ++ r e
-  | ELet (b, e1, e2) -> add_typelike_vars_binder b ++ rt e1 + r e2
-  | EFun (bs, e) -> Set.unionMany (List.map add_typelike_vars_binder bs) ++ r e
-and add_typelike_vars_binder (b:binder):Set<id> =
-  match b with
-  | (_, _, None) -> Set.empty
-  | (_, _, Some e) -> add_typelike_vars_exp true e
- 
 let rec universe0_univ_int (u:univ):bigint =
   let r = universe0_univ_int in
   match u with
@@ -631,6 +611,67 @@ and get_vale_exp_id (env:env) (e:exp):decl option =
     )
   | _ -> None
 
+let as_int_constant (env:env) (e:exp):bigint option =
+  match e with
+  | EInt i -> Some i
+  | EId {name = Some x} when Map.containsKey x env ->
+    (
+      match Map.find x env with
+      | {d_category = "val"; d_udecls = []; d_binders = []; d_body = Some (EInt i)} -> Some i
+      | _ -> None
+    )
+  | _ -> None
+
+type range = bigint option * bigint option
+let range_intersect (r1:range) (r2:range):range =
+  let mix (merge:bigint * bigint -> bigint) (b1:bigint option) (b2:bigint option):bigint option =
+    match (b1, b2) with
+    | (None, None) -> None
+    | (Some i, None) -> Some i
+    | (None, Some i) -> Some i
+    | (Some i1, Some i2) -> Some (merge (i1, i2))
+    in
+  ( mix System.Numerics.BigInteger.Max (fst r1) (fst r2),
+    mix System.Numerics.BigInteger.Min (snd r1) (snd r2) )
+
+// Turn an expression about range_var into a range
+// Example: (5 <= range_var /\ range_var <= 10) becomes (Some 5, Some 10)
+let rec as_range_constant (local_env:Map<string, bigint>) (range_var:string) (e:exp):range option =
+  let r = as_range_constant local_env range_var in
+  let binary_op (flip:bool) (xop:string) (i:bigint):range option =
+    match (xop, flip) with
+    | ("Prims.op_LessThanOrEqual", false) -> Some (None, Some i)
+    | ("Prims.op_LessThanOrEqual", true) -> Some (Some i, None)
+    | ("Prims.op_GreaterThanOrEqual", false) -> Some (Some i, None)
+    | ("Prims.op_GreaterThanOrEqual", true) -> Some (None, Some i)
+    | ("Prims.op_LessThan", false) -> Some (None, Some (i - bigint.One))
+    | ("Prims.op_LessThan", true) -> Some (Some (i + bigint.One), None)
+    | ("Prims.op_GreaterThan", false) -> Some (Some (i + bigint.One), None)
+    | ("Prims.op_GreaterThan", true) -> Some (None, Some (i - bigint.One))
+    | _ -> None
+    in
+  let binary_op_exp (flip:bool) (xop:string) (e:exp):range option =
+    match e with
+    | EInt i -> binary_op flip xop i
+    | EId {name = Some x} when Map.containsKey x local_env ->
+        binary_op flip xop (Map.find x local_env)
+    | _ -> None
+    in
+  match e with
+  | EId {name = Some ("true" | "Prims.l_True")} -> Some (None, None)
+  | EApp (EId {name = Some "Prims.b2t"}, [(_, e)]) -> r e
+  | EApp (EId {name = Some ("Prims.op_AmpAmp" | "Prims.l_and")}, [(_, e1); (_, e2)]) ->
+    (
+      match (r e1, r e2) with
+      | (Some r1, Some r2) -> Some (range_intersect r1 r2)
+      | _ -> None
+    )
+  | EApp (EId {name = Some xop}, [(_, EId {name = Some x}); (_, e)]) when x = range_var ->
+      binary_op_exp false xop e
+  | EApp (EId {name = Some xop}, [(_, e); (_, EId {name = Some x})]) when x = range_var ->
+      binary_op_exp true xop e
+  | _ -> None
+
 let to_vale_decl ((env:env), (envs_ds_rev:(env * decl) list)) (d:decl):(env * (env * decl) list) =
   let d = universe0_decl d in
   let bs = d.d_binders in
@@ -645,11 +686,97 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * decl) list)) (d:decl):(env * (e
     in
   let envs_ds = 
     match (bs, d.d_typ) with
-    | (_, EType _) when bs_are_Type ->
-        // TODO: keep body in some cases
-        [(env, {d with d_category = "type"; d_body = None})]
+    | (_, EType _) ->
+        let body =
+          match (bs, d.d_body) with
+          // TODO: handle case with binders
+          | ([], Some t) when is_vale_type false false env t -> Some t
+          | _ -> None
+          in
+        let int_refine:(range option * (Map<string, bigint> option * string * exp) option) option =
+          // t           --> Some (Some range(t), None)
+          // x:t{bounds} --> Some (Some range(t), Some (None, x, bounds))
+          if d.d_name = "Prims.int" then Some (Some (None, None), None) else
+          let int_type_to_range (e:exp):range option =
+            match e with
+            | EId {name = Some "int"} -> Some (None, None)
+            | EApp (EId {name = Some "int"}, [(_, b1); (_, b2)]) ->
+                let get_bound b = match b with | EInt i -> Some i | _ -> None in
+                Some (get_bound b1, get_bound b2)
+            | _ -> None
+            in
+          let get_int_type (x:string):range option =
+            match Map.tryFind x env with
+            | Some {d_category = "type"; d_udecls = []; d_binders = []; d_body = Some e} ->
+                int_type_to_range e
+            | _ -> None
+            in
+          match d.d_body with
+          | Some (EId {name = Some xt}) -> Some (get_int_type xt, None)
+          | Some (EApp (EId {name = Some xt}, args)) ->
+              let args = List.map snd args in
+              let args = List.map (as_int_constant env) args in
+              if List.forall Option.isSome args then
+                let args = List.map Option.get args in
+                match Map.tryFind xt env with
+                | Some {d_category = "int_type_generator"; d_binders = bs; d_body = Some (ERefine ({name = Some xr}, et, bounds))}
+                    when List.length bs = List.length args ->
+                    let add_x_i env x i = Map.add x i env in
+                    let xs = List.map (fun (_, (x:id), _) -> Option.get x.name) bs in
+                    let local_env = List.fold2 add_x_i Map.empty xs args in
+                    Some (int_type_to_range et, Some (Some local_env, xr, bounds))
+                | _ -> None
+              else
+                None
+          | Some (ERefine ({name = Some xr}, EId {name = Some xt}, bounds)) ->
+              Some (get_int_type xt, Some (None, xr, bounds))
+          | _ -> None
+          in
+        let range_to_int_type (r:range):exp =
+          let eInt = EId {name = Some "int"; index = None} in
+          let eNone = EId {name = Some ""; index = None} in
+          match r with
+          | (None, None) -> eInt
+          | (Some b1, None) -> EApp (eInt, [(Explicit, EInt b1); (Explicit, eNone)])
+          | (None, Some b2) -> EApp (eInt, [(Explicit, eNone); (Explicit, EInt b2)])
+          | (Some b1, Some b2) -> EApp (eInt, [(Explicit, EInt b1); (Explicit, EInt b2)])
+          in
+        let int_refine = match int_refine with Some (Some r, z) -> Some (r, z) | _ -> None in
+        match (bs, bs_are_Type, int_refine) with
+        | (_, true, None) ->
+            [(env, {d with d_category = "type"; d_body = body})]
+        | (_, false, None) ->
+            [(env, {d with d_category = "unsupported"; d_typ = EUnsupported "dependent type"})]
+        | ([], _, Some (r, None)) ->
+            [(env, {d with d_category = "type"; d_body = Some (range_to_int_type r)})]
+        | ([], _, Some (r, Some (local_env_bounds_opt, xr, bounds))) ->
+          (
+            let local_env_bounds = Option.defaultValue Map.empty local_env_bounds_opt in
+            match as_range_constant local_env_bounds xr bounds with
+            | None ->
+                [(env, {d with d_category = "unsupported"; d_typ = EUnsupported "unsupported integer bounds"})]
+            | Some r_bounds ->
+                [(env, {d with d_category = "type"; d_body = Some (range_to_int_type (range_intersect r r_bounds))})]
+          )
+        | (_, false, Some (r, Some (None, xr, bounds))) ->
+            let rec resolve_bounds (e:exp):exp =
+              match (as_int_constant env e, e) with
+              | (Some i, _) -> EInt i
+              | (_, EApp (e0, es)) -> EApp (e0, List.map (fun (a, e) -> (a, resolve_bounds e)) es)
+              | _ -> e
+              in
+            let bounds = resolve_bounds bounds in
+            let body = ERefine ({name = Some xr; index = None}, range_to_int_type r, bounds) in
+            [(env, {d with d_category = "int_type_generator"; d_body = Some body})]
+        | _ ->
+            [(env, {d with d_category = "unsupported"; d_typ = EUnsupported "unsupported"})]
     | (bs, _) when typed_binders bs && is_vale_type true true env (add_binders bs d.d_typ) ->
-        [(env, {d with d_category = "val"; d_body = None})]
+        let body =
+          match (bs, Option.bind (as_int_constant env) d.d_body) with
+          | ([], Some i) -> Some (EInt i)
+          | _ -> None
+          in
+        [(env, {d with d_category = "val"; d_body = body})]
     | _ ->
         let t = match !reason with None -> d.d_typ | Some s -> EUnsupported s in
         [(env, {d with d_category = "unsupported"; d_typ = t})]
@@ -688,6 +815,7 @@ let rec tree_of_vale_type (e:exp):string_tree =
   let r = tree_of_vale_type in
   match e with
   | EId id -> tree_of_vale_id id
+  | EInt i -> st_leaf (i.ToString())
   | EProp -> st_leaf "prop"
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)]) -> r e
@@ -766,8 +894,13 @@ let tree_of_vale_decl (env:env) (d:decl):string_tree =
             let f (_, x, k) = st_list [tree_of_vale_id x; st_leaf ":"; tree_of_vale_kind (Option.get k)] in
             [st_paren (trees_of_comma_list (List.map f bs))]
         in
-      let typing = [st_leaf ":"; tree_of_vale_kind d.d_typ; st_leaf "extern"; st_leaf ";"] in
-      st_list ([st_leaf "type"; tree_of_vale_name d.d_name] @ ps @ typing)
+      let typing = [st_leaf ":"; tree_of_vale_kind d.d_typ] in
+      let body =
+        match d.d_body with
+        | None -> [st_leaf "extern"; st_leaf ";"]
+        | Some t -> [st_leaf ":="; tree_of_vale_type t; st_leaf ";"]
+        in
+      st_list ([st_leaf "type"; tree_of_vale_name d.d_name] @ ps @ typing @ body)
     )
   | "val" ->
     (
@@ -910,6 +1043,7 @@ let main (argv:string array) =
           match (d.d_category, d.d_typ) with
           | (_, EUnsupported s) -> printfn "// unsupported: %s (reason: %s)" d.d_name s; printfn ""
           | ("unsupported", _) -> printfn "// unsupported: %s" d.d_name; printfn ""
+          | ("int_type_generator", _) -> printfn "// unsupported (int type generator): %s" d.d_name; printfn ""
           | _ -> print_tree "" (tree_of_vale_decl env d); printfn ""
          )
       )
