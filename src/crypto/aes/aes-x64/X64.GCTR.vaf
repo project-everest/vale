@@ -11,7 +11,7 @@ open Types_s
 open Types_i
 open FStar.Seq
 open AES_s
-open X64.AES
+open X64.AES128
 open GCTR_s
 open GCTR_i
 open GCM_helpers_i

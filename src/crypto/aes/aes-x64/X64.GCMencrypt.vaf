@@ -1,7 +1,7 @@
 include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
-include "X64.AES.vaf"
+include "X64.AES128.vaf"
 include "X64.GF128_Mul.vaf"
 include "X64.GCTR.vaf"
 include "X64.GHash.vaf"
@@ -21,7 +21,7 @@ open GCM_i
 open GHash_s
 open GHash_i
 open GCM_s
-open X64.AES
+open X64.AES128
 open GF128_s
 open GF128_i
 open X64.Poly1305.Math_i
