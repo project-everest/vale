@@ -300,7 +300,7 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
  */ 
 #reset-options "--z3rlimit 40"
 procedure {:quick} compute_pad_to_128_bits()
-    lets io @= xmm2; num_bytes @= rcx; tmp @= rax; mask @= rdx;
+    lets io @= xmm2; num_bytes @= rax; tmp @= rcx; mask @= rdx;
 
     reads num_bytes;
     modifies io; tmp; mask; efl;
@@ -362,13 +362,13 @@ procedure {:quick} ghash_incremental_bytes_extra(
     ghost old_io:quad32,
     ghost orig_num_bytes:nat64
     )
-    lets in_ptr @= r9; num_bytes @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11;
+    lets in_ptr @= r9; num_bytes @= rax; io @= xmm1; mask @= xmm8; h @= xmm11;
 
     reads
         num_bytes; h; mask; mem; in_ptr;
 
     modifies
-        rax; rdx; r12;
+        rcx; rdx; r12;
         io; efl; 
 
         // ReduceMul128_LE touches almost everything
@@ -457,11 +457,11 @@ procedure {:quick} ghash_incremental_bytes(
      
         compute_ghash_incremental_partial(in_b);
 
-        Mov64(rcx, num_bytes);
-        And64(rcx, 15);
-        assert rcx == num_bytes % 16;
+        Mov64(rax, num_bytes);
+        And64(rax, 15);
+        assert rax == num_bytes % 16;
 
-        if (rcx == 0) {
+        if (rax == 0) {
             ghash_incremental_bytes_no_extra(in_b, old(io), old(in_ptr), old(num_bytes), io, h);
         } else {
             ghash_incremental_bytes_extra(in_b, old(in_ptr), old(io), old(num_bytes)); 

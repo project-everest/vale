@@ -12,6 +12,7 @@ open FStar.Mul
 unfold type gcm_plain_LE = gctr_plain_LE
 unfold type gcm_auth_LE = gctr_plain_LE
 
+#reset-options "--z3rlimit 30"
 // little-endian, except for iv_BE
 let gcm_encrypt_LE (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plain:seq nat8) (auth:seq nat8) :
   Pure (tuple2 (seq nat8) (seq nat8))

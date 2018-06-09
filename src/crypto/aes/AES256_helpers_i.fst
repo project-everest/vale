@@ -110,7 +110,7 @@ let lemma_expand_key_256_0_corollary (key:aes_key_LE AES_256) : Lemma
   ()
 
 
-#reset-options "--z3rlimit 30 --initial_fuel 5 --max_fuel 5 --max_ifuel 0"
+#reset-options "--z3rlimit 60 --initial_fuel 5 --max_fuel 5 --max_ifuel 0"
 // quad32 key expansion is equivalent to nat32 key expansion
 let rec lemma_expand_key_256 (key:aes_key_LE AES_256) (size:nat) : Lemma
   (requires size <= 15)
