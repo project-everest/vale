@@ -21,7 +21,7 @@ let proc_name : string -> platform -> string =
     prefix ^ name
      
 let parse_cmdline :
-  (string * (Prims.bool -> 
+  (string * string * (Prims.bool ->
     (X64_Vale_Decls_i.ins,X64_Vale_Decls_i.ocmp) X64_Machine_s.precode)) list -> unit
   = 
   fun l  ->
@@ -57,9 +57,9 @@ let parse_cmdline :
     in
     let windows = platform_choice = Win in
     X64_Vale_Decls_i.print_header printer;
-    List.iter (fun (name, code) -> 
+    List.iter (fun (name, start, code) ->
                  X64_Vale_Decls_i.print_proc (proc_name name platform_choice) 
                                              (code windows) 
-                                             (Prims.parse_int "0") printer) 
+                                             (Prims.parse_int start) printer)
               l;
     X64_Vale_Decls_i.print_footer printer
