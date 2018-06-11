@@ -93,7 +93,7 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Ins_i.fst': None,
   'src/arch/x64/X64.Leakage_i.fst': None,
   'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
-  'src/arch/x64/X64.Bytes_Semantics_i.fst': None,
+#  'src/arch/x64/X64.Bytes_Semantics_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
 

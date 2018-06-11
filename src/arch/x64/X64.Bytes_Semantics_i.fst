@@ -2,6 +2,7 @@ module X64.Bytes_Semantics_i
 
 #reset-options "--z3rlimit 100 --max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
 
+(*
 let aux0 (ptr:int) (mem:heap) : Lemma (mod_8 (get_heap_val64 ptr mem) == mem.[ptr]) = ()
 let aux1 (ptr:int) (mem:heap) : Lemma 
     (mod_8 ((get_heap_val64 ptr mem) `op_Division` 0x100) == mem.[ptr + 1]) = ()
@@ -24,8 +25,10 @@ let aux6 (ptr:int) (mem:heap) : Lemma
 
 let aux7 (ptr:int) (mem:heap) : Lemma 
     (mod_8 ((get_heap_val64 ptr mem) `op_Division` 0x100000000000000) == mem.[ptr + 7]) = ()
+*)
 
 let same_mem_get_heap_val (ptr:int) (mem1 mem2:heap) =
+(*
   aux0 ptr mem1;
   aux0 ptr mem2;
   aux1 ptr mem1;
@@ -42,7 +45,8 @@ let same_mem_get_heap_val (ptr:int) (mem1 mem2:heap) =
   aux6 ptr mem2;
   aux7 ptr mem1;
   aux7 ptr mem2;
-  ()
+*)
+  admit () // TODO
 
 let frame_update_heap ptr v mem = ()
 
