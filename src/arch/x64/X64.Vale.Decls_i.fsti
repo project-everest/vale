@@ -40,15 +40,15 @@ unfold let va_codes = list va_code
 let va_tl (cs:va_codes) : Ghost va_codes (requires Cons? cs) (ensures fun tl -> tl == Cons?.tl cs) = Cons?.tl cs
 unfold let va_state = state
 val va_fuel : Type0
-unfold let va_operand = operand
-unfold let va_operand_opr64 = operand
+unfold let va_operand = o:operand{not (OMem? o)}
+unfold let va_operand_opr64 = o:operand{not (OMem? o)}
 let va_reg_operand = o:operand{OReg? o}
 let va_operand_reg_opr64 = o:operand{OReg? o}
-unfold let va_dst_operand = operand
-unfold let va_operand_dst_opr64 = operand
-unfold let va_shift_amt = operand
-unfold let va_operand_shift_amt64 = operand
-unfold let va_cmp = operand
+unfold let va_dst_operand = o:operand{not (OMem? o)}
+unfold let va_operand_dst_opr64 = o:operand{not (OMem? o)}
+unfold let va_shift_amt = o:operand{not (OMem? o)}
+unfold let va_operand_shift_amt64 = o:operand{not (OMem? o)}
+unfold let va_cmp = o:operand{not (OMem? o)}
 unfold let va_register = reg
 unfold let va_operand_xmm = xmm
 
@@ -77,7 +77,8 @@ unfold let modifies_mem (s:M.loc) (h1 h2:M.mem) : GTot Type0 = M.modifies s h1 h
 unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
 unfold let loc_union = M.loc_union
-
+unfold let modifies_memTaint (a:int) (m1 m2: map int taint) : GTot Type0 =
+m2 == Map.upd m1 a Public \/ m2 == Map.upd m1 a Secret
 
 
 (* Constructors *)
@@ -99,14 +100,14 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
 [@va_qattr] unfold let va_coerce_reg_opr64_to_dst_opr64 (o:va_operand_reg_opr64) : va_operand_dst_opr64 = o
 [@va_qattr] unfold let va_coerce_reg_opr64_to_opr64 (o:va_operand_reg_opr64) : va_operand_opr64 = o
-[@va_qattr] unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
-[@va_qattr] unfold let va_coerce_opr64_to_cmp (o:va_operand) : va_cmp = o
+[@va_qattr] unfold let va_coerce_operand_to_cmp(o:va_operand{not (OMem? o)}) : va_cmp = o
+[@va_qattr] unfold let va_coerce_opr64_to_cmp (o:va_operand{not (OMem? o)}) : va_cmp = o
 [@va_qattr] unfold let va_op_register (r:reg) : va_register = r
 [@va_qattr] unfold let va_op_reg_oprerand_reg (r:reg) : va_reg_operand = OReg r
 [@va_qattr] unfold let va_op_reg_opr64_reg (r:reg) : va_reg_operand = OReg r
 [@va_qattr] unfold let va_op_dst_operand_reg (r:reg) : va_dst_operand = OReg r
 [@va_qattr] unfold let va_op_dst_opr64_reg (r:reg) : va_dst_operand = OReg r
-[@va_qattr] unfold let va_coerce_operand_to_dst_operand (o:va_operand) : va_dst_operand = o
+[@va_qattr] unfold let va_coerce_operand_to_dst_operand (o:va_operand{not (OMem? o)}) : va_dst_operand = o
 [@va_qattr] unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 [@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
 [@va_qattr]
@@ -142,7 +143,7 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] unfold let va_is_dst_dst_opr64 (o:va_dst_operand) (s:va_state) = va_is_dst_opr64 o s
 [@va_qattr] unfold let va_is_src_reg (r:reg) (s:va_state) = True
 [@va_qattr] unfold let va_is_dst_reg (r:reg) (s:va_state) = True
-[@va_qattr] unfold let va_is_src_shift_amt64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
+[@va_qattr] unfold let va_is_src_shift_amt64 (o:operand{not (OMem? o)}) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
 [@va_qattr] unfold let va_is_src_reg_opr64 (o:operand) (s:va_state) = OReg? o
 [@va_qattr] unfold let va_is_dst_reg_opr64 (o:operand) (s:va_state) = OReg? o /\ not (Rsp? (OReg?.r o))
 [@va_qattr] unfold let va_is_src_xmm (x:xmm) (s:va_state) = True
@@ -154,12 +155,16 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
 [@va_qattr] unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
 [@va_qattr] unfold let va_get_mem (s:va_state) : M.mem = s.mem
+[@va_qattr] unfold let va_get_trace (s:va_state) : list observation = s.trace
+[@va_qattr] unfold let va_get_memTaint (s:va_state) : map int taint = s.memTaint
 
 [@va_qattr] let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
 [@va_qattr] let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
 [@va_qattr] let va_upd_mem (mem:M.mem) (s:state) : state = { s with mem = mem }
 [@va_qattr] let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
 [@va_qattr] let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
+[@va_qattr] let va_upd_trace (trace:list observation) (s:state) : state = { s with trace=trace }
+[@va_qattr] let va_upd_memTaint (memTaint:map int taint) (s:state) : state = { s with memTaint = memTaint }
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
 [@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = va_upd_ok sM.ok sK
@@ -169,6 +174,8 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = va_upd_mem sM.mem sK
 [@va_qattr] unfold let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
   va_upd_xmm x (eval_xmm x sM) sK
+[@va_qattr] unfold let va_update_trace (sM:va_state) (sK:va_state) : va_state = va_upd_trace sM.trace sK
+[@va_qattr] unfold let va_update_memTaint (sM:va_state) (sK:va_state) : va_state = va_upd_memTaint sM.memTaint sK
 
 [@va_qattr]
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
@@ -226,7 +233,7 @@ let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) =
   
 let va_lemma_upd_update (sM:state) : Lemma
   (
-    (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
+    (forall (sK:state) (o:operand{not (OMem? o)}).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
     (forall (sK:state) (o:operand).{:pattern (va_update_operand_reg_opr64 o sM sK)} va_is_dst_reg_opr64 o sK ==> va_update_operand_reg_opr64 o sM sK == va_upd_operand_reg_opr64 o (eval_operand o sM) sK) /\
     (forall (sK:state) (x:xmm).{:pattern (va_update_operand_xmm x sM sK)} va_update_operand_xmm x sM sK == va_upd_operand_xmm x (eval_xmm x sM) sK)
   )
@@ -393,32 +400,38 @@ val lemma_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
 
 val lemma_valid_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
-  (ensures  (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_eq o1 o2) s))
+  (ensures  (valid_operand o1 s /\ valid_operand o2 s 
+  /\ valid_taint o1 s Public /\ valid_taint o2 s Public) ==> (valid_ocmp (va_cmp_eq o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_eq o1 o2) s)]
 
 val lemma_valid_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ne o1 o2) s))
+  (ensures (valid_operand o1 s /\ valid_operand o2 s
+   /\ valid_taint o1 s Public /\ valid_taint o2 s Public) ==> (valid_ocmp (va_cmp_ne o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_ne o1 o2) s)]
 
 val lemma_valid_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_le o1 o2) s))
+  (ensures (valid_operand o1 s /\ valid_operand o2 s
+   /\ valid_taint o1 s Public /\ valid_taint o2 s Public) ==> (valid_ocmp (va_cmp_le o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_le o1 o2) s)]
 
 val lemma_valid_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ge o1 o2) s))
+  (ensures (valid_operand o1 s /\ valid_operand o2 s
+   /\ valid_taint o1 s Public /\ valid_taint o2 s Public) ==> (valid_ocmp (va_cmp_ge o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_ge o1 o2) s)]
 
 val lemma_valid_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_lt o1 o2) s))
+  (ensures (valid_operand o1 s /\ valid_operand o2 s
+   /\ valid_taint o1 s Public /\ valid_taint o2 s Public) ==> (valid_ocmp (va_cmp_lt o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_lt o1 o2) s)]
 
 val lemma_valid_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)
-  (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
+  (ensures (valid_operand o1 s /\ valid_operand o2 s
+   /\ valid_taint o1 s Public /\ valid_taint o2 s Public) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_gt o1 o2) s)]
 
 val va_compute_merge_total (f0:va_fuel) (fM:va_fuel) : va_fuel
@@ -445,14 +458,14 @@ val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : G
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
-    sM == s0
+    sM == {s0 with trace=BranchPredicate(cond)::s0.trace}
   ))
 
 val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
     valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
-    eval_code ct s0 f0 sM
+    eval_code ct ({s0 with trace=BranchPredicate(true)::s0.trace}) f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -462,7 +475,7 @@ val va_lemma_ifElseFalse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state
   (requires
     valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
-    eval_code cf s0 f0 sM
+    eval_code cf ({s0 with trace = BranchPredicate(false)::s0.trace}) f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -480,7 +493,7 @@ val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost ((s1:va_stat
 
 val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
   (requires eval_ocmp sW b /\ valid_ocmp b sW)
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
+  (ensures fun (s1, f1) -> s1 == {sW with trace=BranchPredicate(true)::sW.trace} /\ f1 == fW)
 
 val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
   (requires
@@ -489,7 +502,7 @@ val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (
     eval_while_inv (While b c) s0 fW sW
   )
   (ensures fun (s1, f1) ->
-    s1 == sW /\
+    s1 == {sW with trace=BranchPredicate(false)::sW.trace} /\
     eval_code (While b c) s0 f1 s1
   )
 
@@ -500,7 +513,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
     valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\
-    eval_code (While?.whileBody c) sM fM sN
+    eval_code (While?.whileBody c) ({sM with trace=BranchPredicate(true)::sM.trace}) fM sN
   )
   (ensures (fun fN ->
     eval_while_inv c s0 fN sN

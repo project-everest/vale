@@ -13,15 +13,6 @@ let map (key:eqtype) (value:Type) = Map.t key value
 unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 unfold let op_String_Assignment = Map.upd
 
-type taint =
-  | Public
-  | Secret
-
-type observation =
-  | BranchPredicate: pred:bool -> observation
-  | MemAccess: addr:nat64 -> observation
-  | MemAccessOffset: base:nat64 -> index:nat64 -> observation
-
 noeq type traceState = {
   state: state;
   trace: list observation;

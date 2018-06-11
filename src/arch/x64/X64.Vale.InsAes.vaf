@@ -24,12 +24,13 @@ open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
 open X64.Vale.Decls_i
 module S = X64.Bytes_Semantics_s
+module TS = X64.Taint_Semantics_s
 module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
 
 procedure{:quick exportOnly}
-    {:instruction Ins(S.Pclmulqdq(dst, src, (if dstHi then 1 else 0) + (if srcHi then 16 else 0)))}
+    {:instruction Ins(TS.TaintedIns(tuple(S.Pclmulqdq(dst, src, (if dstHi then 1 else 0) + (if srcHi then 16 else 0)), list(), list()), Public))}
     Pclmulqdq(inout dst:xmm, src:xmm, inline dstHi:bool, inline srcHi:bool)
     modifies efl;
     ensures
@@ -39,7 +40,7 @@ procedure{:quick exportOnly}
 {
 }
 
-procedure{:instruction Ins(S.AESNI_enc(dst, src))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AESNI_enc(dst, src), list(), list()), Public))}{:quick exportOnly}
           AESNI_enc(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
@@ -47,7 +48,7 @@ procedure{:instruction Ins(S.AESNI_enc(dst, src))}{:quick exportOnly}
 {
 }
 
-procedure{:instruction Ins(S.AESNI_enc_last(dst, src))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AESNI_enc_last(dst, src), list(), list()), Public))}{:quick exportOnly}
           AESNI_enc_last(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
@@ -55,7 +56,7 @@ procedure{:instruction Ins(S.AESNI_enc_last(dst, src))}{:quick exportOnly}
 {
 }
 
-procedure{:instruction Ins(S.AESNI_dec(dst, src))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AESNI_dec(dst, src), list(), list()), Public))}{:quick exportOnly}
           AESNI_dec(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
@@ -63,7 +64,7 @@ procedure{:instruction Ins(S.AESNI_dec(dst, src))}{:quick exportOnly}
 {
 }
 
-procedure{:instruction Ins(S.AESNI_dec_last(dst, src))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AESNI_dec_last(dst, src), list(), list()), Public))}{:quick exportOnly}
           AESNI_dec_last(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
@@ -71,7 +72,7 @@ procedure{:instruction Ins(S.AESNI_dec_last(dst, src))}{:quick exportOnly}
 {
 }
 
-procedure{:instruction Ins(S.AESNI_imc(dst, src))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AESNI_imc(dst, src), list(), list()), Public))}{:quick exportOnly}
           AESNI_imc(inout dst:xmm, src:xmm)
   modifies efl;
   ensures
@@ -79,7 +80,7 @@ procedure{:instruction Ins(S.AESNI_imc(dst, src))}{:quick exportOnly}
 {
 }
 
-procedure{:instruction Ins(S.AESNI_keygen_assist(dst, src, imm))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AESNI_keygen_assist(dst, src, imm), list(), list()), Public))}{:quick exportOnly}
           AESNI_keygen_assist(inout dst:xmm, src:xmm, inline imm:imm8)
   modifies efl;
   ensures

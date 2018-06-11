@@ -7,6 +7,7 @@ open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s
 module BS = X64.Bytes_Semantics_s
+module TS = X64.Taint_Semantics_s
 
 #reset-options "--z3cliopt smt.arith.nl=true"
 let lemma_mul_in_bounds (x y:nat64) : Lemma (requires x `op_Multiply` y < pow2_64) (ensures FStar.UInt.mul_mod #64 x y == x `op_Multiply` y) = ()
@@ -19,17 +20,17 @@ let cf = Lemmas_i.cf
 let overflow = Lemmas_i.overflow
 let update_cf = Lemmas_i.update_cf
 let update_of = Lemmas_i.update_of
-let ins = S.ins
-type ocmp = S.ocmp
+let ins = TS.tainted_ins
+type ocmp = TS.tainted_ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
-let va_cmp_eq o1 o2 = BS.OEq o1 o2
-let va_cmp_ne o1 o2 = BS.ONe o1 o2
-let va_cmp_le o1 o2 = BS.OLe o1 o2
-let va_cmp_ge o1 o2 = BS.OGe o1 o2
-let va_cmp_lt o1 o2 = BS.OLt o1 o2
-let va_cmp_gt o1 o2 = BS.OGt o1 o2
+let va_cmp_eq o1 o2 = TS.TaintedOCmp (BS.OEq o1 o2) Public
+let va_cmp_ne o1 o2 = TS.TaintedOCmp (BS.ONe o1 o2) Public
+let va_cmp_le o1 o2 = TS.TaintedOCmp (BS.OLe o1 o2) Public
+let va_cmp_ge o1 o2 = TS.TaintedOCmp (BS.OGe o1 o2) Public
+let va_cmp_lt o1 o2 = TS.TaintedOCmp (BS.OLt o1 o2) Public
+let va_cmp_gt o1 o2 = TS.TaintedOCmp (BS.OGt o1 o2) Public
 
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv

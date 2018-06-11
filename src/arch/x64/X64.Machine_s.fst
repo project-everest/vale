@@ -55,3 +55,12 @@ type precode (t_ins:Type0) (t_ocmp:Type0) =
 
 let valid_dst (o:operand) : bool =
   not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
+
+type taint =
+  | Public
+  | Secret
+
+type observation =
+  | BranchPredicate: pred:bool -> observation
+  | MemAccess: addr:nat64 -> observation
+  | MemAccessOffset: base:nat64 -> index:nat64 -> observation

@@ -134,7 +134,7 @@ procedure{:quick exportOnly} Add64Ghosts(
         ghost h1:int,
         ghost h2:int)
     modifies
-        efl;
+        efl; memTaint;
     requires
         i > 2;
         g1 == src;
@@ -158,6 +158,7 @@ procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;
+        trace; memTaint;
     requires
         rax < 100;
         g1 == rax;
@@ -203,6 +204,7 @@ procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;
+        trace; memTaint;
     requires
         rax < 100;
         g1 == rax;
@@ -217,7 +219,7 @@ procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
 procedure{:quick} AddRaxG(ghost g:int)
     modifies
         efl;
-        rax;
+        rax; memTaint;
     requires
         rax < 200;
         g == rax;
@@ -230,7 +232,7 @@ procedure{:quick} AddRaxG(ghost g:int)
 procedure Incr3(ghost g:int)
     modifies
         efl;
-        rax;
+        rax; memTaint;
     requires
         rax < 100;
         g == rax;
@@ -246,7 +248,7 @@ procedure Incr3(ghost g:int)
 procedure{:quick} While(ghost g1:int) returns(ghost go:int)
     modifies
         efl;
-        rax; rbx;
+        rax; rbx; trace; memTaint;
     requires
         rax < 200;
         rbx < 100;

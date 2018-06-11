@@ -6,12 +6,18 @@ open X64.Vale
 open X64.Memory_i_s
 // TODO: Shouldn't refer to Interop64, only needed for addr_map type definition
 
+let map (key:eqtype) (value:Type) = Map.t key value
+unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
+unfold let op_String_Assignment = Map.upd
+
 noeq type state = {
   ok: bool;
   regs: Regs_i.t;
   xmms: Xmms_i.t;
   flags: nat64;
   mem: mem;
+  trace: list observation;
+  memTaint: map int taint;
 }
 
 let reg_to_int (r:reg) : int =
@@ -88,11 +94,22 @@ let valid_operand (o:operand) (s:state) : Type0 =
   | OReg r -> True
   | OMem m -> valid_maddr m s
 
+let valid_taint (o:operand) (s:state) (t:taint) : Type0 =
+  match o with
+  | OConst _ | OReg _ -> True
+  | OMem m -> let ptr = eval_maddr m s in
+    s.memTaint.[ptr] = t
+
+let valid_taint_ptr (ptr:int) (memTaint:map int taint) (t:taint) : Type0 =
+memTaint.[ptr] == t
+
 [@va_qattr]
 let state_eq (s0:state) (s1:state) : Type0 =
   s0.ok == s1.ok /\
   Regs_i.equal s0.regs s1.regs /\
   Xmms_i.equal s0.xmms s1.xmms /\
   s0.flags == s1.flags /\
-  s0.mem == s1.mem
+  s0.mem == s1.mem /\
+  s0.trace == s1.trace /\
+  s0.memTaint == s1.memTaint
 

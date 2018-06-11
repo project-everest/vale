@@ -1116,7 +1116,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let xp_body = body_id p.pname in
         let xp_while = while_id p.pname in
         let (_, raw_reads, raw_readsOld, raw_mods) = compute_read_mods_stmt env empty_env s in
-        let mods = Set.map (resolve_alias env) raw_mods in
+        let mods = Set.add (Id "trace") (Set.map (resolve_alias env) raw_mods) in
         let reads = Set.map (resolve_alias env) raw_reads in
         let readsOld = Set.map (resolve_alias env) raw_readsOld in
         // each read/mod is one of: (ghost/inline), state
