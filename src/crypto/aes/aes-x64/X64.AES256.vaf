@@ -6,6 +6,7 @@ include "../../../arch/x64/X64.Vale.InsAes.vaf"
 module X64.AES256
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
 open Types_s
 open FStar.Seq
 open AES_s
@@ -20,7 +21,6 @@ open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
 open Types_i
 open AES256_helpers_i
-open Opaque_i
 #endverbatim
 
 #reset-options "--z3rlimit 20"
@@ -68,6 +68,7 @@ procedure{:quick} KeyExpansionRoundEven256(
 
     //assert xmm1 == simd_round_key_256(old(xmm1), old(xmm3), rcon, round + 1);
     lemma_simd_round_key(old(xmm1), old(xmm3), rcon, round + 1);
+    reveal_opaque(expand_key_256_def);
     //assert xmm1 == round_key_256_rcon(old(xmm1), old(xmm3), rcon, round + 1);
 }
 
@@ -108,6 +109,7 @@ procedure{:quick} KeyExpansionRoundOdd256(
     //assert xmm1 == simd_round_key_256(old(xmm1), old(xmm3), rcon, round + 1);
     lemma_simd_round_key(old(xmm3), old(xmm1), 0, round + 1);
     lemma_round_key_256_rcon_odd(old(xmm3), old(xmm1), 0, round + 1);
+    reveal_opaque(expand_key_256_def);
 }
 
 procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive256(
@@ -183,8 +185,11 @@ procedure{:quick} KeyExpansion256Stdcall(
 
     Store128_buffer(rdx, xmm1, 0, output_key_expansion_b, 0);
     Store128_buffer(rdx, xmm3, 16, output_key_expansion_b, 1);
+
+    reveal_opaque(expand_key_256_def);
     KeyExpansionRoundUnrolledRecursive256(key, output_key_expansion_b, 14);
     lemma_expand_key_256(key, 15);
+    reveal_opaque(key_to_round_keys_LE_def);
 
     // Clear secrets out of registers
     Pxor(xmm1, xmm1);

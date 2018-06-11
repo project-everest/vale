@@ -1,11 +1,11 @@
 module X64.Poly1305.Util_i
 
 open FStar.Mul
+open Opaque_s
 open Poly1305.Spec_s
 open X64.Machine_s
 open X64.Poly1305.Math_i
 open X64.Vale.Decls_i
-open Opaque_i
 module M = Memory_i_s
 
 // Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec

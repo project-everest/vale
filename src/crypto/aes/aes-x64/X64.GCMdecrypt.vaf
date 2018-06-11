@@ -252,7 +252,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     decrypt_helper(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth, rax, alleged_tag_quad, computed_tag); 
 }
 
-#reset-options "--z3rlimit 400"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_decrypt_stdcall(
     inline win:bool,
     ghost args_b:buffer64,

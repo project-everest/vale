@@ -1,5 +1,6 @@
 module GCM_i
 
+open Opaque_s
 open Types_s
 open Types_i
 open GCM_s
@@ -21,12 +22,14 @@ let gcm_encrypt_LE_fst_helper (iv_enc iv_BE:quad32) (plain auth cipher:seq nat8)
   )
   (ensures cipher == fst (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth))
   =
+  reveal_opaque (gcm_encrypt_LE_def alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth)
+(*
   let s_key_LE = seq_nat8_to_seq_nat32_LE (seq_nat32_to_seq_nat8_LE key) in
   let s_iv_BE = be_bytes_to_quad32 (be_quad32_to_bytes iv_BE) in
   let s_j0_BE = Mkfour 1 s_iv_BE.lo1 s_iv_BE.hi2 s_iv_BE.hi3 in
   let s_cipher = fst (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth) in
-  assert (s_cipher == gctr_encrypt_LE (inc32 s_j0_BE 1) plain alg s_key_LE);
   be_bytes_to_quad32_to_bytes iv_BE;
+  assert (s_cipher == gctr_encrypt_LE (inc32 s_j0_BE 1) plain alg s_key_LE);
   assert (s_iv_BE == iv_BE);
   assert (s_key_LE == key);
 
@@ -37,6 +40,7 @@ let gcm_encrypt_LE_fst_helper (iv_enc iv_BE:quad32) (plain auth cipher:seq nat8)
   assert (gctr_encrypt_LE (inc32 s_j0_BE 1) (make_gctr_plain_LE plain) alg key ==
           gctr_encrypt_LE iv_enc (make_gctr_plain_LE plain) alg key);
   ()
+*)
 
 let gcm_encrypt_LE_snd_helper (iv_BE length_quad32 hash mac:quad32) (plain auth cipher:seq nat8) (alg:algorithm) (key:aes_key_LE(alg)) : Lemma
   (requires (4096 * (length plain) < pow2_32 /\
@@ -51,9 +55,10 @@ let gcm_encrypt_LE_snd_helper (iv_BE length_quad32 hash mac:quad32) (plain auth 
   ))
   (ensures le_quad32_to_bytes mac == snd (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth))
   =
+  reveal_opaque (gcm_encrypt_LE_def alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth)
   //be_bytes_to_quad32_to_bytes iv_BE;
   //let t = snd (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) plain auth) in
-  ()
+  //()
 
 
 let decrypt_helper (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plain:seq nat8) (auth:seq nat8)

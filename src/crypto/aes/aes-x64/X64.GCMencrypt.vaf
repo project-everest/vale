@@ -49,7 +49,7 @@ let make_ghash_plain_LE (s:seq quad32) : ghash_plain_LE = if length s = 0 then c
 #endverbatim
 
 
-#reset-options "--z3rlimit 200 --z3refresh"
+#reset-options "--z3rlimit 30 --z3refresh"
 
 ///////////////////////////
 // GCM
@@ -180,7 +180,7 @@ procedure {:quick} gcm_one_pass_blocks(
 //    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
-#reset-options "--z3rlimit 400"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_one_pass(
     ghost in_b:buffer128,
     ghost out_b:buffer128,
@@ -279,7 +279,7 @@ procedure {:quick} gcm_one_pass(
 
 }
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_core_part1(
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
@@ -442,7 +442,7 @@ procedure {:quick} gcm_make_length_quad(
 }
 
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_core(
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
@@ -668,7 +668,7 @@ procedure {:quick} callee_restore_registers(
 //  if 256 * length p < pow2_32 then p else createEmpty
 //#endverbatim
 
-#reset-options "--z3rlimit 80"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_encrypt_stdcall_inner(
     ghost args_b:buffer64,
     ghost iv_BE:quad32,
@@ -768,7 +768,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
     Store128_buffer(r15, xmm1, 0, tag_b, 0);
 }
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_encrypt_stdcall(
     inline win:bool,
     ghost args_b:buffer64,

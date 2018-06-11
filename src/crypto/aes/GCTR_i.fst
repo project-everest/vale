@@ -1,5 +1,6 @@
 module GCTR_i
 
+open Opaque_s
 open Words_s
 open Types_s
 open Types_i
@@ -25,6 +26,7 @@ let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algo
          let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
          cipher = gctr_encrypt_LE icb_BE (make_gctr_plain_LE plain) alg key)
   =
+  reveal_opaque gctr_encrypt_LE_def;
   let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
   let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
   assert (plain == createEmpty);
@@ -90,12 +92,13 @@ let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE
   if length plain = 0 then ()
   else gctr_encrypt_recursive_length icb (tail plain) alg key (i + 1)
 
-#reset-options "--z3rlimit 40" 
+#reset-options "--z3rlimit 40"
 let rec gctr_encrypt_length (icb_BE:quad32) (plain:gctr_plain_LE)
                              (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(length (gctr_encrypt_LE icb_BE plain alg key) == length plain)
   [SMTPat (length (gctr_encrypt_LE icb_BE plain alg key))]
   =
+  reveal_opaque gctr_encrypt_LE_def;
   let num_extra = (length plain) % 16 in
   let result = gctr_encrypt_LE icb_BE plain alg key in
   if num_extra = 0 then (
@@ -175,6 +178,7 @@ let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm
             (4096 * (length plain) * 16 < pow2_32))
   (ensures le_seq_quad32_to_bytes cipher == gctr_encrypt_LE icb_BE (le_seq_quad32_to_bytes plain) alg key)
   =
+  reveal_opaque gctr_encrypt_LE_def;
   let p = le_seq_quad32_to_bytes plain in
   assert (length p % 16 == 0);
   let plain_quads_LE = le_bytes_to_seq_quad32 p in
@@ -308,6 +312,7 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq
             let cipher_bytes = slice (le_seq_quad32_to_bytes cipher) 0 num_bytes in
             cipher_bytes == gctr_encrypt_LE icb_BE plain_bytes alg key))
   =
+  reveal_opaque gctr_encrypt_LE_def;
   let num_blocks = num_bytes / 16 in
   let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
   let cipher_bytes = slice (le_seq_quad32_to_bytes cipher) 0 num_bytes in
@@ -359,6 +364,7 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq
 let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
   Lemma(gctr_encrypt_LE icb_BE (le_quad32_to_bytes plain) alg key =
         le_seq_quad32_to_bytes (create 1 (quad32_xor plain (aes_encrypt_BE alg key icb_BE)))) =
+  reveal_opaque gctr_encrypt_LE_def;
   assert(inc32 icb_BE 0 == icb_BE);
   let encrypted_icb = aes_encrypt_BE alg key icb_BE in
   let p = le_quad32_to_bytes plain in

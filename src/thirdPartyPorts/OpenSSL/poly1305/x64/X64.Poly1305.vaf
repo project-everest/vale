@@ -30,6 +30,7 @@ module X64.Poly1305
 
 #verbatim{:interface}{:implementation}
 module M = Memory_i_s
+open Opaque_s
 open Types_s
 open X64.Machine_s
 open X64.Vale.State_i
@@ -42,7 +43,6 @@ open X64.Vale.QuickCodes_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open X64.Poly1305.Util_i
-open Opaque_i
 #endverbatim
 
 procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)

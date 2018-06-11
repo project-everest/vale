@@ -1,5 +1,6 @@
 module GHash_i
 
+open Opaque_s
 open Words_s
 open Types_s
 open Types_i
@@ -26,6 +27,7 @@ let rec ghash_incremental_to_ghash (h:quad32) (x:ghash_plain_LE) :
   Lemma(ensures ghash_incremental h (Mkfour 0 0 0 0) x == ghash_LE h x)
        (decreases %[length x])
   =
+  reveal_opaque ghash_LE_def;
   if length x = 1 then ()
   else ghash_incremental_to_ghash h (all_but_last x)
 

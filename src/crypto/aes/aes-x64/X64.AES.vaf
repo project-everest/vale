@@ -23,7 +23,7 @@ open X64.Vale.QuickCodes_i
 open Types_i
 //open AES_helpers_i
 open AES256_helpers_i
-//open Opaque_i
+//open Opaque_s
 open X64.AES128
 open X64.AES256
 #endverbatim
