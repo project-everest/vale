@@ -60,6 +60,7 @@ let lemma_reverse_reverse_bytes_nat32_seq (s:seq nat32) :
   reveal_reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s);
   assert (equal (reverse_bytes_nat32_seq (reverse_bytes_nat32_seq s)) s)
 
+(*
 let lemma_equality_check_helper_two_to_nat_32 (n:two nat32) :
   Lemma ( ((n.lo == 0 /\ n.hi == 0) ==> two_to_nat 32 n == 0) /\
           ( ~(n.lo == 0) \/ (~(n.hi == 0))) ==> ~(two_to_nat 32 n == 0) /\
@@ -91,6 +92,7 @@ let lemma_equality_check_helper_hi (q:quad32) :
   assert (hi64 q == two_to_nat 32 (Mktwo q.hi2 q.hi3));
   lemma_equality_check_helper_two_to_nat_32 (Mktwo q.hi2 q.hi3);
   ()
+*)
 
 let lemma_equality_check_helper (q:quad32) :
   Lemma ((q.lo0 == 0 /\ q.lo1 == 0 ==> lo64 q == 0) /\ 
@@ -101,8 +103,9 @@ let lemma_equality_check_helper (q:quad32) :
          (q.hi2 == 0xFFFFFFFF /\ q.hi3 == 0xFFFFFFFF <==> hi64 q == 0xFFFFFFFFFFFFFFFF)
          )
   =
-  lemma_equality_check_helper_lo q;
-  lemma_equality_check_helper_hi q;
+//  lemma_equality_check_helper_lo q;
+//  lemma_equality_check_helper_hi q;
+  assert (forall (x:two nat32).{:pattern (two_to_nat 32 x)} two_to_nat 32 x == two_to_nat_unfold 32 x);
   ()
 
 
@@ -258,8 +261,8 @@ let le_quad32_to_bytes_injective ():
       assert (le_quad32_to_bytes b' == seq_four_to_seq_LE b1');
       seq_four_to_seq_LE_injective_specific b1 b1';
       assert (b1 == b1');
-      seq_map_injective (nat_to_four 8);
       nat_to_four_8_injective();
+      seq_map_injective (nat_to_four 8) (four_to_seq_LE b) (four_to_seq_LE b');
       assert ((four_to_seq_LE b) == (four_to_seq_LE b'));
       four_to_seq_LE_injective nat32;
       ()
