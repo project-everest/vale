@@ -18,6 +18,7 @@ struct args
 
 extern "C" void aes_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
 extern "C" void gcm_encrypt(args *a);
+extern "C" int gcm_decrypt(args *a);
 
 byte key[16] =
     { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
@@ -59,6 +60,12 @@ int main()
     gcm_encrypt(&a);
     printbytes("cipher", out, 19);
     printbytes("tag", tag, 16);
+
+    a.out_ptr = plain;
+    a.plain_ptr = out;
+    int ret = gcm_decrypt(&a);
+    printf("gcm_decrypt returned %d\n", ret);
+    printbytes("plaintext", plain, 19);
 
     int nblocks = 256;
     byte *plain2 = new byte[nblocks * 16];
