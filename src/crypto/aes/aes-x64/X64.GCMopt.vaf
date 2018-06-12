@@ -325,6 +325,7 @@ procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64
         PushXmm(xmm11, rax, stack_b, 17);
         PushXmm(xmm10, rax, stack_b, 15);
         PushXmm(xmm8,  rax, stack_b, 13);
+        assert hi64(xmm8) == buffer64_read(stack_b, 12, mem); // HACK
         PushXmm(xmm7,  rax, stack_b, 11);
         PushXmm(xmm6,  rax, stack_b,  9);
     }

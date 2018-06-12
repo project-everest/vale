@@ -7,6 +7,7 @@ module HS = FStar.Monotonic.HyperStack
 module HH = FStar.Monotonic.HyperHeap
 module B = FStar.Buffer
 
+open Opaque_i
 open X64.Machine_s
 open X64.Bytes_Semantics_s
 open X64.Bytes_Semantics_i
@@ -44,6 +45,8 @@ assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap
 let rec write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = FStar.Seq.Base.length contents}) addr (i:nat{i <= length}) 
       (curr_heap:heap{forall j. {:pattern (Seq.index contents j)} 
 	0 <= j /\ j < i ==> get_heap_val64 (addr + (j `op_Multiply` 8)) curr_heap == UInt64.v (Seq.index contents j)}) : Tot heap (decreases %[sub length i]) =
+    reveal_opaque get_heap_val64_def;
+    reveal_opaque update_heap64_def;
     if i >= length then curr_heap
     else
       write_vale_mem64 contents length addr (i + 1) (update_heap64 (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap)
@@ -57,6 +60,8 @@ let rec frame_write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{length = 
       (ensures (let new_heap = write_vale_mem64 contents length addr i curr_heap in
       forall j. j < addr \/ j >= addr + (length `op_Multiply` 8) ==> curr_heap.[j] == new_heap.[j]))
       (decreases %[sub length i])=
+      reveal_opaque get_heap_val64_def;
+      reveal_opaque update_heap64_def;
       if i >= length then ()
       else begin
       let new_heap = update_heap64 (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap in
@@ -72,6 +77,7 @@ let rec load_store_write_vale_mem64 (contents:Seq.seq UInt64.t) (length:nat{leng
       (ensures (let new_heap = write_vale_mem64 contents length addr i curr_heap in
       forall j. {:pattern (Seq.index contents j)} 0 <= j /\ j < length ==> UInt64.v (Seq.index contents j) == get_heap_val64 (addr + (j `op_Multiply` 8)) new_heap))
       (decreases %[sub length i])=
+      reveal_opaque get_heap_val64_def;
       if i >= length then ()
       else begin
       let new_heap = update_heap64 (addr + (i `op_Multiply` 8)) (UInt64.v (FStar.Seq.index contents i)) curr_heap in
@@ -118,6 +124,7 @@ let correct_down_p64_frame mem (addrs:addr_map) (heap:heap) (p:B.buffer UInt64.t
       let addr = addrs.[(B.as_addr p, B.idx p, B.length p)] in
       let new_heap = write_vale_mem64 contents length addr 0 heap in
       correct_down_p64 mem addrs new_heap p')) = 
+  reveal_opaque get_heap_val64_def;
   let aux (p':B.buffer UInt64.t) : Lemma 
     (B.disjoint p p' /\ correct_down_p64 mem addrs heap p' ==> (let length = B.length p in
       let contents = B.as_seq mem p in

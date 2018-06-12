@@ -1,4 +1,5 @@
 module X64.Bytes_Semantics_i
+open Opaque_i
 
 #reset-options "--z3rlimit 100 --max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
 
@@ -48,6 +49,10 @@ let same_mem_get_heap_val (ptr:int) (mem1 mem2:heap) =
 *)
   admit () // TODO
 
-let frame_update_heap ptr v mem = ()
+let frame_update_heap ptr v mem =
+  reveal_opaque get_heap_val64_def;
+  reveal_opaque update_heap64_def
 
-let correct_update_get ptr v mem = ()
+let correct_update_get ptr v mem =
+  reveal_opaque get_heap_val64_def;
+  reveal_opaque update_heap64_def

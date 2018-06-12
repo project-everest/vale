@@ -1,5 +1,6 @@
 module X64.Bytes_Semantics_s
 
+open Opaque_i
 open X64.Machine_s
 open Words_s
 open Words.Two_s
@@ -77,7 +78,7 @@ assume val havoc : state -> ins -> nat64
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 
-let get_heap_val64 (ptr:int) (mem:heap) : nat64 =
+let get_heap_val64_def (ptr:int) (mem:heap) : nat64 =
     (mem.[ptr]) + 
     (mem.[ptr+1]) `op_Multiply` 0x100 + 
     (mem.[ptr+2]) `op_Multiply` 0x10000 +
@@ -86,12 +87,14 @@ let get_heap_val64 (ptr:int) (mem:heap) : nat64 =
     (mem.[ptr+5]) `op_Multiply` 0x10000000000 +
     (mem.[ptr+6]) `op_Multiply` 0x1000000000000 +
     (mem.[ptr+7]) `op_Multiply` 0x100000000000000
+let get_heap_val64 = make_opaque get_heap_val64_def
 
-let get_heap_val32 (ptr:int) (mem:heap) : nat32 =
+let get_heap_val32_def (ptr:int) (mem:heap) : nat32 =
     (mem.[ptr]) + 
     (mem.[ptr+1]) `op_Multiply` 0x100 + 
     (mem.[ptr+2]) `op_Multiply` 0x10000 +
     (mem.[ptr+3]) `op_Multiply` 0x1000000
+let get_heap_val32 = make_opaque get_heap_val32_def
 
 unfold let eval_mem (ptr:int) (s:state) : nat64 = get_heap_val64 ptr s.mem
 unfold let eval_mem128 (ptr:int) (s:state) : quad32 = Mkfour
@@ -137,7 +140,7 @@ let update_xmm' (x:xmm) (v:quad32) (s:state) : state =
 val mod_8: (n:nat{n < pow2_64}) -> nat8
 let mod_8 n = n % 0x100
 
-let update_heap32 (ptr:int) (v:nat32) (mem:heap) : heap =
+let update_heap32_def (ptr:int) (v:nat32) (mem:heap) : heap =
   let mem = mem.[ptr] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+1] <- (mod_8 v) in
@@ -147,8 +150,9 @@ let update_heap32 (ptr:int) (v:nat32) (mem:heap) : heap =
   let mem = mem.[ptr+3] <- (mod_8 v) in
   assert (Set.equal (Map.domain mem) (Set.complement Set.empty));  
   mem
+let update_heap32 = make_opaque update_heap32_def
 
-let update_heap64 (ptr:int) (v:nat64) (mem:heap) : heap =
+let update_heap64_def (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+1] <- (mod_8 v) in
@@ -166,6 +170,7 @@ let update_heap64 (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr+7] <- (mod_8 v) in
   assert (Set.equal (Map.domain mem) (Set.complement Set.empty));
   mem
+let update_heap64 = make_opaque update_heap64_def
 
 let update_heap128 (ptr:int) (v:quad32) (mem:heap) =
   let mem = update_heap32 ptr v.lo0 mem in
