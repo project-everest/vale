@@ -3,6 +3,7 @@ include "X64.Vale.InsBasic.vaf"
 module X64.Vale.InsMem
 
 #verbatim{:interface}
+open Types_s
 open X64.Machine_s
 open X64.Memory_i_s
 open X64.Vale.State_i
@@ -30,6 +31,59 @@ procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost 
     reads
         mem;
     extern;
+
+
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Add64Wrap_Mem(
+    inout dst:dst_opr64,
+    src:reg_opr64,
+    inline offset:int,
+    inline t:taint,
+    ghost b:buffer64,
+    ghost index:int)
+    reads
+        memTaint; mem;
+    modifies
+        efl; trace;
+    requires
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(src + offset, memTaint, t);
+        src + offset == buffer_addr(b, mem) + 8 * index;
+    ensures
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(old(src) + offset, memTaint, t);
+        dst == old(add_wrap(dst, buffer64_read(b, index, mem)));
+        cf(efl) == old(dst + buffer64_read(b, index, mem) >= pow2_64);
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
+}
+
+
+
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Adc64Wrap_Mem(
+    inout dst:dst_opr64,
+    src:reg_opr64,
+    inline offset:int,
+    inline t:taint,
+    ghost b:buffer64,
+    ghost index:int)
+    reads
+        memTaint; mem;
+    modifies
+        efl; trace;
+    requires
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(src + offset, memTaint, t);
+        src + offset == buffer_addr(b, mem) + 8 * index;
+    ensures
+        valid_src_addr(mem, b, index);
+        valid_taint_ptr(old(src) + offset, memTaint, t);
+        dst == old(add_wrap(add_wrap(dst, buffer64_read(b, index, mem)), (if cf(efl) then 1 else 0)));
+        cf(efl) == old(dst + buffer64_read(b, index, mem) + (if cf(efl) then 1 else 0) >= pow2_64);
+{
+    lemma_valid_mem64(b, index, mem);
+    lemma_load_mem64(b, index, mem);
+}
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(src), offset))), list(dst), list(OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
     out dst: dst_opr64,

@@ -26,7 +26,7 @@ include "../../../../arch/x64/X64.Vale.InsMem.vaf"
 
 module X64.Poly1305
 
-#reset-options "--z3rlimit 30"
+#reset-options "--z3rlimit 5000"
 
 #verbatim{:interface}{:implementation}
 open Types_s
@@ -223,13 +223,14 @@ procedure{:quick} poly1305_blocks(
         rax; r15;
         efl;
         mem;
+        trace; memTaint;
     requires
         // Len is measured in bytes
         len % 16 == 0; // REVIEW: may be stronger than necessary
         inp + len < pow2_64;
         buffers_disjoint(ctx_b, inp_b);
-        validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, inp, inp_b, len / 8);
+        validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
+        validSrcAddrs64(mem, inp, inp_b, len / 8, memTaint, Public);
 // TODO: Would be nice to have some syntax for buffer64_read
         let h0_in := buffer64_read(ctx_b, 0, mem);
         let h1_in := buffer64_read(ctx_b, 1, mem);
@@ -245,8 +246,8 @@ procedure{:quick} poly1305_blocks(
         padbit < 2;
     ensures
         h2 < 5;
-        validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, old(inp), inp_b, old(len)/8);
+        validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
+        validSrcAddrs64(mem, old(inp), inp_b, old(len)/8, memTaint, Public);
         modifies_buffer_specific(ctx_b, old(mem), mem, 0, 2);
         h0 == buffer64_read(ctx_b, 0, mem);
         h1 == buffer64_read(ctx_b, 1, mem);
@@ -260,6 +261,7 @@ procedure{:quick} poly1305_blocks(
         rcx == old(rcx);
         ctx == old(ctx); // REVIEW: framing should add this automatically
 
+        memTaint == old(memTaint);
         let r0_in := buffer64_read(ctx_b, 3, mem);
         let r1_in := buffer64_read(ctx_b, 4, mem);
         h == h2 * (pow2_64 * pow2_64) + h1 * pow2_64 + h0;
@@ -274,12 +276,12 @@ procedure{:quick} poly1305_blocks(
     // We can let len == 0 pass through because of the slight difference in the loop condition (see below)
     Mov64(r15, len); // reassign len
 
-    Load64_buffer(r0, ctx, 24, ctx_b, 3); // load r
-    Load64_buffer(s1, ctx, 32, ctx_b, 4);
+    Load64_buffer(r0, ctx, 24, Public, ctx_b, 3); // load r
+    Load64_buffer(s1, ctx, 32, Public, ctx_b, 4);
 
-    Load64_buffer(h0, ctx, 0, ctx_b, 0); // load hash value
-    Load64_buffer(h1, ctx, 8, ctx_b, 1);
-    Load64_buffer(h2, ctx, 16, ctx_b, 2);
+    Load64_buffer(h0, ctx, 0, Public, ctx_b, 0); // load hash value
+    Load64_buffer(h1, ctx, 8, Public, ctx_b, 1);
+    Load64_buffer(h2, ctx, 16, Public, ctx_b, 2);
 
     Mov64(r1, s1);
     Shr64(s1, 2);
@@ -318,8 +320,8 @@ procedure{:quick} poly1305_blocks(
 
             r15 * 16 <= length;    // Not needed with Dafny version
             padbit < 2;            // Not needed with Dafny version 
-            validSrcAddrs64(mem, ctx, ctx_b, 24);
-            validSrcAddrs64(mem, old(inp), inp_b, length/8);
+            validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
+            validSrcAddrs64(mem, old(inp), inp_b, length/8, memTaint, Public);
             ctx == old(ctx); // REVIEW: framing should add this automatically
             rcx == old(rcx); // REVIEW: framing should add this automatically
             (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
@@ -334,9 +336,10 @@ procedure{:quick} poly1305_blocks(
         ghost var hq := h;
 
 
-        Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
+        Add64Wrap_Mem(h0, inp, 0, Public, inp_b, word_index); // accumulate input
         lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
-        Adc64Wrap(h1, Mem(inp, 8, inp_b, word_index+1));
+        apply_valid_taint(length / 8 - 2*r15 + 1, old(rsi), mem, Public, length, memTaint, ctx_b, inp_b);
+        Adc64Wrap_Mem(h1, inp, 8, Public, inp_b, word_index+1);
         ghost var wind:nat := word_index + 1;
         lemma_load_mem64(inp_b, wind, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
         AddLea64(inp, inp, 16);
@@ -358,9 +361,9 @@ procedure{:quick} poly1305_blocks(
             lemma_poly_demod(p, hp, hq - hp, r);
         }
     }
-    Store64_buffer(ctx, h0, 0, ctx_b, 0);
-    Store64_buffer(ctx, h1, 8, ctx_b, 1);
-    Store64_buffer(ctx, h2, 16, ctx_b, 2);
+    Store64_buffer(ctx, h0, 0, Public, ctx_b, 0);
+    Store64_buffer(ctx, h1, 8, Public, ctx_b, 1);
+    Store64_buffer(ctx, h2, 16, Public, ctx_b, 2);
 }
 
 // last 1..15 bytes, in case len is not a multiple of 16
@@ -376,7 +379,7 @@ procedure{:quick} poly1305_last_block()
     reads
         r0; s1; nExtra;
     modifies
-        rax; rcx; rdx; r8; r9; r10; h0; h1; h2; efl;
+        rax; rcx; rdx; r8; r9; r10; h0; h1; h2; efl; trace;
     requires
         h2 < 5;
         r0 < n / 16;
@@ -553,10 +556,11 @@ procedure{:quick} poly1305_impl(
         rax; rcx; rdx; rdi; rsi; rbx; rbp; r8; r9; r10; r11; r12; r13; r14; r15;
         efl;
         mem;
+        trace; memTaint;
     requires
         buffers_disjoint(ctx_b, inp_b);
-        validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, inp, inp_b, readable_words(len));
+        validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
+        validSrcAddrs64(mem, inp, inp_b, readable_words(len), memTaint, Public);
         inp + len < pow2_64;
         let key_r0 := buffer64_read(ctx_b, 3, mem);
         let key_r1 := buffer64_read(ctx_b, 4, mem);
@@ -565,8 +569,8 @@ procedure{:quick} poly1305_impl(
         key_r == lowerUpper128_opaque(key_r0, key_r1);
         key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
-        validSrcAddrs64(mem, ctx, ctx_b, 24);
-        validSrcAddrs64(mem, old(inp), inp_b, readable_words(old(len)));
+        validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
+        validSrcAddrs64(mem, old(inp), inp_b, readable_words(old(len)), memTaint, Public);
         modifies_buffer(ctx_b, old(mem), mem);
         modifies_buffer_specific(ctx_b, old(mem), mem, 0, 8);
         h == lowerUpper128_opaque(h0, h1);
@@ -575,6 +579,7 @@ procedure{:quick} poly1305_impl(
 //        // Framing
         ctx == old(ctx);
 {
+
     ghost var inp_in := inp;
     ghost var len_in := len;
     ghost var key_r0 := buffer64_read(ctx_b, 3, mem);
@@ -583,18 +588,18 @@ procedure{:quick} poly1305_impl(
 
     //assert{:fast_block} true;
     Mov64(rax, 0);
-    Store64_buffer(ctx, rax,  0, ctx_b, 0);
-    Store64_buffer(ctx, rax,  8, ctx_b, 1);
-    Store64_buffer(ctx, rax, 16, ctx_b, 2);
+    Store64_buffer(ctx, rax,  0, Public, ctx_b, 0);
+    Store64_buffer(ctx, rax,  8, Public, ctx_b, 1);
+    Store64_buffer(ctx, rax, 16, Public, ctx_b, 2);
 
-    Load64_buffer(r0, ctx, 24, ctx_b, 3);
-    Load64_buffer(r1, ctx, 32, ctx_b, 4);
+    Load64_buffer(r0, ctx, 24, Public, ctx_b, 3);
+    Load64_buffer(r1, ctx, 32, Public, ctx_b, 4);
     Mov64(rcx, 0x0fff_fffc_0fff_ffff);
     And64(r0, rcx);
     Mov64(rcx, 0x0fff_fffc_0fff_fffc);
     And64(r1, rcx);
-    Store64_buffer(ctx, r0, 24, ctx_b, 3);
-    Store64_buffer(ctx, r1, 32, ctx_b, 4);
+    Store64_buffer(ctx, r0, 24, Public, ctx_b, 3);
+    Store64_buffer(ctx, r1, 32, Public, ctx_b, 4);
 
     ghost var r:nat128 := lowerUpper128_opaque(r0, r1);
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
@@ -612,9 +617,10 @@ procedure{:quick} poly1305_impl(
     Sub64(len, rax);
     // assert rax == len_in % 16;
     // assert len == len_in / 16 * 16; == (num 16-byte blocks) * 16
-    Store64_buffer(ctx, rax, 56, ctx_b, 7);
-    Store64_buffer(ctx, len, 64, ctx_b, 8);
+    Store64_buffer(ctx, rax, 56, Public, ctx_b, 7);
+    Store64_buffer(ctx, len, 64, Public, ctx_b, 8);
 
+   
     Mov64(rcx, 1);
     h := poly1305_blocks(r, 0, ctx_b, inp_b);
     assert modp(0) == 0 by
@@ -630,14 +636,14 @@ procedure{:quick} poly1305_impl(
     assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
         by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
 
-    Load64_buffer(r15, ctx, 56, ctx_b, 7); 
+    Load64_buffer(r15, ctx, 56, Public, ctx_b, 7); 
     // assert r15 == len_in % 16;
     if (r15 != 0)
     {
         //assert{:fast_block} true;
-        Load64_buffer(rax, ctx, 32, ctx_b, 4);
-        Load64_buffer(r8, inp, 0, inp_b, (len_in / 16) * 2);
-        Load64_buffer(r9, inp, 8, inp_b, (len_in / 16) * 2 + 1);
+        Load64_buffer(rax, ctx, 32, Public, ctx_b, 4);
+        Load64_buffer(r8, inp, 0, Public, inp_b, (len_in / 16) * 2);
+        Load64_buffer(r9, inp, 8, Public, inp_b, (len_in / 16) * 2 + 1);
         ghost var a := seqTo128(buffer64_as_seq(mem, inp_b), len_in / 16);
         assert lowerUpper128_opaque(r8, r9) == a
             by { /* reveal heapletTo128; */ reveal_opaque(lowerUpper128); }
@@ -649,8 +655,8 @@ procedure{:quick} poly1305_impl(
     poly1305_reduce_last();
     h := lowerUpper128_opaque(h0, h1);
 
-    Load64_buffer(rax, ctx, 40, ctx_b, 5);
-    Load64_buffer(rdx, ctx, 48, ctx_b, 6);
+    Load64_buffer(rax, ctx, 40, Public, ctx_b, 5);
+    Load64_buffer(rdx, ctx, 48, Public, ctx_b, 6);
     poly1305_add_key_s();
     h := lowerUpper128_opaque(h0, h1);
 
@@ -678,11 +684,11 @@ procedure{:quick} poly1305(
         n := 0x1_0000_0000_0000_0000;
         p := n * n * 4 - 5;
     modifies
-        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem;
+        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem; trace; memTaint;
     requires
         buffers_disjoint(ctx_b, inp_b);
-        validSrcAddrs64(mem, ctx_in, ctx_b, 24);
-        validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in));
+        validSrcAddrs64(mem, ctx_in, ctx_b, 24, memTaint, Public);
+        validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in), memTaint, Public);
         inp_in + len_in < pow2_64;
         let key_r0 := buffer64_read(ctx_b, 3, mem);
         let key_r1 := buffer64_read(ctx_b, 4, mem);
@@ -691,8 +697,8 @@ procedure{:quick} poly1305(
         key_r == lowerUpper128_opaque(key_r0, key_r1);
         key_s == lowerUpper128_opaque(key_s0, key_s1);
     ensures
-        validSrcAddrs64(mem, ctx_in, ctx_b, 24);
-        validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in));
+        validSrcAddrs64(mem, ctx_in, ctx_b, 24, memTaint, Public);
+        validSrcAddrs64(mem, inp_in, inp_b, readable_words(len_in), memTaint, Public);
         modifies_buffer(ctx_b, old(mem), mem);
         let h0_out := buffer64_read(ctx_b, 0, mem);
         let h1_out := buffer64_read(ctx_b, 1, mem);
@@ -729,28 +735,28 @@ procedure{:quick} poly1305(
     //   64: will hold len / 16 * 16
     //   72, 80, 88, 96, 104, 112, 120, 128: callee-save registers
     //assert {:fast_block} true;
-    Store64_buffer(ctx, h1,  72, ctx_b, 9);
-    Store64_buffer(ctx, h2,  80, ctx_b, 10);
-    Store64_buffer(ctx, rax, 88, ctx_b, 11);
-    Store64_buffer(ctx, r9,  96, ctx_b, 12);
-    Store64_buffer(ctx, r1,  104, ctx_b, 13);
-    Store64_buffer(ctx, r13, 112, ctx_b, 14);
-    Store64_buffer(ctx, h0,  120, ctx_b, 15);
-    Store64_buffer(ctx, r15, 128, ctx_b, 16);
+    Store64_buffer(ctx, h1,  72, Public, ctx_b, 9);
+    Store64_buffer(ctx, h2,  80, Public, ctx_b, 10);
+    Store64_buffer(ctx, rax, 88, Public, ctx_b, 11);
+    Store64_buffer(ctx, r9,  96, Public, ctx_b, 12);
+    Store64_buffer(ctx, r1,  104, Public, ctx_b, 13);
+    Store64_buffer(ctx, r13, 112, Public, ctx_b, 14);
+    Store64_buffer(ctx, h0,  120, Public, ctx_b, 15);
+    Store64_buffer(ctx, r15, 128, Public, ctx_b, 16);
 
     h := poly1305_impl(key_r, key_s, ctx_b, inp_b);
 
     //assert {:fast_block} true;
-    Store64_buffer(ctx, h0,  0, ctx_b, 0);
-    Store64_buffer(ctx, h1,  8, ctx_b, 1);
+    Store64_buffer(ctx, h0,  0, Public, ctx_b, 0);
+    Store64_buffer(ctx, h1,  8, Public, ctx_b, 1);
 
-    Load64_buffer(h1,  ctx, 72, ctx_b, 9);
-    Load64_buffer(h2,  ctx, 80, ctx_b, 10);
-    Load64_buffer(rax, ctx, 88, ctx_b, 11);
-    Load64_buffer(inp, ctx, 96, ctx_b, 12);
-    Load64_buffer(r1,  ctx, 104, ctx_b, 13);
-    Load64_buffer(r13, ctx, 112, ctx_b, 14);
-    Load64_buffer(h0,  ctx, 120, ctx_b, 15);
-    Load64_buffer(r15, ctx, 128, ctx_b, 16);
+    Load64_buffer(h1,  ctx, 72, Public, ctx_b, 9);
+    Load64_buffer(h2,  ctx, 80, Public, ctx_b, 10);
+    Load64_buffer(rax, ctx, 88, Public, ctx_b, 11);
+    Load64_buffer(inp, ctx, 96, Public, ctx_b, 12);
+    Load64_buffer(r1,  ctx, 104, Public, ctx_b, 13);
+    Load64_buffer(r13, ctx, 112, Public, ctx_b, 14);
+    Load64_buffer(h0,  ctx, 120, Public, ctx_b, 15);
+    Load64_buffer(r15, ctx, 128, Public, ctx_b, 16);
     Mov64(ctx, rax);
 }

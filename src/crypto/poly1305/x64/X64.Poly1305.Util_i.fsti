@@ -4,6 +4,7 @@ open FStar.Mul
 open Poly1305.Spec_s
 open X64.Machine_s
 open X64.Poly1305.Math_i
+open X64.Vale.State_i
 open X64.Vale.Decls_i
 open Opaque_i
 open X64.Memory_i_s
@@ -71,10 +72,12 @@ match l with
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 
-let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:map int taint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
-    buffer_addr b m == addr
+    buffer_addr b m == addr /\
+    (forall a. 0 <= a && a <= len ==>
+      memTaint.[addr + 8 `op_Multiply` a] == t)    
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
@@ -90,3 +93,8 @@ unfold let buffers_disjoint (b1 b2:buffer64) =
 
 let readable_words (len:nat) =
     ((len + 15) / 16) `op_Multiply` 2 // 2 == 16 for rounding /8 for 8-byte words
+
+let apply_valid_taint (i:int) (r_value:nat) (mem:mem) (t:taint) (length:int) (memTaint:map int taint) (ctx_b:buffer64) (inp_b:buffer64) : Lemma
+    (requires length >= 0 /\ validSrcAddrs64 mem r_value inp_b (length `op_Division` 8) memTaint t /\ 0 <= i /\ i <= length `op_Division` 8)
+    (ensures length >= 0 /\ valid_taint_ptr (r_value + 8 `op_Multiply` i) memTaint t) =
+  ()

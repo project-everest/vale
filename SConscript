@@ -102,7 +102,6 @@ verify_options = {
   'src/arch/x64/interop/Vale_memcpy.fst': None,
   'src/arch/x64/interop/Vale_memcpy.fsti': None,
   'src/crypto/aes/*': None,
-  'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 

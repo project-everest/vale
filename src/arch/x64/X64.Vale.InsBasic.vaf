@@ -78,6 +78,16 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list
 {
 }
 
+
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), Public))}{:fast_instruction}{:quick exportOnly} Add64Wrap_Mem(inout dst: dst_opr64, src: opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap(dst, src));
+        cf(efl) == old(dst + src >= pow2_64);
+{
+}
+
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddLea64(dst, src1, src2), list(dst), list(dst, src1, src2)), Public))}{:quick exportOnly} AddLea64(out dst: dst_opr64, src1: opr64, src2: opr64)
     requires
         src1 + src2 < pow2_64;
