@@ -193,8 +193,7 @@ procedure {:quick} ghash_core(
     if (len != 0) {
         compute_Y0();
         compute_ghash_incremental(in_b);
-        ghost var in_seq:ghash_plain_LE := to_ghash_plain_LE(buffer128_as_seq(mem, in_b));
-        ghash_incremental_to_ghash(old(h), in_seq);
+        ghash_incremental_to_ghash(old(h), buffer128_as_seq(mem, in_b));
     }
 }
 

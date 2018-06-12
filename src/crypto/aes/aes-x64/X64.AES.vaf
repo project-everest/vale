@@ -63,8 +63,7 @@ procedure{:quick} KeyExpansionRound(
     Store128_buffer(rdx, xmm1, 16 * (round + 1), dst, round + 1);
 
     // assert xmm1 == simd_round_key_128(old(xmm1), rcon);
-    ghost var rcon2:nat32 := rcon;
-    lemma_simd_round_key(old(xmm1), rcon2);
+    lemma_simd_round_key(old(xmm1), rcon);
 }
 
 procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(
@@ -128,8 +127,7 @@ procedure{:quick} KeyExpansionStdcall(
 
     Store128_buffer(rdx, xmm1, 0, output_key_expansion_b, 0);
     KeyExpansionRoundUnrolledRecursive(key, output_key_expansion_b, 10);
-    ghost var key2:aes_key_LE(AES_128) := key;
-    lemma_expand_key_128(key2, 11);
+    lemma_expand_key_128(key, 11);
 
     // Clear secrets out of registers
     Pxor(xmm1, xmm1);
