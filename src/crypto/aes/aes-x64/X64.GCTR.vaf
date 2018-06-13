@@ -183,7 +183,7 @@ procedure {:quick} gctr_core(
         Add64(rdx, 1);
         Add64(r9, 16);
         Add64(r10, 16);
-        inc32(icb, xmm4);
+        Inc32(icb, xmm4);
     }
 
     // Call a helpful lemma

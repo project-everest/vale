@@ -167,7 +167,7 @@ procedure {:quick} gcm_one_pass(
         Add64(rdx, 1);
         Add64(r9, 16);
         Add64(r10, 16);
-        inc32(icb, one);
+        Inc32(icb, one);
     }
 
 //    assert length(buffer128_as_seq(mem, in_b)) == length(buffer128_as_seq(mem, out_b));
