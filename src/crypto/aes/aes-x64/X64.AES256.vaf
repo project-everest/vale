@@ -11,6 +11,7 @@ open Types_s
 open FStar.Seq
 open AES_s
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -128,7 +129,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
         xmm3 == expand_key_256(key, 1);
         xmm1 == buffer128_read(dst, 0, mem);
         xmm3 == buffer128_read(dst, 1, mem);
-        rdx == buffer_addr(dst);
+        rdx == buffer_addr(dst, mem);
     ensures
         modifies_buffer128(dst, old(mem), mem);
         buffer128_read(dst, n, mem) == (if (n % 2 = 0) then xmm1 else xmm3);
@@ -215,7 +216,7 @@ procedure{:quick} AES256EncryptRound(
     requires
         1 <= n < 14 <= length(round_keys);
         xmm0 == rounds(init, round_keys, n - 1);
-        r8 == buffer_addr(keys_buffer);
+        r8 == buffer_addr(keys_buffer, mem);
         validSrcAddrs128(mem, r8, keys_buffer, 15);
         buffer128_read(keys_buffer, n, mem) == index(round_keys, n);
     ensures
@@ -240,7 +241,7 @@ procedure{:quick} AES256EncryptBlock(
         length(round_keys) == 15;
         round_keys == key_to_round_keys_LE(AES_256, key);
         xmm0 == input;
-        r8 == buffer_addr(keys_buffer);
+        r8 == buffer_addr(keys_buffer, mem);
         validSrcAddrs128(mem, r8, keys_buffer, 15);
         forall i:int :: 0 <= i < 15 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
     ensures
@@ -291,7 +292,7 @@ procedure{:quick} AES256EncryptBlockStdcall(
         expanded_key_ptr := if win then r8 else rdx;
     requires
         buffer128_read(input_buffer, 0, mem) == input;
-        expanded_key_ptr == buffer_addr(keys_buffer);
+        expanded_key_ptr == buffer_addr(keys_buffer, mem);
         validSrcAddrs128(mem, input_ptr, input_buffer, 1);
         validSrcAddrs128(mem, output_ptr, output_buffer, 1);
         validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, 15);

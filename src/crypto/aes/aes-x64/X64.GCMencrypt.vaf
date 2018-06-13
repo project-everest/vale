@@ -29,6 +29,7 @@ open GCM_helpers_i
 open X64.GHash
 open X64.GCTR
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -83,7 +84,7 @@ procedure {:quick} gcm_one_pass_blocks(
         // AES reqs
         length(round_keys) == 11;
         round_keys == key_to_round_keys_LE(AES_128, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
@@ -131,7 +132,7 @@ procedure {:quick} gcm_one_pass_blocks(
             // AES reqs
             length(round_keys) == 11;
             round_keys == key_to_round_keys_LE(AES_128, key);
-            r8 == buffer_addr(keys_b);
+            r8 == buffer_addr(keys_b, mem);
             validSrcAddrs128(mem, r8, keys_b, 11);
             buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -213,7 +214,7 @@ procedure {:quick} gcm_one_pass(
         // AES reqs
         length(round_keys) == 11;
         round_keys == key_to_round_keys_LE(AES_128, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, 11);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures

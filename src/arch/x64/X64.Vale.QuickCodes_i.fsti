@@ -2,6 +2,7 @@
 
 module X64.Vale.QuickCodes_i
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -183,7 +184,7 @@ let valid_cmp (c:cmp) (s:state) : Type0 =
   | Cmp_gt o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
 
 [@va_qattr]
-let eval_cmp (s:state) (c:cmp) : bool =
+let eval_cmp (s:state) (c:cmp) : GTot bool =
   match c with
   | Cmp_eq o1 o2 -> va_eval_opr64 s o1 =  va_eval_opr64 s o2
   | Cmp_ne o1 o2 -> va_eval_opr64 s o1 <> va_eval_opr64 s o2

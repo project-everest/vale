@@ -12,6 +12,7 @@ open Types_s
 open FStar.Seq
 open AES_s
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -33,7 +34,6 @@ open X64.AES256
 ///////////////////////////
 // KEY EXPANSION
 ///////////////////////////
-
 
 procedure{:quick} KeyExpansionStdcall(
     inline win:bool,
@@ -96,7 +96,7 @@ procedure{:quick} AESEncryptBlock(
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
         xmm0 == input;
-        r8 == buffer_addr(keys_buffer);
+        r8 == buffer_addr(keys_buffer, mem);
         validSrcAddrs128(mem, r8, keys_buffer, nr(alg) + 1);
         forall i:int :: 0 <= i < nr(alg) + 1 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
     ensures
@@ -132,7 +132,7 @@ procedure{:quick} AESEncryptBlockStdcall(
     requires
         alg = AES_128 || alg = AES_256;
         buffer128_read(input_buffer, 0, mem) == input;
-        expanded_key_ptr == buffer_addr(keys_buffer);
+        expanded_key_ptr == buffer_addr(keys_buffer, mem);
         validSrcAddrs128(mem, input_ptr, input_buffer, 1);
         validSrcAddrs128(mem, output_ptr, output_buffer, 1);
         validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, nr(alg) + 1);
