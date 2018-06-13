@@ -6,7 +6,7 @@ open X64.Machine_s
 open X64.Poly1305.Math_i
 open X64.Vale.Decls_i
 open Opaque_i
-open X64.Memory_i_s
+open X64.Memory_i
 
 // Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec
 let heapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) : int->nat128 =

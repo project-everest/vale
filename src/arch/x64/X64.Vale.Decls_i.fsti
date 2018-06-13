@@ -1,11 +1,11 @@
 module X64.Vale.Decls_i
-module M = X64.Memory_i_s
+module M = X64.Memory_i
 
 // This interface should hide all of Semantics_s.
 // (It should not refer to Semantics_s, directly or indirectly.)
-// It should not refer to StateLemmas_i, Lemmas_i, or Print_s,
+// It should not refer to Memory_i_s, StateLemmas_i, Lemmas_i, or Print_s,
 // because they refer to Semantics_s.
-// Regs_i and State_i are ok, because they do not refer to Semantics_s.
+// Memory_i, Regs_i and State_i are ok, because they do not refer to Semantics_s.
 
 open X64.Machine_s
 open X64.Vale.State_i

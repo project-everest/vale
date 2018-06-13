@@ -10,7 +10,7 @@ open Words.Four_s
 open Types_s
 open Types_i
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -24,7 +24,7 @@ let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
 #verbatim
 open Types_s
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale
 open X64.Vale.State_i
 open X64.Vale.StateLemmas_i

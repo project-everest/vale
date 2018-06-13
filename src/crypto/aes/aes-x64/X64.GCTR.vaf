@@ -16,7 +16,7 @@ open GCTR_s
 open GCTR_i
 open Words.Two_s
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic

@@ -73,9 +73,11 @@ verify_options = {
 
   # Any use of expose_interfaces requires adding to manual_dependencies
   'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
-  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
-  'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces src/arch/x64/X64.Memory_i.fst'),
+  'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces src/arch/x64/X64.Memory_i.fst'),
   'obj/arch/x64/X64.Vale.InsAes.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'src/arch/x64/X64.Vale.StateLemmas_i.fsti': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Memory_i.fst'),
+  'src/arch/x64/X64.Vale.StateLemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces src/arch/x64/X64.Memory_i.fst'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),

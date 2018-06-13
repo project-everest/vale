@@ -25,7 +25,7 @@ open GF128_i
 open X64.GHash
 open X64.GCTR
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -326,6 +326,7 @@ procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64
         PushXmm(xmm10, rax, stack_b, 15);
         PushXmm(xmm8,  rax, stack_b, 13);
         assert hi64(xmm8) == buffer64_read(stack_b, 12, mem); // HACK
+        assert lo64(xmm8) == buffer64_read(stack_b, 13, mem); // HACK
         PushXmm(xmm7,  rax, stack_b, 11);
         PushXmm(xmm6,  rax, stack_b,  9);
     }

@@ -1,7 +1,6 @@
-module X64.Memory_i_s
+module X64.Memory_i
 
 open X64.Machine_s
-module S = X64.Bytes_Semantics_s
 
 val heap : Type u#1
 val mem : Type u#1
@@ -51,27 +50,6 @@ unfold let buffer16 = buffer (TBase TUInt16)
 unfold let buffer32 = buffer (TBase TUInt32)
 unfold let buffer64 = buffer (TBase TUInt64)
 unfold let buffer128 = buffer (TBase TUInt128)
-
-//TODO : Review, we may want to do this through expose interface
-noeq type state' = {
-  state: S.state;
-  mem: mem;
-}
-
-val valid_state (s:state') : Type0
-
-val frame_valid (s1:state') : Lemma 
-   (forall s2. s1.state.S.mem == s2.state.S.mem /\ s1.mem == s2.mem ==>
-     (valid_state s1 <==> valid_state s2))
-   [SMTPat (valid_state s1)]
-
-type state = (s:state'{valid_state s})
-
-val get_heap: (h:mem) -> GTot (m:S.heap{forall s. 
-  s.state.S.mem == m /\ s.mem == h ==> valid_state s})
-
-val same_heap: (s1:state) -> (s2:state) -> Lemma (
-  s1.mem == s2.mem ==> s1.state.S.mem == s2.state.S.mem)
 
 val buffer_addr : #t:typ -> b:buffer t -> h:mem -> GTot int
 
@@ -315,13 +293,3 @@ val lemma_frame_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
 val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
   let h' = store_mem128 i v h in
   forall j. valid_mem128 j h <==> valid_mem128 j h')
-
-val valid_state_store_mem64: ptr:int -> v:nat64 -> s:state -> Lemma (
-  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
-  else s.state; mem = store_mem64 ptr v s.mem } in
-  valid_state s')
-
-val valid_state_store_mem128: ptr:int -> v:quad32 -> s:state -> Lemma (
-  let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state 
-  else s.state; mem = store_mem128 ptr v s.mem } in
-  valid_state s')
