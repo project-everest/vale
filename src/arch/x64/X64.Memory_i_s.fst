@@ -2,8 +2,8 @@ module X64.Memory_i_s
 
 module I = Interop64
 module HS = FStar.HyperStack
-module B = FStar.Buffer
-module M = FStar.Modifies
+module B = LowStar.Buffer
+module M = LowStar.Modifies
 module S = X64.Bytes_Semantics_s
 module H = FStar.Heap
 
@@ -98,7 +98,7 @@ let same_heap s1 s2 = ()
 
 let buffer_addr #t b h =
   let addrs = h.addrs in
-  addrs.[(B.as_addr b, B.idx b, B.length b)]
+  addrs (m_of_typ t) b
 
 let loc_readable h s = unit // admit()
 let loc_readable_none = admit()
@@ -172,25 +172,13 @@ let buffer_read #t b i h =
   if i < 0 || i >= buffer_length b then default_of_typ t else
   Seq.index (buffer_as_seq h b) i
 
-// Proven but private in FStar.Buffer
-assume private val lemma_aux: (#t:typ) -> b:buffer t -> n:nat{n < B.length b} -> z:m_of_typ t
-  -> h0:HS.mem -> Lemma
-  (requires True)
-  (ensures (B.live h0 b) ==> (B.live h0 b
-/\ B.modifies_1 b h0 (HS.upd h0 (B.content b) (Seq.upd (B.sel h0 b) (B.idx b + n) z)) ))
-
 let buffer_write #t b i v h =
  if i < 0 || i >= buffer_length b then h else
- begin
- let vu = v_of_typ t v in
- let s0 = B.sel h.hs b in
- let s = Seq.upd s0 (B.idx b + i) vu in
- let h' = HS.upd h.hs (B.content b) s in
- let h' = {h with hs = h'} in
- lemma_aux b i vu h.hs;
+ let hs' = B.g_upd_seq b (Seq.upd (B.as_seq h.hs b) i (v_of_typ t v)) h.hs in
+ B.g_upd_seq_as_seq b (Seq.upd (B.as_seq h.hs b) i (v_of_typ t v)) h.hs;
+ let h':mem = {h with hs = hs'} in
  assert (Seq.equal (buffer_as_seq h' b) (Seq.upd (buffer_as_seq h b) i v));
  h'
- end
 
 val addr_in_ptr: (addr:int) -> (ptr:buffer64) -> (h:mem) ->
   GTot (b:bool{ not b <==> (forall i. 0 <= i /\ i < B.length ptr ==> 
@@ -242,7 +230,7 @@ let load_mem64 ptr h =
   else load_mem_aux ptr h.ptrs h
 
 let rec store_mem_aux addr (ps:list buffer64) (v:nat64) (h:mem{forall x. List.memP x ps ==> List.memP x h.ptrs }) : 
-  GTot (h1:mem{h.addrs == h1.addrs /\ h.ptrs == h1.ptrs /\ (forall (b:buffer64). B.live h.hs b <==> B.live h1.hs b)}) =
+  GTot (h1:mem{h.addrs == h1.addrs /\ h.ptrs == h1.ptrs }) =
   match ps with
   | [] -> h
   | a::q ->
@@ -253,8 +241,6 @@ let rec store_mem_aux addr (ps:list buffer64) (v:nat64) (h:mem{forall x. List.me
       buffer_write a (get_addr_in_ptr n base addr 0) v h
     end
     else store_mem_aux addr q v h
-
-
 
 let store_mem64 i v h =
   if not (valid_mem64 i h) then h
@@ -345,7 +331,7 @@ let rec written_buffer_down_aux1 (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
       (decreases %[i-k]) =
     if k >= i then ()
     else begin
-      assert (Seq.index (B.as_seq h.hs b) k == Seq.index (B.as_seq h1.hs b) k);
+      assert (Seq.index (buffer_as_seq h1 b) k == Seq.index (buffer_as_seq h b) k);
       Bytes_Semantics_i.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
       written_buffer_down_aux1 b i v ps h base (k+1) h1 mem1 mem2
     end
@@ -368,8 +354,8 @@ let rec written_buffer_down_aux2 (b:buffer64) (i:nat{i < B.length b}) (v:nat64)
       (decreases %[n-k]) =
     if k >= n then ()
     else begin
-      assert (Seq.index (B.as_seq h.hs b) k == Seq.index (B.as_seq h1.hs b) k);
-      Bytes_Semantics_i.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
+      assert (Seq.index (buffer_as_seq h1 b) k == Seq.index (buffer_as_seq h b) k);    
+       Bytes_Semantics_i.same_mem_get_heap_val (base + 8 `op_Multiply` k) mem1 mem2;
       written_buffer_down_aux2 b i v ps h base n (k+1) h1 mem1 mem2
     end
     
@@ -516,8 +502,8 @@ let store_buffer_aux_down_mem2 (ptr:int) (v:nat64) (h:mem{valid_mem64 ptr h}) : 
     | [] -> ()
     | a::q ->
       if addr_in_ptr ptr a h0 then () else aux q h0    
-  in aux h.ptrs h;
-  assert (UInt64.v (Seq.index (B.as_seq h1.hs b) i) == v);
+  in aux h.ptrs h;  
+  assert (Seq.index (buffer_as_seq h1 b) i == v);
   ()
 
 let valid_state_store_mem64 i v (s:state) =
