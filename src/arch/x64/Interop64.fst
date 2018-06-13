@@ -268,7 +268,7 @@ let frame_write_low_mem64 heap length addr (buf:(B.buffer UInt64.t){length = B.l
         let r1 : t1  = B.as_ref b in
         let r2' : Heap.mref ty2 (Heap.trivial_preorder _) = B.as_ref buf in
         let r2 : t1 = r2' in
-	ref_extensionality #ty1 #(Heap.trivial_preorder _)  (Map.sel mem.HS.h (B.frameOf b)) r1 r2 ;
+	ref_extensionality #ty1 #(Heap.trivial_preorder _)  (Map.sel (HS.get_hmap mem) (B.frameOf b)) r1 r2 ;
 	assert (Seq.equal (B.as_seq mem b) (B.as_seq new_mem b))
       end
     in Classical.forall_intro aux
