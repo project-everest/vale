@@ -75,8 +75,10 @@ let view_n = function
   | TBase TUInt64 -> 8
   | TBase TUInt128 -> 16
 
-assume val uint64_view: (v:BV.view UInt8.t UInt64.t{BV.View?.n v == view_n (TBase TUInt64)})
+val uint64_view: (v:BV.view UInt8.t UInt64.t{BV.View?.n v == view_n (TBase TUInt64)})
 assume val uint128_view: (v:BV.view UInt8.t quad32{BV.View?.n v == view_n (TBase TUInt128)})
+
+let uint64_view = Views.view64
 
 val uint_view (t:typ) : (v:BV.view UInt8.t (m_of_typ t){BV.View?.n v == view_n t})
 
@@ -93,7 +95,6 @@ let buffer_as_seq #t h b =
   let contents (i:nat{i < len}) : type_of_typ t = v_to_typ t (Seq.index s i) in
   Seq.init len contents
 
-// TODO: Fix this
 let buffer_readable #t h b = List.memP b h.ptrs
 let buffer_length #t b = BV.length (BV.mk_buffer_view b (uint_view t))
 let loc = M.loc
@@ -103,7 +104,6 @@ let loc_buffer #t b = M.loc_buffer b
 let loc_disjoint = M.loc_disjoint
 let loc_includes = M.loc_includes
 let modifies s h h' = 
-  let _ = () in
   M.modifies s h.hs h'.hs /\ h.ptrs == h'.ptrs /\ h.addrs == h'.addrs
 
 let valid_state s = s.state.S.mem == I.down_mem s.mem.hs s.mem.addrs s.mem.ptrs
@@ -119,37 +119,31 @@ let buffer_addr #t b h =
   addrs b
 
 val index64_get_heap_val64 (h:mem)
-			   (b:buffer64)
+			   (b:buffer64{List.memP b h.ptrs})
 			   (heap:S.heap{I.correct_down h.hs h.addrs h.ptrs heap})
 			   (i:nat{i < buffer_length b}) : Lemma
 (Seq.index (buffer_as_seq h b) i == S.get_heap_val64 (buffer_addr b h + 8 `op_Multiply` i) heap)
 
-// TODO: Prove this
-let index64_get_heap_val64 h b heap i = admit()
+#set-options "--z3rlimit 20"
 
-let loc_readable h s = unit // admit()
-let loc_readable_none = admit()
-let loc_readable_union = admit()
-let loc_readable_buffer #t h b = admit()
+let index64_get_heap_val64 h b heap i =
+  let open FStar.Mul in
+  let vb = BV.mk_buffer_view b uint64_view in
+  let ptr = buffer_addr b h + 8 * i in
+  let s = B.as_seq h.hs b in
+  BV.length_eq vb;
+  BV.view_indexing vb i;
+  BV.as_buffer_mk_buffer_view b uint64_view;
+  BV.get_view_mk_buffer_view b uint64_view;
+  BV.as_seq_sel h.hs vb i;
+  BV.get_sel h.hs vb i;
+  Opaque_i.reveal_opaque S.get_heap_val64_def;
+  ()
 
 let modifies_goal_directed s h1 h2 = modifies s h1 h2
 let lemma_modifies_goal_directed s h1 h2 = ()
 
 let buffer_length_buffer_as_seq #t h b = ()
-
-val modifies_loc_readable (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
-  (requires
-    loc_readable h' p /\
-    buffer_readable h b /\
-    modifies p h h'
-  )
-  (ensures
-    buffer_readable h' b
-  )
-
-let modifies_loc_readable #t b p h h' =
-  // TODO
-  admit ()
 
 val same_underlying_seq (#t:typ) (h1 h2:mem) (b:buffer t) : Lemma
   (requires Seq.equal (B.as_seq h1.hs b) (B.as_seq h2.hs b))
@@ -163,7 +157,6 @@ let same_underlying_seq #t h1 h2 b =
     (decreases %[(buffer_length b) - i]) =
     if i = buffer_length b then ()
     else (
-      assume (t = TBase TUInt64);
       let bv = BV.mk_buffer_view b (uint_view t) in
       BV.as_buffer_mk_buffer_view b (uint_view t);
       BV.get_view_mk_buffer_view b (uint_view t);
@@ -176,20 +169,11 @@ let same_underlying_seq #t h1 h2 b =
   in aux 0
 
 let modifies_buffer_elim #t1 b p h h' =
-  if buffer_length b > 0 then
-  (
-    M.modifies_buffer_elim b p h.hs h'.hs;
-    assert (Seq.equal (B.as_seq h.hs b) (B.as_seq h'.hs b));
-    same_underlying_seq h h' b;
-    assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
-    ()
-  )
-  else
-  (
-    modifies_loc_readable b p h h';
-    assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
-    ()
-  )
+  M.modifies_buffer_elim b p h.hs h'.hs;
+  assert (Seq.equal (B.as_seq h.hs b) (B.as_seq h'.hs b));
+  same_underlying_seq h h' b;
+  assert (Seq.equal (buffer_as_seq h b) (buffer_as_seq h' b));
+  ()
 
 let modifies_buffer_addr #t b p h h' = ()
 

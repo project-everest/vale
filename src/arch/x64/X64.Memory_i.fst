@@ -29,10 +29,6 @@ let loc_includes = M.loc_includes
 let modifies = M.modifies
 
 let buffer_addr #t b m = M.buffer_addr b m
-let loc_readable = M.loc_readable
-let loc_readable_none = M.loc_readable_none
-let loc_readable_union = M.loc_readable_union
-let loc_readable_buffer #t h b = M.loc_readable_buffer h b
 
 let modifies_goal_directed s h1 h2 = modifies s h1 h2
 let lemma_modifies_goal_directed s h1 h2 = ()

@@ -75,22 +75,6 @@ val same_heap: (s1:state) -> (s2:state) -> Lemma (
 
 val buffer_addr : #t:typ -> b:buffer t -> h:mem -> GTot int
 
-val loc_readable (h:mem) (s:loc) : GTot Type0
-
-val loc_readable_none (h:mem) : Lemma
-  (ensures (loc_readable h loc_none))
-  [SMTPat (loc_readable h loc_none)]
-
- val loc_readable_union (h:mem) (s1 s2:loc) : Lemma
-  (requires (loc_readable h s1 /\ loc_readable h s2))
-  (ensures (loc_readable h (loc_union s1 s2)))
-  [SMTPat (loc_readable h (loc_union s1 s2))]
-
-val loc_readable_buffer (#t:typ) (h:mem) (b:buffer t) : Lemma
-  (requires (buffer_readable h b))
-  (ensures (loc_readable h (loc_buffer b)))
-  [SMTPat (loc_readable h (loc_buffer b))]
-
 let rec loc_locs_disjoint_rec (l:loc) (ls:list loc) : Type0 =
   match ls with
   | [] -> True
@@ -117,7 +101,6 @@ val buffer_length_buffer_as_seq (#t:typ) (h:mem) (b:buffer t) : Lemma
 val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
   (requires
     loc_disjoint (loc_buffer b) p /\
-    loc_readable h' p /\
     buffer_readable h b /\
     modifies p h h'
   )
@@ -133,7 +116,6 @@ val modifies_buffer_elim (#t1:typ) (b:buffer t1) (p:loc) (h h':mem) : Lemma
 
 val modifies_buffer_addr (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
   (requires
-    loc_readable h' p /\
     modifies p h h'
   )
   (ensures buffer_addr b h == buffer_addr b h')
