@@ -75,17 +75,26 @@ let view_n = function
   | TBase TUInt64 -> 8
   | TBase TUInt128 -> 16
 
+val uint8_view: (v:BV.view UInt8.t UInt8.t{BV.View?.n v == view_n (TBase TUInt8)})
+val uint16_view: (v:BV.view UInt8.t UInt16.t{BV.View?.n v == view_n (TBase TUInt16)})
+val uint32_view: (v:BV.view UInt8.t UInt32.t{BV.View?.n v == view_n (TBase TUInt32)})
 val uint64_view: (v:BV.view UInt8.t UInt64.t{BV.View?.n v == view_n (TBase TUInt64)})
-assume val uint128_view: (v:BV.view UInt8.t quad32{BV.View?.n v == view_n (TBase TUInt128)})
+val uint128_view: (v:BV.view UInt8.t quad32{BV.View?.n v == view_n (TBase TUInt128)})
 
+let uint8_view = Views.view8
+let uint16_view = Views.view16
+let uint32_view = Views.view32
 let uint64_view = Views.view64
+let uint128_view = Views.view128
 
 val uint_view (t:typ) : (v:BV.view UInt8.t (m_of_typ t){BV.View?.n v == view_n t})
 
 let uint_view = function
+  | TBase TUInt8 -> uint8_view
+  | TBase TUInt16 -> uint16_view
+  | TBase TUInt32 -> uint32_view
   | TBase TUInt64 -> uint64_view
   | TBase TUInt128 -> uint128_view
-  | _ -> admit()
 
 let buffer t = (b:B.buffer UInt8.t{B.length b % view_n t == 0})
 

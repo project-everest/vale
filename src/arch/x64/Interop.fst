@@ -217,7 +217,6 @@ let unspecified_down mem addrs ptrs =
   assert (Set.equal (Map.domain heap) (Set.complement Set.empty));
   let (heap:X64.Bytes_Semantics_s.heap) = heap in      
   frame_down_mem_aux ptrs addrs mem ptrs [] heap
-
   
 val same_unspecified_down: 
   (mem1: HS.mem) -> 
