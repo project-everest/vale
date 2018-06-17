@@ -70,7 +70,7 @@ let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
   valid_state_store_mem64 ptr v s;
   s'
 
-let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
+let update_mem128 (ptr:int) (v:quad32) (s:state) : GTot state =
   let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state
     else s.state ; mem = store_mem128 ptr v s.mem } in
  valid_state_store_mem128 ptr v s;
@@ -79,7 +79,7 @@ let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
 let valid_maddr (m:maddr) (s:state) : GTot bool =
   valid_mem64 (eval_maddr m s) s.mem
 
-let valid_maddr128 (m:maddr) (s:state) : bool =
+let valid_maddr128 (m:maddr) (s:state) : GTot bool =
   valid_mem128 (eval_maddr m s) s.mem
 
 let valid_operand (o:operand) (s:state) : GTot bool =
@@ -88,7 +88,7 @@ let valid_operand (o:operand) (s:state) : GTot bool =
   | OReg r -> true
   | OMem m -> valid_maddr m s
 
-let valid_mov128_op (o:mov128_op) (s:state) : bool =
+let valid_mov128_op (o:mov128_op) (s:state) : GTot bool =
   match o with
   | Mov128Xmm i -> true (* We leave it to the printer/assembler to object to invalid XMM indices *)
   | Mov128Mem m -> valid_maddr128 m s
@@ -114,7 +114,7 @@ let update_operand_preserve_flags' (o:operand) (v:nat64) (s:state) : GTot state 
   | OReg r -> update_reg' r v s
   | OMem m -> update_mem (eval_maddr m s) v s // see valid_maddr for how eval_maddr connects to b and i
 
-let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : state =
+let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : GTot state =
   match o with
   | Mov128Xmm i -> update_xmm' i v s
   | Mov128Mem m -> update_mem128 (eval_maddr m s) v s

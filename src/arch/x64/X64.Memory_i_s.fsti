@@ -217,9 +217,9 @@ val valid_mem64 : ptr:int -> h:mem -> GTot bool // is there a 64-bit word at add
 val load_mem64 : ptr:int -> h:mem -> GTot nat64 // the 64-bit word at ptr (if valid_mem64 holds)
 val store_mem64 : ptr:int -> v:nat64 -> h:mem -> GTot mem
 
-val valid_mem128 (ptr:int) (h:mem) : bool
-val load_mem128  (ptr:int) (h:mem) : quad32 
-val store_mem128 (ptr:int) (v:quad32) (h:mem) : mem
+val valid_mem128 (ptr:int) (h:mem) : GTot bool
+val load_mem128  (ptr:int) (h:mem) : GTot quad32 
+val store_mem128 (ptr:int) (v:quad32) (h:mem) : GTot mem
 
 val lemma_valid_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma
   (requires
@@ -288,7 +288,8 @@ val lemma_valid_store_mem64: i:int -> v:nat64 -> h:mem -> Lemma (
   forall j. valid_mem64 j h <==> valid_mem64 j h')
 
 val lemma_store_load_mem128 : ptr:int -> v:quad32 -> h:mem -> Lemma
-  (load_mem128 ptr (store_mem128 ptr v h) = v)
+  (requires valid_mem128 ptr h)
+  (ensures load_mem128 ptr (store_mem128 ptr v h) = v)
 
 val lemma_frame_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
   let h' = store_mem128 i v h in
