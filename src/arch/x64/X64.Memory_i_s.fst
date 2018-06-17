@@ -309,6 +309,30 @@ let load_mem64 ptr h =
   if not (valid_mem64 ptr h) then 0
   else load_mem_aux64 ptr h.ptrs h
 
+let length64_eq (b:buffer64) : Lemma (B.length b == buffer_length b `op_Multiply` 8) =
+  BV.as_buffer_mk_buffer_view b uint64_view;
+  BV.get_view_mk_buffer_view b uint64_view;
+  BV.length_eq (BV.mk_buffer_view b uint64_view)
+
+
+let rec get_addr_ptr64 (ptr:int) (h:mem) (ps:list (B.buffer UInt8.t){valid_mem_aux64 ptr ps h}) : 
+  GTot (b:buffer64{List.memP b ps /\ valid_buffer64 ptr b h}) =
+  match ps with
+  // The list cannot be empty because of the mem predicate
+  | a::q -> if valid_buffer64 ptr a h then a else get_addr_ptr64 ptr h q
+
+let rec load_buffer_read64 (ptr:int) (h:mem) 
+  (ps:list (B.buffer UInt8.t){I.list_disjoint_or_eq ps /\ valid_mem_aux64 ptr ps h /\
+    (forall x. List.memP x ps ==> List.memP x h.ptrs)}) : Lemma
+  (let b = get_addr_ptr64 ptr h ps in
+   length64_eq b;
+   let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
+   load_mem_aux64 ptr ps h == buffer_read b i h) =
+      match ps with
+      | [] -> ()
+      | a::q ->
+        if valid_buffer64 ptr a h then () else load_buffer_read64 ptr h q    
+
 let rec store_mem_aux64 addr (ps:list (B.buffer UInt8.t)) (v:nat64) (h:mem{forall x. List.memP x ps ==> List.memP x h.ptrs }) : 
   GTot (h1:mem{h.addrs == h1.addrs /\ h.ptrs == h1.ptrs }) =
   match ps with
@@ -325,6 +349,18 @@ let rec store_mem_aux64 addr (ps:list (B.buffer UInt8.t)) (v:nat64) (h:mem{foral
 let store_mem64 i v h =
   if not (valid_mem64 i h) then h
   else store_mem_aux64 i h.ptrs v h
+
+let rec store_buffer_write64 (ptr:int) (v:nat64) (h:mem) 
+  (ps:list (B.buffer UInt8.t){I.list_disjoint_or_eq ps /\ valid_mem_aux64 ptr ps h /\
+    (forall x. List.memP x ps ==> List.memP x h.ptrs)}) : Lemma
+  (let b = get_addr_ptr64 ptr h ps in
+   length64_eq b;
+   let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
+   store_mem_aux64 ptr ps v h == buffer_write b i v h) =
+      match ps with
+      | [] -> ()
+      | a::q ->
+        if valid_buffer64 ptr a h then () else store_buffer_write64 ptr v h q   
 
 let valid_mem128 ptr h = admit()
 let load_mem128 ptr h = admit()
@@ -396,14 +432,101 @@ let lemma_valid_mem128 b i h = admit()
 let lemma_load_mem128 b i h = admit()
 let lemma_store_mem128 b i v h = admit()
 
-let rec get_addr_ptr64 (ptr:int) (h:mem) (ps:list (B.buffer UInt8.t){valid_mem_aux64 ptr ps h}) : 
-  GTot (b:buffer64{List.memP b ps /\ valid_buffer64 ptr b h}) =
+let rec same_get_addr_ptr64 (ptr:int)
+			(h:mem) 
+			(ps:list (B.buffer UInt8.t){valid_mem_aux64 ptr ps h})
+			(b:buffer64{List.memP b h.ptrs}) 
+			(i:nat{i < buffer_length b}) 
+			(v:nat64) : Lemma
+  (let h1 = buffer_write b i v h in
+  get_addr_ptr64 ptr h ps == get_addr_ptr64 ptr h1 ps) =
   match ps with
-  // The list cannot be empty because of the mem predicate
-  | a::q -> if valid_buffer64 ptr a h then a else get_addr_ptr64 ptr h q
+  | a::q -> if valid_buffer64 ptr a h then () else same_get_addr_ptr64 ptr h q b i v
 
-let lemma_store_load_mem64 ptr v h = admit()
-let lemma_frame_store_mem64 i v h = admit()
+let lemma_store_load_mem64 ptr v h =
+  let h1 = store_mem64 ptr v h in
+  store_buffer_write64 ptr v h h.ptrs;  
+  load_buffer_read64 ptr h1 h1.ptrs;    
+  let b = get_addr_ptr64 ptr h h.ptrs in
+  length64_eq b;
+  let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
+  same_get_addr_ptr64 ptr h h.ptrs b i v;
+  BV.as_buffer_mk_buffer_view b uint64_view;
+  BV.as_seq_sel h1.hs (BV.mk_buffer_view b uint64_view) i;
+  ()
+
+val different_addr_ptr64 (i:int) (i':nat{i <> i'}) 
+		       (h:mem{valid_mem64 i h /\ valid_mem64 i' h}) : Lemma
+  (get_addr_ptr64 i h h.ptrs =!= get_addr_ptr64 i' h h.ptrs \/
+    (let b = get_addr_ptr64 i h h.ptrs in
+     let b' = get_addr_ptr64 i' h h.ptrs in
+     b == b' /\ get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) i 0 <>
+      get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) i' 0))
+
+let rec different_addr_in_ptr64 (n base:nat) (addr1 addr2:nat) (i:nat{
+  (exists j. i <= j /\ j < n /\ base + 8 `op_Multiply` j == addr1) /\
+  (exists k. i <= k /\ k < n /\ base + 8 `op_Multiply` k == addr2)}) : Lemma
+  (requires addr1 <> addr2)
+  (ensures get_addr_in_ptr64 n base addr1 i <> get_addr_in_ptr64 n base addr2 i)
+  (decreases %[n-i]) =
+   if (base + 8 `op_Multiply` i = addr1) || (base + 8 `op_Multiply` i = addr2) || i >= n then ()
+   else different_addr_in_ptr64 n base addr1 addr2 (i+1)
+
+let different_addr_ptr64 i i' h =
+  let rec aux (ps:list (B.buffer UInt8.t){valid_mem_aux64 i ps h /\ valid_mem_aux64 i' ps h}) :
+    Lemma (get_addr_ptr64 i h ps =!= get_addr_ptr64 i' h ps \/
+    (let b = get_addr_ptr64 i h ps in
+     let b' = get_addr_ptr64 i' h ps in
+     b == b' /\ get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) i 0 <>
+      get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) i' 0)) =
+     match ps with
+     | a::q -> if valid_buffer64 i a h then begin
+       if valid_buffer64 i' a h then begin
+         assert (get_addr_ptr64 i h ps == a);
+	 assert (get_addr_ptr64 i' h ps == a);
+	 let a:buffer64 = a in
+	 length64_eq a;
+	 different_addr_in_ptr64 (buffer_length a) (buffer_addr a h) i i' 0
+       end
+       else ()
+       end else if valid_buffer64 i' a h then ()
+       else aux q
+  in aux h.ptrs
+
+
+let lemma_frame_store_mem64 ptr v h =
+  let h1 = store_mem64 ptr v h in
+  let aux i' : Lemma 
+    (requires i' <> ptr /\ valid_mem64 ptr h /\ valid_mem64 i' h)
+    (ensures load_mem64 i' h == load_mem64 i' h1) =
+    store_buffer_write64 ptr v h h.ptrs;  
+    load_buffer_read64 i' h1 h1.ptrs;
+    load_buffer_read64 i' h h.ptrs;
+    let b1 = get_addr_ptr64 ptr h h.ptrs in
+    let i1 = get_addr_in_ptr64 (buffer_length b1) (buffer_addr b1 h) ptr 0 in
+    let b2 = get_addr_ptr64 i' h h.ptrs in
+    let i2 = get_addr_in_ptr64 (buffer_length b2) (buffer_addr b2 h) i' 0 in
+    same_get_addr_ptr64 i' h h.ptrs b1 i1 v;
+    BV.as_buffer_mk_buffer_view b1 uint64_view;
+    BV.upd_modifies h.hs (BV.mk_buffer_view b1 uint64_view) i1 (v_of_typ (TBase TUInt64) v);
+    assert (load_mem64 i' h == buffer_read b2 i2 h);
+    assert (load_mem64 i' h1 == buffer_read b2 i2 h1);
+    different_addr_ptr64 ptr i' h;
+    let aux_diff_buf () : Lemma
+      (requires b1 =!= b2)
+      (ensures load_mem64 i' h == load_mem64 i' h1) =
+      BV.as_seq_sel h.hs (BV.mk_buffer_view b2 uint64_view) i2;    
+      BV.as_seq_sel h1.hs (BV.mk_buffer_view b2 uint64_view) i2
+    in let aux_same_buf () : Lemma
+      (requires i1 <> i2 /\ b1 == b2)
+      (ensures load_mem64 i' h == load_mem64 i' h1) =
+      BV.sel_upd (BV.mk_buffer_view b2 uint64_view) i1 i2 (v_of_typ (TBase TUInt64) v) h.hs
+    in
+    Classical.move_requires aux_diff_buf ();
+    Classical.move_requires aux_same_buf ();
+    ()
+  in Classical.forall_intro (Classical.move_requires aux)
+
 let lemma_valid_store_mem64 i v h = ()
 
 let lemma_store_load_mem128 ptr v h = admit()
@@ -581,11 +704,6 @@ let unwritten_buffer_down64 (b:buffer64) (i:nat{i < buffer_length b}) (v:nat64)
     in
     Classical.forall_intro fintro
 
-let length64_eq (b:buffer64) : Lemma (B.length b == buffer_length b `op_Multiply` 8) =
-  BV.as_buffer_mk_buffer_view b uint64_view;
-  BV.get_view_mk_buffer_view b uint64_view;
-  BV.length_eq (BV.mk_buffer_view b uint64_view)
-
 let store_buffer_down64_mem (b:buffer64) (i:nat{i < buffer_length b}) (v:nat64)
   (ps: list (B.buffer UInt8.t){I.list_disjoint_or_eq ps /\ List.memP b ps})
   (h:mem{forall x. List.memP x ps ==> List.memP x h.ptrs}) :
@@ -624,17 +742,7 @@ let store_buffer_aux_down64_mem (ptr:int) (v:nat64) (h:mem{valid_mem64 ptr h}) :
   let b = get_addr_ptr64 ptr h h.ptrs in
   length64_eq b;
   let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
-  let rec aux (ps:list (B.buffer UInt8.t){I.list_disjoint_or_eq ps /\ valid_mem_aux64 ptr ps h}) 
-  (h0:mem{h0.addrs == h.addrs /\ (forall x. List.memP x ps ==> List.memP x h0.ptrs)}) :
-  Lemma (let b = get_addr_ptr64 ptr h ps in
-    length64_eq b;
-    let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
-    store_mem_aux64 ptr ps v h0 == buffer_write b i v h0) =
-    match ps with
-    | [] -> ()
-    | a::q ->
-      if valid_buffer64 ptr a h0 then () else aux q h0    
-  in aux h.ptrs h;
+  store_buffer_write64 ptr v h h.ptrs;
   assert (buffer_addr b h + 8 `op_Multiply` i == ptr);
   assert (buffer_addr b h + 8 `op_Multiply` (i+1) == ptr + 8);
   store_buffer_down64_mem b i v h.ptrs h
@@ -648,17 +756,7 @@ let store_buffer_aux_down64_mem2 (ptr:int) (v:nat64) (h:mem{valid_mem64 ptr h}) 
   let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
   let h1 = store_mem_aux64 ptr h.ptrs v h in
   let mem2 = I.down_mem h1.hs h.addrs h.ptrs in
-  let rec aux (ps:list (B.buffer UInt8.t){I.list_disjoint_or_eq ps /\ valid_mem_aux64 ptr ps h}) 
-  (h0:mem{h0.addrs == h.addrs /\ (forall x. List.memP x ps ==> List.memP x h0.ptrs)}) :
-  Lemma (let b = get_addr_ptr64 ptr h ps in
-    length64_eq b;
-    let i = get_addr_in_ptr64 (buffer_length b) (buffer_addr b h) ptr 0 in
-    store_mem_aux64 ptr ps v h0 == buffer_write b i v h0) =
-    match ps with
-    | [] -> ()
-    | a::q ->
-      if valid_buffer64 ptr a h0 then () else aux q h0    
-  in aux h.ptrs h;  
+  store_buffer_write64 ptr v h h.ptrs;  
   assert (Seq.index (buffer_as_seq h1 b) i == v);
   index64_get_heap_val64 h1 b mem2 i;
   ()
