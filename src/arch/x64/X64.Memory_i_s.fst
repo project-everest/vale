@@ -4,6 +4,7 @@ module I = Interop
 module HS = FStar.HyperStack
 module B = LowStar.Buffer
 module M = LowStar.Modifies
+open LowStar.ModifiesPat
 module BV = LowStar.BufferView
 module S = X64.Bytes_Semantics_s
 module H = FStar.Heap
