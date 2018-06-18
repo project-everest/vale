@@ -27,6 +27,7 @@ let get64 (s:Seq.lseq UInt8.t 8) =
     (UInt8.v (Seq.index s 7))    
   )
 
+//TODO
 assume val put64 (a:UInt64.t) : GTot (Seq.lseq UInt8.t 8)
 assume val inverses64 (u:unit) : Lemma (inverses get64 put64)
 
@@ -90,4 +91,38 @@ let inverses32 (u:unit) : Lemma (inverses get32 put32) =
 
 let view32 = inverses32(); View 4 get32 put32
 
-assume val view128: (v:view UInt8.t quad32{View?.n v == 16})
+let nat8s_to_nat32 (v1 v2 v3 v4:nat8) : nat32 =
+    v1 + 
+    v2 `op_Multiply` 0x100 + 
+    v3 `op_Multiply` 0x10000 +
+    v4 `op_Multiply` 0x1000000 
+
+let get128 (s:Seq.lseq UInt8.t 16) =
+  Mkfour 
+  (nat8s_to_nat32
+    (UInt8.v (Seq.index s 0))
+    (UInt8.v (Seq.index s 1))
+    (UInt8.v (Seq.index s 2))    
+    (UInt8.v (Seq.index s 3)))
+ (nat8s_to_nat32
+    (UInt8.v (Seq.index s 4))
+    (UInt8.v (Seq.index s 5))
+    (UInt8.v (Seq.index s 6))
+    (UInt8.v (Seq.index s 7)))
+ (nat8s_to_nat32
+    (UInt8.v (Seq.index s 8))
+    (UInt8.v (Seq.index s 9))
+    (UInt8.v (Seq.index s 10))    
+    (UInt8.v (Seq.index s 11)))
+ (nat8s_to_nat32
+    (UInt8.v (Seq.index s 12))
+    (UInt8.v (Seq.index s 13))
+    (UInt8.v (Seq.index s 14))
+    (UInt8.v (Seq.index s 15)))
+
+//TODO
+assume val put128 (a:quad32) : GTot (Seq.lseq UInt8.t 16)
+assume val inverses128 (u:unit) : Lemma (inverses get128 put128)
+
+let view128 = inverses128 (); View 16 get128 put128
+

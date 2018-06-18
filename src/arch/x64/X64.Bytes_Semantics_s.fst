@@ -91,10 +91,11 @@ let get_heap_val64_def (ptr:int) (mem:heap) : nat64 =
 let get_heap_val64 = make_opaque get_heap_val64_def
 
 let get_heap_val32_def (ptr:int) (mem:heap) : nat32 =
-    (mem.[ptr]) + 
-    (mem.[ptr+1]) `op_Multiply` 0x100 + 
-    (mem.[ptr+2]) `op_Multiply` 0x10000 +
-    (mem.[ptr+3]) `op_Multiply` 0x1000000
+  Views.nat8s_to_nat32
+    mem.[ptr]
+    mem.[ptr+1]
+    mem.[ptr+2]
+    mem.[ptr+3]
 let get_heap_val32 = make_opaque get_heap_val32_def
 
 unfold let eval_mem (ptr:int) (s:state) : nat64 = get_heap_val64 ptr s.mem
