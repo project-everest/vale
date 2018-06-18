@@ -57,7 +57,9 @@ let correct_update_get ptr v mem =
   reveal_opaque get_heap_val64_def;
   reveal_opaque update_heap64_def
 
-let same_mem_get_heap_val32 ptr mem1 mem2 = admit() // TODO
+let same_mem_get_heap_val32 ptr mem1 mem2 =
+  reveal_opaque get_heap_val32_def;
+  reveal_opaque update_heap32_def
 
 let frame_update_heap32 (ptr:int) (v:nat32) (mem:heap) : Lemma
   (let mem' = update_heap32 ptr v mem in
@@ -80,7 +82,7 @@ let correct_update_get32 (ptr:int) (v:nat32) (mem:heap) : Lemma
   reveal_opaque get_heap_val32_def;
   reveal_opaque update_heap32_def
 
-#set-options "--z3rlimit 20"
+#set-options "--z3rlimit 30"
 
 let correct_update_get128 ptr v s =
   reveal_opaque get_heap_val32_def;
