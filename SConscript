@@ -98,6 +98,8 @@ verify_options = {
 #  'src/arch/x64/X64.Bytes_Semantics_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
+  'src/arch/x64/interop/*.fst': None,
+  'src/arch/x64/interop/*.fsti': None,
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
