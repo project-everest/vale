@@ -26,6 +26,7 @@ let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algo
          let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
          cipher = gctr_encrypt_LE icb_BE (make_gctr_plain_LE plain) alg key)
   =
+  reveal_opaque le_bytes_to_seq_quad32_def;
   reveal_opaque gctr_encrypt_LE_def;
   let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
   let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
@@ -98,6 +99,7 @@ let rec gctr_encrypt_length (icb_BE:quad32) (plain:gctr_plain_LE)
   Lemma(length (gctr_encrypt_LE icb_BE plain alg key) == length plain)
   [SMTPat (length (gctr_encrypt_LE icb_BE plain alg key))]
   =
+  reveal_opaque le_bytes_to_seq_quad32_def;
   reveal_opaque gctr_encrypt_LE_def;
   let num_extra = (length plain) % 16 in
   let result = gctr_encrypt_LE icb_BE plain alg key in

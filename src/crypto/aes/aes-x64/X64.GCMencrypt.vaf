@@ -9,6 +9,7 @@ include "X64.GHash.vaf"
 module X64.GCMencrypt
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
 open FStar.Seq
 open Words_s
 open Words.Seq_s
@@ -413,6 +414,7 @@ procedure {:quick} gcm_core_part1(
     y_cipher := xmm1;
     ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));
     gcm_encrypt_LE_fst_helper(icb_enc, iv_BE, plain, auth, cipher, AES_128, key);
+    reveal_opaque(le_bytes_to_seq_quad32_def);
 }
 
 #reset-options "--z3rlimit 10"

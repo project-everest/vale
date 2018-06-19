@@ -116,7 +116,6 @@ let push_pop_xmm (x y:quad32) : Lemma
 //   assert (nat_to_two 32 (hi64 x) == two_select (four_to_two_two x) 1);
    ()
 
-
 #reset-options "--z3rlimit 10 --max_fuel 0 --max_ifuel 0 --using_facts_from '* -FStar.Seq.Properties'"
 let le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
   Lemma (le_bytes_to_seq_quad32 (le_quad32_to_bytes b) == create 1 b)
@@ -138,6 +137,7 @@ let le_bytes_to_seq_quad32_to_bytes_one_quad (b:quad32) :
    create 1 b
  *)
   =
+  reveal_opaque le_bytes_to_seq_quad32_def;
   reveal_opaque le_quad32_to_bytes_def;
   seq_to_seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE b));
   seq_map_inverses (nat_to_four 8) (four_to_nat 8) (four_to_seq_LE b);
@@ -209,6 +209,8 @@ let le_bytes_to_seq_quad32_to_bytes (s:seq quad32) :
     seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE (seq_four_to_seq_LE (seq_map (nat_to_four 8) (seq_four_to_seq_LE s)))))
  *)
   =
+  reveal_opaque le_bytes_to_seq_quad32_def;
+  reveal_opaque le_seq_quad32_to_bytes_def;
   seq_to_seq_four_to_seq_LE (seq_map (nat_to_four 8) (seq_four_to_seq_LE s));
   seq_map_inverses (nat_to_four 8) (four_to_nat 8) (seq_four_to_seq_LE s);
   seq_to_seq_four_to_seq_LE (s) ;
@@ -245,6 +247,7 @@ let le_quad32_to_bytes_to_quad32 (s:seq nat8 { length s == 16 }) :
 let le_seq_quad32_to_bytes_of_singleton (q:quad32) :
   Lemma (le_quad32_to_bytes q == le_seq_quad32_to_bytes (create 1 q))
   =
+  reveal_opaque le_seq_quad32_to_bytes_def;
   reveal_opaque le_quad32_to_bytes_def;
   four_to_seq_LE_is_seq_four_to_seq_LE q;
   ()
@@ -301,6 +304,7 @@ let le_bytes_to_seq_quad_of_singleton (q:quad32) (b:seq nat8 { length b == 16 })
   (requires q == le_bytes_to_quad32 b)
   (ensures create 1 q == le_bytes_to_seq_quad32 b)
   =
+  reveal_opaque le_bytes_to_seq_quad32_def;
   reveal_opaque le_bytes_to_quad32_def;
   seq_to_four_LE_is_seq_to_seq_four_LE (seq_map (four_to_nat 8) (seq_to_seq_four_LE b));
   // q == le_bytes_to_quad32 b
@@ -349,6 +353,7 @@ let slice_commutes_le_seq_quad32_to_bytes (s:seq quad32) (n:nat{n <= length s}) 
   Lemma(slice (le_seq_quad32_to_bytes s) (n * 16) (n' * 16) ==
         le_seq_quad32_to_bytes (slice s n n'))
   =
+  reveal_opaque le_seq_quad32_to_bytes_def;
   slice_commutes_seq_four_to_seq_LE s n n';
   assert (slice (seq_four_to_seq_LE s) (n * 4) (n' * 4) == seq_four_to_seq_LE (slice s n n'));
 (*
@@ -383,6 +388,7 @@ let seq_nat8_to_seq_nat32_LE (x:seq nat8{length x % 4 == 0}) : seq nat32 =
 let rec append_distributes_le_bytes_to_seq_quad32 (s1:seq nat8 { length s1 % 16 == 0 }) (s2:seq nat8 { length s2 % 16 == 0 }) :
   Lemma(le_bytes_to_seq_quad32 (s1 @| s2) == (le_bytes_to_seq_quad32 s1) @| (le_bytes_to_seq_quad32 s2))
   =
+  reveal_opaque le_bytes_to_seq_quad32_def;
   let s1' = seq_nat8_to_seq_nat32_LE s1 in
   let s2' = seq_nat8_to_seq_nat32_LE s2 in
   // (le_bytes_to_seq_quad32 s1) @| (le_bytes_to_seq_quad32 s2)) 

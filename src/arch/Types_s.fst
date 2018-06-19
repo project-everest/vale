@@ -66,11 +66,19 @@ let le_quad32_to_bytes_def (b:quad32) : seqn 16 nat8 =
   seq_four_to_seq_LE (seq_map (nat_to_four 8) (four_to_seq_LE b))
 let le_quad32_to_bytes = make_opaque le_quad32_to_bytes_def
 
-let le_seq_quad32_to_bytes (b:seq quad32) : seq nat8 =
+let le_seq_quad32_to_bytes_def (b:seq quad32) : seq nat8 =
   seq_nat32_to_seq_nat8_LE (seq_four_to_seq_LE b)
+let le_seq_quad32_to_bytes = make_opaque le_seq_quad32_to_bytes_def
 
-let le_bytes_to_seq_quad32 (b:seq nat8{length b % 16 == 0}) : seq quad32 =
+let le_seq_quad32_to_bytes_length (s:seq quad32) : Lemma
+  (ensures length (le_seq_quad32_to_bytes s) == 16 `op_Multiply` (length s))
+  [SMTPat (length (le_seq_quad32_to_bytes s))]
+  =
+  reveal_opaque le_seq_quad32_to_bytes_def
+
+let le_bytes_to_seq_quad32_def (b:seq nat8{length b % 16 == 0}) : seq quad32 =
   seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE b)
+let le_bytes_to_seq_quad32 = make_opaque le_bytes_to_seq_quad32_def
 
 let reverse_bytes_nat32 (n:nat32) : nat32 =
   be_bytes_to_nat32 (reverse_seq (nat32_to_be_bytes n))

@@ -114,6 +114,7 @@ let lemma_ghash_incremental_bytes_extra_helper (h y_init y_mid y_final:quad32) (
   (ensures (let input_bytes = slice_work_around (le_seq_quad32_to_bytes input) num_bytes in
             let padded_bytes = pad_to_128_bits input_bytes in
             let input_quads = le_bytes_to_seq_quad32 padded_bytes in
+            length padded_bytes == 16 * length input_quads /\
             y_final == ghash_incremental h y_init input_quads))
   =
   // Precondition definitions
