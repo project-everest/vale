@@ -6,6 +6,7 @@ include "X64.GF128_Mul.vaf"
 module X64.GHash
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
 open FStar.Seq
 open Words_s
 open Types_s
@@ -98,6 +99,7 @@ procedure {:quick} compute_ghash_incremental_register()
     lemma_to_of_quad32(reverse_bytes_quad32(io));   // Help satisfy precondition
     lemma_to_of_quad32(reverse_bytes_quad32(h));    // Help satisfy precondition
     ReduceMul128_LE(gf128_of_quad32(reverse_bytes_quad32(io)), gf128_of_quad32(reverse_bytes_quad32(h)));    // io := Y_i * H
+    reveal_opaque(ghash_incremental_def);
 }
 
 procedure {:quick} compute_ghash_incremental(
@@ -161,6 +163,7 @@ procedure {:quick} compute_ghash_incremental(
 
             Add64(rdx, 1);
             Add64(r9, 16);
+            reveal_opaque(ghash_incremental_def);
         }
     }
 }
@@ -228,6 +231,7 @@ procedure {:quick} compute_ghash_incremental_partial(
 
             Add64(rdx, 1);
             Add64(r9, 16);
+            reveal_opaque(ghash_incremental_def);
         }
     }
 }

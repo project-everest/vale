@@ -13,20 +13,23 @@ open Collections.Seqs_i
 open FStar.Seq
 
 #reset-options "--use_two_phase_tc true"
-let rec ghash_incremental (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
+let rec ghash_incremental_def (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
   let y_i_minus_1 =
     (if length x = 1 then
        y_prev
      else
-       ghash_incremental h_LE y_prev (all_but_last x)) in
+       ghash_incremental_def h_LE y_prev (all_but_last x)) in
   let x_i = last x in
   let xor_LE = quad32_xor y_i_minus_1 x_i in
   gf128_mul_LE xor_LE h_LE
+
+let ghash_incremental = make_opaque ghash_incremental_def
 
 let rec ghash_incremental_to_ghash (h:quad32) (x:ghash_plain_LE) :
   Lemma(ensures ghash_incremental h (Mkfour 0 0 0 0) x == ghash_LE h x)
        (decreases %[length x])
   =
+  reveal_opaque ghash_incremental_def;
   reveal_opaque ghash_LE_def;
   if length x = 1 then ()
   else ghash_incremental_to_ghash h (all_but_last x)
@@ -38,6 +41,7 @@ let rec lemma_hash_append (h:quad32) (y_prev:quad32) (a b:ghash_plain_LE) :
 	 ghash_incremental h y_a b))
 	(decreases %[length b])
   =
+  reveal_opaque ghash_incremental_def;
   let ab = append a b in
   assert (last ab == last b);
   if length b = 1 then
