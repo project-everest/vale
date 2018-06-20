@@ -59,7 +59,7 @@ let four_to_nat_to_four_8 (x:natN (pow2_norm 32)) :
   lemma_fundamental_div_mod_4 x;
   ()
 
-#reset-options "--z3rlimit 50"
+#reset-options "--z3rlimit 50 --using_facts_from 'Words_s Prims'"
 let nat_to_four_to_nat (x:four (natN (pow2_norm 8))) :
   Lemma (nat_to_four 8 (four_to_nat 8 x) == x)
   [SMTPat (nat_to_four 8 (four_to_nat 8 x) == x)]
