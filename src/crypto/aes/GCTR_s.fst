@@ -3,6 +3,7 @@ module GCTR_s
 // IMPORTANT: Following NIST's specification, this spec is written assuming a big-endian mapping from bytes to quad32s
 //            Since the AES spec (AES_s) is in little-endian, we need to byteswap each time we call AES
 
+open Opaque_s
 open Words_s
 open Types_s
 open FStar.Mul
@@ -34,7 +35,7 @@ let pad_to_128_bits (p:seq nat8) : (q:seq nat8 { length q % 16 == 0 /\ length q 
   else p @| (create (16 - num_extra_bytes) 0)
   
 // little-endian, except for icb_BE
-let gctr_encrypt_LE (icb_BE:quad32) (plain:gctr_plain_LE) (alg:algorithm) (key:aes_key_LE alg) : seq nat8 =
+let gctr_encrypt_LE_def (icb_BE:quad32) (plain:gctr_plain_LE) (alg:algorithm) (key:aes_key_LE alg) : seq nat8 =
   let num_extra = (length plain) % 16 in
 
   if num_extra = 0 then
@@ -56,3 +57,4 @@ let gctr_encrypt_LE (icb_BE:quad32) (plain:gctr_plain_LE) (alg:algorithm) (key:a
 
     cipher_bytes_full_LE @| final_cipher_bytes_LE
 
+let gctr_encrypt_LE = make_opaque gctr_encrypt_LE_def

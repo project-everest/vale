@@ -4,6 +4,7 @@ module AES_s
 //            This is explicit in key_schedule_to_round_keys when we construct the round_key rk,
 //            but it also applies implicitly to the input quad32
 
+open Opaque_s
 open Words_s
 open Words.Four_s
 open Words.Seq_s
@@ -84,11 +85,11 @@ let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_ke
   let state = quad32_xor state (index round_keys (nr alg)) in
   state
 
-let rec expand_key (alg:algorithm) (key:aes_key_LE alg) (size:nat{size <= (nb * ((nr alg) + 1))})
+let rec expand_key_def (alg:algorithm) (key:aes_key_LE alg) (size:nat{size <= (nb * ((nr alg) + 1))})
   : (ek_LE:seq nat32 {length ek_LE == size}) =
   if size = 0 then createEmpty
   else
-    let w = expand_key alg key (size - 1) in
+    let w = expand_key_def alg key (size - 1) in
     let i = size - 1 in
     if 0 <= i && i < nk alg then
       append w (create 1 (index key i))
@@ -97,11 +98,13 @@ let rec expand_key (alg:algorithm) (key:aes_key_LE alg) (size:nat{size <= (nb * 
         if i % (nk alg) = 0 then
           nat32_xor (sub_word (rot_word_LE (index w (i-1)))) (aes_rcon ((i / (nk alg)) - 1))
         else if nk alg > 6 && i % (nk alg) = 4 then
-          sub_word (index w (i-1))
+          sub_word (index w (i - 1))
         else
-          index w (i-1)
+          index w (i - 1)
         in
       append w (create 1 (nat32_xor (index w (i - (nk alg))) temp))
+
+let expand_key = make_opaque expand_key_def
 
 let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * rounds})
   : (round_keys:seq quad32 {length round_keys == rounds}) =
@@ -111,12 +114,17 @@ let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * ro
     let rk = Mkfour (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in
     append round_keys (create 1 rk)
 
-let key_to_round_keys_LE (alg:algorithm) (key:aes_key_LE alg)
+let key_to_round_keys_LE_def (alg:algorithm) (key:aes_key_LE alg)
   : (round_keys:seq quad32 {length round_keys == nr alg + 1}) =
   (key_schedule_to_round_keys (nr alg + 1) (expand_key alg key (nb * (nr alg + 1))))
 
-let aes_encrypt_LE (alg:algorithm) (key:aes_key_LE alg) (input_LE:quad32) =
+let key_to_round_keys_LE = make_opaque key_to_round_keys_LE_def
+
+let aes_encrypt_LE_def (alg:algorithm) (key:aes_key_LE alg) (input_LE:quad32) =
   cipher alg input_LE (key_to_round_keys_LE alg key)
+
+//let aes_encrypt_LE = make_opaque aes_encrypt_LE_def
+unfold let aes_encrypt_LE = aes_encrypt_LE_def
 
 let key_to_round_keys (alg:algorithm) (key:aes_key alg)
   : (round_keys:seq nat8 {length round_keys == 16 * (nr alg + 1)}) =

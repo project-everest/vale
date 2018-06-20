@@ -1,10 +1,10 @@
 module X64.Poly1305.Math_i
 
 open FStar.Mul
+open Opaque_s
 open Words_s
 open Types_s
 open Poly1305.Spec_s
-open Opaque_i
 
 unfold let logand64 (x:nat64) (y:nat64) : nat64 = Types_s.iand x y
 unfold let logand128 (x:nat128) (y:nat128) : nat128 = Types_s.iand x y

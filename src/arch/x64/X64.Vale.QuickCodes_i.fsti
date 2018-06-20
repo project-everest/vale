@@ -2,6 +2,7 @@
 
 module X64.Vale.QuickCodes_i
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -56,8 +57,6 @@ let wp_Bind_t (a:Type0) = state -> a -> Type0
 [@va_qattr]
 let range1 = mk_range "" 0 0 0 0
 
-let guard_false = False
-
 [@va_qattr]
 let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (s0:state) :
   Tot Type0 (decreases %[cs; 0; qcs])
@@ -77,9 +76,9 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
       // REVIEW: rather than just applying 'pre' directly to k,
       // we define this in a roundabout way so that:
       // - it works even if 'pre' isn't known to be monotonic
-      // - F*'s error reporting uses 'guard_free' and 'guard_False <==>' to process labels inside (wp cs qcs k s0)
+      // - F*'s error reporting uses 'guard_free' to process labels inside (wp cs qcs k s0)
       (forall (p:unit -> GTot Type0).//{:pattern (pre p)}
-        (forall (u:unit).{:pattern (guard_free (p u))} guard_false <==> (wp cs qcs k s0) /\ ~(p ()))
+        (forall (u:unit).{:pattern (guard_free (p u))} wp cs qcs k s0 ==> p ())
         ==>
         label r msg (pre p))
   | QLemma r msg pre post l qcs ->
@@ -183,7 +182,7 @@ let valid_cmp (c:cmp) (s:state) : Type0 =
   | Cmp_gt o1 o2 -> valid_operand o1 s /\ valid_operand o2 s
 
 [@va_qattr]
-let eval_cmp (s:state) (c:cmp) : bool =
+let eval_cmp (s:state) (c:cmp) : GTot bool =
   match c with
   | Cmp_eq o1 o2 -> va_eval_opr64 s o1 =  va_eval_opr64 s o2
   | Cmp_ne o1 o2 -> va_eval_opr64 s o1 <> va_eval_opr64 s o2

@@ -3,7 +3,8 @@ module X64.Vale.State_i
 
 open X64.Machine_s
 open X64.Vale
-module M = Memory_i_s
+open X64.Memory_i
+// TODO: Shouldn't refer to Interop64, only needed for addr_map type definition
 
 noeq type state = {
   ok: bool;
@@ -32,12 +33,13 @@ let reg_to_int (r:reg) : int =
   | R14 -> 14
   | R15 -> 15
 
+
 [@va_qattr]
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 [@va_qattr]
 unfold let eval_xmm (x:xmm) (s:state) : Types_s.quad32 = s.xmms x
 [@va_qattr]
-unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
+unfold let eval_mem (ptr:int) (s:state) : GTot nat64 = load_mem64 ptr s.mem
 
 [@va_qattr]
 let eval_maddr (m:maddr) (s:state) : int =
@@ -52,7 +54,7 @@ let to_nat64 (i:int) : nat64 =
   if 0 <= i && i < 0x10000000000000000 then i else int_to_nat64 i
 
 [@va_qattr]
-let eval_operand (o:operand) (s:state) : nat64 =
+let eval_operand (o:operand) (s:state) : GTot nat64 =
   match o with
   | OConst n -> to_nat64 n
   | OReg r -> eval_reg r s
@@ -67,10 +69,10 @@ let update_xmm (x:xmm) (v:Types_s.quad32) (s:state) : state =
   { s with xmms = fun x' -> if x = x' then v else s.xmms x' }
 
 [@va_qattr]
-let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem64 ptr v s.mem }
+let update_mem (ptr:int) (v:nat64) (s:state) : GTot state = { s with mem = store_mem64 ptr v s.mem }
 
 [@va_qattr]
-let update_operand (o:operand) (v:nat64) (sM:state) : state =
+let update_operand (o:operand) (v:nat64) (sM:state) : GTot state =
   match o with
   | OConst n -> sM
   | OReg r -> update_reg r v sM

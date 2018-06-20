@@ -1,5 +1,6 @@
 module GHash_i
 
+open Opaque_s
 open Words_s
 open Types_s
 open Types_i
@@ -12,20 +13,24 @@ open Collections.Seqs_i
 open FStar.Seq
 
 #reset-options "--use_two_phase_tc true"
-let rec ghash_incremental (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
+let rec ghash_incremental_def (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
   let y_i_minus_1 =
     (if length x = 1 then
        y_prev
      else
-       ghash_incremental h_LE y_prev (all_but_last x)) in
+       ghash_incremental_def h_LE y_prev (all_but_last x)) in
   let x_i = last x in
   let xor_LE = quad32_xor y_i_minus_1 x_i in
   gf128_mul_LE xor_LE h_LE
+
+let ghash_incremental = make_opaque ghash_incremental_def
 
 let rec ghash_incremental_to_ghash (h:quad32) (x:ghash_plain_LE) :
   Lemma(ensures ghash_incremental h (Mkfour 0 0 0 0) x == ghash_LE h x)
        (decreases %[length x])
   =
+  reveal_opaque ghash_incremental_def;
+  reveal_opaque ghash_LE_def;
   if length x = 1 then ()
   else ghash_incremental_to_ghash h (all_but_last x)
 
@@ -36,6 +41,7 @@ let rec lemma_hash_append (h:quad32) (y_prev:quad32) (a b:ghash_plain_LE) :
 	 ghash_incremental h y_a b))
 	(decreases %[length b])
   =
+  reveal_opaque ghash_incremental_def;
   let ab = append a b in
   assert (last ab == last b);
   if length b = 1 then
@@ -112,6 +118,7 @@ let lemma_ghash_incremental_bytes_extra_helper (h y_init y_mid y_final:quad32) (
   (ensures (let input_bytes = slice_work_around (le_seq_quad32_to_bytes input) num_bytes in
             let padded_bytes = pad_to_128_bits input_bytes in
             let input_quads = le_bytes_to_seq_quad32 padded_bytes in
+            length padded_bytes == 16 * length input_quads /\
             y_final == ghash_incremental h y_init input_quads))
   =
   // Precondition definitions

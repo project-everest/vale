@@ -1,12 +1,13 @@
 module X64.Poly1305.Util_i
 
 open FStar.Mul
+open Opaque_s
 open Poly1305.Spec_s
 open X64.Machine_s
 open X64.Poly1305.Math_i
 open X64.Vale.Decls_i
-open Opaque_i
-module M = Memory_i_s
+open Opaque_s
+open X64.Memory_i
 
 // Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec
 let heapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) : int->nat128 =
@@ -74,12 +75,12 @@ unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b
 let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
     buffer_readable m b /\
     len <= buffer_length b /\
-    buffer_addr b == addr
+    buffer_addr b m == addr
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
-    (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
+    (forall (i:nat) . {:pattern (Seq.index (buffer_as_seq h2 b) i)}
                         0 <= i /\ i < buffer_length b 
                      /\ (i < start || i > last) 
                     ==> buffer64_read b i h1

@@ -10,6 +10,7 @@ open Words.Four_s
 open Types_s
 open Types_i
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -24,11 +25,12 @@ let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
 #verbatim
 open Types_s
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale
 open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
 open X64.Vale.Decls_i
-module S = X64.Semantics_s
+module S = X64.Bytes_Semantics_s
 module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
@@ -199,7 +201,7 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src),
         mem;
     requires
         valid_src_addr(mem, b, index);
-        src + offset == buffer_addr(b) + 16 * index;
+        src + offset == buffer_addr(b, mem) + 16 * index;
     ensures
         dst == buffer128_read(b, index, mem);
 {
@@ -217,7 +219,7 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov12
         mem;
     requires
         valid_dst_addr(mem, b, index);
-        dst + offset == buffer_addr(b) + 16 * index;
+        dst + offset == buffer_addr(b, mem) + 16 * index;
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
         mem == old(buffer128_write(b, index, src, mem));
@@ -236,7 +238,7 @@ procedure {:quick exportOnly} PushXmm(
     requires
         valid_dst_addr(mem, b, index);
         valid_dst_addr(mem, b, index - 1);
-        rsp - 8 == buffer_addr(b) + 8 * index;
+        rsp - 8 == buffer_addr(b, mem) + 8 * index;
         0 <= rsp - 16;
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
@@ -266,7 +268,7 @@ procedure {:quick exportOnly} PopXmm(
         valid_src_addr(mem, b, index + 1);
         hi64(expected_xmm) == buffer64_read(b, index, mem);
         lo64(expected_xmm) == buffer64_read(b, index + 1, mem);
-        rsp == buffer_addr(b) + 8 * index;
+        rsp == buffer_addr(b, mem) + 8 * index;
         rsp + 16 < pow2_64;
     ensures
         dst == expected_xmm;

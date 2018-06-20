@@ -4,8 +4,8 @@ include "../arch/x64/X64.Vale.InsMem.vaf"
 module Test.Memcpy
 
 #verbatim{:interface}{:implementation}
-module M = Memory_i_s
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -22,8 +22,8 @@ procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
         buffer_readable(mem, bdst);
         buffer_length(bsrc) == 2;
         buffer_length(bdst) == 2;
-        rsi == buffer_addr(bsrc);
-        rdi == buffer_addr(bdst);
+        rsi == buffer_addr(bsrc, mem);
+        rdi == buffer_addr(bdst, mem);
     ensures
         forall i :: 0 <= i && i < 2 ==> buffer64_read(bdst, i, mem) == buffer64_read(bsrc, i, mem);
         modifies_mem(loc_buffer(bdst), old(mem), mem);

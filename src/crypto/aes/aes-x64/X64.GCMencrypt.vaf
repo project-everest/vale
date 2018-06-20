@@ -9,6 +9,7 @@ include "X64.GHash.vaf"
 module X64.GCMencrypt
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
 open FStar.Seq
 open Words_s
 open Words.Seq_s
@@ -29,6 +30,7 @@ open GCM_helpers_i
 open X64.GHash
 open X64.GCTR
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -49,7 +51,7 @@ let make_ghash_plain_LE (s:seq quad32) : ghash_plain_LE = if length s = 0 then c
 #endverbatim
 
 
-#reset-options "--z3rlimit 200 --z3refresh"
+#reset-options "--z3rlimit 30 --z3refresh"
 
 ///////////////////////////
 // GCM
@@ -85,7 +87,7 @@ procedure {:quick} gcm_one_pass_blocks(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
@@ -134,7 +136,7 @@ procedure {:quick} gcm_one_pass_blocks(
             alg = AES_128 || alg = AES_256;
             length(round_keys) == nr(alg) + 1;
             round_keys == key_to_round_keys_LE(alg, key);
-            r8 == buffer_addr(keys_b);
+            r8 == buffer_addr(keys_b, mem);
             validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
             buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -172,6 +174,7 @@ procedure {:quick} gcm_one_pass_blocks(
         Add64(r9, 16);
         Add64(r10, 16);
         inc32(icb, one);
+        reveal_opaque(ghash_incremental_def);
     }
 
 //    assert length(buffer128_as_seq(mem, in_b)) == length(buffer128_as_seq(mem, out_b));
@@ -183,7 +186,7 @@ procedure {:quick} gcm_one_pass_blocks(
 //    gctr_partial_completed(alg, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
-#reset-options "--z3rlimit 400"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_one_pass(
     inline alg:algorithm,
     ghost in_b:buffer128,
@@ -218,12 +221,12 @@ procedure {:quick} gcm_one_pass(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(old(num_bytes)));
 
         // GCTR
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
@@ -267,7 +270,7 @@ procedure {:quick} gcm_one_pass(
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
             Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
             gctr_bytes_extra(alg, old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
-            Mov64(rcx, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rcx
+            Mov64(rax, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rax
             Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
             Mov128(hash, xmm3);
             // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
@@ -284,7 +287,7 @@ procedure {:quick} gcm_one_pass(
 
 }
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_core_part1(
     inline alg:algorithm,
     ghost iv_BE:quad32,
@@ -419,6 +422,7 @@ procedure {:quick} gcm_core_part1(
     y_cipher := xmm1;
     ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));
     gcm_encrypt_LE_fst_helper(icb_enc, iv_BE, plain, auth, cipher, alg, key);
+    reveal_opaque(le_bytes_to_seq_quad32_def);
 }
 
 #reset-options "--z3rlimit 10"
@@ -449,7 +453,7 @@ procedure {:quick} gcm_make_length_quad(
 }
 
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_core(
     inline alg:algorithm,
     ghost iv_BE:quad32,
@@ -677,7 +681,7 @@ procedure {:quick} callee_restore_registers(
 //  if 256 * length p < pow2_32 then p else createEmpty
 //#endverbatim
 
-#reset-options "--z3rlimit 80"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_encrypt_stdcall_inner(
     inline alg:algorithm,
     ghost args_b:buffer64,
@@ -779,7 +783,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
     Store128_buffer(r15, xmm1, 0, tag_b, 0);
 }
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 30"
 procedure {:quick} gcm_encrypt_stdcall(
     inline win:bool,
     inline alg:algorithm,

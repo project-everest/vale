@@ -18,6 +18,7 @@ open GCM_helpers_i
 open X64.Poly1305.Math_i
 open Words.Two_s
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -28,7 +29,7 @@ open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
 #endverbatim
 
-#reset-options "--z3rlimit 40"
+#reset-options "--z3rlimit 30"
 
 ///////////////////////////
 // GCTR encryption
@@ -73,7 +74,7 @@ procedure {:quick} gctr_register(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
@@ -127,7 +128,7 @@ procedure {:quick} gctr_core(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
@@ -168,7 +169,7 @@ procedure {:quick} gctr_core(
             alg = AES_128 || alg = AES_256;
             length(round_keys) == nr(alg) + 1;
             round_keys == key_to_round_keys_LE(alg, key);
-            r8 == buffer_addr(keys_b);
+            r8 == buffer_addr(keys_b, mem);
             validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
             buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -239,7 +240,7 @@ procedure {:quick} gctr_bytes_extra_work(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -315,7 +316,7 @@ procedure {:quick} gctr_bytes_extra(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -386,7 +387,7 @@ procedure {:quick} gctr_bytes_no_extra(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-//        r8 == buffer_addr(keys_b);
+//        r8 == buffer_addr(keys_b, mem);
 //        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
 //        buffer128_as_seq(mem, keys_b) == round_keys;
 
@@ -452,7 +453,7 @@ procedure {:quick} gctr_bytes(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        r8 == buffer_addr(keys_b);
+        r8 == buffer_addr(keys_b, mem);
         validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures

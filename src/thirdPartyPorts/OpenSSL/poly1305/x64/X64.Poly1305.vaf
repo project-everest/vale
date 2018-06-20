@@ -29,9 +29,10 @@ module X64.Poly1305
 #reset-options "--z3rlimit 30"
 
 #verbatim{:interface}{:implementation}
-module M = Memory_i_s
+open Opaque_s
 open Types_s
 open X64.Machine_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -42,7 +43,6 @@ open X64.Vale.QuickCodes_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open X64.Poly1305.Util_i
-open Opaque_i
 #endverbatim
 
 procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
@@ -293,7 +293,7 @@ procedure{:quick} poly1305_blocks(
         reveal_poly1305_heap_blocks(modp(h_in), padbit * (n * n), r, buffer64_as_seq(mem, inp_b), 0); 
     }
 
-    ghost var word_index:int := 0;
+    ghost var word_index:nat := 0;
 
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
@@ -314,7 +314,7 @@ procedure{:quick} poly1305_blocks(
 
             r15 != 0 ==> 8*(word_index + 1) <= length;
             16 * r15 + 8 * word_index == length;
-            inp + 0 /* offset */ == buffer_addr(inp_b) + 8 * word_index;
+            inp + 0 /* offset */ == buffer_addr(inp_b, mem) + 8 * word_index;
 
             r15 * 16 <= length;    // Not needed with Dafny version
             padbit < 2;            // Not needed with Dafny version 
@@ -332,6 +332,7 @@ procedure{:quick} poly1305_blocks(
         ghost var hp := h;
         h := h + nn * nn * padbit + nn * buffer64_read(inp_b, word_index + 1, mem) + buffer64_read(inp_b, word_index, mem);
         ghost var hq := h;
+
 
         Add64Wrap(h0, Mem(inp, 0, inp_b, word_index)); // accumulate input
         lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
