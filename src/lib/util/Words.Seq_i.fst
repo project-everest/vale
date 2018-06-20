@@ -59,7 +59,7 @@ let four_to_nat_to_four_8 (x:natN (pow2_norm 32)) :
   lemma_fundamental_div_mod_4 x;
   ()
 
-#reset-options "--z3rlimit 40"
+#reset-options "--z3rlimit 50"
 let nat_to_four_to_nat (x:four (natN (pow2_norm 8))) :
   Lemma (nat_to_four 8 (four_to_nat 8 x) == x)
   [SMTPat (nat_to_four 8 (four_to_nat 8 x) == x)]
@@ -81,7 +81,7 @@ let nat_to_four_to_nat (x:four (natN (pow2_norm 8))) :
   lemma_fundamental_div_mod_4 x';
   ()
 
-
+#reset-options
 let four_to_seq_to_four_LE (#a:Type) (x:seq4 a) :
   Lemma (four_to_seq_LE (seq_to_four_LE x) == x)
   =
