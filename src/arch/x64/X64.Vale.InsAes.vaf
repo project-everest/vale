@@ -1,5 +1,15 @@
 include "X64.Vale.InsBasic.vaf"
 include "X64.Vale.InsVector.vaf"
+include{:fstar} {:open} "Words_s"
+include{:fstar} {:open} "Types_s"
+include{:fstar} {:open} "Types_i"
+include{:fstar} {:open} "AES_s"
+include{:fstar} {:open} "Math.Poly2_s"
+include{:fstar} {:open} "Math.Poly2.Bits_s"
+include{:fstar} {:open} "X64.Machine_s"
+include{:fstar} {:open} "X64.Vale.State_i"
+include{:fstar} {:open} "X64.Vale.Decls_i"
+include{:fstar} {:open} "X64.Vale.QuickCode_i"
 
 module X64.Vale.InsAes
 

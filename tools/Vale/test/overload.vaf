@@ -1,3 +1,4 @@
+include{:fstar} {:open} "Types_s"
 var{:state ok()} ok:bool;
 var{:state reg(EAX)} eax:int;
 var{:state reg(EBX)} ebx:int;
@@ -90,6 +91,13 @@ unfold let va_make_opaque = make_opaque
 unfold let va_reveal_opaque = reveal_opaque
 
 #endverbatim
+
+type va_state : Type(0) extern;
+type reg : Type(0) extern;
+type va_register : Type(0) := reg;
+type va_operand_reg : Type(0) := reg ;
+function va_eval_reg(s_5048 : va_state , r_5049 : va_register) : int extern;
+function va_op_reg_reg (r_4773 : reg) : va_register extern;
 
 procedure Calls(x:reg, y:reg)
 {

@@ -2,6 +2,7 @@ include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
 include "X64.AES.vaf"
+include{:fstar} {:open} "GCTR_s"
 
 module X64.GCTR
 
@@ -33,7 +34,9 @@ open X64.Vale.QuickCodes_i
 // GCTR encryption
 ///////////////////////////
 
-procedure {:quick} init_ctr()
+// notypecheck due to:cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+// for "r12" of "PinsrdImm"
+procedure {:quick}{:notypecheck} init_ctr()
     modifies xmm4; efl; r12;
     ensures 
         xmm4 == Mkfour(1, 0, 0, 0);

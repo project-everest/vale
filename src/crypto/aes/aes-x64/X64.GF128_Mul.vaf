@@ -1,6 +1,11 @@
 include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
 include "../../../arch/x64/X64.Vale.InsAes.vaf"
+include{:fstar} {:open} "GF128_s"
+include{:fstar} {:open} "GF128_i"
+include{:fstar} {:open} "Math.Poly2_i"
+include{:fstar} {:open} "Math.Poly2.Lemmas_i"
+include{:fstar} {:open} "Math.Poly2.Bits_i"
 
 module X64.GF128_Mul
 
@@ -44,7 +49,9 @@ procedure{:quick} ShiftLeft128_1(ghost a:poly)
     lemma_shift_left_1(a);
 }
 
-procedure{:quick} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
+// notypecheck due to:cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+// for "r12" of "PinsrdImm"
+procedure{:quick}{:notypecheck} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
     modifies
         efl; r12;
         xmm1; xmm2; xmm3; xmm4; xmm5;
@@ -115,7 +122,9 @@ procedure{:quick} ClmulRev64(ghost a:poly, ghost b:poly, inline dstHi:bool, inli
     lemma_mul_reverse_shift_1(a, b, 63);
 }
 
-procedure{:quick exportOnly} High64ToLow(out dst:xmm, ghost a:poly)
+// notypecheck due to:cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+// for "r12" of "PinsrdImm"
+procedure{:quick exportOnly}{:notypecheck} High64ToLow(out dst:xmm, ghost a:poly)
     modifies
         efl; r12;
     requires
@@ -129,7 +138,9 @@ procedure{:quick exportOnly} High64ToLow(out dst:xmm, ghost a:poly)
     lemma_quad32_double_shift(a);
 }
 
-procedure{:quick exportOnly} Low64ToHigh(out dst:xmm, ghost a:poly)
+// notypecheck due to:cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+// for "r12" of "PinsrdImm"
+procedure{:quick exportOnly}{:notypecheck} Low64ToHigh(out dst:xmm, ghost a:poly)
     modifies
         efl; r12;
     requires
@@ -254,7 +265,9 @@ procedure{:quick} ClmulRev128(ghost ab:poly, ghost cd:poly) returns(ghost lo:pol
     lemma_mul_reverse_shift_1(ab, cd, 127);
 }
 
-procedure{:quick exportOnly} Gf128ModulusRev(inout dst:xmm)
+// notypecheck due to:cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+// for "r12" of "PinsrdImm"
+procedure{:quick exportOnly}{:notypecheck} Gf128ModulusRev(inout dst:xmm)
     modifies
         efl; r12;
     ensures

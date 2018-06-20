@@ -1,4 +1,5 @@
 include "../../../src/arch/x64/X64.Vale.InsBasic.vaf"
+include{:fstar} {:open} "X64.Memory_i_s"
 
 module Quick
 
@@ -125,7 +126,8 @@ let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
 let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
 #endverbatim
 
-function lemma_self_int (i:int) : Lemma extern;
+// notypecheck: Prims.Lemma is missing from *.types.vaf files
+function{:notypecheck} lemma_self_int (i:int) : Lemma extern;
 
 procedure{:quick exportOnly} Add64Ghosts(
         inout dst:dst_opr64,

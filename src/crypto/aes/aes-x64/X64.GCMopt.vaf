@@ -294,7 +294,8 @@ procedure {:quick} gcm_core(
     // assert create(1, xmm1) == gctr_encrypt_LE(iv_BE.(lo0 := 1), create(1, hash), AES_128, key);
 }
 
-procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64)
+// notypecheck due to: cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+procedure {:quick}{:notypecheck} callee_save_registers(inline win:bool, ghost stack_b:buffer64)
     requires 
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
     reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; xmm6; xmm7; xmm8; xmm10; xmm11; 
@@ -340,7 +341,8 @@ procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64
     Push(rbx, stack_b, 0);
 }
 
-procedure {:quick} callee_restore_registers(
+// notypecheck due to: cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+procedure {:quick}{:notypecheck} callee_restore_registers(
         inline win:bool,
         ghost stack_b:buffer64,
         ghost old_xmm6:quad32,
@@ -409,7 +411,7 @@ let mk_gctr_plain (p:seq quad32) : gctr_plain_LE =
   if 256 * length p < pow2_32 then p else createEmpty
 #endverbatim
 
-function mk_gctr_plain (p:(seq (quad32))) : gctr_plain  extern;
+function mk_gctr_plain (p:(seq (quad32))) : gctr_plain_LE  extern;
 
 procedure {:quick} gcm_stdcall_inner(
     ghost args_b:buffer64,

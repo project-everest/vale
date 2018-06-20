@@ -1,3 +1,4 @@
+include{:fstar} {:open} "Types_s"
 var{:state ok()} ok:bool;
 var{:state reg(EAX)} eax:int;
 var{:state reg(EBX)} ebx:int;

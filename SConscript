@@ -70,8 +70,7 @@ verify_options = {
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'src/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
-  'src/lib/util/types.vaf': BuildOptions(fstar_default_args, valeIncludes =''),
-
+  
   # Any use of expose_interfaces requires adding to manual_dependencies
   'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
   'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),

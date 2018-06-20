@@ -1041,9 +1041,9 @@ let main (argv:string array) =
           // REVIEW: why are there duplicates?
           duplicates := Set.add d.d_name (!duplicates);
           match (d.d_category, d.d_typ) with
-          | (_, EUnsupported s) -> printfn "// unsupported: %s (reason: %s)" d.d_name s; printfn ""
-          | ("unsupported", _) -> printfn "// unsupported: %s" d.d_name; printfn ""
-          | ("int_type_generator", _) -> printfn "// unsupported (int type generator): %s" d.d_name; printfn ""
+          | (_, EUnsupported s) -> printfn "unsupported: %s //(reason: %s)" d.d_name s; printfn ""
+          | ("unsupported", _) -> printfn "unsupported: %s" d.d_name; printfn ""
+          | ("int_type_generator", _) -> printfn "unsupported (int type generator): %s" d.d_name; printfn ""
           | _ -> print_tree "" (tree_of_vale_decl env d); printfn ""
          )
       )

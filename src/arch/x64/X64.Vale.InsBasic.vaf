@@ -1,3 +1,9 @@
+include{:fstar} {:open} "Types_s"
+include{:fstar} {:open} "X64.Machine_s"
+include{:fstar} {:open} "X64.Vale.State_i"
+include{:fstar} {:open} "X64.Vale.Decls_i"
+include{:fstar} {:open} "X64.Vale.QuickCode_i"
+
 module X64.Vale.InsBasic
 
 #verbatim{:interface}
@@ -40,7 +46,8 @@ var{:state reg(R15)} r15:nat64;
 var{:state flags()} efl:nat64;
 var{:state mem()} mem:mem;
 
-procedure{:quick exportOnly} AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
+// add {:notypecheck} attr because Type0 is not defined.
+procedure{:quick exportOnly}{:notypecheck}AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
     requires
         p;
 {
@@ -145,7 +152,8 @@ procedure{:instruction Ins(S.Mul64(src))}{:fast_instruction}{:quick exportOnly} 
     lemma_fundamental_div_mod(old(rax), old(src));
 }
 
-procedure{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:fast_instruction}{:quick exportOnly} Mulx64(out dst_hi: dst_opr64, out dst_lo: dst_opr64, src: opr64)
+// can't typecheck because "Uop UToOperand" is not implemented
+procedure{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:fast_instruction}{:quick exportOnly}{:notypecheck} Mulx64(out dst_hi: dst_opr64, out dst_lo: dst_opr64, src: opr64)
     requires @dst_hi != @dst_lo;
     reads
         rdx; 

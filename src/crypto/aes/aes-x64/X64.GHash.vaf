@@ -2,6 +2,9 @@ include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
 include "X64.GF128_Mul.vaf"
+include{:fstar} {:open} "FStar.Seq.Base"
+include{:fstar} {:open} "GHash_s"
+include{:fstar} {:open} "GHash_i"
 
 module X64.GHash
 
@@ -81,7 +84,10 @@ procedure {:quick} compute_Y0()
     lemma_quad32_xor();
 }
 
-procedure {:quick} compute_ghash_incremental(
+// notypecheck due to: 
+// cannot unify type "GHash_s.ghash_plain_LE" and "FStar.Seq.Base.seq(Words_s.four(int(0,4294967295)))"
+// for the last parameter of "ghash_incremental"
+procedure {:quick}{:notypecheck} compute_ghash_incremental(
     ghost in_b:buffer128
     )
     lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11; 
@@ -146,8 +152,10 @@ procedure {:quick} compute_ghash_incremental(
     }
 }
 
-
-procedure {:quick} compute_ghash_incremental_register()
+// notypecheck due to: 
+// cannot unify type "GHash_s.ghash_plain_LE" and "FStar.Seq.Base.seq(Words_s.four(int(0,4294967295)))"
+// for the last parameter of "ghash_incremental""
+procedure {:quick}{:notypecheck} compute_ghash_incremental_register()
     lets input @= xmm2; io @= xmm1; mask @= xmm8; h @= xmm11;
     requires mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
     reads
@@ -166,8 +174,9 @@ procedure {:quick} compute_ghash_incremental_register()
     ReduceMul128_LE(gf128_of_quad32(reverse_bytes_quad32(io)), gf128_of_quad32(reverse_bytes_quad32(h)));    // io := Y_i * H
 }
 
-
-procedure {:quick} ghash_core(
+// notypecheck due to: 
+// cannot unify type "GHash_s.ghash_plain_LE" and "FStar.Seq.Base.seq(Words_s.four(int(0,4294967295)))"
+procedure {:quick}{:notypecheck} ghash_core(
     ghost in_b:buffer128
     )
     lets in_ptr @= rax; len @= rcx; output @= xmm1; mask @= xmm8; h @= xmm11;

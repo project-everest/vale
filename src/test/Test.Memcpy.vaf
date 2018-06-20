@@ -15,7 +15,8 @@ open X64.Vale.InsMem
 
 #reset-options "--z3rlimit 20"
 
-procedure Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
+// notypecheck due to:cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+procedure{:notypecheck} Copy16(ghost bsrc:buffer64, ghost bdst:buffer64)
     requires/ensures
         locs_disjoint(list(loc_buffer(bsrc), loc_buffer(bdst)));
         buffer_readable(mem, bsrc);

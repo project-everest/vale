@@ -298,7 +298,7 @@ if 'KREMLIN_HOME' in os.environ:
 
 env['VALE'] = File('bin/vale.exe')
 env['IMPORT_FSTAR_TYPES'] = File('bin/importFStarTypes.exe')
-env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf')) + ' -include ' + str(File('src/lib/util/types.vaf'))
+env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'

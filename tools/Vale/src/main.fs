@@ -19,7 +19,8 @@ let main (argv) =
   let in_files_rev = ref ([]:(string * bool) list) in
   let includes_rev = ref ([]:string list) in
   let suffixMap_rev = ref ([]:(string * string) list) in
-  let include_modules = ref (Map.empty:Map<string, bool>)
+  let include_modules_rev = ref ([]:(string * bool * (((loc * decl) * bool) list)) list)
+  let all_fstar_type_files = ref ([]:string list) in
   let sourceDir = ref "." in
   let destDir = ref "." in
   let sourceFroms = ref (Map.empty:Map<id, string>)
@@ -222,10 +223,22 @@ let main (argv) =
         (if debugIncludes then printfn "adding include from %A: %A --> %A --> %A" sourceDir x xabs path);
         includes_rev := path::!includes_rev
       in
-    let processFStarInclude (x:string) (opened:bool) :unit =
-        include_modules := Map.add x opened !include_modules
-      in 
-    let rec processFile (xRaw:string, isInputFile:bool):((loc * decl) * bool) list =
+    let rec processFStarInclude (x:string) (opened:bool): unit =
+        if !all_fstar_type_files = [] then 
+          all_fstar_type_files := Directory.EnumerateFiles(".", "*.fst.types.vaf", SearchOption.AllDirectories) |> List.ofSeq
+        let filename = x + ".fst.types.vaf" in
+        let f = List.tryFind (fun f -> (Path.GetFileName f) = filename) !all_fstar_type_files in
+        let ds = 
+          match f with
+          | Some f -> 
+            if not (Set.contains f !processedFiles) then
+              processedFiles := Set.add f !processedFiles;
+              processFile (f, false)
+            else []
+          | _ -> if !do_typecheck then err (sprintf "cannot find exported fstar type file %s" filename) else []
+        in
+        include_modules_rev := (x, opened, ds)::!include_modules_rev;
+    and processFile (xRaw:string, isInputFile:bool):((loc * decl) * bool) list =
       let x = if isInputFile then Path.Combine (!sourceDir, xRaw) else xRaw in
       (if debugIncludes then printfn "processing file %A" x);
       let xabs = Path.GetFullPath x in
@@ -316,7 +329,7 @@ let main (argv) =
       if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
       precise_opaque := !emitFStarText;
       fstar := !emitFStarText;
-      let decls = build_decls empty_env !include_modules decls in
+      let decls = build_decls empty_env (List.rev (!include_modules_rev)) decls in
       (match !reprint_file with
         | None -> ()
         | Some filename ->
@@ -332,7 +345,7 @@ let main (argv) =
             rstream.Close ()
         );
       if !emitFStarText then
-        Emit_fstar_text.emit_decls ps decls (Map.fold (fun l key value -> if value then l@[key] else l) [] !include_modules)
+        Emit_fstar_text.emit_decls ps decls (List.fold (fun l (x,b,d) -> if b then x::l else l) [] !include_modules_rev)
       else
         if !dafnyDirect then
           // Initialize Dafny objects

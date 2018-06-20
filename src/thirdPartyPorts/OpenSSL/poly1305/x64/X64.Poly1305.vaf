@@ -23,6 +23,9 @@
 
 include "../../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../../arch/x64/X64.Vale.InsMem.vaf"
+include{:fstar} {:open} "X64.Poly1305.Math_i"
+include{:fstar} {:open} "Poly1305.Spec_s"
+include{:fstar} {:open} "X64.Poly1305.Util_i"
 
 module X64.Poly1305
 
@@ -205,7 +208,8 @@ procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
     assert hh == (n * n) * h2 + n * h1 + h0 /\ (h * r) % p == hh % p;
 }
 
-procedure{:quick} poly1305_blocks(
+// notypecheck: cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+procedure{:quick}{:notypecheck} poly1305_blocks(
     ghost r:int,
     ghost h_in:int,
     ghost ctx_b:buffer64,
@@ -540,10 +544,11 @@ let reveal_logand128 (x y:nat128) : Lemma
   = TypesNative_s.reveal_iand 128 x y
 #endverbatim
 
-function reveal_logand128 (x:nat128, y:nat128) : Lemma 
+function reveal_logand128 (x:nat128, y:nat128) : unit 
   extern;
 
-procedure{:quick} poly1305_impl(
+// notypecheck: cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+procedure{:quick}{:notypecheck} poly1305_impl(
     ghost key_r:nat128,
     ghost key_s:nat128,
     ghost ctx_b:buffer64,
@@ -666,7 +671,9 @@ procedure{:quick} poly1305_impl(
 // Note that this reads 16-byte chunks directly from the input buffer,
 // so (len + 15) / 16 * 16 bytes must be readable, even though only len bytes
 // affect the result.
-procedure{:quick} poly1305(
+
+// notypecheck: cannot unify type "X64.Vale.Decls_i.va_operand_reg_opr64" and "X64.Vale.Decls_i.va_reg_operand"
+procedure{:quick}{:notypecheck} poly1305(
     inline win:bool,
     ghost key_r:nat128,
     ghost key_s:nat128,

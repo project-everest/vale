@@ -173,6 +173,7 @@ and lextoken = parse
     | _ -> op_tok s
   }
 | "unsupported" { UNSUPPORTED (curLoc lexbuf) }
+| "unsupported (int type generator)" { UNSUPPORTED (curLoc lexbuf) }
 | "Type" { TTYPE (curLoc lexbuf) }
 | "type" { TYPE (curLoc lexbuf) }
 | "const" { CONST (curLoc lexbuf) }
@@ -244,9 +245,16 @@ and lextoken = parse
     LITINT ((curLoc lexbuf), hex digits bigint.Zero)
   }
 | "int" { INT (curLoc lexbuf) }
-| "Prims.int" { ID ((curLoc lexbuf), lexeme lexbuf) }
 | ['0'-'9']['0'-'9''_']* { LITINT ((curLoc lexbuf), bigint.Parse((lexeme lexbuf).Replace("_", ""))) }
 | ['0'-'9']+['.']['0'-'9']+ { LITREAL ((curLoc lexbuf), lexeme lexbuf) }
+| "Prims."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
+| "FStar."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
+| "CanonCommMonoid."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
+| "CanonCommSemiring."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
+| "X64.Bytes_Semantics_s.havoc"
+| "X64.Semantics_s.havoc"
+| "X64.Bytes_Semantics_s.return"
+| "X64.Semantics_s.return"
 | ['_''a'-'z''A'-'Z']+['_''a'-'z''A'-'Z''0'-'9''\'']* { ID ((curLoc lexbuf), lexeme lexbuf) }
 | eof { EOF }
 | '\000' { EOF }

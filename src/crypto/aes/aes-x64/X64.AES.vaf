@@ -2,6 +2,22 @@ include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
 include "../../../arch/x64/X64.Vale.InsAes.vaf"
+include{:fstar} {:open} "Types_s"
+include{:fstar} {:open} "FStar.Seq.Base"
+include{:fstar} {:open} "AES_s"
+include{:fstar} {:open} "X64.Machine_s"
+include{:fstar} {:open} "X64.Memory_i_s"
+include{:fstar} {:open} "X64.Vale.State_i"
+include{:fstar} {:open} "X64.Vale.Decls_i"
+include{:fstar} {:open} "X64.Vale.InsBasic"
+include{:fstar} {:open} "X64.Vale.InsMem"
+include{:fstar} {:open} "X64.Vale.InsVector"
+include{:fstar} {:open} "X64.Vale.InsAes"
+include{:fstar} {:open} "X64.Vale.QuickCode_i"
+include{:fstar} {:open} "X64.Vale.QuickCodes_i"
+include{:fstar} {:open} "Types_i"
+include{:fstar} {:open} "AES_helpers_i"
+include{:fstar} {:open} "Opaque_i"
 
 module X64.AES
 
@@ -94,7 +110,12 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
     }
 }
 
-procedure{:quick} KeyExpansionStdcall(
+// can't type check because 
+// type X64.Vale.Decls_i.va_reg_operand : Type(0) extern ;
+// type X64.Vale.Decls_i.va_operand_reg_opr64 : Type(0) extern ;
+// are not equal in the *types.vaf files.
+// for the second parameters of Load128_buffer.
+procedure{:quick} {:notypecheck} KeyExpansionStdcall(
     inline win:bool,
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
@@ -141,7 +162,12 @@ procedure{:quick} KeyExpansionStdcall(
 // ENCRYPTION
 ///////////////////////////
 
-procedure{:quick} AES128EncryptRound(
+// can't type check because 
+// type X64.Vale.Decls_i.va_reg_operand : Type(0) extern ;
+// type X64.Vale.Decls_i.va_operand_reg_opr64 : Type(0) extern ;
+// are not equal in the *types.vaf files.
+// for the second parameters of Load128_buffer.
+procedure{:quick} {:notypecheck} AES128EncryptRound(
     inline n:int,
     ghost init:quad32,
     ghost round_keys:seq(quad32),

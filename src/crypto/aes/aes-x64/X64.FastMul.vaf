@@ -1,5 +1,16 @@
 include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsMem.vaf"
+include{:fstar} {:open} "Types_s"
+include{:fstar} {:open} "Types_i"
+include{:fstar} {:open} "X64.Machine_s"
+include{:fstar} {:open} "X64.Memory_i_s"
+include{:fstar} {:open} "X64.Vale.State_i"
+include{:fstar} {:open} "X64.Vale.Decls_i"
+include{:fstar} {:open} "X64.Vale.InsBasic"
+include{:fstar} {:open} "X64.Vale.InsMem"
+include{:fstar} {:open} "X64.Vale.QuickCode_i"
+include{:fstar} {:open} "X64.Vale.QuickCodes_i"
+include{:fstar} {:open} "FastMul_helpers_i"
 
 module X64.FastMul
 
@@ -49,7 +60,8 @@ function my_bool_to_nat (b:bool) : nat extern;
 
 #reset-options "--z3rlimit 30"
 
-procedure{:quick exportOnly} fast_multiply(
+// can't typecheck because "Uop UToOperand" is not implemented
+procedure{:quick exportOnly} {:notypecheck} fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -217,8 +229,13 @@ procedure{:quick exportOnly} fast_multiply(
 */
 }
 
+// can't type check because 
+// type X64.Vale.Decls_i.va_reg_operand : Type(0) extern ;
+// type X64.Vale.Decls_i.va_operand_reg_opr64 : Type(0) extern ;
+// are not equal in the *types.vaf files.
+// for the first parameters of "Push".
 // fast_mul_stdcall(dst, inA, inB)
-procedure{:quick} fast_mul_stdcall(
+procedure{:quick}{:notypecheck} fast_mul_stdcall(
     inline win:bool,
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
