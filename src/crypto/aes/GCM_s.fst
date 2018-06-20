@@ -62,7 +62,7 @@ let gcm_decrypt_LE_def (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (ciph
       4096 * length cipher < pow2_32 /\
       4096 * length auth < pow2_32
     )
-    (ensures fun (c, t) -> True)
+    (ensures fun (p, t) -> True)
   =
   let key_LE = seq_nat8_to_seq_nat32_LE key in
   let iv_BE = be_bytes_to_quad32 iv in
@@ -89,6 +89,6 @@ let gcm_decrypt_LE (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (cipher:s
       4096 * length cipher < pow2_32 /\
       4096 * length auth < pow2_32
     )
-    (ensures fun (c, t) -> True)
+    (ensures fun (p, t) -> True)
   = 
   make_opaque (gcm_decrypt_LE_def alg key iv cipher auth tag)
