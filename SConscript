@@ -24,7 +24,7 @@ Export('verify_paths')
 verify_options = {
   'src/arch/arm/nlarith.s.dfy': BuildOptions(dafny_default_args_nlarith),
   'src/arch/arm/bitvectors.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'src/crypto/aes/aes-x64/aes_main.i.dfy': BuildOptions(dafny_default_args_larith),
+  'src/crypto/aes/x64/aes_main.i.dfy': BuildOptions(dafny_default_args_larith),
   'src/lib/math/mul_nonlinear.i.dfy': BuildOptions(dafny_default_args_nlarith),
   'src/lib/math/div_nonlinear.i.dfy': BuildOptions(dafny_default_args_nlarith),
   'src/crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
@@ -32,7 +32,7 @@ verify_options = {
   'src/lib/math/div.i.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:60'),
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
-  'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
+  'obj/crypto/aes/x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
