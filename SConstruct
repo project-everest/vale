@@ -25,7 +25,7 @@ if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machin
   target_arch='amd64'
   target_x='64'
   sha_arch_dir='sha-x64'
-  aes_arch_dir='aes-x64'
+  aes_arch_dir='x64'
   
 envDict = {'TARGET_ARCH':target_arch,
            'X':target_x,
