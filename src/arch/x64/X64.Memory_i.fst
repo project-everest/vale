@@ -15,30 +15,6 @@ let m_of_typ (t:typ) : M.typ =
   | TBase TUInt64 -> M.TBase M.TUInt64
   | TBase TUInt128 -> M.TBase M.TUInt128
 
-// let v_of_typ (t:typ) (v:type_of_typ t) : M.type_of_typ (m_of_typ t) =
-//   match t with
-//   | TBase TUInt8 -> coerce (M.type_of_typ (m_of_typ t)) (UInt8.uint_to_t v)
-//   | TBase TUInt16 -> coerce (M.type_of_typ (m_of_typ t)) (UInt16.uint_to_t v)
-//   | TBase TUInt32 -> coerce (M.type_of_typ (m_of_typ t)) (UInt32.uint_to_t v)
-//   | TBase TUInt64 -> coerce (M.type_of_typ (m_of_typ t)) (UInt64.uint_to_t v)
-
-// let v_to_typ (t:typ) (v:M.type_of_typ (m_of_typ t)) : type_of_typ t =
-//   match t with
-//   | TBase TUInt8 -> UInt8.v (coerce UInt8.t v)
-//   | TBase TUInt16 -> UInt16.v (coerce UInt16.t v)
-//   | TBase TUInt32 -> UInt32.v (coerce UInt32.t v)
-//   | TBase TUInt64 -> UInt64.v (coerce UInt64.t v)
-
-// let lemma_v_to_of_typ (t:typ) (v:type_of_typ t) : Lemma
-//   (ensures v_to_typ t (v_of_typ t v) == v)
-//   [SMTPat (v_to_typ t (v_of_typ t v))]
-//   =
-//   match t with
-//   | TBase TUInt8 -> assert (UInt8.v (UInt8.uint_to_t v) == v)
-//   | TBase TUInt16 -> assert (UInt16.v (UInt16.uint_to_t v) == v)
-//   | TBase TUInt32 -> assert (UInt32.v (UInt32.uint_to_t v) == v)
-//   | TBase TUInt64 -> assert (UInt64.v (UInt64.uint_to_t v) == v)
-
 let buffer t = M.buffer (m_of_typ t)
 
 let buffer_as_seq #t h b = M.buffer_as_seq h b
@@ -53,10 +29,6 @@ let loc_includes = M.loc_includes
 let modifies = M.modifies
 
 let buffer_addr #t b m = M.buffer_addr b m
-let loc_readable = M.loc_readable
-let loc_readable_none = M.loc_readable_none
-let loc_readable_union = M.loc_readable_union
-let loc_readable_buffer #t h b = M.loc_readable_buffer h b
 
 let modifies_goal_directed s h1 h2 = modifies s h1 h2
 let lemma_modifies_goal_directed s h1 h2 = ()

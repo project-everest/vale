@@ -19,7 +19,7 @@ open X64.Vale.InsBasic
 open X64.Vale.InsMem
 
 // Annoying type problem workaround
-let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = n
+let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = let m:nat = n in m
 #endverbatim
 
 #verbatim

@@ -108,9 +108,9 @@ verify_options = {
   '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
   '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
-#  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
-  'src/arch/x64/Interop64.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
-  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
+  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
+  'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
+  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true '),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
   'obj/crypto/aes/aes-x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
 

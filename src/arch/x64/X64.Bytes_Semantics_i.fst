@@ -56,3 +56,46 @@ let frame_update_heap ptr v mem =
 let correct_update_get ptr v mem =
   reveal_opaque get_heap_val64_def;
   reveal_opaque update_heap64_def
+
+let same_mem_get_heap_val32 ptr mem1 mem2 =
+  reveal_opaque get_heap_val32_def;
+  reveal_opaque update_heap32_def
+
+let frame_update_heap32 (ptr:int) (v:nat32) (mem:heap) : Lemma
+  (let mem' = update_heap32 ptr v mem in
+  forall i. i < ptr \/ i >= ptr + 4 ==> mem.[i] == mem'.[i]) =
+  reveal_opaque get_heap_val32_def;
+  reveal_opaque update_heap32_def
+
+let frame_update_heap128 ptr v s =
+  let mem1 = update_heap32 ptr v.lo0 s.mem in
+  frame_update_heap32 ptr v.lo0 s.mem;
+  let mem2 = update_heap32 (ptr+4) v.lo1 mem1 in
+  frame_update_heap32 (ptr+4) v.lo1 mem1;
+  let mem3 = update_heap32 (ptr+8) v.hi2 mem2 in
+  frame_update_heap32 (ptr+8) v.hi2 mem2;
+  let mem4 = update_heap32 (ptr+12) v.hi3 mem3 in  
+  frame_update_heap32 (ptr+12) v.hi3 mem3
+
+let correct_update_get32 (ptr:int) (v:nat32) (mem:heap) : Lemma
+  (get_heap_val32 ptr (update_heap32 ptr v mem) == v) =
+  reveal_opaque get_heap_val32_def;
+  reveal_opaque update_heap32_def
+
+#set-options "--z3rlimit 30"
+
+let correct_update_get128 ptr v s =
+  reveal_opaque get_heap_val32_def;
+  reveal_opaque update_heap32_def;
+  let mem1 = update_heap32 ptr v.lo0 s.mem in
+  frame_update_heap32 ptr v.lo0 s.mem;
+  correct_update_get32 ptr v.lo0 s.mem;
+  let mem2 = update_heap32 (ptr+4) v.lo1 mem1 in
+  frame_update_heap32 (ptr+4) v.lo1 mem1;
+  correct_update_get32 (ptr+4) v.lo1 mem1;
+  let mem3 = update_heap32 (ptr+8) v.hi2 mem2 in
+  frame_update_heap32 (ptr+8) v.hi2 mem2;
+  correct_update_get32 (ptr+8) v.hi2 mem2;
+  let mem4 = update_heap32 (ptr+12) v.hi3 mem3 in  
+  frame_update_heap32 (ptr+12) v.hi3 mem3;
+  correct_update_get32 (ptr+12) v.hi3 mem3

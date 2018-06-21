@@ -50,7 +50,7 @@ if sys.platform == 'win32':
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
-  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128'])
+  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128', '-std=c++11'])
   env['MONO'] = 'mono'
   env['NUGET'] = 'nuget'
 
@@ -624,7 +624,11 @@ def extract_fstar(env, sourcefile):
   module_name = os.path.split(base_name)[1]
   mlfile = ml_out_name(sourcefile, '.ml')
   Depends(mlfile, base_name + '.fst.verified')
-  env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces true", ""))
+  flags = env['VERIFIER_FLAGS']
+  flags = flags.replace('--use_extracted_interfaces true', "--expose_interfaces X64.Memory_i.fst")
+  if "--expose_interfaces X64.Memory_i.fst" in flags and "--expose_interfaces src/arch/x64/X64.Memory_i.fst" in flags:
+    flags = flags.replace("--expose_interfaces src/arch/x64/X64.Memory_i.fst", "")
+  env = env.Clone(VERIFIER_FLAGS = flags) 
   cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
   cmd_line += " --odir obj/ml_out --codegen OCaml --admit_smt_queries true --extract_module " + module_name
   return env.Command(mlfile, sourcefile, cmd_line)

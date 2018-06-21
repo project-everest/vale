@@ -82,21 +82,23 @@ unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 
 let get_heap_val64_def (ptr:int) (mem:heap) : nat64 =
-    (mem.[ptr]) + 
-    (mem.[ptr+1]) `op_Multiply` 0x100 + 
-    (mem.[ptr+2]) `op_Multiply` 0x10000 +
-    (mem.[ptr+3]) `op_Multiply` 0x1000000 + 
-    (mem.[ptr+4]) `op_Multiply` 0x100000000 +
-    (mem.[ptr+5]) `op_Multiply` 0x10000000000 +
-    (mem.[ptr+6]) `op_Multiply` 0x1000000000000 +
-    (mem.[ptr+7]) `op_Multiply` 0x100000000000000
+    Views.nat8s_to_nat64
+      mem.[ptr]
+      mem.[ptr+1]
+      mem.[ptr+2]
+      mem.[ptr+3]
+      mem.[ptr+4]
+      mem.[ptr+5]
+      mem.[ptr+6]
+      mem.[ptr+7]
 let get_heap_val64 = make_opaque get_heap_val64_def
 
 let get_heap_val32_def (ptr:int) (mem:heap) : nat32 =
-    (mem.[ptr]) + 
-    (mem.[ptr+1]) `op_Multiply` 0x100 + 
-    (mem.[ptr+2]) `op_Multiply` 0x10000 +
-    (mem.[ptr+3]) `op_Multiply` 0x1000000
+  Views.nat8s_to_nat32
+    mem.[ptr]
+    mem.[ptr+1]
+    mem.[ptr+2]
+    mem.[ptr+3]
 let get_heap_val32 = make_opaque get_heap_val32_def
 
 unfold let eval_mem (ptr:int) (s:state) : nat64 = get_heap_val64 ptr s.mem
