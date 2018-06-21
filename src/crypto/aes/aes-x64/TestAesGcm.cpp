@@ -16,9 +16,9 @@ struct args
     byte *tag_ptr;
 };
 
-extern "C" void aes_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
-extern "C" void gcm_encrypt(args *a);
-extern "C" int gcm_decrypt(args *a);
+extern "C" void aes128_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
+extern "C" void gcm128_encrypt(args *a);
+extern "C" int gcm128_decrypt(args *a);
 
 byte key[16] =
     { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
@@ -55,15 +55,15 @@ int main()
     a.out_ptr = out;
     a.tag_ptr = tag;
     printbytes("key", key, 16);
-    aes_key_expansion(key, key_expansion);
+    aes128_key_expansion(key, key_expansion);
     printbytes("key_expansion", key_expansion, 11 * 16);
-    gcm_encrypt(&a);
+    gcm128_encrypt(&a);
     printbytes("cipher", out, 19);
     printbytes("tag", tag, 16);
 
     a.out_ptr = plain;
     a.plain_ptr = out;
-    int ret = gcm_decrypt(&a);
+    int ret = gcm128_decrypt(&a);
     printf("gcm_decrypt returned %d\n", ret);
     printbytes("plaintext", plain, 19);
 
@@ -83,7 +83,7 @@ int main()
         int n = 10000;
         for (int j = 0; j < n; j++)
         {
-            gcm_encrypt(&a);
+            gcm128_encrypt(&a);
         }
         auto time2 = std::chrono::high_resolution_clock::now();
         int dt = std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count();
