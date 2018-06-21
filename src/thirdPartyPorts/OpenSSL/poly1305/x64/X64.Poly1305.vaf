@@ -39,7 +39,6 @@ open X64.Vale.InsBasic
 open X64.Vale.InsMem
 open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
-//open X64.Vale.StrongPost_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open X64.Poly1305.Util_i

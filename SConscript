@@ -92,8 +92,6 @@ verify_options = {
   'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # Disable verification by adding 'filename': None
-  'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
-  'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
   'src/arch/x64/X64.Taint_Semantics_s.fst': None,
   'src/arch/x64/X64.Leakage_s.fst': None,
