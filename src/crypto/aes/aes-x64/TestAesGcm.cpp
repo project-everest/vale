@@ -20,9 +20,15 @@ extern "C" void aes128_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
 extern "C" void gcm128_encrypt(args *a);
 extern "C" int gcm128_decrypt(args *a);
 
-byte key[16] =
-    { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-byte key_expansion[11 * 16];
+extern "C" void aes256_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
+extern "C" void gcm256_encrypt(args *a);
+extern "C" int gcm256_decrypt(args *a);
+
+
+byte key[32] =
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+     16,17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31 }; 
+byte key_expansion[15 * (128/8)];
 
 byte plain[32] =
     { 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215,
@@ -41,10 +47,11 @@ void printbytes(char *label, byte *b, int len)
     printf("\n");
 }
 
-int main()
+void test(void (*aes_key_expansion) (byte*, byte*),
+          void (*gcm_encrypt) (args*),
+          int  (*gcm_decrypt) (args*),
+          int num_rounds)
 {
-    printf("hello\n");
-
     args a;
     a.plain_ptr = plain;
     a.plain_num_bytes = 19;
@@ -55,15 +62,15 @@ int main()
     a.out_ptr = out;
     a.tag_ptr = tag;
     printbytes("key", key, 16);
-    aes128_key_expansion(key, key_expansion);
-    printbytes("key_expansion", key_expansion, 11 * 16);
-    gcm128_encrypt(&a);
+    aes_key_expansion(key, key_expansion);
+    printbytes("key_expansion", key_expansion, (num_rounds + 1) * 16);
+    gcm_encrypt(&a);
     printbytes("cipher", out, 19);
     printbytes("tag", tag, 16);
 
     a.out_ptr = plain;
     a.plain_ptr = out;
-    int ret = gcm128_decrypt(&a);
+    int ret = gcm_decrypt(&a);
     printf("gcm_decrypt returned %d\n", ret);
     printbytes("plaintext", plain, 19);
 
@@ -83,7 +90,7 @@ int main()
         int n = 10000;
         for (int j = 0; j < n; j++)
         {
-            gcm128_encrypt(&a);
+            gcm_encrypt(&a);
         }
         auto time2 = std::chrono::high_resolution_clock::now();
         int dt = std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count();
@@ -91,6 +98,23 @@ int main()
     }
     printbytes("cipher", out2, 16);
     printbytes("tag", tag, 16);
+}
+
+int main()
+{
+    printf("hello\n");
+
+    printf("\nBeginning 128-bit test...\n");
+    test(aes128_key_expansion,
+         gcm128_encrypt,
+         gcm128_decrypt,
+         10);
+
+    printf("\nBeginning 256-bit test...\n");
+    test(aes256_key_expansion,
+         gcm256_encrypt,
+         gcm256_decrypt,
+         14);
 
     printf("goodbye\n");
     return 0;
