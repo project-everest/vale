@@ -1,7 +1,7 @@
 include "../../../arch/x64/X64.Vale.InsBasic.vaf"
 include "../../../arch/x64/X64.Vale.InsMem.vaf"
 include "../../../arch/x64/X64.Vale.InsVector.vaf"
-include "X64.AES128.vaf"
+include "X64.AES.vaf"
 include "X64.GF128_Mul.vaf"
 include "X64.GCTR.vaf"
 include "X64.GHash.vaf"
@@ -22,7 +22,7 @@ open GCM_i
 open GHash_s
 open GHash_i
 open GCM_s
-open X64.AES128
+open X64.AES
 open GF128_s
 open GF128_i
 open X64.Poly1305.Math_i
@@ -57,9 +57,10 @@ let make_ghash_plain_LE (s:seq quad32) : ghash_plain_LE = if length s = 0 then c
 // GCM
 ///////////////////////////
 procedure {:quick} gcm_one_pass_blocks(
+    inline alg:algorithm,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
-    ghost key:aes_key_LE(AES_128),
+    ghost key:aes_key_LE(alg),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -83,10 +84,11 @@ procedure {:quick} gcm_one_pass_blocks(
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
         r8 == buffer_addr(keys_b, mem);
-        validSrcAddrs128(mem, r8, keys_b, 11);
+        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
@@ -96,8 +98,8 @@ procedure {:quick} gcm_one_pass_blocks(
         r10 == out_ptr + 16 * len;
 
         // GCTR
-        //buffer128_as_seq(mem, out_b) == gctr_encrypt_LE(old(icb), buffer128_as_seq(old(mem), in_b), AES_128, key);
-        gctr_partial(len, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+        //buffer128_as_seq(mem, out_b) == gctr_encrypt_LE(old(icb), buffer128_as_seq(old(mem), in_b), alg, key);
+        gctr_partial(alg, len, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
         icb == inc32(old(icb), old(len));
 
         // GHash
@@ -131,10 +133,11 @@ procedure {:quick} gcm_one_pass_blocks(
             buffer_length(in_b) == buffer_length(out_b); 
 
             // AES reqs
-            length(round_keys) == 11;
-            round_keys == key_to_round_keys_LE(AES_128, key);
+            alg = AES_128 || alg = AES_256;
+            length(round_keys) == nr(alg) + 1;
+            round_keys == key_to_round_keys_LE(alg, key);
             r8 == buffer_addr(keys_b, mem);
-            validSrcAddrs128(mem, r8, keys_b, 11);
+            validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
             buffer128_as_seq(mem, keys_b) == round_keys;
 
             //////////////////// GCTR invariants //////////////////////
@@ -144,21 +147,21 @@ procedure {:quick} gcm_one_pass_blocks(
             //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);
             validSrcAddrs128(mem, out_ptr, out_b, len);
-            gctr_partial(rdx, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+            gctr_partial(alg, rdx, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 
             rdx == 0 ==> hash == old(hash);
             rdx > 0 ==> hash == ghash_incremental(h, old(hash), slice_work_around(buffer128_as_seq(mem, out_b), rdx));
 
 //            forall j :: 0 <= j < rdx ==> 
 //                        buffer128_read(out_b, j, mem) == 
-//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt_LE(AES_128, key, inc32(old(icb), j)));
+//                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt_LE(alg, key, inc32(old(icb), j)));
 
         decreases
             len - rdx;
     {
         Mov128(xmm0, icb);
         Pshufb(xmm0, mask);
-        AES128EncryptBlock(reverse_bytes_quad32(icb), key, round_keys, keys_b);
+        AESEncryptBlock(alg, reverse_bytes_quad32(icb), key, round_keys, keys_b);
 
         Load128_buffer(xmm2, r9, 0, in_b, rdx);
         Pxor(xmm2, xmm0);
@@ -176,18 +179,19 @@ procedure {:quick} gcm_one_pass_blocks(
 
 //    assert length(buffer128_as_seq(mem, in_b)) == length(buffer128_as_seq(mem, out_b));
 //    assert 256 * length(buffer128_as_seq(mem, in_b)) < pow2_32;
-//    assert gctr_partial(length(buffer128_as_seq(mem, out_b)), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+//    assert gctr_partial(alg, length(buffer128_as_seq(mem, out_b)), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 //    
 
 //// Call a helpful lemma
-//    gctr_partial_completed(buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
+//    gctr_partial_completed(alg, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 }
 
 #reset-options "--z3rlimit 30"
 procedure {:quick} gcm_one_pass(
+    inline alg:algorithm,
     ghost in_b:buffer128,
     ghost out_b:buffer128,
-    ghost key:aes_key_LE(AES_128),
+    ghost key:aes_key_LE(alg),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -214,10 +218,11 @@ procedure {:quick} gcm_one_pass(
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
 
         // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
         r8 == buffer_addr(keys_b, mem);
-        validSrcAddrs128(mem, r8, keys_b, 11);
+        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
@@ -226,7 +231,7 @@ procedure {:quick} gcm_one_pass(
         // GCTR
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)), old(num_bytes));
-        cipher == gctr_encrypt_LE(old(icb), make_gctr_plain_LE(plain), AES_128, key);
+        cipher == gctr_encrypt_LE(old(icb), make_gctr_plain_LE(plain), alg, key);
 
         //icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
         icb.lo1 == old(icb.lo1);
@@ -250,11 +255,11 @@ procedure {:quick} gcm_one_pass(
         ghost var num_blocks := old(num_bytes) / 16;
         assert rcx == num_blocks;
 
-        gcm_one_pass_blocks(in_b, out_b, key, round_keys, keys_b);
+        gcm_one_pass_blocks(alg, in_b, out_b, key, round_keys, keys_b);
         assert icb == inc32(old(icb), num_blocks);
 
         if (rsi == 0) {
-            gctr_bytes_no_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
+            gctr_bytes_no_extra(alg, old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
             ghash_incremental_bytes_no_extra(out_b, old(hash), old(out_ptr), old(num_bytes), hash, h);
             bytes_to_quad_size_no_extra_bytes(old(num_bytes));
             //assert icb == inc32(old(icb), bytes_to_quad_size(old(num_bytes)));
@@ -264,7 +269,7 @@ procedure {:quick} gcm_one_pass(
             // TODO: Should update gcm_one_pass_blocks and gctr_* to give their results in terms of old(mem) and in_b, instead of mem
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
             Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
-            gctr_bytes_extra(old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
+            gctr_bytes_extra(alg, old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
             Mov64(rax, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rax
             Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
             Mov128(hash, xmm3);
@@ -278,17 +283,18 @@ procedure {:quick} gcm_one_pass(
     // Handle the else case:
     ghost var plain  := buffer128_as_seq(old(mem),  in_b);
     ghost var cipher := buffer128_as_seq(mem,      out_b);
-    gctr_encrypt_empty(old(icb), plain, cipher, AES_128, key);
+    gctr_encrypt_empty(old(icb), plain, cipher, alg, key);
 
 }
 
 #reset-options "--z3rlimit 30"
 procedure {:quick} gcm_core_part1(
+    inline alg:algorithm,
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
-    ghost key:aes_key_LE(AES_128),
+    ghost key:aes_key_LE(alg),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     ) returns (
@@ -335,9 +341,10 @@ procedure {:quick} gcm_core_part1(
         256 * bytes_to_quad_size(plain_num_bytes) < pow2_32;
 
         // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
-        validSrcAddrs128(mem, keys_ptr, keys_b, 11);
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
+        validSrcAddrs128(mem, keys_ptr, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
@@ -351,7 +358,7 @@ procedure {:quick} gcm_core_part1(
 //        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
-        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+        cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
         
         // Intermediate hash state needed for the next step
         let auth_padded_bytes := pad_to_128_bits(auth);
@@ -371,11 +378,11 @@ procedure {:quick} gcm_core_part1(
         // Other intermediate facts
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
         xmm11 == h;
-        h == aes_encrypt_LE(AES_128, key, y_0);
+        h == aes_encrypt_LE(alg, key, y_0);
 {
     // let h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
     ZeroXmm(xmm0);
-    AES128EncryptBlock(xmm0, key, round_keys, keys_b); // h = xmm0 = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
+    AESEncryptBlock(alg, xmm0, key, round_keys, keys_b); // h = xmm0 = aes_encrypt_LE alg key (Mkfour 0 0 0 0) in
     h := xmm0;
     Mov128(xmm11, xmm0);     // Save a copy of h
 
@@ -411,10 +418,10 @@ procedure {:quick} gcm_core_part1(
     ghost var icb_enc := iv;
 
     assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     // Passes -- REVIEW: Seems to be necessary for it to pass at the end of the procedure; unclear why that could possibly be the case
-    gcm_one_pass(plain_b, out_b, key, round_keys, keys_b);
+    gcm_one_pass(alg, plain_b, out_b, key, round_keys, keys_b);
     y_cipher := xmm1;
     ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));
-    gcm_encrypt_LE_fst_helper(icb_enc, iv_BE, plain, auth, cipher, AES_128, key);
+    gcm_encrypt_LE_fst_helper(icb_enc, iv_BE, plain, auth, cipher, alg, key);
     reveal_opaque(le_bytes_to_seq_quad32_def);
 }
 
@@ -448,11 +455,12 @@ procedure {:quick} gcm_make_length_quad(
 
 #reset-options "--z3rlimit 30"
 procedure {:quick} gcm_core(
+    inline alg:algorithm,
     ghost iv_BE:quad32,
     ghost plain_b:buffer128,
     ghost auth_b:buffer128,
     ghost out_b:buffer128,
-    ghost key:aes_key_LE(AES_128),
+    ghost key:aes_key_LE(alg),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -494,9 +502,10 @@ procedure {:quick} gcm_core(
         256 * bytes_to_quad_size(plain_num_bytes) < pow2_32;
 
         // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
-        validSrcAddrs128(mem, keys_ptr, keys_b, 11);
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
+        validSrcAddrs128(mem, keys_ptr, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
@@ -509,10 +518,10 @@ procedure {:quick} gcm_core(
 //        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
-        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
-        le_quad32_to_bytes(xmm1) == snd(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+        cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
+        le_quad32_to_bytes(xmm1) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 {
-    (ghost var h), (ghost var y_0), (ghost var y_auth), (ghost var y_cipher) := gcm_core_part1(iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
+    (ghost var h), (ghost var y_0), (ghost var y_auth), (ghost var y_cipher) := gcm_core_part1(alg, iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
 
     gcm_make_length_quad();
     ghost var length_quad32 := xmm2;
@@ -536,23 +545,23 @@ procedure {:quick} gcm_core(
 //    assert iv == iv_BE.(lo0 := 1);
 
     // Encrypt the hash value with gctr_register; result goes in xmm1
-    gctr_register(key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
+    gctr_register(alg, key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
 
     ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
 
 //    assert 4096 * length(plain) < pow2_32;
 //    assert 4096 * length(auth_bytes) < pow2_32;
-//    assert 4096 * length(plain) < pow2_32 /\ 4096 * length(auth_bytes) < pow2_32 /\ cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth_bytes));
+//    assert 4096 * length(plain) < pow2_32 /\ 4096 * length(auth_bytes) < pow2_32 /\ cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth_bytes));
 //    assert length_quad32 == reverse_bytes_quad32(Mkfour(nat32_workaround(8 * length(plain)), 0, nat32_workaround(8 * length(auth_bytes)), 0));
-//    //assert h == aes_encrypt_LE(AES_128, key, Mkfour(0,0,0,0));
+//    //assert h == aes_encrypt_LE(alg, key, Mkfour(0,0,0,0));
 //    assert y_final == ghash_LE(h, append(auth_padded_quads, append(cipher_padded_quads, create(1, length_quad32))));
     le_seq_quad32_to_bytes_of_singleton(xmm1);
-//    assert le_quad32_to_bytes(xmm1) == gctr_encrypt_LE(Mkfour(1, iv_BE.lo1, iv_BE.hi2, iv_BE.hi3), le_quad32_to_bytes(y_final), AES_128, key);
+//    assert le_quad32_to_bytes(xmm1) == gctr_encrypt_LE(Mkfour(1, iv_BE.lo1, iv_BE.hi2, iv_BE.hi3), le_quad32_to_bytes(y_final), alg, key);
 
 //    assert length_quad32 == reverse_bytes_quad32(Mkfour(nat32_workaround(8 * old(plain_num_bytes)), 0, nat32_workaround(8 * old(auth_num_bytes)), 0));
 
 
-    gcm_encrypt_LE_snd_helper(iv_BE, length_quad32, y_final, xmm1, plain, auth_bytes, cipher, AES_128, key);
+    gcm_encrypt_LE_snd_helper(iv_BE, length_quad32, y_final, xmm1, plain, auth_bytes, cipher, alg, key);
     //be_bytes_to_quad32_to_bytes(iv_BE);
 }
 
@@ -674,6 +683,7 @@ procedure {:quick} callee_restore_registers(
 
 #reset-options "--z3rlimit 30"
 procedure {:quick} gcm_encrypt_stdcall_inner(
+    inline alg:algorithm,
     ghost args_b:buffer64,
     ghost iv_BE:quad32,
 
@@ -683,7 +693,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
     ghost out_b:buffer128,
     ghost tag_b:buffer128,
 
-    ghost key:aes_key_LE(AES_128),
+    ghost key:aes_key_LE(alg),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -733,9 +743,10 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
         256 * bytes_to_quad_size(plain_num_bytes) < pow2_32;
 
         // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
@@ -751,8 +762,8 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
 //        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
-        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
-        le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+        cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
+        le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 {
     Load64_buffer(r14, r9,  0, args_b, 0);
     Load64_buffer(r13, r9,  8, args_b, 1);
@@ -766,7 +777,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
     // Load the IV into its XMM register
     Load128_buffer(xmm7, r10, 0, iv_b, 0);
 
-    gcm_core(iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
+    gcm_core(alg, iv_BE, plain_b, auth_b, out_b, key, round_keys, keys_b);
 
     // Auth tag is still in xmm1, so save it to memory
     Store128_buffer(r15, xmm1, 0, tag_b, 0);
@@ -775,6 +786,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
 #reset-options "--z3rlimit 30"
 procedure {:quick} gcm_encrypt_stdcall(
     inline win:bool,
+    inline alg:algorithm,
     ghost args_b:buffer64,
     ghost iv_BE:quad32,
 
@@ -785,7 +797,7 @@ procedure {:quick} gcm_encrypt_stdcall(
     ghost tag_b:buffer128,
     ghost stack_b:buffer64,
 
-    ghost key:aes_key_LE(AES_128),
+    ghost key:aes_key_LE(alg),
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
@@ -847,9 +859,10 @@ procedure {:quick} gcm_encrypt_stdcall(
         256 * bytes_to_quad_size(plain_num_bytes) < pow2_32;
 
         // AES reqs
-        length(round_keys) == 11;
-        round_keys == key_to_round_keys_LE(AES_128, key);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_b, 11);
+        alg = AES_128 || alg = AES_256;
+        length(round_keys) == nr(alg) + 1;
+        round_keys == key_to_round_keys_LE(alg, key);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
@@ -865,8 +878,8 @@ procedure {:quick} gcm_encrypt_stdcall(
 //        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
-        cipher == fst(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
-        le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(AES_128, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
+        cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
+        le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
 
         // Calling convention for caller/callee saved registers
         rsp == old(rsp);
@@ -903,6 +916,6 @@ procedure {:quick} gcm_encrypt_stdcall(
     }
 
     callee_save_registers(win, stack_b);
-    gcm_encrypt_stdcall_inner(args_b, iv_BE, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
+    gcm_encrypt_stdcall_inner(alg, args_b, iv_BE, plain_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
     callee_restore_registers(win, stack_b, old(xmm6), old(xmm7), old(xmm8), old(xmm10), old(xmm11));
 }

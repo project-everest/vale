@@ -260,11 +260,12 @@ and print_code (c:code) (n:int) (p:printer) : string * int =
 let print_header (p:printer) =
   print_string (p.header())
 
-let print_proc (name:string) (code:code) (label:int) (p:printer) =
+let print_proc (name:string) (code:code) (label:int) (p:printer) : FStar.All.ML int =
   let proc = p.proc_name name in
-  let code_str, _ = print_code code label p in
+  let code_str, final_label = print_code code label p in
   let ret = p.ret name in
-  print_string (proc ^ code_str ^ ret)
+  print_string (proc ^ code_str ^ ret);
+  final_label
 
 let print_footer (p:printer) =
   print_string (p.footer())

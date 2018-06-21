@@ -1,6 +1,9 @@
 let _ =
   CmdLineParser.parse_cmdline [
-      ("aes_key_expansion", "0",   X64_AES128.va_code_KeyExpansion128Stdcall);
-      ("gcm_encrypt",       "100", X64_GCMencrypt.va_code_gcm_encrypt_stdcall);
-      ("gcm_decrypt",       "200", X64_GCMdecrypt.va_code_gcm_decrypt_stdcall)
+      ("aes128_key_expansion", (fun win -> X64_AES.va_code_KeyExpansionStdcall win AES_s.AES_128));
+      ("aes256_key_expansion", (fun win -> X64_AES.va_code_KeyExpansionStdcall win AES_s.AES_256));
+      ("gcm128_encrypt",       (fun win -> X64_GCMencrypt.va_code_gcm_encrypt_stdcall win AES_s.AES_128));
+      ("gcm128_decrypt",       (fun win -> X64_GCMdecrypt.va_code_gcm_decrypt_stdcall win AES_s.AES_128));
+      ("gcm256_encrypt",       (fun win -> X64_GCMencrypt.va_code_gcm_encrypt_stdcall win AES_s.AES_256));
+      ("gcm256_decrypt",       (fun win -> X64_GCMdecrypt.va_code_gcm_decrypt_stdcall win AES_s.AES_256))
     ]

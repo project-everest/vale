@@ -78,10 +78,10 @@ let aes_encrypt_BE (alg:algorithm) (key:aes_key_LE alg) (p_BE:quad32) =
   let p_LE = reverse_bytes_quad32 p_BE in
   aes_encrypt_LE alg key p_LE
 
-let gctr_partial (bound:nat) (plain cipher:seq quad32) (key:aes_key_LE AES_128) (icb:quad32) =
+let gctr_partial (alg:algorithm) (bound:nat) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) =
   let bound = min bound (min (length plain) (length cipher)) in
   forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==>
-    index cipher j == quad32_xor (index plain j) (aes_encrypt_BE AES_128 key (inc32 icb j))
+    index cipher j == quad32_xor (index plain j) (aes_encrypt_BE alg key (inc32 icb j))
   
 let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE)
                                       (alg:algorithm) (key:aes_key_LE alg) (i:int) : Lemma
@@ -166,13 +166,13 @@ let rec gctr_indexed (icb:quad32) (plain:gctr_plain_internal_LE)
   assert(equal cipher c)  // OBSERVE: Invoke extensionality lemmas
 
 
-let gctr_partial_completed (plain cipher:seq quad32) (key:aes_key_LE AES_128) (icb:quad32) : Lemma
+let gctr_partial_completed (alg:algorithm) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) : Lemma
   (requires length plain == length cipher /\
             256 * (length plain) < pow2_32 /\
-            gctr_partial (length cipher) plain cipher key icb)
-  (ensures cipher == gctr_encrypt_recursive icb plain AES_128 key 0)
+            gctr_partial alg (length cipher) plain cipher key icb)
+  (ensures cipher == gctr_encrypt_recursive icb plain alg key 0)
   =
-  gctr_indexed icb plain AES_128 key cipher;
+  gctr_indexed icb plain alg key cipher;
   ()
 
 let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (cipher:seq quad32) : Lemma
@@ -204,7 +204,7 @@ We know that
 And we know that:
   get_mem out_b num_blocks 
   ==
-  gctr_encrypt_block(icb_BE, (get_mem inb num_blocks), AES_128, key, num_blocks);
+  gctr_encrypt_block(icb_BE, (get_mem inb num_blocks), alg, key, num_blocks);
 
 
 Internally gctr_encrypt_LE will compute:
