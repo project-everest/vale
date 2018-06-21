@@ -50,7 +50,7 @@ fstar_include_paths = [
   'obj/lib/math',
   'obj/lib/util',
   'obj/crypto/aes/',
-  'obj/crypto/aes/aes-x64',
+  'obj/crypto/aes/x64',
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
@@ -115,7 +115,7 @@ verify_options = {
   'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
   'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true '),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
-  'obj/crypto/aes/aes-x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
+  'obj/crypto/aes/x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
 
 
 
@@ -135,12 +135,12 @@ Export('verify_options')
 # Note that the entries below are prefixes of blacklisted files
 #
 min_test_suite_blacklist = [
-  'obj/crypto/aes/aes-x64/X64.GCMencrypt.fst',
-  'obj/crypto/aes/aes-x64/X64.GCMdecrypt.fst',
+  'obj/crypto/aes/x64/X64.GCMencrypt.fst',
+  'obj/crypto/aes/x64/X64.GCMdecrypt.fst',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
-  'obj/crypto/aes/aes-x64/X64.GHash',
-  'obj/crypto/aes/aes-x64/X64.GCTR.fst',
-  'obj/crypto/aes/aes-x64/X64.AES.fst'
+  'obj/crypto/aes/x64/X64.GHash',
+  'obj/crypto/aes/x64/X64.GCTR.fst',
+  'obj/crypto/aes/x64/X64.AES.fst'
 ]
 
 Export('min_test_suite_blacklist')
