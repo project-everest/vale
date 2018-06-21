@@ -82,7 +82,7 @@ let correct_update_get32 (ptr:int) (v:nat32) (mem:heap) : Lemma
   reveal_opaque get_heap_val32_def;
   reveal_opaque update_heap32_def
 
-#reset-options "--z3rlimit 30 --using_facts_from 'Prims Opaque_i X64.Bytes_Semantics_s Words_s Types_s'"
+#reset-options "--z3rlimit 30 --using_facts_from 'Prims Opaque_s X64.Bytes_Semantics_s Words_s Types_s'"
 
 let correct_update_get128 ptr v s =
   reveal_opaque get_heap_val32_def;
