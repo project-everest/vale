@@ -728,26 +728,32 @@ def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name)
   # OCaml depends on many libraries and executables; we have to assume they are in the user's PATH:
   ocaml_env = Environment(ENV = {'PATH' : os.environ['PATH'], 'OCAMLPATH' : env['FSTAR_PATH'] + '/bin'})
   main_ml = ml_out_name(main_name, '.ml')
+  main_cmx = ml_out_name(main_name, '.cmx')
   main_exe = ml_out_name(main_name, '.exe')
   alg_ml = ml_out_name(alg_name, '.ml')
+  alg_cmx = ml_out_name(alg_name, '.cmx')
   cmdline_ml = ml_out_name(cmdline_name, '.ml')
+  cmdline_cmx = ml_out_name(cmdline_name, '.cmx')
   pointer_src = 'src/lib/util/FStar_Pointer_Base.ml'
   pointer_ml = ml_out_name(pointer_src, '.ml')
-  pointer_cmx = ml_out_name(pointer_src, '.ml')
+  pointer_cmx = ml_out_name(pointer_src, '.cmx')
   env.Command(pointer_ml, pointer_src, Copy("$TARGET", "$SOURCE"))
   env.Command(cmdline_ml, cmdline_name, Copy("$TARGET", "$SOURCE"))
   env.Command(main_ml, main_name, Copy("$TARGET", "$SOURCE"))
-  Depends(cmdline_ml, cmdline_name)
-  Depends(main_ml, cmdline_ml)
-  Depends(cmdline_ml, alg_ml)
-  Depends(main_ml, alg_ml)
+  Depends(cmdline_cmx, alg_cmx)
+  Depends(cmdline_cmx, cmdline_ml)
+  Depends(main_cmx, alg_cmx)
+  Depends(main_cmx, cmdline_cmx)
+  Depends(main_cmx, main_ml)
   done = set()
   cmxs = []
   def add_cmx(x_ml):
     x_cmx = ml_out_name(x_ml, '.cmx')
-    Depends(x_cmx, pointer_cmx)
+    if x_ml != pointer_ml:
+      Depends(x_cmx, pointer_cmx)
     cmx = ocaml_env.Command(x_cmx, x_ml, "ocamlfind ocamlopt -c -package fstarlib -o $TARGET $SOURCE -I obj/ml_out")
     cmxs.append(cmx[0])
+    Depends(main_exe, cmx[0])
   def collect_cmxs_in_order(x_ml):
     if not (x_ml in done):
       done.add(x_ml)
