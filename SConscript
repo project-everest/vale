@@ -24,10 +24,10 @@ manual_dependencies = {
   'obj/arch/x64/X64.Vale.InsVector.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
   'obj/arch/x64/X64.Vale.InsAes.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
 
-  'obj/arch/x64/X64.Vale.InsMem.fst': 'obj/arch/x64/X64.Memory_i.fst',
-  'obj/arch/x64/X64.Vale.InsVector.fst': 'obj/arch/x64/X64.Memory_i.fst',
-  'obj/arch/x64/X64.Vale.StateLemmas_i.fsti': 'obj/arch/x64/X64.Memory_i.fst',
-  'obj/arch/x64/X64.Vale.StateLemmas_i.fst': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.InsMem.fst.tmp': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.InsVector.fst.tmp': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.StateLemmas_i.fsti.tmp': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.StateLemmas_i.fst.tmp': 'obj/arch/x64/X64.Memory_i.fst',
 }
 Export('manual_dependencies')
 
