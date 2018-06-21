@@ -371,9 +371,7 @@ let rec typ_equal env t1 t2 =
   let t2 = base_typ env t2 in
   match (t1, t2) with
   | (TName x, TName y) -> 
-    let (mx, x) = name_of_id x in
-    let (my, y) = name_of_id y in
-    if ((x = y) && (mx = "" || my = "" || mx = my)) then true else false
+    if x = y then true else false
   | (TApp (t1, ts1), TApp (t2, ts2)) ->
     (typ_equal env t1 t2) && List.fold2 (fun b t1 t2 -> b && typ_equal env t2 t2) true ts1 ts2
   | (TVar _, TVar _) -> false
@@ -394,6 +392,12 @@ let isArithmeticOp op = match op with | BAdd | BSub | BMul | BDiv | BMod -> true
 let isLogicOp op = match op with | BEquiv | BImply | BExply | BAnd | BOr -> true | _ -> false
 let isIcmpOp op = match op with | BLt | BGt | BLe | BGe -> true | _ -> false
   
+let lookup_evar env x =
+  match x with 
+  | Id "False" -> lookup_id env (Id "Prims.l_False")
+  | Id "True" -> lookup_id env (Id "Prims.l_True")
+  | _ -> lookup_id env x
+
 let compute_transform_info env (formal: pformal) (e:exp) =
   // if env.ghost=true, then it is always Ghost None
   let (g, opr, io) = 
@@ -407,11 +411,7 @@ let compute_transform_info env (formal: pformal) (e:exp) =
     | (x, _, _, _, _) -> err ("unexpected argument for parameter " + (err_id x)) in
   match (g, skip_loc e) with
   | (_, EVar x) ->
-    let (t, info) = 
-      match x with 
-      | Id "False" -> lookup_id env (Id "Prims.l_False")
-      | Id "True" -> lookup_id env (Id "Prims.l_True")
-      | _ -> lookup_id env x in
+    let (t, info) = lookup_evar env x in
     match info with
     | Some InlineLocal -> 
       match (g, opr) with 
@@ -451,11 +451,7 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
         | _ -> if env.ghost then Some EvalOp else None
       match skip_loc e with 
       | EVar x when (x <> Reserved "this") ->
-        let (t, info) = 
-          match x with 
-          | Id "False" -> lookup_id env (Id "Prims.l_False")
-          | Id "True" -> lookup_id env (Id "Prims.l_True")
-          | _ -> lookup_id env x in
+        let (t, info) = lookup_evar env x in
         let t = base_type_with_transform env t tr in
         let et = match et with | None -> t | Some t -> t in
         ([t], AEVar (x, t, et), [])
@@ -500,11 +496,7 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
       let et = match expected_typ with | None -> t | Some t -> t
       ([t], AEVar (Reserved "this", t, et), [])
     | EVar x ->
-      let (t, _) = 
-        match x with 
-        | Id "False" -> lookup_id env (Id "Prims.l_False")
-        | Id "True" -> lookup_id env (Id "Prims.l_True")
-        | _ -> lookup_id env x in
+      let (t, _) = lookup_evar env x in
       let t = base_type_with_transform env t (Some EvalOp) in
       let et = match expected_typ with | None -> t | Some t -> t
       ([t], AEVar (x, t, et), [])    
@@ -562,12 +554,12 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
       let ae = AEOp (Uop UReveal, [ae], TName (Id "unit"), TName (Id "unit")) in
       ([], ae, [])
     | EOp (Uop (UIs x), [e]) ->
-      let x = Id ("uu___is_"+ (string_of_id x)) in
-      let e = EApply (x, [e]) in
+      let ix = Id ("uu___is_"+ (string_of_id x)) in
+      let e = EApply (ix, [e]) in
       let (t, ae, s) = infer_exp_one env e expected_typ in
       let ae = 
         match ae with 
-        | AEApply (x, es, [t], [et]) -> AEOp (Uop (UIs x), es, t, et)
+        | AEApply (_, es, [t], [et]) -> AEOp (Uop (UIs x), es, t, et)
         | _ -> err ("'UIs' should be converted to 'EApply' first before typechecking") in
       ([t], ae, s)
     | EOp (Uop (UCustom op), l) ->
@@ -683,7 +675,7 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
         | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
       let ae = 
         match ae with 
-        | AEApply (x, es, [t], [et]) -> AEOp (FieldOp x, es, t, et)
+        | AEApply (_, es, [t], [et]) -> AEOp (FieldOp x, es, t, et)
         | _ -> err ("'FieldOp' should be converted to 'EApply' before typechecking") in
       ([t], ae, s)
     | EOp (FieldUpdate x, [e1; e2]) -> 
@@ -698,7 +690,7 @@ let rec infer_exp (env:env) (e:exp) (expected_typ:typ option) : (typ list * aexp
         | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
       let ae = 
         match ae with 
-        | AEApply (x, es, [t], [et]) -> AEOp (FieldUpdate x, es@[ae2], t, et)
+        | AEApply (_, es, [t], [et]) -> AEOp (FieldUpdate x, es@[ae2], t, et)
         | _ -> err ("'FieldUpdate' should be converted to 'EApply' before typechecking") in
       ([t], ae, s@s2@[(t2, t)])
     | EOp (op, es) -> 
@@ -921,16 +913,8 @@ let rec unify_one env (m:substitutions) (s:typ) (t:typ):substitutions =
   | (TName (Id "prop"), TName (Id "Prims.bool")) -> 
     let u = TName (Id "prop") in
     let m = bind_typ m s u in bind_typ m t u
-  | (TName (Id "X64.Vale.Decls_i.va_state"), TName (Id "state")) 
-  | (TName (Id "X64.Vale.Decls_i.va_operand"), TName (Id "X64.Machine_s.operand"))
-  | (TName (Id "shift_amt64"), TInt(_,_)) 
-  | (TName (Id "pos"), TInt(_,_)) ->
-    // ISSUE:
-    m
   | (TName x, TName y) -> 
-    let (my, x) = name_of_id x in
-    let (mx, y) = name_of_id y in
-    if (x=y && (mx = "" || my = "" || mx = my)) then m
+    if x = y then m
     else err ("cannot unify type \"" + string_of_type t1 + "\" and \"" + string_of_type t2 + "\"")
   | _ -> err ("cannot unify type \"" + string_of_type t1 + "\" and \"" + string_of_type t2 + "\"")
 

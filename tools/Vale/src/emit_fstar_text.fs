@@ -501,7 +501,8 @@ let emit_decl (ps:print_state) (opens: string list) (loc:loc, d:decl):unit =
     | DPragma (ModuleName s) ->
         ps.PrintLine ("module " + s);
         match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("module " + s);
-        List.iter (emit_open ps) opens
+        // TODO: emit "open M" from "include {:fstar}{:open} M
+        // List.iter (emit_open ps) opens
     | DPragma (ResetOptions s) ->
         resetOptions := s;
         prevResetOptionsPs := s;
