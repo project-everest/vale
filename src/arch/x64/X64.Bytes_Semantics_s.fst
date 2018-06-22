@@ -1,10 +1,12 @@
 module X64.Bytes_Semantics_s
 
+open Opaque_s
 open X64.Machine_s
 open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
+open FStar.Seq.Base
 
 type uint64 = UInt64.t
 
@@ -33,8 +35,10 @@ type ins =
   | Pxor       : dst:xmm -> src:xmm -> ins
   | Pslld      : dst:xmm -> amt:int -> ins
   | Psrld      : dst:xmm -> amt:int -> ins
+  | Psrldq     : dst:xmm -> amt:int -> ins
   | Pshufb     : dst:xmm -> src:xmm -> ins  
   | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pcmpeqd    : dst:xmm -> src:xmm -> ins
   | Pextrq     : dst:operand -> src:xmm -> index:imm8 -> ins
   | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
   | Pinsrq     : dst:xmm -> src:operand -> index:imm8 -> ins
@@ -77,21 +81,25 @@ assume val havoc : state -> ins -> nat64
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 
-let get_heap_val64 (ptr:int) (mem:heap) : nat64 =
-    (mem.[ptr]) + 
-    (mem.[ptr+1]) `op_Multiply` 0x100 + 
-    (mem.[ptr+2]) `op_Multiply` 0x10000 +
-    (mem.[ptr+3]) `op_Multiply` 0x1000000 + 
-    (mem.[ptr+4]) `op_Multiply` 0x100000000 +
-    (mem.[ptr+5]) `op_Multiply` 0x10000000000 +
-    (mem.[ptr+6]) `op_Multiply` 0x1000000000000 +
-    (mem.[ptr+7]) `op_Multiply` 0x100000000000000
+let get_heap_val64_def (ptr:int) (mem:heap) : nat64 =
+    Views.nat8s_to_nat64
+      mem.[ptr]
+      mem.[ptr+1]
+      mem.[ptr+2]
+      mem.[ptr+3]
+      mem.[ptr+4]
+      mem.[ptr+5]
+      mem.[ptr+6]
+      mem.[ptr+7]
+let get_heap_val64 = make_opaque get_heap_val64_def
 
-let get_heap_val32 (ptr:int) (mem:heap) : nat32 =
-    (mem.[ptr]) + 
-    (mem.[ptr+1]) `op_Multiply` 0x100 + 
-    (mem.[ptr+2]) `op_Multiply` 0x10000 +
-    (mem.[ptr+3]) `op_Multiply` 0x1000000
+let get_heap_val32_def (ptr:int) (mem:heap) : nat32 =
+  Views.nat8s_to_nat32
+    mem.[ptr]
+    mem.[ptr+1]
+    mem.[ptr+2]
+    mem.[ptr+3]
+let get_heap_val32 = make_opaque get_heap_val32_def
 
 unfold let eval_mem (ptr:int) (s:state) : nat64 = get_heap_val64 ptr s.mem
 unfold let eval_mem128 (ptr:int) (s:state) : quad32 = Mkfour
@@ -137,7 +145,7 @@ let update_xmm' (x:xmm) (v:quad32) (s:state) : state =
 val mod_8: (n:nat{n < pow2_64}) -> nat8
 let mod_8 n = n % 0x100
 
-let update_heap32 (ptr:int) (v:nat32) (mem:heap) : heap =
+let update_heap32_def (ptr:int) (v:nat32) (mem:heap) : heap =
   let mem = mem.[ptr] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+1] <- (mod_8 v) in
@@ -147,8 +155,9 @@ let update_heap32 (ptr:int) (v:nat32) (mem:heap) : heap =
   let mem = mem.[ptr+3] <- (mod_8 v) in
   assert (Set.equal (Map.domain mem) (Set.complement Set.empty));  
   mem
+let update_heap32 = make_opaque update_heap32_def
 
-let update_heap64 (ptr:int) (v:nat64) (mem:heap) : heap =
+let update_heap64_def (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+1] <- (mod_8 v) in
@@ -166,6 +175,7 @@ let update_heap64 (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr+7] <- (mod_8 v) in
   assert (Set.equal (Map.domain mem) (Set.complement Set.empty));
   mem
+let update_heap64 = make_opaque update_heap64_def
 
 let update_heap128 (ptr:int) (v:quad32) (mem:heap) =
   let mem = update_heap32 ptr v.lo0 mem in
@@ -464,6 +474,16 @@ let eval_ins (ins:ins) : st unit =
     check_imm (0 <= amt && amt < 32);;
     update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
  
+  | Psrldq dst amt ->
+    check_imm (0 <= amt && amt < 16);;
+    let src_q = eval_xmm dst s in
+    let src_bytes = le_quad32_to_bytes src_q in
+    let abs_amt = if 0 <= amt && amt <= (length src_bytes) then amt else 0 in // F* can't use the check_imm above
+    let zero_pad = Seq.create abs_amt 0 in
+    let remaining_bytes = slice src_bytes abs_amt (length src_bytes) in
+    let dst_q = le_bytes_to_quad32 (append zero_pad remaining_bytes) in
+    update_xmm_preserve_flags dst dst_q
+
   | Pshufb dst src -> 
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
@@ -484,6 +504,18 @@ let eval_ins (ins:ins) : st unit =
          (select_word src_val bits.hi3)
     in
     update_xmm_preserve_flags dst permuted_xmm
+
+  | Pcmpeqd dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    let eq_result (b:bool):nat32 = if b then 0xFFFFFFFF else 0 in
+    let eq_val = Mkfour
+        (eq_result (src_q.lo0 = dst_q.lo0))
+        (eq_result (src_q.lo1 = dst_q.lo1))
+        (eq_result (src_q.hi2 = dst_q.hi2))
+        (eq_result (src_q.hi3 = dst_q.hi3))
+    in
+    update_xmm_preserve_flags dst eq_val
 
   | Pextrq dst src index ->
     let src_q = eval_xmm src s in

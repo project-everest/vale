@@ -5,7 +5,6 @@ module S = X64.Semantics_s
 module M = TransparentMap
 module BS = X64.Bytes_Semantics_s
 module ME = X64.Memory_i_s
-module I = Interop64
 module TS = X64.Taint_Semantics_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2"

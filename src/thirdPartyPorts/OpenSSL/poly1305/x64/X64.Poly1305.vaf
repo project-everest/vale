@@ -29,20 +29,19 @@ module X64.Poly1305
 #reset-options "--z3rlimit 5000"
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
 open Types_s
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
 open X64.Vale.InsMem
 open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
-//open X64.Vale.StrongPost_i
 open Poly1305.Spec_s
 open X64.Poly1305.Math_i
 open X64.Poly1305.Util_i
-open Opaque_i
 #endverbatim
 
 procedure{:quick} poly1305_multiply(ghost r1:nat64) returns(ghost hh:int)
@@ -340,8 +339,7 @@ procedure{:quick} poly1305_blocks(
         lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
         apply_valid_taint(length / 8 - 2*r15 + 1, old(rsi), mem, Public, length, memTaint, ctx_b, inp_b);
         Adc64Wrap_Mem(h1, inp, 8, Public, inp_b, word_index+1);
-        ghost var wind:nat := word_index + 1;
-        lemma_load_mem64(inp_b, wind, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
+        lemma_load_mem64(inp_b, word_index + 1, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 
@@ -406,8 +404,7 @@ procedure{:quick} poly1305_last_block()
         lemma_bytes_and_mod(r8, nExtra);
         //assert iand(r8, shift_left64(1, shift_left64(nExtra, 3)) - 1) == r8 % shift_left64(1, shift_left64(nExtra, 3));
         assert padLast == shift_left64(1, shift_left64(nExtra, 3));
-        ghost var pow2_var:nat := pow2(nExtra * 8);
-        lemma_mod_power2_lo(r8, r9, nExtra, pow2_var);
+        lemma_mod_power2_lo(r8, r9, nExtra, pow2(nExtra * 8));
         Mov64(rcx, rdx);
         Sub64(rcx, 1);
         And64(r8, rcx);
@@ -424,29 +421,21 @@ procedure{:quick} poly1305_last_block()
         Adc64Wrap(h1, 0);
         Adc64Wrap(h2, 0);
     } else {
-        // Trick needed for F* type inference. We always have nExtra - 8 >= 0
-        ghost var nExtra2:nat64 := (if nExtra - 8 >= 0 then nExtra - 8 else 1);
-        lemma_bytes_shift_power2(nExtra2);
+        lemma_bytes_shift_power2(nExtra - 8);
         Mov64(rcx, nExtra);
         Sub64(rcx, 8);
         Shl64(rcx, 3);
         Mov64(rdx, 1);
         Shl64(rdx, rcx);
 
-        // Trick needed for F* type inference. We always have 8 * nExtra - 64 >= 0
-        ghost var nExtra_p2add:nat := (if 8 * nExtra - 64 >= 0 then 8 * nExtra - 64 else 1);
         assert padLast == lowerUpper128_opaque(0, rdx) by {
-            lemma_power2_add64(nExtra_p2add);
+            lemma_power2_add64(8 * nExtra - 64);
             reveal_opaque(lowerUpper128);
         }
 
         // inpLast := (inpLast % padLast)
-        lemma_bytes_and_mod(r9, nExtra2);
-        // Trick needed for F* type inference. We always have the correct value here
-        ghost var nExtra_pow1:nat := (if 8 * (nExtra - 8) >= 0 then 8 * (nExtra - 8) else 1);
-        ghost var nExtra_pow:nat64 := (if pow2(nExtra_pow1) < 0x10000000000000000 then
-            pow2(nExtra_pow1) else 1);
-        lemma_mod_hi(r8, r9, nExtra_pow);
+        lemma_bytes_and_mod(r9, nExtra - 8);
+        lemma_mod_hi(r8, r9, pow2(8 * (nExtra - 8)));
         Mov64(rcx, rdx);
         Sub64(rcx, 1);
         And64(r9, rcx);
@@ -467,8 +456,7 @@ procedure{:quick} poly1305_last_block()
     assert r == r1 * n + r0 by { reveal_opaque(lowerUpper128); }
     (ghost var hLast) := poly1305_iteration(r1);
     assert hLast == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2) by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
-    ghost var demod_aux:nonzero := (inpLast % padLast) + padLast;
-    lemma_poly_demod(p, hBlocks, demod_aux, r);
+    lemma_poly_demod(p, hBlocks, (inpLast % padLast) + padLast, r);
     assert modp(hLast) == modp((modp(hBlocks) + padLast + (inpLast % padLast)) * r) by { reveal_opaque(modp'); }
 }
 

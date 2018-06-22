@@ -1,8 +1,10 @@
 module Collections.Seqs_s
 open FStar.Seq
 
-unfold let seq_map (#a #b:Type) (f:a -> b) (s:seq a) : seq b =
-  init (length s) (fun i -> f (index s i))
+let compose (f:'b -> 'c) (g:'a -> 'b) : 'a -> 'c = fun x -> f (g x)
+
+let seq_map (#a #b:Type) (f:a -> b) (s:seq a) : seq b =
+  init (length s) (compose f (index s))
 
 let all_but_last (s:seq 'a {length s > 0}) = 
   slice s 0 (length s - 1)

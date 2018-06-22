@@ -6,6 +6,7 @@ open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
+open FStar.Seq.Base
 module S = X64.Bytes_Semantics_s
 
 type uint64 = UInt64.t
@@ -70,7 +71,7 @@ let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
   valid_state_store_mem64 ptr v s;
   s'
 
-let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
+let update_mem128 (ptr:int) (v:quad32) (s:state) : GTot state =
   let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state
     else s.state ; mem = store_mem128 ptr v s.mem } in
  valid_state_store_mem128 ptr v s;
@@ -79,7 +80,7 @@ let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
 let valid_maddr (m:maddr) (s:state) : GTot bool =
   valid_mem64 (eval_maddr m s) s.mem
 
-let valid_maddr128 (m:maddr) (s:state) : bool =
+let valid_maddr128 (m:maddr) (s:state) : GTot bool =
   valid_mem128 (eval_maddr m s) s.mem
 
 let valid_operand (o:operand) (s:state) : GTot bool =
@@ -88,7 +89,7 @@ let valid_operand (o:operand) (s:state) : GTot bool =
   | OReg r -> true
   | OMem m -> valid_maddr m s
 
-let valid_mov128_op (o:mov128_op) (s:state) : bool =
+let valid_mov128_op (o:mov128_op) (s:state) : GTot bool =
   match o with
   | Mov128Xmm i -> true (* We leave it to the printer/assembler to object to invalid XMM indices *)
   | Mov128Mem m -> valid_maddr128 m s
@@ -114,7 +115,7 @@ let update_operand_preserve_flags' (o:operand) (v:nat64) (s:state) : GTot state 
   | OReg r -> update_reg' r v s
   | OMem m -> update_mem (eval_maddr m s) v s // see valid_maddr for how eval_maddr connects to b and i
 
-let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : state =
+let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : GTot state =
   match o with
   | Mov128Xmm i -> update_xmm' i v s
   | Mov128Mem m -> update_mem128 (eval_maddr m s) v s
@@ -341,8 +342,9 @@ let eval_ins (ins:ins) : GTot (st unit) =
     let new_rsp = ((eval_reg Rsp s) + 8) % pow2_64 in
     update_operand_preserve_flags dst new_dst;;
     update_reg Rsp new_rsp
-// In the XMM-related instructions below, we generally don't need to check for validity of the operands,
-// since all possibilities are valid, thanks to dependent types 
+
+  // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
+  // since all possibilities are valid, thanks to dependent types 
 
   | S.Paddd dst src ->
     let src_q = eval_xmm src s in
@@ -362,8 +364,18 @@ let eval_ins (ins:ins) : GTot (st unit) =
   | S.Psrld dst amt ->
     check_imm (0 <= amt && amt < 32);;
     update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
- 
-  | S.Pshufb dst src -> 
+
+  | S.Psrldq dst amt ->
+    check_imm (0 <= amt && amt < 16);;
+    let src_q = eval_xmm dst s in
+    let src_bytes = le_quad32_to_bytes src_q in
+    let abs_amt = if 0 <= amt && amt <= (length src_bytes) then amt else 0 in // F* can't use the check_imm above
+    let zero_pad = Seq.create abs_amt 0 in
+    let remaining_bytes = slice src_bytes abs_amt (length src_bytes) in
+    let dst_q = le_bytes_to_quad32 (append zero_pad remaining_bytes) in
+    update_xmm_preserve_flags dst dst_q
+
+   | S.Pshufb dst src -> 
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     // We only spec a restricted version sufficient for doing a byte reversal
@@ -383,6 +395,18 @@ let eval_ins (ins:ins) : GTot (st unit) =
          (select_word src_val bits.hi3)
     in
     update_xmm_preserve_flags dst permuted_xmm
+
+  | S.Pcmpeqd dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    let eq_result (b:bool):nat32 = if b then 0xFFFFFFFF else 0 in
+    let eq_val = Mkfour
+        (eq_result (src_q.lo0 = dst_q.lo0))
+        (eq_result (src_q.lo1 = dst_q.lo1))
+        (eq_result (src_q.hi2 = dst_q.hi2))
+        (eq_result (src_q.hi3 = dst_q.hi3))
+    in
+    update_xmm_preserve_flags dst eq_val
 
   | S.Pextrq dst src index ->
     let src_q = eval_xmm src s in
@@ -501,76 +525,3 @@ assume val bytes_valid (m:maddr) (s:state) : Lemma
 assume val bytes_valid128 (m:maddr) (s:state) : Lemma
   (valid_maddr128 m s ==> S.valid_maddr128 m s.state)
   [SMTPat (valid_maddr128 m s)]
-
-
-// This verifies but is very slow
-
-// val equiv_eval_ins (s:state) (ins:S.ins) : Lemma (
-//   let s_hi = run (eval_ins ins) s in
-//   let s_bytes = S.run (S.eval_ins ins) s.state in
-//   s_hi.state.S.ok /\ s_bytes.S.ok ==> s_hi.state == s_bytes)
-
-// assume val same_load (i:int) (s:state) : Lemma 
-//   (eval_mem i s == S.eval_mem i s.state) 
-//   [SMTPat (eval_mem i s)]
-
-// assume val same_store (i:int) (v:nat64) (s:state) : Lemma 
-//   ((update_mem i v s).state == S.update_mem i v s.state) 
-//   [SMTPat (update_mem i v s)]
-
-// assume val same_load128 (i:int) (s:state) : Lemma 
-//   (eval_mem128 i s == S.eval_mem128 i s.state) 
-//   [SMTPat (eval_mem128 i s)]
-
-// assume val same_store128 (i:int) (v:quad32) (s:state) : Lemma 
-//   ((update_mem128 i v s).state == S.update_mem128 i v s.state) 
-//   [SMTPat (update_mem128 i v s)]
-
-// TODO: Too strong, should be an implication
-// assume val same_valid (m:maddr) (s:state) : Lemma
-//   (valid_maddr m s == S.valid_maddr m s.state)
-//   [SMTPat (valid_maddr m s)]
-
-// assume val same_valid128 (m:maddr) (s:state) : Lemma
-//   (valid_maddr128 m s == S.valid_maddr128 m s.state)
-//   [SMTPat (valid_maddr128 m s)]
-
-// #set-options "--z3rlimit 1000"
-
-// let equiv_eval_ins s ins = 
-//   match ins with
-//   | S.Mov64 _ _ -> ()
-//   | S.Add64 _ _ -> ()
-//   | S.AddLea64  _ _ _ -> ()
-//   | S.AddCarry64 _ _ -> ()
-//   | S.Adcx64 _ _ -> ()
-//   | S.Adox64 _ _ -> ()
-//   | S.Sub64 _ _ -> ()
-//   | S.Mul64 _ -> ()
-//   | S.Mulx64 _ _ _ -> ()
-//   | S.IMul64 _ _ -> ()
-//   | S.Xor64 _ _ -> ()
-//   | S.And64 _ _ -> ()
-//   | S.Shr64 _ _ -> ()
-//   | S.Shl64 _ _ -> ()
-//   | S.Push _ -> ()
-//   | S.Pop _ -> ()
-//   | S.Paddd  _ _ -> ()
-//   | S.Pxor  _ _ -> ()
-//   | S.Pslld _ _ -> ()
-//   | S.Psrld _ _ -> ()
-//   | S.Pshufb _ _ -> ()
-//   | S.Pshufd _ _ _ -> ()
-//   | S.Pextrq _ _ _ -> ()
-//   | S.Pinsrd _ _ _ -> ()
-//   | S.Pinsrq _ _ _ -> ()
-//   | S.VPSLLDQ _ _ _ -> ()
-//   | S.MOVDQU  _ _ -> ()
-//   | S.Pclmulqdq _ _ _ -> ()
-//   | S.AESNI_enc _ _ -> ()
-//   | S.AESNI_enc_last _ _ -> ()
-//   | S.AESNI_dec _ _ -> ()
-//   | S.AESNI_dec_last _ _ -> ()
-//   | S.AESNI_imc _ _ -> ()
-//   | S.AESNI_keygen_assist _ _ _ -> ()
-

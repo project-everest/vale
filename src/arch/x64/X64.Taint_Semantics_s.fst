@@ -178,8 +178,8 @@ and taint_eval_while c fuel s0 =
 let is_xmm_ins (ins:tainted_ins) =
   let i, _, _ = ins.ops in
   match i with
-    | S.Paddd _ _ | S.Pxor _ _ | S.Pslld _ _ | S.Psrld _ _ | S.Pshufb _ _ 
-    | S.Pshufd _ _ _ | S.Pextrq _ _ _ | S.Pinsrd _ _ _ | S.Pinsrq _ _ _
+    | S.Paddd _ _ | S.Pxor _ _ | S.Pslld _ _ | S.Psrld _ _ | S.Psrldq _ _ | S.Pshufb _ _ 
+    | S.Pshufd _ _ _ | S.Pcmpeqd _ _ | S.Pextrq _ _ _ | S.Pinsrd _ _ _ | S.Pinsrq _ _ _
     | S.VPSLLDQ _ _ _ | S.MOVDQU _ _
     | S.Pclmulqdq _ _ _ | S.AESNI_enc _ _ | S.AESNI_enc_last _ _ 
     | S.AESNI_dec _ _ | S.AESNI_dec_last _ _ | S.AESNI_imc _ _ 

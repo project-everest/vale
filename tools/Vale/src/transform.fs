@@ -1141,6 +1141,12 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let (p_mods, outs) = List.partition is_state (Set.toList mods) in
         let aliases = List.filter is_alias (Set.toList (Set.union raw_reads raw_mods)) in
         let ins = in_reads @ outs in
+        let in_id (x:id) : id =
+          // REVIEW: consistently apply or not apply in_id?
+          match find_var x with
+          | InlineLocal _ -> x
+          | _ -> in_id x
+          in
         let ins_in = List.map in_id ins in
         let s_old = Reserved "old" in
         let rec replace_old (e:exp):exp map_modify =
@@ -1162,7 +1168,10 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
           | _ -> err ("variables in while loops must be ghost, inline, or state component: " + (err_id x))
           in
         let to_pformal (x:id):pformal = (x, getType x, XGhost, In, []) in
-        let to_pformal_in (x:id):pformal = (in_id x, getType x, XGhost, In, []) in
+        let to_pformal_in (x:id):pformal =
+          let storage = match find_var x with InlineLocal _ -> XInline | _ -> XGhost in
+          (in_id x, getType x, storage, In, [])
+          in
         let pf_state = (s_old, tState, XGhost, In, []) in
         let p_ins_in = List.map to_pformal_in ins in
         let p_outs = List.map to_pformal outs in
@@ -1201,7 +1210,8 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let spec_precedes = inv_to_spec [] (REnsures Unrefined) (lEd, precedes) in
         let sInitIn (x:id) = SVar (x, Some (getType x), Mutable, XGhost, [], Some (EVar (in_id x))) in
         let sInitOut (x:id) = SAssign ([(x, None)], (EVar (in_id x))) in
-        let sInits = List.map sInitIn in_reads @ List.map sInitOut outs in
+        let in_reads_init = List.filter (fun x -> match find_var x with InlineLocal _ -> false | _ -> true) in_reads in
+        let sInits = List.map sInitIn in_reads_init @ List.map sInitOut outs in
         // while(e) invs ed { outs := body_p(ins); }
         let lhss = List.map (fun x -> (x, None)) outs in
         let args = (List.map EVar ins) in

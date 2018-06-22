@@ -251,10 +251,12 @@ let check_if_xmm_ins_consumes_fixed_time ins ts =
     | S.Pxor dst src -> check_if_pxor_leakage_free ins ts
     | S.Pslld dst amt -> check_if_pslld_leakage_free ins ts
     | S.Psrld dst amt -> check_if_psrld_leakage_free ins ts
+    | S.Psrldq _ _ -> (false, ts) // TODO
     | S.Pshufb dst src -> check_if_pshufb_leakage_free ins ts
     | S.Pshufd dst src permutation -> check_if_pshufd_leakage_free ins ts
     | S.Pinsrd _ _ _  -> check_if_pinsrd_leakage_free ins ts
     | S.Pinsrq _ _ _ -> check_if_pinsrq_leakage_free ins ts
+    | S.Pcmpeqd _ _ -> (false, ts) // TODO
     | S.Pextrq _ _ _ -> check_if_pextrq_leakage_free ins ts
     | S.VPSLLDQ dst src count -> check_if_vpslldq_leakage_free ins ts
     | S.MOVDQU dst src -> false, ts
