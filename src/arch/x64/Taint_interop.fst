@@ -10,14 +10,14 @@ open X64.Memory_i_s
 // TODO
 assume val correct_down_taint:(memTaint:MT.t) -> 
                        (mem:mem) ->
-		       (bytesTaint:int -> taint) ->
+		       (bytesTaint:memTaint_t) ->
 		       Type0
 
 assume val down_taint: (memTaint:MT.t) -> 
 		       (mem:mem) ->
-		       GTot (bytesTaint:int -> taint{correct_down_taint memTaint mem bytesTaint})
+		       GTot (bytesTaint:memTaint_t{correct_down_taint memTaint mem bytesTaint})
 
-assume val up_taint: (bytesTaint:int -> taint) ->
+assume val up_taint: (bytesTaint:memTaint_t) ->
                      (mem:mem) ->
 		     GTot (memTaint:MT.t)
 
@@ -25,6 +25,6 @@ assume val up_down_identity: (memTaint:MT.t) ->
 			     (mem:mem) ->
 			     Lemma (up_taint (down_taint memTaint mem) mem == memTaint)
 
-assume val down_up_identity: (bytesTaint:int -> taint) ->
+assume val down_up_identity: (bytesTaint:memTaint_t) ->
 			     (mem:mem) ->
 			     Lemma (down_taint (up_taint bytesTaint mem) mem == bytesTaint)

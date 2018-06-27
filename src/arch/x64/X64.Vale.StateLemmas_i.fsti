@@ -74,6 +74,8 @@ val lemma_to_of : s:TS.traceState -> Lemma
   (ensures s == state_to_S (state_of_S s))
   [SMTPat (state_to_S (state_of_S s))]
 
+unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
+
 val lemma_valid_taint64: (b:X64.Memory_i.buffer64) ->
 			 (memTaint:MT.t) ->
 			 (mem:X64.Memory_i.mem) ->

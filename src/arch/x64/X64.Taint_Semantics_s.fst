@@ -16,7 +16,7 @@ unfold let op_String_Assignment = Map.upd
 noeq type traceState = {
   state: state;
   trace: list observation;
-  memTaint: map int taint;
+  memTaint: memTaint_t;
 }
 
 // TODO : Add the next address also, since we're the heap addresses 64-bit values
@@ -67,7 +67,7 @@ let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
   (operand_obs_list s dsts @ operand_obs_list s srcs)
 
 (* Checks if the taint of an operand matches the ins annotation *)
-let taint_match (o:operand) (t:taint) (memTaint:map int taint) (s:state) : bool =
+let taint_match (o:operand) (t:taint) (memTaint:memTaint_t) (s:state) : bool =
   match o with
     | OConst _ | OReg _ -> true
     | OMem m -> 
@@ -78,15 +78,17 @@ let rec taint_match_list o t memTaint s : bool = match o with
   | [] -> true
   | hd::tl -> (taint_match hd t memTaint s) && taint_match_list tl t memTaint s
 
-let update_taint (memTaint:map int taint) (dst:operand) (t:taint) (s:state) =
+let update_taint (memTaint:memTaint_t) (dst:operand) (t:taint) (s:state) : Tot memTaint_t =
   match dst with
     | OConst _ -> memTaint
     | OReg _ -> memTaint
     | OMem m -> let ptr = eval_maddr m s in
-        memTaint.[ptr] <- t
+        let mt = memTaint.[ptr] <- t in
+	assert (Set.equal (Map.domain mt) (Set.complement Set.empty));
+	mt
 
-val update_taint_list: (memTaint:map int taint) -> (dst:list operand) -> (t:taint) -> (s:state) -> Tot (map int taint) (decreases %[dst])
-let rec update_taint_list memTaint (dst:list operand) t s = match dst with
+val update_taint_list: (memTaint:memTaint_t) -> (dst:list operand) -> (t:taint) -> (s:state) -> Tot (memTaint_t) (decreases %[dst])
+let rec update_taint_list (memTaint:memTaint_t) (dst:list operand) t s = match dst with
   | [] -> memTaint
   | hd :: tl -> update_taint_list (update_taint memTaint hd t s) tl t s
 
