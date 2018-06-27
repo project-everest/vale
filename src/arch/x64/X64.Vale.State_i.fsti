@@ -5,10 +5,6 @@ open X64.Machine_s
 open X64.Vale
 open X64.Memory_i
 
-let map (key:eqtype) (value:Type) = Map.t key value
-unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
-unfold let op_String_Assignment = Map.upd
-
 noeq type state = {
   ok: bool;
   regs: Regs_i.t;
@@ -16,7 +12,7 @@ noeq type state = {
   flags: nat64;
   mem: mem;
   trace: list observation;
-  memTaint: map int taint;
+  memTaint: Memtaint_i.t;
 }
 
 let reg_to_int (r:reg) : int =
@@ -93,14 +89,11 @@ let valid_operand (o:operand) (s:state) : Type0 =
   | OReg r -> True
   | OMem m -> valid_maddr m s
 
-let valid_taint (o:operand) (s:state) (t:taint) : Type0 =
-  match o with
-  | OConst _ | OReg _ -> True
-  | OMem m -> let ptr = eval_maddr m s in
-    s.memTaint.[ptr] = t
+let valid_taint_buf64 (b:buffer64) (memtaint:Memtaint_i.t) (t:taint) : Type0 =
+  memtaint (Memtaint_i.Buffer (TBase TUInt64) b) == t
 
-let valid_taint_ptr (ptr:int) (memTaint:map int taint) (t:taint) : Type0 =
-memTaint.[ptr] == t
+let valid_taint_buf128 (b:buffer128) (memtaint:Memtaint_i.t) (t:taint) : Type0 =
+  memtaint (Memtaint_i.Buffer (TBase TUInt128) b) == t
 
 [@va_qattr]
 let state_eq (s0:state) (s1:state) : Type0 =
@@ -110,5 +103,5 @@ let state_eq (s0:state) (s1:state) : Type0 =
   s0.flags == s1.flags /\
   s0.mem == s1.mem /\
   s0.trace == s1.trace /\
-  s0.memTaint == s1.memTaint
+  Memtaint_i.equal s0.memTaint s1.memTaint
 

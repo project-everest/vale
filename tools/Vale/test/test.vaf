@@ -10,7 +10,7 @@ open X64.Vale.InsBasic
 
 procedure p()
     modifies
-        rax; efl; memTaint;
+        rax; efl;
     requires
         0 <= rax < 10 <= 11;
     ensures
@@ -28,7 +28,7 @@ procedure Calls()
     requires 
         rax < 7;
     modifies
-        rax; rbx; efl; trace; memTaint;
+        rax; rbx; efl; trace;
     ensures
         rax == old(rax) + 7;
 {

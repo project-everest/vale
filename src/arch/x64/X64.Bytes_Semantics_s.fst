@@ -53,12 +53,12 @@ type ins =
   | AESNI_keygen_assist : dst:xmm -> src:xmm -> imm8 -> ins
 
 type ocmp =
-  | OEq: o1:operand -> o2:operand -> ocmp
-  | ONe: o1:operand -> o2:operand -> ocmp
-  | OLe: o1:operand -> o2:operand -> ocmp
-  | OGe: o1:operand -> o2:operand -> ocmp
-  | OLt: o1:operand -> o2:operand -> ocmp
-  | OGt: o1:operand -> o2:operand -> ocmp
+  | OEq: o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> ocmp
+  | ONe: o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> ocmp
+  | OLe: o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> ocmp
+  | OGe: o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> ocmp
+  | OLt: o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> ocmp
+  | OGt: o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> ocmp
 
 type code = precode ins ocmp
 type codes = list code

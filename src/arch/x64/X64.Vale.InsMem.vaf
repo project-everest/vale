@@ -46,16 +46,17 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src
         efl; trace;
     requires
         valid_src_addr(mem, b, index);
-        valid_taint_ptr(src + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
         src + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         valid_src_addr(mem, b, index);
-        valid_taint_ptr(old(src) + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
         dst == old(add_wrap(dst, buffer64_read(b, index, mem)));
         cf(efl) == old(dst + buffer64_read(b, index, mem) >= pow2_64);
 {
     lemma_valid_mem64(b, index, mem);
     lemma_load_mem64(b, index, mem);
+    lemma_valid_taint64(b, memTaint, mem, index, t);
 }
 
 
@@ -73,16 +74,17 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_re
         efl; trace;
     requires
         valid_src_addr(mem, b, index);
-        valid_taint_ptr(src + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
         src + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         valid_src_addr(mem, b, index);
-        valid_taint_ptr(old(src) + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
         dst == old(add_wrap(add_wrap(dst, buffer64_read(b, index, mem)), (if cf(efl) then 1 else 0)));
         cf(efl) == old(dst + buffer64_read(b, index, mem) + (if cf(efl) then 1 else 0) >= pow2_64);
 {
     lemma_valid_mem64(b, index, mem);
     lemma_load_mem64(b, index, mem);
+    lemma_valid_taint64(b, memTaint, mem, index, t);    
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(src), offset))), list(dst), list(OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
@@ -98,14 +100,15 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
         trace;
     requires
         valid_src_addr(mem, b, index);
-        valid_taint_ptr(src + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
         src + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         dst == buffer64_read(b, index, mem);
-        valid_taint_ptr(old(src) + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
 {
     lemma_valid_mem64(b, index, mem);
     lemma_load_mem64(b, index, mem);
+    lemma_valid_taint64(b, memTaint, mem, index, t);    
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), offset)), src), list(OMem(MReg(get_reg(dst), offset))), list(src)), t))}{:fast_instruction}{:quick exportOnly} Store64_buffer(
@@ -115,19 +118,22 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
         inline t:taint,
         ghost b:buffer64,
         ghost index:int)
+    reads memTaint;
     modifies
-        mem; memTaint; trace;
+        mem; trace;
     requires
         valid_dst_addr(mem, b, index);
+        valid_taint_buf64(b, memTaint, t);
         dst + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
-        modifies_memTaint(dst + offset, old(memTaint), memTaint);
         mem == old(buffer64_write(b, index, src, mem));
-        valid_taint_ptr(dst + offset, memTaint, t);
+        valid_taint_buf64(b, memTaint, t);
 {
     lemma_valid_mem64(b, index, old(mem));
     lemma_store_mem64(b, index, old(src), old(mem));
+    lemma_valid_taint64(b, old(memTaint), old(mem), index, t);
+    same_memTaint(b, old(mem), mem, old(memTaint), memTaint);
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(), list()), Public))}{:fast_instruction}{:quick exportOnly} Pop(
@@ -152,8 +158,9 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list()), Pub
         src: reg_opr64,
         ghost b:buffer64,
         ghost index:int)
+    reads memTaint;
     modifies
-        rsp; mem; memTaint; trace;
+        rsp; mem; trace;
     requires
         valid_dst_addr(mem, b, index);
         rsp - 8 == buffer_addr(b, mem) + 8 * index;
@@ -165,5 +172,6 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list()), Pub
 {
     lemma_valid_mem64(b, index, old(mem));
     lemma_store_mem64(b, index, old(src), old(mem));
+    same_memTaint(b, old(mem), mem, old(memTaint), memTaint);
 }
 

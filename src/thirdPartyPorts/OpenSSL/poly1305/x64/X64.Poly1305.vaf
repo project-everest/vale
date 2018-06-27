@@ -216,13 +216,13 @@ procedure{:quick} poly1305_blocks(
         n:nat := pow2_64;
         p:pos := n * n * 4 - 5;
     reads
-        ctx; padbit;
+        ctx; padbit; memTaint;
     modifies
         inp; len; d1; d2; d3; r0; r1; s1; h0; h1; h2; 
         rax; r15;
         efl;
         mem;
-        trace; memTaint;
+        trace;
     requires
         // Len is measured in bytes
         len % 16 == 0; // REVIEW: may be stronger than necessary
@@ -260,7 +260,6 @@ procedure{:quick} poly1305_blocks(
         rcx == old(rcx);
         ctx == old(ctx); // REVIEW: framing should add this automatically
 
-        memTaint == old(memTaint);
         let r0_in := buffer64_read(ctx_b, 3, mem);
         let r1_in := buffer64_read(ctx_b, 4, mem);
         h == h2 * (pow2_64 * pow2_64) + h1 * pow2_64 + h0;
@@ -337,7 +336,6 @@ procedure{:quick} poly1305_blocks(
 
         Add64Wrap_Mem(h0, inp, 0, Public, inp_b, word_index); // accumulate input
         lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
-        apply_valid_taint(length / 8 - 2*r15 + 1, old(rsi), mem, Public, length, memTaint, ctx_b, inp_b);
         Adc64Wrap_Mem(h1, inp, 8, Public, inp_b, word_index+1);
         lemma_load_mem64(inp_b, word_index + 1, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
         AddLea64(inp, inp, 16);
@@ -540,11 +538,12 @@ procedure{:quick} poly1305_impl(
     lets
         ctx @= rdi; inp @= rsi; len @= rdx; r0 @= r11; r1 @= r12; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n := pow2_64;
+    reads memTaint;
     modifies
         rax; rcx; rdx; rdi; rsi; rbx; rbp; r8; r9; r10; r11; r12; r13; r14; r15;
         efl;
         mem;
-        trace; memTaint;
+        trace;
     requires
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
@@ -671,8 +670,9 @@ procedure{:quick} poly1305(
         len_in := (if win then r8 else len);
         n := 0x1_0000_0000_0000_0000;
         p := n * n * 4 - 5;
+    reads memTaint;
     modifies
-        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem; trace; memTaint;
+        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem; trace;
     requires
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx_in, ctx_b, 24, memTaint, Public);
