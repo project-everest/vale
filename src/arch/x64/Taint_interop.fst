@@ -19,7 +19,7 @@ assume val down_taint: (memTaint:MT.t) ->
 
 assume val up_taint: (bytesTaint:memTaint_t) ->
                      (mem:mem) ->
-		     GTot (memTaint:MT.t)
+		     GTot (memTaint:MT.t{correct_down_taint memTaint mem bytesTaint})
 
 assume val up_down_identity: (memTaint:MT.t) ->
 			     (mem:mem) ->
