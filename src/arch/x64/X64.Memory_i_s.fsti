@@ -299,10 +299,18 @@ val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
   let h' = store_mem128 i v h in
   forall j. valid_mem128 j h <==> valid_mem128 j h')
 
+val bytes_valid (i:int) (s:state) : Lemma
+  (requires valid_mem64 i s.mem)
+  (ensures S.valid_addr64 i s.state.S.mem)
+
 val valid_state_store_mem64: ptr:int -> v:nat64 -> s:state -> Lemma (
   let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
   else s.state; mem = store_mem64 ptr v s.mem } in
   valid_state s')
+
+val bytes_valid128 (i:int) (s:state) : Lemma
+  (requires valid_mem128 i s.mem)
+  (ensures S.valid_addr128 i s.state.S.mem)
 
 val valid_state_store_mem128: ptr:int -> v:quad32 -> s:state -> Lemma (
   let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state 

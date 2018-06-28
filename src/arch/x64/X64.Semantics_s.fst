@@ -517,11 +517,3 @@ and eval_while b c fuel s0 =
     | Some s1 ->
       if s1.state.S.ok then eval_while b c (fuel - 1) s1  // success: continue to next iteration
       else Some s1  // failure: propagate failure immediately
-
-assume val bytes_valid (m:maddr) (s:state) : Lemma
-  (valid_maddr m s ==> S.valid_maddr m s.state)
-  [SMTPat (valid_maddr m s)]
-
-assume val bytes_valid128 (m:maddr) (s:state) : Lemma
-  (valid_maddr128 m s ==> S.valid_maddr128 m s.state)
-  [SMTPat (valid_maddr128 m s)]

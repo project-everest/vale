@@ -57,6 +57,11 @@ let correct_update_get ptr v mem =
   reveal_opaque get_heap_val64_def;
   reveal_opaque update_heap64_def
 
+let same_domain_update ptr v mem =
+  reveal_opaque update_heap64_def;
+  let mem2 = update_heap64 ptr v mem in
+  assert (Set.equal (Map.domain mem) (Map.domain mem2))
+
 let same_mem_get_heap_val32 ptr mem1 mem2 =
   reveal_opaque get_heap_val32_def;
   reveal_opaque update_heap32_def
@@ -99,3 +104,13 @@ let correct_update_get128 ptr v s =
   let mem4 = update_heap32 (ptr+12) v.hi3 mem3 in  
   frame_update_heap32 (ptr+12) v.hi3 mem3;
   correct_update_get32 (ptr+12) v.hi3 mem3
+
+#reset-options "--max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
+
+let same_domain_update128 ptr v mem =
+  let memf = update_heap128 ptr v mem in
+  reveal_opaque update_heap32_def;
+  // These two lines are apparently needed
+  let mem1 = update_heap32 ptr v.lo0 mem in
+  assert (Set.equal (Map.domain mem) (Map.domain mem1));
+  assert (Set.equal (Map.domain mem) (Map.domain memf))

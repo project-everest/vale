@@ -136,19 +136,43 @@ val index64_get_heap_val64 (h:mem)
 
 #set-options "--z3rlimit 20"
 
+let index64_heap_aux (s:Seq.lseq UInt8.t 8) (heap:S.heap) (ptr:int) : Lemma
+  (requires forall (j:nat{j < 8}). UInt8.v (Seq.index s j) == heap.[ptr+j])
+  (ensures UInt64.v (Views.get64 s) == S.get_heap_val64 ptr heap) =
+  Opaque_s.reveal_opaque Views.get64_def;
+  Opaque_s.reveal_opaque S.get_heap_val64_def;
+  ()
+
+let index_helper (x y:int) (heap:S.heap) : Lemma
+  (requires x == y)
+  (ensures heap.[x] == heap.[y]) = ()
+
+let index_mul_helper (addr i n j:int) : Lemma 
+  (addr + (i `op_Multiply` n + j) == addr + n `op_Multiply` i + j) =
+ ()
+
 let index64_get_heap_val64 h b heap i =
   let open FStar.Mul in
   let vb = BV.mk_buffer_view b uint64_view in
   let ptr = buffer_addr b h + 8 * i in
   let s = B.as_seq h.hs b in
+  let t = TBase TUInt64 in
+  let addr = buffer_addr b h in
   BV.length_eq vb;
   BV.view_indexing vb i;
   BV.as_buffer_mk_buffer_view b uint64_view;
   BV.get_view_mk_buffer_view b uint64_view;
   BV.as_seq_sel h.hs vb i;
   BV.get_sel h.hs vb i;
-  Opaque_s.reveal_opaque S.get_heap_val64_def;
-  Opaque_s.reveal_opaque Views.get64_def;
+  let s' = Seq.slice s (i*8) (i*8 + 8) in
+  let aux (j:nat{j < 8}) : Lemma (UInt8.v (Seq.index s' j) == heap.[ptr+j]) =
+    assert (UInt8.v (Seq.index s (i*8 + j)) == heap.[addr + (i*8+j)]);
+    Seq.lemma_index_slice s (i*8) (i*8+8) j;
+    assert (UInt8.v (Seq.index s' j) == heap.[addr+(i*8+j)]);
+    index_mul_helper addr i 8 j;
+    ()
+  in Classical.forall_intro aux;  
+  index64_heap_aux s' heap ptr;
   ()
 
 open Words_s
@@ -179,9 +203,6 @@ let index128_get_heap_val128_aux (s:Seq.lseq UInt8.t 16) (ptr:int) (heap:S.heap)
   Opaque_s.reveal_opaque Views.get128_def;
   ()
 
-let index128_helper (x y:int) (heap:S.heap) : Lemma
-  (requires x == y)
-  (ensures heap.[x] == heap.[y]) = ()
 
 let index128_get_heap_val128 h b heap i =
   let open FStar.Mul in
@@ -199,12 +220,11 @@ let index128_get_heap_val128 h b heap i =
   let sl = Seq.slice s (i*16) (i*16+16) in
   assert (sv == Views.get128 sl);
   let aux (j:nat{j < 16}) : Lemma (UInt8.v (Seq.index sl j) == heap.[ptr+j]) =
-    assert (UInt8.v (Seq.index s (16*i + j)) == heap.[addr + (16*i+j)]);
+    assert (UInt8.v (Seq.index s (i*16 + j)) == heap.[addr + (i*16+j)]);
     Seq.lemma_index_slice s (i*16) (i*16+16) j;
-    assert (UInt8.v (Seq.index sl j) == heap.[addr+(16*i+j)]);
-    assert (addr + (16*i+j) == ptr + j);
-    index128_helper (addr + (16*i+j)) (ptr + j) heap;
-    ()
+    assert (UInt8.v (Seq.index sl j) == heap.[addr+(i*16+j)]);
+    index_mul_helper addr i 16 j;
+    () 
   in Classical.forall_intro aux;
   index128_get_heap_val128_aux sl ptr heap;
   ()
@@ -928,7 +948,7 @@ let store_buffer_down64_mem (b:buffer64) (i:nat{i < buffer_length b}) (v:nat64)
     let h1 = buffer_write b i v h in
     let mem2 = I.down_mem h1.hs h.addrs ps in
     let base = buffer_addr b h in
-    forall j. j < base + 8 `op_Multiply` i \/ j >= base + 8 `op_Multiply` (i+1) ==>
+    forall (j:int). j < base + 8 `op_Multiply` i \/ j >= base + 8 `op_Multiply` (i+1) ==>
       mem1.[j] == mem2.[j]) =
     let mem1 = I.down_mem h.hs h.addrs ps in
     let h1 = buffer_write b i v h in
@@ -943,8 +963,8 @@ let store_buffer_down64_mem (b:buffer64) (i:nat{i < buffer_length b}) (v:nat64)
 	  length_t_eq (TBase TUInt64) b
 	end
 	else (
-	I.same_unspecified_down h.hs h1.hs h.addrs ps;
 	unwritten_buffer_down (TBase TUInt64) b i v ps h;
+	I.same_unspecified_down h.hs h1.hs h.addrs ps;
 	()
 	)
     in Classical.forall_intro aux
@@ -979,7 +999,28 @@ let store_buffer_aux_down64_mem2 (ptr:int) (v:nat64) (h:mem{valid_mem64 ptr h}) 
   index64_get_heap_val64 h1 b mem2 i;
   ()
 
+let in_bounds64 (h:mem) (b:buffer64) (i:nat{i < buffer_length b}) : Lemma
+  (forall j. j >= h.addrs b + 8 `op_Multiply` i /\ j < h.addrs b + 8 `op_Multiply` i + 8 ==>
+    j < h.addrs b + B.length b) =
+  length_t_eq (TBase TUInt64) b;
+  ()
 
+let bytes_valid ptr s =
+  let t = TBase TUInt64 in
+  let h = s.mem in
+  let b = get_addr_ptr t ptr h h.ptrs in
+  let i = get_addr_in_ptr t (buffer_length b) (buffer_addr b h) ptr 0 in
+  in_bounds64 h b i;
+  I.addrs_set_mem h.ptrs b h.addrs ptr;
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+1);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+2);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+3);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+4);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+5);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+6);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+7);  
+  ()
+  
 let valid_state_store_mem64 i v (s:state) =
   if not (valid_mem64 i s.mem) then ()
   else
@@ -993,9 +1034,12 @@ let valid_state_store_mem64 i v (s:state) =
     Bytes_Semantics_i.same_mem_get_heap_val i mem1 mem2;
     Bytes_Semantics_i.correct_update_get i v s.state.S.mem;
     Bytes_Semantics_i.frame_update_heap i v s.state.S.mem;
+    bytes_valid i s;
+    Bytes_Semantics_i.same_domain_update i v s.state.S.mem;
     assert (forall j. mem1.[j] == mem2.[j]);
     assert (Map.equal mem1 mem2);
     ()
+
 
 val same_mem_get_heap_val128 (b:buffer128)
 			  (i:nat{i < buffer_length b})
@@ -1191,6 +1235,35 @@ let store_buffer_aux_down128_mem2 (ptr:int) (v:quad32) (h:mem{valid_mem128 ptr h
   index128_get_heap_val128 h1 b mem2 i;
   ()
 
+let in_bounds128 (h:mem) (b:buffer128) (i:nat{i < buffer_length b}) : Lemma
+  (forall j. j >= h.addrs b + 16 `op_Multiply` i /\ j < h.addrs b + 16 `op_Multiply` i + 16 ==>
+    j < h.addrs b + B.length b) =
+  length_t_eq (TBase TUInt128) b;
+  ()
+
+let bytes_valid128 ptr s =
+  let t = TBase TUInt128 in
+  let h = s.mem in
+  let b = get_addr_ptr t ptr h h.ptrs in
+  let i = get_addr_in_ptr t (buffer_length b) (buffer_addr b h) ptr 0 in
+  in_bounds128 h b i;
+  I.addrs_set_mem h.ptrs b h.addrs ptr;
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+1);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+2);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+3);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+4);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+5);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+6);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+7);  
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+8);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+9);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+10);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+11);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+12);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+13);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+14);
+  I.addrs_set_mem h.ptrs b h.addrs (ptr+15);    
+  ()
 
 let valid_state_store_mem128 i v (s:state) =
   if not (valid_mem128 i s.mem) then ()
@@ -1208,6 +1281,8 @@ let valid_state_store_mem128 i v (s:state) =
     Bytes_Semantics_i.same_mem_get_heap_val32 (i+8) mem1 mem2;
     Bytes_Semantics_i.same_mem_get_heap_val32 (i+12) mem1 mem2;    
     Bytes_Semantics_i.frame_update_heap128 i v s.state;
+    bytes_valid128 i s;
+    Bytes_Semantics_i.same_domain_update128 i v s.state.S.mem;
     assert (Map.equal mem1 mem2);
     ()
 

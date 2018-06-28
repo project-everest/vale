@@ -10,7 +10,7 @@ open FStar.Seq.Base
 
 type uint64 = UInt64.t
 
-type heap = (m:Map.t int nat8{Map.domain m == Set.complement Set.empty})
+type heap = Map.t int nat8
 let op_String_Access = Map.sel
 let op_String_Assignment = Map.upd
 
@@ -153,7 +153,6 @@ let update_heap32_def (ptr:int) (v:nat32) (mem:heap) : heap =
   let mem = mem.[ptr+2] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+3] <- (mod_8 v) in
-  assert (Set.equal (Map.domain mem) (Set.complement Set.empty));  
   mem
 let update_heap32 = make_opaque update_heap32_def
 
@@ -173,7 +172,6 @@ let update_heap64_def (ptr:int) (v:nat64) (mem:heap) : heap =
   let mem = mem.[ptr+6] <- (mod_8 v) in
   let v = v `op_Division` 0x100 in
   let mem = mem.[ptr+7] <- (mod_8 v) in
-  assert (Set.equal (Map.domain mem) (Set.complement Set.empty));
   mem
 let update_heap64 = make_opaque update_heap64_def
 
@@ -190,11 +188,45 @@ let update_mem (ptr:int) (v:nat64) (s:state) : state =
 let update_mem128 (ptr:int) (v:quad32) (s:state) : state =
   { s with mem = update_heap128 ptr v s.mem }
 
+let valid_addr (ptr:int) (mem:heap) : bool =
+  Map.contains mem ptr
 
-assume val valid_maddr (m:maddr) (s:state) : bool
+let valid_addr64 (ptr:int) (mem:heap) =
+  valid_addr ptr mem &&
+  valid_addr (ptr+1) mem &&
+  valid_addr (ptr+2) mem &&
+  valid_addr (ptr+3) mem &&
+  valid_addr (ptr+4) mem &&
+  valid_addr (ptr+5) mem &&
+  valid_addr (ptr+6) mem &&
+  valid_addr (ptr+7) mem
 
-assume val valid_maddr128 (m:maddr) (s:state) : bool
+let valid_addr128 (ptr:int) (mem:heap) =
+  valid_addr ptr mem &&
+  valid_addr (ptr+1) mem &&
+  valid_addr (ptr+2) mem &&
+  valid_addr (ptr+3) mem &&
+  valid_addr (ptr+4) mem &&
+  valid_addr (ptr+5) mem &&
+  valid_addr (ptr+6) mem &&
+  valid_addr (ptr+7) mem &&
+  valid_addr (ptr+8) mem &&
+  valid_addr (ptr+9) mem &&
+  valid_addr (ptr+10) mem &&
+  valid_addr (ptr+11) mem &&
+  valid_addr (ptr+12) mem &&
+  valid_addr (ptr+13) mem &&
+  valid_addr (ptr+14) mem &&
+  valid_addr (ptr+15) mem
 
+let valid_maddr (m:maddr) (s:state) : bool =
+  let ptr = eval_maddr m s in 
+  valid_addr64 ptr s.mem
+  
+let valid_maddr128 (m:maddr) (s:state) : bool =
+  let ptr = eval_maddr m s in
+  valid_addr128 ptr s.mem
+  
 let valid_operand (o:operand) (s:state) : bool =
   match o with
   | OConst n -> true
