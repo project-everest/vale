@@ -52,6 +52,11 @@ let rec string_of_typ (t:typ):string =
   | TName x -> sid x
   | TApp (TName (Id "tuple"), ts) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
   | TApp (t, ts) -> (string_of_typ t) + "<" + (String.concat ", " (List.map string_of_typ ts)) + ">"
+  | TArrow (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
+  | TInt (b1, b2) -> "int"
+  | TList t -> "list(" + (string_of_typ t) + ")"
+  | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
+  | _ -> internalErr (sprintf "unexpected string_of_typ %A" t)
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -93,6 +98,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr ("EBind " + (sprintf "%A" e))
+    | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_formal (x:id, t:typ option) = (sid x) + (match t with None -> "" | Some t -> ":" + (string_of_typ t))
 and string_of_formals (xs:formal list):string = String.concat ", " (List.map string_of_formal xs)
@@ -232,6 +238,9 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p
+    | DConst _ -> ()
+    | DType _ -> ()
+    | DUnsupported _ -> ()
   with err -> raise (LocErr (loc, err))
 
 let emit_decls (ps:print_state) (ds:decls):unit =

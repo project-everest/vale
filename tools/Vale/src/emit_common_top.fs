@@ -19,6 +19,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
     match d with
     | DVar _ | DFun _ -> if !reprint_ghost_decls then [d] else []
     | DVerbatim _ -> if !reprint_verbatims then [d] else []
+    | DConst _ | DUnsupported _ | DType _-> []
     | DPragma _ -> [d]
     | DProc p ->
         let p = if !reprint_specs then p else {p with pspecs = []} in

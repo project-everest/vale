@@ -142,6 +142,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         EBind (b, es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
     | EApply (x, es) -> EApply (x, List.map r es)
+    | EApplyTyped(x, ts, es) -> EApplyTyped (x, ts, List.map r es)
     | ECast (e, t) -> ECast (r e, t)
   )
 

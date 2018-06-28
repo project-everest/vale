@@ -53,6 +53,11 @@ let rec string_of_typ (t:typ):string =
   match t with
   | TName x -> sid x
   | TApp (t, ts) -> (string_of_typ t) + "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
+  | TArrow (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
+  | TInt (b1, b2) -> "int"
+  | TList t -> "list(" + (string_of_typ t) + ")"
+  | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
+  | _ -> internalErr (sprintf "unexpected string_of_typ %A" t)
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -97,6 +102,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " := " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _) -> internalErr "EBind"
+    | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ghost (g:ghost) = match g with Ghost -> "ghost " | NotGhost -> ""
 and string_of_stmt_modifier (sm:stmt_modifier) = match sm with SmPlain -> "" | SmGhost -> "ghost " | SmInline -> "inline "
@@ -317,6 +323,9 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
         ps.PrintLine ((string_of_var_storage storage) + "var" + (string_of_attrs attrs) + " " + (sid x) + ":" + (string_of_typ t) + ";")
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p
+    | DConst _ -> ()
+    | DType _ -> ()
+    | DUnsupported _ -> ()
   with err -> raise (LocErr (loc, err))
 
 let emit_decls (ps:print_state) (ds:decls):unit =

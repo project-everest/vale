@@ -114,6 +114,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EBind (b, es, fs, ts, e) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
     | EApply (x, es) -> EApply (x, List.map r es)
+    | EApplyTyped(x, ts, es) -> EApplyTyped (x, ts, List.map r es)
     | ECast(e, t) -> ECast(r e, t)
   )
 
@@ -126,6 +127,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     | EBind (b, es, fs, ts, e) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
     | EOp (op, es) -> List.map r es
     | EApply (x, es) -> List.map r es
+    | EApplyTyped(x, ts, es) -> List.map r es
     | ECast (e, t) -> [r e]
   in f e children
 

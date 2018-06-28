@@ -78,6 +78,10 @@ let rec string_of_typ (t:typ):string =
   | TApp (t, []) -> "(" + (string_of_typ t) + " ())"
   | TApp (t, ts) -> "(" + (string_of_typ t) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
   | TInt(_, _) -> "int"
+  | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
+  | TList t -> "list(" + (string_of_typ t) + ")"
+  | TArrow (ts, t) -> "(" + (String.concat " " (List.map string_of_typ ts)) + " " +  (string_of_typ t) + ")"
+  | _ -> internalErr (sprintf "unexpected string_of_typ: %A" t)
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -138,6 +142,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
     | ECast (e, t) -> (r prec e, prec) // TODO: add type conversion
+    | _ -> internalErr  (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ret (x:id, t:typ option) = match t with None -> internalErr (sprintf "string_of_ret: %A" x) | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"

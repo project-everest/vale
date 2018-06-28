@@ -153,6 +153,8 @@ let rec create_type (built_ins:BuiltIns) (t:typ):Type = // ignoring function typ
                 let e = new NameSegment(tok, s, args) in
                 new UserDefinedType(e.tok, e) :> Type
       | _ -> internalErr "TAPP: expected TName"
+  | TInt _ -> new IntType() :> Type
+  | _ -> internalErr (sprintf "not implemented create_type for %A" t)
 
 // Create Dafny formal from Vale formal
 let create_formal (built_ins:BuiltIns) (loc:loc) (x:id, t:typ option):Formal =
@@ -388,6 +390,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
       | EBind (BindSet, [], xs, ts, e) ->
           notImplemented "BindSet"
       | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr "EBind"
+      | _ -> internalErr (sprintf "unexpected create_expression %A" x)
   with err -> raise (LocErr (loc, err))
 
 // TODO: Mismatch between Vale and Dafny definitions of attributes
@@ -685,6 +688,9 @@ let create_dafny_decl (mdl:LiteralModuleDecl) (built_ins:BuiltIns) (loc:loc, d:d
         if errCount > 0 then internalErr (sprintf "%i parse errors detected within verbatim block in %s at (%i,%i)/n" errCount loc.loc_file loc.loc_line loc.loc_col)
     | DPragma _ -> ()
     | DVar _ -> ()
+    | DConst _ -> ()
+    | DType _ -> ()
+    | DUnsupported _ -> ()
     | DFun f -> default_class.Members.Add(build_fun built_ins loc f)
     | DProc p ->
         gen_lemma_sym_count := 0;
