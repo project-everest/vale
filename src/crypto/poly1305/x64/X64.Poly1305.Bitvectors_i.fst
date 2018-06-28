@@ -5,9 +5,12 @@ open FStar.Tactics.Derived
 open FStar.Tactics.BV
 open FStar.Mul
 open FStar.UInt
+open Vale.Tactics
 
 // tweak options?
 #reset-options "--smtencoding.elim_box true"
+
+//NOTE: Using the split tactic seems to slowdown execution by a lot.
 
 let lemma_shr2 x = 
   assert_by_tactic (shift_right #64 x 2 == udiv #64 x 4) bv_tac
@@ -16,10 +19,10 @@ let lemma_shr4 x =
   assert_by_tactic (shift_right #64 x 4 == udiv #64 x 16) bv_tac
 
 let lemma_and_mod_n x =
-  admit ()
-// This used to work but recently started to use a lot of fstar.exe time and memory:
-//  assert_by_tactic (logand #64 x 3 == mod #64 x 4 /\ logand #64 x 15 == mod #64 x 16)
-//                   (fun () -> seq split bv_tac)
+  assert_by_tactic (logand #64 x 3 == mod #64 x 4) (bv_tac);
+  assert_by_tactic (logand #64 x 15 == mod #64 x 16) (bv_tac)
+  // assert_by_tactic (logand #64 x 3 == mod #64 x 4 /\ logand #64 x 15 == mod #64 x 16)
+  //                  (fun () -> seq split bv_tac)
 
 let lemma_clear_lower_2 x =
   assert_by_tactic
@@ -27,39 +30,66 @@ let lemma_clear_lower_2 x =
   bv_tac
 
 let lemma_and_constants x =
-  admit ()
-// This used to work but recently started to use a lot of fstar.exe time and memory:
-//  assert_by_tactic 
-//  (logand #64 x 0 == (0 <: uint_t 64) /\ 
-//   logand #64 x 0xffffffffffffffff == x)
-//  (fun () -> seq split bv_tac)
+ assert_by_tactic (logand #64 x 0 == (0 <: uint_t 64)) bv_tac;
+ assert_by_tactic (logand #64 x 0xffffffffffffffff == x) bv_tac
+ // assert_by_tactic 
+ // (logand #64 x 0 == (0 <: uint_t 64) /\ 
+ //  logand #64 x 0xffffffffffffffff == x)
+ // (fun () -> seq split bv_tac)
 
 let lemma_poly_constants x =
-  admit ()
-// This used to work but recently started to use a lot of fstar.exe time and memory:
+ // using split in this seems to hang execution.
+  assert_by_tactic  
+    (logand #64 x 0x0ffffffc0fffffff < (0x1000000000000000 <: uint_t 64)) 
+      (fun () ->  bv_tac_lt 64);
+  assert_by_tactic
+    (logand #64 x 0x0ffffffc0ffffffc < (0x1000000000000000 <: uint_t 64)) 
+      (fun () -> bv_tac_lt 64);
+  assert_by_tactic
+    (mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64)) 
+      (fun () -> bv_tac ())
 // assert_by_tactic  
 //   (logand #64 x 0x0ffffffc0fffffff < (0x1000000000000000 <: uint_t 64) /\
 //     logand #64 x 0x0ffffffc0ffffffc < (0x1000000000000000 <: uint_t 64) /\
 //     mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64))
-//  (fun () -> split (); split ();
-//		   bv_tac_lt 64;
-//		   bv_tac_lt 64;
-//		   bv_tac ())
+//  (fun () -> split(); split (); 
+// 		   bv_tac_lt 64;
+// 		   bv_tac_lt 64;
+// 		   bv_tac ())
 
 let lemma_and_commutes x y =
   assert_by_tactic 
     (logand #64 x y == logand #64 y x)
     bv_tac
 
+let lemma_bv128_64_64_and_helper' (x0:bv_t 64) (x1:bv_t 64) (y0:bv_t 64) (y1:bv_t 64) :
+  Lemma (requires True)
+	(ensures ((bvor #128 (bvshl #128 (bv_uext #64 #64 (bvand #64 x1 y1)) 64) 
+					 (bv_uext #64 #64 (bvand #64 x0 y0))) == 
+		   bvand #128 (bvor #128 (bvshl #128 (bv_uext #64 #64 x1) 64) 
+						     (bv_uext #64 #64 x0)) 
+			      (bvor #128 (bvshl #128 (bv_uext #64 #64 y1) 64)
+						     (bv_uext #64 #64 y0)))) = ()
+
+// Rewrite all equalities and then the goal is trivial for Z3.
+// Without rewriting this does not go through.
+// I believe the reason is related to a previously reported issue with the way
+// Z3 bit-blasts through the Boxing/Unboxing functions. I thought this was fixed
+// but it may not be the case. Notice that by rewriting with tactics the solver
+// only gets to see one big term without any boxing or unboxing inside it.
 let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
-// TODO
-  admit()
+  lemma_bv128_64_64_and_helper' x0 x1 y0 y1;
+  assert_by_tactic (z == bvand #128 x y) 
+		   (fun () -> destruct_conj ();
+			   rewrite_eqs_from_context ())
 
 let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
 
 let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
-// TODO
-  admit()
+  assert_by_tactic (z == bvand #128 x y) 
+		   (fun () -> destruct_conj ();
+			   rewrite_eqs_from_context ();
+			   norm[delta])
 
 #reset-options "--smtencoding.elim_box true --z3cliopt smt.case_split=3"
 let lemma_bytes_shift_constants0 x =
