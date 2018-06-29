@@ -281,7 +281,7 @@ let correct_down mem (addrs:addr_map) (ptrs: list (B.buffer UInt8.t)) heap =
   Set.equal (addrs_set ptrs addrs) (Map.domain heap) /\ 
   (forall p. List.memP p ptrs ==> correct_down_p mem addrs heap p)
 
-(* Takes a Low* Hyperstack and two buffers (for the moment) and create a vale memory + keep track of the vale addresses *)
+(* Takes a Low* Hyperstack and a list of buffers and create a vale memory + keep track of the vale addresses *)
 val down_mem: (mem:HS.mem) -> (addrs: addr_map) -> (ptrs:list (B.buffer UInt8.t){list_disjoint_or_eq ptrs}) -> GTot (heap :heap {correct_down mem addrs ptrs heap})
 
 let rec down_mem_aux (ptrs:list (B.buffer UInt8.t){list_disjoint_or_eq ptrs})

@@ -352,7 +352,7 @@ val lemma_valid_taint64: (b:buffer64) ->
 			 (mem:mem) ->
 			 (i:nat{i < buffer_length b}) ->
 			 (t:taint) -> Lemma
-  (requires valid_taint_buf64 b memTaint t)
+  (requires valid_taint_buf64 b memTaint t /\ buffer_readable mem b)
   (ensures Map.sel (down_taint memTaint mem) (buffer_addr b mem + 8 `op_Multiply` i) == t)
 
 val lemma_valid_taint128: (b:buffer128) ->
@@ -360,7 +360,7 @@ val lemma_valid_taint128: (b:buffer128) ->
 			 (mem:mem) ->
 			 (i:nat{i < buffer_length b}) ->
 			 (t:taint) -> Lemma
-  (requires valid_taint_buf128 b memTaint t)
+  (requires valid_taint_buf128 b memTaint t /\ buffer_readable mem b)
   (ensures Map.sel (down_taint memTaint mem) (buffer_addr b mem + 16 `op_Multiply` i) == t)
 
 val same_memTaint64: (b:buffer64) -> 

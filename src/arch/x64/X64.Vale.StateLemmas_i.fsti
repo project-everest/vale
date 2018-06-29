@@ -79,7 +79,7 @@ val lemma_valid_taint64: (b:X64.Memory_i.buffer64) ->
 			 (mem:X64.Memory_i.mem) ->
 			 (i:nat{i < X64.Memory_i.buffer_length b}) ->
 			 (t:taint) -> Lemma
-  (requires X64.Memory_i.valid_taint_buf64 b memTaint t)
+  (requires X64.Memory_i.valid_taint_buf64 b memTaint t /\ X64.Memory_i.buffer_readable mem b)
   (ensures (ME.down_taint memTaint mem).[X64.Memory_i.buffer_addr b mem + 8 `op_Multiply` i] == t)
 
 val lemma_valid_taint128: (b:X64.Memory_i.buffer128) ->
@@ -87,7 +87,7 @@ val lemma_valid_taint128: (b:X64.Memory_i.buffer128) ->
 			 (mem:X64.Memory_i.mem) ->
 			 (i:nat{i < X64.Memory_i.buffer_length b}) ->
 			 (t:taint) -> Lemma
-  (requires X64.Memory_i.valid_taint_buf128 b memTaint t)
+  (requires X64.Memory_i.valid_taint_buf128 b memTaint t /\ X64.Memory_i.buffer_readable mem b)
   (ensures (ME.down_taint memTaint mem).[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i] == t)
 
 
