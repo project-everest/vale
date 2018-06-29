@@ -1286,3 +1286,21 @@ let valid_state_store_mem128 i v (s:state) =
     assert (Map.equal mem1 mem2);
     ()
 
+open X64.Machine_s
+
+let memtaint = B.buffer UInt8.t -> GTot taint
+
+let correct_down_taint memTaint mem bytesTaint = admit()
+let down_taint memTaint mem = admit()
+let up_taint bytesTaint mem = admit()
+let up_down_identity memTaint mem = admit()
+let down_up_identity bytesTaint mem = admit()
+
+let valid_taint_buf64 b memTaint t = memTaint b = t
+let valid_taint_buf128 b memTaint t = memTaint b = t
+
+let lemma_valid_taint64 b memTaint mem i t = admit()
+let lemma_valid_taint128 b memTaint mem i t = admit()
+
+let same_memTaint64 b mem0 mem1 memtaint0 memtaint1 = admit()
+let same_memTaint128 b mem0 mem1 memtaint0 memtaint1 = admit()

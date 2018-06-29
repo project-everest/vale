@@ -276,3 +276,8 @@ val lemma_frame_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
 val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
   let h' = store_mem128 i v h in
   forall j. valid_mem128 j h <==> valid_mem128 j h')
+
+val memtaint: Type u#0
+
+val valid_taint_buf64: (b:buffer64) -> (memTaint:memtaint) -> (taint:taint) -> GTot bool
+val valid_taint_buf128: (b:buffer128) -> (memTaint:memtaint) -> (taint:taint) -> GTot bool

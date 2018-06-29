@@ -73,7 +73,7 @@ match l with
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 
-let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:X64.Vale.Memtaint_i.t) (t:taint) =
+let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:memtaint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b m == addr /\

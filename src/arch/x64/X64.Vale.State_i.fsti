@@ -12,7 +12,7 @@ noeq type state = {
   flags: nat64;
   mem: mem;
   trace: list observation;
-  memTaint: Memtaint_i.t;
+  memTaint: memtaint;
 }
 
 let reg_to_int (r:reg) : int =
@@ -89,12 +89,6 @@ let valid_operand (o:operand) (s:state) : Type0 =
   | OReg r -> True
   | OMem m -> valid_maddr m s
 
-let valid_taint_buf64 (b:buffer64) (memtaint:Memtaint_i.t) (t:taint) : Type0 =
-  memtaint (Memtaint_i.Buffer (TBase TUInt64) b) == t
-
-let valid_taint_buf128 (b:buffer128) (memtaint:Memtaint_i.t) (t:taint) : Type0 =
-  memtaint (Memtaint_i.Buffer (TBase TUInt128) b) == t
-
 [@va_qattr]
 let state_eq (s0:state) (s1:state) : Type0 =
   s0.ok == s1.ok /\
@@ -103,5 +97,4 @@ let state_eq (s0:state) (s1:state) : Type0 =
   s0.flags == s1.flags /\
   s0.mem == s1.mem /\
   s0.trace == s1.trace /\
-  Memtaint_i.equal s0.memTaint s1.memTaint
-
+  s0.memTaint == s1.memTaint

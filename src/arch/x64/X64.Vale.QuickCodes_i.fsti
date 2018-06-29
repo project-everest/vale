@@ -284,7 +284,7 @@ let va_state_match (s0:state) (s1:state) : Pure Type0
 
 [@va_qattr]
 unfold let wp_sound_pre (#a:Type0) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:Memtaint_i.t).
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:memtaint).
     let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; trace=trace; memTaint=memTaint} in
     s0 == s0' ==> wp cs qcs (k s0') s0'
 
@@ -299,7 +299,7 @@ val wp_sound_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:stat
 
 [@va_qattr]
 unfold let wp_sound_code_pre (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:Memtaint_i.t).
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:memtaint).
     let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; trace=trace; memTaint=memTaint} in
     s0 == s0' ==> QProc?.wp qc s0' (k s0')
 
@@ -318,20 +318,20 @@ val wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:stat
 [@va_qattr]
 let wp_final_k (#a:Type0) (update:state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (sN:state) (g:a) : Type0 =
   va_state_match sN (update sN) /\ post sN sN /\
-    (forall (ok':bool) (regs':Regs_i.t) (xmms':Xmms_i.t) (flags':nat64) (mem':mem) (trace':list observation) (memTaint':Memtaint_i.t).
+    (forall (ok':bool) (regs':Regs_i.t) (xmms':Xmms_i.t) (flags':nat64) (mem':mem) (trace':list observation) (memTaint':memtaint).
       let sN' = {ok = ok'; regs = regs'; xmms = xmms'; flags = flags'; mem = mem'; trace=trace'; memTaint=memTaint'} in
       post sN sN' ==> k sN' g)
 
 // For efficiency, introduce shorter names (e.g. ok, mem) for components of initial state s0.
 [@va_qattr]
 let wp_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:Memtaint_i.t).
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:memtaint).
     let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; trace=trace; memTaint=memTaint} in
     s0 == s0' ==> wp cs qcs (wp_final_k (update s0') post k) s0'
 
 [@va_qattr]
 let wp_wrap_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:Memtaint_i.t).
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:memtaint).
     let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; trace=trace; memTaint=memTaint} in
     s0 == s0' ==> QProc?.wp qc s0' (wp_final_k (update s0') post k)
 

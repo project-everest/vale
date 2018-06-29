@@ -85,3 +85,8 @@ let lemma_valid_store_mem64 = M.lemma_valid_store_mem64
 let lemma_store_load_mem128 = M.lemma_store_load_mem128
 let lemma_frame_store_mem128 = M.lemma_frame_store_mem128
 let lemma_valid_store_mem128 = M.lemma_valid_store_mem128
+
+let memtaint = M.memtaint
+
+let valid_taint_buf64 = M.valid_taint_buf64
+let valid_taint_buf128 = M.valid_taint_buf128

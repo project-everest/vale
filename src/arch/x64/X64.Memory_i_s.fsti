@@ -316,3 +316,67 @@ val valid_state_store_mem128: ptr:int -> v:quad32 -> s:state -> Lemma (
   let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state 
   else s.state; mem = store_mem128 ptr v s.mem } in
   valid_state s')
+
+//Memtaint related functions
+
+val memtaint: Type u#0
+
+// TODO
+val correct_down_taint:(memTaint:memtaint) -> 
+                       (mem:mem) ->
+		       (bytesTaint:memTaint_t) ->
+		       Type0
+
+val down_taint: (memTaint:memtaint) -> 
+    	        (mem:mem) ->
+           GTot (bytesTaint:memTaint_t{correct_down_taint memTaint mem bytesTaint})
+
+val up_taint: (bytesTaint:memTaint_t) ->
+              (mem:mem) ->
+         GTot (memTaint:memtaint{correct_down_taint memTaint mem bytesTaint})
+
+val up_down_identity: (memTaint:memtaint) ->
+                      (mem:mem) ->
+	        Lemma (up_taint (down_taint memTaint mem) mem == memTaint)
+
+val down_up_identity: (bytesTaint:memTaint_t) ->
+                      (mem:mem) ->
+	        Lemma (down_taint (up_taint bytesTaint mem) mem == bytesTaint)
+
+
+val valid_taint_buf64 (b:buffer64) (memTaint:memtaint) (t:taint) : GTot bool
+val valid_taint_buf128 (b:buffer128) (memTaint:memtaint) (t:taint) : GTot bool
+
+val lemma_valid_taint64: (b:buffer64) ->
+			 (memTaint:memtaint) ->
+			 (mem:mem) ->
+			 (i:nat{i < buffer_length b}) ->
+			 (t:taint) -> Lemma
+  (requires valid_taint_buf64 b memTaint t)
+  (ensures Map.sel (down_taint memTaint mem) (buffer_addr b mem + 8 `op_Multiply` i) == t)
+
+val lemma_valid_taint128: (b:buffer128) ->
+			 (memTaint:memtaint) ->
+			 (mem:mem) ->
+			 (i:nat{i < buffer_length b}) ->
+			 (t:taint) -> Lemma
+  (requires valid_taint_buf128 b memTaint t)
+  (ensures Map.sel (down_taint memTaint mem) (buffer_addr b mem + 16 `op_Multiply` i) == t)
+
+val same_memTaint64: (b:buffer64) -> 
+                   (mem0:mem) ->
+		   (mem1:mem) ->
+		   (memtaint0:memtaint) ->
+		   (memtaint1:memtaint) -> Lemma
+  (requires (modifies (loc_buffer b) mem0 mem1 /\ 
+    (forall p. Map.sel (down_taint memtaint0 mem0) p == Map.sel (down_taint memtaint1 mem1) p)))
+  (ensures memtaint0 == memtaint1)
+
+val same_memTaint128: (b:buffer128) -> 
+                   (mem0:mem) ->
+		   (mem1:mem) ->
+		   (memtaint0:memtaint) ->
+		   (memtaint1:memtaint) -> Lemma
+  (requires (modifies (loc_buffer b) mem0 mem1 /\ 
+    (forall p. Map.sel (down_taint memtaint0 mem0) p == Map.sel (down_taint memtaint1 mem1) p)))
+  (ensures memtaint0 == memtaint1)

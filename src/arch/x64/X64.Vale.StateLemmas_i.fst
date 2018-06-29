@@ -6,7 +6,6 @@ module M = TransparentMap
 module BS = X64.Bytes_Semantics_s
 module ME = X64.Memory_i_s
 module TS = X64.Taint_Semantics_s
-open Taint_interop
 
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
@@ -21,7 +20,7 @@ let state_to_S (s:state) : GTot TS.traceState =
   } in
   { ME.state = s'; ME.mem = s.mem});
   TS.trace = s.trace;
-  TS.memTaint = down_taint s.memTaint s.mem;
+  TS.memTaint = ME.down_taint s.memTaint s.mem;
   }
 
 let state_of_S (s:TS.traceState) : GTot state =
@@ -34,7 +33,7 @@ let state_of_S (s:TS.traceState) : GTot state =
     flags = flags;
     mem = mem;
     trace = s.TS.trace;
-    memTaint = up_taint s.TS.memTaint mem;
+    memTaint = ME.up_taint s.TS.memTaint mem;
   }
 
 let lemma_to_ok s = ()
@@ -43,7 +42,7 @@ let lemma_to_mem s = ()
 let lemma_to_reg s r = ()
 let lemma_to_xmm s x = ()
 let lemma_to_trace s = ()
-let lemma_to_memTaint s = up_down_identity s.memTaint s.mem
+let lemma_to_memTaint s = ME.up_down_identity s.memTaint s.mem
 let lemma_to_memTaint2 s = ()
 let lemma_to_eval_operand s o = ()
 let lemma_to_eval_xmm s x = ()
@@ -51,7 +50,7 @@ let lemma_to_valid_operand s o = ()
 let lemma_to_valid_taint s o t = ()
 
 let lemma_of_to s =
-  up_down_identity s.memTaint s.mem;
+  ME.up_down_identity s.memTaint s.mem;
   assert (state_eq s (state_of_S (state_to_S s)));
   ()
 
@@ -65,11 +64,11 @@ let lemma_to_of s =
   assert (feq regs regs'');
   assert (feq xmms xmms'');
   ME.same_heap s.TS.state s''.TS.state;
-  down_up_identity s.TS.memTaint mem;
+  ME.down_up_identity s.TS.memTaint mem;
   ()
 
-let lemma_valid_taint64 b memTaint mem i t = admit()
-let lemma_valid_taint128 b memTaint mem i t = admit()
+let lemma_valid_taint64 = ME.lemma_valid_taint64
+let lemma_valid_taint128  = ME.lemma_valid_taint128
 
 let modify_trace s0 b =
   let s1 = {s0 with trace = BranchPredicate(b)::s0.trace} in
@@ -78,5 +77,5 @@ let modify_trace s0 b =
   assert (FunctionalExtensionality.feq s0'.TS.state.ME.state.BS.regs s1'.TS.state.ME.state.BS.regs);
   assert (FunctionalExtensionality.feq s0'.TS.state.ME.state.BS.xmms s1'.TS.state.ME.state.BS.xmms)  
 
-let same_memTaint b mem0 mem1 memtaint0 memtaint1 = admit()
-let same_memTaint128 b mem0 mem1 memtaint0 memtaint1 = admit()
+let same_memTaint64 = ME.same_memTaint64
+let same_memTaint128 = ME.same_memTaint128

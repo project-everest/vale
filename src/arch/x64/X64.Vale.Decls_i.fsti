@@ -155,7 +155,7 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
 [@va_qattr] unfold let va_get_mem (s:va_state) : M.mem = s.mem
 [@va_qattr] unfold let va_get_trace (s:va_state) : list observation = s.trace
-[@va_qattr] unfold let va_get_memTaint (s:va_state) : Memtaint_i.t = s.memTaint
+[@va_qattr] unfold let va_get_memTaint (s:va_state) : M.memtaint = s.memTaint
 
 [@va_qattr] let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
 [@va_qattr] let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
@@ -293,27 +293,26 @@ unfold let modifies_buffer_2 (b1 b2:M.buffer64) (h1 h2:M.mem) =modifies_mem (M.l
 unfold let modifies_buffer128 (b:M.buffer128) (h1 h2:M.mem) = modifies_mem (loc_buffer b) h1 h2
 unfold let modifies_buffer128_2 (b1 b2:M.buffer128) (h1 h2:M.mem) = modifies_mem (M.loc_union (loc_buffer b1) (loc_buffer b2)) h1 h2
 
-let validSrcAddrs64 (m:M.mem) (addr:int) (b:M.buffer64) (len:int) (memTaint:Memtaint_i.t) (t:taint) =
+let validSrcAddrs64 (m:M.mem) (addr:int) (b:M.buffer64) (len:int) (memTaint:M.memtaint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
     M.buffer_addr b m == addr /\ 
-    memTaint (Memtaint_i.Buffer (M.TBase M.TUInt64) b) == t
+    M.valid_taint_buf64 b memTaint t
 
 unfold 
 let validDstAddrs64 = validSrcAddrs64
 
-let validSrcAddrs128 (m:M.mem) (addr:int) (b:M.buffer128) (len:int) (memTaint:Memtaint_i.t) (t:taint) =
+let validSrcAddrs128 (m:M.mem) (addr:int) (b:M.buffer128) (len:int) (memTaint:M.memtaint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
     M.buffer_addr b m == addr /\
-    memTaint (Memtaint_i.Buffer (M.TBase M.TUInt128) b) == t
+    M.valid_taint_buf128 b memTaint t
 
-let validDstAddrs128 (m:M.mem) (addr:int) (b:M.buffer128) (len:int) (memTaint:Memtaint_i.t) (t:taint) =
+let validDstAddrs128 (m:M.mem) (addr:int) (b:M.buffer128) (len:int) (memTaint:M.memtaint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
     M.buffer_addr b m == addr /\
-    memTaint (Memtaint_i.Buffer (M.TBase M.TUInt128) b) == t
-
+    M.valid_taint_buf128 b memTaint t
 
 let valid_stack_slots (m:M.mem) (rsp:int) (b:M.buffer64) (num_slots:int) =
     buffer_readable m b /\
