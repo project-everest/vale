@@ -9,7 +9,7 @@ module X64.Vale.InsMem
 
 #verbatim{:interface}
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -17,7 +17,7 @@ open X64.Vale.QuickCode_i
 
 #verbatim
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale
 open X64.Vale.State_i
 open X64.Vale.StateLemmas_i

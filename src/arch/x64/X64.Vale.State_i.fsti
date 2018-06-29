@@ -4,8 +4,7 @@ module X64.Vale.State_i
 open Prop_s
 open X64.Machine_s
 open X64.Vale
-open X64.Memory_i_s
-// TODO: Shouldn't refer to Interop64, only needed for addr_map type definition
+open X64.Memory_i
 
 noeq type state = {
   ok: bool;

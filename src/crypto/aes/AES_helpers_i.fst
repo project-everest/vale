@@ -1,5 +1,6 @@
 module AES_helpers_i
 
+open Opaque_s
 open Words_s
 open Types_s
 open FStar.Seq
@@ -35,14 +36,17 @@ let round_key_128_rcon (prev:quad32) (rcon:nat32) : quad32 =
 let round_key_128 (prev:quad32) (round:nat) : quad32 =
   round_key_128_rcon prev (aes_rcon (round - 1))
 
-let rec expand_key_128 (key:aes_key_LE AES_128) (round:nat) : quad32 =
+let rec expand_key_128_def (key:aes_key_LE AES_128) (round:nat) : quad32 =
   if round = 0 then Mkfour key.[0] key.[1] key.[2] key.[3]
-  else round_key_128 (expand_key_128 key (round - 1)) round
+  else round_key_128 (expand_key_128_def key (round - 1)) round
+
+let expand_key_128 = make_opaque expand_key_128_def
 
 #reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 0"
 let lemma_expand_key_128_0 (key:aes_key_LE AES_128) : Lemma
   (equal key (expand_key AES_128 key 4))
-  = ()
+  =
+  reveal_opaque expand_key_def
 
 #reset-options "--initial_fuel 1 --max_fuel 1 --max_ifuel 0 --z3rlimit 10"
 let lemma_expand_key_128_i (key:aes_key_LE AES_128) (i:nat) : Lemma
@@ -54,11 +58,11 @@ let lemma_expand_key_128_i (key:aes_key_LE AES_128) (i:nat) : Lemma
     let n = 4 * i in
     let v = expand_key AES_128 key n in
     let w = expand_key AES_128 key (n + 4) in
-    let prev = Mkfour v.[m + 0] v.[m + 1] v.[m + 2] v.[m + 3] in
-    let Mkfour r0 r1 r2 r3 = round_key_128 prev i in
-    r0 == w.[n + 0] /\ r1 == w.[n + 1] /\ r2 == w.[n + 2] /\ r3 == w.[n + 3]
+    let prev =              Mkfour v.[m + 0] v.[m + 1] v.[m + 2] v.[m + 3] in
+    round_key_128 prev i == Mkfour w.[n + 0] w.[n + 1] w.[n + 2] w.[n + 3]
   ))
   =
+  reveal_opaque expand_key_def;
   let n = 4 * i in
   // unfold expand_key 4 times (could use fuel, but that unfolds everything):
   let _ = expand_key AES_128 key (n + 1) in
@@ -73,6 +77,7 @@ let rec lemma_expand_append (key:aes_key_LE AES_128) (size1:nat) (size2:nat) : L
   (ensures equal (expand_key AES_128 key size1) (slice (expand_key AES_128 key size2) 0 size1))
   (decreases size2)
   =
+  reveal_opaque expand_key_def;
   if size1 < size2 then lemma_expand_append key size1 (size2 - 1)
 
 #reset-options "--z3rlimit 10"
@@ -81,9 +86,11 @@ let rec lemma_expand_key_128 (key:aes_key_LE AES_128) (size:nat) : Lemma
   (requires size <= 11)
   (ensures (
     let s = key_schedule_to_round_keys size (expand_key AES_128 key 44) in
-    (forall (i:nat).{:pattern (expand_key_128 key i)} i < size ==> expand_key_128 key i == s.[i])
+    (forall (i:nat).{:pattern (expand_key_128 key i) \/ (expand_key_128_def key i)}
+      i < size ==> expand_key_128 key i == s.[i])
   ))
   =
+  reveal_opaque expand_key_128_def;
   lemma_expand_append key (4 * size) 44;
   if size = 0 then ()
   else

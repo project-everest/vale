@@ -158,6 +158,7 @@ let try_lookup_proc (env:env) (x:id): (decl_type option * bool) =
   | _ -> (None, false)
 
 let lookup_proc (env:env) (x:id): (decl_type * bool) =
+  let x = if x = Id "not" then Id "Prims.l_not" else x in
   match try_lookup_proc env x with
   | (Some t, b) -> (t, b)
   | _ -> err ("cannot find fun/proc '" + (err_id x) + "'")

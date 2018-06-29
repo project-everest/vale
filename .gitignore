@@ -15,3 +15,4 @@ tools/FsLexYacc/
 .sconsign.dblite
 fstar_test_suite/*fst
 fstar_test_suite/*fsti
+data/

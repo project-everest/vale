@@ -19,14 +19,15 @@ include{:fstar} {:open} "Types_i"
 include{:fstar} {:open} "AES_helpers_i"
 include{:fstar} {:open} "Opaque_i"
 
-module X64.AES
+module X64.AES128
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
 open Types_s
 open FStar.Seq
 open AES_s
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.InsBasic
@@ -37,7 +38,6 @@ open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
 open Types_i
 open AES_helpers_i
-open Opaque_i
 #endverbatim
 
 #reset-options "--z3rlimit 20"
@@ -79,8 +79,8 @@ procedure{:quick} KeyExpansionRound(
     Store128_buffer(rdx, xmm1, 16 * (round + 1), dst, round + 1);
 
     // assert xmm1 == simd_round_key_128(old(xmm1), rcon);
-    ghost var rcon2:nat32 := rcon;
-    lemma_simd_round_key(old(xmm1), rcon2);
+    lemma_simd_round_key(old(xmm1), rcon);
+    reveal_opaque(expand_key_128_def);
 }
 
 procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(
@@ -104,6 +104,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
         forall j {buffer128_read(dst, j, mem)} :: 0 <= j <= n ==>
             buffer128_read(dst, j, mem) == expand_key_128(key, j);
 {
+    reveal_opaque(expand_key_128_def);
     inline if (0 < n <= 10) {
         KeyExpansionRoundUnrolledRecursive(key, dst, n - 1);
         KeyExpansionRound(n - 1, aes_rcon(n - 1), dst, key);
@@ -115,7 +116,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
 // type X64.Vale.Decls_i.va_operand_reg_opr64 : Type(0) extern ;
 // are not equal in the *types.vaf files.
 // for the second parameters of Load128_buffer.
-procedure{:quick} {:notypecheck} KeyExpansionStdcall(
+procedure{:quick} {:notypecheck} KeyExpansion128Stdcall(
     inline win:bool,
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
@@ -149,8 +150,8 @@ procedure{:quick} {:notypecheck} KeyExpansionStdcall(
 
     Store128_buffer(rdx, xmm1, 0, output_key_expansion_b, 0);
     KeyExpansionRoundUnrolledRecursive(key, output_key_expansion_b, 10);
-    ghost var key2:aes_key_LE(AES_128) := key;
-    lemma_expand_key_128(key2, 11);
+    lemma_expand_key_128(key, 11);
+    reveal_opaque(key_to_round_keys_LE_def);
 
     // Clear secrets out of registers
     Pxor(xmm1, xmm1);

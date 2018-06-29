@@ -23,6 +23,11 @@ manual_dependencies = {
   'obj/arch/x64/X64.Vale.InsMem.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
   'obj/arch/x64/X64.Vale.InsVector.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
   'obj/arch/x64/X64.Vale.InsAes.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
+
+  'obj/arch/x64/X64.Vale.InsMem.fst.tmp': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.InsVector.fst.tmp': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.StateLemmas_i.fsti.tmp': 'obj/arch/x64/X64.Memory_i.fst',
+  'obj/arch/x64/X64.Vale.StateLemmas_i.fst.tmp': 'obj/arch/x64/X64.Memory_i.fst',
 }
 Export('manual_dependencies')
 
@@ -45,7 +50,7 @@ fstar_include_paths = [
   'obj/lib/math',
   'obj/lib/util',
   'obj/crypto/aes/',
-  'obj/crypto/aes/aes-x64',
+  'obj/crypto/aes/x64',
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
@@ -60,7 +65,7 @@ env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths]
 verify_options = {
   'src/arch/arm/nlarith.s.dfy': BuildOptions(dafny_default_args_nlarith),
   'src/arch/arm/bitvectors.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
-  'src/crypto/aes/aes-x64/aes_main.i.dfy': BuildOptions(dafny_default_args_larith),
+  'src/crypto/aes/x64/aes_main.i.dfy': BuildOptions(dafny_default_args_larith),
   'src/lib/math/mul_nonlinear.i.dfy': BuildOptions(dafny_default_args_nlarith),
   'src/lib/math/div_nonlinear.i.dfy': BuildOptions(dafny_default_args_nlarith),
   'src/crypto/hashing/sha-arm/bit-vector-lemmas.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
@@ -68,14 +73,16 @@ verify_options = {
   'src/lib/math/div.i.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:60'),
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
-  'obj/crypto/aes/aes-x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
+  'obj/crypto/aes/x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'src/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
   
   # Any use of expose_interfaces requires adding to manual_dependencies
   'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
-  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
-  'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
   'obj/arch/x64/X64.Vale.InsAes.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst'),
+  'src/arch/x64/X64.Vale.StateLemmas_i.fsti': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'src/arch/x64/X64.Vale.StateLemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
@@ -85,15 +92,13 @@ verify_options = {
   'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # Disable verification by adding 'filename': None
-  'src/arch/x64/X64.Vale.StrongPost_i.fsti': None,
-  'src/arch/x64/X64.Vale.StrongPost_i.fst': None,
   'src/test/Test.FastBlock.vaf': None,
   'src/arch/x64/X64.Taint_Semantics_s.fst': None,
   'src/arch/x64/X64.Leakage_s.fst': None,
   'src/arch/x64/X64.Leakage_Ins_i.fst': None,
   'src/arch/x64/X64.Leakage_i.fst': None,
   'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
-  'src/arch/x64/X64.Bytes_Semantics_i.fst': None,
+#  'src/arch/x64/X64.Bytes_Semantics_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
 
@@ -103,13 +108,14 @@ verify_options = {
   'src/*/*.fsti': BuildOptions(fstar_default_args),
 
   # .fst/.fsti files default to this set of options
-  '.fst': BuildOptions(fstar_default_args),
-  '.fsti': BuildOptions(fstar_default_args),
-#  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
-  'src/arch/x64/Interop64.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
-  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
+  '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
+  '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
+
+  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
+  'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
+  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true '),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
-  'obj/crypto/aes/aes-x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
+  'obj/crypto/aes/x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
 
 
 
@@ -129,12 +135,12 @@ Export('verify_options')
 # Note that the entries below are prefixes of blacklisted files
 #
 min_test_suite_blacklist = [
-  'obj/crypto/aes/aes-x64/X64.GCMopt.fst',
-  'obj/crypto/aes/aes-x64/X64.GCM.fst',
+  'obj/crypto/aes/x64/X64.GCMencrypt.fst',
+  'obj/crypto/aes/x64/X64.GCMdecrypt.fst',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.fst',
-  'obj/crypto/aes/aes-x64/X64.GHash',
-  'obj/crypto/aes/aes-x64/X64.GCTR.fst',
-  'obj/crypto/aes/aes-x64/X64.AES.fst'
+  'obj/crypto/aes/x64/X64.GHash',
+  'obj/crypto/aes/x64/X64.GCTR.fst',
+  'obj/crypto/aes/x64/X64.AES.fst'
 ]
 
 Export('min_test_suite_blacklist')

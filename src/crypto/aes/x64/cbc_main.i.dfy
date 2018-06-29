@@ -1,10 +1,10 @@
-include "../../../../obj/crypto/aes/aes-x64/aes.gen.dfy"
+include "../../../../obj/crypto/aes/x64/cbc.gen.dfy"
 include "../../../arch/x64/print.s.dfy"
 include "../../../lib/util/Io.s.dfy"
 
-module AESMain {
+module CBCMain {
 
-import opened aes_vale
+import opened CBC
 import opened x64_print_s
 import opened Io_s
 
@@ -46,17 +46,18 @@ method {:main} Main(ghost env:HostEnvironment)
     printHeader(asm_choice);
     var win := (platform_choice == Win);
 
-    printProcPlatform("KeyExpansionStdcall",
+    printProcPlatform("aes_main_i_KeyExpansionStdcall",
         va_code_KeyExpansionStdcall(Secret, win),
-        0, 0, asm_choice, platform_choice);
-    printProcPlatform("KeyExpansionAndInversionStdcall",
+        0, 8,
+        asm_choice, platform_choice);
+    printProcPlatform("aes_main_i_KeyExpansionAndInversionStdcall",
         va_code_KeyExpansionAndInversionStdcall(Secret, win),
-        0, 0, asm_choice, platform_choice);
-
-    printProcPlatform("AES128EncryptOneBlockStdcall",
-        va_code_AES128EncryptOneBlockStdcall(win),
-        0, 0, asm_choice, platform_choice);
-
+        0, 8,
+        asm_choice, platform_choice);
+    printProcPlatform("CBCEncryptStdcall",
+        va_code_CBCEncryptStdcall(win),
+        0, 24,
+        asm_choice, platform_choice);
     printFooter(asm_choice);
 }
 

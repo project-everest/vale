@@ -1,11 +1,11 @@
 module X64.Vale.Decls_i
-module M = X64.Memory_i_s
+module M = X64.Memory_i
 
 // This interface should hide all of Semantics_s.
 // (It should not refer to Semantics_s, directly or indirectly.)
-// It should not refer to StateLemmas_i, Lemmas_i, or Print_s,
+// It should not refer to Memory_i_s, StateLemmas_i, Lemmas_i, or Print_s,
 // because they refer to Semantics_s.
-// Regs_i and State_i are ok, because they do not refer to Semantics_s.
+// Memory_i, Regs_i and State_i are ok, because they do not refer to Semantics_s.
 
 open Prop_s
 open X64.Machine_s
@@ -22,8 +22,8 @@ val update_of (flags:int) (new_of:bool) : (new_flags:int)
 //unfold let va_subscript = Map.sel
 unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 unfold let va_update = Map.upd
-unfold let va_make_opaque = Opaque_i.make_opaque
-unfold let va_reveal_opaque = Opaque_i.reveal_opaque
+unfold let va_make_opaque = Opaque_s.make_opaque
+unfold let va_reveal_opaque = Opaque_s.reveal_opaque
 unfold let va_hd = Cons?.hd
 //unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
 
@@ -95,6 +95,7 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_op_shift_amt64_reg (r:reg) : va_shift_amt = OReg r
 [@va_qattr] unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
 [@va_qattr] unfold let va_const_cmp (n:int) : va_cmp = OConst n
+[@va_qattr] unfold let va_coerce_reg_opr64_to_cmp (r:va_operand_reg_opr64) : va_cmp = r
 [@va_qattr] unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 [@va_qattr] unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
 [@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
@@ -510,7 +511,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
 val printer : Type0
 val print_string : string -> FStar.All.ML unit
 val print_header : printer -> FStar.All.ML unit
-val print_proc : (name:string) -> (code:va_code) -> (label:int) -> (p:printer) -> FStar.All.ML unit
+val print_proc : (name:string) -> (code:va_code) -> (label:int) -> (p:printer) -> FStar.All.ML int
 val print_footer : printer -> FStar.All.ML unit
 val masm : printer
 val gcc : printer
