@@ -96,7 +96,7 @@ let name_of_id x =
   | Reserved _ -> (mn, Reserved sn)
   | Operator _ -> (mn, Operator sn)
 
-let lookup_name (env:env) (x:id):(name_info option * id) =
+let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
   let find = function 
   | Variable (s, t, info) when s=x -> (Some (Info (t, info)), x)
   | Func (s, decl) when s=x -> (Some (Func_decl decl), x)
@@ -104,7 +104,7 @@ let lookup_name (env:env) (x:id):(name_info option * id) =
   | Type (s, ts, kind, t) when s=x -> (Some (Type_info (ts, kind, t)), x)
   | Const (s, t) when s=x -> (Some (Info (t, None)), x)
   | Unsupported (s) when s=x -> (Some (Name s), x)
-  | Include_module (s, opened) ->
+  | Include_module (s, opened) when include_import ->
     let r = Map.tryFind x env.declsmap in
     match r with
     | Some r -> (Some r, x)
@@ -128,7 +128,7 @@ let push_scope_mod env scope_mod =
  {env with scope_mods = scope_mod :: env.scope_mods}
 
 let try_lookup_id (env:env) (x:id): (typ * id_info option) option = 
-  match lookup_name env x with
+  match lookup_name env x true with
   | (Some (Info (t, info)), _) -> Some (t, info)
   | (Some (Name x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
   | _ -> None
@@ -139,7 +139,7 @@ let lookup_id (env:env) (x:id): (typ * id_info option) =
   | _ -> err ("cannot find id '" + (err_id x) + "'")
 
 let try_lookup_type (env:env) (x:id): ((typ option * kind) option * id) =
-  let (t, qx) = lookup_name env x in
+  let (t, qx) = lookup_name env x true in
   match t with
   | Some (Type_info (ts, k, t)) -> (Some (t, k), qx)
   | Some (Name x) -> unsupported ("unsupported '" + (err_id x) + "'")
@@ -151,7 +151,7 @@ let lookup_type (env:env) (x:id): (typ option * kind) =
   | _ -> err ("cannot find type '" + (err_id x) + "'")
 
 let try_lookup_proc (env:env) (x:id): (decl_type option * bool) =
-  match lookup_name env x with
+  match lookup_name env x true with
   | (Some (Proc_decl t), _) -> (Some t, false)
   | (Some (Func_decl t), _) -> (Some t, true)
   | (Some (Name x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
@@ -448,7 +448,7 @@ let compute_transform_info env (formal: pformal) (e:exp) =
   | _ -> None
 
 let check_not_local env x = 
-  match lookup_name env x with
+  match lookup_name env x false with
   | (Some (Info (t, info)), _) -> err ("formal: " + (err_id x) + " is a local variable")
   | _ -> ()
 
@@ -1087,7 +1087,7 @@ let resolve_id env id:unit =
   match id with
   | Reserved _ -> ()
   | _ ->
-    match lookup_name env id with
+    match lookup_name env id true with
     | (None, _) -> err ("Identifier not found " + (err_id id))
     | (Some r, _) -> ()
 
