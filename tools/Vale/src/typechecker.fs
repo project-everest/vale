@@ -1235,7 +1235,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool)
       let env = push_const env x t in
       (env, decl)
     | DFun ({fbody = None} as f) ->
-      let isTypeChecked = (attrs_get_bool (Id "typecheck") true f.fattrs) && not (attrs_get_bool (Id "notypecheck") false f.fattrs) in
+      let isTypeChecked = (attrs_get_bool (Id "typecheck") false f.fattrs) && not (attrs_get_bool (Id "notypecheck") false f.fattrs) in
       let env = 
         if isTypeChecked then
           let ftyp = compute_func_typ env f in
@@ -1244,7 +1244,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)) : env * ((loc * decl) * bool)
           push_unsupported env f.fname in
       (env, decl)
     | DProc p ->
-      let isTypeChecked = (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") true p.pattrs) && not (attrs_get_bool (Id "notypecheck") false p.pattrs) in
+      let isTypeChecked = (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") false p.pattrs) && not (attrs_get_bool (Id "notypecheck") false p.pattrs) in
       let (env,p) = if isTypeChecked then tc_proc env p else let env = push_unsupported env p.pname in (env, p) in 
       (env, ((l, DProc(p)), b))
     | DUnsupported x ->
