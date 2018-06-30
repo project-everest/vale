@@ -64,16 +64,13 @@ let lemma_reverse_degree a n =
   lemma_index a;
   lemma_reverse_define a n;
   lemma_degree (reverse a n)
-#set-options "--print_effect_args"
+
 let lemma_of_list_degree l =
   let len = List.length l in
   let s = of_list l in
   let a = of_seq s in
-  lemma_of_list_length s l;
-  let aux (i:nat{i < len}) : Lemma (index s i == List.index l i) =
-    Seq.lemma_of_list s l i
-  in
-  FStar.Classical.forall_intro aux; //Seq.lemma_of_list has a poor pattern
+  lemma_of_list_length l;
+  assert (forall (i:nat).{:pattern (index s i)} i < len ==> index s i == List.index l i);
   lemma_index a;
   lemma_degree a;
   lemma_zero_define ();
@@ -85,19 +82,8 @@ let lemma_of_list_degree l =
 let lemma_add_define a b =
   FStar.Classical.forall_intro (lemma_add_define_i a b)
 
-(* THIS WILL SOON BE IN FStar.Classical and we can remove it from here *)
-private
-let forall_intro_2_with_pat
-                   (#a:Type) (#b:(a -> Type))
-                   (#c: (x:a -> y:b x -> Type))
-                   (#p:(x:a -> b x -> GTot Type0))
-                   ($pat: (x:a -> y:b x -> Tot (c x y)))
-                   ($f: (x:a -> y:b x -> Lemma (p x y)))
-  : Lemma (forall (x:a) (y:b x).{:pattern (pat x y)} p x y)
-  = FStar.Classical.forall_intro_2 f
-
 let lemma_add_define_all () =
-  forall_intro_2_with_pat (fun a b -> (a +. b)) lemma_add_define
+  FStar.Classical.forall_intro_2_with_pat (fun a b -> (a +. b)) lemma_add_define
 
 let lemma_mul_distribute_left a b c =
   lemma_mul_commute (a +. b) c;
