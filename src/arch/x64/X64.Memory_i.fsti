@@ -279,5 +279,5 @@ val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
 
 val memtaint: Type u#0
 
-val valid_taint_buf64: (b:buffer64) -> (memTaint:memtaint) -> (taint:taint) -> GTot bool
-val valid_taint_buf128: (b:buffer128) -> (memTaint:memtaint) -> (taint:taint) -> GTot bool
+val valid_taint_buf64: (b:buffer64) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
+val valid_taint_buf128: (b:buffer128) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0

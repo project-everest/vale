@@ -1287,12 +1287,12 @@ let valid_state_store_mem128 i v (s:state) =
 
 open X64.Machine_s
 
-let memtaint = b8 -> GTot taint
+let memtaint = (b:b8) -> GTot ((i:nat{i < B.length b}) -> GTot taint)
 
 let correct_down_taint_p (memTaint:memtaint) (addrs:I.addr_map) (bytesTaint:memTaint_t) (p:b8) =
   let length = B.length p in
   let addr = addrs p in
-  (forall i. 0 <= i /\ i < length ==> bytesTaint.[addr + i] == memTaint p)
+  (forall i. 0 <= i /\ i < length ==> bytesTaint.[addr + i] == memTaint p i)
 
 let correct_down_taint_aux (memTaint:memtaint) (addrs:I.addr_map) (bytesTaint:memTaint_t) (ptrs:list b8) =
   forall p. List.memP p ptrs ==> correct_down_taint_p memTaint addrs bytesTaint p  
@@ -1304,21 +1304,21 @@ let down_taint_buffer (p:b8) (addrs:I.addr_map) (bytesTaint:memTaint_t) (memTain
   (newTaint:memTaint_t{
     let length = B.length p in
     let addr = addrs p in
-    (forall i. 0 <= i /\ i < length ==> newTaint.[addr+i] = memTaint p) /\
+    (forall i. 0 <= i /\ i < length ==> newTaint.[addr+i] = memTaint p i) /\
     (forall i. i < addr \/ i >= addr + length ==> bytesTaint.[i] = newTaint.[i])}) =
   let length = B.length p in
   let addr = addrs p in
   let rec aux (j:nat{j <= B.length p}) 
     (accu:memTaint_t{
-     (forall k. 0 <= k /\ k < j ==> accu.[addr+k] = memTaint p) /\
+     (forall k. 0 <= k /\ k < j ==> accu.[addr+k] = memTaint p k) /\
      (forall k. k < addr \/ k >= addr + j ==> bytesTaint.[k] = accu.[k])}) :
    GTot (newT:memTaint_t{
-    (forall i. 0 <= i /\ i < length ==> newT.[addr+i] = memTaint p) /\
+    (forall i. 0 <= i /\ i < length ==> newT.[addr+i] = memTaint p i) /\
     (forall i. i < addr \/ i >= addr + length ==> bytesTaint.[i] = newT.[i])})
    (decreases %[length-j]) =
     if j >= B.length p then accu else
     begin
-      let newT = accu.[addr+j] <- memTaint p in
+      let newT = accu.[addr+j] <- memTaint p j in
       assert (Set.equal (Map.domain newT) (Set.complement Set.empty));
       aux (j+1) newT
     end
@@ -1354,17 +1354,59 @@ let down_taint memT mem =
   assert (Set.equal (Map.domain bytesT) (Set.complement Set.empty));
   down_taint_aux mem.ptrs mem.addrs memT mem.ptrs [] bytesT
 
-let up_taint bytesTaint mem = admit()
+let up_taint_buffer (p:b8) (addrs:I.addr_map) (bytesT:memTaint_t) (memT:memtaint) : GTot
+  (newT:memtaint{
+    let length = B.length p in
+    let addr = addrs p in
+    (forall i. 0 <= i /\ i < length ==> newT p i == bytesT.[addr+i]) /\
+    (forall b. b =!= p ==> memT b == newT b)}) =
+  let length = B.length p in
+  let addr = addrs p in
+  let rec aux (j:nat{j <= B.length p})
+    (accu:memtaint{
+      (forall k. 0 <= k /\ k < j ==> accu p k == bytesT.[addr+k]) /\
+      (forall b. b =!= p ==> memT b == accu b)}) : 
+  GTot (newT:memtaint{
+    (forall i. 0 <= i /\ i < length ==> newT p i == bytesT.[addr+i]) /\
+    (forall b. b =!= p ==> memT b == newT b)})
+  (decreases %[length-j]) =
+    if j >= B.length p then accu
+    else begin
+      let f = fun (x:nat{x < B.length p}) -> if x = j then bytesT.[addr+j] else accu p x in
+      let newT = fun b ->
+	if StrongExcludedMiddle.strong_excluded_middle (b=!=p) then accu b
+	else f
+      in aux (j+1) newT
+    end
+  in aux 0 memT
 
-let same_up (mem0 mem1:mem) (bytesT0 bytesT1:memTaint_t) : Lemma
-  (requires mem0.addrs == mem1.addrs /\ mem0.ptrs == mem1.ptrs)
-  (ensures up_taint bytesT0 mem0 == up_taint bytesT1 mem1) = admit()
+let rec up_taint_aux (ptrs:list b8{I.list_disjoint_or_eq ptrs}) 
+                  (addrs:I.addr_map)
+	          (bytesT:memTaint_t)
+	          (ps:list b8)
+	          (accu:list b8{forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
+	          (memT:memtaint{correct_down_taint_aux memT addrs bytesT accu}) : 
+  GTot (newT:memtaint{correct_down_taint_aux newT addrs bytesT ptrs}) =
+  match ps with
+    | [] -> memT
+    | a::q ->
+      let newT = up_taint_buffer a addrs bytesT memT in
+      up_taint_aux ptrs addrs bytesT q (a::accu) newT
+
+let up_taint bytesTaint mem = 
+  up_taint_aux mem.ptrs mem.addrs bytesTaint mem.ptrs [] (fun b i -> Public)
 
 let up_down_identity memTaint mem = admit()
 let down_up_identity bytesTaint mem = admit()
 
-let valid_taint_buf64 b memTaint t = memTaint b = t
-let valid_taint_buf128 b memTaint t = memTaint b = t
+let valid_taint_buf64 b memTaint t = 
+  length_t_eq (TBase TUInt64) b;
+  (forall (i:nat{i < buffer_length b}). memTaint b (8 `op_Multiply` i) = t)
+  
+let valid_taint_buf128 b memTaint t =
+  length_t_eq (TBase TUInt128) b;
+  (forall (i:nat{i < buffer_length b}). memTaint b (16 `op_Multiply` i) = t)
+
 
 let lemma_valid_taint64 b memTaint mem i t =
   length_t_eq (TBase TUInt64) b;
@@ -1383,7 +1425,7 @@ let same_memTaint (t:typ) (b:buffer t) (mem0 mem1:mem) (memT0 memT1:memtaint) : 
   assert (Map.equal bytesT0 bytesT1);
   up_down_identity memT0 mem0;
   up_down_identity memT1 mem1; 
-  same_up mem0 mem1 bytesT0 bytesT1
+  ()
 
 let same_memTaint64 b mem0 mem1 memtaint0 memtaint1 =
   same_memTaint (TBase TUInt64) b mem0 mem1 memtaint0 memtaint1

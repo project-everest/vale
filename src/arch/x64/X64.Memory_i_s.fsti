@@ -344,8 +344,8 @@ val down_up_identity: (bytesTaint:memTaint_t) ->
 	        Lemma (down_taint (up_taint bytesTaint mem) mem == bytesTaint)
 
 
-val valid_taint_buf64 (b:buffer64) (memTaint:memtaint) (t:taint) : GTot bool
-val valid_taint_buf128 (b:buffer128) (memTaint:memtaint) (t:taint) : GTot bool
+val valid_taint_buf64 (b:buffer64) (memTaint:memtaint) (t:taint) : GTot Type0
+val valid_taint_buf128 (b:buffer128) (memTaint:memtaint) (t:taint) : GTot Type0
 
 val lemma_valid_taint64: (b:buffer64) ->
 			 (memTaint:memtaint) ->
