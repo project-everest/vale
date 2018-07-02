@@ -77,7 +77,10 @@ let ghost_poly ctx inp len h0 =
     | Rdx -> len
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
+  let taint_t b = if StrongExcludedMiddle.strong_excluded_middle (b == ctx) then(fun (i:nat) -> if i < B.length ctx then Public else Public) else
+      if StrongExcludedMiddle.strong_excluded_middle (b==inp) then (fun (i:nat) -> if i < B.length inp then Public else Public) else default_of_taint in
+  let memTaint = {buffs = buffers; t = taint_t} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace=[]; memTaint = memTaint} in
   length_t_eq (TBase TUInt64) ctx;
   length_t_eq (TBase TUInt64) inp;
   let s1, f1 = va_lemma_poly (va_code_poly ()) s0 ctx inp len  in
@@ -90,6 +93,9 @@ let ghost_poly ctx inp len h0 =
   assert(s0.regs R13 == s1.regs R13);
   assert(s0.regs R14 == s1.regs R14);
   assert(s0.regs R15 == s1.regs R15);
+  // Ensures that the output taint is correct
+  assert (valid_taint_buf64 ctx s1.memTaint Public);
+  assert (valid_taint_buf64 inp s1.memTaint Public);
   // Ensures that va_code_poly is actually Vale code, and that s1 is the result of executing this code
   assert (va_ensure_total (va_code_poly ()) s0 s1 f1);
   // This assertion was manually added
