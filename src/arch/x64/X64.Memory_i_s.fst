@@ -1289,12 +1289,13 @@ open X64.Machine_s
 
 noeq type memtaint' = {
   buffs: list b8;
-  t: (b:b8) -> GTot ((i:nat{i < B.length b}) -> GTot taint);
+  t: (b:b8) -> GTot (nat -> GTot taint);
 }
 
 let default_of_taint (i:nat) : GTot taint = Public
 
-let memtaint = (m:memtaint'{forall p. ~ (List.memP p m.buffs) ==> m.t p == default_of_taint})
+let memtaint = (m:memtaint'{(forall p. ~ (List.memP p m.buffs) ==> m.t p == default_of_taint) /\
+			     (forall (p:b8) (i:nat{i >= B.length p}). m.t p i == Public)})
 
 let correct_down_taint_p (memTaint:memtaint) (addrs:I.addr_map) (bytesTaint:memTaint_t) (p:b8) =
   let length = B.length p in
@@ -1382,7 +1383,7 @@ let up_taint_buffer (p:b8) (addrs:I.addr_map) (bytesT:memTaint_t) (memT:memtaint
   (decreases %[length-j]) =
     if j >= B.length p then accu
     else begin
-      let f = fun (x:nat{x < B.length p}) -> if x = j then bytesT.[addr+j] else accu.t p x in
+      let f = fun (x:nat) -> if x = j then bytesT.[addr+j] else accu.t p x in
       let newT = fun b ->
 	if StrongExcludedMiddle.strong_excluded_middle (b=!=p) then accu.t b
 	else f
@@ -1396,7 +1397,7 @@ let rec up_taint_aux (ptrs:list b8{I.list_disjoint_or_eq ptrs})
 	          (ps:list b8)
 	          (accu:list b8{forall p. List.memP p ptrs <==> List.memP p ps \/ List.memP p accu})
 	          (memT:memtaint{correct_down_taint_aux memT addrs bytesT accu /\ memT.buffs == ptrs}) : 
-  GTot (newT:memtaint{correct_down_taint_aux newT addrs bytesT ptrs}) =
+  GTot (newT:memtaint{correct_down_taint_aux newT addrs bytesT ptrs /\ newT.buffs == ptrs}) =
   match ps with
     | [] -> memT
     | a::q ->
@@ -1407,8 +1408,34 @@ let up_taint bytesTaint mem =
   let memT:memtaint = ({buffs = mem.ptrs; t = (fun b -> default_of_taint)}) in
   up_taint_aux mem.ptrs mem.addrs bytesTaint mem.ptrs [] memT
 
-let up_down_identity memTaint mem = admit()
-let down_up_identity bytesTaint mem = admit()
+let up_down_identity memTaint mem =
+  let bytesT = down_taint memTaint mem in
+  let newT = up_taint bytesT mem in
+  // TODO: Need to enforce that memTaint and mem agree on buffers in scope
+  assume (mem.ptrs == memTaint.buffs);
+  let aux1 (b:b8{List.memP b memTaint.buffs}) : Lemma (newT.t b == memTaint.t b) =
+    assert(FunctionalExtensionality.gfeq (newT.t b) (memTaint.t b))
+  in Classical.forall_intro aux1;
+  let aux2 (b:b8{~ (List.memP b memTaint.buffs)}) : Lemma (newT.t b == memTaint.t b) =
+    assert(FunctionalExtensionality.gfeq (newT.t b) (memTaint.t b))
+  in Classical.forall_intro aux2;  
+  assert (FunctionalExtensionality.gfeq newT.t memTaint.t);
+  ()
+
+let down_up_identity bytesTaint mem =
+  let memT = up_taint bytesTaint mem in
+  let newT = down_taint memT mem in
+  assert (Set.equal (Map.domain newT) (Map.domain bytesTaint));
+  // TODO: We need to restrict memTaint to valid addresses.
+  // TODO:For valid addresses, the proof is below
+  let aux i : Lemma (Map.sel bytesTaint i == Map.sel newT i) =
+    assume (exists (b:b8{List.memP b mem.ptrs}). valid_buffer (TBase TUInt8) i b mem);
+    let b = get_addr_ptr (TBase TUInt8) i mem mem.ptrs in
+    length_t_eq (TBase TUInt8) b;
+    ()
+  in Classical.forall_intro aux;
+  assert (Map.equal newT bytesTaint);
+  ()
 
 let valid_taint_buf64 b memTaint t = 
   length_t_eq (TBase TUInt64) b;
