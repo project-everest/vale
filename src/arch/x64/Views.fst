@@ -3,7 +3,7 @@ module Views
 open LowStar.BufferView
 open Words_s
 open Types_s
-open Opaque_i
+open Opaque_s
 
 let get8_def (s:Seq.lseq UInt8.t 1) = Seq.index s 0
 let put8_def (x:UInt8.t) : GTot (Seq.lseq UInt8.t 1) =

@@ -7,28 +7,37 @@ typedef unsigned char byte;
 struct args
 {
     byte *plain_ptr;
-    uint64_t plain_len;
+    uint64_t plain_num_bytes;
     byte *auth_ptr;
-    uint64_t auth_len;
+    uint64_t auth_num_bytes;
     byte *iv_ptr;
     byte *expanded_key_ptr;
     byte *out_ptr;
     byte *tag_ptr;
 };
 
-extern "C" void aes_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
-extern "C" void gcm_encrypt(args *a);
+extern "C" void aes128_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
+extern "C" void gcm128_encrypt(args *a);
+extern "C" int gcm128_decrypt(args *a);
 
-byte key[16] =
-    { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-byte key_expansion[11 * 16];
+extern "C" void aes256_key_expansion(byte *key_ptr, byte *key_expansion_ptr);
+extern "C" void gcm256_encrypt(args *a);
+extern "C" int gcm256_decrypt(args *a);
 
-byte plain[16] =
-    { 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215 };
+
+byte key[32] =
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+     16,17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31 }; 
+byte key_expansion[15 * (128/8)];
+
+byte plain[32] =
+    { 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215,
+      216, 217, 218, 99,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+    };
 byte auth[1]; // actually size 0
 byte iv[16] =
     { 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 0, 0, 0, 0 };
-byte out[16];
+byte out[32];
 byte tag[16];
 
 void printbytes(char *label, byte *b, int len)
@@ -38,25 +47,32 @@ void printbytes(char *label, byte *b, int len)
     printf("\n");
 }
 
-int main()
+void test(void (*aes_key_expansion) (byte*, byte*),
+          void (*gcm_encrypt) (args*),
+          int  (*gcm_decrypt) (args*),
+          int num_rounds)
 {
-    printf("hello\n");
-
     args a;
     a.plain_ptr = plain;
-    a.plain_len = 1;
+    a.plain_num_bytes = 19;
     a.auth_ptr = auth;
-    a.auth_len = 0;
+    a.auth_num_bytes = 0;
     a.iv_ptr = iv;
     a.expanded_key_ptr = key_expansion;
     a.out_ptr = out;
     a.tag_ptr = tag;
     printbytes("key", key, 16);
     aes_key_expansion(key, key_expansion);
-    printbytes("key_expansion", key_expansion, 11 * 16);
+    printbytes("key_expansion", key_expansion, (num_rounds + 1) * 16);
     gcm_encrypt(&a);
-    printbytes("cipher", out, 16);
+    printbytes("cipher", out, 19);
     printbytes("tag", tag, 16);
+
+    a.out_ptr = plain;
+    a.plain_ptr = out;
+    int ret = gcm_decrypt(&a);
+    printf("gcm_decrypt returned %d\n", ret);
+    printbytes("plaintext", plain, 19);
 
     int nblocks = 256;
     byte *plain2 = new byte[nblocks * 16];
@@ -66,7 +82,7 @@ int main()
         plain2[i] = i % 256;
     }
     a.plain_ptr = plain2;
-    a.plain_len = nblocks;
+    a.plain_num_bytes = nblocks * 16;
     a.out_ptr = out2;
     for (int i = 0; i < 10; i++)
     {
@@ -82,6 +98,23 @@ int main()
     }
     printbytes("cipher", out2, 16);
     printbytes("tag", tag, 16);
+}
+
+int main()
+{
+    printf("hello\n");
+
+    printf("\nBeginning 128-bit test...\n");
+    test(aes128_key_expansion,
+         gcm128_encrypt,
+         gcm128_decrypt,
+         10);
+
+    printf("\nBeginning 256-bit test...\n");
+    test(aes256_key_expansion,
+         gcm256_encrypt,
+         gcm256_decrypt,
+         14);
 
     printf("goodbye\n");
     return 0;

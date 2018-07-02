@@ -25,7 +25,7 @@ if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machin
   target_arch='amd64'
   target_x='64'
   sha_arch_dir='sha-x64'
-  aes_arch_dir='aes-x64'
+  aes_arch_dir='x64'
   
 envDict = {'TARGET_ARCH':target_arch,
            'X':target_x,
@@ -50,7 +50,7 @@ if sys.platform == 'win32':
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
 else:
-  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128'])
+  env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128', '-std=c++11'])
   env['MONO'] = 'mono'
   env['NUGET'] = 'nuget'
 
@@ -626,7 +626,7 @@ def extract_fstar(env, sourcefile):
   Depends(mlfile, base_name + '.fst.verified')
   env = env.Clone(VERIFIER_FLAGS = env['VERIFIER_FLAGS'].replace("--use_extracted_interfaces true", ""))
   cmd_line = "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS"
-  cmd_line += " --odir obj/ml_out --codegen OCaml --extract_module " + module_name
+  cmd_line += " --odir obj/ml_out --codegen OCaml --admit_smt_queries true --extract_module " + module_name
   return env.Command(mlfile, sourcefile, cmd_line)
 
 # Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
@@ -728,26 +728,32 @@ def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name)
   # OCaml depends on many libraries and executables; we have to assume they are in the user's PATH:
   ocaml_env = Environment(ENV = {'PATH' : os.environ['PATH'], 'OCAMLPATH' : env['FSTAR_PATH'] + '/bin'})
   main_ml = ml_out_name(main_name, '.ml')
+  main_cmx = ml_out_name(main_name, '.cmx')
   main_exe = ml_out_name(main_name, '.exe')
   alg_ml = ml_out_name(alg_name, '.ml')
+  alg_cmx = ml_out_name(alg_name, '.cmx')
   cmdline_ml = ml_out_name(cmdline_name, '.ml')
+  cmdline_cmx = ml_out_name(cmdline_name, '.cmx')
   pointer_src = 'src/lib/util/FStar_Pointer_Base.ml'
   pointer_ml = ml_out_name(pointer_src, '.ml')
-  pointer_cmx = ml_out_name(pointer_src, '.ml')
+  pointer_cmx = ml_out_name(pointer_src, '.cmx')
   env.Command(pointer_ml, pointer_src, Copy("$TARGET", "$SOURCE"))
   env.Command(cmdline_ml, cmdline_name, Copy("$TARGET", "$SOURCE"))
   env.Command(main_ml, main_name, Copy("$TARGET", "$SOURCE"))
-  Depends(cmdline_ml, cmdline_name)
-  Depends(main_ml, cmdline_ml)
-  Depends(cmdline_ml, alg_ml)
-  Depends(main_ml, alg_ml)
+  Depends(cmdline_cmx, alg_cmx)
+  Depends(cmdline_cmx, cmdline_ml)
+  Depends(main_cmx, alg_cmx)
+  Depends(main_cmx, cmdline_cmx)
+  Depends(main_cmx, main_ml)
   done = set()
   cmxs = []
   def add_cmx(x_ml):
     x_cmx = ml_out_name(x_ml, '.cmx')
-    Depends(x_cmx, pointer_cmx)
+    if x_ml != pointer_ml:
+      Depends(x_cmx, pointer_cmx)
     cmx = ocaml_env.Command(x_cmx, x_ml, "ocamlfind ocamlopt -c -package fstarlib -o $TARGET $SOURCE -I obj/ml_out")
     cmxs.append(cmx[0])
+    Depends(main_exe, cmx[0])
   def collect_cmxs_in_order(x_ml):
     if not (x_ml in done):
       done.add(x_ml)
@@ -1184,10 +1190,10 @@ env.VerifyFilesIn(verify_paths)
 # build aesgcm
 #
 if fstar_extract and stage2:
-  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/aes-x64/Main.ml', 'src/crypto/aes/aes-x64/X64.GCMopt.vaf', 'src/lib/util/CmdLineParser.ml')
+  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/x64/Main.ml', 'src/crypto/aes/x64/X64.GCMdecrypt.vaf', 'src/lib/util/CmdLineParser.ml')
   if env['TARGET_ARCH'] == 'amd64': 
     aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
-    aesgcmtest_src = 'src/crypto/aes/aes-x64/TestAesGcm.cpp'
+    aesgcmtest_src = 'src/crypto/aes/x64/TestAesGcm.cpp'
     aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
     env.Command(aesgcmtest_cpp, aesgcmtest_src, Copy("$TARGET", "$SOURCE"))
     aesgcmtest_exe = env.Program(source = [aesgcmasm_obj, aesgcmtest_cpp], target = 'obj/TestAesGcm.exe')

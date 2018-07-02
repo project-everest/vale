@@ -1,5 +1,5 @@
 module X64.Bytes_Semantics_i
-open Opaque_i
+open Opaque_s
 
 #reset-options "--z3rlimit 100 --max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
 
@@ -58,6 +58,7 @@ let correct_update_get ptr v mem =
   reveal_opaque update_heap64_def
 
 let same_mem_get_heap_val32 ptr mem1 mem2 =
+assume False; // TODO
   reveal_opaque get_heap_val32_def;
   reveal_opaque update_heap32_def
 
@@ -82,7 +83,7 @@ let correct_update_get32 (ptr:int) (v:nat32) (mem:heap) : Lemma
   reveal_opaque get_heap_val32_def;
   reveal_opaque update_heap32_def
 
-#set-options "--z3rlimit 30"
+#reset-options "--z3rlimit 30 --using_facts_from 'Prims Opaque_s X64.Bytes_Semantics_s Words_s Types_s'"
 
 let correct_update_get128 ptr v s =
   reveal_opaque get_heap_val32_def;

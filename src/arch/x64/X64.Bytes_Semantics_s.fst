@@ -1,11 +1,12 @@
 module X64.Bytes_Semantics_s
 
-open Opaque_i
+open Opaque_s
 open X64.Machine_s
 open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
+open FStar.Seq.Base
 
 type uint64 = UInt64.t
 
@@ -34,8 +35,10 @@ type ins =
   | Pxor       : dst:xmm -> src:xmm -> ins
   | Pslld      : dst:xmm -> amt:int -> ins
   | Psrld      : dst:xmm -> amt:int -> ins
+  | Psrldq     : dst:xmm -> amt:int -> ins
   | Pshufb     : dst:xmm -> src:xmm -> ins  
   | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pcmpeqd    : dst:xmm -> src:xmm -> ins
   | Pextrq     : dst:operand -> src:xmm -> index:imm8 -> ins
   | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
   | Pinsrq     : dst:xmm -> src:operand -> index:imm8 -> ins
@@ -471,6 +474,16 @@ let eval_ins (ins:ins) : st unit =
     check_imm (0 <= amt && amt < 32);;
     update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
  
+  | Psrldq dst amt ->
+    check_imm (0 <= amt && amt < 16);;
+    let src_q = eval_xmm dst s in
+    let src_bytes = le_quad32_to_bytes src_q in
+    let abs_amt = if 0 <= amt && amt <= (length src_bytes) then amt else 0 in // F* can't use the check_imm above
+    let zero_pad = Seq.create abs_amt 0 in
+    let remaining_bytes = slice src_bytes abs_amt (length src_bytes) in
+    let dst_q = le_bytes_to_quad32 (append zero_pad remaining_bytes) in
+    update_xmm_preserve_flags dst dst_q
+
   | Pshufb dst src -> 
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
@@ -491,6 +504,18 @@ let eval_ins (ins:ins) : st unit =
          (select_word src_val bits.hi3)
     in
     update_xmm_preserve_flags dst permuted_xmm
+
+  | Pcmpeqd dst src ->
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    let eq_result (b:bool):nat32 = if b then 0xFFFFFFFF else 0 in
+    let eq_val = Mkfour
+        (eq_result (src_q.lo0 = dst_q.lo0))
+        (eq_result (src_q.lo1 = dst_q.lo1))
+        (eq_result (src_q.hi2 = dst_q.hi2))
+        (eq_result (src_q.hi3 = dst_q.hi3))
+    in
+    update_xmm_preserve_flags dst eq_val
 
   | Pextrq dst src index ->
     let src_q = eval_xmm src s in

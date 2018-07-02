@@ -4,17 +4,17 @@ module Words.Seq_s
 let two_to_seq_LE #a x =
   let l = [x.lo; x.hi] in
   let s = of_list l in
-  lemma_of_list_length s l; 
-  lemma_of_list s l 0;
-  lemma_of_list s l 1;
+  lemma_of_list_length l; 
+  lemma_of_list l 0;
+  lemma_of_list l 1;
   of_list l
 
 let two_to_seq_BE #a x =
   let l = [x.hi; x.lo] in
   let s = of_list l in
-  lemma_of_list_length s l; 
-  lemma_of_list s l 0;
-  lemma_of_list s l 1;
+  lemma_of_list_length l; 
+  lemma_of_list l 0;
+  lemma_of_list l 1;
   of_list l
 #reset-options
 
@@ -22,20 +22,20 @@ let two_to_seq_BE #a x =
 let four_to_seq_LE #a x =
   let l = [x.lo0; x.lo1; x.hi2; x.hi3] in
   let s = of_list l in
-  lemma_of_list_length s l; 
-  lemma_of_list s l 0;
-  lemma_of_list s l 1;
-  lemma_of_list s l 2;
-  lemma_of_list s l 3;  
+  lemma_of_list_length l; 
+  lemma_of_list l 0;
+  lemma_of_list l 1;
+  lemma_of_list l 2;
+  lemma_of_list l 3;  
   of_list l
 
 let four_to_seq_BE #a x =
   let l = [x.hi3; x.hi2; x.lo1; x.lo0] in
   let s = of_list l in
-  lemma_of_list_length s l; 
-  lemma_of_list s l 0;
-  lemma_of_list s l 1;
-  lemma_of_list s l 2;
-  lemma_of_list s l 3;  
+  lemma_of_list_length l; 
+  lemma_of_list l 0;
+  lemma_of_list l 1;
+  lemma_of_list l 2;
+  lemma_of_list l 3;  
   of_list l
 #reset-options

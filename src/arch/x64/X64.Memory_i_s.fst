@@ -147,8 +147,8 @@ let index64_get_heap_val64 h b heap i =
   BV.get_view_mk_buffer_view b uint64_view;
   BV.as_seq_sel h.hs vb i;
   BV.get_sel h.hs vb i;
-  Opaque_i.reveal_opaque S.get_heap_val64_def;
-  Opaque_i.reveal_opaque Views.get64_def;
+  Opaque_s.reveal_opaque S.get_heap_val64_def;
+  Opaque_s.reveal_opaque Views.get64_def;
   ()
 
 open Words_s
@@ -175,8 +175,8 @@ let index128_get_heap_val128_aux (s:Seq.lseq UInt8.t 16) (ptr:int) (heap:S.heap)
     (S.get_heap_val32 (ptr+4) heap)
     (S.get_heap_val32 (ptr+8) heap)
     (S.get_heap_val32 (ptr+12) heap)) =
-  Opaque_i.reveal_opaque S.get_heap_val32_def;
-  Opaque_i.reveal_opaque Views.get128_def;
+  Opaque_s.reveal_opaque S.get_heap_val32_def;
+  Opaque_s.reveal_opaque Views.get128_def;
   ()
 
 let index128_helper (x y:int) (heap:S.heap) : Lemma

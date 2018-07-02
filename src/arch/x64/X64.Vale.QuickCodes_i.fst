@@ -1,6 +1,6 @@
 module X64.Vale.QuickCodes_i
 
-#reset-options "--initial_ifuel 1 --z3rlimit 1000"
+#reset-options "--initial_ifuel 1 --z3rlimit 30"
 
 let lemma_label_Type0 (r:range) (msg:string) (p:Type0) : Lemma
   (requires True) (ensures label r msg p ==> p)

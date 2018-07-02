@@ -11,7 +11,7 @@ module HS = FStar.Monotonic.HyperStack
 module HH = FStar.Monotonic.HyperHeap
 module B = LowStar.Buffer
 
-open Opaque_i
+open Opaque_s
 open X64.Machine_s
 open X64.Bytes_Semantics_s
 open X64.Bytes_Semantics_i
