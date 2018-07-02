@@ -5,11 +5,9 @@ open FStar.Tactics.Canon
 open FStar.Math.Lemmas
 open FStar.Math.Lib
 open FStar.Mul
-open Calc
+// open Calc
 open X64.Vale.State_i   // needed for mem
 open X64.Poly1305.Bitvectors_i
-
-
 
 // private unfold let op_Star = op_Multiply
 
@@ -41,60 +39,76 @@ val swap_add: a:int -> b:int -> c:int -> Lemma
       (a + b + c = a + c + b)
 let swap_add a b c = ()
 
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 15"
+
+let lemma_mul_increases(x y:pos) :
+  Lemma (y <= y * x) = ()
+
+val multiplication_order_lemma_int: a:int -> b:int -> p:pos ->
+    Lemma (a < b <==> p * a < p * b)
+let multiplication_order_lemma_int a b p = ()
+
+val multiplication_order_eq_lemma_int: a:int -> b:int -> p:pos ->
+    Lemma (a <= b <==> p * a <= p * b)
+let multiplication_order_eq_lemma_int a b p = ()
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
 
 let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:int) (h1:int) 
 			(h2:int) (s1:int) (d0:int) (d1:int) (d2:int) (hh:int) =
-  admit ()
-(*
   let r1:nat = r1 in
   let helper_lemma (x:nat) (y:int) : Lemma 
     (ensures ((h2*n + h1)*((p+5)*x) + y + (h1*r0 + h0*r1)*n + h0*r0 ==
      	      y + (h0*r1 + h1*r0 + h2*(5*x))* n + 
     	      (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p)) =
      assert_by_tactic ((h2*n+h1)*((p+5)*x) == (h2*n+h1)*5*x + ((h2*n+h1)*x)*p) canon;
-    calc (
-      (h2*n + h1)*((p+5)*x) + (y + (h1*r0 + h0*r1)*n + h0*r0)
-      &= (h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0) &| using z3
-      &= (h2*n + h1)*5*x + (y + (h1*r0 + h0*r1)*n + h0*r0) + ((h2*n + h1)*x)*p &| 
-      	 using (swap_add ((h2*n + h1)*5*x) 
-			 (((h2*n + h1)*x)*p)
-      			 ((h2*r0)*(n*n) + (h1*r0 + h0*r1)*n + h0*r0))
-      &= y + (h0*r1 + h1*r0 + h2*(5*x))*n + (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p &|| canon
-      )
-  in
-    calc(  
-      h*r 
-      &= (h2*(n*n) + h1*n + h0)*(r1*n + r0) &| using z3
-      &= (h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0 &|| canon
-      &= ((h2*n+h1)*((p+5)*(r1/4)))+(h2*r0)*(n*n)+ 
-    	 (h1*r0+h0*r1)*n + h0*r0 &| using (slash_star_axiom (n*n) 4 (p+5);
-					   lemma_mul_div_comm (p+5) 4 r1; 
-					   z3)
-      &= (h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + 
-      	 (h0*r0 + h1*(5*(r1/4))) + ((h2*n + h1)*(r1/4))*p  &| using (helper_lemma (r1/4)
-								       ((h2*r0)*(n*n)); z3)
-     );
-      calc(
-      	r1 + (r1/4) 
-      	&= 5*(r1/4) &| using (comm_plus #r1 #(r1/4);
-      		              division_addition_lemma r1 4 r1;
-      			      lemma_mul_div_sep 5 4 r1)
-      );
-    // assumptions due to library requiring nats, can we switch to nats?
+     assert((h2*n + h1)*((p+5)*x) + (y + (h1*r0 + h0*r1)*n + h0*r0) =
+               (h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0));
+
+     (* by swap_add *)
+     swap_add ((h2*n + h1)*5*x) (((h2*n + h1)*x)*p)
+      			 ((h2*r0)*(n*n) + (h1*r0 + h0*r1)*n + h0*r0);
+     assert((h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0) =
+             (h2*n + h1)*5*x + (y + (h1*r0 + h0*r1)*n + h0*r0) + ((h2*n + h1)*x)*p);
+
+     assert_by_tactic ((h2*n + h1)*5*x + (y + (h1*r0 + h0*r1)*n + h0*r0) + ((h2*n + h1)*x)*p =
+		      y + (h0*r1 + h1*r0 + h2*(5*x))*n + (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p)
+		      canon
+     in
+     assert (h*r = (h2*(n*n) + h1*n + h0)*(r1*n + r0));
+     assert_by_tactic ((h2*(n*n) + h1*n + h0)*(r1*n + r0) =
+                        (h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0) canon;
+
+     (* by slash_star_axiom and lemma_mul_div_comm *)
+     slash_star_axiom (n*n) 4 (p+5);
+     lemma_mul_div_comm (p+5) 4 r1;
+     assert((h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0 =
+            ((h2*n+h1)*((p+5)*(r1/4)))+(h2*r0)*(n*n)+ (h1*r0+h0*r1)*n + h0*r0);
+
+    (* by helper_lemma *)
+     helper_lemma (r1/4) ((h2*r0)*(n*n));
+     assert(((h2*n+h1)*((p+5)*(r1/4)))+(h2*r0)*(n*n)+ (h1*r0+h0*r1)*n + h0*r0 =
+              (h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n +
+	      (h0*r0 + h1*(5*(r1/4))) + ((h2*n + h1)*(r1/4))*p);
+
+     (*by comm_plus, division_addition_lemma, lemma_mul_div_sep *)
+      comm_plus #r1 #(r1/4);
+      division_addition_lemma r1 4 r1;
+      lemma_mul_div_sep 5 4 r1;
+      assert(r1 + (r1/4) = 5*(r1/4));
+      assert (hh == (h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + 
+    			   h0*r0 + h1*(5*(r1/4)));
+     (* proof that ((h2*n + h1)*(r1/4))*p % p = 0 *)
+     // assumptions due to library requiring nats (because some operator is nat only)
+     //can we switch to nats?
       assume ((h2*n + h1) >= 0); 
       assume ((h2*n+h1)*(r1/4) >= 0);
       assume ((h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + (h0*r0 + h1*(5*(r1/4))) >= 0);
-      assert (hh == (h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + 
-    			   h0*r0 + h1*(5*(r1/4)));
-    (* proof that ((h2*n + h1)*(r1/4))*p % p = 0 *)
       multiple_modulo_lemma ((h2*n + h1)*(r1/4)) p;
-    (* and (a+b*p)%p = a%p*)
+      (* and (a+b*p)%p = a%p*)
       lemma_mod_plus ((h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + (h0*r0 + h1*(5*(r1/4))))
       	((h2*n + h1)*(r1/4)) p;
       assert ((h*r) % p == hh % p)
-*)
 
 let lemma_poly_reduce_nat (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) : Lemma
   (requires
@@ -107,35 +121,31 @@ let lemma_poly_reduce_nat (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh
     c == (h2 / 4) + (h2 / 4) * 4 /\
     hh == h10 + c + (h2 % 4) * (n * n))
   (ensures h % p == hh % p)
-  =
-assume False
-(*
-  lemma_div_mod h (n*n);
-  assert (h == (n*n)*h2 + h10);
-  calc(
-    h 
-      &= (n*n)*h2 + h10 &| using (lemma_div_mod h (n*n))
-      &= (n*n)*((h2 / 4) * 4 + h2 % 4) + h10 &| using z3
-      &= h10 + (h2 % 4)*(n*n) + (h2 / 4) * (p+5) &|| (admit_goal())
-// NS: used to be this
-//     But I can't see how that could have worked, since the lemma invocation of paren_mul_right doesn't help in this context
-//     Might have been relying on some Z3 flakiness
-// (paren_mul_right (h2/4) 4 (n*n); canon)
-      &= h10 + (h2 % 4)*(n*n) + (h2/4)*5 + p*(h2/4) &|| canon
-      &= h10 + (h2 % 4)*(n*n) + c + p*(h2/4) &| using z3
-      &= hh + p*(h2/4) &| using z3);
-  // proving hh >= 0, annoying
-  lemma_mod_lt h2 4;
-  lemma_mul_nat_pos_is_nat (h2 % 4) (n*n);
-  lemma_mod_lt h (n*n);
-  assert (hh >= 0); 
-  lemma_mod_plus hh (h2/4) p
-*)
+  = 
+   lemma_div_mod h (n*n);
+   assert (h == (n*n)*h2 + h10);
+
+   assert ((n*n)*h2 + h10 == (n*n)*((h2 / 4) * 4 + h2 % 4) + h10);
+   assert_by_tactic ((n*n)*((h2 / 4) * 4 + h2 % 4) + h10 == 
+		     (h2 / 4) * (n * n * 4) + (h2 % 4) * (n*n) + h10) canon;
+   assert_by_tactic (n * n * 4 = 4 * (n * n)) canon;
+   assert ((h2 / 4) * (n * n * 4) + (h2 % 4) * (n*n) + h10 == 
+		    (h2 / 4) * (p+5) + (h2 % 4) * (n*n) + h10);
+   assert_by_tactic ((h2 / 4) * (p+5) + (h2 % 4) * (n*n) + h10 == 
+	    h10 + (h2 % 4) * (n*n) + c + p*(h2 / 4)) canon;
+   assert (h10 + (h2 % 4) * (n*n) + c + p*(h2 / 4) == hh + p*(h2/4));
+   lemma_mod_lt h2 4;
+   lemma_mul_nat_pos_is_nat (h2 % 4) (n*n);
+   lemma_mod_lt h (n*n);
+   assert (hh >= 0); 
+   lemma_mod_plus hh (h2/4) p
+      
+
 let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
   lemma_poly_reduce_nat n p h h2 h10 c hh
 
 (* Provable, when we merge the UInt branch and use the lemmas 
-   from Poly1305_Bitvectors *)
+   from Poly1305_Bitvectors - operations here are abstract?*)
 let lemma_poly_bits64 () =
   admit ()
 
@@ -195,19 +205,113 @@ let lemma_mod_power2_lo (x0:nat64) (x1:nat64) (y:int) (z:int) =
     lemma_mod_factor_lo x0 x1 0x10000 0x1000000000000;
     lemma_mod_factor_lo x0 x1 0x100 0x100000000000000;
     lemma_bytes_power2 ();
-    admit()
+    reveal_opaque (lowerUpper128)
 
 let lemma_power2_add64 (n:nat) =
   pow2_plus 64 n;
   FStar.UInt.pow2_values 64
 
-//TODO: dafny proof seems tedious
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 15"
+
+let lemma_mul_increases(x y:pos) :
+  Lemma (y <= y * x) = ()
+
+val multiplication_order_lemma_int: a:int -> b:int -> p:pos ->
+    Lemma (a < b <==> p * a < p * b)
+let multiplication_order_lemma_int a b p = ()
+
+val multiplication_order_eq_lemma_int: a:int -> b:int -> p:pos ->
+    Lemma (a <= b <==> p * a <= p * b)
+let multiplication_order_eq_lemma_int a b p = ()
+
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
+
+(* lemma_div_mod <-> lemma_fundamental_div_mod *)
+let lemma_part_bound1(a:nat) (b:pos) (c:pos):
+  Lemma(0<b*c /\ b*(a/b) % (b*c) <= b * (c-1)) =
+    lemma_mul_pos_pos_is_pos b c;
+    lemma_div_mod (b*(a/b)) (b*c);
+    assert (b*(a/b) % (b*c) = b*(a/b) - (b*c)*((b*(a/b))/(b*c)));
+    assert_by_tactic (b*(a/b) - (b*c)*((b*(a/b))/(b*c)) == b*(a/b) - b*(c*((b*(a/b))/(b*c)))) 
+		     canon; // associativity of mul
+    distributivity_sub_right b (a/b) (c*((b*(a/b))/(b*c)));
+    assert (b*(a/b) - b*(c*((b*(a/b))/(b*c))) == b*((a/b) - (c*((b*(a/b))/(b*c)))));
+
+    lemma_mod_lt (b*(a/b)) (b*c);
+    assert (b*(a/b) % (b*c) < b*c);
+    assert (b*((a/b) - (c*((b*(a/b))/(b*c)))) < b*c);
+    multiplication_order_lemma_int (((a/b) - (c*((b*(a/b))/(b*c))))) c b;
+    assert (((a/b) - (c*((b*(a/b))/(b*c)))) < c);
+    assert (((a/b) - (c*((b*(a/b))/(b*c)))) <= c-1);
+    multiplication_order_eq_lemma_int ((a/b) - (c*((b*(a/b))/(b*c)))) (c-1) b;
+    assert (b*((a/b) - (c*((b*(a/b))/(b*c)))) <= b*(c-1));
+    assert (b*(a/b) % (b*c) <= b*(c-1))
+
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
+
+let lemma_lt_le_trans (a : nat) (b c : pos) :
+  Lemma (requires (a < b) /\ b <= c)
+	(ensures a < c) = ()
+
+let lemma_part_bound2 (a : nat) (b c: pos) :
+    Lemma(0 < b*c /\ (a%b)%(b*c) < b) = 
+    pos_times_pos_is_pos b c; 
+    lemma_mod_lt a b; // a%b < b
+    assert (0 <= a%b);
+    lemma_mul_increases c b; // b <= b * c
+    assert (a%b < b);
+    lemma_lt_le_trans (a%b) b (b*c);
+    assert (a%b < b * c);
+    modulo_lemma (a%b) (b*c)  
+
+let lemma_truncate_middle (x:nat) (b c:pos) :
+  Lemma (0 < b * c /\ (b*x)%(b*c) == b*(x%c)) =
+    pos_times_pos_is_pos b c;
+    nat_times_nat_is_nat b x; // or x%c
+    lemma_div_mod (b*x) (b*c);
+    assert (b*x == (b*c)*((b*x)/(b*c)) + (b*x)%(b*c));
+
+    division_multiplication_lemma (b*x) b c;
+    assert ((b*c)*((b*x)/(b*c)) + (b*x)%(b*c) == (b*c)*(((b*x)/b)/c) + (b*x)%(b*c));
+    swap_mul b x;
+    multiple_division_lemma x b;
+    assert((b*c)*(((b*x)/b)/c) + (b*x)%(b*c) == (b*c)*(x/c) + (b*x)%(b*c));
+
+    lemma_div_mod x c;
+    assert (b*x == b*(c*(x/c) + x%c));
+    distributivity_add_right b (c*(x/c)) (b*(x%c));
+    paren_mul_right b c (x/c)
+
 let lemma_mod_breakdown (a:nat) (b:pos) (c:pos) :
   Lemma(0<b*c /\ a%(b*c) == b * ((a/b)%c) + a%b) =
   lemma_mul_pos_pos_is_pos b c;
   nat_over_pos_is_nat a b;
-  admit ()
 
+  lemma_part_bound1 a b c;
+  assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) <= b*(c-1) + (a%b) % (b*c));
+  lemma_part_bound2 a b c;
+  assert (b*(c-1) + (a%b) % (b*c) <  b*(c-1) + b);
+  assert_by_tactic (b*(c-1) + b == b*c) canon;
+  assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) < b*c);
+
+  lemma_div_mod a b;
+  assert(a% (b*c) == (b*(a/b) + a%b) % (b*c));
+  lemma_mod_lt a b;
+  nat_over_pos_is_nat a b;
+  nat_times_nat_is_nat b (a/b);
+  assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) < b*c);
+  modulo_lemma ((b*(a/b)) % (b*c) + (a%b) % (b*c)) (b*c);
+  modulo_distributivity (b*(a/b)) (a%b) (b*c); // ((b*(a/b))%(b*c) + (a%b)%(b*c))%(b*c) = ((b*(a/b)) + 
+											  //(a%b))%(b*c)
+  assert ((b*(a/b) + a%b) % (b*c) == (b*(a/b)) % (b*c) + (a%b) % (b*c));
+  lemma_mul_increases c b; // b <= b*c
+  
+  swap_mul b (a/b);
+  modulo_lemma (a%b) (b*c);
+  assert ((a%b) % (b*c) == a%b);
+  assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) == (b*(a/b)) % (b*c) + a%b);
+  lemma_truncate_middle (a/b) b c 
+  
 
 #reset-options "--smtencoding.elim_box true --z3rlimit 8 --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr native"
 // using calc it was not even proving the first equation, look into this later
