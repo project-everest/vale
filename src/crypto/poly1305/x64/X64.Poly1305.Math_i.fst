@@ -211,19 +211,6 @@ let lemma_power2_add64 (n:nat) =
   pow2_plus 64 n;
   FStar.UInt.pow2_values 64
 
-#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 15"
-
-let lemma_mul_increases(x y:pos) :
-  Lemma (y <= y * x) = ()
-
-val multiplication_order_lemma_int: a:int -> b:int -> p:pos ->
-    Lemma (a < b <==> p * a < p * b)
-let multiplication_order_lemma_int a b p = ()
-
-val multiplication_order_eq_lemma_int: a:int -> b:int -> p:pos ->
-    Lemma (a <= b <==> p * a <= p * b)
-let multiplication_order_eq_lemma_int a b p = ()
-
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
 
 (* lemma_div_mod <-> lemma_fundamental_div_mod *)
@@ -313,8 +300,6 @@ let lemma_mod_breakdown (a:nat) (b:pos) (c:pos) :
   lemma_truncate_middle (a/b) b c 
   
 
-#reset-options "--smtencoding.elim_box true --z3rlimit 8 --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr native"
-// using calc it was not even proving the first equation, look into this later
 let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
   let n = 0x10000000000000000 in   
   assert(lowerUpper128 x0 x1 % lowerUpper128 0 z = (x1 * n + x0) % (z * n));
@@ -323,7 +308,7 @@ let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
   lemma_mod_plus x0 x1 n;
   assert (n * (((x1 * n + x0) / n) % z) + (x1 * n + x0) % n == n * (((x1 * n + x0) / n) % z) + x0 % n);
   assert(n * (((x1 * n + x0) / n) % z) + x0 % n == n * (x1 % z) + x0);
-  admit()
+  reveal_opaque(lowerUpper128)
   
 let lemma_poly_demod (p:pos) (h:int) (x:int) (r:int) =
   admit()
