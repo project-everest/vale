@@ -34,8 +34,9 @@ let disjoint_addr addr1 length1 addr2 length2 =
   addr1 + length1 < addr2 || addr2 + length2 < addr1
 
 type addr_map = (m:((B.buffer UInt8.t) -> nat64){
-  forall (buf1 buf2:B.buffer UInt8.t). B.disjoint buf1 buf2 ==> 
-    disjoint_addr (m buf1) (B.length buf1) (m buf2) (B.length buf2)})
+  (forall (buf1 buf2:B.buffer UInt8.t). B.disjoint buf1 buf2 ==> 
+    disjoint_addr (m buf1) (B.length buf1) (m buf2) (B.length buf2)) /\
+  (forall (b:B.buffer UInt8.t). m b + B.length b < pow2_64)})
 
 unfold
 let list_live mem ptrs = forall p . List.memP p ptrs ==> B.live mem p
