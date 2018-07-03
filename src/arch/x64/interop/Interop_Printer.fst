@@ -230,11 +230,6 @@ let translate_lowstar os target (func:func_ty) =
   "open Vale_" ^ name ^ "\n\n" ^
   "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)\n\n" ^
   "let b8 = B.buffer UInt8.t\n\n" ^
-  "//This lemma will be available in the next version of Low*\n" ^
-  "assume val buffers_disjoint (b1 b2:b8) : Lemma
-  (requires M.loc_disjoint (M.loc_buffer b1) (M.loc_buffer b2))
-  (ensures B.disjoint b1 b2)
-  [SMTPat (B.disjoint b1 b2)]\n\n" ^
   "//The map from buffers to addresses in the heap, that remains abstract\n" ^
   "assume val addrs: addr_map\n\n" ^  
    "let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =\n" ^
@@ -320,15 +315,23 @@ let rec print_buff_readable = function
   | [] -> ""
   | (a, _)::q -> "        buffer_readable(mem, "^a^");\n" ^ print_buff_readable q
 
-//TODO
-let print_vale_calling_stack (args:list arg) = ""
+let print_vale_arg_value = function
+  | (a, TBuffer ty) -> "buffer_addr(" ^ a ^ ", mem)"
+  | (a, TBase ty) -> a
+
+let print_vale_calling_stack (args:list arg) =
+  let rec aux (i:nat) (args:list arg) : Tot string (decreases %[args])  =
+  match args with
+  | [] -> ""
+  | a::q -> "        buffer_read(stack_b, " ^ (string_of_int i) ^ ", mem) == " ^  print_vale_arg_value a ^ ";\n" ^ aux (i+1) q
+  in aux 0 args
 
 let print_calling_args os target (args:list arg) =
   let rec aux regs (args:list arg) =
   match regs, args with
     | [], q -> print_vale_calling_stack q
     | _, [] -> ""
-    | r1::rn, (a, _)::q -> "        " ^ r1 ^ " == buffer_addr(" ^ a ^ ");\n" ^ aux rn q
+    | r1::rn, a::q -> "        " ^ r1 ^ " == " ^ print_vale_arg_value a ^ ";\n" ^ aux rn q
   in aux (calling_registers os target) args
 
 let print_callee_saved os target =
@@ -339,12 +342,12 @@ let print_callee_saved os target =
 
 let translate_vale os target (func:func_ty) =
   let name, args = func in
-  let args = ("stack_b", TBuffer TUInt64)::args in
   let buffer_args = List.Tot.Base.filter is_buffer args in
   let nbr_stack_args = List.Tot.Base.length args - 
     List.Tot.Base.length (calling_registers os target) in
   let length_stack = nbr_stack_args `op_Multiply` 8 in
   let stack_needed = nbr_stack_args > 0 in  
+  let args = ("stack_b", TBuffer TUInt64)::args in
   "module Vale_" ^ name ^
   "\n#verbatim{:interface}{:implementation}\n" ^ 
   "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^
@@ -352,7 +355,12 @@ let translate_vale os target (func:func_ty) =
   "    requires/ensures\n" ^
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
   print_buff_readable args ^
-  print_calling_args os target args ^
+  (if stack_needed then
+  "    requires\n" ^
+  "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int nbr_stack_args) ^ ");\n"
+  else "") ^
+  // Called on the tail because stack_b is not a real argument
+  print_calling_args os target (List.Tot.Base.tl args) ^
   "    ensures\n" ^ print_callee_saved os target ^ 
   "    modifies\n" ^
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^

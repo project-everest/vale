@@ -22,12 +22,6 @@ assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS
 
 let b8 = B.buffer UInt8.t
 
-//This lemma will be available in the next version of Low*
-assume val buffers_disjoint (b1 b2:b8) : Lemma
-  (requires M.loc_disjoint (M.loc_buffer b1) (M.loc_buffer b2))
-  (ensures B.disjoint b1 b2)
-  [SMTPat (B.disjoint b1 b2)]
-
 //The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
 

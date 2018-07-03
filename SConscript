@@ -103,6 +103,7 @@ verify_options = {
   'tools/Vale/test/tactics1.vaf': None,
   'src/arch/x64/interop/*.fst': None,
   'src/arch/x64/interop/*.fsti': None,
+  'src/arch/x64/interop/*.vaf': None,
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
