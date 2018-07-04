@@ -46,11 +46,11 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src
         efl; trace;
     requires
         valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
         src + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
         dst == old(add_wrap(dst, buffer64_read(b, index, mem)));
         cf(efl) == old(dst + buffer64_read(b, index, mem) >= pow2_64);
 {
@@ -74,11 +74,11 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_re
         efl; trace;
     requires
         valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
         src + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
         dst == old(add_wrap(add_wrap(dst, buffer64_read(b, index, mem)), (if cf(efl) then 1 else 0)));
         cf(efl) == old(dst + buffer64_read(b, index, mem) + (if cf(efl) then 1 else 0) >= pow2_64);
 {
@@ -100,11 +100,11 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
         trace;
     requires
         valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
         src + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         dst == buffer64_read(b, index, mem);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
 {
     lemma_valid_mem64(b, index, mem);
     lemma_load_mem64(b, index, mem);
@@ -123,12 +123,12 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
         mem; trace;
     requires
         valid_dst_addr(mem, b, index);
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
         dst + offset == buffer_addr(b, mem) + 8 * index;
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
         mem == old(buffer64_write(b, index, src, mem));
-        valid_taint_buf64(b, memTaint, t);
+        valid_taint_buf64(b, mem, memTaint, t);
 {
     lemma_valid_mem64(b, index, old(mem));
     lemma_store_mem64(b, index, old(src), old(mem));

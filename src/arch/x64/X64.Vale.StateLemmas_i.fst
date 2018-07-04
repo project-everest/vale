@@ -20,7 +20,7 @@ let state_to_S (s:state) : GTot TS.traceState =
   } in
   { ME.state = s'; ME.mem = s.mem});
   TS.trace = s.trace;
-  TS.memTaint = ME.down_taint s.memTaint s.mem;
+  TS.memTaint = s.memTaint;
   }
 
 let state_of_S (s:TS.traceState) : GTot state =
@@ -33,7 +33,7 @@ let state_of_S (s:TS.traceState) : GTot state =
     flags = flags;
     mem = mem;
     trace = s.TS.trace;
-    memTaint = ME.up_taint s.TS.memTaint mem;
+    memTaint = s.TS.memTaint;
   }
 
 let lemma_to_ok s = ()
@@ -42,15 +42,13 @@ let lemma_to_mem s = ()
 let lemma_to_reg s r = ()
 let lemma_to_xmm s x = ()
 let lemma_to_trace s = ()
-let lemma_to_memTaint s = ME.up_down_identity s.memTaint s.mem
-let lemma_to_memTaint2 s = ()
+let lemma_to_memTaint s = ()
 let lemma_to_eval_operand s o = ()
 let lemma_to_eval_xmm s x = ()
 let lemma_to_valid_operand s o = ()
 let lemma_to_valid_taint s o t = ()
 
 let lemma_of_to s =
-  ME.up_down_identity s.memTaint s.mem;
   assert (state_eq s (state_of_S (state_to_S s)));
   ()
 
@@ -64,7 +62,6 @@ let lemma_to_of s =
   assert (feq regs regs'');
   assert (feq xmms xmms'');
   ME.same_heap s.TS.state s''.TS.state;
-  ME.down_up_identity s.TS.memTaint mem;
   ()
 
 let lemma_valid_taint64 = ME.lemma_valid_taint64

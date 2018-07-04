@@ -297,7 +297,7 @@ let validSrcAddrs64 (m:M.mem) (addr:int) (b:M.buffer64) (len:int) (memTaint:M.me
     buffer_readable m b /\
     len <= buffer_length b /\
     M.buffer_addr b m == addr /\ 
-    M.valid_taint_buf64 b memTaint t
+    M.valid_taint_buf64 b m memTaint t
 
 unfold 
 let validDstAddrs64 = validSrcAddrs64
@@ -306,13 +306,13 @@ let validSrcAddrs128 (m:M.mem) (addr:int) (b:M.buffer128) (len:int) (memTaint:M.
     buffer_readable m b /\
     len <= buffer_length b /\
     M.buffer_addr b m == addr /\
-    M.valid_taint_buf128 b memTaint t
+    M.valid_taint_buf128 b m memTaint t
 
 let validDstAddrs128 (m:M.mem) (addr:int) (b:M.buffer128) (len:int) (memTaint:M.memtaint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
     M.buffer_addr b m == addr /\
-    M.valid_taint_buf128 b memTaint t
+    M.valid_taint_buf128 b m memTaint t
 
 let valid_stack_slots (m:M.mem) (rsp:int) (b:M.buffer64) (num_slots:int) =
     buffer_readable m b /\

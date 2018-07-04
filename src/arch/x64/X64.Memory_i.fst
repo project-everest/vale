@@ -90,3 +90,6 @@ let memtaint = M.memtaint
 
 let valid_taint_buf64 = M.valid_taint_buf64
 let valid_taint_buf128 = M.valid_taint_buf128
+
+let modifies_valid_taint64 = M.modifies_valid_taint64
+let modifies_valid_taint128 = M.modifies_valid_taint128

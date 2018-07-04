@@ -279,5 +279,19 @@ val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
 
 val memtaint: Type u#0
 
-val valid_taint_buf64: (b:buffer64) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
-val valid_taint_buf128: (b:buffer128) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
+val valid_taint_buf64: (b:buffer64) -> (mem:mem) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
+val valid_taint_buf128: (b:buffer128) -> (mem:mem) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
+
+val modifies_valid_taint64 (b:buffer64) (p:loc) (h h':mem) (memTaint:memtaint) (t:taint) : Lemma
+  (requires
+    modifies p h h'
+  )
+  (ensures valid_taint_buf64 b h memTaint t <==> valid_taint_buf64 b h' memTaint t)
+  [SMTPat (modifies p h h'); SMTPat (valid_taint_buf64 b h' memTaint t)]
+
+val modifies_valid_taint128 (b:buffer128) (p:loc) (h h':mem) (memTaint:memtaint) (t:taint) : Lemma
+  (requires
+    modifies p h h'
+  )
+  (ensures valid_taint_buf128 b h memTaint t <==> valid_taint_buf128 b h' memTaint t)
+  [SMTPat (modifies p h h'); SMTPat (valid_taint_buf128 b h' memTaint t)]

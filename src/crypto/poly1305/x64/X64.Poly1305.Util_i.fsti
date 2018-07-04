@@ -77,7 +77,7 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:memtaint
     buffer_readable m b /\
     len <= buffer_length b /\
     buffer_addr b m == addr /\
-    valid_taint_buf64 b memTaint t
+    valid_taint_buf64 b m memTaint t
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
