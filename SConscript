@@ -106,6 +106,7 @@ verify_options = {
   'tools/Vale/test/tactics1.vaf': None,
   'src/arch/x64/interop/*.fst': None,
   'src/arch/x64/interop/*.fsti': None,
+  'src/arch/x64/interop/*.vaf': None,
   'src/crypto/aes/*': None,
   'src/crypto/aes/AES_s.fst': BuildOptions(fstar_default_args),
 

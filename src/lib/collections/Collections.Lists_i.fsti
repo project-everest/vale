@@ -41,13 +41,13 @@ val lemma_from_list_le (l:list bool) : Lemma
   (ensures (
     let rl = List.rev l in
     let s = of_list rl in
-    lemma_of_list_length s rl;
+    lemma_of_list_length rl;
     from_list_le l == from_vec #(List.length rl) s
   ))
 
 val lemma_from_list_be (l:list bool) : Lemma
   (ensures (
     let s = of_list l in
-    lemma_of_list_length s l;
+    lemma_of_list_length l;
     from_list_be l == from_vec #(List.length l) s
   ))
