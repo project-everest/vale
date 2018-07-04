@@ -12,8 +12,10 @@ type ty =
   | TBuffer of base_type
   | TBase of base_type
 
+type stack_slots = | Stk of nat
+
 type arg = string * ty
-type func_ty = string * list arg
+type func_ty = string * list arg * stack_slots
 
 type os = | Windows | Linux
 type target = | X86
@@ -204,10 +206,10 @@ let rec print_args_vale_list = function
   | (a,ty)::q -> "(" ^ a ^ ":" ^ print_vale_full_ty ty ^ ") " ^ print_args_vale_list q
 
 let translate_lowstar os target (func:func_ty) =
-  let name, args = func in
+  let name, args, Stk slots = func in
   let buffer_args = List.Tot.Base.filter is_buffer args in
   let real_args = List.Tot.Base.filter not_ghost args in
-  let nbr_stack_args = List.Tot.Base.length real_args - 
+  let nbr_stack_args = slots + List.Tot.Base.length real_args - 
     List.Tot.Base.length (calling_registers os target) in
   let length_stack = nbr_stack_args `op_Multiply` 8 in
   let stack_needed = nbr_stack_args > 0 in
@@ -354,9 +356,9 @@ let print_callee_saved os target =
   in aux (callee_saved os target)
 
 let translate_vale os target (func:func_ty) =
-  let name, args = func in
+  let name, args, Stk slots = func in
   let real_args = List.Tot.Base.filter not_ghost args in
-  let nbr_stack_args = List.Tot.Base.length real_args - 
+  let nbr_stack_args = slots + List.Tot.Base.length real_args - 
     List.Tot.Base.length (calling_registers os target) in
   let stack_needed = nbr_stack_args > 0 in  
   let args = ("stack_b", TBuffer TUInt64)::args in
@@ -376,6 +378,6 @@ let translate_vale os target (func:func_ty) =
   "    ensures\n" ^ print_callee_saved os target ^ 
   "    modifies\n" ^
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^
-  "        xmm0; xmm1; xmm2; xmM3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15\n;" ^
+  "        xmm0; xmm1; xmm2; xmM3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;\n" ^
   "        efl; mem;\n"^
   "{\n\n}\n"

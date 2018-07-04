@@ -10,9 +10,10 @@ let gcmencrypt = ("gcmencrypt", [
   ("iv_b", TBuffer TUInt128); 
   ("key", TGhost "aes_key_LE AES_128"); ("keys_b", TBuffer TUInt128);
   ("cipher_b", TBuffer TUInt128); ("tag_b", TBuffer TUInt128)
-  ])
+  ],
+    Stk (Prims.parse_int "18"))
 
-let os = Windows 
+let os = Linux
 
 let _ = print_string (translate_vale os X86 gcmencrypt)
 let _ = print_newline()

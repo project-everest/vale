@@ -5,7 +5,6 @@ open X64.Machine_s
 open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
-open AES_s
 #set-options "--z3rlimit 20"
 #endverbatim
 
@@ -20,7 +19,7 @@ procedure gcmencrypt(ghost stack_b:buffer64, ghost plain_b:buffer128, ghost plai
         buffer_readable(mem, cipher_b);
         buffer_readable(mem, tag_b);
     requires
-        valid_stack_slots(mem, rsp, stack_b, 2);
+        valid_stack_slots(mem, rsp, stack_b, 20);
         rdi == buffer_addr(plain_b, mem);
         rsi == plain_num_bytes;
         rdx == buffer_addr(auth_b, mem);
@@ -38,7 +37,8 @@ procedure gcmencrypt(ghost stack_b:buffer64, ghost plain_b:buffer128, ghost plai
         r15 == old(r15);
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
-        mem;
+        xmm0; xmm1; xmm2; xmM3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
 {
 
 }
