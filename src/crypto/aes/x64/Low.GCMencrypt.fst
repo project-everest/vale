@@ -35,11 +35,94 @@ open FStar.Mul
 let seq_U8_to_seq_nat8 (b:seq U8.t) : (seq nat8) =
   Seq.init (length b) (fun (i:nat { i < length b }) -> U8.v (index b i))
 
-assume val aes128_encrypt_block (input:quad32) 
-                                (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
-                              : Stack quad32 
+assume val quad32_to_buffer (q:quad32) (b:B.buffer U8.t) : Stack unit
   (requires fun h -> True)
-  (ensures fun h output h' -> True)                            
+  (ensures fun h () h' -> M.modifies (M.loc_buffer b) h h')
+
+assume val buffer_to_quad32 (b:B.buffer U8.t) : Stack quad32
+  (requires fun h -> True)
+  (ensures fun h q h' -> M.modifies M.loc_none h h')
+
+let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t { B.length keys_b % 16 == 0 }) (h:HS.mem) =
+  let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
+  let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
+  BV.as_seq h keys128_b == round_keys
+
+let keys_match' (key:Ghost.erased (aes_key_LE AES_128)) (keys128_b:BV.buffer quad32) (h:HS.mem) =
+  let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
+  BV.as_seq h keys128_b == round_keys
+
+assume val aes128_encrypt_block_buffer 
+             (input_b output_b:B.buffer U8.t) 
+             (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
+             : Stack unit 
+  (requires fun h -> 
+    B.live h input_b /\ B.live h keys_b /\ B.live h output_b /\
+    B.length  input_b % 16 == 0 /\ B.length  input_b >= 16 /\
+    B.length output_b % 16 == 0 /\ B.length output_b >= 16 /\    
+    // AES reqs
+    B.length keys_b == (nr AES_128 + 1) * 16 /\
+    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    keys_match key keys_b h (*
+    (let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
+     let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
+     BV.as_seq h keys128_b == round_keys)  
+    *)
+  )
+  (ensures fun h () h' -> 
+    B.live h' input_b /\ B.live h' keys_b /\
+    M.modifies (M.loc_buffer output_b) h h' /\
+    (let  input128_b = BV.mk_buffer_view  input_b Views.view128 in
+     let output128_b = BV.mk_buffer_view output_b Views.view128 in
+     BV.length input128_b > 1 /\ BV.length output128_b > 1 /\
+    (let  input_q = index (BV.as_seq h   input128_b) 0 in 
+     let output_q = index (BV.as_seq h' output128_b) 0 in
+     output_q == aes_encrypt_LE AES_128 (Ghost.reveal key) input_q))
+  )         
+
+(*
+let aes128_encrypt_block (input:quad32) 
+                         (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
+                        : Stack quad32 
+  (requires fun h ->
+    // AES reqs
+    B.live h keys_b /\
+    B.length keys_b == (nr AES_128 + 1) * 16 /\
+    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    keys_match key keys_b h (*
+    (let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
+     let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
+     BV.as_seq h keys128_b == round_keys)  
+     *)
+  )
+  (ensures fun h output h' -> 
+    //modifies_none h h' /\
+    //output == aes_encrypt_LE AES_128 (Ghost.reveal key) input
+    True
+  )                            
+  = 
+  //Call these lemmas explicitly to relate a buffer view back to the underlying buffer
+  BV.as_buffer_mk_buffer_view keys_b Views.view128;
+  BV.get_view_mk_buffer_view keys_b Views.view128;
+  BV.length_eq (BV.mk_buffer_view keys_b Views.view128);
+  let h0 = ST.get() in
+  //assert (keys_match key keys_b h0);
+  assert (keys_match' key (BV.mk_buffer_view keys_b Views.view128) h0);
+  push_frame ();
+  let h1 = ST.get() in
+  //assert (keys_match key keys_b h1);
+  assert (keys_match' key (BV.mk_buffer_view keys_b Views.view128) h1);
+  // TODO: Future work: Pass a pointer to the struct, instead of copying to a bytes buffer
+  let  input_b = magic() in // B.alloca 0uy 16ul in
+  let output_b = magic() in //B.alloca 0uy 16ul in
+  //quad32_to_buffer input input_b;
+  assume (B.live h1 input_b /\ B.live h1 keys_b /\ B.live h1 output_b);
+  assume (B.length  input_b % 16 == 0 /\ B.length  input_b >= 16 /\
+    B.length output_b % 16 == 0 /\ B.length output_b >= 16);
+  aes128_encrypt_block_buffer input_b output_b key keys_b;
+  let output = buffer_to_quad32 output_b in
+  pop_frame ();
+  output
 
 assume val ghash_incremental_bytes (h old_hash:quad32) (input_b:B.buffer U8.t) (num_bytes:U64.t) : Stack quad32
   (requires fun h -> True)
@@ -54,9 +137,7 @@ assume val gcm128_one_pass
   (requires fun h -> True)
   (ensures fun h new_hash h' -> True) 
 
-assume val quad32_to_buffer (q:quad32) (b:B.buffer U8.t) : Stack unit
-  (requires fun h -> True)
-  (ensures fun h () h' -> True)
+
 
 let gcm_core (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
              (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
@@ -100,7 +181,7 @@ let gcm128_encrypt (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t)
                    (iv_b:B.buffer U8.t) 
                    (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
                    (cipher_b:B.buffer U8.t)
-                   (tag_b:B.buffer U8.t) : ST unit
+f                   (tag_b:B.buffer U8.t) : ST unit
   (requires fun h ->  h `B.live` plain_b /\
                    h `B.live` auth_b /\
                    h `B.live` keys_b /\
@@ -167,3 +248,4 @@ let gcm128_encrypt (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t)
   =
   // TODO: Call stub generated by Aymeric's interop
   admit()
+*)
