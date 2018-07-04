@@ -227,6 +227,7 @@ procedure{:quick} AddRaxG(ghost g:int)
     Add64(rax, 1);
 }
 
+/*
 procedure Incr3(ghost g:int)
     modifies
         efl;
@@ -242,6 +243,7 @@ procedure Incr3(ghost g:int)
     AddRaxG(g + 1);
     Add64(rax, 1);
 }
+*/
 
 procedure{:quick} While(ghost g1:int) returns(ghost go:int)
     modifies

@@ -210,7 +210,14 @@ let wp_sound_code #a c qc k s0 =
   (sM, f0, g)
 
 let wp_sound_wrap #a cs qcs s0 k = wp_sound cs qcs (k s0) s0; wp_monotone cs qcs (k s0) k_true s0; wp_compute cs qcs s0
-let wp_sound_code_wrap #a c qc s0 k = wp_sound_code c qc (k s0) s0
+
+let wp_sound_code_wrap #a c qc s0 k =
+  let {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem} = s0 in
+  let regs' = Map16_i.eta regs in
+  let xmms' = Map16_i.eta xmms in
+  let s0' = {ok = ok; regs = regs'; xmms = xmms'; flags = flags; mem = mem} in
+  assert (QProc?.wp qc s0' (k s0'));
+  wp_sound_code c qc (k s0) s0
 
 irreducible
 val wp_wrap_monotone (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k1:state -> a -> Type0) (k2:state -> a -> Type0) (s0:state) : Lemma
@@ -305,5 +312,15 @@ let wp_run_code #a c qc s0 update post =
   (sN, fN, gN)
 
 let wp_sound_norm = wp_sound_wrap
-let wp_sound_code_norm = wp_sound_code_wrap
+
+let assert_normal (p:Type) : Lemma
+  (requires normal p)
+  (ensures p)
+  =
+  ()
+
+let wp_sound_code_norm #a c qc s0 k =
+  assert_normal (wp_sound_code_pre qc s0 k);
+  wp_sound_code_wrap c qc s0 k
+
 let wp_run_norm = wp_run

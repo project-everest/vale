@@ -26,7 +26,7 @@ include "../../../../arch/x64/X64.Vale.InsMem.vaf"
 
 module X64.Poly1305
 
-#reset-options "--z3rlimit 30"
+#reset-options "--z3rlimit 60"
 
 #verbatim{:interface}{:implementation}
 open Opaque_s
