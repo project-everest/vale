@@ -1,0 +1,44 @@
+module Vale_gcmencrypt
+#verbatim{:interface}{:implementation}
+
+open X64.Machine_s
+open X64.Memory_i_s
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open AES_s
+#set-options "--z3rlimit 20"
+#endverbatim
+
+procedure gcmencrypt(ghost stack_b:buffer64, ghost plain_b:buffer128, ghost plain_num_bytes:nat64, ghost auth_b:buffer128, ghost auth_num_bytes:nat64, ghost iv_b:buffer128, ghost key:(aes_key_LE AES_128), ghost keys_b:buffer128, ghost cipher_b:buffer128, ghost tag_b:buffer128)
+    requires/ensures
+        locs_disjoint(list(loc_buffer(stack_b), loc_buffer(plain_b), loc_buffer(auth_b), loc_buffer(iv_b), loc_buffer(keys_b), loc_buffer(cipher_b), loc_buffer(tag_b)));
+        buffer_readable(mem, stack_b);
+        buffer_readable(mem, plain_b);
+        buffer_readable(mem, auth_b);
+        buffer_readable(mem, iv_b);
+        buffer_readable(mem, keys_b);
+        buffer_readable(mem, cipher_b);
+        buffer_readable(mem, tag_b);
+    requires
+        valid_stack_slots(mem, rsp, stack_b, 2);
+        rdi == buffer_addr(plain_b, mem);
+        rsi == plain_num_bytes;
+        rdx == buffer_addr(auth_b, mem);
+        rcx == auth_num_bytes;
+        r8 == buffer_addr(iv_b, mem);
+        r9 == buffer_addr(keys_b, mem);
+        buffer_read(stack_b, 0, mem) == buffer_addr(cipher_b, mem);
+        buffer_read(stack_b, 1, mem) == buffer_addr(tag_b, mem);
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        mem;
+{
+
+}

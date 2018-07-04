@@ -8,6 +8,7 @@ type base_type =
   | TUInt128
 
 type ty =
+  | TGhost of string // Ghost parameter of type given as a string
   | TBuffer of base_type
   | TBase of base_type
 
@@ -35,6 +36,7 @@ let print_low_nat_ty = function
   | TUInt128 -> "nat128"
 
 let print_low_ty = function
+  | TGhost ty -> "Ghost.erased (" ^ ty ^ ")"
   | TBuffer ty -> "b8"
   | TBase ty -> print_low_nat_ty ty
 
@@ -54,6 +56,12 @@ let rec print_args_names = function
   | [] -> ""
   | (a, _)::q -> a ^ " " ^ print_args_names q  
 
+let rec print_args_names_reveal = function
+  | [] -> ""
+  | (a, TGhost _)::q -> "(Ghost.reveal " ^ a ^ ") " ^ print_args_names_reveal q
+  | (a, _)::q -> a ^ " " ^ print_args_names_reveal q
+
+
 let rec print_buffers_list = function
   | [] -> "[]"
   | (a,ty)::q -> 
@@ -63,14 +71,16 @@ let rec print_buffers_list = function
 let is_buffer arg =
   let _, ty = arg in TBuffer? ty
 
+let not_ghost (a, ty) = not (TGhost? ty)
+
 let rec liveness heap args =
   let args = List.Tot.Base.filter is_buffer args in
   let rec aux heap = function
   | [] -> "True"
   | [(a,TBuffer ty)] -> "live " ^ heap ^ " " ^ a 
-  | [(a, TBase ty)] -> "" // Should not happen
+  | [(a, TBase ty)] | [(a, TGhost ty)] -> "" // Should not happen
   | (a, TBuffer ty)::q -> "live " ^ heap ^ " " ^ a ^ " /\\ " ^ aux heap q
-  | (a, TBase ty)::q -> aux heap q // Should not happen
+  | (a, TBase ty)::q | (a, TGhost ty)::q -> aux heap q // Should not happen
   in aux heap args
 
 let print_base_type = function
@@ -79,7 +89,7 @@ let print_base_type = function
   | TUInt128 -> "(TBase TUInt128)"
 
 let single_length_t (arg: arg) = match arg with
-  | (_, TBase _) -> ""
+  | (_, TBase _) | (_, TGhost _) -> ""
   | (a, TBuffer ty) -> "  length_t_eq " ^ print_base_type ty ^ " " ^ a ^ ";\n"
 
 let rec print_length_t = function
@@ -96,9 +106,6 @@ let namelist_of_args args =
 let disjoint args =
   let args = List.Tot.Base.filter is_buffer args in
   "locs_disjoint " ^ namelist_of_args args
-
-let enough_registers os target args = 
-  List.Tot.Base.length args <= List.Tot.Base.length (calling_registers os target)
 
 let reg_to_low = function
   | "rax" -> "Rax"
@@ -119,10 +126,10 @@ let reg_to_low = function
   | "r15" -> "R15"
   | _ -> "error"
 
-// TODO
 let print_low_calling_stack (args:list arg) =
   let rec aux (i:nat) (args:list arg) : Tot string (decreases %[args]) = match args with
     | [] -> ""
+    | (_, TGhost _)::q -> aux i q // We ignore ghost parameters
     | (a, TBase _)::q -> "  let mem = buffer_write #(TBase TUInt64) stack_b " ^ (string_of_int i) ^ " " ^ a ^ " mem in\n" ^ aux (i+1) q
     | (a, TBuffer _)::q -> "  let mem = buffer_write #(TBase TUInt64) stack_b " ^ (string_of_int i) ^ " (addrs " ^ a ^ ") mem in\n" ^ aux (i+1) q
   in aux 0 args
@@ -132,6 +139,7 @@ let print_low_calling_args os target (args:list arg) =
   match regs, args with
     | [], q -> "    | _ -> init_regs r end in\n" ^ print_low_calling_stack q
     | _, [] -> "    | _ -> init_regs r end in\n"
+    | re, (_, TGhost _)::q -> aux re q // We ignore ghost parameters
     | r1::rn, (a, ty)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
       (if TBuffer? ty then "addr_" ^ a else a) ^ 
       "\n" ^ aux rn q
@@ -154,7 +162,7 @@ let size = function
   | TUInt128 -> "16"
 
 let print_length = function
-  | (a, TBase _) -> ""
+  | (_, TBase _) | (_, TGhost _) -> ""
   | (a, TBuffer ty) -> "length " ^ a ^ " % " ^ (size ty) ^ " == 0"
 
 let print_lengths args =
@@ -187,6 +195,7 @@ let print_vale_ty = function
   | TUInt128 -> "quad32"
 
 let print_vale_full_ty = function
+  | TGhost ty -> "(" ^ ty ^ ")"
   | TBase ty -> print_vale_ty ty
   | TBuffer ty -> print_vale_bufferty ty
 
@@ -197,7 +206,8 @@ let rec print_args_vale_list = function
 let translate_lowstar os target (func:func_ty) =
   let name, args = func in
   let buffer_args = List.Tot.Base.filter is_buffer args in
-  let nbr_stack_args = List.Tot.Base.length args - 
+  let real_args = List.Tot.Base.filter not_ghost args in
+  let nbr_stack_args = List.Tot.Base.length real_args - 
     List.Tot.Base.length (calling_registers os target) in
   let length_stack = nbr_stack_args `op_Multiply` 8 in
   let stack_needed = nbr_stack_args > 0 in
@@ -256,14 +266,14 @@ let translate_lowstar os target (func:func_ty) =
   "  (requires pre_cond h0 " ^ (print_args_names args) ^ stack_precond "h0" ^ ")\n" ^
   "  (ensures (\n" ^ implies_precond ^ "(" ^
   (create_state os target args stack_needed length_stack) ^ 
-  "  va_pre (va_code_" ^ name ^ " ()) s0 " ^ (print_args_names args) ^ "))) =\n" ^
+  "  va_pre (va_code_" ^ name ^ " ()) s0 " ^ (print_args_names_reveal args) ^ "))) =\n" ^
   print_length_t args ^ 
   "  ()\n\n" ^
   "let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) " ^ (print_args_list args) ^
   (if stack_needed then " (stack_b:b8)" else "") ^
   " : Lemma\n" ^
   "  (requires pre_cond va_s0.mem.hs " ^ (print_args_names args) ^ "/\\\n" ^
-  "    va_post (va_code_" ^ name ^ " ()) va_s0 va_sM va_fM " ^ (print_args_names args) ^ ")\n" ^
+  "    va_post (va_code_" ^ name ^ " ()) va_s0 va_sM va_fM " ^ (print_args_names_reveal args) ^ ")\n" ^
   "  (ensures post_cond va_s0.mem.hs va_sM.mem.hs " ^ (print_args_names args) ^ ") =\n" ^
   print_length_t args ^
   "  ()\n\n" ^
@@ -280,7 +290,7 @@ let translate_lowstar os target (func:func_ty) =
   (create_state os target args stack_needed length_stack) ^
   "  implies_pre h0 " ^ (print_args_names args) ^ 
   (if stack_needed then "stack_b " else "") ^ ";\n" ^
-  "  let s1, f1 = va_lemma_" ^ name ^ " (va_code_" ^ name ^ " ()) s0 " ^ print_args_names args ^ " in\n" ^
+  "  let s1, f1 = va_lemma_" ^ name ^ " (va_code_" ^ name ^ " ()) s0 " ^ print_args_names_reveal args ^ " in\n" ^
   "  // Ensures that the Vale execution was correct\n" ^
   "  assert(s1.ok);\n" ^
   "  // Ensures that the callee_saved registers are correct\n" ^
@@ -298,8 +308,7 @@ let translate_lowstar os target (func:func_ty) =
   (if stack_needed then "stack_b);\n  pop_frame()\n" else ")\n")
   
 let print_vale_arg = function
-  | (a, TBuffer ty) -> "ghost " ^ a ^ ":" ^ print_vale_bufferty ty
-  | (a, TBase ty) -> a ^ ":" ^ print_vale_ty ty
+  | (a, ty) -> "ghost " ^ a ^ ":" ^ print_vale_full_ty ty
 
 let rec print_vale_args = function
   | [] -> ""
@@ -308,14 +317,18 @@ let rec print_vale_args = function
 
 let rec print_vale_loc_buff = function
   | [] -> ""
-  | [(a, _)] -> "loc_buffer("^a^")"
-  | (a, _)::q -> "loc_buffer("^a^"), " ^ print_vale_loc_buff q
+  | [(_, TBase _)] | [(_, TGhost _)] -> ""
+  | [(a, TBuffer _)] -> "loc_buffer("^a^")"
+  | (a, TBuffer _)::q -> "loc_buffer("^a^"), " ^ print_vale_loc_buff q
+  | a::q -> print_vale_loc_buff q
 
 let rec print_buff_readable = function
   | [] -> ""
-  | (a, _)::q -> "        buffer_readable(mem, "^a^");\n" ^ print_buff_readable q
+  | (a, TBuffer _)::q -> "        buffer_readable(mem, "^a^");\n" ^ print_buff_readable q
+  | a::q -> print_buff_readable q
 
 let print_vale_arg_value = function
+  | (_, TGhost _) -> "error" // Should not happen
   | (a, TBuffer ty) -> "buffer_addr(" ^ a ^ ", mem)"
   | (a, TBase ty) -> a
 
@@ -342,10 +355,9 @@ let print_callee_saved os target =
 
 let translate_vale os target (func:func_ty) =
   let name, args = func in
-  let buffer_args = List.Tot.Base.filter is_buffer args in
-  let nbr_stack_args = List.Tot.Base.length args - 
+  let real_args = List.Tot.Base.filter not_ghost args in
+  let nbr_stack_args = List.Tot.Base.length real_args - 
     List.Tot.Base.length (calling_registers os target) in
-  let length_stack = nbr_stack_args `op_Multiply` 8 in
   let stack_needed = nbr_stack_args > 0 in  
   let args = ("stack_b", TBuffer TUInt64)::args in
   "module Vale_" ^ name ^
@@ -359,8 +371,8 @@ let translate_vale os target (func:func_ty) =
   "    requires\n" ^
   "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int nbr_stack_args) ^ ");\n"
   else "") ^
-  // Called on the tail because stack_b is not a real argument
-  print_calling_args os target (List.Tot.Base.tl args) ^
+  // stack_b and ghost args are not real arguments
+  print_calling_args os target real_args ^
   "    ensures\n" ^ print_callee_saved os target ^ 
   "    modifies\n" ^
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^
