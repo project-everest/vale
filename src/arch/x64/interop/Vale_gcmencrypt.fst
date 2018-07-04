@@ -22,13 +22,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
     /\ buffer_readable va_s0.mem iv_b  /\ buffer_readable va_s0.mem tag_b /\ buffer_readable va_s0.mem cipher_b /\
     buffer_readable va_sM.mem plain_b /\ buffer_readable va_sM.mem auth_b /\ buffer_readable va_sM.mem keys_b
     /\ buffer_readable va_sM.mem iv_b  /\ buffer_readable va_sM.mem tag_b /\ buffer_readable va_sM.mem cipher_b
-    /\ va_sM.ok /\
-    va_s0.regs Rbx == va_sM.regs Rbx /\
-    va_s0.regs Rbp == va_sM.regs Rbp /\
-    va_s0.regs R12 == va_sM.regs R12 /\
-    va_s0.regs R13 == va_sM.regs R13 /\
-    va_s0.regs R14 == va_sM.regs R14 /\
-    va_s0.regs R15 == va_sM.regs R15 /\    
+    /\ va_sM.ok /\ va_s0 == va_sM /\
     va_ensure_total (va_code_gcmencrypt()) va_s0 va_sM va_fM
 
 val va_lemma_gcmencrypt(va_b0:va_code) (va_s0:va_state)

@@ -13,7 +13,7 @@ let gcmencrypt = ("gcmencrypt", [
   ],
     Stk (Prims.parse_int "18"))
 
-let os = Linux
+let os = Windows 
 
 let _ = print_string (translate_vale os X86 gcmencrypt)
 let _ = print_newline()

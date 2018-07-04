@@ -50,9 +50,9 @@ assume val init_xmms:xmm -> quad32
 #set-options "--initial_fuel 9 --max_fuel 9 --initial_ifuel 2 --max_ifuel 2"
 // TODO: Prove these two lemmas if they are not proven automatically
 let implies_pre (h0:HS.mem) (plain_b:b8) (plain_num_bytes:nat64) (auth_b:b8) (auth_num_bytes:nat64) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) (tag_b:b8)  (stack_b:b8) : Lemma
-  (requires pre_cond h0 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 16 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b])
+  (requires pre_cond h0 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b])
   (ensures (
-B.length stack_b == 16 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b] /\ (  let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
+B.length stack_b == 216 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b] /\ (  let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
   let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
   let addr_plain_b = addrs plain_b in
   let addr_auth_b = addrs auth_b in
@@ -60,18 +60,18 @@ B.length stack_b == 16 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_tag_b = addrs tag_b in
-  let addr_stack:nat64 = addrs stack_b + 16 in
+  let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
     | Rsp -> addr_stack
-    | Rdi -> addr_plain_b
-    | Rsi -> plain_num_bytes
-    | Rdx -> addr_auth_b
-    | Rcx -> auth_num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | Rcx -> addr_plain_b
+    | Rdx -> plain_num_bytes
+    | R8 -> addr_auth_b
+    | R9 -> auth_num_bytes
     | _ -> init_regs r end in
-  let mem = buffer_write #(TBase TUInt64) stack_b 0 (addrs cipher_b) mem in
-  let mem = buffer_write #(TBase TUInt64) stack_b 1 (addrs tag_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 25 (addrs cipher_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 26 (addrs tag_b) mem in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
   length_t_eq (TBase TUInt128) plain_b;
@@ -105,7 +105,7 @@ val gcmencrypt: plain_b:b8 -> plain_num_bytes:nat64 -> auth_b:b8 -> auth_num_byt
 	(requires (fun h -> pre_cond h plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b ))
 
-val ghost_gcmencrypt: plain_b:b8 -> plain_num_bytes:nat64 -> auth_b:b8 -> auth_num_bytes:nat64 -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> tag_b:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 16 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b })
+val ghost_gcmencrypt: plain_b:b8 -> plain_num_bytes:nat64 -> auth_b:b8 -> auth_num_bytes:nat64 -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> tag_b:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b })
 
 let ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b stack_b h0 =
   let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
@@ -116,18 +116,18 @@ let ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_tag_b = addrs tag_b in
-  let addr_stack:nat64 = addrs stack_b + 16 in
+  let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
     | Rsp -> addr_stack
-    | Rdi -> addr_plain_b
-    | Rsi -> plain_num_bytes
-    | Rdx -> addr_auth_b
-    | Rcx -> auth_num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | Rcx -> addr_plain_b
+    | Rdx -> plain_num_bytes
+    | R8 -> addr_auth_b
+    | R9 -> auth_num_bytes
     | _ -> init_regs r end in
-  let mem = buffer_write #(TBase TUInt64) stack_b 0 (addrs cipher_b) mem in
-  let mem = buffer_write #(TBase TUInt64) stack_b 1 (addrs tag_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 25 (addrs cipher_b) mem in
+  let mem = buffer_write #(TBase TUInt64) stack_b 26 (addrs tag_b) mem in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
   length_t_eq (TBase TUInt128) plain_b;
@@ -143,10 +143,23 @@ let ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys
   // Ensures that the callee_saved registers are correct
   assert(s0.regs Rbx == s1.regs Rbx);
   assert(s0.regs Rbp == s1.regs Rbp);
+  assert(s0.regs Rdi == s1.regs Rdi);
+  assert(s0.regs Rsi == s1.regs Rsi);
+  assert(s0.regs Rsp == s1.regs Rsp);
   assert(s0.regs R12 == s1.regs R12);
   assert(s0.regs R13 == s1.regs R13);
   assert(s0.regs R14 == s1.regs R14);
   assert(s0.regs R15 == s1.regs R15);
+  assert(s0.xmms 6 == s1.xmms 6);
+  assert(s0.xmms 7 == s1.xmms 7);
+  assert(s0.xmms 8 == s1.xmms 8);
+  assert(s0.xmms 9 == s1.xmms 9);
+  assert(s0.xmms 10 == s1.xmms 10);
+  assert(s0.xmms 11 == s1.xmms 11);
+  assert(s0.xmms 12 == s1.xmms 12);
+  assert(s0.xmms 13 == s1.xmms 13);
+  assert(s0.xmms 14 == s1.xmms 14);
+  assert(s0.xmms 15 == s1.xmms 15);
   // Ensures that va_code_gcmencrypt is actually Vale code, and that s1 is the result of executing this code
   assert (va_ensure_total (va_code_gcmencrypt ()) s0 s1 f1);
   implies_post s0 s1 f1 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b stack_b ;
@@ -154,7 +167,7 @@ let ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys
 
 let gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b  =
   push_frame();
-  let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 16) in
+  let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 216) in
   let h0 = get() in
-  st_put h0 (fun h -> pre_cond h plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 16 /\ live h stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]) (ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b stack_b);
+  st_put h0 (fun h -> pre_cond h plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]) (ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b stack_b);
   pop_frame()
