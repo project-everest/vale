@@ -242,8 +242,6 @@ let check_if_aesni_keygen_leakage_free ins ts =
   let ts' = set_xmm_taint ts dst taint in
   true, TaintState ts'.regTaint Secret Secret ts'.xmmTaint
 
-val check_if_xmm_ins_consumes_fixed_time: (ins:tainted_ins{is_xmm_ins ins}) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
-
 let check_if_xmm_ins_consumes_fixed_time ins ts =
   let i, _, _ = ins.ops in
   match i with

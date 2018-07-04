@@ -11,9 +11,7 @@ let rec has_mem_operand = function
   | [] -> false
   | a::q -> if OMem? a then true else has_mem_operand q
 
-val check_if_ins_consumes_fixed_time: (ins:tainted_ins{not (is_xmm_ins ins)}) -> (ts:taintState) -> (res:(bool*taintState){ins_consumes_fixed_time ins ts res})
 #reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 80"
-
 
 let check_if_ins_consumes_fixed_time ins ts =
   let i, dsts, srcs = ins.ops in
@@ -419,7 +417,7 @@ val lemma_adcx_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = in
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 150"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 200"
 
 let lemma_adcx_same_public ts ins s1 s2 fuel =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -456,7 +454,7 @@ val lemma_mul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
   (b2t b ==> isExplicitLeakageFreeGivenStates (Ins ins) fuel ts ts' s1 s2))
 
-let lemma_mul_same_public ts ins s1 s2 fuel = ()
+let lemma_mul_same_public ts ins s1 s2 fuel = lemma_public_flags_same ts ins; ()
 
 val lemma_shr_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Shr64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -585,10 +583,6 @@ let lemma_ins_same_public ts ins s1 s2 fuel = let i, _, _ = ins.ops in
   | S.Shl64 _ _ -> lemma_shl_same_public ts ins s1 s2 fuel
   | S.Shr64 _ _ -> lemma_shr_same_public ts ins s1 s2 fuel
   | _ -> ()
-
-val lemma_ins_leakage_free: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> Lemma
- (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
-  (b2t b ==> isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'))
 
 let lemma_ins_leakage_free ts ins =
   let b, ts' = check_if_ins_consumes_fixed_time ins ts in
