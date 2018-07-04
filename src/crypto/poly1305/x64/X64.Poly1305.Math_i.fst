@@ -4,9 +4,11 @@ open FStar.Tactics
 open FStar.Tactics.Canon
 open FStar.Math.Lemmas
 open FStar.Math.Lib
+open Math.Lemmas.Int_i
 open FStar.Mul
-// open Calc
-open X64.Vale.State_i   // needed for mem
+open TypesNative_s
+open TypesNative_i
+open FStar.Classical
 open X64.Poly1305.Bitvectors_i
 
 // private unfold let op_Star = op_Multiply
@@ -144,10 +146,57 @@ let lemma_poly_reduce_nat (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh
 let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
   lemma_poly_reduce_nat n p h h2 h10 c hh
 
-(* Provable, when we merge the UInt branch and use the lemmas 
-   from Poly1305_Bitvectors - operations here are abstract?*)
+(* These lemmas go through because of SMT patterns,
+   is that the right style to use here?*)
+
+let lemma_shr2_nat (x:nat64) :
+  Lemma (shift_right64 x 2 == x / 4) =
+  reveal_ishr 64 x 2
+let lemma_shr4_nat (x:nat64) :
+  Lemma (shift_right64 x 4 == x / 16) =
+  reveal_ishr 64 x 4  
+let lemma_and_mod_n_nat (x:nat64) :
+ Lemma (logand64 x 3 == x % 4 /\ 
+        logand64 x 15 == x % 16) =
+  reveal_iand 64 x 3;
+  reveal_iand 64 x 15
+let lemma_and_constants_nat (x:nat64) :
+  Lemma (logand64 x 0 == 0 /\ 
+	 logand64 x 0xffffffffffffffff == x) =
+  reveal_iand 64 x 0;
+  reveal_iand 64 x 0xffffffffffffffff
+
+let lemma_clear_lower_2_nat (x:nat64) : 
+  Lemma (logand64 x 0xfffffffffffffffc == (x/4)*4) =
+  reveal_iand 64 x 0xfffffffffffffffc;
+  assert (x < pow2_64);
+  assert ((x/4)*4 < pow2_64);
+  modulo_lemma ((x/4)*4) (pow2_64)
+
+// reveal_iand_all 64 does not work here.
+let lemma_poly_constants_nat (x:nat64) :
+  Lemma (logand64 x 0x0ffffffc0fffffff < 0x1000000000000000 /\
+	 logand64 x 0x0ffffffc0ffffffc < 0x1000000000000000 /\
+	 (logand64 x 0x0ffffffc0ffffffc) % 4 == 0) =
+  reveal_iand 64 x 0x0ffffffc0fffffff;
+  reveal_iand 64 x 0x0ffffffc0ffffffc
+
+let lemma_and_commutes_nat (x y:nat64) :
+  Lemma (logand64 x y == logand64 y x) =
+  reveal_iand_all 64;
+  lemma_and_commutes x y
+  	 
+
+// using forall_intro on original bitvector lemmas and
+// ireveal_and_all etc. does not solve the goal
 let lemma_poly_bits64 () =
-  admit ()
+    forall_intro (lemma_shr2_nat);
+    forall_intro (lemma_shr4_nat);
+    forall_intro (lemma_and_mod_n_nat);
+    forall_intro (lemma_and_constants_nat);
+    forall_intro (lemma_clear_lower_2_nat);
+    forall_intro (lemma_poly_constants_nat);
+    forall_intro_2 (lemma_and_commutes_nat)
 
 let lemma_mul_strict_upper_bound (x:int) (x_bound:int) (y:int) (y_bound:int) =
   lemma_mult_lt_right y x x_bound;
@@ -161,26 +210,45 @@ let lemma_mul_strict_upper_bound (x:int) (x_bound:int) (y:int) (y_bound:int) =
     else
       lemma_mult_lt_left x_bound y y_bound 
 
-// Again provable from Poly1305_Bitvectors
 let lemma_bytes_shift_power2 (y:nat64) =
-  admit()
+  lemma_bytes_shift_power2 y;
+  reveal_ishl_all 64
 
-//Same
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 1 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 30 --z3refresh"
 let lemma_bytes_and_mod (x:nat64) (y:nat64) =
-  admit()
-
+  lemma_bytes_and_mod x y;
+  // reveal_iand_all 64;
+  // reveal_ishl_all 64;
+  reveal_ishl 64 y 3;
+  assert_norm(shift_left64 y 3 < 64);
+  reveal_ishl 64 1 (shift_left64 y 3);
+  assert_norm(shift_left64 1 (shift_left64 y 3) <> 0);
+  reveal_iand 64 x (( shift_left64 1 (shift_left64 y 3))-1);
+  // reveal_iand 64 x (( shift_left64 1 (shift_left64 y 3))-1);
+  // reveal_ishl 64 y 3;
+  // reveal_ishl 64 1 (shift_left64 y 3);
+  euclidean_division_definition x  ( shift_left64 1 (shift_left64 y 3));
+  assert((shift_left64 1 (shift_left64 y 3) -1) < pow2_64);
+  assume False; // can't get this equality to work
+  assert_by_tactic 
+      (logand64 x (( shift_left64 1 (shift_left64 y 3))-1) == x % ( shift_left64 1 (shift_left64 y 3)))
+      (fun () -> dump "before"; norm[delta]; rewrite_eqs_from_context (); dump "after")
+  
 let lemma_mod_factors(x0:nat) (x1:nat) (y:nat) (z:pos) :
   Lemma ((x0 + (y * z) * x1) % z == (x0 % z)) =
   nat_times_nat_is_nat y x1;
   lemma_mod_plus x0 (y*x1) z;
   assert_by_tactic ((y*z)*x1 == (y*x1)*z) canon
 
-#reset-options "--initial_fuel 0 --max_fuel 0 --smtencoding.elim_box true"
 let lemma_mul_pos_pos_is_pos_inverse (x:pos) (y:int) :
   Lemma (requires y*x > 0)
 	(ensures y > 0) = 
   if y = 0 then assert_norm (0*x == 0)
-  else if y < 0 then assume(False)
+  else if y < 0 then
+    begin
+      lemma_mult_lt_right x y 0;
+      assert_norm (y*x <= 0)
+    end
   else ()
   
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
@@ -233,8 +301,6 @@ let lemma_part_bound1(a:nat) (b:pos) (c:pos):
     multiplication_order_eq_lemma_int ((a/b) - (c*((b*(a/b))/(b*c)))) (c-1) b;
     assert (b*((a/b) - (c*((b*(a/b))/(b*c)))) <= b*(c-1));
     assert (b*(a/b) % (b*c) <= b*(c-1))
-
-#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
 
 let lemma_lt_le_trans (a : nat) (b c : pos) :
   Lemma (requires (a < b) /\ b <= c)
@@ -310,44 +376,56 @@ let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
   assert(n * (((x1 * n + x0) / n) % z) + x0 % n == n * (x1 % z) + x0);
   reveal_opaque(lowerUpper128)
   
-let lemma_poly_demod (p:pos) (h:int) (x:int) (r:int) =
-  admit()
+let lemma_poly_demod (p:pos) (h:int) (x:int) (r:int) = 
+  distributivity_add_left (h%p) x r; // ((h%p + x)*r)% = ((h%p)*r + x*r)%p
+  assume ((h%p)*r >= 0); //lemmas are phrased for nats...
+  assume (x*r >= 0);
+  assume (h >=0);
+  assume (r >=0);
+  nat_times_nat_is_nat h r;
+  modulo_distributivity ((h%p)*r) (x*r) p; // ((h%p)*r + x*r)%p = (((h%p)*r)%p + (x*r)%p)%p
+  lemma_mod_mul_distr_l h r p; // ((h%p)*r)%p = (h*r)%p ==> ((h*r)%p + (x*r)%p)%p
+  lemma_mod_plus_distr_r ((h*r)%p) (x*r) p;
+  lemma_mod_plus_distr_l (h*r) (x*r) p
 
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 2 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 50"
 let lemma_reduce128  (h:int) (h2:nat64) (h1:nat64) (h0:nat64) (g:int) (g2:nat64) (g1:nat64) (g0:nat64) =
-      admit()
-      (*
-      reveal_opaque mod2_128';
-      assert_norm (mod2_128(g - 0x400000000000000000000000000000000) == mod2_128(g));
-      if (g2<4) then
-      begin
-	assert(h < 0x3fffffffffffffffffffffffffffffffb);
-	assert(h >= 0);
-        calc(
-	     mod2_128(modp(h))
-          &= mod2_128(h) &| using (assert (modp(h) == h % 0x3fffffffffffffffffffffffffffffffb)));
-	  assert_norm (mod2_128(h) == lowerUpper128 h0 h1) // TODO: assert_norm for Calc
-      end
-      else
-      begin
-       assert (0 <= h);
-       assert (h - 0x3fffffffffffffffffffffffffffffffb < 
-		 0x3fffffffffffffffffffffffffffffffb);
-       calc(
-            mod2_128(modp(h))
-         &= mod2_128(h - 0x3fffffffffffffffffffffffffffffffb) &| 
-			  using (assert (modp(h) == h % 0x3fffffffffffffffffffffffffffffffb);
-				 assert (h - 0x3fffffffffffffffffffffffffffffffb == h % 
-					                 0x3fffffffffffffffffffffffffffffffb))
-	 &= mod2_128(g - 0x400000000000000000000000000000000) &| using z3
-	 &= mod2_128(g) &| using z3);
-       assert_norm (mod2_128(g) == lowerUpper128 g0 g1)
-      end;
-      *)
+  reveal_opaque mod2_128';
+  reveal_opaque lowerUpper128;
+  reveal_opaque lowerUpper192;
+  reveal_opaque modp';
+  assert_norm (mod2_128'(g - 0x400000000000000000000000000000000) == mod2_128'(g));
+  if (g2<4) then
+  begin
+    assert(h < 0x3fffffffffffffffffffffffffffffffb);
+    assert(h >= 0);
+    assert (modp(h) == h % 0x3fffffffffffffffffffffffffffffffb);
+    assert (mod2_128(modp(h)) == mod2_128(h));
+    reveal_opaque lowerUpper128;
+    assert_norm (mod2_128'(h) == lowerUpper128 h0 h1)
+  end
+  else
+  begin
+    assert (0 <= h);
+    assert (h - 0x3fffffffffffffffffffffffffffffffb < 
+	      0x3fffffffffffffffffffffffffffffffb);
+
+    assert (modp(h) == h % 0x3fffffffffffffffffffffffffffffffb);
+    assert (h - 0x3fffffffffffffffffffffffffffffffb == h % 
+	      0x3fffffffffffffffffffffffffffffffb);
+    assert (mod2_128(modp(h)) == mod2_128(h - 0x3fffffffffffffffffffffffffffffffb));
+    assert(mod2_128(h - 0x3fffffffffffffffffffffffffffffffb) == 
+		      mod2_128(g - 0x400000000000000000000000000000000));
+    assert(mod2_128(g - 0x400000000000000000000000000000000) == mod2_128(g));
+    assert_norm (mod2_128'(g) == lowerUpper128 g0 g1)
+  end
 
 let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) = 
-  admit()
+  reveal_opaque lowerUpper128;
+  reveal_opaque mod2_128';
+  ()
+  
 
 let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
   admit()

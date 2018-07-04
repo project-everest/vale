@@ -14,9 +14,9 @@ val lemma_and_mod_n: x:uint_t 64 -> Lemma (logand #64 x 3 == mod #64 x 4 /\
 				   [SMTPat (logand #64 x 3); 
 				    SMTPat (logand #64 x 15)]
 				    
-val lemma_clear_lower_2: x:uint_t 8 -> 
-  Lemma (logand #8 x 0xfc == mul_mod #8 (udiv #8 x 4) 4)
-  [SMTPat (logand #8 x 0xfc)]
+val lemma_clear_lower_2: x:uint_t 64 -> 
+  Lemma (logand #64 x 0xfffffffffffffffc == mul_mod #64 (udiv #64 x 4) 4)
+  [SMTPat (logand #64 x 0xfffffffffffffffc)]
 val lemma_and_constants: x:uint_t 64 ->
   Lemma (logand #64 x 0 == 0 /\ logand #64 x 0xffffffffffffffff == x)
   [SMTPat (logand #64 x 0); SMTPat (logand #64 x 0xffffffffffffffff)]

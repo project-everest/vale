@@ -26,8 +26,9 @@ let lemma_and_mod_n x =
 
 let lemma_clear_lower_2 x =
   assert_by_tactic
-  (logand #8 x 0xfc == mul_mod #8 (udiv #8 x 4) 4)
+  (logand #64 x 0xfffffffffffffffc == mul_mod #64 (udiv #64 x 4) 4)
   bv_tac
+  
 
 let lemma_and_constants x =
  assert_by_tactic (logand #64 x 0 == (0 <: uint_t 64)) bv_tac;
@@ -84,6 +85,39 @@ let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
 			   rewrite_eqs_from_context ())
 
 let bv128_64_64 x1 x0 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
+
+open FStar.Math.Lemmas
+
+let uint_to_nat (#n:pos) (x:uint_t n) : r:nat{r = x} =
+ assert (x < pow2 n);
+ modulo_lemma x (pow2 n); 
+ x 
+
+let uint_ext (#n : pos) (#m : pos{n < m}) (x : uint_t n) : r:(uint_t m){uint_to_nat r = uint_to_nat x} =
+  assert_norm(fits x n);
+  pow2_lt_compat m n;
+  assert_norm(fits x m);
+  modulo_lemma x (pow2 m);
+  to_uint_t m x
+
+
+// let bv128_64_64_spec' (x1 x0 : bv_t 64) :
+//   Lemma (bvadd (bv_uext #64 #64 (bvmul (int2bv 0x10000000000000000) x1)) (uint_ext #64 #128 x0) ==
+// 	  bv128_64_64 x1 x0) =
+//   assert (bvadd (bv_uext #64 #64 (bvmul (int2bv 0x10000000000000000) x1)) (uint_ext #64 #128 x0) ==
+// 	  bv128_64_64 x1 x0);
+// 	  assume False
+
+// #reset-options "--smtencoding.elim_box true --log_queries --z3refresh --z3rlimit 8"
+// let bv128_64_64_spec' (x1 x0 : uint_t 64) :
+//   Lemma (int2bv #128 (0x10000000000000000 `op_Multiply` x1 + x0) ==
+// 	 (bv128_64_64 (int2bv x1) (int2bv x0))
+//   ) =
+//   assert (bvadd (bvmul (int2bv #128 0x00000000000000010000000000000000) (uint_ext #64 #128 x1)) 
+// 		(int2bv #128 (uint_ext #64 #128 x0)) = bv128_64_64 (int2bv x1) (int2bv x0));
+// 	  assume False
+  
+		   
 
 let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
   assert_by_tactic (z == bvand #128 x y) 
