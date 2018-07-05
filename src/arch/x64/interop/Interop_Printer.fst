@@ -418,6 +418,6 @@ let translate_vale os target (func:func_ty) =
   "    ensures\n" ^ print_callee_saved os target ^ print_xmm_callee_saved os target ^
   "    modifies\n" ^
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^
-  "        xmm0; xmm1; xmm2; xmM3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;\n" ^
+  "        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;\n" ^
   "        efl; mem;\n"^
   "{\n\n}\n"

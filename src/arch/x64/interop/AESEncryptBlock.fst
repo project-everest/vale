@@ -101,15 +101,6 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (output_b:b8)
   length_t_eq (TBase TUInt128) output_b;
   length_t_eq (TBase TUInt128) input_b;
   length_t_eq (TBase TUInt128) keys_b;
-  // let  input128_b = BV.mk_buffer_view  input_b Views.view128 in
-  // let output128_b = BV.mk_buffer_view output_b Views.view128 in
-  // assert (BV.length input128_b > 1 /\ BV.length output128_b > 1);
-  // let  input_q = Seq.index (BV.as_seq h0 input128_b) 0 in 
-  // let output_q = Seq.index (BV.as_seq h1 output128_b) 0 in
-  // output_q == aes_encrypt_LE AES_128 (Ghost.reveal key) input_q))
-
-
- // assert (Seq.equal (buffer128_read input_b 0 va_s0.mem) (
   ()
 
 val aes128_encrypt_block: output_b:b8 -> input_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> Stack unit
