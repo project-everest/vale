@@ -14,10 +14,7 @@ noeq type state = {
 }
 
 [@va_qattr]
-unfold let reg_to_int = Regs_i.reg_to_int
-
-[@va_qattr]
-unfold let eval_reg (r:reg) (s:state) : nat64 = Map16_i.sel s.regs (reg_to_int r)
+unfold let eval_reg (r:reg) (s:state) : nat64 = Map16_i.sel s.regs r
 [@va_qattr]
 unfold let eval_xmm (x:xmm) (s:state) : Types_s.quad32 = Map16_i.sel s.xmms x
 [@va_qattr]
@@ -44,7 +41,7 @@ let eval_operand (o:operand) (s:state) : GTot nat64 =
 
 [@va_qattr]
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = Map16_i.upd s.regs (reg_to_int r) v }
+  { s with regs = Map16_i.upd s.regs r v }
 
 [@va_qattr]
 let update_xmm (x:xmm) (v:Types_s.quad32) (s:state) : state =

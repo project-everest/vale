@@ -176,8 +176,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     funs := (loc, dFun)::!funs;
     (*
       let (va_s2, va_fc2, ()) = wp_run_code_norm (va_code_1_Incr3 ()) (va_quick_1_Incr3 ()) va_s0
-        (fun (s0:state) (sN:state) -> va_update_reg Rax sN (va_update_flags sN s0))
-        (fun (sN:state) (sN':state) -> va_get_reg Rax sN == va_get_reg Rax sN' /\ va_get_flags sN == va_get_flags sN')
+        (fun (s0:state) (sN:state) -> va_update_reg rax sN (va_update_flags sN s0))
+        (fun (sN:state) (sN':state) -> va_get_reg rax sN == va_get_reg rax sN' /\ va_get_flags sN == va_get_flags sN')
     *)
     let eCode = EApply (cid, fArgs) in
     let eQCode = EApply (id, pArgs) in
@@ -209,9 +209,9 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   [@"opaque_to_smt"]
   let va_qcode_Add3 () : quickCode unit (va_code_Add3 ()) = qblock (
     fun (va_s:state) -> let va_old_s = va_s in
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+    QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+    QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+    QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
     QEmpty ()
     )))
   )

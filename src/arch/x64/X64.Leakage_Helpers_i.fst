@@ -17,22 +17,22 @@ let registerAsExpected (r:reg) (tsAnalysis:taintState) (tsExpected:taintState) =
   (tsExpected.regTaint r = Public && tsAnalysis.regTaint r = Public) || (tsExpected.regTaint r = Secret)
 
 let publicRegisterValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
-  registerAsExpected Rax tsAnalysis tsExpected &&
-  registerAsExpected Rbx tsAnalysis tsExpected &&
-  registerAsExpected Rcx tsAnalysis tsExpected &&
-  registerAsExpected Rdx tsAnalysis tsExpected &&
-  registerAsExpected Rsi tsAnalysis tsExpected &&
-  registerAsExpected Rdi tsAnalysis tsExpected &&
-  registerAsExpected Rbp tsAnalysis tsExpected &&
-  registerAsExpected Rsp tsAnalysis tsExpected &&
-  registerAsExpected R8 tsAnalysis tsExpected &&
-  registerAsExpected R9 tsAnalysis tsExpected &&
-  registerAsExpected R10 tsAnalysis tsExpected &&
-  registerAsExpected R11 tsAnalysis tsExpected &&
-  registerAsExpected R12 tsAnalysis tsExpected &&
-  registerAsExpected R13 tsAnalysis tsExpected &&
-  registerAsExpected R14 tsAnalysis tsExpected &&
-  registerAsExpected R15 tsAnalysis tsExpected
+  registerAsExpected  0 tsAnalysis tsExpected &&
+  registerAsExpected  1 tsAnalysis tsExpected &&
+  registerAsExpected  2 tsAnalysis tsExpected &&
+  registerAsExpected  3 tsAnalysis tsExpected &&
+  registerAsExpected  4 tsAnalysis tsExpected &&
+  registerAsExpected  5 tsAnalysis tsExpected &&
+  registerAsExpected  6 tsAnalysis tsExpected &&
+  registerAsExpected  7 tsAnalysis tsExpected &&
+  registerAsExpected  8 tsAnalysis tsExpected &&
+  registerAsExpected  9 tsAnalysis tsExpected &&
+  registerAsExpected 10 tsAnalysis tsExpected &&
+  registerAsExpected 11 tsAnalysis tsExpected &&
+  registerAsExpected 12 tsAnalysis tsExpected &&
+  registerAsExpected 13 tsAnalysis tsExpected &&
+  registerAsExpected 14 tsAnalysis tsExpected &&
+  registerAsExpected 15 tsAnalysis tsExpected
 
 let publicTaintsAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
     publicFlagValuesAreAsExpected tsAnalysis tsExpected

@@ -34,7 +34,7 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | AddLea64 dst src1 src2 -> [dst], [dst; src1; src2]
   | AddCarry64 dst src -> [dst], [dst; src]
   | Sub64 dst src -> [dst], [dst; src]
-  | Mul64 src -> [OReg Rax; OReg Rdx], [OReg Rax; src]
+  | Mul64 src -> [OReg rax; OReg rdx], [OReg rax; src]
   | IMul64 dst src -> [dst], [dst; src]
   | Xor64 dst src -> [dst], [dst; src]
   | And64 dst src -> [dst], [dst; src]

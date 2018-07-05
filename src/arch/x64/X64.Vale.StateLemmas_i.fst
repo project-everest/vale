@@ -11,46 +11,17 @@ module ME = X64.Memory_i_s
 let state_to_S (s:state) : GTot ME.state = 
   let s' = {
     BS.ok = s.ok;
-    BS.regs = (fun r -> Map16_i.sel s.regs (reg_to_int r));
+    BS.regs = (fun r -> Map16_i.sel s.regs r);
     BS.xmms = (fun x -> Map16_i.sel s.xmms x);
     BS.flags = int_to_nat64 s.flags;
     BS.mem = ME.get_heap s.mem
   } in
   { ME.state = s'; ME.mem = s.mem}
 
-let regs_of_S (m:reg -> nat64) : Pure (Map16_i.map nat64)
+let regs_of_S (#a:Type0) (m:reg -> a) : Pure (Map16_i.map a)
   (requires True)
   (ensures fun m' ->
-    (forall (r:reg).{:pattern (m r) \/ (Map16_i.sel m' (reg_to_int r))} m r == Map16_i.sel m' (reg_to_int r))
-  )
-  =
-  let m0_3 = ((m Rax, m Rbx), (m Rcx, m Rdx)) in
-  let m4_7 = ((m Rsi, m Rdi), (m Rbp, m Rsp)) in
-  let m8_11 = ((m R8, m R9), (m R10, m R11)) in
-  let m12_15 = ((m R12, m R13), (m R14, m R15)) in
-  let m' = ((m0_3, m4_7), (m8_11, m12_15)) in
-  assert_norm (m Rax == Map16_i.sel m'  0);
-  assert_norm (m Rbx == Map16_i.sel m'  1);
-  assert_norm (m Rcx == Map16_i.sel m'  2);
-  assert_norm (m Rdx == Map16_i.sel m'  3);
-  assert_norm (m Rsi == Map16_i.sel m'  4);
-  assert_norm (m Rdi == Map16_i.sel m'  5);
-  assert_norm (m Rbp == Map16_i.sel m'  6);
-  assert_norm (m Rsp == Map16_i.sel m'  7);
-  assert_norm (m R8  == Map16_i.sel m'  8);
-  assert_norm (m R9  == Map16_i.sel m'  9);
-  assert_norm (m R10 == Map16_i.sel m' 10);
-  assert_norm (m R11 == Map16_i.sel m' 11);
-  assert_norm (m R12 == Map16_i.sel m' 12);
-  assert_norm (m R13 == Map16_i.sel m' 13);
-  assert_norm (m R14 == Map16_i.sel m' 14);
-  assert_norm (m R15 == Map16_i.sel m' 15);
-  m'
-
-let xmms_of_S (m:xmm -> quad32) : Pure (Map16_i.map quad32)
-  (requires True)
-  (ensures fun m' ->
-    (forall (x:xmm).{:pattern (m x) \/ (Map16_i.sel m' x)} m x == Map16_i.sel m' x)
+    (forall (r:reg).{:pattern (m r) \/ (Map16_i.sel m' r)} m r == Map16_i.sel m' r)
   )
   =
   let m0_3 = ((m 0, m 1), (m 2, m 3)) in
@@ -82,7 +53,7 @@ let state_of_S (s:ME.state) : state =
   {
     ok = ok;
     regs = regs_of_S regs;
-    xmms = xmms_of_S xmms;
+    xmms = regs_of_S xmms;
     flags = flags;
     mem = mem;
   }

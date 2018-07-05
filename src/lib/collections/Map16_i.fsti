@@ -59,7 +59,8 @@ val lemma_equal16 (#a:Type0) (m1 m2:map16 a) : Lemma
   (requires (forall (i:int).{:pattern (sel16 m1 i) \/ (sel16 m2 i)} 0 <= i /\ i < 16 ==> sel16 m1 i == sel16 m2 i))
   (ensures m1 == m2)
 
-unfold let map = map16
+[@"uninterpreted_by_smt"]
+let map = map16
 
 [@plugin norm_attr "opaque_to_smt"]
 let sel (#a:Type0) (m:map16 a) (n:int) : a =

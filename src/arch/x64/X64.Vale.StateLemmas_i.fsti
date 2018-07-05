@@ -29,8 +29,8 @@ val lemma_to_mem : s:state -> Lemma
   [SMTPat s.mem]
   
 val lemma_to_reg : s:state -> r:reg -> Lemma
-  (ensures Map16_i.sel s.regs (reg_to_int r) == regs' (state_to_S s) r)
-  [SMTPat (Map16_i.sel s.regs (reg_to_int r))]
+  (ensures Map16_i.sel s.regs r == regs' (state_to_S s) r)
+  [SMTPat (Map16_i.sel s.regs r)]
 
 val lemma_to_xmm : s:state -> x:xmm -> Lemma
   (ensures Map16_i.sel s.xmms x == xmms' (state_to_S s) x)
