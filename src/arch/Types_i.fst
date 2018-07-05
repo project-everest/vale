@@ -315,6 +315,21 @@ let le_bytes_to_seq_quad_of_singleton (q:quad32) (b:seq nat8 { length b == 16 })
   // le_bytes_to_seq_quad32 b == seq_to_seq_four_LE (seq_nat8_to_seq_nat32_LE b)
   ()
 
+let le_bytes_to_quad32_to_bytes (q:quad32) :
+  Lemma(le_bytes_to_quad32 (le_quad32_to_bytes q) == q)
+  =
+  le_seq_quad32_to_bytes_of_singleton q;  // ==> le_quad32_to_bytes q == le_seq_quad32_to_bytes (create 1 q)
+  let b = le_quad32_to_bytes q in
+  let q' = le_bytes_to_quad32 b in
+  le_bytes_to_seq_quad_of_singleton q' b; // ==> create 1 q' == le_bytes_to_seq_quad32 b
+                                          //                 == le_bytes_to_seq_quad32 (le_seq_quad32_to_bytes (create 1 q))
+  le_bytes_to_seq_quad32_to_bytes (create 1 q); //           == create 1 q
+  //assert (create 1 q == create 1 q');
+  //assert (equal (create 1 q) (create 1 q'));
+  assert (q == index (create 1 q) 0);      // OBSERVE
+  assert (q == q');
+  ()
+
 // let be_quad32_to_bytes (q:quad32) : seqn 16 nat8 =
 //   seq_four_to_seq_BE (seq_map (nat_to_four 8) (four_to_seq_BE q))
 
