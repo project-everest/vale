@@ -201,7 +201,7 @@ assume val ghash_incremental_bytes_buffer (h_b hash_b input_b:B.buffer U8.t) (nu
      )
     )
   )
-(*
+
 let ghash_incremental_bytes (h_val old_hash:quad32) (input_b:B.buffer U8.t) (num_bytes:U64.t) : Stack quad32
   (requires fun h -> 
     B.live h input_b /\
@@ -226,17 +226,24 @@ let ghash_incremental_bytes (h_val old_hash:quad32) (input_b:B.buffer U8.t) (num
   let h0 = ST.get() in
   push_frame ();
   let h1 = ST.get() in
-  assume (buffer_to_seq_quad input_b h0 == buffer_to_seq_quad input_b h1);
+  //assume (buffer_to_seq_quad input_b h0 == buffer_to_seq_quad input_b h1);
   // TODO: Future work: Pass a pointer to the struct, instead of copying to a bytes buffer
   let    h_b = B.alloca 0uy 16ul in
   let hash_b = B.alloca 0uy 16ul in
   quad32_to_buffer h_val       h_b;
+  let h1_5 = ST.get() in
   quad32_to_buffer old_hash hash_b; 
+  let h2 = ST.get() in
+assume (buffer_to_quad h_b h1_5 == buffer_to_quad h_b h2);  // TODO: Remove this once BV.as_seq plays nicely with other stack changes
   ghash_incremental_bytes_buffer h_b hash_b input_b num_bytes;
+  let h3 = ST.get() in
   let output = buffer_to_quad32 hash_b in
   pop_frame ();
+  let h4 = ST.get() in
+assume (buffer_to_seq_quad input_b h2 == buffer_to_seq_quad input_b h0);    // TODO: Remove this once BV.as_seq plays nicely with other stack changes
   output
-*)
+
+
 assume val gcm128_one_pass 
              (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t)              
              (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
