@@ -17,8 +17,10 @@ open Types_i
 open Words_s
 open Words.Seq_s
 open AES_s
+open GCTR_s
 open GCM_s
 open GCM_helpers_i
+open GHash_i
 open X64.Memory_i_s
 open FStar.Seq
 
@@ -35,24 +37,34 @@ open FStar.Mul
 let seq_U8_to_seq_nat8 (b:seq U8.t) : (seq nat8) =
   Seq.init (length b) (fun (i:nat { i < length b }) -> U8.v (index b i))
 
+let buffer_to_quad (b:B.buffer U8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
+  let b128 = BV.mk_buffer_view b Views.view128 in
+  BV.as_buffer_mk_buffer_view b Views.view128;
+  BV.get_view_mk_buffer_view b Views.view128;
+  BV.length_eq b128;
+  assert (B.length b >= 16);
+  assert (BV.length b128 > 0);
+  index (BV.as_seq h b128) 0
+
+let buffer_to_seq_quad (b:B.buffer U8.t { B.length b % 16 == 0 }) (h:HS.mem) : GTot (s:seq quad32 {length s == B.length b / 16} ) =
+  let b128 = BV.mk_buffer_view b Views.view128 in
+  BV.as_buffer_mk_buffer_view b Views.view128;
+  BV.get_view_mk_buffer_view b Views.view128;
+  BV.length_eq b128;
+  (BV.as_seq h b128)
+
 assume val quad32_to_buffer (q:quad32) (b:B.buffer U8.t { B.length b % 16 == 0 } ) : Stack unit
   (requires fun h -> B.length b > 0)
   (ensures fun h () h' -> 
     M.modifies (M.loc_buffer b) h h' /\
-    (let b128 = BV.mk_buffer_view b Views.view128 in
-     BV.length b128 > 1 /\
-     index (BV.as_seq h' b128) 0 == q
-    )
+    buffer_to_quad b h' == q
   )
 
 assume val buffer_to_quad32 (b:B.buffer U8.t { B.length b % 16 == 0 }) : Stack quad32
   (requires fun h -> B.length b > 0)
   (ensures fun h q h' -> 
     M.modifies M.loc_none h h' /\
-    (let b128 = BV.mk_buffer_view b Views.view128 in
-     BV.length b128 > 1 /\
-     q == index (BV.as_seq h b128) 0
-    )
+    q == buffer_to_quad b h
   )
 
 let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t { B.length keys_b % 16 == 0 }) (h:HS.mem) =
@@ -84,12 +96,9 @@ assume val aes128_encrypt_block_buffer
   (ensures fun h () h' -> 
     B.live h' input_b /\ B.live h' keys_b /\
     M.modifies (M.loc_buffer output_b) h h' /\
-    (let  input128_b = BV.mk_buffer_view  input_b Views.view128 in
-     let output128_b = BV.mk_buffer_view output_b Views.view128 in
-     BV.length input128_b > 1 /\ BV.length output128_b > 1 /\
-    (let  input_q = index (BV.as_seq h   input128_b) 0 in 
-     let output_q = index (BV.as_seq h' output128_b) 0 in
-     output_q == aes_encrypt_LE AES_128 (Ghost.reveal key) input_q))
+    (let  input_q = buffer_to_quad  input_b h in
+     let output_q = buffer_to_quad output_b h' in
+     output_q == aes_encrypt_LE AES_128 (Ghost.reveal key) input_q)
   )         
 
 let aes128_encrypt_block (input:quad32) 
@@ -173,16 +182,61 @@ assume val ghash_incremental_bytes_buffer (h_b hash_b input_b:B.buffer U8.t) (nu
     B.length     h_b % 16 == 0 /\ B.length    h_b >= 16 /\ 
     B.length  hash_b % 16 == 0 /\ B.length hash_b >= 16 /\ 
     B.length input_b % 16 == 0 /\ 
+    B.length input_b >= 16 * (bytes_to_quad_size (U64.v num_bytes)) /\
     True
   )
   (ensures fun h () h' -> 
-    M.modifies (M.loc_buffer hash_b) h h'
-    ) 
-
-assume val ghash_incremental_bytes (h old_hash:quad32) (input_b:B.buffer U8.t) (num_bytes:U64.t) : Stack quad32
-  (requires fun h -> True)
-  (ensures fun h new_hash h' -> True) 
-
+    M.modifies (M.loc_buffer hash_b) h h' /\
+    (let old_hash = buffer_to_quad hash_b h  in
+     let new_hash = buffer_to_quad hash_b h' in
+     let h_q      = buffer_to_quad h_b    h  in
+     let num_bytes = U64.v num_bytes in 
+     (num_bytes == 0 ==> new_hash == old_hash) /\
+     (let input_bytes = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad input_b h)) 0 num_bytes in
+      let padded_bytes = pad_to_128_bits input_bytes in
+      let input_quads = le_bytes_to_seq_quad32 padded_bytes in
+      num_bytes > 0 ==>  
+        length input_quads > 0 /\
+        new_hash == ghash_incremental h_q old_hash input_quads
+     )
+    )
+  )
+(*
+let ghash_incremental_bytes (h_val old_hash:quad32) (input_b:B.buffer U8.t) (num_bytes:U64.t) : Stack quad32
+  (requires fun h -> 
+    B.live h input_b /\
+    B.length input_b % 16 == 0 /\ 
+    B.length input_b >= 16 * (bytes_to_quad_size (U64.v num_bytes)) /\
+    True
+  )
+  (ensures fun h new_hash h' -> 
+    M.modifies (M.loc_none) h h' /\
+    (let num_bytes = U64.v num_bytes in 
+     (num_bytes == 0 ==> new_hash == old_hash) /\
+     (let input_bytes = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad input_b h)) 0 num_bytes in
+      let padded_bytes = pad_to_128_bits input_bytes in
+      let input_quads = le_bytes_to_seq_quad32 padded_bytes in
+      num_bytes > 0 ==>  
+        length input_quads > 0 /\
+        new_hash == ghash_incremental h_val old_hash input_quads
+     )
+    )
+  )
+  =
+  let h0 = ST.get() in
+  push_frame ();
+  let h1 = ST.get() in
+  assume (buffer_to_seq_quad input_b h0 == buffer_to_seq_quad input_b h1);
+  // TODO: Future work: Pass a pointer to the struct, instead of copying to a bytes buffer
+  let    h_b = B.alloca 0uy 16ul in
+  let hash_b = B.alloca 0uy 16ul in
+  quad32_to_buffer h_val       h_b;
+  quad32_to_buffer old_hash hash_b; 
+  ghash_incremental_bytes_buffer h_b hash_b input_b num_bytes;
+  let output = buffer_to_quad32 hash_b in
+  pop_frame ();
+  output
+*)
 assume val gcm128_one_pass 
              (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t)              
              (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
