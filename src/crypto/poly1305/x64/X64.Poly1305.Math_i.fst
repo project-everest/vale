@@ -3,8 +3,9 @@ module X64.Poly1305.Math_i
 open FStar.Tactics
 open FStar.Tactics.Canon
 open FStar.Math.Lemmas
-open FStar.Math.Lib
+// open FStar.Math.Lib
 open Math.Lemmas.Int_i
+open CanonCommSemiring
 open FStar.Mul
 open TypesNative_s
 open TypesNative_i
@@ -58,93 +59,29 @@ let multiplication_order_eq_lemma_int a b p = ()
 
 let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:int) (h1:int) 
 			(h2:int) (s1:int) (d0:int) (d1:int) (d2:int) (hh:int) =
-  let r1:nat = r1 in
-  let helper_lemma (x:nat) (y:int) : Lemma 
-    (ensures ((h2*n + h1)*((p+5)*x) + y + (h1*r0 + h0*r1)*n + h0*r0 ==
-     	      y + (h0*r1 + h1*r0 + h2*(5*x))* n + 
-    	      (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p)) =
-     assert_by_tactic ((h2*n+h1)*((p+5)*x) == (h2*n+h1)*5*x + ((h2*n+h1)*x)*p) canon;
-     assert((h2*n + h1)*((p+5)*x) + (y + (h1*r0 + h0*r1)*n + h0*r0) =
-               (h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0));
-
-     (* by swap_add *)
-     swap_add ((h2*n + h1)*5*x) (((h2*n + h1)*x)*p)
-      			 ((h2*r0)*(n*n) + (h1*r0 + h0*r1)*n + h0*r0);
-     assert((h2*n + h1)*5*x + ((h2*n + h1)*x)*p + (y + (h1*r0 + h0*r1)*n + h0*r0) =
-             (h2*n + h1)*5*x + (y + (h1*r0 + h0*r1)*n + h0*r0) + ((h2*n + h1)*x)*p);
-
-     assert_by_tactic ((h2*n + h1)*5*x + (y + (h1*r0 + h0*r1)*n + h0*r0) + ((h2*n + h1)*x)*p =
-		      y + (h0*r1 + h1*r0 + h2*(5*x))*n + (h0*r0 + h1*(5*x)) + ((h2*n + h1)*x)*p)
-		      canon
-     in
-     assert (h*r = (h2*(n*n) + h1*n + h0)*(r1*n + r0));
-     assert_by_tactic ((h2*(n*n) + h1*n + h0)*(r1*n + r0) =
-                        (h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0) canon;
-
-     (* by slash_star_axiom and lemma_mul_div_comm *)
-     slash_star_axiom (n*n) 4 (p+5);
-     lemma_mul_div_comm (p+5) 4 r1;
-     assert((h2*n+h1)*((n*n)*r1)+(h2*r0)*(n*n)+(h1*r0+h0*r1)*n+h0*r0 =
-            ((h2*n+h1)*((p+5)*(r1/4)))+(h2*r0)*(n*n)+ (h1*r0+h0*r1)*n + h0*r0);
-
-    (* by helper_lemma *)
-     helper_lemma (r1/4) ((h2*r0)*(n*n));
-     assert(((h2*n+h1)*((p+5)*(r1/4)))+(h2*r0)*(n*n)+ (h1*r0+h0*r1)*n + h0*r0 =
-              (h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n +
-	      (h0*r0 + h1*(5*(r1/4))) + ((h2*n + h1)*(r1/4))*p);
-
-     (*by comm_plus, division_addition_lemma, lemma_mul_div_sep *)
-      comm_plus #r1 #(r1/4);
-      division_addition_lemma r1 4 r1;
-      lemma_mul_div_sep 5 4 r1;
-      assert(r1 + (r1/4) = 5*(r1/4));
-      assert (hh == (h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + 
-    			   h0*r0 + h1*(5*(r1/4)));
-     (* proof that ((h2*n + h1)*(r1/4))*p % p = 0 *)
-     // assumptions due to library requiring nats (because some operator is nat only)
-     //can we switch to nats?
-      assume ((h2*n + h1) >= 0); 
-      assume ((h2*n+h1)*(r1/4) >= 0);
-      assume ((h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + (h0*r0 + h1*(5*(r1/4))) >= 0);
-      multiple_modulo_lemma ((h2*n + h1)*(r1/4)) p;
-      (* and (a+b*p)%p = a%p*)
-      lemma_mod_plus ((h2*r0)*(n*n) + (h0*r1 + h1*r0 + h2*(5*(r1/4)))*n + (h0*r0 + h1*(5*(r1/4))))
-      	((h2*n + h1)*(r1/4)) p;
-      assert ((h*r) % p == hh % p)
-
-let lemma_poly_reduce_nat (n:int) (p:pos) (h:nat) (h2:nat) (h10:int) (c:int) (hh:int) : Lemma
-  (requires
-    p > 0 /\
-    n * n > 0 /\
-    h2 >= 0 /\  // TODO: Shouldn't need to add this
-    4 * (n * n) == p + 5 /\
-    h2 == h / (n * n) /\
-    h10 == h % (n * n) /\
-    c == (h2 / 4) + (h2 / 4) * 4 /\
-    hh == h10 + c + (h2 % 4) * (n * n))
-  (ensures h % p == hh % p)
-  = 
-   lemma_div_mod h (n*n);
-   assert (h == (n*n)*h2 + h10);
-
-   assert ((n*n)*h2 + h10 == (n*n)*((h2 / 4) * 4 + h2 % 4) + h10);
-   assert_by_tactic ((n*n)*((h2 / 4) * 4 + h2 % 4) + h10 == 
-		     (h2 / 4) * (n * n * 4) + (h2 % 4) * (n*n) + h10) canon;
-   assert_by_tactic (n * n * 4 = 4 * (n * n)) canon;
-   assert ((h2 / 4) * (n * n * 4) + (h2 % 4) * (n*n) + h10 == 
-		    (h2 / 4) * (p+5) + (h2 % 4) * (n*n) + h10);
-   assert_by_tactic ((h2 / 4) * (p+5) + (h2 % 4) * (n*n) + h10 == 
-	    h10 + (h2 % 4) * (n*n) + c + p*(h2 / 4)) canon;
-   assert (h10 + (h2 % 4) * (n*n) + c + p*(h2 / 4) == hh + p*(h2/4));
-   lemma_mod_lt h2 4;
-   lemma_mul_nat_pos_is_nat (h2 % 4) (n*n);
-   lemma_mod_lt h (n*n);
-   assert (hh >= 0); 
-   lemma_mod_plus hh (h2/4) p
+  let r1_4 = r1 / 4 in
+  let h_r_expand = (h2 * (n * n) + h1 * n + h0) * ((r1_4 * 4) * n + r0) in
+  let hh_expand = (h2 * r0) * (n * n) + (h0 * (r1_4 * 4) + h1 * r0 + h2 * (5 * r1_4)) * n
+    + (h0 * r0 + h1 * (5 * r1_4)) in
+  //assert (h * r == h_r_expand);
+  //assert (hh == hh_expand);
+  let b = ((h2 * n + h1) * r1_4) in
+  modulo_addition_lemma hh_expand p b;
+  assert_by_tactic (h_r_expand == hh_expand + b * (n * n * 4 + (-5)))
+    (fun _ -> canon_semiring int_cr);
+  ()
       
 
 let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
-  lemma_poly_reduce_nat n p h h2 h10 c hh
+   let h2_4 = h2 / 4 in
+   let h2_m = h2 % 4 in
+   let h_expand = h10 + (h2_4 * 4 + h2_m) * (n * n) in
+   let hh_expand = h10 + (h2_m) * (n * n) + h2_4 * 5 in
+   lemma_div_mod h (n * n);
+   modulo_addition_lemma hh_expand p h2_4;
+   assert_by_tactic (h_expand == hh_expand + h2_4 * (n * n * 4 + (-5)))
+     (fun _ -> canon_semiring int_cr);
+   ()
 
 (* These lemmas go through because of SMT patterns,
    is that the right style to use here?*)
@@ -347,7 +284,7 @@ let lemma_mod_breakdown (a:nat) (b:pos) (c:pos) :
   assert_by_tactic (b*(c-1) + b == b*c) canon;
   assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) < b*c);
 
-  lemma_div_mod a b;
+  FStar.Math.Lemmas.lemma_div_mod a b;
   assert(a% (b*c) == (b*(a/b) + a%b) % (b*c));
   lemma_mod_lt a b;
   nat_over_pos_is_nat a b;
@@ -428,7 +365,11 @@ let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s
   
 
 let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
-  admit()
+  reveal_opaque (lowerUpper128);
+  reveal_iand 64 x0 y0;
+  reveal_iand 64 x1 y1;
+  reveal_iand 128 x y;
+  lemma_lowerUpper128_andu x x0 x1 y y0 y1 z z0 z1
 
 let lemma_add_mod128 (x y :int) =
   reveal_opaque mod2_128'
