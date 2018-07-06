@@ -1285,6 +1285,31 @@ let valid_state_store_mem128 i v (s:state) =
     assert (Map.equal mem1 mem2);
     ()
 
+let equiv_load_mem ptr s =
+  let t = TBase TUInt64 in
+  let h = s.mem in
+  let b = get_addr_ptr t ptr h h.ptrs in
+  let i = get_addr_in_ptr t (buffer_length b) (buffer_addr b h) ptr 0 in
+  let addr = buffer_addr b h in
+  let contents = B.as_seq h.hs b in
+  let heap = s.state.S.mem in
+  index64_get_heap_val64 h b heap i;
+  lemma_load_mem64 b i h;
+  ()
+  
+
+let equiv_load_mem128 ptr s =
+  let t = TBase TUInt128 in
+  let h = s.mem in
+  let b = get_addr_ptr t ptr h h.ptrs in
+  let i = get_addr_in_ptr t (buffer_length b) (buffer_addr b h) ptr 0 in
+  let addr = buffer_addr b h in
+  let contents = B.as_seq h.hs b in
+  let heap = s.state.S.mem in
+  index128_get_heap_val128 h b heap i;
+  lemma_load_mem128 b i h;
+  ()
+
 open X64.Machine_s
 
 let valid_taint_buf64 b mem memTaint t = 
