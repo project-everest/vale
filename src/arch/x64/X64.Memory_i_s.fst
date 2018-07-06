@@ -166,7 +166,7 @@ val index128_get_heap_val128 (h:mem)
     (S.get_heap_val32 (addr + 16 `op_Multiply` i +12) heap)
  )
 
-#set-options "--z3rlimit 50"
+#set-options "--z3rlimit 50 --max_fuel 7 --initial_fuel 7 --max_ifuel 7 --initial_ifuel 7 --z3refresh"
 
 let index128_get_heap_val128_aux (s:Seq.lseq UInt8.t 16) (ptr:int) (heap:S.heap) : Lemma
   (requires (forall (j:nat) . j < 16 ==> UInt8.v (Seq.index s j) == heap.[ptr+j]))
@@ -177,8 +177,10 @@ let index128_get_heap_val128_aux (s:Seq.lseq UInt8.t 16) (ptr:int) (heap:S.heap)
     (S.get_heap_val32 (ptr+12) heap)) =
   Opaque_s.reveal_opaque S.get_heap_val32_def;
   Opaque_s.reveal_opaque Views.get128_def;
+  Opaque_s.reveal_opaque Types_s.le_bytes_to_quad32_def;
   ()
 
+#set-options "--z3rlimit 50"
 let index128_helper (x y:int) (heap:S.heap) : Lemma
   (requires x == y)
   (ensures heap.[x] == heap.[y]) = ()
