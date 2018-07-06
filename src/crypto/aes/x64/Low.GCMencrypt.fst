@@ -11,6 +11,7 @@ module U64 = FStar.UInt64
 module HS = FStar.HyperStack
 module ST = FStar.HyperStack.ST
 module HST = FStar.HyperStack.ST
+module E = Kremlin.Endianness
 
 open Types_s
 open Types_i
@@ -53,19 +54,53 @@ let buffer_to_seq_quad (b:B.buffer U8.t { B.length b % 16 == 0 }) (h:HS.mem) : G
   BV.length_eq b128;
   (BV.as_seq h b128)
 
-assume val quad32_to_buffer (q:quad32) (b:B.buffer U8.t { B.length b % 16 == 0 } ) : Stack unit
-  (requires fun h -> B.length b > 0)
+let quad32_to_buffer (q:quad32) (b:B.buffer U8.t { B.length b % 16 == 0 } ) : Stack unit
+  (requires fun h -> B.live h b /\ B.length b > 0)
   (ensures fun h () h' -> 
     M.modifies (M.loc_buffer b) h h' /\
     buffer_to_quad b h' == q
   )
-
-assume val buffer_to_quad32 (b:B.buffer U8.t { B.length b % 16 == 0 }) : Stack quad32
-  (requires fun h -> B.length b > 0)
+  =
+  let b_lo0 = E.n_to_le 4ul q.lo0 in
+  let b_lo1 = E.n_to_le 4ul q.lo1 in
+  let b_hi2 = E.n_to_le 4ul q.hi2 in
+  let b_hi3 = E.n_to_le 4ul q.hi3 in
+  B.upd b 0ul (index b_lo0 0);
+  B.upd b 1ul (index b_lo0 1);
+  B.upd b 2ul (index b_lo0 2);
+  B.upd b 3ul (index b_lo0 3);
+  B.upd b 4ul (index b_lo1 0);
+  B.upd b 5ul (index b_lo1 1);
+  B.upd b 6ul (index b_lo1 2);
+  B.upd b 7ul (index b_lo1 3);  
+  B.upd b 8ul (index b_hi2 0);
+  B.upd b 9ul (index b_hi2 1);
+  B.upd b 10ul (index b_hi2 2);
+  B.upd b 11ul (index b_hi2 3);
+  B.upd b 12ul (index b_hi3 0);
+  B.upd b 13ul (index b_hi3 1);
+  B.upd b 14ul (index b_hi3 2);
+  B.upd b 15ul (index b_hi3 3);
+admit();  // TODO: Prove this actually works!
+  ()
+  
+let buffer_to_quad32 (b:B.buffer U8.t { B.length b % 16 == 0 }) : Stack quad32
+  (requires fun h -> B.live h b /\ B.length b > 0)
   (ensures fun h q h' -> 
     M.modifies M.loc_none h h' /\
     q == buffer_to_quad b h
   )
+  =
+  let b_lo0 = [B.index b 0ul; B.index b 1ul; B.index b 2ul; B.index b 3ul] in
+  let b_lo1 = [B.index b 4ul; B.index b 5ul; B.index b 6ul; B.index b 7ul] in
+  let b_hi2 = [B.index b 8ul; B.index b 9ul; B.index b 10ul; B.index b 11ul] in
+  let b_hi3 = [B.index b 12ul; B.index b 13ul; B.index b 14ul; B.index b 15ul] in
+  let lo0 = E.le_to_n (of_list b_lo0) in
+  let lo1 = E.le_to_n (of_list b_lo1) in
+  let hi2 = E.le_to_n (of_list b_hi2) in
+  let hi3 = E.le_to_n (of_list b_hi3) in
+admit();    // TODO: Prove this actually works!
+  Mkfour lo0 lo1 hi2 hi3
 
 let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t { B.length keys_b % 16 == 0 }) (h:HS.mem) =
   let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
