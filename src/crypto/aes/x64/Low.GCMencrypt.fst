@@ -7,6 +7,7 @@ module BV = LowStar.BufferView
 module M = LowStar.Modifies
 open LowStar.ModifiesPat
 module U8 = FStar.UInt8
+module U32 = FStar.UInt32
 module U64 = FStar.UInt64
 module HS = FStar.HyperStack
 module ST = FStar.HyperStack.ST
@@ -38,6 +39,16 @@ open FStar.Mul
 let seq_U8_to_seq_nat8 (b:seq U8.t) : (seq nat8) =
   Seq.init (length b) (fun (i:nat { i < length b }) -> U8.v (index b i))
 
+let buffer_to_nat32 (b:B.buffer U8.t { B.length b % 4 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot nat32 =
+  let b32 = BV.mk_buffer_view b Views.view32 in
+  BV.as_buffer_mk_buffer_view b Views.view32;
+  BV.get_view_mk_buffer_view b Views.view32;
+  BV.length_eq b32;
+  //assert (B.length b >= 4);
+  //assert (BV.length b32 > 0);
+  U32.v (BV.sel h b32 0)
+  //U32.v (index (BV.as_seq h b32) 0)
+
 let buffer_to_quad (b:B.buffer U8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
   BV.as_buffer_mk_buffer_view b Views.view128;
@@ -45,7 +56,8 @@ let buffer_to_quad (b:B.buffer U8.t { B.length b % 16 == 0 /\ B.length b > 0 }) 
   BV.length_eq b128;
   assert (B.length b >= 16);
   assert (BV.length b128 > 0);
-  index (BV.as_seq h b128) 0
+  BV.sel h b128 0
+  //index (BV.as_seq h b128) 0
 
 let buffer_to_seq_quad (b:B.buffer U8.t { B.length b % 16 == 0 }) (h:HS.mem) : GTot (s:seq quad32 {length s == B.length b / 16} ) =
   let b128 = BV.mk_buffer_view b Views.view128 in
@@ -53,6 +65,77 @@ let buffer_to_seq_quad (b:B.buffer U8.t { B.length b % 16 == 0 }) (h:HS.mem) : G
   BV.get_view_mk_buffer_view b Views.view128;
   BV.length_eq b128;
   (BV.as_seq h b128)
+
+let nat32_to_buffer (n:nat32) (b:B.buffer U8.t { B.length b % 4 == 0 } ) : Stack unit
+  (requires fun h -> B.live h b /\ B.length b == 4)
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    buffer_to_nat32 b h' == n
+  )
+  =
+  let original_n = n in
+  B.upd b 0ul (U8.uint_to_t (n % 0x100));
+  let n = n `op_Division` 0x100 in
+  B.upd b 1ul (U8.uint_to_t (n % 0x100));
+  let n = n `op_Division` 0x100 in
+  B.upd b 2ul (U8.uint_to_t (n % 0x100));
+  let n = n `op_Division` 0x100 in
+  B.upd b 3ul (U8.uint_to_t (n % 0x100));
+  let h = ST.get() in
+  Opaque_s.reveal_opaque Views.put32_def;
+  let b_s = B.as_seq h b in
+  let v_s = (Views.put32 (U32.uint_to_t original_n)) in
+  assert (equal b_s v_s);
+  Views.inverses32();
+  BV.as_buffer_mk_buffer_view b Views.view32;
+  BV.get_view_mk_buffer_view b Views.view32;
+  let b32 = BV.mk_buffer_view b Views.view32 in
+  BV.length_eq b32;
+  assert (BV.length b32 > 0);
+  BV.get_sel h b32 0;
+  ()
+
+let nat32_from_buffer (b:B.buffer U8.t { B.length b % 4 == 0 }) : Stack nat32
+  (requires fun h -> B.live h b /\ B.length b > 0)
+  (ensures fun h n h' -> 
+    M.modifies M.loc_none h h' /\
+    n == buffer_to_nat32 b h
+  )
+  =
+  admit()     // TODO
+
+(*
+let quad32_to_buffer' (q:quad32) (b:B.buffer U8.t { B.length b % 16 == 0 } ) : Stack unit
+  (requires fun h -> B.live h b /\ B.length b == 16)
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    buffer_to_quad b h' == q
+  )
+  =
+  let lo0_b = B.sub b 0ul 4ul in
+  nat32_to_buffer q.lo0 lo0_b;
+  let lo1_b = B.sub b 4ul 4ul in
+  nat32_to_buffer q.lo1 lo1_b;
+  let hi2_b = B.sub b 8ul 4ul in
+  nat32_to_buffer q.hi2 hi2_b;  
+  let hi3_b = B.sub b 12ul 4ul in
+  nat32_to_buffer q.hi3 hi3_b;  
+  let h' = ST.get() in
+  Opaque_s.reveal_opaque Views.put128_def;
+  let p_s = Views.put128_def q in
+  let v_s = B.as_seq h' b in
+  assert (length p_s == length v_s);
+  assert (equal p_s v_s);
+  (*
+  Views.inverses128();
+  BV.as_buffer_mk_buffer_view b Views.view128;
+  BV.get_view_mk_buffer_view b Views.view128;
+  let b128 = BV.mk_buffer_view b Views.view128 in
+  BV.length_eq b128;
+  *)
+  admit();
+  ()
+*)
 
 let quad32_to_buffer (q:quad32) (b:B.buffer U8.t { B.length b % 16 == 0 } ) : Stack unit
   (requires fun h -> B.live h b /\ B.length b > 0)
