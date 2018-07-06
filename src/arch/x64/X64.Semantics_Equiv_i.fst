@@ -408,3 +408,140 @@ let equiv_eval_ins s ins = match ins with
   | S.AESNI_dec_last _ _ -> equiv_eval_aesni_dec_last s ins
   | S.AESNI_imc _ _ -> equiv_eval_aesni_imc s ins
   | S.AESNI_keygen_assist _ _ _ -> equiv_eval_aesni_keygen s ins
+
+val monotone_ok_ins (ins:S.ins) (s:state) : Lemma (
+  let s_hi = run (eval_ins ins) s in
+  let s_bytes = S.run (S.eval_ins ins) s.state in
+  (s_hi.state.S.ok ==> s.state.S.ok) /\
+  (s_bytes.S.ok ==> s.state.S.ok))
+
+val monotone_ok_code (code:code) (fuel:nat) (s:state) : Lemma 
+  (requires True)
+  (ensures (
+  let s_hi = eval_code code fuel s in
+  (Some? s_hi /\ (Some?.v s_hi).state.S.ok ==> s.state.S.ok)))
+  (decreases %[fuel; code])
+
+val monotone_ok_codes (l:codes) (fuel:nat) (s:state) : Lemma 
+  (requires True)
+  (ensures (
+  let s_hi = eval_codes l fuel s in
+  (Some? s_hi /\ (Some?.v s_hi).state.S.ok ==> s.state.S.ok)))
+  (decreases %[fuel; l])
+
+val monotone_ok_while (b:ocmp) (code:code) (fuel:nat) (s:state) : Lemma
+  (requires True)
+  (ensures (
+  let s_hi = eval_while b code fuel s in
+  (Some? s_hi /\ (Some?.v s_hi).state.S.ok ==> s.state.S.ok)))
+  (decreases %[fuel; code])
+
+
+val monotone_ok_code_bytes (code:code) (fuel:nat) (s:S.state) : Lemma 
+  (requires True)
+  (ensures (
+  let s_bytes = S.eval_code code fuel s in
+  (Some? s_bytes /\ (Some?.v s_bytes).S.ok ==> s.S.ok)))
+  (decreases %[fuel; code])
+
+val monotone_ok_codes_bytes (l:codes) (fuel:nat) (s:S.state) : Lemma 
+  (requires True)
+  (ensures
+    (let s_bytes = S.eval_codes l fuel s in
+  (Some? s_bytes /\ (Some?.v s_bytes).S.ok ==> s.S.ok)))
+  (decreases %[fuel; l])
+
+val monotone_ok_while_bytes (b:ocmp) (code:code) (fuel:nat) (s:S.state) : Lemma 
+  (requires True)
+  (ensures 
+  (let s_bytes = S.eval_while b code fuel s in
+  (Some? s_bytes /\ (Some?.v s_bytes).S.ok ==> s.S.ok)))
+  (decreases %[fuel; code])
+
+let monotone_ok_ins ins s = ()
+
+let rec monotone_ok_code code fuel s = match code with
+  | Ins ins -> monotone_ok_ins ins s
+  | Block l -> monotone_ok_codes l fuel s
+  | IfElse ifCond ifTrue ifFalse -> 
+    let s_hi = run (check (valid_ocmp ifCond)) s in
+    monotone_ok_code ifTrue fuel s_hi;
+    monotone_ok_code ifFalse fuel s_hi
+  | While b c -> monotone_ok_while b c fuel s
+
+and monotone_ok_codes l fuel s = match l with
+  | [] -> ()
+  | c::tl ->
+    let s_opt = eval_code c fuel s in
+    monotone_ok_code c fuel s;
+    if None? s_opt then () else monotone_ok_codes tl fuel (Some?.v s_opt)
+
+and monotone_ok_while b c fuel s =
+  if fuel = 0 then () else
+  let s = run (check (valid_ocmp b)) s in
+  if not (eval_ocmp s b) then ()
+  else (
+  monotone_ok_code c (fuel-1) s;
+  match eval_code c (fuel-1) s with
+    | None -> ()
+    | Some s1 -> monotone_ok_while b c (fuel-1) s1
+  )
+
+let rec monotone_ok_code_bytes code fuel s = match code with
+  | Ins ins -> ()
+  | Block l -> monotone_ok_codes_bytes l fuel s
+  | IfElse ifCond ifTrue ifFalse -> 
+    let s_bytes = S.run (S.check (S.valid_ocmp ifCond)) s in
+    monotone_ok_code_bytes ifTrue fuel s_bytes;
+    monotone_ok_code_bytes ifFalse fuel s_bytes
+  | While b c -> monotone_ok_while_bytes b c fuel s
+
+and monotone_ok_codes_bytes l fuel s = match l with
+  | [] -> ()
+  | c::tl ->
+    let s_opt = S.eval_code c fuel s in
+    monotone_ok_code_bytes c fuel s;
+    if None? s_opt then () else monotone_ok_codes_bytes tl fuel (Some?.v s_opt)
+
+and monotone_ok_while_bytes b c fuel s =
+  if fuel = 0 then () else
+  let s = S.run (S.check (S.valid_ocmp b)) s in
+  if not (S.eval_ocmp s b) then ()
+  else (
+  monotone_ok_code_bytes c (fuel-1) s;
+  match S.eval_code c (fuel-1) s with
+    | None -> ()
+    | Some s1 -> monotone_ok_while_bytes b c (fuel-1) s1
+  )
+
+let rec equiv_eval_code code fuel s = match code with
+  | Ins ins -> equiv_eval_ins s ins
+  | Block l -> equiv_eval_codes l fuel s
+  | IfElse ifCond ifTrue ifFalse -> 
+    let s = run (check (valid_ocmp ifCond)) s in
+    equiv_eval_code ifTrue fuel s;
+    equiv_eval_code ifFalse fuel s
+  | While b c -> equiv_eval_while b c fuel s
+
+and equiv_eval_codes l fuel s = match l with
+  | [] -> ()
+  | c::tl -> let s_opt = eval_code c fuel s in
+    let s_bytes = S.eval_code c fuel s.state in
+    if None? s_opt || None? s_bytes then () else 
+      (equiv_eval_code c fuel s;
+      let s_hi = Some?.v s_opt in
+      let s_bytes = Some?.v s_bytes in 
+      if not (s_hi.state.S.ok) || not (s_bytes.S.ok) then (
+        monotone_ok_codes_bytes tl fuel s_bytes;
+	monotone_ok_codes tl fuel s_hi
+      ) else equiv_eval_codes tl fuel (Some?.v s_opt))
+
+
+and equiv_eval_while b c fuel s =
+  if fuel = 0 then () else
+  let s0 = run (check (valid_ocmp b)) s in
+  if not (eval_ocmp s0 b) then ()
+  else
+    match eval_code c (fuel-1) s0 with
+    | None -> ()
+    | Some s1 -> equiv_eval_code c (fuel-1) s0; equiv_eval_while b c (fuel-1) s1
