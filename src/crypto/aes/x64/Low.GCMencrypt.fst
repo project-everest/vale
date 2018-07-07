@@ -24,6 +24,7 @@ open GCM_s
 open GCM_helpers_i
 open GHash_i
 open X64.Memory_i_s
+open BufferViewHelpers
 open FStar.Seq
 
 open FStar.Mul
@@ -586,7 +587,10 @@ let gcm128_one_pass
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
     M.loc_disjoint (M.loc_buffer keys_b)  mods /\
     M.loc_disjoint (M.loc_buffer hash_b)  mods /\    
-    M.loc_disjoint (M.loc_buffer h_b)  mods /\
+    M.loc_disjoint (M.loc_buffer h_b)     mods /\
+    M.(loc_disjoint (loc_buffer iv_b) (loc_buffer cipher_b)) /\
+    M.(loc_disjoint (loc_buffer hash_b) (loc_buffer cipher_b)) /\
+    M.(loc_disjoint (loc_buffer hash_b) (loc_buffer iv_b)) /\
     
     B.length plain_b  == bytes_to_quad_size (U32.v num_bytes) * 16 /\
     B.length cipher_b == B.length plain_b /\
@@ -678,8 +682,6 @@ let gcm128_one_pass
       // From gcm_one_pass, we get:
       bytes_to_quad_size_no_extra_bytes (U32.v num_bytes);
 
-assume (buffer_to_seq_quad32  plain_b h0 == buffer_to_seq_quad32  plain_b h1);
-
       // Prove a property about le_bytes_to_seq_quad32 while trying to keep its definition hidden
       let length_helper (x:int) : Lemma (forall y . {:pattern length (le_bytes_to_seq_quad32 y)}
                                              length y > 0 ==> length (le_bytes_to_seq_quad32 y) > 0) =
@@ -689,21 +691,9 @@ assume (buffer_to_seq_quad32  plain_b h0 == buffer_to_seq_quad32  plain_b h1);
       ()
     ) else (
       let iv_old = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
-      let hash_old = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h0) in
-assume (buffer_to_seq_quad32  keys_b h0 == buffer_to_seq_quad32  keys_b h1);      
+      let hash_old = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h0) in      
       gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b cipher_b;
-      
-      let h2 = ST.get() in
-assume (buffer_to_quad32       h_b    h0 == buffer_to_quad32      h_b     h2);       
-assume (buffer_to_quad32       hash_b h1 == buffer_to_quad32      hash_b  h2);          
-assume (buffer_to_seq_quad32  plain_b h0 == buffer_to_seq_quad32  plain_b h1);
-
-      ghash_incremental_bytes_extra_buffer cipher_b hash_b h_b num_bytes hash_old;
-      let h3 = ST.get() in
-      
-assume (buffer_to_seq_quad32  plain_b h0 == buffer_to_seq_quad32   plain_b h3);
-assume (buffer_to_seq_quad32 cipher_b h2 == buffer_to_seq_quad32  cipher_b h3);
-assume (buffer_to_quad32         iv_b h1 == buffer_to_quad32          iv_b h3);
+      ghash_incremental_bytes_extra_buffer cipher_b hash_b h_b num_bytes hash_old;    
       ()
     )    
   ) else (
