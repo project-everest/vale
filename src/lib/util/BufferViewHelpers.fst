@@ -23,7 +23,6 @@ let lemma_bv_equal
     FStar.Classical.forall_intro (BV.view_indexing bv);
     FStar.Classical.forall_intro (BV.as_seq_sel h0 bv);
     FStar.Classical.forall_intro (BV.as_seq_sel h1 bv);
-        admit();
     FStar.Classical.forall_intro (BV.get_sel h0 bv);
     FStar.Classical.forall_intro (BV.get_sel h1 bv);
     Seq.lemma_eq_intro (BV.as_seq h0 bv) (BV.as_seq h1 bv)
