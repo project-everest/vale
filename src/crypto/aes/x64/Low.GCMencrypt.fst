@@ -404,7 +404,7 @@ let gcm128_one_pass_blocks
                  (loc_union (loc_buffer iv_b) 
                             (loc_buffer hash_b))) in
     M.modifies mods h h' /\
-    // REVIEW: Do we really need to relist all of these liven ess predicates?
+    // REVIEW: Do we really need to relist all of these liveness predicates?
     B.live h' plain_b /\ B.live h' iv_b /\ B.live h' keys_b /\ B.live h' cipher_b /\
     B.live h' h_b /\ B.live h' hash_b /\ 
     (let num_blocks = U32.v num_blocks in
@@ -453,6 +453,7 @@ let gcm128_one_pass_blocks
   ()
   *)
 
+#reset-options "--z3rlimit 20"
 let gcm128_one_pass
              (plain_b:B.buffer U8.t) (num_bytes:U32.t)  
              (iv_b:B.buffer U8.t) 
@@ -469,6 +470,7 @@ let gcm128_one_pass
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
     M.loc_disjoint (M.loc_buffer keys_b)  mods /\
     M.loc_disjoint (M.loc_buffer h_b)  mods /\
+    
     B.length plain_b  == bytes_to_quad_size (U32.v num_bytes) * 16 /\
     B.length cipher_b == B.length plain_b /\
     B.length iv_b == 16 /\
@@ -476,7 +478,10 @@ let gcm128_one_pass
     B.length hash_b == 16 /\
     B.length iv_b == 16 /\
     B.length plain_b % 16 == 0 /\
-    
+
+    4096 * (U32.v num_bytes) < pow2_32 /\
+    256 * bytes_to_quad_size (U32.v num_bytes) < pow2_32 /\
+
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
     B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
@@ -518,7 +523,70 @@ let gcm128_one_pass
    ) /\
   True) 
   =
-  admit()
+  let h0 = ST.get() in
+  if U32.v num_bytes > 0 then (
+    let num_blocks = U32.div num_bytes 16ul in
+    let num_extra = U32.rem num_bytes 16ul in
+    gcm128_one_pass_blocks plain_b num_blocks iv_b key keys_b cipher_b h_b hash_b;
+    let h1 = ST.get() in
+    //assert (gctr_partial AES_128 (U32.v num_blocks) (buffer_to_seq_quad32 plain_b h1) (buffer_to_seq_quad32 cipher_b h1) (Ghost.reveal key) (buffer_to_quad32 iv_b h0));
+(*
+    assert (let c = buffer_to_seq_quad32 cipher_b h1 in
+            (U32.v num_blocks) > 0 ==> length c > 0 /\       
+            buffer_to_quad32 hash_b h1 == 
+            ghash_incremental (buffer_to_quad32 h_b h0) 
+                              (buffer_to_quad32 hash_b h0) 
+                              (slice c 0 (U32.v num_blocks)));
+ *)   
+    if num_extra = 0ul then (
+      // No work to be done.  Just call a bunch of lemmas
+        
+      // From gctr_bytes_no_extra(), we get:
+      gctr_partial_completed AES_128 
+                             (buffer_to_seq_quad32 plain_b h1)
+                             (buffer_to_seq_quad32 cipher_b h1)
+                             (Ghost.reveal key)
+                             (buffer_to_quad32 iv_b h0); 
+      gctr_partial_to_full_basic (buffer_to_quad32 iv_b h0)  
+                                 (buffer_to_seq_quad32 plain_b h1)
+                                 AES_128
+                                 (Ghost.reveal key)
+                                 (buffer_to_seq_quad32 cipher_b h1);
+      no_extra_bytes_helper (buffer_to_seq_quad32 plain_b h1) (U32.v num_bytes);
+      no_extra_bytes_helper (buffer_to_seq_quad32 cipher_b h1) (U32.v num_bytes);  
+
+      // From ghash_incremental_bytes_no_extra() we get the following,
+      // after eliminating redundancies with lemma calls above):
+      le_bytes_to_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h1);
+
+      // From gcm_one_pass, we get:
+      bytes_to_quad_size_no_extra_bytes (U32.v num_bytes);
+
+assume (buffer_to_seq_quad32  plain_b h0 == buffer_to_seq_quad32  plain_b h1);
+
+      // Prove a property about le_bytes_to_seq_quad32 while trying to keep its definition hidden
+      let length_helper (x:int) : Lemma (forall y . {:pattern length (le_bytes_to_seq_quad32 y)}
+                                             length y > 0 ==> length (le_bytes_to_seq_quad32 y) > 0) =
+        Opaque_s.reveal_opaque le_bytes_to_seq_quad32_def
+      in
+      length_helper 0;                            
+      ()
+    ) else (
+      admit() 
+    )    
+  ) else (
+    // Wow, this is a painful way to handle ghost values :(
+    let plain  = Ghost.elift2 buffer_to_seq_quad32  (Ghost.hide plain_b)  (Ghost.hide h0) in
+    let cipher = Ghost.elift2 buffer_to_seq_quad32  (Ghost.hide cipher_b) (Ghost.hide h0) in
+    let old_iv = Ghost.elift2 buffer_to_quad32      (Ghost.hide iv_b)     (Ghost.hide h0) in 
+    gctr_encrypt_empty (Ghost.reveal old_iv) 
+                       (Ghost.reveal plain) 
+                       (Ghost.reveal cipher) 
+                       AES_128 
+                       (Ghost.reveal key);
+    ()
+  );
+  ()
 
 (*
 let gcm_core (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
