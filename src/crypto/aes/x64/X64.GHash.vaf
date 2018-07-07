@@ -102,6 +102,68 @@ procedure {:quick} compute_ghash_incremental_register()
     reveal_opaque(ghash_incremental_def);
 }
 
+procedure {:quick} ghash_incremental_one_block_buffer(
+  ghost h_b:buffer128,
+  ghost hash_b:buffer128,
+  ghost input_b:buffer128,
+  ghost offset:nat64)
+    requires
+        locs_disjoint(list(loc_buffer(h_b), loc_buffer(hash_b), loc_buffer(input_b)));
+        buffer_readable(mem, h_b);
+        buffer_readable(mem, hash_b);
+        buffer_readable(mem, input_b);
+        rdi == buffer_addr(h_b, mem);
+        rsi == buffer_addr(hash_b, mem);
+        rdx == buffer_addr(input_b, mem);
+        rcx == offset;
+
+        buffer_length(input_b) >= offset + 1;
+        buffer_length(h_b) >= 1;
+        buffer_length(hash_b) >= 1;
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        modifies_buffer128(hash_b, old(mem), mem);
+        let old_hash := buffer128_read(hash_b, 0, old(mem));
+        let new_hash := buffer128_read(hash_b, 0, mem);
+        let h_q := buffer128_read(h_b, 0, old(mem));
+        let input_quad := buffer128_read(input_b, offset, old(mem));
+        new_hash == ghash_incremental(h_q, old_hash, create(1, input_quad));
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
+{
+        // Save R12 register
+        Mov64(rax, r12);
+
+        // Input into xmm2
+        Load128_buffer_reg(xmm2, rdx, rcx, input_b, offset);
+
+        // old_hash into xmm1
+        Load128_buffer(xmm1, rsi, 0, hash_b, 0);
+
+        // mask into xmm8
+        InitPshufbMask(xmm8, r11);        
+
+        // h into xmm11
+        Load128_buffer(xmm11, rdi, 0, h_b, 0);
+
+        // Call the function
+        compute_ghash_incremental_register();
+
+        // Store the new_hash into hash_b
+        Store128_buffer(rsi, xmm1, 0, hash_b, 0);
+
+        // Restore r12 register
+        Mov64(r12, rax);
+}
+
 procedure {:quick} compute_ghash_incremental(
     ghost in_b:buffer128
     )
