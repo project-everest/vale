@@ -26,16 +26,22 @@ let ghash = ("ghash_incremental_bytes_stdcall", [
   ("input_b", TBuffer TUInt128); ("num_bytes", TBase TUInt64)
   ], Stk (Prims.parse_int "0"))
 *)
-
+(*
 let gctr_bytes_extra_buffer = ("gctr_bytes_extra_buffer", [
   ("plain_b", TBuffer TUInt128); ("num_bytes", TBase TUInt64);
   ("iv_old", TGhost "quad32"); ("iv_b", TBuffer TUInt128);
   ("key", TGhost "aes_key_LE AES_128"); ("keys_b", TBuffer TUInt128);
   ("cipher_b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
+*)
+
+let ghash_extra = ("ghash_incremental_extra_stdcall", [
+  ("in_b", TBuffer TUInt128); ("hash_b", TBuffer TUInt128);
+  ("h_b", TBuffer TUInt128); ("num_bytes", TBase TUInt64);
+  ("orig_hash", TGhost "quad32")], Stk (Prims.parse_int "0"))
 
 let os = Linux
 
-let name = gctr_bytes_extra_buffer
+let name = ghash_extra
 
 let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()
