@@ -20,13 +20,23 @@ let aes_encrypt_block = ("aes128_encrypt_block", [
   ], Stk (Prims.parse_int "0"))
 *)
 
+(*
 let ghash = ("ghash_incremental_bytes_stdcall", [
   ("h_b", TBuffer TUInt128); ("hash_b", TBuffer TUInt128);
   ("input_b", TBuffer TUInt128); ("num_bytes", TBase TUInt64)
   ], Stk (Prims.parse_int "0"))
+*)
+
+let gctr_bytes_extra_buffer = ("gctr_bytes_extra_buffer", [
+  ("plain_b", TBuffer TUInt128); ("num_bytes", TBase TUInt64);
+  ("iv_old", TGhost "quad32"); ("iv_b", TBuffer TUInt128);
+  ("key", TGhost "aes_key_LE AES_128"); ("keys_b", TBuffer TUInt128);
+  ("cipher_b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
 
 let os = Linux
 
-let _ = print_string (translate_vale os X86 ghash)
+let name = gctr_bytes_extra_buffer
+
+let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()
-let _ = print_string (translate_lowstar os X86 ghash)
+let _ = print_string (translate_lowstar os X86 name)
