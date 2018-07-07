@@ -188,6 +188,27 @@ assume val ghash_incremental_bytes_buffer (h_b hash_b input_b:B.buffer U8.t) (nu
     )
   )
 
+assume val ghash_incremental_one_block_buffer (h_b hash_b input_b:B.buffer U8.t) (offset:U64.t) : Stack unit
+  (requires fun h -> 
+    B.live h h_b  /\ B.live h hash_b /\ B.live h input_b /\
+    B.length     h_b % 16 == 0 /\ B.length    h_b >= 16 /\ 
+    B.length  hash_b % 16 == 0 /\ B.length hash_b >= 16 /\ 
+    B.length input_b % 16 == 0 /\ 
+    B.length input_b >= 16 * (U64.v offset + 1) /\
+    True
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer hash_b) h h' /\
+    (let old_hash = buffer_to_quad32 hash_b h  in
+     let new_hash = buffer_to_quad32 hash_b h' in
+     let h_q      = buffer_to_quad32 h_b    h  in
+     let offset   = U64.v offset in 
+     let input    = buffer_to_seq_quad32 input_b h in
+     let input_quad = index input offset in
+     new_hash == ghash_incremental h_q old_hash (create 1 input_quad)
+    )
+  )
+
 assume val ghash_incremental_bytes_extra_buffer
              (in_b hash_b h_b:B.buffer U8.t) (num_bytes:U32.t) 
              (orig_hash:Ghost.erased quad32)
@@ -269,7 +290,7 @@ assume val gcm_load_xor_store_buffer
 
      // gcm_body specific
      offset < num_blocks /\
-     mask == aes_encrypt_BE AES_128 key (inc32 iv offset) /\
+     mask == aes_encrypt_LE AES_128 key (inc32 iv offset) /\
      gctr_partial AES_128 offset plain cipher key iv
     )
   )
@@ -299,7 +320,6 @@ assume val inc32_buffer (iv_b:B.buffer U8.t) : Stack unit
      let new_iv = buffer_to_quad32 iv_b h' in
      new_iv == inc32 old_iv 1))
 
-(*
 (*** Actual Low* code ***)
 let gcm128_one_pass_blocks 
              (plain_b:B.buffer U8.t) (num_blocks:U32.t)  
@@ -334,7 +354,6 @@ let gcm128_one_pass_blocks
                  (loc_union (loc_buffer iv_b) 
                             (loc_buffer hash_b))) in
     M.modifies mods h h' /\
-    // REVIEW: Do we really need to relist all of these liveness predicates?
     B.live h' plain_b /\ B.live h' iv_b /\ B.live h' keys_b /\ B.live h' cipher_b /\
     B.live h' h_b /\ B.live h' hash_b /\ 
     (let num_blocks = U32.v num_blocks in
@@ -355,7 +374,7 @@ let gcm128_one_pass_blocks
   True) 
   =
   push_frame();
-  let ctr_b = B.alloca 0uy 16ul in
+//  let ctr_b = B.alloca 0uy 16ul in
   let enc_ctr_b = B.alloca 0uy 16ul in
 //  memcpy_simple iv_b ctr_b 16ul;
   let h0 = ST.get() in
@@ -363,29 +382,52 @@ let gcm128_one_pass_blocks
     i <= U32.v num_blocks /\
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
     B.live h h_b /\ B.live h hash_b /\
-    B.live h ctr_b /\ B.live h enc_ctr_b /\
+    B.live h enc_ctr_b /\
     (let mods = M.(loc_union (loc_buffer cipher_b) 
                   (loc_union (loc_buffer iv_b) 
-                             (loc_buffer hash_b))) in 
+                  (loc_union (loc_buffer enc_ctr_b)
+                             (loc_buffer hash_b)))) in 
                             
-    M.(modifies (loc_union (loc_buffer ctr_b) (loc_buffer enc_ctr_b)) h0 h) /\
+    M.modifies mods h0 h) /\
+
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
     B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
-    keys_match key keys_b h 
+    keys_match key keys_b h /\
+
+    // Interesting loop invariants
+    (let old_iv = buffer_to_quad32 iv_b h0 in
+     let new_iv = buffer_to_quad32 iv_b h in
+     let plain  = buffer_to_seq_quad32  plain_b h in
+     let cipher = buffer_to_seq_quad32 cipher_b h in
+     let key = Ghost.reveal key in
+     new_iv == inc32 old_iv i /\
+     gctr_partial AES_128 i plain cipher key old_iv
     )
   in
   let body (i:U32.t{ U32.v 0ul <= U32.v i /\ U32.v i < U32.v num_blocks }) : Stack unit
     (requires (fun h -> inv h (U32.v i)))
     (ensures (fun h () h' -> inv h (U32.v i) /\ inv h (U32.v i + 1)))
     =
-    aes128_encrypt_block_buffer ctr_b enc_ctr_b key keys_b;
+    aes128_encrypt_block_buffer iv_b enc_ctr_b key keys_b;
+    let h1 = ST.get() in
+    let iv = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+    gcm_load_xor_store_buffer plain_b enc_ctr_b cipher_b i (Ghost.hide num_blocks) key iv;
+
+    // Update our hash
+    //ghash_incremental_bytes_buffer h_b hash_b cipher_b
+
+    // Increment the ctr
+    inc32_buffer iv_b;
+    admit();
     ()
   in
   //C.Loops.for 0ul num_blocks inv body;
   pop_frame();
+  admit();
   ()
- 
+
+(*
 #reset-options "--z3rlimit 20"
 let gcm128_one_pass
              (plain_b:B.buffer U8.t) (num_bytes:U32.t)  
