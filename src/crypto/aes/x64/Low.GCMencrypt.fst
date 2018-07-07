@@ -243,7 +243,7 @@ assume val ghash_incremental_bytes_extra_buffer
     )
   ) 
 
-assume val gcm_load_xor_store 
+assume val gcm_load_xor_store_buffer
        (plain_b mask_b cipher_b:B.buffer U8.t) 
        (offset:U32.t) 
        (num_blocks:(Ghost.erased U32.t))
@@ -288,7 +288,7 @@ assume val gcm_load_xor_store
     ) /\
   True) 
 
-assume val inc32 (iv_b:B.buffer U8.t) : Stack unit
+assume val inc32_buffer (iv_b:B.buffer U8.t) : Stack unit
   (requires fun h ->
     B.live h iv_b /\
     B.length iv_b == 16
@@ -382,7 +382,7 @@ let gcm128_one_pass_blocks
     aes128_encrypt_block_buffer ctr_b enc_ctr_b key keys_b;
     ()
   in
-  C.Loops.for 0ul num_blocks inv body;
+  //C.Loops.for 0ul num_blocks inv body;
   pop_frame();
   ()
  
