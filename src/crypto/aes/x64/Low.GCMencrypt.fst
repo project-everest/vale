@@ -674,7 +674,7 @@ assume val gcm_make_length_quad_buffer
   (ensures fun h () h' -> 
     M.modifies (M.loc_buffer b) h h' /\
     (let new_b = buffer_to_quad32 b h' in
-     new_b == Mkfour (8 * (U64.v plain_num_bytes)) 0 (8 * (U64.v auth_num_bytes)) 0)
+     new_b == reverse_bytes_quad32 (Mkfour (8 * (U64.v plain_num_bytes)) 0 (8 * (U64.v auth_num_bytes)) 0))
   )
 
 
@@ -815,6 +815,7 @@ let gcm_core_part1
   pop_frame();
   Ghost.hide (Ghost.reveal y_0, Ghost.reveal y_auth, Ghost.reveal y_cipher)  
 
+
 #reset-options "--z3rlimit 20"
 let gcm_core      
     (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
@@ -925,9 +926,9 @@ let gcm_core
                        auth_padded_quads cipher_padded_quads length_quads
   in
   lemma_hash_works();
-admit();
+
   // Encrypt the hash to generate the tag
-  mk_quad32_lo0_be_1_buffer iv_b;                       // Rest the IV  
+  mk_quad32_lo0_be_1_buffer iv_b;                       // Reset the IV  
   let h5 = ST.get() in
   aes128_encrypt_block_BE_buffer iv_b iv_b key keys_b;  // Encrypt the IV
   quad32_xor_buffer hash_b iv_b tag_b;                  // Compute GCTR with hash as input
