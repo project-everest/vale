@@ -26,38 +26,6 @@ let b8 = B.buffer UInt8.t
 //The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
-
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
-
-unfold
-let locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
-
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
-  let b128 = BV.mk_buffer_view b Views.view128 in
-  BV.as_buffer_mk_buffer_view b Views.view128;
-  BV.get_view_mk_buffer_view b Views.view128;
-  BV.length_eq b128;
-  assert (B.length b >= 16);
-  assert (BV.length b128 > 0);
-  BV.sel h b128 0
-
-// TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (src1:b8) (src2:b8) (dst:b8) = live h src1 /\ live h src2 /\ live h dst /\ locs_disjoint [src1;src2;dst] /\     B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
-
-let post_cond (h:HS.mem) (h':HS.mem) (src1:b8) (src2:b8) (dst:b8) =
-B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16 /\
-  M.modifies (M.loc_buffer dst) h h' /\
-    (let src1 = buffer_to_quad32 src1 h  in
-     let src2 = buffer_to_quad32 src2 h  in
-     let dst  = buffer_to_quad32 dst  h' in
-     dst = quad32_xor src1 src2)
 
 //The initial registers and xmms
 assume val init_regs:reg -> nat64
@@ -106,10 +74,6 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (src1:b8) (sr
   assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) dst) (BV.as_seq va_sM.mem.hs dst128));
   BV.as_seq_sel va_sM.mem.hs dst128 0;
   ()
-
-val quad32_xor_buffer: src1:b8 -> src2:b8 -> dst:b8 -> Stack unit
-	(requires (fun h -> pre_cond h src1 src2 dst ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 src1 src2 dst ))
 
 val ghost_quad32_xor_buffer: src1:b8 -> src2:b8 -> dst:b8 -> (h0:HS.mem{pre_cond h0 src1 src2 dst }) -> GTot (h1:HS.mem{post_cond h0 h1 src1 src2 dst })
 

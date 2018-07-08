@@ -35,49 +35,6 @@ let b8 = B.buffer UInt8.t
 //The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
-
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
-
-unfold
-let locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
-
-open FStar.Mul
-
-// TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (plain_b:b8) (plain_num_bytes:nat64) (auth_b:b8) (auth_num_bytes:nat64) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) (tag_b:b8) =
-   B.length plain_b % 16 == 0 /\ B.length auth_b % 16 == 0 /\ B.length iv_b % 16 == 0 /\ B.length keys_b % 16 == 0 /\ B.length cipher_b % 16 == 0 /\ B.length tag_b % 16 == 0 /\
-live h plain_b /\ live h auth_b /\ live h iv_b /\ live h keys_b /\ live h cipher_b /\ live h tag_b /\ locs_disjoint [plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b] /\
-                   B.length plain_b  == bytes_to_quad_size (plain_num_bytes) * 16 /\
-                   B.length auth_b   == bytes_to_quad_size (auth_num_bytes) * 16 /\
-                   B.length cipher_b == B.length plain_b /\
-                   B.length iv_b     == 16 /\
-		   B.length tag_b >= 1 /\
-
-                   4096 * (plain_num_bytes) < pow2_32 /\
-                   4096 * (auth_num_bytes)  < pow2_32 /\
-                   256 * bytes_to_quad_size (plain_num_bytes) < pow2_32 /\
-                   256 * bytes_to_quad_size (auth_num_bytes)  < pow2_32 /\
-
-                   // AES reqs
-                   B.length keys_b == (nr AES_128 + 1) * 16 /\
-                   B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
-                   (let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
-                    let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
-                    BV.as_seq h keys128_b == round_keys /\
-                    True) /\                    
-                   True    
-
-
-let seq_U8_to_seq_nat8 (b:seq U8.t) : (s:seq nat8{length s == length b}) =
-  Seq.init (length b) (fun (i:nat { i < length b }) -> let n:nat8 = U8.v (index b i) in n)
-
 let equal_seqs_vale (b:b8) (num_bytes:nat) (mem:mem) : Lemma (requires B.length b % 16 = 0 /\ num_bytes <= B.length b)
 (ensures
 (   
@@ -87,40 +44,6 @@ let equal_seqs_vale (b:b8) (num_bytes:nat) (mem:mem) : Lemma (requires B.length 
   )) =
   Opaque_s.reveal_opaque le_seq_quad32_to_bytes_def;
   admit()
-
-let post_cond (h0:HS.mem) (h1:HS.mem) (plain_b:b8) (plain_num_bytes:nat64) (auth_b:b8) (auth_num_bytes:nat64) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) (tag_b:b8) =    
-    B.length plain_b % 16 == 0 /\ B.length auth_b % 16 == 0 /\ B.length iv_b % 16 == 0 /\ B.length keys_b % 16 == 0 /\ B.length cipher_b % 16 == 0 /\ B.length tag_b % 16 == 0 /\
-    h1 `B.live` cipher_b /\
-    h1 `B.live` tag_b /\
-    B.length plain_b  == bytes_to_quad_size (plain_num_bytes) * 16 /\
-    B.length auth_b   == bytes_to_quad_size (auth_num_bytes) * 16 /\
-    B.length cipher_b == B.length plain_b /\
-    B.length iv_b     == 16 /\
-
-    (let auth  = seq_U8_to_seq_nat8 (slice (B.as_seq h0 auth_b) 0 auth_num_bytes) in
-     let plain = seq_U8_to_seq_nat8 (slice (B.as_seq h0 plain_b) 0 plain_num_bytes) in
-     let cipher = seq_U8_to_seq_nat8 (slice (B.as_seq h1 cipher_b) 0 plain_num_bytes) in 
-     B.length iv_b % 16 == 0 /\
-     B.length tag_b % 16 == 0
-     /\
-     4096 * length plain < pow2_32 /\
-     4096 * length auth < pow2_32 /\
-     (let iv128_b  = BV.mk_buffer_view iv_b  Views.view128 in
-      let tag128_b = BV.mk_buffer_view tag_b Views.view128 in
-      BV.length iv128_b  > 0 /\
-      BV.length tag128_b > 0 /\
-      (let iv_BE = reverse_bytes_quad32 (index (BV.as_seq h0 iv128_b) 0) in
-       let tag = index (BV.as_seq h1 tag128_b) 0 in // TODO: Should be able to simplify this to the original bytes
-       let c,t = gcm_encrypt_LE AES_128 
-                                (seq_nat32_to_seq_nat8_LE (Ghost.reveal key))
-                                (be_quad32_to_bytes iv_BE)
-                                plain
-                                auth in
-       cipher == c /\
-       le_quad32_to_bytes tag == t                                                     
-     )
-    )
-  )
 
 
 //The initial registers and xmms
@@ -278,9 +201,6 @@ let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
 
 #set-options "--z3rlimit 60 --initial_fuel 9 --max_fuel 9 --initial_ifuel 2 --max_ifuel 2"
 
-val gcmencrypt: plain_b:b8 -> plain_num_bytes:nat64 -> auth_b:b8 -> auth_num_bytes:nat64 -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> tag_b:b8 -> Stack unit
-	(requires (fun h -> pre_cond h plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\  M.modifies (M.loc_union (M.loc_buffer cipher_b) (M.loc_buffer tag_b)) h0 h1))
 
 val ghost_gcmencrypt: plain_b:b8 -> plain_num_bytes:nat64 -> auth_b:b8 -> auth_num_bytes:nat64 -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> tag_b:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b
  /\ M.modifies (M.loc_union
@@ -352,7 +272,7 @@ let gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cip
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 216) in
   let h0 = get() in
   assume (let keys128_b = BV.mk_buffer_view keys_b Views.view128 in BV.as_seq init_h0 keys128_b == BV.as_seq h0 keys128_b);
-  st_put h0 (fun h -> pre_cond h plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]) (ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cipher_b tag_b stack_b);
+  st_put h0 (fun h -> pre_cond h plain_b (UInt64.v plain_num_bytes) auth_b (UInt64.v auth_num_bytes) iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]) (ghost_gcmencrypt plain_b (UInt64.v plain_num_bytes) auth_b (UInt64.v auth_num_bytes) iv_b key keys_b cipher_b tag_b stack_b);
   let h1 = get() in
   pop_frame();
   let h1_final = get() in

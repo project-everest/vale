@@ -26,44 +26,6 @@ let b8 = B.buffer UInt8.t
 //The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
-
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
-
-unfold
-let locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
-
-open FStar.Mul
-
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
-  let b128 = BV.mk_buffer_view b Views.view128 in
-  BV.as_buffer_mk_buffer_view b Views.view128;
-  BV.get_view_mk_buffer_view b Views.view128;
-  BV.length_eq b128;
-  assert (B.length b >= 16);
-  assert (BV.length b128 > 0);
-  BV.sel h b128 0
-
-// TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat64) (b:b8) = 
-    B.live h b /\
-    B.length b == 16 /\
-    8 * plain_num_bytes < pow2_32 /\
-    8 * auth_num_bytes < pow2_32
-
-let post_cond (h:HS.mem) (h':HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat64) (b:b8) = 
-    8 * plain_num_bytes < pow2_32 /\
-    8 * auth_num_bytes < pow2_32 /\
-  length b == 16 /\     M.modifies (M.loc_buffer b) h h' /\
-    (let new_b = buffer_to_quad32 b h' in
-     new_b == reverse_bytes_quad32 (Mkfour (8 * plain_num_bytes) 0 (8 * auth_num_bytes) 0))
-
 //The initial registers and xmms
 assume val init_regs:reg -> nat64
 assume val init_xmms:xmm -> quad32
@@ -98,10 +60,6 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_num_by
   BV.as_seq_sel va_sM.mem.hs b128 0;  
   ()
 
-val gcm_make_length_quad_buffer: plain_num_bytes:nat64 -> auth_num_bytes:nat64 -> b:b8 -> Stack unit
-	(requires (fun h -> pre_cond h plain_num_bytes auth_num_bytes b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_num_bytes auth_num_bytes b ))
-
 val ghost_gcm_make_length_quad_buffer: plain_num_bytes:nat64 -> auth_num_bytes:nat64 -> b:b8 -> (h0:HS.mem{pre_cond h0 plain_num_bytes auth_num_bytes b }) -> GTot (h1:HS.mem{post_cond h0 h1 plain_num_bytes auth_num_bytes b })
 
 let ghost_gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes b h0 =
@@ -134,4 +92,4 @@ let ghost_gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes b h0 =
 
 let gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes b  =
   let h0 = get() in
-  st_put h0 (fun h -> pre_cond h plain_num_bytes auth_num_bytes b ) (ghost_gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes b )
+  st_put h0 (fun h -> pre_cond h (UInt64.v plain_num_bytes) (UInt64.v auth_num_bytes) b ) (ghost_gcm_make_length_quad_buffer (UInt64.v plain_num_bytes) (UInt64.v auth_num_bytes) b )

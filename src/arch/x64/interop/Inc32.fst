@@ -27,40 +27,6 @@ let b8 = B.buffer UInt8.t
 //The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
-
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
-
-unfold
-let locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
-
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
-  let b128 = BV.mk_buffer_view b Views.view128 in
-  BV.as_buffer_mk_buffer_view b Views.view128;
-  BV.get_view_mk_buffer_view b Views.view128;
-  BV.length_eq b128;
-  assert (B.length b >= 16);
-  assert (BV.length b128 > 0);
-  BV.sel h b128 0
-
-// TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (iv_b:b8) =     
-    B.live h iv_b /\
-    B.length iv_b == 16
-
-let post_cond (h:HS.mem) (h':HS.mem) (iv_b:b8) =
-    B.length iv_b == 16 /\
-    M.modifies (M.loc_buffer iv_b) h h' /\
-    (let old_iv = buffer_to_quad32 iv_b h  in
-     let new_iv = buffer_to_quad32 iv_b h' in
-     new_iv == inc32 old_iv 1)
-
 //The initial registers and xmms
 assume val init_regs:reg -> nat64
 assume val init_xmms:xmm -> quad32
@@ -95,10 +61,6 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (iv_b:b8)  : 
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) iv_b) (BV.as_seq va_s0.mem.hs iv128_b));
   BV.as_seq_sel va_s0.mem.hs iv128_b 0;        
   ()
-
-val inc32_buffer: iv_b:b8 -> Stack unit
-	(requires (fun h -> pre_cond h iv_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 iv_b ))
 
 val ghost_inc32_buffer: iv_b:b8 -> (h0:HS.mem{pre_cond h0 iv_b }) -> GTot (h1:HS.mem{post_cond h0 h1 iv_b })
 

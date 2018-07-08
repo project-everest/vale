@@ -19,11 +19,13 @@ open X64.Vale.Decls_i
 
 open Vale_zero_quad32_buffer
 
+noextract
 assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)
 
 let b8 = B.buffer UInt8.t
 
 //The map from buffers to addresses in the heap, that remains abstract
+noextract
 assume val addrs: addr_map
 
 let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
@@ -39,27 +41,11 @@ let rec locs_disjoint_rec (ls:list b8) : Type0 =
 unfold
 let locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
 
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
-  let b128 = BV.mk_buffer_view b Views.view128 in
-  BV.as_buffer_mk_buffer_view b Views.view128;
-  BV.get_view_mk_buffer_view b Views.view128;
-  BV.length_eq b128;
-  assert (B.length b >= 16);
-  assert (BV.length b128 > 0);
-  BV.sel h b128 0
-
-// TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (b:b8) =    B.live h b /\
-    B.length b == 16
-
-let post_cond (h:HS.mem) (h':HS.mem) (b:b8) = length b == 16 /\
-    M.modifies (M.loc_buffer b) h h' /\
-    (let new_b = buffer_to_quad32 b h' in
-     new_b == Mkfour 0 0 0 0)
-
 
 //The initial registers and xmms
+noextract
 assume val init_regs:reg -> nat64
+noextract
 assume val init_xmms:xmm -> quad32
 
 #set-options "--initial_fuel 4 --max_fuel 4 --initial_ifuel 2 --max_ifuel 2"
@@ -90,10 +76,6 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (b:b8)  : Lem
   BV.as_seq_sel va_sM.mem.hs b128 0;
   ()
 
-val zero_quad32_buffer: b:b8 -> Stack unit
-	(requires (fun h -> pre_cond h b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 b ))
-
 val ghost_zero_quad32_buffer: b:b8 -> (h0:HS.mem{pre_cond h0 b }) -> GTot (h1:HS.mem{post_cond h0 h1 b })
 
 let ghost_zero_quad32_buffer b h0 =
@@ -122,6 +104,7 @@ let ghost_zero_quad32_buffer b h0 =
   implies_post s0 s1 f1 b ;
   s1.mem.hs
 
+noextract
 let zero_quad32_buffer b  =
   let h0 = get() in
   st_put h0 (fun h -> pre_cond h b ) (ghost_zero_quad32_buffer b )
