@@ -663,7 +663,8 @@ assume val quad32_xor_buffer
      dst = quad32_xor src1 src2)
   )
 
-#reset-options "--z3rlimit 30"
+(*
+#reset-options "--z3rlimit 20"
 let gcm_core      
     (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
     (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
@@ -734,6 +735,7 @@ let gcm_core
   zero_quad32_buffer h_b;
   zero_quad32_buffer hash_b;
   aes128_encrypt_block_buffer h_b h_b key keys_b;  // h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) 
+  let h1 = ST.get() in
   let y_0 = Ghost.hide (Mkfour 0 0 0 0) in
   ghash_incremental_bytes_buffer h_b hash_b auth_b auth_num_bytes;
   let h2 = ST.get() in
@@ -763,7 +765,22 @@ let gcm_core
   let h5 = ST.get() in
   let y_final = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h5) in
 
-    // Invoke lemma showing that incremental hashing works
+  // Invoke lemma showing that incremental hashing works
+  lemma_hash_append3 
+    (buffer_to_quad32 h_b h1)
+    (Ghost.reveal y_0)
+    (Ghost.reveal y_auth)
+    (Ghost.reveal y_cipher)
+    (Ghost.reveal y_final)
+    (let auth_bytes = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 auth_b h0)) 0 (U64.v auth_num_bytes) in
+     let auth_padded_quads = le_bytes_to_seq_quad32 (pad_to_128_bits auth_bytes) in
+     auth_padded_quads)
+    (let cipher_bytes = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h5)) 0 (U64.v plain_num_bytes) in
+     let cipher_padded_quads = le_bytes_to_seq_quad32 (pad_to_128_bits cipher_bytes) in
+     cipher_padded_quads)
+    (create 1 (buffer_to_quad32 length_quad_b h5));
+     
+
     (*
     ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)), old(auth_num_bytes));
     ghost var auth_padded_quads := le_bytes_to_seq_quad32(pad_to_128_bits(auth_bytes));
@@ -776,8 +793,9 @@ let gcm_core
                        create(1, length_quad32)); 
   *)
   
-  mk_quad32_lo0_be_1_buffer iv_b;
   (*
+  mk_quad32_lo0_be_1_buffer iv_b;
+  
   aes128_encrypt_block_buffer iv_b iv_b key keys_b;
   quad32_xor_buffer hash_b iv_b tag_b;
   // Call lemma: gctr_encrypt_one_block(icb_BE, old(io), alg, key) ?
@@ -796,7 +814,7 @@ let gcm_core
   admit();
   pop_frame();
   ()  
-
+*)
 
 (*
 let gcm128_encrypt (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
