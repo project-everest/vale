@@ -302,10 +302,12 @@ assume val gcm_load_xor_store_buffer
      let num_blocks = U32.v (Ghost.reveal num_blocks) in
      let mask   = buffer_to_quad32       mask_b h in
      let plain  = buffer_to_seq_quad32  plain_b h' in
+     let old_cipher = buffer_to_seq_quad32 cipher_b h in
      let cipher = buffer_to_seq_quad32 cipher_b h' in
      let key = Ghost.reveal key in
      let iv = Ghost.reveal iv in
-     gctr_partial AES_128 (offset + 1) plain cipher key iv
+     gctr_partial AES_128 (offset + 1) plain cipher key iv /\
+     slice cipher 0 offset == slice old_cipher 0 offset  // We didn't disrupt earlier slots
     ) /\
   True) 
 
@@ -327,7 +329,7 @@ let inc32_twice (q:quad32) (i:int) :
   =
   ()
 
-#reset-options "--z3rlimit 20"
+#reset-options "--z3rlimit 30"
 let gcm128_one_pass_blocks 
              (plain_b:B.buffer U8.t) (num_blocks:U32.t)  
              (iv_b:B.buffer U8.t) 
@@ -383,8 +385,8 @@ let gcm128_one_pass_blocks
     )
   ) 
   =
-  let h0 = ST.get() in
   push_frame();
+  let h0 = ST.get() in
   let enc_ctr_b = B.alloca 0uy 16ul in
   let inv h (i:nat) =
     i <= U32.v num_blocks /\
@@ -408,11 +410,18 @@ let gcm128_one_pass_blocks
      let new_iv = buffer_to_quad32 iv_b h in
      let plain  = buffer_to_seq_quad32  plain_b h in
      let cipher = buffer_to_seq_quad32 cipher_b h in
+     let old_hash = buffer_to_quad32 hash_b h0 in
+     let new_hash = buffer_to_quad32 hash_b h in
+     let h_val = buffer_to_quad32 h_b h in
      let key = Ghost.reveal key in
      new_iv == inc32 old_iv i /\
-     gctr_partial AES_128 i plain cipher key old_iv
+     gctr_partial AES_128 i plain cipher key old_iv /\
+     (i == 0 ==> new_hash == old_hash) /\
+     (i  > 0 ==> new_hash == ghash_incremental h_val old_hash (slice cipher 0 i))     
     )
   in
+  (* This is the preferred style and useful for debugging the body.
+     However, there's a "unification/delta_depth issue" somewhere, so we have to inline it below
   let body (i:U32.t{ U32.v 0ul <= U32.v i /\ U32.v i < U32.v num_blocks }) : Stack unit
     (requires (fun h -> inv h (U32.v i)))
     (ensures (fun h () h' -> inv h (U32.v i) /\ inv h' (U32.v i + 1)))
@@ -428,14 +437,34 @@ let gcm128_one_pass_blocks
     let i32:nat32 = UInt32.v i in
     let i64:UInt64.t = UInt64.uint_to_t i32 in
     ghash_incremental_one_block_buffer h_b hash_b cipher_b i64;
+    Opaque_s.reveal_opaque ghash_incremental_def;
 
     // Increment the ctr
     inc32_buffer iv_b;
     ()
   in
-  //C.Loops.for 0ul num_blocks inv body;
+  *)
+  C.Loops.for 0ul num_blocks inv 
+    (fun (i:U32.t{ U32.v 0ul <= U32.v i /\ U32.v i < U32.v num_blocks }) ->
+      // Compute the encryption of the counter value
+      aes128_encrypt_block_buffer iv_b enc_ctr_b key keys_b;
+      
+      // Xor the encrypted counter to the plaintext, to make progress on the gctr computation
+      let iv = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+      gcm_load_xor_store_buffer plain_b enc_ctr_b cipher_b i (Ghost.hide num_blocks) key iv;
+      
+      // Update our hash (TODO: unify 32 vs 64 and remove this cast)
+      let i32:nat32 = UInt32.v i in
+      let i64:UInt64.t = UInt64.uint_to_t i32 in
+      ghash_incremental_one_block_buffer h_b hash_b cipher_b i64;
+      Opaque_s.reveal_opaque ghash_incremental_def;
+
+      // Increment the ctr
+      inc32_buffer iv_b;
+      ()
+    )
+  ;
   pop_frame();
-  admit();
   ()
 
 (*
