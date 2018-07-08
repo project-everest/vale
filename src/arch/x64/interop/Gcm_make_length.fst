@@ -62,7 +62,7 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat
     8 * auth_num_bytes < pow2_32 /\
   length b == 16 /\     M.modifies (M.loc_buffer b) h h' /\
     (let new_b = buffer_to_quad32 b h' in
-     new_b == Mkfour (8 * plain_num_bytes) 0 (8 * auth_num_bytes) 0)
+     new_b == reverse_bytes_quad32 (Mkfour (8 * plain_num_bytes) 0 (8 * auth_num_bytes) 0))
 
 //The initial registers and xmms
 assume val init_regs:reg -> nat64
