@@ -483,8 +483,8 @@ let gcm128_one_pass
     B.live h h_b /\ B.live h hash_b /\
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
     M.loc_disjoint (M.loc_buffer keys_b)  mods /\
-    M.loc_disjoint (M.loc_buffer hash_b)  mods /\    
-    M.loc_disjoint (M.loc_buffer h_b)     mods /\
+    M.loc_disjoint (M.loc_buffer h_b)     mods /\ 
+    
     M.(loc_disjoint (loc_buffer iv_b) (loc_buffer cipher_b)) /\
     M.(loc_disjoint (loc_buffer hash_b) (loc_buffer cipher_b)) /\
     M.(loc_disjoint (loc_buffer hash_b) (loc_buffer iv_b)) /\
@@ -607,43 +607,196 @@ let gcm128_one_pass
   );
   ()
 
-(*
-let gcm_core (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
-             (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
-             (iv_BE:quad32) 
-             (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
-             (cipher_b:B.buffer U8.t)
-             (tag_b:B.buffer U8.t) : Stack unit
+
+assume val zero_quad32_buffer (b:B.buffer U8.t) : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let new_b = buffer_to_quad32 b h' in
+     new_b == Mkfour 0 0 0 0)
+  )
+
+assume val mk_quad32_lo0_be_1_buffer (b:B.buffer U8.t) : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let old_b = buffer_to_quad32 b h  in
+     let new_b = buffer_to_quad32 b h' in
+     new_b == Mkfour 1 old_b.lo1 old_b.hi2 old_b.hi3)
+  )
+
+assume val gcm_make_length_quad_buffer 
+  (plain_num_bytes auth_num_bytes:U64.t)
+  (b:B.buffer U8.t)
+  : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16 /\
+    8 * (U64.v plain_num_bytes) < pow2_32 /\
+    8 * (U64.v  auth_num_bytes) < pow2_32
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let new_b = buffer_to_quad32 b h' in
+     new_b == Mkfour (8 * (U64.v plain_num_bytes)) 0 (8 * (U64.v auth_num_bytes)) 0)
+  )
+
+
+assume val quad32_xor_buffer 
+  (src1 src2 dst:B.buffer U8.t)
+  : Stack unit
+  (requires fun h ->
+    B.live h src1 /\ B.live h src2 /\ B.live h dst /\
+    B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer dst) h h' /\
+    (let src1 = buffer_to_quad32 src1 h  in
+     let src2 = buffer_to_quad32 src2 h  in
+     let dst  = buffer_to_quad32 dst  h' in
+     dst = quad32_xor src1 src2)
+  )
+
+#reset-options "--z3rlimit 30"
+let gcm_core      
+    (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
+    (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
+    (iv_b:B.buffer U8.t) 
+    (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
+    (cipher_b:B.buffer U8.t)
+    (tag_b:B.buffer U8.t) : ST unit
   (requires fun h -> 
-    4096 * (U64.v plain_num_bytes) < pow2_32 /\
-    4096 * (U64.v auth_num_bytes)  < pow2_32 /\
-    True)
-  (ensures fun h () h' -> True)
+      let mods = M.((loc_union (loc_buffer cipher_b) (loc_buffer iv_b))) in 
+      B.live h plain_b /\ B.live h auth_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
+      M.loc_disjoint (M.loc_buffer plain_b) mods /\
+      M.loc_disjoint (M.loc_buffer keys_b)  mods /\
+      M.(loc_disjoint (loc_buffer iv_b) (loc_buffer cipher_b)) /\
+      
+      B.length plain_b  == bytes_to_quad_size (U64.v plain_num_bytes) * 16 /\
+      B.length auth_b   == bytes_to_quad_size (U64.v auth_num_bytes) * 16 /\
+      B.length cipher_b == B.length plain_b /\
+      B.length iv_b     == 16 /\
+
+      4096 * (U64.v plain_num_bytes) < pow2_32 /\
+      4096 * (U64.v auth_num_bytes)  < pow2_32 /\
+      256 * bytes_to_quad_size (U64.v plain_num_bytes) < pow2_32 /\
+      256 * bytes_to_quad_size (U64.v auth_num_bytes)  < pow2_32 /\
+
+      // AES reqs
+      B.length keys_b == (nr AES_128 + 1) * 16 /\
+      B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+      (let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
+       let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
+       BV.as_seq h keys128_b == round_keys /\
+       True) /\                    
+      True                   
+  )
+  (ensures fun h () h' -> 
+    h' `B.live` cipher_b /\
+    h' `B.live` tag_b /\
+    M.modifies (M.loc_union (M.loc_buffer cipher_b) (M.loc_buffer tag_b)) h h' /\  
+    (let auth  = seq_U8_to_seq_nat8 (slice (B.as_seq h auth_b) 0 (U64.v auth_num_bytes)) in
+     let plain = seq_U8_to_seq_nat8 (slice (B.as_seq h plain_b) 0 (U64.v plain_num_bytes)) in
+     let cipher = seq_U8_to_seq_nat8 (slice (B.as_seq h' cipher_b) 0 (U64.v plain_num_bytes)) in 
+     B.length iv_b % 16 == 0 /\
+     B.length tag_b % 16 == 0 /\
+     4096 * length plain < pow2_32 /\
+     4096 * length auth < pow2_32 /\     
+     (let iv128_b  = BV.mk_buffer_view iv_b  Views.view128 in
+      let tag128_b = BV.mk_buffer_view tag_b Views.view128 in
+      BV.length iv128_b  > 0 /\
+      BV.length tag128_b > 0 /\
+      (let iv_BE = reverse_bytes_quad32 (index (BV.as_seq h iv128_b) 0) in
+       let tag = index (BV.as_seq h' tag128_b) 0 in // TODO: Should be able to simplify this to the original bytes
+       let c,t = gcm_encrypt_LE AES_128 
+                                (seq_nat32_to_seq_nat8_LE (Ghost.reveal key))
+                                (be_quad32_to_bytes iv_BE)
+                                plain
+                                auth in
+       cipher == c /\
+       le_quad32_to_bytes tag == t                                                     
+     )
+    )
+   ) 
+  )
   =
+  let h0 = ST.get() in
+  let iv_BE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
   push_frame ();
-  let quad32_zero = Mkfour 0 0 0 0 in
-  let h = aes128_encrypt_block quad32_zero key keys_b in
-  (*
-  let iv_be = reverse_bytes_quad32 iv in
-  let iv_be = four_insert iv_be 2 0 in
-  *) 
-  let y_0 = quad32_zero in 
-  let y_auth = ghash_incremental_bytes h y_0 auth_b auth_num_bytes in
-  let j0_BE = Mkfour 1 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
-  let j0_inc32_BE = Mkfour 2 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
-  let y_cipher = gcm128_one_pass plain_b plain_num_bytes key keys_b cipher_b y_auth j0_inc32_BE in
-  // Call some lemmas here
-  let length_quad = Mkfour (8 * UInt64.v plain_num_bytes) 0 (8 * UInt64.v auth_num_bytes) 0 in
+  let h_b = B.alloca 0uy 16ul in
+  let hash_b = B.alloca 0uy 16ul in
+  zero_quad32_buffer h_b;
+  zero_quad32_buffer hash_b;
+  aes128_encrypt_block_buffer h_b h_b key keys_b;  // h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) 
+  let y_0 = Ghost.hide (Mkfour 0 0 0 0) in
+  ghash_incremental_bytes_buffer h_b hash_b auth_b auth_num_bytes;
+  let h2 = ST.get() in
+  let y_auth = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h2) in
+  mk_quad32_lo0_be_1_buffer iv_b;
+  inc32_buffer iv_b;  // iv_b == old(iv_b)[lo0 := 2]
+  let h3 = ST.get() in
+  let icb_enc = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h3) in
+  let plain_num_bytes_nat64:nat64 = U64.v plain_num_bytes in
+  let p_n = U32.uint_to_t plain_num_bytes_nat64 in
+  gcm128_one_pass plain_b p_n iv_b key keys_b cipher_b h_b hash_b;
+  let h4 = ST.get() in
+  let y_cipher = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h4) in
+  GCM_i.gcm_encrypt_LE_fst_helper 
+    (Ghost.reveal icb_enc) 
+    (Ghost.reveal iv_BE) 
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h0)) 0 plain_num_bytes_nat64)
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32   auth_b h0)) 0 (U64.v auth_num_bytes))
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h4)) 0 plain_num_bytes_nat64)
+    AES_128
+    (Ghost.reveal key);
+  Opaque_s.reveal_opaque le_bytes_to_seq_quad32_def;  // REVIEW: Save for later?
+
   let length_quad_b = B.alloca 0uy 16ul in
-  quad32_to_buffer length_quad length_quad_b;
-  let y_final = ghash_incremental_bytes h y_cipher length_quad_b 16UL in
+  gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes length_quad_b;
+  ghash_incremental_one_block_buffer h_b hash_b length_quad_b 0UL;
+  let h5 = ST.get() in
+  let y_final = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h5) in
+
+    // Invoke lemma showing that incremental hashing works
+    (*
+    ghost var auth_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)), old(auth_num_bytes));
+    ghost var auth_padded_quads := le_bytes_to_seq_quad32(pad_to_128_bits(auth_bytes));
+
+    ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));
+    ghost var cipher_padded_quads := le_bytes_to_seq_quad32(pad_to_128_bits(cipher));
+    lemma_hash_append3(h, y_0, y_auth, y_cipher, y_final,
+                       auth_padded_quads, //buffer128_as_seq(mem, auth_b),
+                       cipher_padded_quads, //buffer128_as_seq(mem, out_b),
+                       create(1, length_quad32)); 
+  *)
+  
+  mk_quad32_lo0_be_1_buffer iv_b;
+  (*
+  aes128_encrypt_block_buffer iv_b iv_b key keys_b;
+  quad32_xor_buffer hash_b iv_b tag_b;
+  // Call lemma: gctr_encrypt_one_block(icb_BE, old(io), alg, key) ?
+
+  // Call: le_seq_quad32_to_bytes_of_singleton(xmm1);
+
+  
+  (*
+  let j0_BE = Mkfour 1 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
+
   let encrypted_ctr = aes128_encrypt_block j0_BE key keys_b in
   let tag = quad32_xor encrypted_ctr y_final in
-  quad32_to_buffer tag tag_b;  
   // Call more lemmas here
+  *)
+  *)
+  admit();
   pop_frame();
   ()  
-*)
+
 
 (*
 let gcm128_encrypt (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
@@ -651,7 +804,7 @@ let gcm128_encrypt (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t)
                    (iv_b:B.buffer U8.t) 
                    (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
                    (cipher_b:B.buffer U8.t)
-f                   (tag_b:B.buffer U8.t) : ST unit
+                   (tag_b:B.buffer U8.t) : ST unit
   (requires fun h ->  h `B.live` plain_b /\
                    h `B.live` auth_b /\
                    h `B.live` keys_b /\
