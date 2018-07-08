@@ -467,7 +467,6 @@ let gcm128_one_pass_blocks
   pop_frame();
   ()
 
-(*
 #reset-options "--z3rlimit 20"
 let gcm128_one_pass
              (plain_b:B.buffer U8.t) (num_bytes:U32.t)  
@@ -646,6 +645,7 @@ let gcm_core (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t)
   ()  
 *)
 
+(*
 let gcm128_encrypt (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
                    (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
                    (iv_b:B.buffer U8.t) 
