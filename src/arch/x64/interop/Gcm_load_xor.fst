@@ -80,7 +80,7 @@ let pre_cond (h:HS.mem) (plain_b:b8) (mask_b:b8) (cipher_b:b8) (offset:nat64) (n
 
      // gcm_body specific
      offset < num_blocks /\
-     mask == aes_encrypt_LE AES_128 key (inc32 iv offset) /\
+     mask == aes_encrypt_BE AES_128 key (inc32 iv offset) /\
      gctr_partial AES_128 offset plain cipher key iv
     )
   )

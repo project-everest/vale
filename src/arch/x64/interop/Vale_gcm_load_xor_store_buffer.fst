@@ -26,7 +26,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state)
     (buffer_length plain_b) /\ (buffer_length mask_b) == 1 /\ (let mask = (buffer128_read mask_b 0
     (va_get_mem va_s0)) in let plain = (buffer128_as_seq (va_get_mem va_s0) plain_b) in let cipher
     = (buffer128_as_seq (va_get_mem va_s0) cipher_b) in offset < num_blocks /\ mask ==
-    (aes_encrypt_LE AES_128 key (inc32 iv offset)) /\ (gctr_partial AES_128 offset plain cipher key
+    (aes_encrypt_BE AES_128 key (inc32 iv offset)) /\ (gctr_partial AES_128 offset plain cipher key
     iv)))
 
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)

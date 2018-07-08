@@ -70,13 +70,14 @@ let gcm_load_xor = ("gcm_load_xor_store_buffer", [
   ("key", TGhost "aes_key_LE AES_128"); ("iv", TGhost "quad32")], Stk (Prims.parse_int "0"))
 *)
 
-let memcpy = ("memcpy_simple", [
-  ("dst", TBuffer TUInt64); ("src", TBuffer TUInt64);
-  ("len", TBase TUInt64)], Stk (Prims.parse_int "0"))
+let aes_encrypt_block_be = ("aes128_encrypt_block_be", [
+  ("output_b", TBuffer TUInt128); ("input_b", TBuffer TUInt128);
+  ("key", TGhost "aes_key_LE AES_128"); ("keys_b", TBuffer TUInt128)
+  ], Stk (Prims.parse_int "0"))
 
 let os = Linux
 
-let name = memcpy 
+let name = aes_encrypt_block_be
 
 let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()
