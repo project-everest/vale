@@ -270,7 +270,7 @@ let translate_lowstar os target (func:func_ty) =
   "(ensures (fun (va_sM, va_fM) -> va_post va_b0 va_s0 va_sM va_fM " ^ (print_args_names args) ^ "))" ^
   "\n\n\n\n" ^
   "module " ^ name ^
-  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 40\"\n\n" ^
+  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 40\"\n\n" ^
   "open Vale_" ^ name ^ "\n\n" ^
   "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)\n\n" ^
   "let b8 = B.buffer UInt8.t\n\n" ^
@@ -400,17 +400,17 @@ let translate_vale os target (func:func_ty) =
   let nbr_stack_args = stack_before_args + List.Tot.Base.length real_args - 
     List.Tot.Base.length (calling_registers os target) in
   let stack_needed = nbr_stack_args > 0 in  
-  let args = ("stack_b", TBuffer TUInt64)::args in
+  let args = if stack_needed then ("stack_b", TBuffer TUInt64)::args else args in
   "module Vale_" ^ name ^
   "\n#verbatim{:interface}{:implementation}\n" ^ 
   "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^
-  "procedure " ^ name ^ "(" ^ print_vale_args args ^")\n" ^
+  "procedure {:quick} " ^ name ^ "(" ^ print_vale_args args ^")\n" ^
   "    requires/ensures\n" ^
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
   print_buff_readable args ^
   (if stack_needed then
   "    requires\n" ^
-  "        buffer_length(stack_b) > " ^ (string_of_int nbr_stack_args) ^ ";\n" ^
+(if stack_needed then  "        buffer_length(stack_b) > " ^ (string_of_int nbr_stack_args) ^ ";\n" else "") ^
   "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int slots) ^ ");\n"
   else "") ^
   // stack_b and ghost args are not real arguments
