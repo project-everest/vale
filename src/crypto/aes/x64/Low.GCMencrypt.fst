@@ -27,6 +27,9 @@ open X64.Memory_i_s
 open BufferViewHelpers
 open FStar.Seq
 
+// Not sure how to define this after we open FStar.Mul
+let quad32x3 = quad32 * quad32 * quad32
+
 open FStar.Mul
 
 (*** Useful specification abbreviations ***)
@@ -662,6 +665,128 @@ assume val quad32_xor_buffer
      let dst  = buffer_to_quad32 dst  h' in
      dst = quad32_xor src1 src2)
   )
+
+let gcm_core_part1      
+    (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
+    (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
+    (iv_b:B.buffer U8.t) 
+    (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer U8.t)
+    (cipher_b:B.buffer U8.t)
+    (h_b hash_b:B.buffer U8.t)
+    : ST (Ghost.erased quad32x3)
+  (requires fun h -> 
+      let mods = M.((loc_union (loc_buffer cipher_b) 
+                    (loc_union (loc_buffer iv_b)
+                    (loc_union (loc_buffer h_b)
+                               (loc_buffer hash_b))))) in 
+      B.live h plain_b /\ B.live h auth_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
+      B.live h h_b /\ B.live h hash_b /\
+      
+      M.loc_disjoint (M.loc_buffer plain_b) mods /\
+      M.loc_disjoint (M.loc_buffer auth_b) mods /\
+      M.loc_disjoint (M.loc_buffer keys_b)  mods /\
+            
+      M.(loc_disjoint (loc_buffer iv_b) (loc_buffer cipher_b)) /\
+      M.(loc_disjoint (loc_buffer hash_b) (loc_buffer cipher_b)) /\
+      M.(loc_disjoint (loc_buffer hash_b) (loc_buffer iv_b)) /\
+      M.(loc_disjoint (loc_buffer h_b) (loc_buffer iv_b)) /\
+      M.(loc_disjoint (loc_buffer h_b) (loc_buffer cipher_b)) /\
+      M.(loc_disjoint (loc_buffer h_b) (loc_buffer hash_b)) /\
+      
+      B.length plain_b  == bytes_to_quad_size (U64.v plain_num_bytes) * 16 /\
+      B.length auth_b   == bytes_to_quad_size (U64.v auth_num_bytes) * 16 /\
+      B.length cipher_b == B.length plain_b /\
+      B.length iv_b     == 16 /\
+      B.length h_b == 16 /\
+      B.length hash_b == 16 /\
+
+      4096 * (U64.v plain_num_bytes) < pow2_32 /\
+      4096 * (U64.v auth_num_bytes)  < pow2_32 /\
+      256 * bytes_to_quad_size (U64.v plain_num_bytes) < pow2_32 /\
+      256 * bytes_to_quad_size (U64.v auth_num_bytes)  < pow2_32 /\
+
+      // AES reqs
+      B.length keys_b == (nr AES_128 + 1) * 16 /\
+      B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+      keys_match key keys_b h            
+  )
+  (ensures fun h q3 h' -> 
+    let mods = M.((loc_union (loc_buffer cipher_b) 
+                    (loc_union (loc_buffer iv_b)
+                    (loc_union (loc_buffer h_b)
+                               (loc_buffer hash_b))))) in 
+    B.live h plain_b /\ B.live h auth_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
+    B.live h h_b /\ B.live h hash_b /\
+      
+    M.modifies mods h h' /\
+    
+    (let plain_num_bytes = U64.v plain_num_bytes in
+     let auth_num_bytes = U64.v auth_num_bytes in
+     let iv_old = buffer_to_quad32 iv_b h in
+     let iv_new = buffer_to_quad32 iv_b h' in
+     let old_hash = buffer_to_quad32 hash_b h in
+     let new_hash = buffer_to_quad32 hash_b h' in
+     let h_val = buffer_to_quad32 h_b h' in
+     let auth   = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32   auth_b h))  0 auth_num_bytes in
+     let plain  = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h))  0 plain_num_bytes in
+     let cipher = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h')) 0 plain_num_bytes in 
+     let (y_0, y_auth, y_cipher) = (Ghost.reveal q3) in
+     let auth_padded_bytes = pad_to_128_bits auth in
+     let auth_padded_quads = le_bytes_to_seq_quad32 auth_padded_bytes in
+     let cipher_padded_bytes = pad_to_128_bits cipher in
+     let cipher_padded_quads = le_bytes_to_seq_quad32 cipher_padded_bytes in
+        
+     // GCTR 
+     let k = seq_nat32_to_seq_nat8_LE (Ghost.reveal key) in
+     cipher == fst (gcm_encrypt_LE AES_128 k (be_quad32_to_bytes iv_old) plain auth) /\
+
+     // Intermediate hash state needed for the next step
+     y_0      == Mkfour 0 0 0 0 /\
+     y_auth   == ghash_incremental0 h_val y_0    auth_padded_quads /\
+     y_cipher == ghash_incremental0 h_val y_auth cipher_padded_quads /\
+     new_hash == y_cipher /\     
+     h_val == aes_encrypt_LE AES_128 (Ghost.reveal key) y_0 /\
+
+     // Intermediate IV state
+     iv_new.lo1 == iv_old.lo1 /\
+     iv_new.hi2 == iv_old.hi2 /\
+     iv_new.hi3 == iv_old.hi3 /\     
+    True)
+  )
+  =
+  let h0 = ST.get() in
+  let iv_BE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+  push_frame ();
+  zero_quad32_buffer h_b;
+  zero_quad32_buffer hash_b;
+  aes128_encrypt_block_buffer h_b h_b key keys_b;  // h = aes_encrypt_LE alg key (Mkfour 0 0 0 0) 
+  let h1 = ST.get() in
+  let y_0 = Ghost.hide (Mkfour 0 0 0 0) in
+  ghash_incremental_bytes_buffer h_b hash_b auth_b auth_num_bytes;
+  let h2 = ST.get() in
+
+  let y_auth = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h2) in
+  mk_quad32_lo0_be_1_buffer iv_b;
+  inc32_buffer iv_b;  // iv_b == old(iv_b)[lo0 := 2]
+  let h3 = ST.get() in
+
+  let icb_enc = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h3) in
+  let plain_num_bytes_nat64:nat64 = U64.v plain_num_bytes in
+  let p_n = U32.uint_to_t plain_num_bytes_nat64 in
+  gcm128_one_pass plain_b p_n iv_b key keys_b cipher_b h_b hash_b;
+  let h4 = ST.get() in
+  let y_cipher = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h4) in
+  GCM_i.gcm_encrypt_LE_fst_helper 
+    (Ghost.reveal icb_enc) 
+    (Ghost.reveal iv_BE) 
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h0)) 0 plain_num_bytes_nat64)
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32   auth_b h0)) 0 (U64.v auth_num_bytes))
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h4)) 0 plain_num_bytes_nat64)
+    AES_128
+    (Ghost.reveal key);
+  Opaque_s.reveal_opaque le_bytes_to_seq_quad32_def; 
+  pop_frame();
+  Ghost.hide (Ghost.reveal y_0, Ghost.reveal y_auth, Ghost.reveal y_cipher)  
 
 (*
 #reset-options "--z3rlimit 20"
