@@ -247,6 +247,25 @@ procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov12
     lemma_store_mem128(b, index, old(src), old(mem));
 }
 
+procedure{:instruction Ins(S.MOVDQU(Mov128Mem(MIndex(get_reg(dst), 16, get_reg(offset), 0)), Mov128Xmm(src)))}{:quick exportOnly} Store128_buffer_reg(
+        dst:reg_opr64,
+        src:xmm,
+        offset:reg_opr64,
+        ghost b:buffer128,
+        ghost index:int)
+    modifies
+        mem;
+    requires
+        valid_dst_addr(mem, b, index);
+        dst + 16 * offset == buffer_addr(b, mem) + 16 * index;
+    ensures
+        modifies_mem(loc_buffer(b), old(mem), mem);
+        mem == old(buffer128_write(b, index, src, mem));
+{
+    lemma_valid_mem128(b, index, old(mem));
+    lemma_store_mem128(b, index, old(src), old(mem));
+}
+
 procedure {:quick exportOnly} PushXmm(
         src:xmm, 
     out tmp:reg_opr64, 

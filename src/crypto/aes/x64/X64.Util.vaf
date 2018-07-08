@@ -5,11 +5,26 @@ include "../../../arch/x64/X64.Vale.InsVector.vaf"
 module X64.Util
 
 #verbatim{:interface}{:implementation}
+open Opaque_s
+open FStar.Seq
 open Words_s
+open Words.Seq_s
 open Types_s
 open Types_i
 open AES_s
-open FStar.Seq
+open GCTR_s
+open GCTR_i
+open GCM_i
+open GHash_s
+open GHash_i
+open GCM_s
+open X64.AES
+open GF128_s
+open GF128_i
+open X64.Poly1305.Math_i
+open GCM_helpers_i
+open X64.GHash
+open X64.GCTR
 open X64.Machine_s
 open X64.Memory_i
 open X64.Vale.State_i
@@ -20,8 +35,7 @@ open X64.Vale.InsVector
 open X64.Vale.InsAes
 open X64.Vale.QuickCode_i
 open X64.Vale.QuickCodes_i
-open GCTR_i
-open GCTR_s
+open X64.GF128_Mul
 #endverbatim
 
 #reset-options "--z3rlimit 30"
@@ -164,35 +178,16 @@ procedure {:quick} gcm_load_xor_store_buffer(
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
         efl; mem;
 {
-        assume(false);
+        Load128_buffer_reg(xmm2, rdi, rcx, plain_b, offset);
+        Load128_buffer(xmm0, rsi, 0, mask_b, 0);
+        Pxor(xmm2, xmm0);
+        Store128_buffer_reg(rdx, xmm2, rcx, cipher_b, offset);
+
+        assert (modifies_buffer128(cipher_b, old(mem), mem));
+        ghost var mask := buffer128_read(mask_b, 0, old(mem));
+        ghost var plain := buffer128_as_seq(mem, plain_b);
+        ghost var old_cipher := buffer128_as_seq(old(mem), cipher_b);
+        ghost var cipher := buffer128_as_seq(mem, cipher_b);
+        assume (gctr_partial(AES_128, offset + 1, plain, cipher, key, iv));    
 }
-
-
-procedure {:quick} memcpy_simple(ghost dst:buffer64, ghost src:buffer64, ghost len:nat64)
-    requires
-        locs_disjoint(list(loc_buffer(dst), loc_buffer(src)));
-        buffer_readable(mem, dst);
-        buffer_readable(mem, src);
-        rdi == buffer_addr(dst, mem);
-        rsi == buffer_addr(src, mem);
-        rdx == len;
-
-        buffer_length(src) == len;
-        buffer_length(dst) == len;
-    ensures
-        rbx == old(rbx);
-        rbp == old(rbp);
-        r12 == old(r12);
-        r13 == old(r13);
-        r14 == old(r14);
-        r15 == old(r15);
-
-        modifies_mem(loc_buffer(dst), old(mem), mem);
-        buffer64_as_seq(mem, dst) == buffer64_as_seq(old(mem), src);
-    modifies
-        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
-        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem;
-{
-        assume(false);
-}
+        
