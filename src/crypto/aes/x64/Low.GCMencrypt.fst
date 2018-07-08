@@ -357,6 +357,62 @@ assume val inc32_buffer (iv_b:B.buffer U8.t) : Stack unit
      let new_iv = buffer_to_quad32 iv_b h' in
      new_iv == inc32 old_iv 1))
 
+
+assume val zero_quad32_buffer (b:B.buffer U8.t) : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let new_b = buffer_to_quad32 b h' in
+     new_b == Mkfour 0 0 0 0)
+  )
+
+assume val mk_quad32_lo0_be_1_buffer (b:B.buffer U8.t) : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let old_b = buffer_to_quad32 b h  in
+     let new_b = buffer_to_quad32 b h' in
+     new_b == Mkfour 1 old_b.lo1 old_b.hi2 old_b.hi3)
+  )
+
+assume val gcm_make_length_quad_buffer 
+  (plain_num_bytes auth_num_bytes:U64.t)
+  (b:B.buffer U8.t)
+  : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16 /\
+    8 * (U64.v plain_num_bytes) < pow2_32 /\
+    8 * (U64.v  auth_num_bytes) < pow2_32
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let new_b = buffer_to_quad32 b h' in
+     new_b == reverse_bytes_quad32 (Mkfour (8 * (U64.v plain_num_bytes)) 0 (8 * (U64.v auth_num_bytes)) 0))
+  )
+
+
+assume val quad32_xor_buffer 
+  (src1 src2 dst:B.buffer U8.t)
+  : Stack unit
+  (requires fun h ->
+    B.live h src1 /\ B.live h src2 /\ B.live h dst /\
+    B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer dst) h h' /\
+    (let src1 = buffer_to_quad32 src1 h  in
+     let src2 = buffer_to_quad32 src2 h  in
+     let dst  = buffer_to_quad32 dst  h' in
+     dst = quad32_xor src1 src2)
+  )
+
 (*** Actual Low* code ***)
 
 #reset-options "--z3rlimit 30"
@@ -636,62 +692,6 @@ let gcm128_one_pass
     ()
   );
   ()
-
-
-assume val zero_quad32_buffer (b:B.buffer U8.t) : Stack unit
-  (requires fun h ->
-    B.live h b /\
-    B.length b == 16
-  )
-  (ensures fun h () h' -> 
-    M.modifies (M.loc_buffer b) h h' /\
-    (let new_b = buffer_to_quad32 b h' in
-     new_b == Mkfour 0 0 0 0)
-  )
-
-assume val mk_quad32_lo0_be_1_buffer (b:B.buffer U8.t) : Stack unit
-  (requires fun h ->
-    B.live h b /\
-    B.length b == 16
-  )
-  (ensures fun h () h' -> 
-    M.modifies (M.loc_buffer b) h h' /\
-    (let old_b = buffer_to_quad32 b h  in
-     let new_b = buffer_to_quad32 b h' in
-     new_b == Mkfour 1 old_b.lo1 old_b.hi2 old_b.hi3)
-  )
-
-assume val gcm_make_length_quad_buffer 
-  (plain_num_bytes auth_num_bytes:U64.t)
-  (b:B.buffer U8.t)
-  : Stack unit
-  (requires fun h ->
-    B.live h b /\
-    B.length b == 16 /\
-    8 * (U64.v plain_num_bytes) < pow2_32 /\
-    8 * (U64.v  auth_num_bytes) < pow2_32
-  )
-  (ensures fun h () h' -> 
-    M.modifies (M.loc_buffer b) h h' /\
-    (let new_b = buffer_to_quad32 b h' in
-     new_b == reverse_bytes_quad32 (Mkfour (8 * (U64.v plain_num_bytes)) 0 (8 * (U64.v auth_num_bytes)) 0))
-  )
-
-
-assume val quad32_xor_buffer 
-  (src1 src2 dst:B.buffer U8.t)
-  : Stack unit
-  (requires fun h ->
-    B.live h src1 /\ B.live h src2 /\ B.live h dst /\
-    B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
-  )
-  (ensures fun h () h' -> 
-    M.modifies (M.loc_buffer dst) h h' /\
-    (let src1 = buffer_to_quad32 src1 h  in
-     let src2 = buffer_to_quad32 src2 h  in
-     let dst  = buffer_to_quad32 dst  h' in
-     dst = quad32_xor src1 src2)
-  )
 
 let gcm_core_part1      
     (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
