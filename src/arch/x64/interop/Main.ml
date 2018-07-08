@@ -56,13 +56,27 @@ let ghash_one_block = ("ghash_incremental_one_block_buffer", [
 (* let quad32_xor = ("quad32_xor_buffer", [("src1", TBuffer TUInt128);
   ("src2", TBuffer TUInt128); ("dst", TBuffer TUInt128)], Stk (Prims.parse_int "0")) *)
 
+(*
 let gcm_make_length = ("gcm_make_length_quad_buffer", [
   ("plain_num_bytes", TBase TUInt64); ("auth_num_bytes", TBase TUInt64);
   ("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
+*)
+
+(*
+let gcm_load_xor = ("gcm_load_xor_store_buffer", [
+  ("plain_b", TBuffer TUInt128); ("mask_b", TBuffer TUInt128);
+  ("cipher_b", TBuffer TUInt128); ("offset", TBase TUInt64);
+  ("num_blocks", TGhost "nat64");
+  ("key", TGhost "aes_key_LE AES_128"); ("iv", TGhost "quad32")], Stk (Prims.parse_int "0"))
+*)
+
+let memcpy = ("memcpy_simple", [
+  ("dst", TBuffer TUInt64); ("src", TBuffer TUInt64);
+  ("len", TBase TUInt64)], Stk (Prims.parse_int "0"))
 
 let os = Linux
 
-let name = gcm_make_length 
+let name = memcpy 
 
 let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()
