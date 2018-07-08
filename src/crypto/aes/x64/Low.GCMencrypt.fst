@@ -383,11 +383,9 @@ let gcm128_one_pass_blocks
     )
   ) 
   =
-  push_frame();
-//  let ctr_b = B.alloca 0uy 16ul in
-  let enc_ctr_b = B.alloca 0uy 16ul in
-//  memcpy_simple iv_b ctr_b 16ul;
   let h0 = ST.get() in
+  push_frame();
+  let enc_ctr_b = B.alloca 0uy 16ul in
   let inv h (i:nat) =
     i <= U32.v num_blocks /\
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
@@ -419,47 +417,20 @@ let gcm128_one_pass_blocks
     (requires (fun h -> inv h (U32.v i)))
     (ensures (fun h () h' -> inv h (U32.v i) /\ inv h' (U32.v i + 1)))
     =
-    let h1 = ST.get() in
     // Compute the encryption of the counter value
     aes128_encrypt_block_buffer iv_b enc_ctr_b key keys_b;
-    let h2 = ST.get() in
-    
-    let j = U32.v i in
-assert (let old_iv = buffer_to_quad32 iv_b h0 in
-    buffer_to_quad32 enc_ctr_b h2 == aes_encrypt_LE AES_128 (Ghost.reveal key) (inc32 old_iv j));
     
     // Xor the encrypted counter to the plaintext, to make progress on the gctr computation
     let iv = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
     gcm_load_xor_store_buffer plain_b enc_ctr_b cipher_b i (Ghost.hide num_blocks) key iv;
-    let h3 = ST.get() in
-    assert (
-    let old_iv = buffer_to_quad32 iv_b h0 in
-            let plain  = buffer_to_seq_quad32  plain_b h3 in
-            let cipher = buffer_to_seq_quad32 cipher_b h3 in
-    gctr_partial AES_128 (j + 1) plain cipher (Ghost.reveal key) old_iv);
     
-(*
-    assert (let old_iv = buffer_to_quad32 iv_b h0 in
-            let plain  = buffer_to_seq_quad32  plain_b h3 in
-            let cipher = buffer_to_seq_quad32 cipher_b h3 in
-      index cipher j == quad32_xor (index plain j) (aes_encrypt_LE AES_128 (Ghost.reveal key) (inc32 old_iv j)));
-      *)
-
-    // Update our hash
+    // Update our hash (TODO: unify 32 vs 64 and remove this cast)
     let i32:nat32 = UInt32.v i in
     let i64:UInt64.t = UInt64.uint_to_t i32 in
     ghash_incremental_one_block_buffer h_b hash_b cipher_b i64;
-    let h4 = ST.get() in
-    assert (buffer_to_quad32 iv_b h3 == buffer_to_quad32 iv_b h4);
 
     // Increment the ctr
     inc32_buffer iv_b;
-    let h5 = ST.get() in
-
-    // Help with the calculation showing we incremented iv_b correctly
-    //inc32_twice (buffer_to_quad32 iv_b h0) (U32.v i);
-    //assert (buffer_to_quad32 iv_b h5 == inc32 (buffer_to_quad32 iv_b h0) ((U32.v i) + 1));
-    let j = i32 in
     ()
   in
   //C.Loops.for 0ul num_blocks inv body;
