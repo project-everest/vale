@@ -57,6 +57,34 @@ procedure {:quick exportOnly} inc32(inout dst:xmm, one:xmm)
     Paddd(dst, one);
 }
 
+procedure {:quick} inc32_buffer(ghost iv_b:buffer128)
+    requires
+        buffer_readable(mem, iv_b);
+        buffer_length(iv_b) == 1;
+        rdi == buffer_addr(iv_b, mem);
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        modifies_buffer128(iv_b, old(mem), mem);
+        buffer128_read(iv_b, 0, mem) == inc32(buffer128_read(iv_b, 0, old(mem)), 1);
+
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
+{
+        Load128_buffer(xmm1, rdi, 0, iv_b, 0);
+        ZeroXmm(xmm2);
+        PinsrdImm(xmm2, 1, 0, rax);    
+        inc32(xmm1, xmm2);
+        Store128_buffer(rdi, xmm1, 0, iv_b, 0);
+}
+
 // GCTR encrypt one block
 procedure {:quick} gctr_register(
     inline alg:algorithm,

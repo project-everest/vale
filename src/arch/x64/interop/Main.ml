@@ -40,14 +40,18 @@ let ghash_extra = ("ghash_incremental_extra_stdcall", [
   ("orig_hash", TGhost "quad32")], Stk (Prims.parse_int "0"))
 *)
 
+(*
 let ghash_one_block = ("ghash_incremental_one_block_buffer", [
   ("h_b", TBuffer TUInt128); ("hash_b", TBuffer TUInt128);
   ("input_b", TBuffer TUInt128); ("offset", TBase TUInt64)
   ], Stk (Prims.parse_int "0"))
+*)
+
+let inc32 = ("inc32_buffer", [("iv_b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
 
 let os = Linux
 
-let name = ghash_one_block
+let name = inc32
 
 let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()
