@@ -40,7 +40,7 @@ let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 
   BV.sel h b128 0
 
 // TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (src1:b8) (src2:b8) (dst:b8) = live h src1 /\ live h src2 /\ live h dst /\ locs_disjoint [src1;src2;dst] /\     B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
+let pre_cond (h:HS.mem) (src1:b8) (src2:b8) (dst:b8) = live h src1 /\ live h src2 /\ live h dst /\ list_disjoint_or_eq [src1;src2;dst] /\     B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
 
 let post_cond (h:HS.mem) (h':HS.mem) (src1:b8) (src2:b8) (dst:b8) =
 B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16 /\

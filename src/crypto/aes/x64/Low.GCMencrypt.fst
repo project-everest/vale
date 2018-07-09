@@ -131,8 +131,6 @@ let aes128_encrypt_block_buffer
      output_q == aes_encrypt_LE AES_128 (Ghost.reveal key) input_q)
   )         
   =
-  // TODO: Weaken this  
-assume (AESEncryptBlock.locs_disjoint [input_b;output_b;keys_b]);
   AESEncryptBlock.aes128_encrypt_block output_b input_b key keys_b
   
 let aes128_encrypt_block_BE_buffer 
@@ -145,7 +143,6 @@ let aes128_encrypt_block_BE_buffer
     B.length output_b % 16 == 0 /\ B.length output_b >= 16 /\
     // Required by interop layer; not actually needed here
     disjoint_or_eq input_b output_b /\
-    disjoint_or_eq input_b output_b /\
     disjoint keys_b input_b /\
     disjoint keys_b output_b /\
     // AES reqs
@@ -155,13 +152,12 @@ let aes128_encrypt_block_BE_buffer
   )
   (ensures fun h () h' -> 
     B.live h' input_b /\ B.live h' output_b /\ B.live h' keys_b /\
-    M.modifies (M.loc_buffer output_b) h h' /\
+    M.modifies (M.loc_union (M.loc_buffer output_b) (M.loc_buffer input_b)) h h' /\
     (let  input_q = buffer_to_quad32  input_b h in
      let output_q = buffer_to_quad32 output_b h' in
      output_q == aes_encrypt_BE AES_128 (Ghost.reveal key) input_q)
   )   
   =
-assume (AESEncryptBlock.locs_disjoint [input_b;output_b;keys_b]);
   AESEncryptBE.aes128_encrypt_block_be output_b input_b key keys_b
 
 let gctr_bytes_extra_buffer
@@ -174,7 +170,7 @@ let gctr_bytes_extra_buffer
   (requires fun h ->
     let mods = M.loc_buffer cipher_b in 
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
-    disjoint_or_eq plain_b cipher_b /\
+    disjoint plain_b cipher_b /\
     M.loc_disjoint (M.loc_buffer keys_b)  mods /\
     // Required by interop layer; not actually needed here
     buffers_disjoint [plain_b; iv_b; keys_b] /\
@@ -229,8 +225,7 @@ let gctr_bytes_extra_buffer
     )
   ) 
   = 
-// TODO: Make num_bytes be U64
-  admit() //GCTR.gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b cipher_b
+  GCTR.gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b cipher_b
 
 let ghash_incremental_bytes_buffer (h_b hash_b input_b:B.buffer U8.t) (num_bytes:U64.t) : Stack unit
   (requires fun h -> 
@@ -357,8 +352,8 @@ let gcm_load_xor_store_buffer
        : Stack unit
   (requires fun h ->
     B.live h plain_b /\ B.live h mask_b /\ B.live h cipher_b /\
-    disjoint_or_eq plain_b cipher_b /\
-    disjoint_or_eq mask_b  cipher_b /\
+    disjoint plain_b cipher_b /\
+    disjoint mask_b  cipher_b /\
 
     // Required by interop layer; not actually needed here
     disjoint plain_b mask_b /\
@@ -401,7 +396,6 @@ let gcm_load_xor_store_buffer
   let num_blocks = Ghost.hide (U64.v (Ghost.reveal num_blocks)) in
   let h = ST.get() in
 // TODO: Weaken this  
-assume (Gcm_load_xor.locs_disjoint [plain_b;mask_b;cipher_b]);
   Gcm_load_xor.gcm_load_xor_store_buffer plain_b mask_b cipher_b offset num_blocks key iv
 
 let inc32_buffer (iv_b:B.buffer U8.t) : Stack unit
@@ -484,13 +478,11 @@ let quad32_xor_buffer
      dst = quad32_xor src1 src2)
   )
   =
-// TODO: Weaken this  
-assume (Gcm_load_xor.locs_disjoint [src1;src2;dst]);  
   Quad32_xor.quad32_xor_buffer src1 src2 dst
   
 (*** Actual Low* code ***)
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 250"
 let gcm128_one_pass_blocks 
              (plain_b:B.buffer U8.t) (num_blocks:U64.t)  
              (iv_b:B.buffer U8.t) 

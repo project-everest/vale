@@ -172,7 +172,9 @@ procedure{:quick} AESEncryptBlockStdcall_BE(
         input_ptr := if win then rdx else rsi;
         expanded_key_ptr := if win then r8 else rdx;
     requires
-        locs_disjoint(list(loc_buffer(input_buffer), loc_buffer(output_buffer), loc_buffer(keys_buffer)));
+        locs_disjoint(list(loc_buffer(input_buffer), loc_buffer(keys_buffer)));
+        locs_disjoint(list(loc_buffer(output_buffer), loc_buffer(keys_buffer)));
+        buffers_disjoint128(output_buffer, input_buffer) \/ output_buffer == input_buffer;
         alg = AES_128 || alg = AES_256;
         buffer128_read(input_buffer, 0, mem) == input;
         expanded_key_ptr == buffer_addr(keys_buffer, mem);
@@ -198,7 +200,6 @@ procedure{:quick} AESEncryptBlockStdcall_BE(
       Store128_buffer(rsi, xmm2, 0, input_buffer, 0);
     }
 
-    assert (buffer128_read(input_buffer, 0, mem) == reverse_bytes_quad32(input));
     assume(false);
 
     inline if (alg = AES_128) {

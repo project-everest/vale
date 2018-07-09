@@ -62,7 +62,7 @@ let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer UInt8.t 
 open FStar.Mul
 
 // TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = live h plain_b /\ live h iv_b /\ live h keys_b /\ live h cipher_b /\ locs_disjoint [plain_b;iv_b;keys_b;cipher_b] /\ length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0
+let pre_cond (h:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = live h plain_b /\ live h iv_b /\ live h keys_b /\ live h cipher_b /\ locs_disjoint [plain_b;iv_b;keys_b;cipher_b] /\ length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0
 /\ (    let mods = M.loc_buffer cipher_b in 
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
@@ -97,7 +97,7 @@ let pre_cond (h:HS.mem) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghost.erased (qua
      iv == inc32 (Ghost.reveal iv_old) num_blocks) 
      )
 
-let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0 /\ (let mods = M.loc_buffer cipher_b in
+let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0 /\ (let mods = M.loc_buffer cipher_b in
     M.modifies mods h h' /\
     B.live h' plain_b /\ B.live h' iv_b /\ B.live h' keys_b /\ B.live h' cipher_b /\
     
@@ -124,6 +124,6 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghos
   )
 
 
-val gctr_bytes_extra_buffer: plain_b:b8 -> num_bytes:UInt32.t -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> Stack unit
-	(requires (fun h -> pre_cond h plain_b (UInt32.v num_bytes) iv_old iv_b key keys_b cipher_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b (UInt32.v num_bytes) iv_old iv_b key keys_b cipher_b ))
+val gctr_bytes_extra_buffer: plain_b:b8 -> num_bytes:UInt64.t -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> Stack unit
+	(requires (fun h -> pre_cond h plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))
+	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))

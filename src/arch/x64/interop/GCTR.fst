@@ -41,7 +41,7 @@ assume val init_xmms:xmm -> quad32
 
 #set-options "--initial_fuel 7 --max_fuel 7 --initial_ifuel 2 --max_ifuel 2"
 // TODO: Prove these two lemmas if they are not proven automatically
-let implies_pre (h0:HS.mem) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) : Lemma
+let implies_pre (h0:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) : Lemma
   (requires pre_cond h0 plain_b num_bytes iv_old iv_b key keys_b cipher_b )
   (ensures (
 (  let buffers = plain_b::iv_b::keys_b::cipher_b::[] in
@@ -93,7 +93,7 @@ let implies_pre (h0:HS.mem) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghost.erased 
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) keys_b) (BV.as_seq h0 keys128_b));
   ()
 
-let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_b:b8) (num_bytes:nat32) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8)  : Lemma
+let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8)  : Lemma
   (requires pre_cond va_s0.mem.hs plain_b num_bytes iv_old iv_b key keys_b cipher_b /\
     va_post (va_code_gctr_bytes_extra_buffer ()) va_s0 va_sM va_fM plain_b num_bytes (Ghost.reveal iv_old) iv_b (Ghost.reveal key) keys_b cipher_b )
   (ensures post_cond va_s0.mem.hs va_sM.mem.hs plain_b num_bytes iv_old iv_b key keys_b cipher_b ) =
@@ -107,7 +107,7 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_b:b8) 
   ()
 
 
-val ghost_gctr_bytes_extra_buffer: plain_b:b8 -> num_bytes:nat32 -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b num_bytes iv_old iv_b key keys_b cipher_b }) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b num_bytes iv_old iv_b key keys_b cipher_b })
+val ghost_gctr_bytes_extra_buffer: plain_b:b8 -> num_bytes:nat64 -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b num_bytes iv_old iv_b key keys_b cipher_b }) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b num_bytes iv_old iv_b key keys_b cipher_b })
 
 let ghost_gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b cipher_b h0 =
   let buffers = plain_b::iv_b::keys_b::cipher_b::[] in
@@ -147,4 +147,4 @@ let ghost_gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b ciphe
 
 let gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b cipher_b  =
   let h0 = get() in
-  st_put h0 (fun h -> pre_cond h plain_b (UInt32.v num_bytes) iv_old iv_b key keys_b cipher_b ) (ghost_gctr_bytes_extra_buffer plain_b (UInt32.v num_bytes) iv_old iv_b key keys_b cipher_b )
+  st_put h0 (fun h -> pre_cond h plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ) (ghost_gctr_bytes_extra_buffer plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b )
