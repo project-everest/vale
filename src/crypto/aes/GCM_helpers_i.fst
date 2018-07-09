@@ -1,17 +1,19 @@
 module GCM_helpers_i
 
+open FStar.Tactics
 open Words_s
 open Words.Seq_s
 open Types_s
 open Types_i
 open FStar.Mul
 open FStar.Seq
+open Opaque_s
+open Words.Four_s
 open AES_s 
 open GCTR_s
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
-#reset-options "--lax"
 let slice_work_around (s:seq 'a) (i:int) =
   if 0 <= i && i <= length s then slice s 0 i 
   else slice s 0 0
@@ -146,9 +148,6 @@ let insert_0_is_padding (q:quad32) :
   =
   ()
 *)
-open FStar.Tactics
-open Opaque_s
-open Words.Four_s
 
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 2 --initial_fuel 2 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr native --z3rlimit 10"

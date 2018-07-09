@@ -22,8 +22,6 @@ let lemma_shr4 x =
 let lemma_and_mod_n x =
   assert_by_tactic (logand #64 x 3 == mod #64 x 4) (bv_tac);
   assert_by_tactic (logand #64 x 15 == mod #64 x 16) (bv_tac)
-  // assert_by_tactic (logand #64 x 3 == mod #64 x 4 /\ logand #64 x 15 == mod #64 x 16)
-  //                  (fun () -> seq split bv_tac)
 
 let lemma_clear_lower_2 x =
   assert_by_tactic
@@ -34,10 +32,7 @@ let lemma_clear_lower_2 x =
 let lemma_and_constants x =
  assert_by_tactic (logand #64 x 0 == (0 <: uint_t 64)) bv_tac;
  assert_by_tactic (logand #64 x 0xffffffffffffffff == x) bv_tac
- // assert_by_tactic 
- // (logand #64 x 0 == (0 <: uint_t 64) /\ 
- //  logand #64 x 0xffffffffffffffff == x)
- // (fun () -> seq split bv_tac)
+
 
 let lemma_poly_constants x =
  // using split in this seems to hang execution.
