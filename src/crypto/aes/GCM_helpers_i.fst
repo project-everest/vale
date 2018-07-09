@@ -11,6 +11,7 @@ open GCTR_s
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
+#reset-options "--lax"
 let slice_work_around (s:seq 'a) (i:int) =
   if 0 <= i && i <= length s then slice s 0 i 
   else slice s 0 0
@@ -145,9 +146,145 @@ let insert_0_is_padding (q:quad32) :
   =
   ()
 *)
+open FStar.Tactics
+open Opaque_s
+open Words.Four_s
+
+
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 2 --initial_fuel 2 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr native --z3rlimit 10"
+let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) :
+    Lemma(let Mkfour q0 q1 q2 q3 = q in
+	      (i < 4 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q0) (i % 4)) /\
+	      (4 <= i /\ i < 8 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q1) (i % 4)) /\
+ 	      (8 <= i /\ i < 12  ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q2) (i % 4)) /\
+	      (12 <= i /\ i < 16 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q3) (i % 4)))
+  = reveal_opaque (le_quad32_to_bytes_def);
+    let Mkfour q0 q1 q2 q3 = q in
+    assert (index (Words.Seq_s.four_to_seq_LE q) 0 == q0);
+    assert (index (Words.Seq_s.four_to_seq_LE q) 1 == q1);
+    assert (index (Words.Seq_s.four_to_seq_LE q) 2 == q2);
+    assert (index (Words.Seq_s.four_to_seq_LE q) 3 == q3);
+    let Mkfour q00 q01 q02 q03 = nat_to_four 8 q0 in
+    let Mkfour q10 q11 q12 q13 = nat_to_four 8 q1 in
+    let Mkfour q20 q21 q22 q23 = nat_to_four 8 q2 in
+    let Mkfour q30 q31 q32 q33 = nat_to_four 8 q3 in
+    assert_by_tactic (four_select (nat_to_four 8 q0) 0 == q00)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q0) 1 == q01)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q0) 2 == q02)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q0) 3 == q03)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+
+    assert_by_tactic (four_select (nat_to_four 8 q1) 0 == q10)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q1) 1 == q11)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q1) 2 == q12)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q1) 3 == q13)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+
+    assert_by_tactic (four_select (nat_to_four 8 q2) 0 == q20)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q2) 1 == q21)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q2) 2 == q22)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q2) 3 == q23)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+
+    assert_by_tactic (four_select (nat_to_four 8 q3) 0 == q30)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q3) 1 == q31)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q3) 2 == q32)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+    assert_by_tactic (four_select (nat_to_four 8 q3) 3 == q33)
+      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+
+    assert(i < 4 ==> (fun n ->
+	four_select (index (init (length (four_to_seq_LE q))
+                           (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+			     (n / 4))
+			 (n % 4)) i == four_select (nat_to_four 8 q0) i);
+    assert(4 <= i /\ i < 8 ==> (fun n ->
+      four_select (index (init (length (four_to_seq_LE q))
+                       (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+		  (n / 4))
+		     (n % 4)) i == four_select (nat_to_four 8 q1) (i % 4));
+    assert(8 <= i /\ i < 12 ==> (fun n ->
+      four_select (index (init (length (four_to_seq_LE q))
+                       (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+		  (n / 4))
+		     (n % 4)) i == four_select (nat_to_four 8 q2) (i % 4));
+    assert(12 <= i /\ i < 16 ==> (fun n ->
+      four_select (index (init (length (four_to_seq_LE q))
+                       (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+		  (n / 4))
+		     (n % 4)) i == four_select (nat_to_four 8 q3) (i % 4));
+    assert_by_tactic (i < 16 ==> index (le_quad32_to_bytes_def q) i = 
+		     (index (init (length (init (length (four_to_seq_LE q))
+			   (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x))) *
+								       4)
+			   (fun n ->
+			     four_select (index (init (length (four_to_seq_LE q))
+					 (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+			     (n / 4))
+			   (n % 4))) i))
+    			 (fun () -> norm[primops; delta_only ["Types_s.le_quad32_to_bytes_def"; 
+    			 "Collections.Seqs_s.seq_map"; "Collections.Seqs_s.compose"; 
+    			 "Words.Seq_s.seq_four_to_seq_LE"]]; dump " after norm2");
+  assert(i < 4 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q0) i);
+  assert(4 <= i /\ i < 8 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q1) (i % 4));
+  assert(8 <= i /\ i < 12 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q2) (i % 4));
+  assert(12 <= i /\ i < 16 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q3) (i % 4))
+
+
+#reset-options "--smtencoding.elim_box true --z3rlimit 10 --z3refresh --max_ifuel 1 --initial_fuel 0 --max_fuel 2"
 let pad_to_128_bits_lower (q:quad32) (num_bytes:int) =
-  admit();       ///////////////////////////////  TODO!!!  //////////////////////////////////////////////////////////////
-  ()
+  let Mkfour x0 x1 x2 x3 = q in
+  assert (num_bytes * 8 < 64);
+  pow2_lt_compat 64 (num_bytes * 8);
+  modulo_range_lemma (lo64 q) (pow2 (num_bytes * 8));
+  let new_lo = (lo64 q) % pow2 (num_bytes * 8) in
+  assert_norm (pow2 64 == pow2_64); // refinement on Words_s.pow2_64?
+  assert (new_lo < pow2_64);
+  let q' = insert_nat64 (insert_nat64 q 0 1) new_lo 0 in
+  assert_by_tactic (insert_nat64 (Mkfour x0 x1 x2 x3) 0 1 == Mkfour x0 x1 0 0)
+    (fun () -> norm[delta;primops];  trefl ());
+  let new_lo_two = Words.Two_s.nat_to_two 32 new_lo in
+
+  let helper new_lo_o :
+    Lemma (let Mktwo new_lo_lo new_lo_hi = Words.Two_s.nat_to_two 32 new_lo_o in
+	  insert_nat64 (insert_nat64 q 0 1) new_lo_o 0 == Mkfour new_lo_lo new_lo_hi 0 0) =
+    assert_by_tactic (
+      let Mktwo new_lo_lo new_lo_hi = Words.Two_s.nat_to_two 32 new_lo_o in
+      insert_nat64 (Mkfour x0 x1 0 0) new_lo_o 0 == Mkfour new_lo_lo new_lo_hi 0 0)
+        (fun () -> norm[delta; primops]; trefl ())
+  in
+    helper new_lo;
+    assert_norm (lo64 (Mkfour x0 x1 x2 x3) == Words.Two_s.two_to_nat 32 (Mktwo x0 x1));
+    assert (new_lo == (Words.Two_s.two_to_nat_unfold 32 (Mktwo x0 x1)) % pow2 (num_bytes * 8));
+    assert (q' == Mkfour new_lo_two.lo new_lo_two.hi 0 0); 
+
+    // Easier to prove that le_quad32_to_bytes q' == ... and then derive the goal from injectivity.
+    let q'_bytes = le_quad32_to_bytes q' in
+    FStar.Classical.forall_intro (le_quad32_to_bytes_sel q');
+    FStar.Classical.forall_intro (le_quad32_to_bytes_sel q);
+    assert (q'_bytes == le_quad32_to_bytes (Mkfour new_lo_two.lo new_lo_two.hi 0 0));
+    assert (forall i. i <= 8 /\ i < 16 ==> index q'_bytes i == 0);
+    assert (forall i. i <= 8 /\ i < 16 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 0);
+    assert (forall i. i < 4 ==> index q'_bytes i == four_select (nat_to_four 8 new_lo_two.lo) i);
+    assert (forall i. i < 4 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
+			   four_select (nat_to_four 8 x0) i);
+    assert (forall i. i < 4 ==> four_select (nat_to_four 8 x0) i == four_select (nat_to_four 8 new_lo_two.hi) i);
+    assert (forall i. i <= 4 /\ i < 8 ==> index q'_bytes i == four_select (nat_to_four 8 x1) (i % 4));
+    assert (forall i. i <= 4 /\ i < 8 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
+				       four_select (nat_to_four 8 new_lo_two.hi) (i % 4));
+    assert (forall i. i <= 4 /\ i < 8 ==> four_select (nat_to_four 8 x1) i == four_select (nat_to_four 8 new_lo_two.hi) i)
+    
             
 let pad_to_128_bits_upper (q:quad32) (num_bytes:int) =
   admit();       ///////////////////////////////  TODO!!!  //////////////////////////////////////////////////////////////

@@ -50,14 +50,6 @@ let lemma_poly_constants x =
   assert_by_tactic
     (mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64)) 
       (fun () -> bv_tac ())
-// assert_by_tactic  
-//   (logand #64 x 0x0ffffffc0fffffff < (0x1000000000000000 <: uint_t 64) /\
-//     logand #64 x 0x0ffffffc0ffffffc < (0x1000000000000000 <: uint_t 64) /\
-//     mod #64 (logand #64 x 0x0ffffffc0ffffffc) 4 == (0 <: uint_t 64))
-//  (fun () -> split(); split (); 
-// 		   bv_tac_lt 64;
-// 		   bv_tac_lt 64;
-// 		   bv_tac ())
 
 let lemma_and_commutes x y =
   assert_by_tactic 
@@ -111,27 +103,6 @@ let mul_bvshl (u:uint_t 64) :
 
 let plus_bvor (u h:bv_t 128) : 
   Lemma (bvand u h = bv_zero ==> bvadd u h == bvor u h) = ()
-
-  // assert_by_tactic (int2bv #128 (lowerUpper128 x0 x1) = bv128_64_64 (int2bv #64 x0) (int2bv #64 x1))
-  //   (fun () -> bv_tac (); dump "after bv tac")
-
-
-
-// let bv128_64_64_spec' (x1 x0 : bv_t 64) :
-//   Lemma (bvadd (bv_uext #64 #64 (bvmul (int2bv 0x10000000000000000) x1)) (uint_ext #64 #128 x0) ==
-// 	  bv128_64_64 x1 x0) =
-//   assert (bvadd (bv_uext #64 #64 (bvmul (int2bv 0x10000000000000000) x1)) (uint_ext #64 #128 x0) ==
-// 	  bv128_64_64 x1 x0);
-// 	  assume False
-
-// #reset-options "--smtencoding.elim_box true --log_queries --z3refresh --z3rlimit 8"
-// let bv128_64_64_spec' (x1 x0 : uint_t 64) :
-//   Lemma (int2bv #128 (0x10000000000000000 `op_Multiply` x1 + x0) ==
-// 	 (bv128_64_64 (int2bv x1) (int2bv x0))
-//   ) =
-//   assert (bvadd (bvmul (int2bv #128 0x00000000000000010000000000000000) (uint_ext #64 #128 x1)) 
-// 		(int2bv #128 (uint_ext #64 #128 x0)) = bv128_64_64 (int2bv x1) (int2bv x0));
-// 	  assume False
   
 		   
 let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
@@ -139,7 +110,6 @@ let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
 		   (fun () -> destruct_conj ();
 			   rewrite_eqs_from_context ();
 			   norm[delta])
-
 
 #reset-options "--smtencoding.elim_box true --z3refresh --z3rlimit 12 --max_ifuel 1 --max_fuel 1"
 // this should be provable, but it requires  some non trivial effort due to subtypings.
