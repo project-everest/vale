@@ -74,7 +74,7 @@ let lemma_bv128_64_64_and_helper x x0 x1 y y0 y1 z z0 z1 =
 
 let bv128_64_64 x0 x1 = bvor (bvshl (bv_uext #64 #64 x1) 64) (bv_uext #64 #64 x0)
 
-let uint_to_nat (#n:nat) (x:uint_t n) : r:nat{r = x} =
+unfold let uint_to_nat (#n:nat) (x:uint_t n) : r:nat{r = x} =
  assert (x < pow2 n);
  modulo_lemma x (pow2 n); 
  x 
@@ -110,11 +110,12 @@ let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
 // this should be provable, but it requires  some non trivial effort due to subtypings.
 let int2bv_uext_64_128 (x1 : nat) :
   Lemma  (requires (FStar.UInt.size x1 64))
-	 (ensures (bv_uext #64 #64 (int2bv #64 x1) = int2bv #128 (uint_ext #64 #128 x1))) =
+	 (ensures (bv_uext #64 #64 (int2bv #64 x1) == int2bv #128 x1)) =
    assert (64 <= 128);
    pow2_le_compat 128 64;
    assert (x1 < pow2 128);
    modulo_lemma x1 (pow2 128); // x1 % pow2 128 = x1
+   assert (FStar.UInt.size x1 128);
    assume False;
    assert_by_tactic (bv_uext #64 #64 (int2bv #64 x1) == int2bv #128 x1)
 		(fun () -> dump ".."; 
@@ -123,18 +124,19 @@ let int2bv_uext_64_128 (x1 : nat) :
 		dump "After norm"; smt ())
 
 
-// this should be provable, but it requires  some non trivial effort due to subtypings.
+#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 2 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 15"
 let bv128_64_64_lowerUpper128u (x0 x1:nat) :
   Lemma (requires (FStar.UInt.size x0 64 /\ FStar.UInt.size x1 64))
 	(ensures (int2bv (lowerUpper128u x0 x1) = bv128_64_64 (int2bv x0) (int2bv x1))) =
   mul_bvshl x0;
   plus_bvor (bvshl (bv_uext #64 #64 (int2bv x0)) 64) (bv_uext #64 #64 (int2bv x1));
-  assume ((0x10000000000000000)*x0 + x1 == ((0x10000000000000000)*x0 + x1) % pow2 128);
-  assume ((size (0x10000000000000000 * x0) 128));
+  assert ((0x10000000000000000)*x0 + x1 == ((0x10000000000000000)*x0 + x1) % pow2 128);
+  assert ((size (0x10000000000000000 * x0) 128));
+  assert (size x1 128);
   let x2 : uint_t 128 = x1 in
   let hi : uint_t 128 = (0x10000000000000000 <: uint_t 128) * x0 in
-  assert_by_tactic (int2bv #128 (add_mod hi x2) ==
-		    bvadd #128 (int2bv #128 hi) (int2bv #128 x2))
+  assert_by_tactic (int2bv #128 (add_mod #128 (0x10000000000000000 * x0) x1) ==
+		    bvadd #128 (int2bv #128 (0x10000000000000000 * x0)) (int2bv #128 x1))
 		    (fun () -> mapply (`trans); dump "do trans";
 			  apply_lemma (`int2bv_add);
 			  dump "do apply lemma";
