@@ -108,8 +108,6 @@ verify_options = {
   'src/arch/x64/interop/*.fst': None,
   'src/arch/x64/interop/*.fsti': None,
   'src/arch/x64/interop/*.vaf': None,
-  'src/crypto/aes/*': None,
-  'src/crypto/aes/AES_s.fst': BuildOptions(fstar_default_args),
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 

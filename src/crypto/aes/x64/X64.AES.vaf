@@ -42,10 +42,10 @@ procedure{:quick} KeyExpansionStdcall(
     ghost input_key_b:buffer128,
     ghost output_key_expansion_b:buffer128)
     reads
-        rcx; rsi; rdi;
+        rcx; rsi; rdi; memTaint;
     modifies
         rdx;
-        mem; xmm1; xmm2; xmm3; xmm4; efl;
+        mem; xmm1; xmm2; xmm3; xmm4; efl; trace;
     lets
         key_ptr := if win then rcx else rdi;
         key_expansion_ptr := if win then rdx else rsi;
@@ -56,8 +56,8 @@ procedure{:quick} KeyExpansionStdcall(
     requires/ensures
         alg = AES_128 || alg = AES_256;
         buffers_disjoint128(input_key_b, output_key_expansion_b); 
-        validSrcAddrs128(mem, key_ptr, input_key_b, if alg = AES_128 then 1 else 2);
-        validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, nr(alg) + 1);
+        validSrcAddrs128(mem, key_ptr, input_key_b, if alg = AES_128 then 1 else 2, memTaint, Secret);
+        validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, nr(alg) + 1, memTaint, Secret);
     ensures
         modifies_buffer128(output_key_expansion_b, old(mem), mem);
         // TODO: Revisit when Vale has native typing
@@ -89,16 +89,16 @@ procedure{:quick} AESEncryptBlock(
     ghost keys_buffer:buffer128
     )
     reads
-        r8; mem;
+        r8; mem; memTaint;
     modifies
-        xmm0; xmm2; efl;
+        xmm0; xmm2; efl; trace;
     requires
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
         xmm0 == input;
         r8 == buffer_addr(keys_buffer, mem);
-        validSrcAddrs128(mem, r8, keys_buffer, nr(alg) + 1);
+        validSrcAddrs128(mem, r8, keys_buffer, nr(alg) + 1, memTaint, Secret);
         forall i:int :: 0 <= i < nr(alg) + 1 ==> buffer128_read(keys_buffer, i, mem) == index(round_keys, i);
     ensures
         xmm0 == aes_encrypt_LE(alg, key, input);
@@ -122,10 +122,10 @@ procedure{:quick} AESEncryptBlockStdcall(
     ghost keys_buffer:buffer128
     )
     reads
-        rcx; rdx; rsi; rdi;
+        rcx; rdx; rsi; rdi; memTaint;
     modifies
         r8;
-        mem; xmm0; xmm2; efl;
+        mem; xmm0; xmm2; efl; trace;
     lets
         output_ptr := if win then rcx else rdi;
         input_ptr := if win then rdx else rsi;
@@ -134,14 +134,14 @@ procedure{:quick} AESEncryptBlockStdcall(
         alg = AES_128 || alg = AES_256;
         buffer128_read(input_buffer, 0, mem) == input;
         expanded_key_ptr == buffer_addr(keys_buffer, mem);
-        validSrcAddrs128(mem, input_ptr, input_buffer, 1);
-        validSrcAddrs128(mem, output_ptr, output_buffer, 1);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, nr(alg) + 1);
+        validSrcAddrs128(mem, input_ptr, input_buffer, 1, memTaint, Secret);
+        validSrcAddrs128(mem, output_ptr, output_buffer, 1, memTaint, Secret);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, nr(alg) + 1, memTaint, Secret);
         forall i:int :: 0 <= i < nr(alg) + 1 ==>
             buffer128_read(keys_buffer, i, mem) == index(key_to_round_keys_LE(alg, key), i);
     ensures
         modifies_mem(loc_buffer(output_buffer), old(mem), mem);
-        validSrcAddrs128(mem, output_ptr, output_buffer, 1);
+        validSrcAddrs128(mem, output_ptr, output_buffer, 1, memTaint, Secret);
         buffer128_read(output_buffer, 0, mem) == aes_encrypt_LE(alg, key, input);
 {
     inline if (alg = AES_128) {
@@ -163,10 +163,10 @@ procedure{:quick} AESEncryptBlockStdcall_BE(
     ghost keys_buffer:buffer128
     )
     reads
-        rcx; rdx; rsi; rdi;
+        rcx; rdx; rsi; rdi; memTaint;
     modifies
         r8; rax;
-        mem; xmm0; xmm2; efl;
+        mem; xmm0; xmm2; efl; trace;
     lets
         output_ptr := if win then rcx else rdi;
         input_ptr := if win then rdx else rsi;
@@ -176,26 +176,26 @@ procedure{:quick} AESEncryptBlockStdcall_BE(
         alg = AES_128 || alg = AES_256;
         buffer128_read(input_buffer, 0, mem) == input;
         expanded_key_ptr == buffer_addr(keys_buffer, mem);
-        validSrcAddrs128(mem, input_ptr, input_buffer, 1);
-        validSrcAddrs128(mem, output_ptr, output_buffer, 1);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, nr(alg) + 1);
+        validSrcAddrs128(mem, input_ptr, input_buffer, 1, memTaint, Secret);
+        validSrcAddrs128(mem, output_ptr, output_buffer, 1, memTaint, Secret);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_buffer, nr(alg) + 1, memTaint, Secret);
         forall i:int :: 0 <= i < nr(alg) + 1 ==>
             buffer128_read(keys_buffer, i, mem) == index(key_to_round_keys_LE(alg, key), i);
     ensures
         modifies_mem(loc_buffer(output_buffer), old(mem), mem);
-        validSrcAddrs128(mem, output_ptr, output_buffer, 1);
+        validSrcAddrs128(mem, output_ptr, output_buffer, 1, memTaint, Secret);
         buffer128_read(output_buffer, 0, mem) == aes_encrypt_BE(alg, key, input);
 {
     // Reverse the input
     InitPshufbMask(xmm0, rax);
     inline if (win) {
-      Load128_buffer(xmm2, rdx, 0, input_buffer, 0);
+      Load128_buffer(xmm2, rdx, 0, Secret, input_buffer, 0);
       Pshufb(xmm2, xmm0);
-      Store128_buffer(rdx, xmm2, 0, input_buffer, 0);
+      Store128_buffer(rdx, xmm2, 0, Secret, input_buffer, 0);
     } else {
-      Load128_buffer(xmm2, rsi, 0, input_buffer, 0);
+      Load128_buffer(xmm2, rsi, 0, Secret, input_buffer, 0);
       Pshufb(xmm2, xmm0);
-      Store128_buffer(rsi, xmm2, 0, input_buffer, 0);
+      Store128_buffer(rsi, xmm2, 0, Secret, input_buffer, 0);
     }
 
     assert (buffer128_read(input_buffer, 0, mem) == reverse_bytes_quad32(input));

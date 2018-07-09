@@ -69,17 +69,17 @@ procedure {:quick} gcm_one_pass_blocks(
     lets in_ptr @= rax; out_ptr @= rbx; len @= rcx; icb @= xmm7; mask @= xmm8; hash @= xmm1; one @= xmm10; h @= xmm11;
 
     reads
-        r8; in_ptr; out_ptr; len; mask; h;
+        r8; in_ptr; out_ptr; len; mask; h; memTaint;
 
     modifies
-        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
+        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl; trace;
 
     requires
         // GCTR reqs
         buffers_disjoint128(in_b, out_b);
         buffers_disjoint128(keys_b, out_b);
-        validSrcAddrs128(mem, in_ptr, in_b, len);
-        validDstAddrs128(mem, out_ptr, out_b, len);
+        validSrcAddrs128(mem, in_ptr, in_b, len, memTaint, Secret);
+        validDstAddrs128(mem, out_ptr, out_b, len, memTaint, Secret);
         in_ptr  + 16 * len < pow2_64;
         out_ptr + 16 * len < pow2_64;
         buffer_length(in_b) == buffer_length(out_b) /\ 256 * buffer_length(in_b) < pow2_32;
@@ -89,11 +89,11 @@ procedure {:quick} gcm_one_pass_blocks(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, len);
+        validSrcAddrs128(mem, out_ptr, out_b, len, memTaint, Secret);
 
         r9  ==  in_ptr + 16 * len;
         r10 == out_ptr + 16 * len;
@@ -126,8 +126,8 @@ procedure {:quick} gcm_one_pass_blocks(
             // GCTR reqs
             buffers_disjoint128(in_b, out_b);
             buffers_disjoint128(keys_b, out_b);
-            validSrcAddrs128(mem, in_ptr, in_b, len);
-            validDstAddrs128(mem, out_ptr, out_b, len);
+            validSrcAddrs128(mem, in_ptr, in_b, len, memTaint, Secret);
+            validDstAddrs128(mem, out_ptr, out_b, len, memTaint, Secret);
             in_ptr  + 16 * len < pow2_64;
             out_ptr + 16 * len < pow2_64;
             buffer_length(in_b) == buffer_length(out_b); 
@@ -136,7 +136,7 @@ procedure {:quick} gcm_one_pass_blocks(
             alg = AES_128 || alg = AES_256;
             length(round_keys) == nr(alg) + 1;
             round_keys == key_to_round_keys_LE(alg, key);
-            validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
+            validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1, memTaint, Secret);
             buffer128_as_seq(mem, keys_b) == round_keys;
 
             //////////////////// GCTR invariants //////////////////////
@@ -145,7 +145,7 @@ procedure {:quick} gcm_one_pass_blocks(
 
             //////////////////// Postcondition goals //////////////////////
             modifies_buffer128(out_b, old(mem), mem);
-            validSrcAddrs128(mem, out_ptr, out_b, len);
+            validSrcAddrs128(mem, out_ptr, out_b, len, memTaint, Secret);
             gctr_partial(alg, rdx, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
 
             rdx == 0 ==> hash == old(hash);
@@ -158,7 +158,7 @@ procedure {:quick} gcm_one_pass_blocks(
         decreases
             len - rdx;
     {
-        Load128_buffer(xmm0, r9, 0, in_b, rdx);
+        Load128_buffer(xmm0, r9, 0, Secret, in_b, rdx);
 
         // Update our hash
         Mov128(xmm2, xmm0); // Hash expects input in xmm2
@@ -172,7 +172,7 @@ procedure {:quick} gcm_one_pass_blocks(
         AESEncryptBlock(alg, reverse_bytes_quad32(icb), key, round_keys, keys_b); // Clobbers xmm0 and xmm2
 
         Pxor(xmm3, xmm0);
-        Store128_buffer(r10, xmm3, 0, out_b, rdx);
+        Store128_buffer(r10, xmm3, 0, Secret, out_b, rdx);
 
 
         Add64(rdx, 1);
@@ -196,17 +196,17 @@ procedure {:quick} gcm_one_pass(
     lets in_ptr @= rax; out_ptr @= rbx; num_bytes @= rcx; icb @= xmm7; mask @= xmm8; hash @= xmm1; one @= xmm10; h @= xmm11;
 
     reads
-        r8; out_ptr; mask; h;
+        r8; out_ptr; mask; h; memTaint;
 
     modifies
-        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
+        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl; trace;
 
     requires
         // GCTR reqs
         buffers_disjoint128(in_b, out_b);
         buffers_disjoint128(keys_b, out_b);
-        validSrcAddrs128(mem, in_ptr,  in_b,  bytes_to_quad_size(num_bytes));
-        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes));
+        validSrcAddrs128(mem, in_ptr,  in_b,  bytes_to_quad_size(num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes), memTaint, Secret);
         in_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
         buffer_length(in_b)  == buffer_length(out_b);
@@ -219,11 +219,11 @@ procedure {:quick} gcm_one_pass(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, r8, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(old(num_bytes)));
+        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(old(num_bytes)), memTaint, Secret);
 
         // GCTR
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem),  in_b)), old(num_bytes));
@@ -311,12 +311,12 @@ procedure {:quick} gcm_core_part1(
     iv @= xmm7;
 
     reads
-        out_ptr; cipher_ptr; keys_ptr; cipher_num_bytes; auth_num_bytes; 
+        out_ptr; cipher_ptr; keys_ptr; cipher_num_bytes; auth_num_bytes;  memTaint;
 
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
-        mem; efl; 
+        mem; efl; trace; 
 
 
     requires
@@ -325,9 +325,9 @@ procedure {:quick} gcm_core_part1(
         buffers_disjoint128(cipher_b, out_b);
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
-        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes));
-        validSrcAddrs128(mem, auth_ptr,  auth_b,  bytes_to_quad_size(auth_num_bytes));
-        validDstAddrs128(mem, out_ptr,   out_b,   bytes_to_quad_size(cipher_num_bytes));
+        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, auth_ptr,  auth_b,  bytes_to_quad_size(auth_num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, out_ptr,   out_b,   bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
         cipher_ptr + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
         auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
         out_ptr   + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
@@ -346,11 +346,11 @@ procedure {:quick} gcm_core_part1(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, keys_ptr, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, keys_ptr, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes));
+        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
 
         // Main result
         let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
@@ -432,8 +432,7 @@ procedure {:quick} gcm_core_part1(
 procedure {:quick} gcm_make_length_quad(
         )
     lets cipher_num_bytes @= r13; auth_num_bytes @= r11; mask @= xmm8;
-    reads cipher_num_bytes; auth_num_bytes; mask;
-
+    reads cipher_num_bytes; auth_num_bytes; mask; 
     modifies xmm2; rax; efl;
     requires
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
@@ -473,12 +472,12 @@ procedure {:quick} gcm_core(
     iv @= xmm7;
 
     reads
-        out_ptr; cipher_ptr; keys_ptr; cipher_num_bytes; auth_num_bytes; 
+        out_ptr; cipher_ptr; keys_ptr; cipher_num_bytes; auth_num_bytes; memTaint;
 
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
-        mem; efl; 
+        mem; efl; trace; 
 
 
     requires
@@ -487,9 +486,9 @@ procedure {:quick} gcm_core(
         buffers_disjoint128(cipher_b, out_b);
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
-        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes));
-        validSrcAddrs128(mem, auth_ptr,  auth_b,  bytes_to_quad_size(auth_num_bytes));
-        validDstAddrs128(mem, out_ptr,   out_b,   bytes_to_quad_size(cipher_num_bytes));
+        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, auth_ptr,  auth_b,  bytes_to_quad_size(auth_num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, out_ptr,   out_b,   bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
         cipher_ptr + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
         auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
         out_ptr   + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
@@ -508,11 +507,11 @@ procedure {:quick} gcm_core(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, keys_ptr, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, keys_ptr, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes));
+        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
 
         let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
@@ -571,9 +570,10 @@ procedure {:quick} gcm_decrypt_stdcall_inner_inner(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
+    reads memTaint; 
     modifies
         rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; 
+        mem; efl; trace; 
     lets
         args_ptr := r9;
 
@@ -587,18 +587,18 @@ procedure {:quick} gcm_decrypt_stdcall_inner_inner(
         tag_ptr           := buffer64_read(args_b, 7, mem);
 
     requires
-        validSrcAddrs64(mem, args_ptr, args_b, 8);
+        validSrcAddrs64(mem, args_ptr, args_b, 8, memTaint, Public);
 
         buffers_disjoint128(cipher_b, out_b);
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
         
-        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes));
-        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes));
-        validSrcAddrs128(mem, iv_ptr, iv_b, 1);
-        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes));
-        validDstAddrs128(mem, tag_ptr, tag_b, 1);
+        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, iv_ptr, iv_b, 1, memTaint, Secret);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, tag_ptr, tag_b, 1, memTaint, Secret);
 
         cipher_ptr + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
         auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
@@ -620,14 +620,13 @@ procedure {:quick} gcm_decrypt_stdcall_inner_inner(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
         modifies_buffer128(out_b, old(mem), mem);
 
-        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(old(cipher_num_bytes)));
-        //validSrcAddrs128(mem, old(tag_ptr), tag_b, 1);
+        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(old(cipher_num_bytes)), memTaint, Secret);
 
         let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),   old(auth_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
@@ -642,17 +641,17 @@ procedure {:quick} gcm_decrypt_stdcall_inner_inner(
         le_quad32_to_bytes(xmm1) == gcm_decrypt_LE_tag(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth);
         r15 == old(buffer64_read(args_b, 7, mem));
 {
-    Load64_buffer(r14, r9,  0, args_b, 0);
-    Load64_buffer(r13, r9,  8, args_b, 1);
-    Load64_buffer(rax, r9, 16, args_b, 2);
-    Load64_buffer(r11, r9, 24, args_b, 3);
-    Load64_buffer(r10, r9, 32, args_b, 4);
-    Load64_buffer(r8,  r9, 40, args_b, 5);
-    Load64_buffer(rbx, r9, 48, args_b, 6);
-    Load64_buffer(r15, r9, 56, args_b, 7);
+    Load64_buffer(r14, r9,  0, Public, args_b, 0);
+    Load64_buffer(r13, r9,  8, Public, args_b, 1);
+    Load64_buffer(rax, r9, 16, Public, args_b, 2);
+    Load64_buffer(r11, r9, 24, Public, args_b, 3);
+    Load64_buffer(r10, r9, 32, Public, args_b, 4);
+    Load64_buffer(r8,  r9, 40, Public, args_b, 5);
+    Load64_buffer(rbx, r9, 48, Public, args_b, 6);
+    Load64_buffer(r15, r9, 56, Public, args_b, 7);
 
     // Load the IV into its XMM register
-    Load128_buffer(xmm7, r10, 0, iv_b, 0);
+    Load128_buffer(xmm7, r10, 0, Secret, iv_b, 0);
 
     gcm_core(alg, iv_BE, cipher_b, auth_b, out_b, key, round_keys, keys_b);
 
@@ -681,9 +680,10 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
+    reads memTaint; 
     modifies
         rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; 
+        mem; efl; trace; 
     lets
         args_ptr := r9;
 
@@ -697,19 +697,19 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
         tag_ptr           := buffer64_read(args_b, 7, mem);
 
     requires
-        validSrcAddrs64(mem, args_ptr, args_b, 8);
+        validSrcAddrs64(mem, args_ptr, args_b, 8, memTaint, Public);
 
         buffers_disjoint128(cipher_b, out_b);
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
         
-        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes));
-        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes));
-        validSrcAddrs128(mem, iv_ptr, iv_b, 1);
-        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes));
-        validDstAddrs128(mem, tag_ptr, tag_b, 1);
-
+        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, iv_ptr, iv_b, 1, memTaint, Secret);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, tag_ptr, tag_b, 1, memTaint, Secret);
+        
         cipher_ptr + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
         auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
         out_ptr   + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
@@ -730,12 +730,12 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
         modifies_buffer128(out_b, old(mem), mem);
-        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(old(cipher_num_bytes)));
+        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(old(cipher_num_bytes)), memTaint, Secret);
 
         let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
@@ -749,10 +749,10 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
 {
     gcm_decrypt_stdcall_inner_inner(alg, args_b, iv_BE, cipher_b, auth_b, iv_b, out_b, tag_b, key, round_keys, keys_b);
     
-    assert validDstAddrs128(mem, r15, tag_b, 1);
+    assert validDstAddrs128(mem, r15, tag_b, 1, memTaint, Secret);
 
     // Auth tag is in xmm1; compare it to the value in memory
-    Load128_buffer(xmm0, r15, 0, tag_b, 0);
+    Load128_buffer(xmm0, r15, 0, Secret, tag_b, 0);
     assert xmm0 == buffer128_read(tag_b, 0, mem);       // OBSERVE?
     assert xmm0 == buffer128_read(tag_b, 0, old(mem));  // OBSERVE?
     ghost var alleged_tag_quad := xmm0;
@@ -782,10 +782,11 @@ procedure {:quick} gcm_decrypt_stdcall(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
+    reads memTaint; 
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
         rbp; rdi; rsi; 
-        mem; efl; rsp;
+        mem; efl; trace; rsp;
     lets
         args_ptr := if win then rcx else rdi;
 
@@ -799,7 +800,7 @@ procedure {:quick} gcm_decrypt_stdcall(
         tag_ptr           := buffer64_read(args_b, 7, mem);
 
     requires
-        validSrcAddrs64(mem, args_ptr, args_b, 8);
+        validSrcAddrs64(mem, args_ptr, args_b, 8, memTaint, Public);
 
         buffers_disjoint128(cipher_b, out_b);
         buffers_disjoint128(auth_b, out_b);
@@ -815,13 +816,14 @@ procedure {:quick} gcm_decrypt_stdcall(
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(tag_b)));
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(keys_b)));
 
-        validDstAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes));
-        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes));
-        validSrcAddrs128(mem, iv_ptr, iv_b, 1);
-        validSrcAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes));
-        validSrcAddrs128(mem, tag_ptr, tag_b, 1);
+        validSrcAddrs128(mem, cipher_ptr, cipher_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes), memTaint, Secret);
+        validSrcAddrs128(mem, iv_ptr, iv_b, 1, memTaint, Secret);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, tag_ptr, tag_b, 1, memTaint, Secret);
 
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
+        valid_taint_buf64(stack_b, mem, memTaint, Public);
 
         cipher_ptr + 16 * bytes_to_quad_size(cipher_num_bytes) < pow2_64;
         auth_ptr  + 16 * bytes_to_quad_size(auth_num_bytes)  < pow2_64;
@@ -843,13 +845,13 @@ procedure {:quick} gcm_decrypt_stdcall(
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
         round_keys == key_to_round_keys_LE(alg, key);
-        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1);
+        validSrcAddrs128(mem, expanded_key_ptr, keys_b, nr(alg) + 1, memTaint, Secret);
         buffer128_as_seq(mem, keys_b) == round_keys;
 
     ensures
         modifies_mem(loc_union(loc_buffer(stack_b), loc_buffer(out_b)), old(mem), mem);
 
-        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(cipher_num_bytes));
+        validSrcAddrs128(mem, old(out_ptr), out_b, bytes_to_quad_size(cipher_num_bytes), memTaint, Secret);
 
         let auth   := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), auth_b)),  old(auth_num_bytes));
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
