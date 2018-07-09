@@ -65,7 +65,7 @@ live h plain_b /\ live h auth_b /\ live h iv_b /\ live h keys_b /\ live h cipher
                     True) /\                    
                    True    
 
-
+noextract
 let seq_U8_to_seq_nat8 (b:seq U8.t) : (s:seq nat8{length s == length b}) =
   Seq.init (length b) (fun (i:nat { i < length b }) -> let n:nat8 = U8.v (index b i) in n)
 

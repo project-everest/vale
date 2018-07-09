@@ -36,7 +36,6 @@ let post_cond (h:HS.mem) (h':HS.mem) (b:b8) = length b == 16 /\
     (let new_b = buffer_to_quad32 b h' in
      new_b == Mkfour 0 0 0 0)
 
-noextract
 val zero_quad32_buffer: b:b8 -> Stack unit
 	(requires (fun h -> pre_cond h b ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 b ))

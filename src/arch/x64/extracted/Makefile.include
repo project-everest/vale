@@ -1,0 +1,2 @@
+ALL_C_FILES=C_Loops_Spec_Loops.c Prims.c FStar.c LowStar.c Quad32_xor.c
+ALL_H_FILES=C_Loops_Spec_Loops.h Prims.h FStar.h LowStar.h Quad32_xor.h

@@ -104,7 +104,6 @@ let ghost_zero_quad32_buffer b h0 =
   implies_post s0 s1 f1 b ;
   s1.mem.hs
 
-noextract
 let zero_quad32_buffer b  =
   let h0 = get() in
   st_put h0 (fun h -> pre_cond h b ) (ghost_zero_quad32_buffer b )
