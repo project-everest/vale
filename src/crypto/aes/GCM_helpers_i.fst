@@ -151,90 +151,85 @@ let insert_0_is_padding (q:quad32) :
 
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 2 --initial_fuel 2 --max_ifuel 0 --smtencoding.elim_box true --smtencoding.nl_arith_repr native --z3rlimit 10"
-let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) :
-    Lemma(let Mkfour q0 q1 q2 q3 = q in
-	      (i < 4 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q0) (i % 4)) /\
-	      (4 <= i /\ i < 8 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q1) (i % 4)) /\
- 	      (8 <= i /\ i < 12  ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q2) (i % 4)) /\
-	      (12 <= i /\ i < 16 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q3) (i % 4)))
-  = reveal_opaque (le_quad32_to_bytes_def);
-    let Mkfour q0 q1 q2 q3 = q in
-    assert (index (Words.Seq_s.four_to_seq_LE q) 0 == q0);
-    assert (index (Words.Seq_s.four_to_seq_LE q) 1 == q1);
-    assert (index (Words.Seq_s.four_to_seq_LE q) 2 == q2);
-    assert (index (Words.Seq_s.four_to_seq_LE q) 3 == q3);
-    let Mkfour q00 q01 q02 q03 = nat_to_four 8 q0 in
-    let Mkfour q10 q11 q12 q13 = nat_to_four 8 q1 in
-    let Mkfour q20 q21 q22 q23 = nat_to_four 8 q2 in
-    let Mkfour q30 q31 q32 q33 = nat_to_four 8 q3 in
-    assert_by_tactic (four_select (nat_to_four 8 q0) 0 == q00)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q0) 1 == q01)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q0) 2 == q02)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q0) 3 == q03)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) =
+  reveal_opaque (le_quad32_to_bytes_def);
+  let Mkfour q0 q1 q2 q3 = q in
+  assert (index (Words.Seq_s.four_to_seq_LE q) 0 == q0);
+  assert (index (Words.Seq_s.four_to_seq_LE q) 1 == q1);
+  assert (index (Words.Seq_s.four_to_seq_LE q) 2 == q2);
+  assert (index (Words.Seq_s.four_to_seq_LE q) 3 == q3);
+  let Mkfour q00 q01 q02 q03 = nat_to_four 8 q0 in
+  let Mkfour q10 q11 q12 q13 = nat_to_four 8 q1 in
+  let Mkfour q20 q21 q22 q23 = nat_to_four 8 q2 in
+  let Mkfour q30 q31 q32 q33 = nat_to_four 8 q3 in
+  assert_by_tactic (four_select (nat_to_four 8 q0) 0 == q00)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q0) 1 == q01)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q0) 2 == q02)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q0) 3 == q03)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
 
-    assert_by_tactic (four_select (nat_to_four 8 q1) 0 == q10)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q1) 1 == q11)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q1) 2 == q12)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q1) 3 == q13)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q1) 0 == q10)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q1) 1 == q11)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q1) 2 == q12)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q1) 3 == q13)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
 
-    assert_by_tactic (four_select (nat_to_four 8 q2) 0 == q20)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q2) 1 == q21)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q2) 2 == q22)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q2) 3 == q23)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q2) 0 == q20)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q2) 1 == q21)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q2) 2 == q22)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q2) 3 == q23)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
 
-    assert_by_tactic (four_select (nat_to_four 8 q3) 0 == q30)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q3) 1 == q31)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q3) 2 == q32)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
-    assert_by_tactic (four_select (nat_to_four 8 q3) 3 == q33)
-      (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q3) 0 == q30)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q3) 1 == q31)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q3) 2 == q32)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
+  assert_by_tactic (four_select (nat_to_four 8 q3) 3 == q33)
+    (fun () -> norm[delta_only ["Words.Four_s.four_select"]]);
 
-    assert(i < 4 ==> (fun n ->
-	four_select (index (init (length (four_to_seq_LE q))
-                           (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-			     (n / 4))
-			 (n % 4)) i == four_select (nat_to_four 8 q0) i);
-    assert(4 <= i /\ i < 8 ==> (fun n ->
-      four_select (index (init (length (four_to_seq_LE q))
+  assert(i < 4 ==> (fun n ->
+    four_select (index (init (length (four_to_seq_LE q))
                        (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-		  (n / 4))
-		     (n % 4)) i == four_select (nat_to_four 8 q1) (i % 4));
-    assert(8 <= i /\ i < 12 ==> (fun n ->
-      four_select (index (init (length (four_to_seq_LE q))
-                       (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-		  (n / 4))
-		     (n % 4)) i == four_select (nat_to_four 8 q2) (i % 4));
-    assert(12 <= i /\ i < 16 ==> (fun n ->
-      four_select (index (init (length (four_to_seq_LE q))
-                       (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-		  (n / 4))
-		     (n % 4)) i == four_select (nat_to_four 8 q3) (i % 4));
-    assert_by_tactic (i < 16 ==> index (le_quad32_to_bytes_def q) i = 
-		     (index (init (length (init (length (four_to_seq_LE q))
-			   (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x))) *
-								       4)
-			   (fun n ->
-			     four_select (index (init (length (four_to_seq_LE q))
-					 (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-			     (n / 4))
-			   (n % 4))) i))
-    			 (fun () -> norm[primops; delta_only ["Types_s.le_quad32_to_bytes_def"; 
-    			 "Collections.Seqs_s.seq_map"; "Collections.Seqs_s.compose"; 
-    			 "Words.Seq_s.seq_four_to_seq_LE"]]; dump " after norm2");
+			    (n / 4))
+		       (n % 4)) i == four_select (nat_to_four 8 q0) i);
+  assert(4 <= i /\ i < 8 ==> (fun n ->
+    four_select (index (init (length (four_to_seq_LE q))
+                (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+		(n / 4))
+		   (n % 4)) i == four_select (nat_to_four 8 q1) (i % 4));
+  assert(8 <= i /\ i < 12 ==> (fun n ->
+    four_select (index (init (length (four_to_seq_LE q))
+                (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+		(n / 4))
+		   (n % 4)) i == four_select (nat_to_four 8 q2) (i % 4));
+  assert(12 <= i /\ i < 16 ==> (fun n ->
+    four_select (index (init (length (four_to_seq_LE q))
+                (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+		(n / 4))
+		   (n % 4)) i == four_select (nat_to_four 8 q3) (i % 4));
+  assert_by_tactic (i < 16 ==> index (le_quad32_to_bytes_def q) i = 
+		   (index (init (length (init (length (four_to_seq_LE q))
+			  (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x))) *
+								      4)
+			  (fun n ->
+			    four_select (index (init (length (four_to_seq_LE q))
+					(fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+			    (n / 4))
+			  (n % 4))) i))
+    		   (fun () -> norm[primops; delta_only ["Types_s.le_quad32_to_bytes_def"; 
+    		      "Collections.Seqs_s.seq_map"; "Collections.Seqs_s.compose"; 
+    			"Words.Seq_s.seq_four_to_seq_LE"]]; dump " after norm2");
   assert(i < 4 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q0) i);
   assert(4 <= i /\ i < 8 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q1) (i % 4));
   assert(8 <= i /\ i < 12 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q2) (i % 4));
