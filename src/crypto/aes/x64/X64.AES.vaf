@@ -189,25 +189,31 @@ procedure{:quick} AESEncryptBlockStdcall_BE(
         buffer128_read(output_buffer, 0, mem) == aes_encrypt_BE(alg, key, input);
 {
     // Reverse the input
-    InitPshufbMask(xmm0, rax);
+    InitPshufbMask(xmm2, rax);
     inline if (win) {
-      Load128_buffer(xmm2, rdx, 0, input_buffer, 0);
-      Pshufb(xmm2, xmm0);
-      Store128_buffer(rdx, xmm2, 0, input_buffer, 0);
+      Load128_buffer(xmm0, rdx, 0, input_buffer, 0);
+      Pshufb(xmm0, xmm2);
     } else {
-      Load128_buffer(xmm2, rsi, 0, input_buffer, 0);
-      Pshufb(xmm2, xmm0);
-      Store128_buffer(rsi, xmm2, 0, input_buffer, 0);
+      Load128_buffer(xmm0, rsi, 0, input_buffer, 0);
+      Pshufb(xmm0, xmm2);
+      Mov64(r8, rdx);
     }
-
-    assume(false);
 
     inline if (alg = AES_128) {
         assert {:quick_type} alg == AES_128;
-        AES128EncryptBlockStdcall(win, reverse_bytes_quad32(input), key, input_buffer, output_buffer, keys_buffer);
+        AES128EncryptBlock(reverse_bytes_quad32(input), key, key_to_round_keys_LE(AES_128, key), keys_buffer);
     } else {
         assert {:quick_type} alg == AES_256;
-        AES256EncryptBlockStdcall(win, reverse_bytes_quad32(input), key, input_buffer, output_buffer, keys_buffer);
+        AES256EncryptBlock(reverse_bytes_quad32(input), key, key_to_round_keys_LE(AES_256, key), keys_buffer);
+    }
+
+    inline if (win)
+    {
+        Store128_buffer(rcx, xmm0, 0, output_buffer, 0);
+    }
+    else
+    {
+        Store128_buffer(rdi, xmm0, 0, output_buffer, 0);
     }
 }
 

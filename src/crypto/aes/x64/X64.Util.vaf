@@ -185,6 +185,5 @@ procedure {:quick} gcm_load_xor_store_buffer(
         Pxor(xmm2, xmm0);
         Store128_buffer_reg(rdx, xmm2, rcx, cipher_b, offset);
 
-        assume(false);
 }
         

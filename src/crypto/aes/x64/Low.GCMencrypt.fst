@@ -152,7 +152,7 @@ let aes128_encrypt_block_BE_buffer
   )
   (ensures fun h () h' -> 
     B.live h' input_b /\ B.live h' output_b /\ B.live h' keys_b /\
-    M.modifies (M.loc_union (M.loc_buffer output_b) (M.loc_buffer input_b)) h h' /\
+    M.modifies (M.loc_buffer output_b) h h' /\
     (let  input_q = buffer_to_quad32  input_b h in
      let output_q = buffer_to_quad32 output_b h' in
      output_q == aes_encrypt_BE AES_128 (Ghost.reveal key) input_q)
@@ -482,7 +482,7 @@ let quad32_xor_buffer
   
 (*** Actual Low* code ***)
 
-#reset-options "--z3rlimit 250"
+#reset-options "--z3rlimit 100"
 let gcm128_one_pass_blocks 
              (plain_b:B.buffer U8.t) (num_blocks:U64.t)  
              (iv_b:B.buffer U8.t) 
@@ -575,12 +575,12 @@ let gcm128_one_pass_blocks
     )
   in
   (* This is the preferred style and useful for debugging the body.
-     However, there's a "unification/delta_depth issue" somewhere, so we have to inline it below 
+     However, there's a "unification/delta_depth issue" somewhere, so we have to inline it below
   let body (i:U64.t{ U64.v 0UL <= U64.v i /\ U64.v i < U64.v num_blocks }) : Stack unit
     (requires (fun h -> inv h (U64.v i)))
     (ensures (fun h () h' -> inv h (U64.v i) /\ inv h' (U64.v i + 1)))
     =
-    // Compute the encryption of the counter value
+     // Compute the encryption of the counter value
     aes128_encrypt_block_BE_buffer iv_b enc_ctr_b key keys_b;
     
     // Xor the encrypted counter to the plaintext, to make progress on the gctr computation
@@ -594,8 +594,7 @@ let gcm128_one_pass_blocks
     // Increment the ctr
     inc32_buffer iv_b;
     ()
-  in
-  *)
+  in *)
   C.Loops.for64 0UL num_blocks inv 
     (fun (i:U64.t{ U64.v 0UL <= U64.v i /\ U64.v i < U64.v num_blocks }) ->
       // Compute the encryption of the counter value
@@ -760,6 +759,8 @@ let gcm128_one_pass
   );
   ()
 
+#set-options "--z3rlimit 150"
+
 let gcm_core_part1      
     (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
     (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
@@ -885,7 +886,7 @@ let gcm_core_part1
   Ghost.hide (Ghost.reveal y_0, Ghost.reveal y_auth, Ghost.reveal y_cipher)  
 
 
-#reset-options "--z3rlimit 20"
+#reset-options "--z3rlimit 50"
 let gcm_core      
     (plain_b:B.buffer U8.t) (plain_num_bytes:U64.t) 
     (auth_b:B.buffer U8.t)  (auth_num_bytes:U64.t)
