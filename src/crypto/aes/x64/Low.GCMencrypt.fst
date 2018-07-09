@@ -29,14 +29,16 @@ open BufferViewHelpers
 open FStar.Seq
 
 // Not sure how to define this after we open FStar.Mul
+noextract
 let quad32x3 = quad32 * quad32 * quad32
 
 open FStar.Mul
 
 (*** Useful specification abbreviations ***)
-
+(*
 let seq_U8_to_seq_nat8 (b:seq U8.t) : (seq nat8) =
   Seq.init (length b) (fun (i:nat { i < length b }) -> U8.v (index b i))
+*)
 
 let buffer_to_nat32 (b:B.buffer U8.t { B.length b % 4 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot nat32 =
   let b32 = BV.mk_buffer_view b Views.view32 in
@@ -482,7 +484,7 @@ let quad32_xor_buffer
   
 (*** Actual Low* code ***)
 
-#reset-options "--z3rlimit 100"
+#reset-options "--z3rlimit 150"
 let gcm128_one_pass_blocks 
              (plain_b:B.buffer U8.t) (num_blocks:U64.t)  
              (iv_b:B.buffer U8.t) 
@@ -693,7 +695,7 @@ let gcm128_one_pass
   True) 
   =
   let h0 = ST.get() in
-  if U64.v num_bytes > 0 then (
+  if UInt64.gt num_bytes 0UL then (
     let num_blocks = U64.div num_bytes 16UL in
     let num_extra = U64.rem num_bytes 16UL in
     gcm128_one_pass_blocks plain_b num_blocks iv_b key keys_b cipher_b h_b hash_b;
@@ -872,13 +874,12 @@ let gcm_core_part1
   gcm128_one_pass plain_b plain_num_bytes iv_b key keys_b cipher_b h_b hash_b;
   let h4 = ST.get() in
   let y_cipher = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h4) in
-  let plain_num_bytes_nat64:nat64 = U64.v plain_num_bytes in
   GCM_i.gcm_encrypt_LE_fst_helper 
     (Ghost.reveal icb_enc) 
     (Ghost.reveal iv_BE) 
-    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h0)) 0 plain_num_bytes_nat64)
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h0)) 0 (U64.v plain_num_bytes))
     (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32   auth_b h0)) 0 (U64.v auth_num_bytes))
-    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h4)) 0 plain_num_bytes_nat64)
+    (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 cipher_b h4)) 0 (U64.v plain_num_bytes))
     AES_128
     (Ghost.reveal key);
   Opaque_s.reveal_opaque le_bytes_to_seq_quad32_def; 

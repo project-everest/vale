@@ -49,7 +49,6 @@ let ghash_one_block = ("ghash_incremental_one_block_buffer", [
 
 (* let inc32 = ("inc32_buffer", [("iv_b", TBuffer TUInt128)], Stk (Prims.parse_int "0")) *)
 
-(* let zero_quad32_buffer = ("zero_quad32_buffer", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0")) *)
  
 (* let quad32_xor = ("quad32_xor_buffer", [("src1", TBuffer TUInt128);
   ("src2", TBuffer TUInt128); ("dst", TBuffer TUInt128)], Stk (Prims.parse_int "0")) *)
@@ -75,8 +74,10 @@ let aes_encrypt_block_be = ("aes128_encrypt_block_be", [
   ], Stk (Prims.parse_int "0"))
 *)
 
-let mk_quad1 = ("mk_quad32_lo0_be_1_buffer", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
-
+let mk_quad1 = ("mk_quad32_lo0_be_1_buffer_win", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
+(*
+let zero_quad32_buffer = ("zero_quad32_buffer_win", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
+*)
 let os = Windows 
 
 let name = mk_quad1 
