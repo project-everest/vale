@@ -6,7 +6,7 @@ module B = LowStar.Buffer
 module BV = LowStar.BufferView
 module M = LowStar.Modifies
 open LowStar.ModifiesPat
-module U8 = FStar.UInt8
+module U8 = SecretByte
 module U32 = FStar.UInt32
 module U64 = FStar.UInt64
 module HS = FStar.HyperStack
