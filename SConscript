@@ -54,7 +54,8 @@ fstar_include_paths = [
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
-  env['FSTAR_PATH'] + '/examples/tactics/'
+  env['FSTAR_PATH'] + '/examples/tactics/',
+  env['KREMLIN_HOME'] + '/kremlib/'
 ]
 Export('fstar_include_paths')
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
@@ -91,7 +92,7 @@ verify_options = {
   '.dfy': BuildOptions(dafny_default_args_larith),
 
   # Special treatment for sensitive modules
-  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '--smtencoding.elim_box true')),
+  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding + ' --smtencoding.elim_box true'),
   'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # Disable verification by adding 'filename': None
@@ -119,12 +120,13 @@ verify_options = {
   '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
   '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
+  'obj/lib/collections/Collections.Lists_i.fst': BuildOptions(fstar_default_args.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
   'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
   'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
   'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true '),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
   'obj/crypto/aes/x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
-
+  'src/lib/util/BufferViewHelpers.fst' : BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.arith.nl=false', '')),
 
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti

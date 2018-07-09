@@ -1,0 +1,186 @@
+include "../../../arch/x64/X64.Vale.InsBasic.vaf"
+include "../../../arch/x64/X64.Vale.InsMem.vaf"
+include "../../../arch/x64/X64.Vale.InsVector.vaf"
+
+module X64.Util
+
+#verbatim{:interface}{:implementation}
+open Opaque_s
+open FStar.Seq
+open Words_s
+open Words.Seq_s
+open Types_s
+open Types_i
+open AES_s
+open GCTR_s
+open GCTR_i
+open GCM_i
+open GHash_s
+open GHash_i
+open GCM_s
+open X64.AES
+open GF128_s
+open GF128_i
+open X64.Poly1305.Math_i
+open GCM_helpers_i
+open X64.GHash
+open X64.GCTR
+open X64.Machine_s
+open X64.Memory_i
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+open X64.Vale.InsVector
+open X64.Vale.InsAes
+open X64.Vale.QuickCode_i
+open X64.Vale.QuickCodes_i
+open X64.GF128_Mul
+#endverbatim
+
+#reset-options "--z3rlimit 30"
+
+procedure {:quick} zero_quad32_buffer(ghost b:buffer128)
+    requires/ensures
+        buffer_readable(mem, b);
+        buffer_length(b) == 1;
+        rdi == buffer_addr(b, mem);
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        modifies_buffer128(b, old(mem), mem);
+        buffer128_read(b, 0, mem) == Mkfour(0, 0, 0, 0);
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
+{
+        ZeroXmm(xmm1);
+        Store128_buffer(rdi, xmm1, 0, b, 0);
+}
+
+
+procedure {:quick} mk_quad32_lo0_be_1_buffer(ghost b:buffer128)
+    requires
+        buffer_readable(mem, b);
+        buffer_length(b) == 1;
+        rdi == buffer_addr(b, mem);
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        modifies_buffer128(b, old(mem), mem);
+        let old_b := buffer128_read(b, 0, old(mem));
+        let new_b := buffer128_read(b, 0, mem);
+        new_b == Mkfour (1, old_b.lo1, old_b.hi2, old_b.hi3);
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
+{
+     Load128_buffer(xmm1, rdi, 0, b, 0);
+     PinsrdImm(xmm1, 1, 0, rax);
+     Store128_buffer(rdi, xmm1, 0, b, 0);
+
+}
+
+procedure {:quick} quad32_xor_buffer(
+  ghost src1:buffer128,
+  ghost src2:buffer128,
+  ghost dst:buffer128)
+    requires
+        locs_disjoint(list(loc_buffer(src1), loc_buffer(src2), loc_buffer(dst)));
+        buffer_readable(mem, src1);
+        buffer_readable(mem, src2);
+        buffer_readable(mem, dst);
+        rdi == buffer_addr(src1, mem);
+        rsi == buffer_addr(src2, mem);
+        rdx == buffer_addr(dst, mem);
+        buffer_length(src1) == 1;
+        buffer_length(src2) == 1;
+        buffer_length(dst) == 1;        
+   ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        modifies_buffer128(dst, old(mem), mem);
+        buffer128_read(dst, 0, mem) == quad32_xor(buffer128_read(src1, 0, old(mem)), buffer128_read(src2, 0, old(mem)));
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
+{
+        Load128_buffer(xmm1, rdi, 0, src1, 0);
+        Load128_buffer(xmm2, rsi, 0, src2, 0);
+        Pxor(xmm1, xmm2);
+        Store128_buffer(rdx, xmm1, 0, dst, 0);
+}
+
+procedure {:quick} gcm_load_xor_store_buffer(
+  ghost plain_b:buffer128,
+  ghost mask_b:buffer128,
+  ghost cipher_b:buffer128,
+  ghost offset:nat64,
+  ghost num_blocks:nat64,
+  ghost key:aes_key_LE(AES_128),
+  ghost iv:quad32)
+    requires
+        locs_disjoint(list(loc_buffer(plain_b), loc_buffer(mask_b), loc_buffer(cipher_b)));
+        buffer_readable(mem, plain_b);
+        buffer_readable(mem, mask_b);
+        buffer_readable(mem, cipher_b);
+        rdi == buffer_addr(plain_b, mem);
+        rsi == buffer_addr(mask_b, mem);
+        rdx == buffer_addr(cipher_b, mem);
+        rcx == offset;
+
+        buffer_length(plain_b) >= num_blocks;
+        buffer_length(cipher_b) == buffer_length(plain_b);
+        buffer_length(mask_b) == 1;
+
+        let mask := buffer128_read(mask_b, 0, mem);
+        let plain := buffer128_as_seq(mem, plain_b);
+        let cipher := buffer128_as_seq(mem, cipher_b);
+        offset < num_blocks;
+        mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
+        gctr_partial(AES_128, offset, plain, cipher, key, iv);
+
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        modifies_buffer128(cipher_b, old(mem), mem);
+        let mask := buffer128_read(mask_b, 0, old(mem));
+        let plain := buffer128_as_seq(mem, plain_b);
+        let old_cipher := buffer128_as_seq(old(mem), cipher_b);
+        let cipher := buffer128_as_seq(mem, cipher_b);
+        gctr_partial(AES_128, offset + 1, plain, cipher, key, iv);
+        slice(cipher, 0, offset) == slice(old_cipher, 0, offset);
+    modifies
+        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
+        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        efl; mem;
+{
+        Load128_buffer_reg(xmm2, rdi, rcx, plain_b, offset);
+        Load128_buffer(xmm0, rsi, 0, mask_b, 0);
+        Pxor(xmm2, xmm0);
+        Store128_buffer_reg(rdx, xmm2, rcx, cipher_b, offset);
+}
+        

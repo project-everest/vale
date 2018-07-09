@@ -294,6 +294,7 @@ env['FSTAR'] = Dir(env['FSTAR_PATH']).Dir('bin').File('fstar.exe')
 if 'KREMLIN_HOME' in os.environ:
   kremlin_path = os.environ['KREMLIN_HOME']
   env['KREMLIN'] = File(kremlin_path + '/_build/src/Kremlin.native')
+  env['KREMLIN_HOME'] = os.environ['KREMLIN_HOME']
   kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')

@@ -24,6 +24,7 @@ let op_String_Assignment = Map.upd
 
 let sub l i = l - i
 
+inline_for_extraction
 let b8 = B.buffer UInt8.t
 
 unfold
