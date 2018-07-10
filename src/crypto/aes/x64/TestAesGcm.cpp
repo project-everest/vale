@@ -2,6 +2,10 @@
 #include <stdint.h>
 #include <chrono>
 
+#ifdef LOWSTAR
+#include "Low_GCMencrypt.h"
+#endif // LOWSTAR
+
 typedef unsigned char byte;
 
 struct args
@@ -61,18 +65,18 @@ void test(void (*aes_key_expansion) (byte*, byte*),
     a.expanded_key_ptr = key_expansion;
     a.out_ptr = out;
     a.tag_ptr = tag;
-    printbytes("key", key, 16);
+    printbytes((char*)"key", key, 16);
     aes_key_expansion(key, key_expansion);
-    printbytes("key_expansion", key_expansion, (num_rounds + 1) * 16);
+    printbytes((char*)"key_expansion", key_expansion, (num_rounds + 1) * 16);
     gcm_encrypt(&a);
-    printbytes("cipher", out, 19);
-    printbytes("tag", tag, 16);
+    printbytes((char*)"cipher", out, 19);
+    printbytes((char*)"tag", tag, 16);
 
     a.out_ptr = plain;
     a.plain_ptr = out;
     int ret = gcm_decrypt(&a);
     printf("gcm_decrypt returned %d\n", ret);
-    printbytes("plaintext", plain, 19);
+    printbytes((char*)"plaintext", plain, 19);
 
     int nblocks = 256;
     byte *plain2 = new byte[nblocks * 16];
@@ -96,14 +100,79 @@ void test(void (*aes_key_expansion) (byte*, byte*),
         int dt = std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count();
         printf("time = %d microseconds for %d iterations (%lf MB/s)\n", dt, n, double(n) * (nblocks * 16) / dt);
     }
-    printbytes("cipher", out2, 16);
-    printbytes("tag", tag, 16);
+    printbytes((char*)"cipher", out2, 16);
+    printbytes((char*)"tag", tag, 16);
 }
+
+#ifdef LOWSTAR
+
+void test_lowstar() {
+    int auth_num_bytes = 0;
+    int plain_num_bytes = 19;
+    int num_rounds = 10; 
+    args a;
+    a.plain_ptr = plain;
+    a.plain_num_bytes = plain_num_bytes;
+    a.auth_ptr = auth;
+    a.auth_num_bytes = auth_num_bytes;
+    a.iv_ptr = iv;
+    a.expanded_key_ptr = key_expansion;
+    a.out_ptr = out;
+    a.tag_ptr = tag;
+    printbytes((char*)"original plaintext", plain, 19);
+    printbytes((char*)"key", key, 16);
+    aes128_key_expansion(key, key_expansion);
+    printbytes((char*)"key_expansion", key_expansion, (num_rounds + 1) * 16);
+
+    // Encrypt using Low* version
+    Low_GCMencrypt_gcm_core(plain, plain_num_bytes, auth, auth_num_bytes, iv, key_expansion, out, tag);
+    //gcm_encrypt(&a);
+
+    printbytes((char*)"cipher", out, 19);
+    printbytes((char*)"tag", tag, 16);
+
+    a.out_ptr = plain;
+    a.plain_ptr = out;
+
+    // Decrypt using Vale version
+    int ret = gcm128_decrypt(&a);
+    printf("gcm_decrypt returned %d\n", ret);
+    printbytes((char*)"decrypted plaintext", plain, 19);
+
+    int nblocks = 256;
+    byte *plain2 = new byte[nblocks * 16];
+    byte *out2 = new byte[nblocks * 16];
+    for (int i = 0; i < nblocks * 16; i++)
+    {
+        plain2[i] = i % 256;
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        auto time1 = std::chrono::high_resolution_clock::now();
+        int n = 10000;
+        for (int j = 0; j < n; j++)
+        {
+          Low_GCMencrypt_gcm_core(plain2, nblocks * 16, auth, auth_num_bytes, iv, key_expansion, out2, tag);
+        }
+        auto time2 = std::chrono::high_resolution_clock::now();
+        int dt = std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count();
+        printf("time = %d microseconds for %d iterations (%lf MB/s)\n", dt, n, double(n) * (nblocks * 16) / dt);
+    }
+    printbytes((char*)"cipher", out2, 16);
+    printbytes((char*)"tag", tag, 16);
+}
+
+#endif // LOWSTAR
+
 
 int main()
 {
     printf("hello\n");
 
+#ifdef LOWSTAR    
+    test_lowstar();
+#else // !LOWSTAR
     printf("\nBeginning 128-bit test...\n");
     test(aes128_key_expansion,
          gcm128_encrypt,
@@ -115,6 +184,7 @@ int main()
          gcm256_encrypt,
          gcm256_decrypt,
          14);
+#endif // LOWSTAR
 
     printf("goodbye\n");
     return 0;

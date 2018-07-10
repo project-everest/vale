@@ -97,6 +97,6 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (mask_b:b8) (cipher_b:b8) (off
     )
     )
 
-val gcm_load_xor_store_buffer: plain_b:b8 -> mask_b:b8 -> cipher_b:b8 -> offset:UInt64.t -> num_blocks:Ghost.erased (nat64) -> key:Ghost.erased (aes_key_LE AES_128) -> iv:Ghost.erased (quad32) -> Stack unit
+val gcm_load_xor_store_buffer_win: plain_b:b8 -> mask_b:b8 -> cipher_b:b8 -> offset:UInt64.t -> num_blocks:Ghost.erased (nat64) -> key:Ghost.erased (aes_key_LE AES_128) -> iv:Ghost.erased (quad32) -> Stack unit
 	(requires (fun h -> pre_cond h plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv ))

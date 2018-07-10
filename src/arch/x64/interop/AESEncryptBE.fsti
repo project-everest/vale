@@ -41,7 +41,10 @@ open FStar.Mul
 
 // TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (output_b:b8) (input_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) =
-live h output_b /\ live h input_b /\ live h keys_b /\ locs_disjoint [output_b;input_b;keys_b] /\ length output_b % 16 == 0 /\ length input_b % 16 == 0 /\ length keys_b % 16 == 0 /\ B.length keys_b == (nr AES_128 + 1) * 16 /\
+live h output_b /\ live h input_b /\ live h keys_b /\    
+    disjoint_or_eq input_b output_b /\
+    disjoint keys_b input_b /\
+    disjoint keys_b output_b /\ length output_b % 16 == 0 /\ length input_b % 16 == 0 /\ length keys_b % 16 == 0 /\ B.length keys_b == (nr AES_128 + 1) * 16 /\
   keys_match key keys_b h
   /\ B.length output_b >= 1 /\ B.length input_b >= 1
 

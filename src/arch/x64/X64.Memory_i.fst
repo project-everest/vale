@@ -39,6 +39,8 @@ let modifies_buffer_elim #t1 b p h h' = M.modifies_buffer_elim b p h h'
 
 let modifies_buffer_addr #t b p h h' = M.modifies_buffer_addr b p h h'
 
+let modifies_buffer_readable #t b p h h' = M.modifies_buffer_readable b p h h'
+
 let loc_disjoint_none_r s = M.loc_disjoint_none_r s
 let loc_disjoint_union_r s s1 s2 = M.loc_disjoint_union_r s s1 s2
 let loc_includes_refl s = M.loc_includes_refl s

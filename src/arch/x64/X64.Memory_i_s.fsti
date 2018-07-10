@@ -121,6 +121,15 @@ val modifies_buffer_addr (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
   (ensures buffer_addr b h == buffer_addr b h')
   [SMTPat (modifies p h h'); SMTPat (buffer_addr b h')]
 
+
+val modifies_buffer_readable (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
+  (requires
+    modifies p h h' /\
+    buffer_readable h b
+  )
+  (ensures buffer_readable h' b)
+  [SMTPat (modifies p h h'); SMTPat (buffer_readable h' b)]
+
 val loc_disjoint_none_r (s:loc) : Lemma
   (ensures (loc_disjoint s loc_none))
   [SMTPat (loc_disjoint s loc_none)]
