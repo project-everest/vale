@@ -207,7 +207,19 @@ let print_lengths args =
  | a::q  -> print_length a ^ " /\\ " ^ aux q
  in aux (List.Tot.Base.filter is_buffer args)
 
+let taint_of_label = function
+  | Sec -> "Secret"
+  | Pub -> "Public"
+
+let create_taint_fun (args:list arg) = 
+  let rec aux args = match args with
+  | [] -> "    Public "
+  | (a, TBuffer _, t)::q -> "    if StrongExcludedMiddle.strong_excluded_middle (x == "^a^") then " ^ taint_of_label t ^ " else\n" ^ aux q
+  | _::q -> aux q
+  in "  let taint_func (x:b8) : GTot taint =\n" ^ aux args ^ "in\n"
+
 let create_state os target args stack slots stkstart =
+  create_taint_fun args ^
   "  let buffers = " ^ (if stack then "stack_b::" else "") ^ print_buffers_list args ^ " in\n" ^
   "  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in\n" ^
   generate_low_addrs args ^
@@ -237,17 +249,6 @@ let print_vale_full_ty = function
 let rec print_args_vale_list = function
   | [] -> ""
   | (a,ty, _)::q -> "(" ^ a ^ ":" ^ print_vale_full_ty ty ^ ") " ^ print_args_vale_list q
-
-let taint_of_label = function
-  | Sec -> "Secret"
-  | Pub -> "Public"
-
-let create_taint_fun (args:list arg) = 
-  let rec aux args = match args with
-  | [] -> "  Public"
-  | (a, TBuffer _, t)::q -> "  if StrongExcludedMiddle.strong_excluded_middle (x == a) then " ^ taint_of_label t ^ " else\n" ^ aux q
-  | _::q -> aux q
-  in "let taint_func (x:b8) : GTot taint =\n" ^ aux args ^ "in\n"
 
 let translate_lowstar os target (func:func_ty) =
   let name, args, Stk slots = func in
@@ -298,7 +299,7 @@ let translate_lowstar os target (func:func_ty) =
   "  | [] -> True\n" ^
   "  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t\n\n" ^
   "unfold\nlet locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)\n\n" ^
-  "// TODO: Complete with your pre- and post-conditions\n" ^
+  "\n// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
   "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
     ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
@@ -334,7 +335,6 @@ let translate_lowstar os target (func:func_ty) =
     "}) -> GTot (h1:HS.mem{post_cond h0 h1 " ^ (print_args_names args) ^ "})\n\n" ^
   "let ghost_" ^ name ^ " " ^ (print_args_names args) ^
   (if stack_needed then "stack_b " else "") ^ "h0 =\n" ^
-  create_taint_fun args ^
   (create_state os target args stack_needed slots (slots+additional)) ^
   "  implies_pre h0 " ^ (print_args_names args) ^ 
   (if stack_needed then "stack_b " else "") ^ ";\n" ^

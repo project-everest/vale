@@ -1345,13 +1345,13 @@ let same_memTaint128 b mem0 mem1 memtaint0 memtaint1 =
 let modifies_valid_taint64 b p h h' memTaint t = ()
 let modifies_valid_taint128 b p h h' memTaint t = ()
 
-let valid_taint_bufs (mem:mem) (memTaint:memtaint) (ps:list b8) (ts:b8 -> taint) =
+let valid_taint_bufs (mem:mem) (memTaint:memtaint) (ps:list b8) (ts:b8 -> GTot taint) =
   forall b. List.memP b ps ==> valid_taint_buf b mem memTaint (ts b)
 
 val create_valid_memtaint 
   (mem:mem)
   (ps:list b8{I.list_disjoint_or_eq ps})
-  (ts:b8 -> taint) : 
+  (ts:b8 -> GTot taint) : 
   GTot (m:memtaint{valid_taint_bufs mem m ps ts})
 
 private

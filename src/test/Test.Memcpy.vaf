@@ -32,14 +32,14 @@ procedure Copy16(inline t:taint, ghost bsrc:buffer64, ghost bdst:buffer64)
     reads
         rsi; rdi; memTaint;
     modifies
-        rax; rbx;
+        rax; rcx;
         mem; trace;
 {
 //    assert{:fast_block} true;
     Load64_buffer(rax, rsi, 0, t, bsrc, 0);
-    Load64_buffer(rbx, rsi, 8, t, bsrc, 1);
+    Load64_buffer(rcx, rsi, 8, t, bsrc, 1);
     Store64_buffer(rdi, rax, 0, t, bdst, 0);
-    Store64_buffer(rdi, rbx, 8, t, bdst, 1);
+    Store64_buffer(rdi, rcx, 8, t, bdst, 1);
 }
 
 /*

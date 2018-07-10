@@ -1,6 +1,6 @@
 open Interop_Printer
 
-let memcpy = ("memcpy" [("dst", TBuffer TUInt64, Sec); ("src", TBuffer TUInt64, Sec); ("len", TBase TUInt64)], Stk (Prims.parse_int "0"))
+let memcpy = ("memcpy", [("dst", TBuffer TUInt64, Sec); ("src", TBuffer TUInt64, Sec)], Stk (Prims.parse_int "0"))
 
 (* let poly = ("poly", [("ctx", TBuffer TUInt64); ("inp", TBuffer TUInt64); ("len", TBase TUInt64)]) *)
 
