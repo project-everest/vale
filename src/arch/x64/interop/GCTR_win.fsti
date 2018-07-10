@@ -101,8 +101,7 @@ let pre_cond (h:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (qua
      iv == inc32 (Ghost.reveal iv_old) num_blocks) 
      )
 
-let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0 /\ (let mods = M.loc_buffer cipher_b in
-    M.modifies mods h h' /\
+let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0 /\ (
     B.live h' plain_b /\ B.live h' iv_b /\ B.live h' keys_b /\ B.live h' cipher_b /\
     
     B.length plain_b  == bytes_to_quad_size num_bytes * 16 /\
@@ -127,7 +126,11 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghos
     )
   )
 
+let full_post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = 
+  let mods = M.loc_buffer cipher_b in
+    M.modifies mods h h' /\
+    post_cond h h' plain_b num_bytes iv_old iv_b key keys_b cipher_b
 
 val gctr_bytes_extra_buffer_win: plain_b:b8 -> num_bytes:UInt64.t -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> Stack unit
 	(requires (fun h -> pre_cond h plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))
+	(ensures (fun h0 _ h1 -> full_post_cond h0 h1 plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))

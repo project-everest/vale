@@ -91,25 +91,61 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) keys_b) (BV.as_seq h0 keys128_b));  
   ()
 
-let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8)  (stack_b:b8) : Lemma
-  (requires pre_cond va_s0.mem.hs plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live va_s0.mem.hs stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]/\
-    va_post (va_code_gctr_bytes_extra_buffer_win ()) va_s0 va_sM va_fM stack_b plain_b num_bytes (Ghost.reveal iv_old) iv_b (Ghost.reveal key) keys_b cipher_b )
-  (ensures post_cond va_s0.mem.hs va_sM.mem.hs plain_b num_bytes iv_old iv_b key keys_b cipher_b ) =
+let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8)  (stack_b:b8) : Lemma
+  (requires pre_cond h0 plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]/\
+(
+  let buffers = stack_b::plain_b::iv_b::keys_b::cipher_b::[] in
+  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
+  let addr_plain_b = addrs plain_b in
+  let addr_iv_b = addrs iv_b in
+  let addr_keys_b = addrs keys_b in
+  let addr_cipher_b = addrs cipher_b in
+  let addr_stack:nat64 = addrs stack_b + 0 in
+  let regs = fun r -> begin match r with
+    | Rsp -> addr_stack
+    | Rcx -> addr_plain_b
+    | Rdx -> num_bytes
+    | R8 -> addr_iv_b
+    | R9 -> addr_keys_b
+    | _ -> init_regs r end in
+  let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
+  let xmms = init_xmms in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) iv_b;
   length_t_eq (TBase TUInt128) keys_b;
   length_t_eq (TBase TUInt128) cipher_b;
-  assert (Seq.equal (buffer_to_seq_quad32 cipher_b va_s0.mem.hs) (buffer128_as_seq (va_get_mem va_s0) cipher_b));
+    va_post (va_code_gctr_bytes_extra_buffer_win ()) s0 va_sM va_fM stack_b plain_b num_bytes (Ghost.reveal iv_old) iv_b (Ghost.reveal key) keys_b cipher_b ))
+  (ensures post_cond h0 va_sM.mem.hs plain_b num_bytes iv_old iv_b key keys_b cipher_b ) =
+  let buffers = stack_b::plain_b::iv_b::keys_b::cipher_b::[] in
+  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
+  let addr_plain_b = addrs plain_b in
+  let addr_iv_b = addrs iv_b in
+  let addr_keys_b = addrs keys_b in
+  let addr_cipher_b = addrs cipher_b in
+  let addr_stack:nat64 = addrs stack_b + 0 in
+  let regs = fun r -> begin match r with
+    | Rsp -> addr_stack
+    | Rcx -> addr_plain_b
+    | Rdx -> num_bytes
+    | R8 -> addr_iv_b
+    | R9 -> addr_keys_b
+    | _ -> init_regs r end in
+  let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
+  let xmms = init_xmms in
+  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in   
+  length_t_eq (TBase TUInt64) stack_b;
+  length_t_eq (TBase TUInt128) plain_b;
+  length_t_eq (TBase TUInt128) iv_b;
+  length_t_eq (TBase TUInt128) keys_b;
+  length_t_eq (TBase TUInt128) cipher_b;
+  assert (Seq.equal (buffer_to_seq_quad32 cipher_b h0) (buffer128_as_seq (va_get_mem va_s0) cipher_b));
   assert (Seq.equal (buffer_to_seq_quad32 cipher_b va_sM.mem.hs) (buffer128_as_seq (va_get_mem va_sM) cipher_b));
-  assert (Seq.equal (buffer_to_seq_quad32 plain_b va_s0.mem.hs) (buffer128_as_seq (va_get_mem va_s0) plain_b));    
+  assert (Seq.equal (buffer_to_seq_quad32 plain_b h0) (buffer128_as_seq (va_get_mem va_s0) plain_b));    
   ()
 
-val gctr_bytes_extra_buffer_win: plain_b:b8 -> num_bytes:nat64 -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> Stack unit
-	(requires (fun h -> pre_cond h plain_b num_bytes iv_old iv_b key keys_b cipher_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b num_bytes iv_old iv_b key keys_b cipher_b ))
-
-val ghost_gctr_bytes_extra_buffer_win: plain_b:b8 -> num_bytes:nat64 -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b num_bytes iv_old iv_b key keys_b cipher_b })
+val ghost_gctr_bytes_extra_buffer_win: plain_b:b8 -> num_bytes:nat64 -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b num_bytes iv_old iv_b key keys_b cipher_b  /\ M.modifies (M.loc_union (M.loc_buffer cipher_b) (M.loc_buffer stack_b)) h0 h1 })
 
 let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b cipher_b stack_b h0 =
   let buffers = stack_b::plain_b::iv_b::keys_b::cipher_b::[] in
@@ -160,12 +196,12 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
   assert(s0.xmms 15 == s1.xmms 15);
   // Ensures that va_code_gctr_bytes_extra_buffer_win is actually Vale code, and that s1 is the result of executing this code
   assert (va_ensure_total (va_code_gctr_bytes_extra_buffer_win ()) s0 s1 f1);
-  implies_post s0 s1 f1 plain_b num_bytes iv_old iv_b key keys_b cipher_b stack_b ;
+  implies_post h0 s1 f1 plain_b num_bytes iv_old iv_b key keys_b cipher_b stack_b ;
   s1.mem.hs
 
 let gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b cipher_b  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 48) in
   let h0 = get() in
-  st_put h0 (fun h -> pre_cond h plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live h stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]) (ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b cipher_b stack_b);
+  st_put h0 (fun h -> pre_cond h plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live h stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]) (ghost_gctr_bytes_extra_buffer_win plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b stack_b);
   pop_frame()
