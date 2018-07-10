@@ -297,6 +297,7 @@ let pad_to_128_bits_lower (q:quad32) (num_bytes:int) = admit ()
 
 #reset-options "--smtencoding.elim_box true --z3rlimit 25 --z3refresh --max_ifuel 1 --initial_fuel 0 --max_fuel 2"
 let pad_to_128_bits_upper (q:quad32) (num_bytes:int) =
+  assume False;
     let Mkfour x0 x1 x2 x3 = q in
   let new_hi = (hi64 q) % pow2 ((num_bytes - 8) * 8) in
   assert_norm (pow2 64 == pow2_64); // refinement on Words_s.pow2_64?
@@ -316,7 +317,7 @@ let pad_to_128_bits_upper (q:quad32) (num_bytes:int) =
   FStar.Classical.forall_intro (le_quad32_to_bytes_sel q);
   assert (q'_bytes == le_quad32_to_bytes (Mkfour x0 x1 new_hi_two.lo new_hi_two.hi));
   assert (forall i. i <= 8 /\ i < 12 ==> index q'_bytes i == four_select (nat_to_four 8 new_hi_two.lo) (i % 4));
-  assume False
+  ()
   // assert (forall i. i <= 8 /\ i < 12 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
   // 					     four_select (nat_to_four 8 new_hi_two.lo) (i % 4));
   // assert (forall i. i <= 12 /\ i < 16 ==> index q'_bytes i == four_select (nat_to_four 8 new_hi_two.hi) (i % 4));
