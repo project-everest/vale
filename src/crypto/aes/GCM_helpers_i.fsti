@@ -2,6 +2,7 @@ module GCM_helpers_i
 
 open Words_s
 open Words.Seq_s
+open Words.Four_s
 open Types_s
 open Types_i
 open FStar.Mul
@@ -57,6 +58,13 @@ val pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) : Lemma
              pad_to_128_bits (slice (le_seq_quad32_to_bytes s) 0 num_bytes)
              ==
              le_seq_quad32_to_bytes full_quads @| pad_to_128_bits (slice (le_quad32_to_bytes final_quad) 0 (num_bytes % 16)))))
+
+val le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) :
+    Lemma(let Mkfour q0 q1 q2 q3 = q in
+	      (i < 4 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q0) (i % 4)) /\
+	      (4 <= i /\ i < 8 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q1) (i % 4)) /\
+ 	      (8 <= i /\ i < 12  ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q2) (i % 4)) /\
+	      (12 <= i /\ i < 16 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q3) (i % 4)))
 
 val pad_to_128_bits_lower (q:quad32) (num_bytes:int) : Lemma
   (requires 1 <= num_bytes /\ num_bytes < 8)

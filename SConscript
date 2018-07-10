@@ -7,7 +7,7 @@ import os, os.path
 import sys
 
 # Imported identifiers defined in the SConstruct file
-Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
+Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage1', 'stage2', 'fstar_extract')
 
 #
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
@@ -17,6 +17,21 @@ verify_paths = [
   'tools/Vale/test',
 ]
 Export('verify_paths')
+
+external_files = [
+  'obj/external/CanonCommSwaps.fst',
+  'obj/external/CanonCommMonoid.fst',
+  'obj/external/CanonCommSemiring.fst',
+]
+Export('external_files')
+
+no_extraction_files = [
+  'obj/ml_out/CanonCommMonoid.ml',
+  'obj/ml_out/CanonCommSemiring.ml',
+  'obj/ml_out/X64_Poly1305_Math_i.ml',
+  'obj/ml_out/Vale_Tactics.ml',
+]
+Export('no_extraction_files')
 
 manual_dependencies = {
   'obj/arch/x64/X64.Vale.InsBasic.fst.verified.tmp': 'obj/arch/x64/X64.Vale.Decls_i.fst',
@@ -54,8 +69,7 @@ fstar_include_paths = [
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
-  env['FSTAR_PATH'] + '/examples/tactics/',
-  env['KREMLIN_HOME'] + '/kremlib/'
+  'obj/external/'
 ]
 Export('fstar_include_paths')
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
@@ -90,7 +104,6 @@ verify_options = {
 
   # Special treatment for sensitive modules
   'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
-  'src/crypto/poly1305/x64/X64.Poly1305.Math_i.fst': BuildOptions(fstar_default_args.replace('--cache_checked_modules', '')),
 
   # Disable verification by adding 'filename': None
   'src/test/Test.FastBlock.vaf': None,
@@ -117,21 +130,30 @@ verify_options = {
   '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
   'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native')),
-  'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
-  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces obj/arch/SecretByte.fst'),
+  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces obj/arch/SecretByte.fst'),
+  'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--use_extracted_interfaces true', '') + '--smtencoding.elim_box true '),
   'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
-  'obj/crypto/aes/x64/X64.GCMopt.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
   'src/lib/util/BufferViewHelpers.fst' : BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.arith.nl=false', '')),
 
+  # We copy these files from F*'s library because we need to generate a .checked file for them,
+  # but we don't need to reverify them:
+  'obj/external/*.fst': BuildOptions('--cache_checked_modules --admit_smt_queries true'),
 
   # .vad/.vaf files default to this set of options when compiling .gen.dfy/.fst/.fsti
   '.vad': BuildOptions(dafny_default_args_larith),
   '.vaf': BuildOptions(fstar_default_args  + ' --use_two_phase_tc false'),
 }
 if env['TARGET_ARCH'] != 'x86':
- verify_options['src/test/memcpy.vad'] = None
- verify_options['src/test/stack-test.vad'] = None
+  verify_options['src/test/memcpy.vad'] = None
+  verify_options['src/test/stack-test.vad'] = None
+
+if do_fstar and stage1:
+  for x in ['CanonCommSwaps.fst', 'CanonCommMonoid.fst', 'CanonCommSemiring.fst']:
+    env.Command('obj/external/' + x, env['FSTAR_PATH'] + '/examples/tactics/' + x, Copy("$TARGET", "$SOURCE"))
+  for x in ['C.Loops.fst']:
+    env.Command('obj/external/' + x, env['KREMLIN_HOME'] + '/kremlib/' + x, Copy("$TARGET", "$SOURCE"))
  
+
 Export('verify_options')
 
 #

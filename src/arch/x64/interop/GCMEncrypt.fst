@@ -24,6 +24,7 @@ open GCM_s
 open GCM_helpers_i
 module U8 = FStar.UInt8
 module U64 = FStar.UInt64
+open BufferViewHelpers
 #set-options "--z3rlimit 40"
 
 open Vale_gcmencrypt
@@ -271,13 +272,5 @@ let gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys_b cip
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 216) in
   let h0 = get() in
-  assume (let keys128_b = BV.mk_buffer_view keys_b Views.view128 in BV.as_seq init_h0 keys128_b == BV.as_seq h0 keys128_b);
   st_put h0 (fun h -> pre_cond h plain_b (UInt64.v plain_num_bytes) auth_b (UInt64.v auth_num_bytes) iv_b key keys_b cipher_b tag_b /\ B.length stack_b == 216 /\ live h stack_b /\ locs_disjoint [stack_b;plain_b;auth_b;iv_b;keys_b;cipher_b;tag_b]) (ghost_gcmencrypt plain_b (UInt64.v plain_num_bytes) auth_b (UInt64.v auth_num_bytes) iv_b key keys_b cipher_b tag_b stack_b);
-  let h1 = get() in
-  pop_frame();
-  let h1_final = get() in
-  assume (
-    let iv128_b  = BV.mk_buffer_view iv_b  Views.view128 in
-    let tag128_b = BV.mk_buffer_view tag_b Views.view128 in
-    BV.as_seq h1 tag128_b == BV.as_seq h1_final tag128_b /\
-    BV.as_seq h0 iv128_b == BV.as_seq init_h0 iv128_b)
+  pop_frame()
