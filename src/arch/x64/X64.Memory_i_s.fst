@@ -1312,13 +1312,13 @@ let equiv_load_mem128 ptr s =
 
 open X64.Machine_s
 
-let valid_taint_buf64 b mem memTaint t = 
+let valid_taint_buf (b:b8) (mem:mem) (memTaint:memtaint) t =
   let addr = mem.addrs b in
   (forall (i:nat{i < B.length b}). memTaint.[addr + i] = t)
+
+let valid_taint_buf64 b mem memTaint t = valid_taint_buf b mem memTaint t
   
-let valid_taint_buf128 b mem memTaint t =
-  let addr = mem.addrs b in
-  (forall (i:nat{i < B.length b}). memTaint.[addr + i] = t)
+let valid_taint_buf128 b mem memTaint t = valid_taint_buf b mem memTaint t
 
 let lemma_valid_taint64 b memTaint mem i t =
   length_t_eq (TBase TUInt64) b;
@@ -1344,4 +1344,37 @@ let same_memTaint128 b mem0 mem1 memtaint0 memtaint1 =
 
 let modifies_valid_taint64 b p h h' memTaint t = ()
 let modifies_valid_taint128 b p h h' memTaint t = ()
-  
+
+let valid_taint_bufs (mem:mem) (memTaint:memtaint) (ps:list b8) (ts:b8 -> taint) =
+  forall b. List.memP b ps ==> valid_taint_buf b mem memTaint (ts b)
+
+val create_valid_memtaint 
+  (mem:mem)
+  (ps:list b8{I.list_disjoint_or_eq ps})
+  (ts:b8 -> taint) : 
+  GTot (m:memtaint{valid_taint_bufs mem m ps ts})
+
+private
+let rec write_taint (t:taint) (length addr:nat) (i:nat{i <= length}) (accu:memtaint{
+  forall j. 0 <= j /\ j < i ==> accu.[addr+j] = t}) : Tot (m:memtaint{
+  forall j. (0 <= j /\ j < length ==> m.[addr+j] = t) /\ 
+       (j < addr \/ j >= addr + length ==> m.[j] == accu.[j])}) 
+  (decreases %[length - i]) =
+  if i >= length then accu
+  else (
+    let new_accu = accu.[addr+i] <- t in
+    assert (Set.equal (Map.domain new_accu) (Set.complement Set.empty)); 
+    write_taint t length addr (i+1) new_accu
+  )
+
+let create_valid_memtaint mem ps ts =
+  let memTaint = FStar.Map.const Public in
+  assert (Set.equal (Map.domain memTaint) (Set.complement Set.empty));
+  let rec aux (ps:list b8{I.list_disjoint_or_eq ps}) (accu:memtaint) : GTot (m:memtaint{valid_taint_bufs mem m ps ts /\ (forall j. (forall b. List.memP b ps ==> j < mem.addrs b \/ j >= mem.addrs b + B.length b) ==> accu.[j] = m.[j])}) =
+  match ps with
+    | [] -> accu
+    | b::q ->
+    let accu = aux q (write_taint (ts b) (B.length b) (mem.addrs b) 0 accu) in
+    assert (forall p. List.memP p q ==> I.disjoint_or_eq p b);
+    accu
+  in aux ps memTaint

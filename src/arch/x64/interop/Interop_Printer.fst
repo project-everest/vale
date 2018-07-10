@@ -12,9 +12,11 @@ type ty =
   | TBuffer of base_type
   | TBase of base_type
 
+type label = | Sec | Pub
+
 type stack_slots = | Stk of nat
 
-type arg = string * ty
+type arg = string * ty * label
 type func_ty = string * list arg * stack_slots
 
 type os = | Windows | Linux
@@ -50,45 +52,45 @@ let print_low_ty = function
 
 let rec print_low_args = function
   | [] -> "Stack unit"
-  | (a, ty)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args q
+  | (a, ty, _)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args q
 
 let rec print_low_args_and = function
   | [] -> ""
-  | (a, ty)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args_and q
+  | (a, ty, _)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args_and q
 
 let rec print_args_list = function
   | [] -> ""
-  | (a,ty)::q -> "(" ^ a ^ ":" ^ print_low_ty ty ^ ") " ^ print_args_list q
+  | (a,ty, _)::q -> "(" ^ a ^ ":" ^ print_low_ty ty ^ ") " ^ print_args_list q
 
 let rec print_args_names = function
   | [] -> ""
-  | (a, _)::q -> a ^ " " ^ print_args_names q  
+  | (a, _, _)::q -> a ^ " " ^ print_args_names q  
 
 let rec print_args_names_reveal = function
   | [] -> ""
-  | (a, TGhost _)::q -> "(Ghost.reveal " ^ a ^ ") " ^ print_args_names_reveal q
-  | (a, _)::q -> a ^ " " ^ print_args_names_reveal q
+  | (a, TGhost _, _)::q -> "(Ghost.reveal " ^ a ^ ") " ^ print_args_names_reveal q
+  | (a, _, _)::q -> a ^ " " ^ print_args_names_reveal q
 
 
 let rec print_buffers_list = function
   | [] -> "[]"
-  | (a,ty)::q -> 
+  | (a,ty, _)::q -> 
     (if TBuffer? ty then a ^ "::" else "") ^
     print_buffers_list q
 
 let is_buffer arg =
-  let _, ty = arg in TBuffer? ty
+  let _, ty, _ = arg in TBuffer? ty
 
-let not_ghost (a, ty) = not (TGhost? ty)
+let not_ghost (a, ty, _) = not (TGhost? ty)
 
 let rec liveness heap args =
   let args = List.Tot.Base.filter is_buffer args in
   let rec aux heap = function
   | [] -> "True"
-  | [(a,TBuffer ty)] -> "live " ^ heap ^ " " ^ a 
-  | [(a, TBase ty)] | [(a, TGhost ty)] -> "" // Should not happen
-  | (a, TBuffer ty)::q -> "live " ^ heap ^ " " ^ a ^ " /\\ " ^ aux heap q
-  | (a, TBase ty)::q | (a, TGhost ty)::q -> aux heap q // Should not happen
+  | [(a,TBuffer ty, _)] -> "live " ^ heap ^ " " ^ a 
+  | [(a, TBase ty, _)] | [(a, TGhost ty, _)] -> "" // Should not happen
+  | (a, TBuffer ty, _)::q -> "live " ^ heap ^ " " ^ a ^ " /\\ " ^ aux heap q
+  | (a, TBase ty, _)::q | (a, TGhost ty, _)::q -> aux heap q // Should not happen
   in aux heap args
 
 let print_base_type = function
@@ -97,8 +99,8 @@ let print_base_type = function
   | TUInt128 -> "(TBase TUInt128)"
 
 let single_length_t (arg: arg) = match arg with
-  | (_, TBase _) | (_, TGhost _) -> ""
-  | (a, TBuffer ty) -> "  length_t_eq " ^ print_base_type ty ^ " " ^ a ^ ";\n"
+  | (_, TBase _, _) | (_, TGhost _, _) -> ""
+  | (a, TBuffer ty, _) -> "  length_t_eq " ^ print_base_type ty ^ " " ^ a ^ ";\n"
 
 let rec print_length_t = function
   | [] -> ""
@@ -107,8 +109,8 @@ let rec print_length_t = function
 let namelist_of_args args =
   let rec aux = function
   | [] -> ""
-  | [a, _] -> a
-  | (a, _)::q -> a ^ ";" ^ aux q in
+  | [a, _, _] -> a
+  | (a, _, _)::q -> a ^ ";" ^ aux q in
   "[" ^ aux args ^ "]" 
 
 let disjoint args =
@@ -137,9 +139,9 @@ let reg_to_low = function
 let print_low_calling_stack (args:list arg) (stkstart) =
   let rec aux (i:nat) (args:list arg) : Tot string (decreases %[args]) = match args with
     | [] -> ""
-    | (_, TGhost _)::q -> aux i q // We ignore ghost parameters
-    | (a, TBase _)::q -> "  let mem = buffer_write #(TBase TUInt64) stack_b " ^ (string_of_int (i+stkstart)) ^ " " ^ a ^ " mem in\n" ^ aux (i+1) q
-    | (a, TBuffer _)::q -> "  let mem = buffer_write #(TBase TUInt64) stack_b " ^ (string_of_int (i+stkstart)) ^ " (addrs " ^ a ^ ") mem in\n" ^ aux (i+1) q
+    | (_, TGhost _, _)::q -> aux i q // We ignore ghost parameters
+    | (a, TBase _, _)::q -> "  let mem = buffer_write #(TBase TUInt64) stack_b " ^ (string_of_int (i+stkstart)) ^ " " ^ a ^ " mem in\n" ^ aux (i+1) q
+    | (a, TBuffer _, _)::q -> "  let mem = buffer_write #(TBase TUInt64) stack_b " ^ (string_of_int (i+stkstart)) ^ " (addrs " ^ a ^ ") mem in\n" ^ aux (i+1) q
   in aux 0 args
 
 let print_low_calling_args os target (args:list arg) stkstart =
@@ -147,8 +149,8 @@ let print_low_calling_args os target (args:list arg) stkstart =
   match regs, args with
     | [], q -> "    | _ -> init_regs r end in\n" ^ print_low_calling_stack q stkstart
     | _, [] -> "    | _ -> init_regs r end in\n"
-    | re, (_, TGhost _)::q -> aux re q // We ignore ghost parameters
-    | r1::rn, (a, ty)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
+    | re, (_, TGhost _, _)::q -> aux re q // We ignore ghost parameters
+    | r1::rn, (a, ty, _)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
       (if TBuffer? ty then "addr_" ^ a else a) ^ 
       "\n" ^ aux rn q
   in aux (calling_registers os target) args
@@ -186,7 +188,7 @@ let print_low_xmm_callee_saved os target =
 
 let rec generate_low_addrs = function
   | [] -> ""
-  | (a, TBuffer _)::q -> "  let addr_" ^ a ^ " = addrs " ^ a ^ " in\n" ^ generate_low_addrs q
+  | (a, TBuffer _, _)::q -> "  let addr_" ^ a ^ " = addrs " ^ a ^ " in\n" ^ generate_low_addrs q
   | _::q -> generate_low_addrs q
 
 let size = function
@@ -195,8 +197,8 @@ let size = function
   | TUInt128 -> "16"
 
 let print_length = function
-  | (_, TBase _) | (_, TGhost _) -> ""
-  | (a, TBuffer ty) -> "length " ^ a ^ " % " ^ (size ty) ^ " == 0"
+  | (_, TBase _, _) | (_, TGhost _, _) -> ""
+  | (a, TBuffer ty, _) -> "length " ^ a ^ " % " ^ (size ty) ^ " == 0"
 
 let print_lengths args =
  let rec aux = function
@@ -214,7 +216,7 @@ let create_state os target args stack slots stkstart =
   (if stack then "    | Rsp -> addr_stack\n" else "") ^
   (print_low_calling_args os target args stkstart) ^
   "  let xmms = init_xmms in\n" ^
-  "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in\n" ^
+  "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in\n" ^
   print_length_t args
 
 let print_vale_bufferty = function
@@ -234,7 +236,18 @@ let print_vale_full_ty = function
 
 let rec print_args_vale_list = function
   | [] -> ""
-  | (a,ty)::q -> "(" ^ a ^ ":" ^ print_vale_full_ty ty ^ ") " ^ print_args_vale_list q
+  | (a,ty, _)::q -> "(" ^ a ^ ":" ^ print_vale_full_ty ty ^ ") " ^ print_args_vale_list q
+
+let taint_of_label = function
+  | Sec -> "Secret"
+  | Pub -> "Public"
+
+let create_taint_fun (args:list arg) = 
+  let rec aux args = match args with
+  | [] -> "  Public"
+  | (a, TBuffer _, t)::q -> "  if StrongExcludedMiddle.strong_excluded_middle (x == a) then " ^ taint_of_label t ^ " else\n" ^ aux q
+  | _::q -> aux q
+  in "let taint_func (x:b8) : GTot taint =\n" ^ aux args ^ "in\n"
 
 let translate_lowstar os target (func:func_ty) =
   let name, args, Stk slots = func in
@@ -247,11 +260,11 @@ let translate_lowstar os target (func:func_ty) =
   let stack_needed = length_stack > 0 in
   let fuel_value = string_of_int (List.Tot.Base.length buffer_args + 3) in
   let implies_precond = if stack_needed then "B.length stack_b == " ^ string_of_int length_stack ^
-    " /\ live h0 stack_b /\ locs_disjoint " ^ (namelist_of_args (("stack_b",TBuffer TUInt64)::buffer_args)) ^ " /\ "
+    " /\ live h0 stack_b /\ locs_disjoint " ^ (namelist_of_args (("stack_b",TBuffer TUInt64, Pub)::buffer_args)) ^ " /\ "
   else "" in
   let stack_precond memname = if stack_needed then
     "/\ B.length stack_b == " ^ string_of_int length_stack ^
-    " /\ live " ^ memname ^ " stack_b /\ locs_disjoint " ^ (namelist_of_args (("stack_b",TBuffer TUInt64)::buffer_args))
+    " /\ live " ^ memname ^ " stack_b /\ locs_disjoint " ^ (namelist_of_args (("stack_b",TBuffer TUInt64, Pub)::buffer_args))
   else "" in
   let separator0 = if (List.Tot.Base.length buffer_args = 0) then "" else " /\\ " in
   let separator1 = if (List.Tot.Base.length buffer_args <= 1) then "" else " /\\ " in  
@@ -321,6 +334,7 @@ let translate_lowstar os target (func:func_ty) =
     "}) -> GTot (h1:HS.mem{post_cond h0 h1 " ^ (print_args_names args) ^ "})\n\n" ^
   "let ghost_" ^ name ^ " " ^ (print_args_names args) ^
   (if stack_needed then "stack_b " else "") ^ "h0 =\n" ^
+  create_taint_fun args ^
   (create_state os target args stack_needed slots (slots+additional)) ^
   "  implies_pre h0 " ^ (print_args_names args) ^ 
   (if stack_needed then "stack_b " else "") ^ ";\n" ^
@@ -342,7 +356,7 @@ let translate_lowstar os target (func:func_ty) =
   (if stack_needed then "stack_b);\n  pop_frame()\n" else ")\n")
   
 let print_vale_arg = function
-  | (a, ty) -> "ghost " ^ a ^ ":" ^ print_vale_full_ty ty
+  | (a, ty, _) -> "ghost " ^ a ^ ":" ^ print_vale_full_ty ty
 
 let rec print_vale_args = function
   | [] -> ""
@@ -351,20 +365,20 @@ let rec print_vale_args = function
 
 let rec print_vale_loc_buff = function
   | [] -> ""
-  | [(_, TBase _)] | [(_, TGhost _)] -> ""
-  | [(a, TBuffer _)] -> "loc_buffer("^a^")"
-  | (a, TBuffer _)::q -> "loc_buffer("^a^"), " ^ print_vale_loc_buff q
+  | [(_, TBase _, _)] | [(_, TGhost _, _)] -> ""
+  | [(a, TBuffer _, _)] -> "loc_buffer("^a^")"
+  | (a, TBuffer _, _)::q -> "loc_buffer("^a^"), " ^ print_vale_loc_buff q
   | a::q -> print_vale_loc_buff q
 
 let rec print_buff_readable = function
   | [] -> ""
-  | (a, TBuffer _)::q -> "        buffer_readable(mem, "^a^");\n" ^ print_buff_readable q
+  | (a, TBuffer _, _)::q -> "        buffer_readable(mem, "^a^");\n" ^ print_buff_readable q
   | a::q -> print_buff_readable q
 
 let print_vale_arg_value = function
-  | (_, TGhost _) -> "error" // Should not happen
-  | (a, TBuffer ty) -> "buffer_addr(" ^ a ^ ", mem)"
-  | (a, TBase ty) -> a
+  | (_, TGhost _, _) -> "error" // Should not happen
+  | (a, TBuffer ty, _) -> "buffer_addr(" ^ a ^ ", mem)"
+  | (a, TBase ty, _) -> a
 
 let print_vale_calling_stack sstart (args:list arg) =
   let rec aux (i:nat) (args:list arg) : Tot string (decreases %[args])  =
@@ -400,7 +414,7 @@ let translate_vale os target (func:func_ty) =
   let nbr_stack_args = stack_before_args + List.Tot.Base.length real_args - 
     List.Tot.Base.length (calling_registers os target) in
   let stack_needed = nbr_stack_args > 0 in  
-  let args = if stack_needed then ("stack_b", TBuffer TUInt64)::args else args in
+  let args = if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args in
   "module Vale_" ^ name ^
   "\n#verbatim{:interface}{:implementation}\n" ^ 
   "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^

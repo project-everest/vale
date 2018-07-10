@@ -1,5 +1,7 @@
 open Interop_Printer
 
+let memcpy = ("memcpy" [("dst", TBuffer TUInt64, Sec); ("src", TBuffer TUInt64, Sec); ("len", TBase TUInt64)], Stk (Prims.parse_int "0"))
+
 (* let poly = ("poly", [("ctx", TBuffer TUInt64); ("inp", TBuffer TUInt64); ("len", TBase TUInt64)]) *)
 
 (* let aes = ("aes", [("input_key", TBuffer TUInt128); ("output_key", TBuffer TUInt128)]) *)
@@ -70,14 +72,15 @@ let gcm_load_xor = ("gcm_load_xor_store_buffer", [
   ("key", TGhost "aes_key_LE AES_128"); ("iv", TGhost "quad32")], Stk (Prims.parse_int "0"))
 *)
 
+(*
 let aes_encrypt_block_be = ("aes128_encrypt_block_be", [
   ("output_b", TBuffer TUInt128); ("input_b", TBuffer TUInt128);
   ("key", TGhost "aes_key_LE AES_128"); ("keys_b", TBuffer TUInt128)
   ], Stk (Prims.parse_int "0"))
-
+*)
 let os = Linux
 
-let name = aes_encrypt_block_be
+let name = memcpy
 
 let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()

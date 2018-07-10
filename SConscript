@@ -108,6 +108,7 @@ verify_options = {
   'src/arch/x64/interop/*.fst': None,
   'src/arch/x64/interop/*.fsti': None,
   'src/arch/x64/interop/*.vaf': None,
+  'src/crypto/aes/x64/Low.GCMencrypt.fst': None,
 
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
