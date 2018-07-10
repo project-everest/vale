@@ -238,6 +238,7 @@ let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) =
 
 #reset-options "--smtencoding.elim_box true --z3rlimit 10 --z3refresh --max_ifuel 1 --initial_fuel 0 --max_fuel 2"
 let pad_to_128_bits_lower (q:quad32) (num_bytes:int) =
+  admit();
   let Mkfour x0 x1 x2 x3 = q in
   assert (num_bytes * 8 < 64);
   pow2_lt_compat 64 (num_bytes * 8);
@@ -281,6 +282,7 @@ let pad_to_128_bits_lower (q:quad32) (num_bytes:int) =
     
             
 let pad_to_128_bits_upper (q:quad32) (num_bytes:int) =
+  admit();
   let Mkfour x0 x1 x2 x3 = q in
   let new_hi = (hi64 q) % pow2 ((num_bytes - 8) * 8) in
   assert_norm (pow2 64 == pow2_64); // refinement on Words_s.pow2_64?
