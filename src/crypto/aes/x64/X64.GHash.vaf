@@ -120,7 +120,7 @@ procedure {:quick} ghash_incremental_one_block_buffer(
         buffer_length(input_b) >= offset + 1;
         buffer_length(h_b) >= 1;
         buffer_length(hash_b) >= 1;
-        offset * 16 < pow2_64;
+        buffer_addr(input_b, mem) +  offset * 16 < pow2_64;
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -146,7 +146,8 @@ procedure {:quick} ghash_incremental_one_block_buffer(
         
         // Input into xmm2
         IMul64(rcx, 16);
-        Load128_buffer_reg(xmm2, rdx, rcx, input_b, offset);
+        Add64(rcx, rdx);
+        Load128_buffer(xmm2, rcx, 0, input_b, offset);
 
         // old_hash into xmm1
         Load128_buffer(xmm1, rsi, 0, hash_b, 0);
@@ -189,7 +190,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
         buffer_length(input_b) >= offset + 1;
         buffer_length(h_b) >= 1;
         buffer_length(hash_b) >= 1;
-        offset * 16 < pow2_64;        
+        buffer_addr(input_b, mem) + offset * 16 < pow2_64;        
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -234,7 +235,8 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
 
         // Input into xmm2
         IMul64(r9, 16);
-        Load128_buffer_reg(xmm2, r8, r9, input_b, offset);
+        Add64(r9, r8);
+        Load128_buffer(xmm2, r9, 0, input_b, offset);
 
         // Save xmm8
         Mov128(xmm0, xmm8);

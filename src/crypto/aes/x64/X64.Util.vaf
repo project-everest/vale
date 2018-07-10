@@ -298,7 +298,8 @@ procedure {:quick} gcm_load_xor_store_buffer(
         let plain := buffer128_as_seq(mem, plain_b);
         let cipher := buffer128_as_seq(mem, cipher_b);
         offset < num_blocks;
-        offset * 16 < pow2_64;
+        buffer_addr(plain_b, mem) + offset * 16 < pow2_64;
+        buffer_addr(cipher_b, mem) + offset * 16 < pow2_64;                
         mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
         gctr_partial(AES_128, offset, plain, cipher, key, iv);
 
@@ -323,10 +324,12 @@ procedure {:quick} gcm_load_xor_store_buffer(
         efl; mem;
 {
         IMul64(rcx, 16);
-        Load128_buffer_reg(xmm2, rdi, rcx, plain_b, offset);
+        Add64(rdi, rcx);
+        Load128_buffer(xmm2, rdi, 0, plain_b, offset);
         Load128_buffer(xmm0, rsi, 0, mask_b, 0);
         Pxor(xmm2, xmm0);
-        Store128_buffer_reg(rdx, xmm2, rcx, cipher_b, offset);
+        Add64(rdx, rcx);
+        Store128_buffer(rdx, xmm2, 0, cipher_b, offset);
 
 }
 
@@ -362,7 +365,8 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
         let plain := buffer128_as_seq(mem, plain_b);
         let cipher := buffer128_as_seq(mem, cipher_b);
         offset < num_blocks;
-        offset * 16 < pow2_64;        
+        buffer_addr(plain_b, mem) + offset * 16 < pow2_64;        
+        buffer_addr(cipher_b, mem) + offset * 16 < pow2_64;        
         mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
         gctr_partial(AES_128, offset, plain, cipher, key, iv);
         
@@ -400,8 +404,10 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
         efl; mem;
 {
         IMul64(r9, 16);
-        Load128_buffer_reg(xmm2, rcx, r9, plain_b, offset);
+        Add64(rcx, r9);
+        Load128_buffer(xmm2, rcx, 0, plain_b, offset);
         Load128_buffer(xmm0, rdx, 0, mask_b, 0);
         Pxor(xmm2, xmm0);
-        Store128_buffer_reg(r8, xmm2, r9, cipher_b, offset);
+        Add64(r8, r9);
+        Store128_buffer(r8, xmm2, 0, cipher_b, offset);
 }
