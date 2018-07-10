@@ -5,14 +5,14 @@
  */
 
 #include "kremlib.h"
-#ifndef __FStar_H
-#define __FStar_H
-
-#include "AESEncryptBE_win.h"
-#include "LowStar.h"
+#ifndef __AESEncryptBE_win_H
+#define __AESEncryptBE_win_H
 
 
 
 
-#define __FStar_H_DEFINED
+extern void
+AESEncryptBE_win_aes128_encrypt_block_be_win(uint8_t *x0, uint8_t *x1, uint8_t *x2);
+
+#define __AESEncryptBE_win_H_DEFINED
 #endif

@@ -120,6 +120,7 @@ procedure {:quick} ghash_incremental_one_block_buffer(
         buffer_length(input_b) >= offset + 1;
         buffer_length(h_b) >= 1;
         buffer_length(hash_b) >= 1;
+        offset * 16 < pow2_64;
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -142,7 +143,9 @@ procedure {:quick} ghash_incremental_one_block_buffer(
         // Save R12 register
         Mov64(rax, r12);
 
+        
         // Input into xmm2
+        IMul64(rcx, 16);
         Load128_buffer_reg(xmm2, rdx, rcx, input_b, offset);
 
         // old_hash into xmm1
@@ -186,6 +189,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
         buffer_length(input_b) >= offset + 1;
         buffer_length(h_b) >= 1;
         buffer_length(hash_b) >= 1;
+        offset * 16 < pow2_64;        
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -229,6 +233,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
         Mov64(rax, r12);
 
         // Input into xmm2
+        IMul64(r9, 16);
         Load128_buffer_reg(xmm2, r8, r9, input_b, offset);
 
         // Save xmm8

@@ -298,6 +298,7 @@ procedure {:quick} gcm_load_xor_store_buffer(
         let plain := buffer128_as_seq(mem, plain_b);
         let cipher := buffer128_as_seq(mem, cipher_b);
         offset < num_blocks;
+        offset * 16 < pow2_64;
         mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
         gctr_partial(AES_128, offset, plain, cipher, key, iv);
 
@@ -321,6 +322,7 @@ procedure {:quick} gcm_load_xor_store_buffer(
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
         efl; mem;
 {
+        IMul64(rcx, 16);
         Load128_buffer_reg(xmm2, rdi, rcx, plain_b, offset);
         Load128_buffer(xmm0, rsi, 0, mask_b, 0);
         Pxor(xmm2, xmm0);
@@ -360,6 +362,7 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
         let plain := buffer128_as_seq(mem, plain_b);
         let cipher := buffer128_as_seq(mem, cipher_b);
         offset < num_blocks;
+        offset * 16 < pow2_64;        
         mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
         gctr_partial(AES_128, offset, plain, cipher, key, iv);
         
@@ -396,6 +399,7 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
         efl; mem;
 {
+        IMul64(r9, 16);
         Load128_buffer_reg(xmm2, rcx, r9, plain_b, offset);
         Load128_buffer(xmm0, rdx, 0, mask_b, 0);
         Pxor(xmm2, xmm0);

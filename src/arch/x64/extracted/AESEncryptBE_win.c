@@ -4,15 +4,7 @@
  * KreMLin version: d5afab72
  */
 
-#include "kremlib.h"
-#ifndef __FStar_H
-#define __FStar_H
-
 #include "AESEncryptBE_win.h"
-#include "LowStar.h"
 
 
 
-
-#define __FStar_H_DEFINED
-#endif
