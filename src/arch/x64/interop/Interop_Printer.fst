@@ -113,7 +113,7 @@ let namelist_of_args args =
 
 let disjoint args =
   let args = List.Tot.Base.filter is_buffer args in
-  "locs_disjoint " ^ namelist_of_args args
+  "bufs_disjoint " ^ namelist_of_args args
 
 let reg_to_low = function
   | "rax" -> "Rax"
@@ -247,11 +247,11 @@ let translate_lowstar os target (func:func_ty) =
   let stack_needed = length_stack > 0 in
   let fuel_value = string_of_int (List.Tot.Base.length buffer_args + 3) in
   let implies_precond = if stack_needed then "B.length stack_b == " ^ string_of_int length_stack ^
-    " /\ live h0 stack_b /\ locs_disjoint " ^ (namelist_of_args (("stack_b",TBuffer TUInt64)::buffer_args)) ^ " /\ "
+    " /\ live h0 stack_b /\ buf_disjoint_from stack_b " ^ (namelist_of_args (buffer_args)) ^ " /\ "
   else "" in
   let stack_precond memname = if stack_needed then
     "/\ B.length stack_b == " ^ string_of_int length_stack ^
-    " /\ live " ^ memname ^ " stack_b /\ locs_disjoint " ^ (namelist_of_args (("stack_b",TBuffer TUInt64)::buffer_args))
+    " /\ live " ^ memname ^ " stack_b /\ buf_disjoint_from stack_b " ^ (namelist_of_args (buffer_args))
   else "" in
   let separator0 = if (List.Tot.Base.length buffer_args = 0) then "" else " /\\ " in
   let separator1 = if (List.Tot.Base.length buffer_args <= 1) then "" else " /\\ " in  
@@ -275,7 +275,7 @@ let translate_lowstar os target (func:func_ty) =
   (print_args_names args) ^ "))" ^
   "\n\n\n\n" ^
   "module " ^ name ^
-  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 40\"\n\n" ^
+  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\nopen BufferViewHelpers\n#set-options \"--z3rlimit 40\"\n\n" ^
   "open Vale_" ^ name ^ "\n\n" ^
   "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)\n\n" ^
   "let b8 = B.buffer UInt8.t\n\n" ^
@@ -289,7 +289,8 @@ let translate_lowstar os target (func:func_ty) =
   "  match ls with\n"^
   "  | [] -> True\n" ^
   "  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t\n\n" ^
-  "unfold\nlet locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)\n\n" ^
+  "unfold\nlet bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)\n\n" ^
+  "unfold\nlet buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
   "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 

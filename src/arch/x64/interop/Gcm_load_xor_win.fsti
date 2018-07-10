@@ -1,4 +1,4 @@
-module Gcm_load_xor
+module Gcm_load_xor_win
 
 open LowStar.Buffer
 module B = LowStar.Buffer
@@ -20,20 +20,6 @@ open GCTR_s
 open GCTR_i
 
 
-
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
-
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
-
-unfold
-let locs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
-
 let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
   BV.as_buffer_mk_buffer_view b Views.view128;
@@ -51,10 +37,25 @@ let buffer_to_seq_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 }) (h:HS.mem
   BV.length_eq b128;
   (BV.as_seq h b128)
 
+
+let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
+  match ls with
+  | [] -> True
+  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
+
+let rec locs_disjoint_rec (ls:list b8) : Type0 =
+  match ls with
+  | [] -> True
+  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
+
+unfold
+let bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
+
+
 open FStar.Mul
 
 // TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (plain_b:b8) (mask_b:b8) (cipher_b:b8) (offset:nat64) (num_blocks:Ghost.erased (nat64)) (key:Ghost.erased (aes_key_LE AES_128)) (iv:Ghost.erased (quad32)) = live h plain_b /\ live h mask_b /\ live h cipher_b /\ locs_disjoint [plain_b;mask_b;cipher_b] /\ length plain_b % 16 == 0 /\ length mask_b % 16 == 0 /\ length cipher_b % 16 == 0
+let pre_cond (h:HS.mem) (plain_b:b8) (mask_b:b8) (cipher_b:b8) (offset:nat64) (num_blocks:Ghost.erased (nat64)) (key:Ghost.erased (aes_key_LE AES_128)) (iv:Ghost.erased (quad32)) = live h plain_b /\ live h mask_b /\ live h cipher_b /\ bufs_disjoint [plain_b;mask_b;cipher_b] /\ length plain_b % 16 == 0 /\ length mask_b % 16 == 0 /\ length cipher_b % 16 == 0
  /\  ( let mods = M.loc_buffer cipher_b in  
     B.live h plain_b /\ B.live h mask_b /\ B.live h cipher_b /\
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
