@@ -41,6 +41,8 @@ let seq_U8_to_seq_nat8 (b:seq U8.t) : (seq nat8) =
 *)
 
 let buffer_to_nat32 (b:B.buffer U8.t { B.length b % 4 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot nat32 =
+  assert (B.length b % 4 == 0);
+  assert (BV.View?.n Views.view32 == 4);
   let b32 = BV.mk_buffer_view b Views.view32 in
   BV.as_buffer_mk_buffer_view b Views.view32;
   BV.get_view_mk_buffer_view b Views.view32;
@@ -543,7 +545,7 @@ let gcm128_one_pass_blocks
   =
   push_frame();
   let h0 = ST.get() in
-  let enc_ctr_b = B.alloca 0uy 16ul in
+  let enc_ctr_b = B.alloca (U8.uint_to_t 0) 16ul in
   let inv h (i:nat) =
     i <= U64.v num_blocks /\
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
@@ -952,8 +954,8 @@ let gcm_core
   let h0 = ST.get() in
   let iv_BE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
   push_frame ();
-  let h_b = B.alloca 0uy 16ul in
-  let hash_b = B.alloca 0uy 16ul in
+  let h_b = B.alloca (U8.uint_to_t 0) 16ul in
+  let hash_b = B.alloca (U8.uint_to_t 0) 16ul in
   let h1 = ST.get() in
   let ys = gcm_core_part1 plain_b plain_num_bytes
                            auth_b  auth_num_bytes
@@ -962,7 +964,7 @@ let gcm_core
                           cipher_b
                           h_b hash_b in
   let h2 = ST.get() in
-  let length_quad_b = B.alloca 0uy 16ul in
+  let length_quad_b = B.alloca (U8.uint_to_t 0) 16ul in
   gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes length_quad_b;
   let h3 = ST.get() in  
   ghash_incremental_one_block_buffer h_b hash_b length_quad_b 0UL;
