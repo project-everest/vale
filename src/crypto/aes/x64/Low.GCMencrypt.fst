@@ -424,7 +424,21 @@ let zero_quad32_buffer (b:B.buffer U8.t) : Stack unit
   )
   = 
   Zero_quad32_win.zero_quad32_buffer b
-  
+
+let reverse_bytes_quad32_buffer (b:B.buffer U8.t) : Stack unit
+  (requires fun h ->
+    B.live h b /\
+    B.length b == 16
+  )
+  (ensures fun h () h' -> 
+    M.modifies (M.loc_buffer b) h h' /\
+    (let old_b = buffer_to_quad32 b h  in
+     let new_b = buffer_to_quad32 b h' in
+     new_b == reverse_bytes_quad32 old_b)
+  )
+  = 
+  admit()
+
 let mk_quad32_lo0_be_1_buffer (b:B.buffer U8.t) : Stack unit
   (requires fun h ->
     B.live h b /\
@@ -821,7 +835,7 @@ let gcm_core_part1
     
     (let plain_num_bytes = U64.v plain_num_bytes in
      let auth_num_bytes = U64.v auth_num_bytes in
-     let iv_old = buffer_to_quad32 iv_b h in
+     let iv_old = reverse_bytes_quad32 (buffer_to_quad32 iv_b h) in
      let iv_new = buffer_to_quad32 iv_b h' in
      let old_hash = buffer_to_quad32 hash_b h in
      let new_hash = buffer_to_quad32 hash_b h' in
@@ -854,7 +868,8 @@ let gcm_core_part1
   )
   =
   let h0 = ST.get() in
-  let iv_BE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+  let iv_LE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+  let iv_BE = Ghost.hide (reverse_bytes_quad32 (Ghost.reveal iv_LE)) in 
   push_frame ();
   zero_quad32_buffer h_b;
   zero_quad32_buffer hash_b;
@@ -865,6 +880,7 @@ let gcm_core_part1
   let h2 = ST.get() in
 
   let y_auth = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h2) in
+  reverse_bytes_quad32_buffer iv_b;
   mk_quad32_lo0_be_1_buffer iv_b;
   inc32_buffer iv_b;  // iv_b == old(iv_b)[lo0 := 2]
   let h3 = ST.get() in
@@ -936,7 +952,7 @@ let gcm_core
 
     (let plain_num_bytes = U64.v plain_num_bytes in
      let auth_num_bytes = U64.v auth_num_bytes in
-     let iv_old = be_quad32_to_bytes (buffer_to_quad32 iv_b h) in
+     let iv_old = be_quad32_to_bytes (reverse_bytes_quad32 (buffer_to_quad32 iv_b h)) in
      let tag = buffer_to_quad32 tag_b h' in
      let auth   = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32   auth_b h))  0 auth_num_bytes in
      let plain  = slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h))  0 plain_num_bytes in
@@ -949,7 +965,8 @@ let gcm_core
   )
   =
   let h0 = ST.get() in
-  let iv_BE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+  let iv_LE = Ghost.elift2 buffer_to_quad32 (Ghost.hide iv_b) (Ghost.hide h0) in
+  let iv_BE = Ghost.hide (reverse_bytes_quad32 (Ghost.reveal iv_LE)) in 
   push_frame ();
   let h_b = B.alloca 0uy 16ul in
   let hash_b = B.alloca 0uy 16ul in
@@ -959,7 +976,7 @@ let gcm_core
                           iv_b
                           key keys_b
                           cipher_b
-                          h_b hash_b in
+                          h_b hash_b in                          
   let h2 = ST.get() in
   let length_quad_b = B.alloca 0uy 16ul in
   gcm_make_length_quad_buffer plain_num_bytes auth_num_bytes length_quad_b;
