@@ -14,12 +14,13 @@ open Interop_Printer
     Stk (Prims.parse_int "18"))
 *)
 
+(*
 let gctr_bytes_extra_buffer = ("gctr_bytes_extra_buffer_win", [
   ("plain_b", TBuffer TUInt128); ("num_bytes", TBase TUInt64);
   ("iv_old", TGhost "quad32"); ("iv_b", TBuffer TUInt128);
   ("key", TGhost "aes_key_LE AES_128"); ("keys_b", TBuffer TUInt128);
   ("cipher_b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
-
+*)
 (*
 let aes_encrypt_block = ("aes128_encrypt_block_win", [
   ("output_b", TBuffer TUInt128); ("input_b", TBuffer TUInt128);
@@ -86,9 +87,11 @@ let mk_quad1 = ("mk_quad32_lo0_be_1_buffer_win", [("b", TBuffer TUInt128)], Stk 
 (*
 let zero_quad32_buffer = ("zero_quad32_buffer_win", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
 *)
-let os = Windows 
+let reverse_quad32 = ("reverse_bytes_quad32_buffer", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
 
-let name = gctr_bytes_extra_buffer 
+let os = Linux 
+
+let name = reverse_quad32 
 
 let _ = print_string (translate_vale os X86 name)
 let _ = print_newline()
