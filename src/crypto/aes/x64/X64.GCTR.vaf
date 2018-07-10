@@ -533,12 +533,13 @@ procedure {:quick} gctr_bytes_extra_stdcall(
 }
 // Generated for Windows
 procedure {:quick} gctr_bytes_extra_buffer_win(
+  inline alg:algorithm,
   ghost stack_b:buffer64,
   ghost plain_b:buffer128,
   ghost num_bytes:nat64,
   ghost iv_old:(quad32),
   ghost iv_b:buffer128,
-  ghost key:aes_key_LE(AES_128),
+  ghost key:aes_key_LE(alg),
   ghost keys_b:buffer128,
   ghost cipher_b:buffer128)
     requires
@@ -567,15 +568,16 @@ procedure {:quick} gctr_bytes_extra_buffer_win(
         4096 * num_bytes < pow2_32;
         256 * bytes_to_quad_size(num_bytes) < pow2_32;
 
-        buffer_length(keys_b) == nr(AES_128) + 1;
-        buffer_as_seq(mem, keys_b) == key_to_round_keys_LE(AES_128, key);
+        alg = AES_128 || alg = AES_256;
+        buffer_length(keys_b) == nr(alg) + 1;
+        buffer_as_seq(mem, keys_b) == key_to_round_keys_LE(alg, key);
         
         // Extra reqs
         let num_blocks := num_bytes / 16;
         num_bytes % 16 != 0;
         0 < num_bytes < 16 * bytes_to_quad_size(num_bytes);
         16 * (bytes_to_quad_size(num_bytes) -1) < num_bytes;
-        gctr_partial(AES_128, num_blocks, buffer128_as_seq(mem, plain_b), buffer128_as_seq(mem, cipher_b), key, iv_old);
+        gctr_partial(alg, num_blocks, buffer128_as_seq(mem, plain_b), buffer128_as_seq(mem, cipher_b), key, iv_old);
         buffer128_read(iv_b, 0, mem) == inc32(iv_old, num_blocks);
     ensures
         rbx == old(rbx);
@@ -607,7 +609,7 @@ procedure {:quick} gctr_bytes_extra_buffer_win(
         let num_blocks := num_bytes / 16;
         let plain := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, plain_b)), 0, num_bytes);
         let cipher := slice(le_seq_quad32_to_bytes(buffer128_as_seq(mem, cipher_b)), 0, num_bytes);
-        cipher == gctr_encrypt_LE(iv_old, make_gctr_plain_LE(plain), AES_128, key);
+        cipher == gctr_encrypt_LE(iv_old, make_gctr_plain_LE(plain), alg, key);
 
         let cipher_blocks := slice_work_around(buffer128_as_seq(mem, cipher_b), num_blocks);
         let old_cipher_blocks := slice_work_around(buffer128_as_seq(old(mem), cipher_b), num_blocks);
@@ -617,24 +619,46 @@ procedure {:quick} gctr_bytes_extra_buffer_win(
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
         efl; mem;
 {
-        // Save r12 and rdx
-        Mov64(rax, r12);
-        Mov64(r11, rdx);
-
-        // Save xmm7
-        Mov128(xmm3, xmm7);
-
         ghost var orig_in_ptr := rcx;
         ghost var orig_out_ptr := buffer_read(stack_b, 5, mem);
+        ghost var round_keys := buffer128_as_seq(mem, keys_b);
 
-        // r9 should contain rcx + num_bytes / 16 * 16
+        // Shuffle parameters around to avoid clobbering incoming arguments
+        Mov64(rax, r9);
+        Mov64(r11, r8);
+
+        // r9 should contain orig_in_ptr + num_bytes / 16 * 16
+        // r10 should contain orig_out_ptr + num_bytes / 16 * 16
+        Mov64(r9, rcx);
+        Load64_buffer(r10, rsp, 40, stack_b, 5);
+
+        // rdx initially holds num_bytes
         Shr64(rdx, 4);
         lemma_poly_bits64();
         IMul64(rdx, 16);
-        Add64(rcx, rdx);
-        Mov64(r9, rcx);
+        assert (rdx == num_bytes / 16 * 16);
 
-        assume(false);
+        Add64(r9, rdx);
+        Add64(r10, rdx);
+
+        // r8 must contain the address of keys_b
+        Mov64(r8, rax);
+
+
+        // Load iv into xmm7, after saving a copy
+        Mov128(xmm3, xmm7);
+        Load128_buffer(xmm7, r11, 0, iv_b, 0);
+
+        // Save r12, which gctr_bytes_extra clobbers
+        Mov64(r11, r12);
+
+        gctr_bytes_extra(alg, iv_old, plain_b, cipher_b, key, round_keys, keys_b, orig_in_ptr, orig_out_ptr, num_bytes);
+
+        // Restore r12
+        Mov64(r12, r11);
+
+        // Restore xmm7
+        Mov128(xmm7, xmm3);
 }
 
 #reset-options "--z3rlimit 20"
