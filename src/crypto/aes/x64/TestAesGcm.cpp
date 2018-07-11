@@ -65,6 +65,7 @@ void test(void (*aes_key_expansion) (byte*, byte*),
     a.expanded_key_ptr = key_expansion;
     a.out_ptr = out;
     a.tag_ptr = tag;
+    printbytes((char*)"original plaintext", plain, 19);
     printbytes((char*)"key", key, 16);
     aes_key_expansion(key, key_expansion);
     printbytes((char*)"key_expansion", key_expansion, (num_rounds + 1) * 16);
@@ -107,6 +108,11 @@ void test(void (*aes_key_expansion) (byte*, byte*),
 #ifdef LOWSTAR
 
 void test_lowstar() {
+    byte iv_backup[16];
+
+    // Save a copy of iv, since Low* version modifies it
+    memcpy(iv_backup, iv, 16);
+
     int auth_num_bytes = 0;
     int plain_num_bytes = 19;
     int num_rounds = 10; 
@@ -131,6 +137,8 @@ void test_lowstar() {
     printbytes((char*)"cipher", out, 19);
     printbytes((char*)"tag", tag, 16);
 
+    // Restore iv
+    memcpy(iv, iv_backup, 16);
     a.out_ptr = plain;
     a.plain_ptr = out;
 
