@@ -7,6 +7,7 @@ open FStar.Mul
 open FStar.UInt
 open FStar.Math.Lemmas
 open Vale.Tactics
+open Vale.Bv_s
 
 // tweak options?
 #reset-options "--smtencoding.elim_box true"
@@ -107,7 +108,6 @@ let lemma_bv128_64_64_and x x0 x1 y y0 y1 z z0 z1 =
 			   norm[delta])
 
 #reset-options "--smtencoding.elim_box true --z3refresh --z3rlimit 12 --max_ifuel 1 --max_fuel 1"
-// this should be provable, but it requires  some non trivial effort due to subtypings.
 let int2bv_uext_64_128 (x1 : nat) :
   Lemma  (requires (FStar.UInt.size x1 64))
 	 (ensures (bv_uext #64 #64 (int2bv #64 x1) == int2bv #128 x1)) =
@@ -116,7 +116,6 @@ let int2bv_uext_64_128 (x1 : nat) :
    assert (x1 < pow2 128);
    modulo_lemma x1 (pow2 128); // x1 % pow2 128 = x1
    assert (FStar.UInt.size x1 128);
-   assume False;
    assert_by_tactic (bv_uext #64 #64 (int2bv #64 x1) == int2bv #128 x1)
 		(fun () -> dump ".."; 
 		norm[delta_only ["X64.Poly1305.Bitvectors_i.uint_ext"; "FStar.UInt.to_uint_t"]];
@@ -124,32 +123,193 @@ let int2bv_uext_64_128 (x1 : nat) :
 		dump "After norm"; smt ())
 
 
-#reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=true --max_fuel 2 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 15"
+#reset-options "--smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped --smtencoding.elim_box true --z3cliopt smt.arith.nl=false --max_fuel 1 --max_ifuel 0"
+
+let bv128_64_64_lowerUpper128u_bv_bv (x0 x1:bv_t 64) (xx0 xx1:bv_t 128) : Lemma
+  (requires xx0 == bv_uext #64 #64 x0 /\ xx1 == bv_uext #64 #64 x1)
+  (ensures bvadd (bvmul #128 xx1 0x10000000000000000) xx0 == bvor (bvshl xx1 64) xx0)
+  =
+  ()
+
+// REVIEW: it would greatly help if we could turn bit blasting off in the proofs below (e.g. selectively make bv* uninterpreted)
+
+unfold let mult (x y:int) : int = x * y
+let bv128_64_64_lowerUpper128u_bv_rhs1 (x0 x1:bv_t 64) (xx0 xx1:bv_t 128) : Lemma
+  (requires xx0 == bv_uext #64 #64 x0 /\ xx1 == bv_uext #64 #64 x1)
+  (ensures bv128_64_64 x0 x1 == bvor (bvshl xx1 64) xx0)
+  =
+  assert (bv128_64_64 x0 x1 == bvor (bvshl xx1 64) xx0) by (fun () ->
+	  norm[delta];
+    destruct_conj ();
+    rewrite_eqs_from_context ();
+    trivial ()
+  )
+
+let bv128_64_64_lowerUpper128u_bv_rhs2_helper (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1 /\ int2bv xx0 == bv_uext #64 #64 (int2bv x0) /\ int2bv xx1 == bv_uext #64 #64 (int2bv x1))
+  (ensures bv128_64_64 (int2bv x0) (int2bv x1) == bvor (bvshl (int2bv xx1) 64) (int2bv xx0))
+  =
+  bv128_64_64_lowerUpper128u_bv_rhs1 (int2bv x0) (int2bv x1) (int2bv xx0) (int2bv xx1);
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_rhs2 (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures bv128_64_64 (int2bv x0) (int2bv x1) == bvor (bvshl (int2bv xx1) 64) (int2bv xx0))
+  =
+  int2bv_uext #64 #64 x0 xx0;
+  int2bv_uext #64 #64 x1 xx1;
+  bv128_64_64_lowerUpper128u_bv_rhs2_helper x0 x1 xx0 xx1;
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_mul_mod (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures bvmul #128 (int2bv xx1) 0x10000000000000000 == int2bv #128 (mul_mod #128 xx1 0x10000000000000000))
+  =
+  int2bv_mul #128 #xx1 #0x10000000000000000 #(bvmul #128 (int2bv #128 xx1) 0x10000000000000000) ();
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_mul_mod_eq (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures mul_mod #128 xx1 0x10000000000000000 == mult xx1 0x10000000000000000)
+  =
+  assert (mul_mod #128 xx1 0x10000000000000000 == mult xx1 0x10000000000000000 % 0x100000000000000000000000000000000);
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_mul (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures bvmul #128 (int2bv xx1) 0x10000000000000000 == int2bv #128 (mult xx1 0x10000000000000000))
+  =
+  bv128_64_64_lowerUpper128u_bv_lhs_mul_mod x0 x1 xx0 xx1;
+  bv128_64_64_lowerUpper128u_bv_lhs_mul_mod_eq x0 x1 xx0 xx1;
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add_mod (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures
+    bvadd (int2bv #128 (mult xx1 0x10000000000000000)) (int2bv xx0) ==
+    int2bv #128 (add_mod #128 (mult xx1 0x10000000000000000) xx0)
+  )
+  =
+  int2bv_add #128 #(mult xx1 0x10000000000000000) #xx0
+    #(bvadd (int2bv #128 (mult xx1 0x10000000000000000)) (int2bv xx0)) ();
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add_mod_eq (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures add_mod #128 (mult xx1 0x10000000000000000) xx0 == mult xx1 0x10000000000000000 + xx0)
+  =
+  assert (add_mod #128 (mult xx1 0x10000000000000000) xx0 == (mult xx1 0x10000000000000000 + xx0) % 0x100000000000000000000000000000000);
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add_mod_eq2 (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires
+    x0 == xx0 /\ x1 == xx1
+  )
+  (ensures
+    int2bv #128 (add_mod #128 (mult xx1 0x10000000000000000) xx0) ==
+    int2bv #128 (mult xx1 0x10000000000000000 + xx0)
+  )
+  =
+  bv128_64_64_lowerUpper128u_bv_lhs_add_mod_eq x0 x1 xx0 xx1
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures
+    bvadd (int2bv #128 (mult xx1 0x10000000000000000)) (int2bv xx0) ==
+    int2bv #128 (mult xx1 0x10000000000000000 + xx0)
+  )
+  =
+  bv128_64_64_lowerUpper128u_bv_lhs_add_mod x0 x1 xx0 xx1;
+  bv128_64_64_lowerUpper128u_bv_lhs_add_mod_eq2 x0 x1 xx0 xx1;
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add_mul_helper (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures
+    bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) ==
+    bvadd (int2bv #128 (mult xx1 0x10000000000000000)) (int2bv xx0)
+  )
+  =
+  bv128_64_64_lowerUpper128u_bv_lhs_mul x0 x1 xx0 xx1
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add_mul_squash (x0 x1:uint_t 64) (xx0 xx1:uint_t 128)
+  (p1:squash (x0 == xx0))
+  (p2:squash (x1 == xx1))
+  (p3:squash (bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) == bvadd (int2bv #128 (mult xx1 0x10000000000000000)) (int2bv xx0)))
+  (p4:squash (int2bv #128 (mult xx1 0x10000000000000000 + xx0)                 == bvadd (int2bv #128 (mult xx1 0x10000000000000000)) (int2bv xx0)))
+  : Lemma
+  (ensures
+    bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) ==
+    int2bv #128 (mult xx1 0x10000000000000000 + xx0)
+  )
+  =
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_add_mul (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures
+    bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) ==
+    int2bv #128 (mult xx1 0x10000000000000000 + xx0)
+  )
+  =
+  bv128_64_64_lowerUpper128u_bv_lhs_add_mul_helper x0 x1 xx0 xx1;
+  bv128_64_64_lowerUpper128u_bv_lhs_add x0 x1 xx0 xx1;
+  bv128_64_64_lowerUpper128u_bv_lhs_add_mul_squash x0 x1 xx0 xx1 () () () ();
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_lu_helper (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures
+    int2bv #128 (mult xx1 0x10000000000000000 + xx0) ==
+    int2bv #128 (lowerUpper128u x0 x1)
+  )
+  =
+  ()
+
+let bv128_64_64_lowerUpper128u_bv_lhs_lu (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures
+    bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) ==
+    int2bv #128 (lowerUpper128u x0 x1)
+  )
+  =
+  bv128_64_64_lowerUpper128u_bv_lhs_add_mul x0 x1 xx0 xx1;
+  bv128_64_64_lowerUpper128u_bv_lhs_lu_helper x0 x1 xx0 xx1;
+  ()
+
+let bv128_64_64_lowerUpper128u_int_helper (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1 /\ int2bv xx0 == bv_uext #64 #64 (int2bv x0) /\ int2bv xx1 == bv_uext #64 #64 (int2bv x1))
+  (ensures bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) == bvor (bvshl (int2bv xx1) 64) (int2bv xx0))
+  =
+  bv128_64_64_lowerUpper128u_bv_bv (int2bv x0) (int2bv x1) (int2bv xx0) (int2bv xx1);
+  ()
+
+let bv128_64_64_lowerUpper128u_int (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+  (ensures bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0) == bvor (bvshl (int2bv xx1) 64) (int2bv xx0))
+  =
+  int2bv_uext #64 #64 x0 xx0;
+  int2bv_uext #64 #64 x1 xx1;
+  bv128_64_64_lowerUpper128u_int_helper x0 x1 xx0 xx1;
+  ()
+
+let bv128_64_64_lowerUpper128u_helper (x0 x1:uint_t 64) (xx0 xx1:uint_t 128) : Lemma
+  (requires x0 == xx0 /\ x1 == xx1)
+	(ensures int2bv (lowerUpper128u x0 x1) == bv128_64_64 (int2bv x0) (int2bv x1))
+  =
+  // int2bv (lowerUpper128u x0 x1)
+  bv128_64_64_lowerUpper128u_bv_lhs_lu x0 x1 xx0 xx1;
+  // bvadd (bvmul #128 (int2bv xx1) 0x10000000000000000) (int2bv xx0)
+  bv128_64_64_lowerUpper128u_int x0 x1 xx0 xx1;
+  // bvor (bvshl (int2bv xx1) 64) (int2bv xx0)
+  bv128_64_64_lowerUpper128u_bv_rhs2 x0 x1 xx0 xx1;
+  // bv128_64_64 (int2bv x0) (int2bv x1)
+  ()
+
 let bv128_64_64_lowerUpper128u (x0 x1:nat) :
   Lemma (requires (FStar.UInt.size x0 64 /\ FStar.UInt.size x1 64))
 	(ensures (int2bv (lowerUpper128u x0 x1) = bv128_64_64 (int2bv x0) (int2bv x1))) =
-  mul_bvshl x0;
-  plus_bvor (bvshl (bv_uext #64 #64 (int2bv x0)) 64) (bv_uext #64 #64 (int2bv x1));
-  assert ((0x10000000000000000)*x0 + x1 == ((0x10000000000000000)*x0 + x1) % pow2 128);
-  assert ((size (0x10000000000000000 * x0) 128));
-  assert (size x1 128);
-  let x2 : uint_t 128 = x1 in
-  let hi : uint_t 128 = (0x10000000000000000 <: uint_t 128) * x0 in
-  assert_by_tactic (int2bv #128 (add_mod #128 (0x10000000000000000 * x0) x1) ==
-		    bvadd #128 (int2bv #128 (0x10000000000000000 * x0)) (int2bv #128 x1))
-		    (fun () -> mapply (`trans); dump "do trans";
-			  apply_lemma (`int2bv_add);
-			  dump "do apply lemma";
-			  trefl ();
-			  trefl ();
-			  trefl ();
-			  dump "after trefl";
-			  ());
-  assume False
- // int2bv( 0x10000 * x0) == bvshl (bv_uext (int2bcv x0)) 64
- // bvadd (bvshl (bv_uext (int2bv x0) 64)) (bv_uext (int2bv x1)) = bvor (bvshl (bv_uext (int2bv x0) 64)) ..
- // bvadd (int2bv (0x10000 * x0)) (bv_uext (int2bv x1)) = .. 
- // int2bv ((0x1000 * x0) + x1) = bvadd (int2bv (0x1000 *x0)) (int2bv x1)
+  bv128_64_64_lowerUpper128u_helper x0 x1 x0 x1
   
 
 //this was so flaky, new options helped.
