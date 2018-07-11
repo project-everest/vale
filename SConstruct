@@ -12,9 +12,6 @@ import atexit
 import platform
 import fnmatch
 
-# TODO:
-#  - switch over to Dafny/Vale tools for dependency generation, rather than regex
-
 Import("*")
 
 target_arch='x86'
@@ -74,22 +71,6 @@ AddOption('--STAGE2',
   default=False,
   action='store_true',
   help='F* stage 2 (of 2)')
-AddOption('--DAFNY',
-  dest='do_dafny',
-  default=False,
-  action='store_true',
-  help='Verify Dafny files')
-AddOption('--NODAFNY',
-  dest='do_dafny',
-  default=False,
-  action='store_false',
-  help='Do not verify Dafny files')
-AddOption('--DAFNYPATH',
-  dest='dafny_path',
-  type='string',
-  default='#tools/Dafny',
-  action='store',
-  help='Specify the path to Dafny tool binaries')
 AddOption('--FSTAR',
   dest='do_fstar',
   default=True,
@@ -127,12 +108,6 @@ AddOption('--GEN-HINTS',
   default=False,
   action='store_true',
   help='Generate new F* .hints files and copy them into the hints directory')
-AddOption('--DARGS',
-  dest='dafny_user_args',
-  type='string',
-  default=[],
-  action='append',
-  help='Supply temporary additional arguments to the Dafny compiler')
 AddOption('--FARGS',
   dest='fstar_user_args',
   type='string',
@@ -206,16 +181,13 @@ AddOption('--MIN_TEST',
   action='store_true',
   help="Only run on a minimal set of test files")
 
-env['DAFNY_PATH'] = Dir(GetOption('dafny_path')).abspath
 env['FSTAR_PATH'] = Dir(GetOption('fstar_path')).abspath
-env['DAFNY_USER_ARGS'] = GetOption('dafny_user_args')
 env['FSTAR_USER_ARGS'] = GetOption('fstar_user_args')
 env['VALE_USER_ARGS'] = GetOption('vale_user_args')
 env['KREMLIN_USER_ARGS'] = GetOption('kremlin_user_args')
 env.Append(CCFLAGS=GetOption('c_user_args'))
 env['OPENSSL_PATH'] = GetOption('openssl_path')
 
-do_dafny = GetOption('do_dafny')
 do_fstar = GetOption('do_fstar')
 stage1 = GetOption('stage1')
 stage2 = GetOption('stage2')
@@ -255,6 +227,22 @@ if (not sys.stdout.isatty()) or GetOption('nocolor'):
 #
 ####################################################################
 
+def get_build_options(srcpath):
+  srcpath = os.path.normpath(srcpath)  # normalize the path, which, on Windows, switches to \\ separators
+  srcpath = srcpath.replace('\\', '/') # switch to posix path separators
+
+  if srcpath in verify_options:
+    return verify_options[srcpath]
+  else:
+    for key in verify_options:
+      if fnmatch.fnmatch (srcpath, key):
+        return verify_options[key]
+    ext = os.path.splitext(srcpath)[1]
+    if ext in verify_options:
+      return verify_options[ext]
+    else:
+      return None
+
 if do_fstar and not stage1 and not stage2:
   #
   # Stage1 builds the Vale tool and compiles vaf files to F* files.
@@ -275,12 +263,10 @@ if do_fstar and not stage1 and not stage2:
 
 # --NOVERIFY is intended for CI scenarios, where the Win32/x86 build is verified, so
 # the other build flavors do not redundently re-verify the same results.
-env['DAFNY_NO_VERIFY'] = ''
 env['FSTAR_NO_VERIFY'] = ''
 verify=(GetOption('noverify') == False)
 if not verify:
   print('***\n*** WARNING:  NOT VERIFYING ANY CODE\n***')
-  env['DAFNY_NO_VERIFY'] = '/noVerify'
   env['FSTAR_NO_VERIFY'] = '--lax'
 
 cache_dir=GetOption('cache_dir')
@@ -288,7 +274,6 @@ if cache_dir != None:
   print('Using Shared Cache Directory %s'%cache_dir)
   CacheDir(cache_dir)
 
-env['DAFNY'] = Dir(env['DAFNY_PATH']).File('Dafny.exe')
 env['FSTAR'] = Dir(env['FSTAR_PATH']).Dir('bin').File('fstar.exe')
 
 if 'KREMLIN_HOME' in os.environ:
@@ -299,10 +284,6 @@ if 'KREMLIN_HOME' in os.environ:
 
 env['VALE'] = File('bin/vale.exe')
 env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
-
-# Useful Dafny command lines
-dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
-dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
 fstar_default_args_nosmtencoding = ('--max_fuel 1 --max_ifuel 1' \
   + (' --initial_ifuel 1' if is_single_vaf else ' --initial_ifuel 0') \
@@ -428,14 +409,9 @@ def vale_tool_dependency_Emitter(target, source, env):
   
 # add env.Vale*(), to invoke Vale to compile a .vad to a .gen.dfy or a .vaf to a .fst
 def add_vale_builders(env):
-  vale_dafny_builder = Builder(action = "$MONO $VALE -includeSuffix .vad .gen.dfy -sourceFrom BASE src -destFrom BASE obj -in $SOURCE -out $TARGET $VALE_USER_ARGS",
-                            suffix = '.gen.dfy',
-                            src_suffix = '.vad',
-                            emitter = vale_tool_dependency_Emitter)
   vale_fstar_builder = Builder(action = "$MONO $VALE -fstarText $VALE_INCLUDE -in $SOURCE -out $TARGET -outi ${TARGET}i $VALE_SCONS_ARGS $VALE_USER_ARGS",
                             src_suffix = '.vaf',
                             emitter = vale_tool_dependency_Emitter)
-  env.Append(BUILDERS = {'ValeDafny' : vale_dafny_builder})
   env.Append(BUILDERS = {'ValeFStar' : vale_fstar_builder})
 
 # match 'include {:attr1} ... {:attrn} "filename"'
@@ -443,26 +419,6 @@ def add_vale_builders(env):
 vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\})*)\s*"(\S+)"', re.M)
 vale_verbatim_re = re.compile(r'\{\:\s*verbatim\s*\}')
 vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
-
-def vale_dafny_file_scan(node, env, path):
-  contents = node.get_text_contents()
-  dirname =  os.path.dirname(str(node))
-
-  includes = vale_include_re.findall(contents)
-
-  v_dfy_includes = []
-  v_vad_includes = []
-  for (attrs, inc) in includes:
-    f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
-    if vale_verbatim_re.search(attrs):
-      v_dfy_includes.append(f)
-      #v = os.path.join(dirname.replace('src', 'obj'), os.path.splitext(inc)[0] + '.vdfy')
-    else:
-      #v = os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy').replace('src', 'obj')
-      v_vad_includes.append(f)
-
-  files = env.File(v_dfy_includes + v_vad_includes) 
-  return files
 
 def vale_fstar_file_scan(node, env, path):
   contents = node.get_text_contents()
@@ -487,108 +443,17 @@ def vale_fstar_file_scan(node, env, path):
   files = env.File(v_vaf_includes) 
   return files
 
-vale_dafny_scan = Scanner(function = vale_dafny_file_scan,
-                     skeys = ['.vad'])
 vale_fstar_scan = Scanner(function = vale_fstar_file_scan,
                      skeys = ['.vaf'])
-if do_dafny:
-  env.Append(SCANNERS = vale_dafny_scan)
 if do_fstar and not is_single_vaf:
   env.Append(SCANNERS = vale_fstar_scan)
 
 
 ####################################################################
 #
-#   Dafny-specific utilities
-#
-####################################################################
-
-### Could try adding this to the scanner below...
-### From: http://stackoverflow.com/questions/241327/python-snippet-to-remove-c-and-c-comments
-##def comment_remover(text):
-##    def replacer(match):
-##        s = match.group(0)
-##        if s.startswith('/'):
-##            return " " # note: a space and not an empty string
-##        else:
-##            return s
-##    pattern = re.compile(
-##        r'//.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"',
-##        re.DOTALL | re.MULTILINE
-##    )
-##    return re.sub(pattern, replacer, text)
-##
-## This picks up on any include statement, even those commented out by /* on earlier lines :(
-## (It does work for //, though)
-dafny_include_re = re.compile(r'^\s*include\s+"(\S+)"', re.M)
-
-# helper to look up a Dafny BuildOptions matching a srcpath, from the 
-# verify_options[] list, dealing with POSIX and Windows pathnames, and 
-# falling back on a default if no specific override is present.
-def get_build_options(srcpath):
-  srcpath = os.path.normpath(srcpath)  # normalize the path, which, on Windows, switches to \\ separators
-  srcpath = srcpath.replace('\\', '/') # switch to posix path separators
-
-  if srcpath in verify_options:
-    return verify_options[srcpath]
-  else:
-    for key in verify_options:
-      if fnmatch.fnmatch (srcpath, key):
-        return verify_options[key]
-    ext = os.path.splitext(srcpath)[1]
-    if ext in verify_options:
-      return verify_options[ext]
-    else:
-      return None
-
-# Scan a .dfy file to discover its dependencies, and add .vdfy targets for each.
-# Returns a list of File representing the discovered .dfy dependencies.      
-def dafny_file_scan(node, env, path):
-    #print("Scanning " + str(node))
-    contents = node.get_text_contents()
-    dirname =  os.path.dirname(str(node))
-    #output = docmd(env, '$DAFNY /nologo /ironDafny /noVerify /printIncludes:Transitive /deprecation:0 /noNLarith ' + str(node))
-    #for o in output:
-    #  print("Output " + o)
-    
-    includes = dafny_include_re.findall(contents)
-    v_includes = []
-    for i in includes:
-      srcpath = os.path.join(dirname, i)
-      # TODO : this should convert the .gen.dfy filename back to a src\...\.vad filename, and look up its options
-      options = get_build_options(srcpath)
-      if options != None:
-        f = to_obj_dir(os.path.join(dirname, os.path.splitext(i)[0] + '.vdfy'))
-        v_includes.append(f)
-        options.env.Dafny(f, srcpath)
-    return env.File(v_includes)
-
-# Add env.dafny_scan(), to automatically scan .dfy files for dependencies
-dafny_scan = Scanner(function = dafny_file_scan,
-                     skeys = ['.dfy'])
-if do_dafny:
-  env.Append(SCANNERS = dafny_scan)
-
-####################################################################
-#
 #   Define some transformation Builders
 #
 ####################################################################
-
-# Pseudo-builder that takes Dafny code verifies it
-# Arguments:
-#  targetfile - the target .vdfy to generate, as a string
-#  sourcefile - the .dfy file to verify, as a string or File()
-# Return:
-#  File representing the verification result
-def verify_dafny(env, targetfile, sourcefile):
-  temptargetfile = os.path.splitext(targetfile)[0] + '.tmp'
-  temptarget = env.Command(temptargetfile, sourcefile, "$MONO $DAFNY $VERIFIER_FLAGS $DAFNY_Z3_PATH $SOURCE $DAFNY_NO_VERIFY $DAFNY_USER_ARGS >$TARGET")
-  return env.CopyAs(source=temptarget, target=targetfile)
-
-# Add env.Dafny(), to verify a .dfy file into a .vdfy
-def add_dafny_verifier(env):
-  env.AddMethod(verify_dafny, "Dafny")
 
 def on_black_list(f, list):
   for entry in list:
@@ -642,81 +507,6 @@ def add_fstar_verifier(env):
 # Add env.FStar(), to verify a .fst or .fsti file into a .fst.verified or .fsti.verified
 def add_fstar_extract(env):
   env.AddMethod(extract_fstar, "FStarExtract")
-
-# Add env.DafnyCompile(), to compile without verification, a .dfy file into a .exe
-def add_dafny_compiler(env):
-  env['DAFNY_COMPILER_FLAGS'] = '/nologo /noVerify /compile:2'
-  dafny_compiler = Builder(action='$MONO $DAFNY $DAFNY_COMPILER_FLAGS $SOURCE /out:$TARGET $DAFNY_USER_ARGS',
-                           suffix = '.exe',
-                           src_suffix = '.dfy')
-
-  env.Append(BUILDERS = {'DafnyCompile' : dafny_compiler})
-
-# Add env.DafnyKremlin(), to compile without verification, a .dfy file into a Kremlin .json.  
-def add_dafny_kremlin(env):
-  env['DAFNY_KREMLIN_FLAGS'] = dafny_default_args_larith + ' /nologo /kremlin /noVerify /compile:2 /spillTargetCode:1'
-  dafny_kremlin = Builder(action='$MONO $DAFNY $DAFNY_KREMLIN_FLAGS $SOURCE /out:$TARGET $DAFNY_USER_ARGS',
-                           suffix = '.json',
-                           src_suffix = '.dfy')
-
-  env.Append(BUILDERS = {'DafnyKremlin' : dafny_kremlin})
-
-# Custom emitter for Kremlin .json->.c that also notes the generation of the matching .h file  
-def kremlin_emitter(target, source, env):
-  c_name = str(target[0])
-  h_name = os.path.splitext(c_name)[0]+'.h'
-  target.append(h_name)
-  return target, source
-
-# Add env.Kremlin(), to extract .c/.h from .json.  The builder returns
-# two targets, the .c file first, followed by the .h file.
-def add_kremlin(env):
-  # In order to succeed, the Kremlin builder needs an extra directory in the
-  # PATH on Windows so that the DLL can be properly found.
-  if sys.platform == 'win32':
-    gmp_dll = FindFile('libgmp-10.dll', os.environ['PATH'].split(';'))
-    if gmp_dll != None:
-      env.PrependENVPath('PATH', os.path.dirname(str(gmp_dll)))
-  env['KREMLIN_FLAGS'] = '-fnouint128 -warn-error +1..4 -warn-error @4 -skip-compilation -add-include \\"DafnyLib.h\\" -cc msvc -drop FStar'
-  kremlin = Builder(action='cd ${TARGET.dir} && ${KREMLIN.abspath} $KREMLIN_FLAGS ${SOURCE.file} $KREMLIN_USER_ARGS',
-                           suffix = '.c',
-                           src_suffix = '.json',
-                           emitter = kremlin_emitter)
-  # Copy pre-generated FStar.h; could be regenerared using
-  # krml -fnouint128 -I ../kremlin/kremlib -skip-compilation ulib/FStar.UInt128.fst
-  env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
-  env.Append(BUILDERS = {'Kremlin' : kremlin})
-
-# Pseudo-builder that takes Dafny code and extracts it via Kremlin
-# Arguments:
-#  kremlin_dfys - a list of .dfy files to extract to C
-# Return:
-#  A set of targets, two per dfy, the first for the .c file and the second for the .h file
-def extract_dafny_code(env, kremlin_dfys):
-  kremlin_outputs = []
-  for k in kremlin_dfys:
-    # generate .json from .dfy
-    json_file = os.path.splitext(to_obj_dir(k))[0]+'.json' # dest is in obj\ dir and has .json extension instead of .dfy
-    json = env.DafnyKremlin(source=k, target=json_file)
-    # generate .c from .json
-    json_split = os.path.split(json_file) # [0] is the pathname, [1] is the filename
-    target_path = json_split[0]
-    json_file = json_split[1]
-    target_file_base = os.path.join(target_path, os.path.splitext(json_file)[0].replace('.', '_'))
-    target_file_c = target_file_base+'.c'
-    target_file_h = target_file_base+'.h'
-    if 'KREMLIN_HOME' in os.environ:
-      outputs = env.Kremlin(source=json, target=target_file_c)
-      kremlin_outputs.append(outputs)
-  return kremlin_outputs
-
-# Compile Vale .vad to Dafny .gen.dfy
-# Takes a source .vad file as a string
-# Returns a File() representing the resulting .gen.dfy file
-def compile_vale_dafny(env, source_vad):
-  target_s = os.path.splitext(to_obj_dir(source_vad))[0]+'.gen.dfy'
-  target_dfy = env.ValeDafny(source=source_vad, target=target_s)
-  return target_dfy
 
 # Compile Vale .vaf to FStar .fst/fsti pair
 # Takes a source .vaf file as a string
@@ -793,45 +583,6 @@ def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name)
   else:
     print('Unsupported sys.platform value: ' + sys.platform)
 
-# Pseudo-builder that takes Vale code, a main .dfy, and generates a Vale EXE which then emits .asm files
-# Arguments:
-#  vads - a list of vad files to extract
-#  vad_main_dfy - the main .dfy used to drive extraction
-#  output_base_name - the base name to use for the EXE and ASM files, such as "sha256" to generate "obj\sha256.asm/.s"
-# Return:
-#  Multiple targets, which are the assembly source files for all platforms.  The first one is the correct file for 
-#  the current OS platform (ie. the .s file when running on a POSIX OS, or the .asm on Windows).  The subsequent
-#  ones are for other OS platforms, in no particular order.
-def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
-  # generate decls.gen.dfy from decls.vad
-  vale_outputs = []
-  for s in vads:
-    outputs = compile_vale_dafny(env, s)
-    vale_outputs.append(File(env.subst(s)))
-  output_target_base = 'obj/'+output_base_name
-  ionative = os.path.normpath('src/lib/util/IoNative.cs')
-  exe_name = output_target_base+'.exe'
-  exe = env.Clone(DAFNY_COMPILER_FLAGS=dafny_default_args_larith + ' /nologo /noVerify /compile:2 '+ionative).DafnyCompile(
-    source=vad_main_dfy, target=exe_name)
-  Depends(exe, ionative)
-  Depends(exe, vale_outputs) # todo: this should be implicitly generated by scanning the vad_main_dfy file.  Is it?
-  
-  masm_win = env.Command(output_target_base+'.asm', exe, '$MONO $SOURCE MASM Win > $TARGET')
-  gcc_win = env.Command(output_target_base+'-gcc.S', exe, '$MONO $SOURCE GCC Win > $TARGET')
-  gcc_linux = env.Command(output_target_base+'-linux.S', exe, '$MONO $SOURCE GCC Linux > $TARGET')
-  gcc_macos = env.Command(output_target_base+'-macos.S', exe, '$MONO $SOURCE GCC MacOS > $TARGET')
-  
-  if sys.platform.startswith('linux'):
-    return [gcc_linux, masm_win, gcc_win, gcc_macos]
-  elif sys.platform == 'win32':
-    return [masm_win, gcc_win, gcc_linux, gcc_macos]
-  elif sys.platform == 'cygwin':
-    return [gcc_win, masm_win, gcc_linux, gcc_macos]
-  elif sys.platform == 'darwin':
-    return [gcc_macos, gcc_win, masm_win, gcc_linux]
-  else:
-    print('Unsupported sys.platform value: ' + sys.platform)
-  
 # build and execute a test app
 # inputs - set of files to build into the resulting exe
 # include_dir - an extra include directory - usually the path to the kremlin-generated headers
@@ -867,8 +618,6 @@ def build_test(env, inputs, include_dir, output_base_name):
 # Add pseudobuilders to env.  
 def add_extract_code(env):
   env.AddMethod(extract_vale_ocaml, "ExtractValeOCaml")
-  env.AddMethod(extract_vale_code, "ExtractValeCode")
-  env.AddMethod(extract_dafny_code, "ExtractDafnyCode")
   env.AddMethod(build_test, "BuildTest")
 
 # Helper class used by the src/SConscript file, to specify per-file
@@ -879,15 +628,6 @@ class BuildOptions:
     self.env = env.Clone(VERIFIER_FLAGS=args)
     if valeIncludes != None:
       self.env = self.env.Clone(VALE_INCLUDE=valeIncludes)
-
-# Verify a set of Dafny files by creating verification targets for each,
-# which in turn causes a dependency scan to verify all of their dependencies.
-def verify_dafny_files(env, files):
-  for f in files:
-    options = get_build_options(f)
-    if options != None and verify == True:
-      target = os.path.splitext(to_obj_dir(f))[0] + '.vdfy'
-      options.env.Dafny(target, f)
 
 # Verify .fst and/or .fsti files
 def verify_fstar_files(env, files):
@@ -904,19 +644,6 @@ def verify_fstar_files(env, files):
           if os.path.splitext(o)[1] == '.fst':
             if not (ml_out_name(o, '.ml') in no_extraction_files):
               options.env.FStarExtract(o)
-
-# Verify a set of Vale files by creating verification targets for each,
-# which in turn causes a dependency scan to verify all of their dependencies.
-def verify_vale_dafny_files(env, files):
-  for f in files:
-    options = get_build_options(f)
-    if options != None:
-      dfy = compile_vale_dafny(env, f)
-      if verify == True:
-        dfy_str = str(dfy[0]).replace('\\', '/')  # switch from Windows to Unix path ahead of calling get_build_options()
-        dafny_gen_options = get_build_options(dfy_str)
-        target = os.path.splitext(to_obj_dir(f))[0] + '.gen.vdfy'
-        dafny_gen_options.env.Dafny(target, dfy)
 
 def verify_vale_fstar_files(env, files):
   for f in files:
@@ -954,11 +681,6 @@ def recursive_glob(env, pattern, strings=False):
 # which in turn causes a dependency scan to verify all of their dependencies.
 def verify_files_in(env, directories):
   for d in directories:
-    if do_dafny:
-      files = recursive_glob(env, d+'/*.dfy', strings=True)
-      verify_dafny_files(env, files)
-      files = recursive_glob(env, d+'/*.vad', strings=True)
-      verify_vale_dafny_files(env, files)
     if do_fstar:
       if is_single_vaf:
         files = [single_vaf]
@@ -1117,18 +839,11 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
 #   Put it all together
 #
 ####################################################################
-add_dafny_verifier(env)
 add_fstar_verifier(env)
 add_fstar_extract(env)
-add_dafny_compiler(env)
-add_dafny_kremlin(env)
 add_vale_builders(env)
-if do_fstar or 'KREMLIN_HOME' in os.environ:
-  add_kremlin(env)
 add_extract_code(env)
 env.AddMethod(verify_files_in, "VerifyFilesIn")
-env.AddMethod(verify_vale_dafny_files, "VerifyValeDafnyFiles")
-env.AddMethod(verify_dafny_files, "VerifyDafnyFiles")
 env.AddMethod(verify_vale_fstar_files, "VerifyValeFStarFiles")
 env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 
@@ -1137,16 +852,12 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage1', 'stage2', 'fstar_extract')
+Export('env', 'BuildOptions', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_fstar', 'stage1', 'stage2', 'fstar_extract')
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')
 vale_deps = vale_tool_results.dependencies;
 env['Z3'] = vale_tool_results.z3
-if sys.platform == 'win32':
-  env['DAFNY_Z3_PATH'] = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
-else:
-  env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
 
 # Check F* version
 if do_fstar and not fstar_my_version:
@@ -1176,7 +887,7 @@ else:
 SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
-Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'min_test_suite_blacklist'])
+Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths' ])
 Import('external_files')
 Import('no_extraction_files')
 

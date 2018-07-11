@@ -5,10 +5,8 @@ open Parse_util
 open Transform
 open Emit_common_base
 open Emit_common_top
-open Microsoft.Dafny
 open Microsoft.FSharp.Math
 open Microsoft.FSharp.Text.Lexing
-open DafnyInterface
 open System.IO
 
 let cur_file = ref ""
@@ -325,15 +323,7 @@ let main (argv) =
       if !emitFStarText then
         Emit_fstar_text.emit_decls ps decls
       else
-        if !dafnyDirect then
-          // Initialize Dafny objects
-          let mdl = new LiteralModuleDecl(new DefaultModuleDecl(), null) in
-          let built_ins = new BuiltIns() in
-          let arg_list = List.rev (!cur_file::!dafny_opts_rev) in
-          DafnyOptions.Install(new DafnyOptions(new ConsoleErrorReporter()));
-          Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
-          DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
-        else Emit_dafny_text.emit_decls ps decls;
+        ()
       close_streams ()
     ) with err -> close_streams (); raise err
   )
