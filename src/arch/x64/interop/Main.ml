@@ -87,7 +87,7 @@ let mk_quad1 = ("mk_quad32_lo0_be_1_buffer_win", [("b", TBuffer TUInt128, Sec)],
 (*
 let zero_quad32_buffer = ("zero_quad32_buffer_win", [("b", TBuffer TUInt128, Sec)], Stk (Prims.parse_int "0"))
 *)
-let reverse_quad32 = ("reverse_bytes_quad32_buffer", [("b", TBuffer TUInt128)], Stk (Prims.parse_int "0"))
+let reverse_quad32 = ("reverse_bytes_quad32_buffer_win", [("b", TBuffer TUInt128, Sec)], Stk (Prims.parse_int "0"))
 
 let os = Windows
 

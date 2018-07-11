@@ -17,21 +17,12 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open BufferViewHelpers
+open Interop_assumptions
 #set-options "--z3rlimit 40"
 
 open Vale_aes128_encrypt_block_win
 
-assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0) (fun h0 _ h1 -> f h0 == h1)
-
-//The map from buffers to addresses in the heap, that remains abstract
-assume val addrs: addr_map
-
-//The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
-
 #set-options "--initial_fuel 6 --max_fuel 6 --initial_ifuel 2 --max_ifuel 2"
-// TODO: Prove these two lemmas if they are not proven automatically
 let implies_pre (h0:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8)  (stack_b:b8) : Lemma
   (requires pre_cond h0 output_b input_b key keys_b /\ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [output_b;input_b;keys_b])
   (ensures (
@@ -133,6 +124,5 @@ let ghost_aes128_encrypt_block_win output_b input_b key keys_b stack_b h0 =
 let aes128_encrypt_block_win output_b input_b key keys_b  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 32) in
-  let h0 = get() in
   st_put (fun h -> pre_cond h output_b input_b key keys_b /\ B.length stack_b == 32 /\ live h stack_b /\ buf_disjoint_from stack_b [output_b;input_b;keys_b]) (ghost_aes128_encrypt_block_win output_b input_b key keys_b stack_b);
   pop_frame()

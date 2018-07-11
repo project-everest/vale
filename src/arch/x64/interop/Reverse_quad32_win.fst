@@ -8,6 +8,7 @@ module M = LowStar.Modifies
 open LowStar.ModifiesPat
 open FStar.HyperStack.ST
 module HS = FStar.HyperStack
+module S8 = SecretByte
 open Interop
 open Words_s
 open Types_s
@@ -16,59 +17,18 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open BufferViewHelpers
+open Interop_assumptions
 #set-options "--z3rlimit 40"
 
 open Vale_reverse_bytes_quad32_buffer_win
 
-assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)
-
-let b8 = B.buffer UInt8.t
-
-//The map from buffers to addresses in the heap, that remains abstract
-assume val addrs: addr_map
-
-//The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
-
 #set-options "--initial_fuel 4 --max_fuel 4 --initial_ifuel 2 --max_ifuel 2"
-// TODO: Prove these two lemmas if they are not proven automatically
-let implies_pre (h0:HS.mem) (b:b8)  (stack_b:b8) : Lemma
+let implies_pre (h0:HS.mem) (b:s8)  (stack_b:b8) : Lemma
   (requires pre_cond h0 b /\ B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b])
   (ensures (
-B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b] /\ (  let buffers = stack_b::b::[] in
-  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
-  let addr_b = addrs b in
-  let addr_stack:nat64 = addrs stack_b + 0 in
-  let regs = fun r -> begin match r with
-    | rsp -> addr_stack
-    | rcx -> addr_b
-    | _ -> init_regs r end in
-  let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
-  length_t_eq (TBase TUInt64) stack_b;
-  length_t_eq (TBase TUInt128) b;
-  va_pre (va_code_reverse_bytes_quad32_buffer_win ()) s0 stack_b b ))) =
-  length_t_eq (TBase TUInt64) stack_b;
-  length_t_eq (TBase TUInt128) b;
-  ()
-
-let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (b:b8)  (stack_b:b8) : Lemma
-  (requires pre_cond va_s0.mem.hs b /\ B.length stack_b == 16 /\ live va_s0.mem.hs stack_b /\ buf_disjoint_from stack_b [b]/\
-    va_post (va_code_reverse_bytes_quad32_buffer_win ()) va_s0 va_sM va_fM stack_b b )
-  (ensures post_cond va_s0.mem.hs va_sM.mem.hs b ) =
-  length_t_eq (TBase TUInt64) stack_b;
-  length_t_eq (TBase TUInt128) b;
-  let b128 = BV.mk_buffer_view b Views.view128 in
-  assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) b) (BV.as_seq va_sM.mem.hs b128));
-  BV.as_seq_sel va_sM.mem.hs b128 0;
-  assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) b) (BV.as_seq va_s0.mem.hs b128));
-  BV.as_seq_sel va_s0.mem.hs b128 0;  
-  ()
-
-val ghost_reverse_bytes_quad32_buffer_win: b:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 b /\ B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b]}) -> GTot (h1:HS.mem{post_cond h0 h1 b })
-
-let ghost_reverse_bytes_quad32_buffer_win b stack_b h0 =
+B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b] /\ (  let taint_func (x:b8) : GTot taint =
+    if StrongExcludedMiddle.strong_excluded_middle (x == b) then Secret else
+    Public in
   let buffers = stack_b::b::[] in
   let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
   let addr_b = addrs b in
@@ -78,7 +38,43 @@ let ghost_reverse_bytes_quad32_buffer_win b stack_b h0 =
     | rcx -> addr_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  length_t_eq (TBase TUInt64) stack_b;
+  length_t_eq (TBase TUInt128) b;
+  va_pre (va_code_reverse_bytes_quad32_buffer_win ()) s0 stack_b b ))) =
+  length_t_eq (TBase TUInt64) stack_b;
+  length_t_eq (TBase TUInt128) b;
+  ()
+
+let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (b:s8)  (stack_b:b8) : Lemma
+  (requires pre_cond va_s0.mem.hs b /\ B.length stack_b == 16 /\ live va_s0.mem.hs stack_b /\ buf_disjoint_from stack_b [b]/\
+    va_post (va_code_reverse_bytes_quad32_buffer_win ()) va_s0 va_sM va_fM stack_b b )
+  (ensures post_cond va_s0.mem.hs va_sM.mem.hs b ) =
+  length_t_eq (TBase TUInt64) stack_b;
+  length_t_eq (TBase TUInt128) b;
+  let b128 = BV.mk_buffer_view b Views.view128 in
+  assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) b) (BV.as_seq va_sM.mem.hs b128));
+  BV.as_seq_sel va_sM.mem.hs b128 0;
+  assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) b) (BV.as_seq va_s0.mem.hs b128));
+  BV.as_seq_sel va_s0.mem.hs b128 0;    
+  ()
+
+val ghost_reverse_bytes_quad32_buffer_win: b:s8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 b /\ B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b]}) -> GTot (h1:HS.mem{post_cond h0 h1 b })
+
+let ghost_reverse_bytes_quad32_buffer_win b stack_b h0 =
+  let taint_func (x:b8) : GTot taint =
+    if StrongExcludedMiddle.strong_excluded_middle (x == b) then Secret else
+    Public in
+  let buffers = stack_b::b::[] in
+  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
+  let addr_b = addrs b in
+  let addr_stack:nat64 = addrs stack_b + 0 in
+  let regs = fun r -> begin match r with
+    | rsp -> addr_stack
+    | rcx -> addr_b
+    | _ -> init_regs r end in
+  let xmms = init_xmms in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) b;
   implies_pre h0 b stack_b ;
@@ -113,6 +109,5 @@ let ghost_reverse_bytes_quad32_buffer_win b stack_b h0 =
 let reverse_bytes_quad32_buffer_win b  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 16) in
-  let h0 = get() in
-  st_put h0 (fun h -> pre_cond h b /\ B.length stack_b == 16 /\ live h stack_b /\ buf_disjoint_from stack_b [b]) (ghost_reverse_bytes_quad32_buffer_win b stack_b);
+  st_put (fun h -> pre_cond h b /\ B.length stack_b == 16 /\ live h stack_b /\ buf_disjoint_from stack_b [b]) (ghost_reverse_bytes_quad32_buffer_win b stack_b);
   pop_frame()

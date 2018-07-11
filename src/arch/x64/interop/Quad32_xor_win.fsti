@@ -45,7 +45,6 @@ let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem
   assert (BV.length b128 > 0);
   BV.sel h b128 0
 
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (src1:s8) (src2:s8) (dst:s8) = live h src1 /\ live h src2 /\ live h dst /\ list_disjoint_or_eq [src1;src2;dst] /\     B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
 
 let post_cond (h:HS.mem) (h':HS.mem) (src1:s8) (src2:s8) (dst:s8) =

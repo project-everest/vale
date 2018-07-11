@@ -17,18 +17,10 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open BufferViewHelpers
+open Interop_assumptions
 #set-options "--z3rlimit 40"
 
 open Vale_gctr_bytes_extra_buffer_win
-
-assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0) (fun h0 _ h1 -> f h0 == h1)
-
-//The map from buffers to addresses in the heap, that remains abstract
-assume val addrs: addr_map
-
-//The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
 
 #set-options "--initial_fuel 7 --max_fuel 7 --initial_ifuel 2 --max_ifuel 2"
 let implies_pre (h0:HS.mem) (plain_b:s8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) (cipher_b:s8)  (stack_b:b8) : Lemma
@@ -231,6 +223,5 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
 let gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b cipher_b  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 48) in
-  let h0 = get() in
   st_put (fun h -> pre_cond h plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b /\ B.length stack_b == 48 /\ live h stack_b /\ buf_disjoint_from stack_b [plain_b;iv_b;keys_b;cipher_b]) (ghost_gctr_bytes_extra_buffer_win plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b stack_b);
   pop_frame()

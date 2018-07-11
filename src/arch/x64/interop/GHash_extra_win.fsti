@@ -60,7 +60,6 @@ let buffer_to_seq_quad32 (b:s8 { B.length b % 16 == 0 }) (h:HS.mem) : GTot (s:Se
 
 open FStar.Mul
 
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_hash:Ghost.erased (quad32)) = live h in_b /\ live h hash_b /\ live h h_b /\ bufs_disjoint [in_b;hash_b;h_b] /\ length in_b % 16 == 0 /\ length hash_b % 16 == 0 /\ length h_b % 16 == 0 /\
    ( let mods = M.loc_buffer hash_b in 
     B.live h in_b /\ B.live h hash_b /\ B.live h h_b /\ 

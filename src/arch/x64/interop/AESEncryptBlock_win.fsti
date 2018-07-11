@@ -43,7 +43,6 @@ let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8 { B.length key
 
 open FStar.Mul
 
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) = live h output_b /\ live h input_b /\ live h keys_b /\ length output_b % 16 == 0 /\ length input_b % 16 == 0 /\ length keys_b % 16 == 0 /\
     disjoint_or_eq input_b output_b /\
     disjoint keys_b input_b /\
