@@ -3,6 +3,7 @@ module Zero_quad32_win
 open LowStar.Buffer
 module B = LowStar.Buffer
 module BV = LowStar.BufferView
+module S8 = SecretByte
 open LowStar.Modifies
 module M = LowStar.Modifies
 open LowStar.ModifiesPat
@@ -17,13 +18,14 @@ open X64.Vale.State_i
 open X64.Vale.Decls_i
 
 let b8 = B.buffer UInt8.t
+let s8 = B.buffer S8.t
 
 // TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (b:b8) = B.live h b /\
+let pre_cond (h:HS.mem) (b:s8) = B.live h b /\
     B.length b == 16
 
 
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
+let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
   BV.as_buffer_mk_buffer_view b Views.view128;
   BV.get_view_mk_buffer_view b Views.view128;
@@ -33,11 +35,11 @@ let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 
   BV.sel h b128 0
 
 
-let post_cond (h:HS.mem) (h':HS.mem) (b:b8) = length b == 16 /\
+let post_cond (h:HS.mem) (h':HS.mem) (b:s8) = length b == 16 /\
     M.modifies (M.loc_buffer b) h h' /\
     (let new_b = buffer_to_quad32 b h' in
      new_b == Mkfour 0 0 0 0)
 
-val zero_quad32_buffer: b:b8 -> Stack unit
+val zero_quad32_buffer_win: b:s8 -> Stack unit
 	(requires (fun h -> pre_cond h b ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 b ))

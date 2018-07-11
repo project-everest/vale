@@ -45,22 +45,22 @@ let print_low_nat_ty = function
   | TUInt64 -> "nat64"
   | TUInt128 -> "nat128"
 
-let print_low_ty = function
+let print_low_ty ty t = match ty with
   | TGhost ty -> "Ghost.erased (" ^ ty ^ ")"
-  | TBuffer ty -> "b8"
+  | TBuffer ty -> if t = Pub then "b8" else "s8"
   | TBase ty -> print_low_nat_ty ty
 
 let rec print_low_args = function
   | [] -> "Stack unit"
-  | (a, ty, _)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args q
+  | (a, ty, t)::q -> a ^ ":" ^ print_low_ty ty t ^ " -> " ^ print_low_args q
 
 let rec print_low_args_and = function
   | [] -> ""
-  | (a, ty, _)::q -> a ^ ":" ^ print_low_ty ty ^ " -> " ^ print_low_args_and q
+  | (a, ty, t)::q -> a ^ ":" ^ print_low_ty ty t ^ " -> " ^ print_low_args_and q
 
 let rec print_args_list = function
   | [] -> ""
-  | (a,ty, _)::q -> "(" ^ a ^ ":" ^ print_low_ty ty ^ ") " ^ print_args_list q
+  | (a,ty, t)::q -> "(" ^ a ^ ":" ^ print_low_ty ty t ^ ") " ^ print_args_list q
 
 let rec print_args_names = function
   | [] -> ""
@@ -229,7 +229,7 @@ let create_state os target args stack slots stkstart =
   (print_low_calling_args os target args stkstart) ^
   "  let xmms = init_xmms in\n" ^
   "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in\n" ^
-  print_length_t (if stack then ("stack_b", TBuffer TUInt64)::args else args)
+  print_length_t (if stack then ("stack_b", TBuffer TUInt64, Pub)::args else args)
 
 let print_vale_bufferty = function
   | TUInt8 -> "buffer8"
@@ -289,10 +289,11 @@ let translate_lowstar os target (func:func_ty) =
   (print_args_names args) ^ "))" ^
   "\n\n\n\n" ^
   "module " ^ name ^
-  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\nopen BufferViewHelpers\n#set-options \"--z3rlimit 40\"\n\n" ^
+  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nmodule S8 = SecretByte\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\nopen BufferViewHelpers\n#set-options \"--z3rlimit 40\"\n\n" ^
   "open Vale_" ^ name ^ "\n\n" ^
-  "assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)\n\n" ^
-  "let b8 = B.buffer UInt8.t\n\n" ^
+  "assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0) (fun h0 _ h1 -> f h0 == h1)\n\n" ^
+  "let b8 = B.buffer UInt8.t\n" ^
+  "let s8 = B.buffer S8.t\n\n" ^
   "//The map from buffers to addresses in the heap, that remains abstract\n" ^
   "assume val addrs: addr_map\n\n" ^  
    "let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =\n" ^
@@ -306,7 +307,6 @@ let translate_lowstar os target (func:func_ty) =
   "unfold\nlet bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)\n\n" ^
   "unfold\nlet buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
->>>>>>> lowstar-secret
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
   "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
     ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
@@ -324,7 +324,7 @@ let translate_lowstar os target (func:func_ty) =
   "  va_pre (va_code_" ^ name ^ " ()) s0 " ^ 
   (if stack_needed then "stack_b " else "") ^
   (print_args_names_reveal args) ^ "))) =\n" ^
-  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64)::args else args) ^ 
+  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args) ^ 
   "  ()\n\n" ^
   "let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) " ^ (print_args_list args) ^
   (if stack_needed then " (stack_b:b8)" else "") ^
@@ -334,7 +334,7 @@ let translate_lowstar os target (func:func_ty) =
   (if stack_needed then "stack_b " else "") ^
   (print_args_names_reveal args) ^ ")\n" ^
   "  (ensures post_cond va_s0.mem.hs va_sM.mem.hs " ^ (print_args_names args) ^ ") =\n" ^
-  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64)::args else args) ^ 
+  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args) ^ 
   "  ()\n\n" ^
   "val " ^ name ^ ": " ^ (print_low_args args) ^
   "\n\t(requires (fun h -> pre_cond h " ^ (print_args_names args) ^ "))\n\t" ^
@@ -365,7 +365,7 @@ let translate_lowstar os target (func:func_ty) =
   (if stack_needed then "  push_frame();\n" ^
     "  let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t " ^ string_of_int length_stack ^ ") in\n"  else "") ^
   "  let h0 = get() in\n" ^
-  "  st_put h0 (fun h -> pre_cond h " ^ (print_args_names args) ^ stack_precond "h" ^ ") (ghost_" ^ name ^ " " ^ (print_args_names args) ^ 
+  "  st_put (fun h -> pre_cond h " ^ (print_args_names args) ^ stack_precond "h" ^ ") (ghost_" ^ name ^ " " ^ (print_args_names args) ^ 
   (if stack_needed then "stack_b);\n  pop_frame()\n" else ")\n")
   
 let print_vale_arg = function

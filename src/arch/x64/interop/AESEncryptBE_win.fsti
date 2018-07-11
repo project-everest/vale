@@ -8,6 +8,7 @@ module M = LowStar.Modifies
 open LowStar.ModifiesPat
 open FStar.HyperStack.ST
 module HS = FStar.HyperStack
+module S8 = SecretByte
 open Interop
 open Words_s
 open Types_s
@@ -18,30 +19,32 @@ open X64.Vale.Decls_i
 open AES_s
 open GCTR_i
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
+let s8 = B.buffer S8.t
+
+let rec loc_locs_disjoint_rec (l:s8) (ls:list s8) : Type0 =
   match ls with
   | [] -> True
   | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
 
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
+let rec locs_disjoint_rec (ls:list s8) : Type0 =
   match ls with
   | [] -> True
   | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
 
 unfold
-let bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
+let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
 
 unfold 
-let buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
+let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
-let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer UInt8.t { B.length keys_b % 16 == 0 }) (h:HS.mem) =
+let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8 { B.length keys_b % 16 == 0 }) (h:HS.mem) =
   let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
   let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
   BV.as_seq h keys128_b == round_keys
 
 open FStar.Mul
 
-let pre_cond (h:HS.mem) (output_b:b8) (input_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) =
+let pre_cond (h:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) =
 live h output_b /\ live h input_b /\ live h keys_b /\    
     disjoint_or_eq input_b output_b /\
     disjoint keys_b input_b /\
@@ -52,7 +55,7 @@ live h output_b /\ live h input_b /\ live h keys_b /\
 
 
 
-let post_cond (h0:HS.mem) (h1:HS.mem) (output_b:b8) (input_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) =
+let post_cond (h0:HS.mem) (h1:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) =
   length input_b % 16 == 0 /\ length output_b % 16 == 0 /\ length keys_b % 16 == 0 /\
     B.live h1 input_b /\ B.live h1 keys_b /\
     M.modifies (M.loc_buffer output_b) h0 h1 /\
@@ -63,6 +66,6 @@ let post_cond (h0:HS.mem) (h1:HS.mem) (output_b:b8) (input_b:b8) (key:Ghost.eras
      let output_q = Seq.index (BV.as_seq h1 output128_b) 0 in
      output_q == aes_encrypt_BE AES_128 (Ghost.reveal key) input_q))
 
-val aes128_encrypt_block_be_win: output_b:b8 -> input_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> Stack unit
+val aes128_encrypt_block_be_win: output_b:s8 -> input_b:s8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:s8 -> Stack unit
 	(requires (fun h -> pre_cond h output_b input_b key keys_b ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 output_b input_b key keys_b ))

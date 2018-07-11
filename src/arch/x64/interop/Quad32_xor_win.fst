@@ -8,6 +8,7 @@ module M = LowStar.Modifies
 open LowStar.ModifiesPat
 open FStar.HyperStack.ST
 module HS = FStar.HyperStack
+module S8 = SecretByte
 open Interop
 open Words_s
 open Types_s
@@ -20,23 +21,25 @@ open BufferViewHelpers
 
 open Vale_quad32_xor_buffer_win
 
-assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)
-
-let b8 = B.buffer UInt8.t
+assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0) (fun h0 _ h1 -> f h0 == h1)
 
 //The map from buffers to addresses in the heap, that remains abstract
 assume val addrs: addr_map
-
 //The initial registers and xmms
 assume val init_regs:reg -> nat64
 assume val init_xmms:xmm -> quad32
 
 #set-options "--initial_fuel 6 --max_fuel 6 --initial_ifuel 2 --max_ifuel 2"
 // TODO: Prove these two lemmas if they are not proven automatically
-let implies_pre (h0:HS.mem) (src1:b8) (src2:b8) (dst:b8)  (stack_b:b8) : Lemma
+let implies_pre (h0:HS.mem) (src1:s8) (src2:s8) (dst:s8)  (stack_b:b8) : Lemma
   (requires pre_cond h0 src1 src2 dst /\ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src2;dst])
   (ensures (
-B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src2;dst] /\ (  let buffers = stack_b::src1::src2::dst::[] in
+B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src2;dst] /\ (  let taint_func (x:b8) : GTot taint =
+    if StrongExcludedMiddle.strong_excluded_middle (x == src1) then Secret else
+    if StrongExcludedMiddle.strong_excluded_middle (x == src2) then Secret else
+    if StrongExcludedMiddle.strong_excluded_middle (x == dst) then Secret else
+    Public in
+  let buffers = stack_b::src1::src2::dst::[] in
   let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
   let addr_src1 = addrs src1 in
   let addr_src2 = addrs src2 in
@@ -49,7 +52,7 @@ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src
     | R8 -> addr_dst
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) src1;
   length_t_eq (TBase TUInt128) src2;
@@ -61,7 +64,7 @@ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src
   length_t_eq (TBase TUInt128) dst;
   ()
 
-let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (src1:b8) (src2:b8) (dst:b8)  (stack_b:b8) : Lemma
+let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (src1:s8) (src2:s8) (dst:s8)  (stack_b:b8) : Lemma
   (requires pre_cond va_s0.mem.hs src1 src2 dst /\ B.length stack_b == 32 /\ live va_s0.mem.hs stack_b /\ buf_disjoint_from stack_b [src1;src2;dst]/\
     va_post (va_code_quad32_xor_buffer_win ()) va_s0 va_sM va_fM stack_b src1 src2 dst )
   (ensures post_cond va_s0.mem.hs va_sM.mem.hs src1 src2 dst ) =
@@ -77,12 +80,17 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (src1:b8) (sr
   BV.as_seq_sel va_s0.mem.hs src2_128 0;
   let dst128 = BV.mk_buffer_view dst Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) dst) (BV.as_seq va_sM.mem.hs dst128));
-  BV.as_seq_sel va_sM.mem.hs dst128 0;  
+  BV.as_seq_sel va_sM.mem.hs dst128 0;    
   ()
 
-val ghost_quad32_xor_buffer_win: src1:b8 -> src2:b8 -> dst:b8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 src1 src2 dst /\ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src2;dst]}) -> GTot (h1:HS.mem{post_cond h0 h1 src1 src2 dst })
+val ghost_quad32_xor_buffer_win: src1:s8 -> src2:s8 -> dst:s8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 src1 src2 dst /\ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src2;dst]}) -> GTot (h1:HS.mem{post_cond h0 h1 src1 src2 dst })
 
 let ghost_quad32_xor_buffer_win src1 src2 dst stack_b h0 =
+  let taint_func (x:b8) : GTot taint =
+    if StrongExcludedMiddle.strong_excluded_middle (x == src1) then Secret else
+    if StrongExcludedMiddle.strong_excluded_middle (x == src2) then Secret else
+    if StrongExcludedMiddle.strong_excluded_middle (x == dst) then Secret else
+    Public in
   let buffers = stack_b::src1::src2::dst::[] in
   let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in
   let addr_src1 = addrs src1 in
@@ -96,7 +104,7 @@ let ghost_quad32_xor_buffer_win src1 src2 dst stack_b h0 =
     | R8 -> addr_dst
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) src1;
   length_t_eq (TBase TUInt128) src2;
@@ -134,5 +142,5 @@ let quad32_xor_buffer_win src1 src2 dst  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 32) in
   let h0 = get() in
-  st_put h0 (fun h -> pre_cond h src1 src2 dst /\ B.length stack_b == 32 /\ live h stack_b /\ buf_disjoint_from stack_b [src1;src2;dst]) (ghost_quad32_xor_buffer_win src1 src2 dst stack_b);
+  st_put (fun h -> pre_cond h src1 src2 dst /\ B.length stack_b == 32 /\ live h stack_b /\ buf_disjoint_from stack_b [src1;src2;dst]) (ghost_quad32_xor_buffer_win src1 src2 dst stack_b);
   pop_frame()

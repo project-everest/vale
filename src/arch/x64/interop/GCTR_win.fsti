@@ -8,6 +8,7 @@ module M = LowStar.Modifies
 open LowStar.ModifiesPat
 open FStar.HyperStack.ST
 module HS = FStar.HyperStack
+module S8 = SecretByte
 open Interop
 open X64.Machine_s
 open X64.Memory_i_s
@@ -24,32 +25,33 @@ open GCM_s
 open GCM_helpers_i
 open GHash_i
 
+let s8 = B.buffer S8.t
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
+let rec loc_locs_disjoint_rec (l:s8) (ls:list s8) : Type0 =
   match ls with
   | [] -> True
   | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
 
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
+let rec locs_disjoint_rec (ls:list s8) : Type0 =
   match ls with
   | [] -> True
   | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
 
 unfold
-let bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
+let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
 
 unfold
-let buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
+let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
 
-let buffer_to_seq_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 }) (h:HS.mem) : GTot (s:Seq.seq quad32 {Seq.length s == B.length b / 16} ) =
+let buffer_to_seq_quad32 (b:s8{ B.length b % 16 == 0 }) (h:HS.mem) : GTot (s:Seq.seq quad32 {Seq.length s == B.length b / 16} ) =
   let b128 = BV.mk_buffer_view b Views.view128 in
   BV.as_buffer_mk_buffer_view b Views.view128;
   BV.get_view_mk_buffer_view b Views.view128;
   BV.length_eq b128;
   (BV.as_seq h b128)
 
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
+let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
   BV.as_buffer_mk_buffer_view b Views.view128;
   BV.get_view_mk_buffer_view b Views.view128;
@@ -58,7 +60,7 @@ let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 
   assert (BV.length b128 > 0);
   BV.sel h b128 0
 
-let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer UInt8.t { B.length keys_b % 16 == 0 }) (h:HS.mem) =
+let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8 { B.length keys_b % 16 == 0 }) (h:HS.mem) =
   let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
   let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
   BV.as_seq h keys128_b == round_keys
@@ -66,7 +68,7 @@ let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:B.buffer UInt8.t 
 open FStar.Mul
 
 // TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = live h plain_b /\ live h iv_b /\ live h keys_b /\ live h cipher_b /\ bufs_disjoint [plain_b;iv_b;keys_b;cipher_b] /\ length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0
+let pre_cond (h:HS.mem) (plain_b:s8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) (cipher_b:s8) = live h plain_b /\ live h iv_b /\ live h keys_b /\ live h cipher_b /\ bufs_disjoint [plain_b;iv_b;keys_b;cipher_b] /\ length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0
 /\ (    let mods = M.loc_buffer cipher_b in 
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
@@ -101,7 +103,7 @@ let pre_cond (h:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (qua
      iv == inc32 (Ghost.reveal iv_old) num_blocks) 
      )
 
-let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0 /\ (
+let post_cond (h:HS.mem) (h':HS.mem) (plain_b:s8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) (cipher_b:s8) = length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0 /\ (
     B.live h' plain_b /\ B.live h' iv_b /\ B.live h' keys_b /\ B.live h' cipher_b /\
     
     B.length plain_b  == bytes_to_quad_size num_bytes * 16 /\
@@ -126,11 +128,11 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghos
     )
   )
 
-let full_post_cond (h:HS.mem) (h':HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:b8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:b8) (cipher_b:b8) = 
+let full_post_cond (h:HS.mem) (h':HS.mem) (plain_b:s8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) (cipher_b:s8) = 
   let mods = M.loc_buffer cipher_b in
     M.modifies mods h h' /\
     post_cond h h' plain_b num_bytes iv_old iv_b key keys_b cipher_b
 
-val gctr_bytes_extra_buffer_win: plain_b:b8 -> num_bytes:UInt64.t -> iv_old:Ghost.erased (quad32) -> iv_b:b8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:b8 -> cipher_b:b8 -> Stack unit
+val gctr_bytes_extra_buffer_win: plain_b:s8 -> num_bytes:UInt64.t -> iv_old:Ghost.erased (quad32) -> iv_b:s8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:s8 -> cipher_b:s8 -> Stack unit
 	(requires (fun h -> pre_cond h plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))
 	(ensures (fun h0 _ h1 -> full_post_cond h0 h1 plain_b (UInt64.v num_bytes) iv_old iv_b key keys_b cipher_b ))

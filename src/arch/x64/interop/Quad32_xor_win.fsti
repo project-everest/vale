@@ -8,6 +8,7 @@ module M = LowStar.Modifies
 open LowStar.ModifiesPat
 open FStar.HyperStack.ST
 module HS = FStar.HyperStack
+module S8 = SecretByte
 open Interop
 open Words_s
 open Types_s
@@ -16,25 +17,26 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 
+let s8 = B.buffer S8.t
 
-let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
+let rec loc_locs_disjoint_rec (l:s8) (ls:list s8) : Type0 =
   match ls with
   | [] -> True
   | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
 
-let rec locs_disjoint_rec (ls:list b8) : Type0 =
+let rec locs_disjoint_rec (ls:list s8) : Type0 =
   match ls with
   | [] -> True
   | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
 
 unfold
-let bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
+let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
 
 unfold
-let buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
+let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
 
-let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
+let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
   BV.as_buffer_mk_buffer_view b Views.view128;
   BV.get_view_mk_buffer_view b Views.view128;
@@ -44,9 +46,9 @@ let buffer_to_quad32 (b:B.buffer UInt8.t { B.length b % 16 == 0 /\ B.length b > 
   BV.sel h b128 0
 
 // TODO: Complete with your pre- and post-conditions
-let pre_cond (h:HS.mem) (src1:b8) (src2:b8) (dst:b8) = live h src1 /\ live h src2 /\ live h dst /\ list_disjoint_or_eq [src1;src2;dst] /\     B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
+let pre_cond (h:HS.mem) (src1:s8) (src2:s8) (dst:s8) = live h src1 /\ live h src2 /\ live h dst /\ list_disjoint_or_eq [src1;src2;dst] /\     B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16
 
-let post_cond (h:HS.mem) (h':HS.mem) (src1:b8) (src2:b8) (dst:b8) =
+let post_cond (h:HS.mem) (h':HS.mem) (src1:s8) (src2:s8) (dst:s8) =
 B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16 /\
   M.modifies (M.loc_buffer dst) h h' /\
     (let src1 = buffer_to_quad32 src1 h  in
@@ -54,6 +56,6 @@ B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16 /\
      let dst  = buffer_to_quad32 dst  h' in
      dst = quad32_xor src1 src2)
 
-val quad32_xor_buffer_win: src1:b8 -> src2:b8 -> dst:b8 -> Stack unit
+val quad32_xor_buffer_win: src1:s8 -> src2:s8 -> dst:s8 -> Stack unit
 	(requires (fun h -> pre_cond h src1 src2 dst ))
 	(ensures (fun h0 _ h1 -> post_cond h0 h1 src1 src2 dst ))
