@@ -7,6 +7,7 @@ open FStar.Math.Lib
 open FStar.Mul
 open X64.Vale.State_i   // needed for mem
 open X64.Poly1305.Bitvectors_i
+open X64.Memory_i
 
 // private unfold let op_Star = op_Multiply
 
@@ -38,9 +39,3 @@ let reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s) (k) =
 //       assert (i >= 0 ==> precedes (kk - i) (k-i));
 //       assert (i < 0 ==> precedes (kk - i) (k-i));
 //       lemma_poly1305_heap_hash_blocks' h pad r m i len kk
-
-
-let lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int) (m:mem) (b) (len) (k)  =
-  admit()
-  // decreases k - i
-
