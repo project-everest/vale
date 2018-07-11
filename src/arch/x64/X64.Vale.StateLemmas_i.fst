@@ -13,8 +13,8 @@ let state_to_S (s:state) : GTot TS.traceState =
   {
   TS.state = (let s' = {
     BS.ok = s.ok;
-    BS.regs = (fun r -> s.regs r);
-    BS.xmms = (fun x -> s.xmms x);
+    BS.regs = (fun r -> Map16_i.sel s.regs r);
+    BS.xmms = (fun x -> Map16_i.sel s.xmms x);
     BS.flags = int_to_nat64 s.flags;
     BS.mem = ME.get_heap s.mem
   } in
@@ -23,13 +23,42 @@ let state_to_S (s:state) : GTot TS.traceState =
   TS.memTaint = s.memTaint;
   }
 
+let regs_of_S (#a:Type0) (m:reg -> a) : Pure (Map16_i.map a)
+  (requires True)
+  (ensures fun m' ->
+    (forall (r:reg).{:pattern (m r) \/ (Map16_i.sel m' r)} m r == Map16_i.sel m' r)
+  )
+  =
+  let m0_3 = ((m 0, m 1), (m 2, m 3)) in
+  let m4_7 = ((m 4, m 5), (m 6, m 7)) in
+  let m8_11 = ((m 8, m 9), (m 10, m 11)) in
+  let m12_15 = ((m 12, m 13), (m 14, m 15)) in
+  let m' = ((m0_3, m4_7), (m8_11, m12_15)) in
+  assert_norm (m  0 == Map16_i.sel m'  0);
+  assert_norm (m  1 == Map16_i.sel m'  1);
+  assert_norm (m  2 == Map16_i.sel m'  2);
+  assert_norm (m  3 == Map16_i.sel m'  3);
+  assert_norm (m  4 == Map16_i.sel m'  4);
+  assert_norm (m  5 == Map16_i.sel m'  5);
+  assert_norm (m  6 == Map16_i.sel m'  6);
+  assert_norm (m  7 == Map16_i.sel m'  7);
+  assert_norm (m  8 == Map16_i.sel m'  8);
+  assert_norm (m  9 == Map16_i.sel m'  9);
+  assert_norm (m 10 == Map16_i.sel m' 10);
+  assert_norm (m 11 == Map16_i.sel m' 11);
+  assert_norm (m 12 == Map16_i.sel m' 12);
+  assert_norm (m 13 == Map16_i.sel m' 13);
+  assert_norm (m 14 == Map16_i.sel m' 14);
+  assert_norm (m 15 == Map16_i.sel m' 15);
+  m'
+
 let state_of_S (s:TS.traceState) : GTot state =
   let { ME.state = st; ME.mem = mem } = s.TS.state in
   let { BS.ok = ok; BS.regs = regs; BS.xmms = xmms; BS.flags = flags; BS.mem = _} = st in
   {
     ok = ok;
-    regs = (fun r -> regs r);
-    xmms = (fun x -> xmms x);
+    regs = regs_of_S regs;
+    xmms = regs_of_S xmms;
     flags = flags;
     mem = mem;
     trace = s.TS.trace;

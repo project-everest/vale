@@ -26,9 +26,9 @@ let va_pre (va_b0:va_code) (va_s0:va_state)
 ((va_require_total va_b0 (va_code_ghash_incremental_extra_stdcall ()) va_s0) /\
     (va_get_ok va_s0) /\ (locs_disjoint [(loc_buffer in_b); (loc_buffer hash_b); (loc_buffer h_b)])
     /\ (buffer_readable (va_get_mem va_s0) in_b) /\ (buffer_readable (va_get_mem va_s0) hash_b) /\
-    (buffer_readable (va_get_mem va_s0) h_b) /\ (va_get_reg Rdi va_s0) == (buffer_addr in_b
-    (va_get_mem va_s0)) /\ (va_get_reg Rsi va_s0) == (buffer_addr hash_b (va_get_mem va_s0)) /\
-    (va_get_reg Rdx va_s0) == (buffer_addr h_b (va_get_mem va_s0)) /\ (va_get_reg Rcx va_s0) ==
+    (buffer_readable (va_get_mem va_s0) h_b) /\ (va_get_reg rdi va_s0) == (buffer_addr in_b
+    (va_get_mem va_s0)) /\ (va_get_reg rsi va_s0) == (buffer_addr hash_b (va_get_mem va_s0)) /\
+    (va_get_reg rdx va_s0) == (buffer_addr h_b (va_get_mem va_s0)) /\ (va_get_reg rcx va_s0) ==
     num_bytes /\ (buffer_length in_b) == (bytes_to_quad_size num_bytes) /\ (buffer_length h_b) == 1
     /\ (buffer_length hash_b) == 1 /\ (buffer_addr in_b (va_get_mem va_s0)) + 16 `op_Multiply`
     (bytes_to_quad_size num_bytes) < pow2_64 /\ 4096 `op_Multiply` num_bytes < pow2_32 /\ 256
@@ -43,10 +43,10 @@ let va_pre (va_b0:va_code) (va_s0:va_state)
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
   (in_b:buffer128) (hash_b:buffer128) (h_b:buffer128) (num_bytes:nat64) (orig_hash:(quad32))  =
 ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (va_get_reg Rbx va_sM) == (va_get_reg Rbx va_s0) /\ (va_get_reg Rbp va_sM) == (va_get_reg
-    Rbp va_s0) /\ (va_get_reg R12 va_sM) == (va_get_reg R12 va_s0) /\ (va_get_reg R13 va_sM) ==
-    (va_get_reg R13 va_s0) /\ (va_get_reg R14 va_sM) == (va_get_reg R14 va_s0) /\ (va_get_reg R15
-    va_sM) == (va_get_reg R15 va_s0) /\ (modifies_buffer128 hash_b (va_get_mem va_s0) (va_get_mem
+    /\ (va_get_reg rbx va_sM) == (va_get_reg rbx va_s0) /\ (va_get_reg rbp va_sM) == (va_get_reg
+    rbp va_s0) /\ (va_get_reg r12 va_sM) == (va_get_reg r12 va_s0) /\ (va_get_reg r13 va_sM) ==
+    (va_get_reg r13 va_s0) /\ (va_get_reg r14 va_sM) == (va_get_reg r14 va_s0) /\ (va_get_reg r15
+    va_sM) == (va_get_reg r15 va_s0) /\ (modifies_buffer128 hash_b (va_get_mem va_s0) (va_get_mem
     va_sM)) /\ (buffer_readable (va_get_mem va_sM) in_b) /\ (buffer_readable (va_get_mem va_sM)
     hash_b) /\ (buffer_readable (va_get_mem va_sM) h_b) /\ (let h_val = (buffer128_read h_b 0
     (va_get_mem va_sM)) in let new_hash = (buffer128_read hash_b 0 (va_get_mem va_sM)) in let
@@ -58,11 +58,11 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
     (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM
     (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM
     (va_update_xmm 4 va_sM (va_update_xmm 3 va_sM (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM
-    (va_update_xmm 0 va_sM (va_update_reg R15 va_sM (va_update_reg R14 va_sM (va_update_reg R13
-    va_sM (va_update_reg R12 va_sM (va_update_reg R11 va_sM (va_update_reg R10 va_sM (va_update_reg
-    R9 va_sM (va_update_reg R8 va_sM (va_update_reg Rsp va_sM (va_update_reg Rbp va_sM
-    (va_update_reg Rdi va_sM (va_update_reg Rsi va_sM (va_update_reg Rdx va_sM (va_update_reg Rcx
-    va_sM (va_update_reg Rbx va_sM (va_update_reg Rax va_sM (va_update_ok va_sM
+    (va_update_xmm 0 va_sM (va_update_reg r15 va_sM (va_update_reg r14 va_sM (va_update_reg r13
+    va_sM (va_update_reg r12 va_sM (va_update_reg r11 va_sM (va_update_reg r10 va_sM (va_update_reg
+    r9 va_sM (va_update_reg r8 va_sM (va_update_reg rsp va_sM (va_update_reg rbp va_sM
+    (va_update_reg rdi va_sM (va_update_reg rsi va_sM (va_update_reg rdx va_sM (va_update_reg rcx
+    va_sM (va_update_reg rbx va_sM (va_update_reg rax va_sM (va_update_ok va_sM
     va_s0)))))))))))))))))))))))))))))))))))))
 
 val va_lemma_ghash_incremental_extra_stdcall(va_b0:va_code) (va_s0:va_state)

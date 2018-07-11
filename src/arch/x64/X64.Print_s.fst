@@ -24,22 +24,22 @@ noeq type printer = {
 
 let print_reg_name (r:reg) =
   match r with
-  | Rax -> "rax"
-  | Rbx -> "rbx"
-  | Rcx -> "rcx"
-  | Rdx -> "rdx"
-  | Rsi -> "rsi"
-  | Rdi -> "rdi"
-  | Rbp -> "rbp"
-  | Rsp -> "rsp"
-  | R8  -> "r8"
-  | R9  -> "r9"
-  | R10 -> "r10"
-  | R11 -> "r11"
-  | R12 -> "r12"
-  | R13 -> "r13"
-  | R14 -> "r14"
-  | R15 -> "r15"
+  |  0 -> "rax"
+  |  1 -> "rbx"
+  |  2 -> "rcx"
+  |  3 -> "rdx"
+  |  4 -> "rsi"
+  |  5 -> "rdi"
+  |  6 -> "rbp"
+  |  7 -> "rsp"
+  |  8 -> "r8"
+  |  9 -> "r9"
+  | 10 -> "r10"
+  | 11 -> "r11"
+  | 12 -> "r12"
+  | 13 -> "r13"
+  | 14 -> "r14"
+  | 15 -> "r15"
   
 let print_reg (r:reg) (p:printer) =
   p.reg_prefix() ^ print_reg_name r
@@ -47,24 +47,24 @@ let print_reg (r:reg) (p:printer) =
 let print_reg32 (r:reg) (p:printer) =
   p.reg_prefix() ^
   (match r with
-  | Rax -> "eax"
-  | Rbx -> "ebx"
-  | Rcx -> "ecx"
-  | Rdx -> "edx"
-  | Rsi -> "esi"
-  | Rdi -> "edi"
-  | Rbp -> "ebp"
-  | Rsp -> "esp"
+  | 0 -> "eax"
+  | 1 -> "ebx"
+  | 2 -> "ecx"
+  | 3 -> "edx"
+  | 4 -> "esi"
+  | 5 -> "edi"
+  | 6 -> "ebp"
+  | 7 -> "esp"
   | _ -> print_reg_name r ^ "d"
   )
 
 let print_small_reg (r:reg) (p:printer) =
   p.reg_prefix() ^
   (match r with
-  | Rax -> "al"
-  | Rbx -> "bl"
-  | Rcx -> "cl"
-  | Rdx -> "dl"
+  | 0 -> "al"
+  | 1 -> "bl"
+  | 2 -> "cl"
+  | 3 -> "dl"
   | _ -> " !!! INVALID small operand !!!  Expected al, bl, cl, or dl."
   )
 
@@ -122,7 +122,7 @@ let print_shift_operand (o:operand) (p:printer) =
   | OConst n ->
       if n < 64 then p.const n
       else "!!! INVALID shift operand: " ^ string_of_int n ^ " is too large !!!"
-  | OReg Rcx -> print_small_reg (OReg?.r o) p
+  | OReg 2 (* OReg r when r = rcx *) -> print_small_reg (OReg?.r o) p
   | _ -> "!!! INVALID shift operand !!! Expected constant or cl."
 
 let cmp_not(o:ocmp) : ocmp =

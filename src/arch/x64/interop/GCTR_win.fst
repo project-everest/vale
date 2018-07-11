@@ -48,11 +48,11 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> num_bytes
+    | r8 -> addr_iv_b
+    | r9 -> addr_keys_b
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
@@ -77,11 +77,11 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> num_bytes
+    | r8 -> addr_iv_b
+    | r9 -> addr_keys_b
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
@@ -122,11 +122,11 @@ let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (num_
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> num_bytes
+    | r8 -> addr_iv_b
+    | r9 -> addr_keys_b
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
@@ -148,11 +148,11 @@ let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (num_
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> num_bytes
+    | r8 -> addr_iv_b
+    | r9 -> addr_keys_b
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
@@ -185,11 +185,11 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> num_bytes
-    | R8 -> addr_iv_b
-    | R9 -> addr_keys_b
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> num_bytes
+    | r8 -> addr_iv_b
+    | r9 -> addr_keys_b
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
@@ -204,15 +204,15 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs Rbx == s1.regs Rbx);
-  assert(s0.regs Rbp == s1.regs Rbp);
-  assert(s0.regs Rdi == s1.regs Rdi);
-  assert(s0.regs Rsi == s1.regs Rsi);
-  assert(s0.regs Rsp == s1.regs Rsp);
-  assert(s0.regs R12 == s1.regs R12);
-  assert(s0.regs R13 == s1.regs R13);
-  assert(s0.regs R14 == s1.regs R14);
-  assert(s0.regs R15 == s1.regs R15);
+  assert(s0.regs rbx == s1.regs rbx);
+  assert(s0.regs rbp == s1.regs rbp);
+  assert(s0.regs rdi == s1.regs rdi);
+  assert(s0.regs rsi == s1.regs rsi);
+  assert(s0.regs rsp == s1.regs rsp);
+  assert(s0.regs r12 == s1.regs r12);
+  assert(s0.regs r13 == s1.regs r13);
+  assert(s0.regs r14 == s1.regs r14);
+  assert(s0.regs r15 == s1.regs r15);
   assert(s0.xmms 6 == s1.xmms 6);
   assert(s0.xmms 7 == s1.xmms 7);
   assert(s0.xmms 8 == s1.xmms 8);

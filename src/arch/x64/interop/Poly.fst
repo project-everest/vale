@@ -72,9 +72,9 @@ let ghost_poly ctx inp len h0 =
   let addr_ctx = addrs ctx in
   let addr_inp = addrs inp in
   let regs = fun r -> begin match r with
-    | Rdi -> addr_ctx
-    | Rsi -> addr_inp
-    | Rdx -> len
+    | rdi -> addr_ctx
+    | rsi -> addr_inp
+    | rdx -> len
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let taint_t b = if StrongExcludedMiddle.strong_excluded_middle (b == ctx) then(fun (i:nat) -> if i < B.length ctx then Public else Public) else
@@ -87,12 +87,12 @@ let ghost_poly ctx inp len h0 =
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs Rbx == s1.regs Rbx);
-  assert(s0.regs Rbp == s1.regs Rbp);
-  assert(s0.regs R12 == s1.regs R12);
-  assert(s0.regs R13 == s1.regs R13);
-  assert(s0.regs R14 == s1.regs R14);
-  assert(s0.regs R15 == s1.regs R15);
+  assert(s0.regs rbx == s1.regs rbx);
+  assert(s0.regs rbp == s1.regs rbp);
+  assert(s0.regs r12 == s1.regs r12);
+  assert(s0.regs r13 == s1.regs r13);
+  assert(s0.regs r14 == s1.regs r14);
+  assert(s0.regs r15 == s1.regs r15);
   // Ensures that the output taint is correct
   assert (valid_taint_buf64 ctx s1.memTaint Public);
   assert (valid_taint_buf64 inp s1.memTaint Public);

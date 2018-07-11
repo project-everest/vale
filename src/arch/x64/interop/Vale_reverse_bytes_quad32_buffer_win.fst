@@ -17,17 +17,17 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
   ((va_require_total va_b0 (va_code_reverse_bytes_quad32_buffer_win ()) va_s0) /\
     (va_get_ok va_s0) /\ (locs_disjoint [(loc_buffer stack_b); (loc_buffer b)]) /\ (buffer_readable
     (va_get_mem va_s0) stack_b) /\ (buffer_readable (va_get_mem va_s0) b) /\ (buffer_length
-    stack_b) >= 2 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0) /\
-    (va_get_reg Rcx va_s0) == (buffer_addr b (va_get_mem va_s0)) /\ (buffer_length b) == 1)
+    stack_b) >= 2 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg rsp va_s0) stack_b 0) /\
+    (va_get_reg rcx va_s0) == (buffer_addr b (va_get_mem va_s0)) /\ (buffer_length b) == 1)
 
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (stack_b:buffer64)
 (b:buffer128)  =
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (va_get_reg Rbx va_sM) == (va_get_reg Rbx va_s0) /\ (va_get_reg Rbp va_sM) == (va_get_reg
-    Rbp va_s0) /\ (va_get_reg Rdi va_sM) == (va_get_reg Rdi va_s0) /\ (va_get_reg Rsi va_sM) ==
-    (va_get_reg Rsi va_s0) /\ (va_get_reg Rsp va_sM) == (va_get_reg Rsp va_s0) /\ (va_get_reg R12
-    va_sM) == (va_get_reg R12 va_s0) /\ (va_get_reg R13 va_sM) == (va_get_reg R13 va_s0) /\
-    (va_get_reg R14 va_sM) == (va_get_reg R14 va_s0) /\ (va_get_reg R15 va_sM) == (va_get_reg R15
+    /\ (va_get_reg rbx va_sM) == (va_get_reg rbx va_s0) /\ (va_get_reg rbp va_sM) == (va_get_reg
+    rbp va_s0) /\ (va_get_reg rdi va_sM) == (va_get_reg rdi va_s0) /\ (va_get_reg rsi va_sM) ==
+    (va_get_reg rsi va_s0) /\ (va_get_reg rsp va_sM) == (va_get_reg rsp va_s0) /\ (va_get_reg r12
+    va_sM) == (va_get_reg r12 va_s0) /\ (va_get_reg r13 va_sM) == (va_get_reg r13 va_s0) /\
+    (va_get_reg r14 va_sM) == (va_get_reg r14 va_s0) /\ (va_get_reg r15 va_sM) == (va_get_reg r15
     va_s0) /\ (va_get_xmm 6 va_sM) == (va_get_xmm 6 va_s0) /\ (va_get_xmm 7 va_sM) == (va_get_xmm 7
     va_s0) /\ (va_get_xmm 8 va_sM) == (va_get_xmm 8 va_s0) /\ (va_get_xmm 9 va_sM) == (va_get_xmm 9
     va_s0) /\ (va_get_xmm 10 va_sM) == (va_get_xmm 10 va_s0) /\ (va_get_xmm 11 va_sM) ==
@@ -40,11 +40,11 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM
     (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM
     (va_update_xmm 4 va_sM (va_update_xmm 3 va_sM (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM
-    (va_update_xmm 0 va_sM (va_update_reg R15 va_sM (va_update_reg R14 va_sM (va_update_reg R13
-    va_sM (va_update_reg R12 va_sM (va_update_reg R11 va_sM (va_update_reg R10 va_sM (va_update_reg
-    R9 va_sM (va_update_reg R8 va_sM (va_update_reg Rsp va_sM (va_update_reg Rbp va_sM
-    (va_update_reg Rdi va_sM (va_update_reg Rsi va_sM (va_update_reg Rdx va_sM (va_update_reg Rcx
-    va_sM (va_update_reg Rbx va_sM (va_update_reg Rax va_sM (va_update_ok va_sM
+    (va_update_xmm 0 va_sM (va_update_reg r15 va_sM (va_update_reg r14 va_sM (va_update_reg r13
+    va_sM (va_update_reg r12 va_sM (va_update_reg r11 va_sM (va_update_reg r10 va_sM (va_update_reg
+    r9 va_sM (va_update_reg r8 va_sM (va_update_reg rsp va_sM (va_update_reg rbp va_sM
+    (va_update_reg rdi va_sM (va_update_reg rsi va_sM (va_update_reg rdx va_sM (va_update_reg rcx
+    va_sM (va_update_reg rbx va_sM (va_update_reg rax va_sM (va_update_ok va_sM
     va_s0)))))))))))))))))))))))))))))))))))))
 
 val va_lemma_reverse_bytes_quad32_buffer_win(va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)

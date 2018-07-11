@@ -117,24 +117,7 @@ let disjoint args =
   let args = List.Tot.Base.filter is_buffer args in
   "bufs_disjoint " ^ namelist_of_args args
 
-let reg_to_low = function
-  | "rax" -> "Rax"
-  | "rbx" -> "Rbx"
-  | "rcx" -> "Rcx"
-  | "rdx" -> "Rdx"
-  | "rsi" -> "Rsi"
-  | "rdi" -> "Rdi"
-  | "rbp" -> "Rbp"
-  | "rsp" -> "Rsp"
-  | "r8" -> "R8"
-  | "r9" -> "R9"
-  | "r10" -> "R10"
-  | "r11" -> "R11"
-  | "r12" -> "R12"
-  | "r13" -> "R13"
-  | "r14" -> "R14"
-  | "r15" -> "R15"
-  |  _ -> "error"
+let reg_to_low x = x
 
 let print_low_calling_stack (args:list arg) (stkstart) =
   let rec aux (i:nat) (args:list arg) : Tot string (decreases %[args]) = match args with
@@ -225,7 +208,7 @@ let create_state os target args stack slots stkstart =
   generate_low_addrs args ^
   (if stack then "  let addr_stack:nat64 = addrs stack_b + " ^ (string_of_int (slots `op_Multiply` 8)) ^ " in\n" else "") ^
   "  let regs = fun r -> begin match r with\n" ^
-  (if stack then "    | Rsp -> addr_stack\n" else "") ^
+  (if stack then "    | rsp -> addr_stack\n" else "") ^
   (print_low_calling_args os target args stkstart) ^
   "  let xmms = init_xmms in\n" ^
   "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in\n" ^

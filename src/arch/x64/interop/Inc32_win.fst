@@ -44,8 +44,8 @@ B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [iv_b] /\
   let addr_iv_b = addrs iv_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_iv_b
+    | rsp -> addr_stack
+    | rcx -> addr_iv_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
@@ -82,8 +82,8 @@ let ghost_inc32_buffer_win iv_b stack_b h0 =
   let addr_iv_b = addrs iv_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_iv_b
+    | rsp -> addr_stack
+    | rcx -> addr_iv_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
@@ -94,15 +94,15 @@ let ghost_inc32_buffer_win iv_b stack_b h0 =
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs Rbx == s1.regs Rbx);
-  assert(s0.regs Rbp == s1.regs Rbp);
-  assert(s0.regs Rdi == s1.regs Rdi);
-  assert(s0.regs Rsi == s1.regs Rsi);
-  assert(s0.regs Rsp == s1.regs Rsp);
-  assert(s0.regs R12 == s1.regs R12);
-  assert(s0.regs R13 == s1.regs R13);
-  assert(s0.regs R14 == s1.regs R14);
-  assert(s0.regs R15 == s1.regs R15);
+  assert(s0.regs rbx == s1.regs rbx);
+  assert(s0.regs rbp == s1.regs rbp);
+  assert(s0.regs rdi == s1.regs rdi);
+  assert(s0.regs rsi == s1.regs rsi);
+  assert(s0.regs rsp == s1.regs rsp);
+  assert(s0.regs r12 == s1.regs r12);
+  assert(s0.regs r13 == s1.regs r13);
+  assert(s0.regs r14 == s1.regs r14);
+  assert(s0.regs r15 == s1.regs r15);
   assert(s0.xmms 6 == s1.xmms 6);
   assert(s0.xmms 7 == s1.xmms 7);
   assert(s0.xmms 8 == s1.xmms 8);

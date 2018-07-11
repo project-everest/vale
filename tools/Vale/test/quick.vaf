@@ -18,56 +18,56 @@ open X64.Vale.QuickCodes_i
 #verbatim
 [@"opaque_to_smt" va_qattr]
 let codes_bench : codes = [
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
 
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
 
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
 
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
-  va_code_Add64 (OReg Rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
+  va_code_Add64 (OReg rax) (OConst 1);
   ]
 
 [@"opaque_to_smt" va_qattr]
 let wpCodes_bench : quickCodes unit codes_bench =
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
 
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
 
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
 
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-  QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+  QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
 
   QEmpty ()
   )))))
@@ -80,27 +80,27 @@ let wpCodes_bench : quickCodes unit codes_bench =
 let lemma_bench1 (s0:state) : Ghost (state * fuel)
   (requires
     s0.ok /\
-    s0.regs Rax < 100
+    s0.regs rax < 100
   )
   (ensures fun (sN, f0) ->
     eval (Block codes_bench) s0 f0 sN /\
     sN.ok /\
-    sN.regs Rax == s0.regs Rax + 20 /\
-    va_state_eq sN (va_update_reg Rax sN (va_update_flags sN s0))
+    sN.regs rax == s0.regs rax + 20 /\
+    va_state_eq sN (va_update_reg rax sN (va_update_flags sN s0))
   )
   =
 (*
   let (sN, f0, ()) = wp_sound_norm codes_bench wpCodes_bench s0
     (fun s0 sN () ->
       sN.ok /\
-      sN.regs Rax == s0.regs Rax + 20 /\
-      va_state_match sN (va_update_reg Rax sN (va_update_flags sN s0))
+      sN.regs rax == s0.regs rax + 20 /\
+      va_state_match sN (va_update_reg rax sN (va_update_flags sN s0))
     )
     in
 *)
   let (sN, f0, ()) = wp_run_norm codes_bench wpCodes_bench s0
-    (fun (s0:state) (sN:state) -> va_update_reg Rax sN (va_update_flags sN s0))
-    (fun (sN:state) (sN':state) -> eval_reg Rax sN == eval_reg Rax sN' /\ sN.flags == sN'.flags)
+    (fun (s0:state) (sN:state) -> va_update_reg rax sN (va_update_flags sN s0))
+    (fun (sN:state) (sN':state) -> eval_reg rax sN == eval_reg rax sN' /\ sN.flags == sN'.flags)
     in
 //  let (sN, f0, ()) = wp_run_norm codes_bench wpCodes_bench s0 in
   (sN, f0)
@@ -229,6 +229,7 @@ procedure{:quick} AddRaxG(ghost g:int)
     Add64(rax, 1);
 }
 
+/*
 procedure Incr3(ghost g:int)
     modifies
         efl;
@@ -244,6 +245,7 @@ procedure Incr3(ghost g:int)
     AddRaxG(g + 1);
     Add64(rax, 1);
 }
+*/
 
 procedure{:quick} While(ghost g1:int) returns(ghost go:int)
     modifies

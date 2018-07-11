@@ -15,30 +15,10 @@ noeq type state = {
   memTaint: memtaint;
 }
 
-let reg_to_int (r:reg) : int =
-  match r with
-  | Rax -> 0
-  | Rbx -> 1
-  | Rcx -> 2
-  | Rdx -> 3
-  | Rsi -> 4
-  | Rdi -> 5
-  | Rbp -> 6
-  | Rsp -> 7
-  | R8 -> 8
-  | R9 -> 9
-  | R10 -> 10
-  | R11 -> 11
-  | R12 -> 12
-  | R13 -> 13
-  | R14 -> 14
-  | R15 -> 15
-
-
 [@va_qattr]
-unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
+unfold let eval_reg (r:reg) (s:state) : nat64 = Map16_i.sel s.regs r
 [@va_qattr]
-unfold let eval_xmm (x:xmm) (s:state) : Types_s.quad32 = s.xmms x
+unfold let eval_xmm (x:xmm) (s:state) : Types_s.quad32 = Map16_i.sel s.xmms x
 [@va_qattr]
 unfold let eval_mem (ptr:int) (s:state) : GTot nat64 = load_mem64 ptr s.mem
 
@@ -63,11 +43,11 @@ let eval_operand (o:operand) (s:state) : GTot nat64 =
 
 [@va_qattr]
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = fun r' -> if r = r' then v else s.regs r' }
+  { s with regs = Map16_i.upd s.regs r v }
 
 [@va_qattr]
 let update_xmm (x:xmm) (v:Types_s.quad32) (s:state) : state =
-  { s with xmms = fun x' -> if x = x' then v else s.xmms x' }
+  { s with xmms = Map16_i.upd s.xmms x v }
 
 [@va_qattr]
 let update_mem (ptr:int) (v:nat64) (s:state) : GTot state = { s with mem = store_mem64 ptr v s.mem }

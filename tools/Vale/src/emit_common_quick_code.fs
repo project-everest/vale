@@ -176,8 +176,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     funs := (loc, dFun)::!funs;
     (*
       let (va_s2, va_fc2, ()) = wp_run_code_norm (va_code_1_Incr3 ()) (va_quick_1_Incr3 ()) va_s0
-        (fun (s0:state) (sN:state) -> va_update_reg Rax sN (va_update_flags sN s0))
-        (fun (sN:state) (sN':state) -> va_get_reg Rax sN == va_get_reg Rax sN' /\ va_get_flags sN == va_get_flags sN')
+        (fun (s0:state) (sN:state) -> va_update_reg rax sN (va_update_flags sN s0))
+        (fun (sN:state) (sN':state) -> va_get_reg rax sN == va_get_reg rax sN' /\ va_get_flags sN == va_get_flags sN')
     *)
     let eCode = EApply (cid, fArgs) in
     let eQCode = EApply (id, pArgs) in
@@ -209,9 +209,9 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   [@"opaque_to_smt"]
   let va_qcode_Add3 () : quickCode unit (va_code_Add3 ()) = qblock (
     fun (va_s:state) -> let va_old_s = va_s in
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+    QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+    QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
+    QSeq (va_quick_Add64 (OReg rax) (OConst 1)) (
     QEmpty ()
     )))
   )
@@ -245,6 +245,13 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
 let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt list =
   let makeArg (x, t, storage, io, attrs) = EVar x
   let args = List.map makeArg p.pargs in
+  // let va_old = expand_state va_old in
+  let expand_arg (x, t, _, _, a) =
+    if attrs_get_bool (Reserved "expand_arg") false a then
+      [SAssign ([(x, None)], EApply (Id "expand_state", [EVar x]))]
+    else []
+    in
+  let expansions = List.collect expand_arg p.pargs in
   // let (sM, fM, g) = wpSound_X code (qCodes_X ARGS) s0 (fun s0 sM gs -> let (g1, ..., gn) = g in ENS) in
   // let (g1, ..., gn) = g in
   let s0 = Reserved "s0" in
@@ -266,4 +273,4 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
     | [] -> []
     | _ -> [SAssign (gAssigns, EVar g)]
     in
-  [sWpSound] @ sAssignGs
+  expansions @ [sWpSound] @ sAssignGs

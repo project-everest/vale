@@ -20,8 +20,8 @@ let va_code_aes = fun () -> va_code_KeyExpansionStdcall false
 let va_pre (va_b0:va_code) (va_s0:va_state)
 (input_key:buffer128) (output_key:buffer128)  =   
   (va_require_total va_b0 (va_code_KeyExpansionStdcall false) va_s0) /\ (va_get_ok va_s0)
-    /\ (let key_ptr = ((va_get_reg Rdi va_s0)) in let
-    key_expansion_ptr = ((va_get_reg Rsi va_s0)) in let key
+    /\ (let key_ptr = ((va_get_reg rdi va_s0)) in let
+    key_expansion_ptr = ((va_get_reg rsi va_s0)) in let key
     = (quad32_to_seq (buffer128_read input_key 0 (va_get_mem va_s0))) in (buffers_disjoint128
     input_key output_key) /\ (validSrcAddrs128 (va_get_mem va_s0) key_ptr input_key
     1) /\ (validDstAddrs128 (va_get_mem va_s0) key_expansion_ptr output_key 11))
@@ -29,19 +29,19 @@ let va_pre (va_b0:va_code) (va_s0:va_state)
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
   (input_key:buffer128) (output_key:buffer128)  =  
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (let key_ptr = ((va_get_reg Rdi va_s0)) in let
-    key_expansion_ptr = ((va_get_reg Rsi va_s0)) in let key
+    /\ (let key_ptr = ((va_get_reg rdi va_s0)) in let
+    key_expansion_ptr = ((va_get_reg rsi va_s0)) in let key
     = (quad32_to_seq (buffer128_read input_key 0 (va_get_mem va_s0))) in (buffers_disjoint128
     input_key output_key) /\ (validSrcAddrs128 (va_get_mem va_sM) key_ptr input_key
     1) /\ (validDstAddrs128 (va_get_mem va_sM) key_expansion_ptr output_key 11)) /\
-    (let key_ptr = ((va_get_reg Rdi va_s0)) in let
-    key_expansion_ptr = ((va_get_reg Rsi va_s0)) in let key
+    (let key_ptr = ((va_get_reg rdi va_s0)) in let
+    key_expansion_ptr = ((va_get_reg rsi va_s0)) in let key
     = (quad32_to_seq (buffer128_read input_key 0 (va_get_mem va_s0))) in (modifies_buffer128
     output_key (va_get_mem va_s0) (va_get_mem va_sM)) /\ (forall j .
     {:pattern(buffer128_read output_key j (va_get_mem va_sM))}(0 <= j && j <= 10) ==>
     (buffer128_read output_key j (va_get_mem va_sM)) == (index (key_to_round_keys_LE
     AES_128 key) j))) /\ (va_state_eq va_sM (va_update_flags va_sM (va_update_xmm 3 va_sM
-    (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM (va_update_mem va_sM (va_update_reg Rdx va_sM
+    (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM (va_update_mem va_sM (va_update_reg rdx va_sM
     (va_update_ok va_sM va_s0)))))))))
 
 val va_lemma_aes(va_b0:va_code) (va_s0:va_state)

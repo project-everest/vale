@@ -112,22 +112,22 @@ let registerAsExpected (r:reg) (tsAnalysis:taintState) (tsExpected:taintState) =
   (tsExpected.regTaint r = Public && tsAnalysis.regTaint r = Public) || (tsExpected.regTaint r = Secret)
 
 let publicRegisterValuesAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
-  registerAsExpected Rax tsAnalysis tsExpected &&
-  registerAsExpected Rbx tsAnalysis tsExpected &&
-  registerAsExpected Rcx tsAnalysis tsExpected &&
-  registerAsExpected Rdx tsAnalysis tsExpected &&
-  registerAsExpected Rsi tsAnalysis tsExpected &&
-  registerAsExpected Rdi tsAnalysis tsExpected &&
-  registerAsExpected Rbp tsAnalysis tsExpected &&
-  registerAsExpected Rsp tsAnalysis tsExpected &&
-  registerAsExpected R8 tsAnalysis tsExpected &&
-  registerAsExpected R9 tsAnalysis tsExpected &&
-  registerAsExpected R10 tsAnalysis tsExpected &&
-  registerAsExpected R11 tsAnalysis tsExpected &&
-  registerAsExpected R12 tsAnalysis tsExpected &&
-  registerAsExpected R13 tsAnalysis tsExpected &&
-  registerAsExpected R14 tsAnalysis tsExpected &&
-  registerAsExpected R15 tsAnalysis tsExpected
+  registerAsExpected rax tsAnalysis tsExpected &&
+  registerAsExpected rbx tsAnalysis tsExpected &&
+  registerAsExpected rcx tsAnalysis tsExpected &&
+  registerAsExpected rdx tsAnalysis tsExpected &&
+  registerAsExpected rsi tsAnalysis tsExpected &&
+  registerAsExpected rdi tsAnalysis tsExpected &&
+  registerAsExpected rbp tsAnalysis tsExpected &&
+  registerAsExpected rsp tsAnalysis tsExpected &&
+  registerAsExpected r8 tsAnalysis tsExpected &&
+  registerAsExpected r9 tsAnalysis tsExpected &&
+  registerAsExpected r10 tsAnalysis tsExpected &&
+  registerAsExpected r11 tsAnalysis tsExpected &&
+  registerAsExpected r12 tsAnalysis tsExpected &&
+  registerAsExpected r13 tsAnalysis tsExpected &&
+  registerAsExpected r14 tsAnalysis tsExpected &&
+  registerAsExpected r15 tsAnalysis tsExpected
 
 let publicTaintsAreAsExpected (tsAnalysis:taintState) (tsExpected:taintState) =
     publicFlagValuesAreAsExpected tsAnalysis tsExpected

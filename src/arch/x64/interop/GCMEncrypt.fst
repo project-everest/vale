@@ -67,11 +67,11 @@ B.length stack_b == 216 /\ live h0 stack_b /\ locs_disjoint [stack_b;plain_b;aut
   let addr_tag_b = addrs tag_b in
   let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> plain_num_bytes
-    | R8 -> addr_auth_b
-    | R9 -> auth_num_bytes
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> plain_num_bytes
+    | r8 -> addr_auth_b
+    | r9 -> auth_num_bytes
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
   let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
@@ -97,11 +97,11 @@ let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
   let addr_tag_b = addrs tag_b in
   let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> plain_num_bytes
-    | R8 -> addr_auth_b
-    | R9 -> auth_num_bytes
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> plain_num_bytes
+    | r8 -> addr_auth_b
+    | r9 -> auth_num_bytes
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
   let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
@@ -139,11 +139,11 @@ let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
   let addr_tag_b = addrs tag_b in
   let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> plain_num_bytes
-    | R8 -> addr_auth_b
-    | R9 -> auth_num_bytes
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> plain_num_bytes
+    | r8 -> addr_auth_b
+    | r9 -> auth_num_bytes
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
   let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
@@ -170,11 +170,11 @@ let buffers = stack_b::plain_b::auth_b::iv_b::keys_b::cipher_b::tag_b::[] in
   let addr_tag_b = addrs tag_b in
   let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> plain_num_bytes
-    | R8 -> addr_auth_b
-    | R9 -> auth_num_bytes
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> plain_num_bytes
+    | r8 -> addr_auth_b
+    | r9 -> auth_num_bytes
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
   let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
@@ -218,11 +218,11 @@ let ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys
   let addr_tag_b = addrs tag_b in
   let addr_stack:nat64 = addrs stack_b + 144 in
   let regs = fun r -> begin match r with
-    | Rsp -> addr_stack
-    | Rcx -> addr_plain_b
-    | Rdx -> plain_num_bytes
-    | R8 -> addr_auth_b
-    | R9 -> auth_num_bytes
+    | rsp -> addr_stack
+    | rcx -> addr_plain_b
+    | rdx -> plain_num_bytes
+    | r8 -> addr_auth_b
+    | r9 -> auth_num_bytes
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 23 (addrs iv_b) mem in
   let mem = buffer_write #(TBase TUInt64) stack_b 24 (addrs keys_b) mem in
@@ -242,15 +242,15 @@ let ghost_gcmencrypt plain_b plain_num_bytes auth_b auth_num_bytes iv_b key keys
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs Rbx == s1.regs Rbx);
-  assert(s0.regs Rbp == s1.regs Rbp);
-  assert(s0.regs Rdi == s1.regs Rdi);
-  assert(s0.regs Rsi == s1.regs Rsi);
-  assert(s0.regs Rsp == s1.regs Rsp);
-  assert(s0.regs R12 == s1.regs R12);
-  assert(s0.regs R13 == s1.regs R13);
-  assert(s0.regs R14 == s1.regs R14);
-  assert(s0.regs R15 == s1.regs R15);
+  assert(s0.regs rbx == s1.regs rbx);
+  assert(s0.regs rbp == s1.regs rbp);
+  assert(s0.regs rdi == s1.regs rdi);
+  assert(s0.regs rsi == s1.regs rsi);
+  assert(s0.regs rsp == s1.regs rsp);
+  assert(s0.regs r12 == s1.regs r12);
+  assert(s0.regs r13 == s1.regs r13);
+  assert(s0.regs r14 == s1.regs r14);
+  assert(s0.regs r15 == s1.regs r15);
   assert(s0.xmms 6 == s1.xmms 6);
   assert(s0.xmms 7 == s1.xmms 7);
   assert(s0.xmms 8 == s1.xmms 8);

@@ -42,11 +42,11 @@ let vale_pre (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm) (iv_BE:
   (tag_b:buffer128) (stack_b:buffer64) (key:(aes_key_LE alg)) (round_keys:(seq quad32))
   (keys_b:buffer128) =
 ((va_require_total va_b0 (va_code_gcm_encrypt2_stdcall win alg) va_s0) /\ (va_get_ok
-    va_s0) /\ (let plain_ptr = (if win then (va_get_reg Rcx va_s0) else (va_get_reg Rdi va_s0)) in
-    let auth_ptr = (if win then (va_get_reg R8 va_s0) else (va_get_reg Rdx va_s0)) in let iv_ptr =
-    (if win then (buffer64_read stack_b (18 + 4 + 1 + 0) (va_get_mem va_s0)) else (va_get_reg R8
+    va_s0) /\ (let plain_ptr = (if win then (va_get_reg rcx va_s0) else (va_get_reg rdi va_s0)) in
+    let auth_ptr = (if win then (va_get_reg r8 va_s0) else (va_get_reg rdx va_s0)) in let iv_ptr =
+    (if win then (buffer64_read stack_b (18 + 4 + 1 + 0) (va_get_mem va_s0)) else (va_get_reg r8
     va_s0)) in let expanded_key_ptr = (if win then (buffer64_read stack_b (18 + 4 + 1 + 1)
-    (va_get_mem va_s0)) else (va_get_reg R9 va_s0)) in let out_ptr = (if win then (buffer64_read
+    (va_get_mem va_s0)) else (va_get_reg r9 va_s0)) in let out_ptr = (if win then (buffer64_read
     stack_b (18 + 4 + 1 + 2) (va_get_mem va_s0)) else (buffer64_read stack_b (8 + 0) (va_get_mem
     va_s0))) in let tag_ptr = (if win then (buffer64_read stack_b (18 + 4 + 1 + 3) (va_get_mem
     va_s0)) else (buffer64_read stack_b (8 + 1) (va_get_mem va_s0))) in (buffers_disjoint128
@@ -55,9 +55,9 @@ let vale_pre (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm) (iv_BE:
     plain_b)]) /\ (locs_disjoint [(loc_buffer stack_b); (loc_buffer auth_b)]) /\ (locs_disjoint
     [(loc_buffer stack_b); (loc_buffer iv_b)]) /\ (locs_disjoint [(loc_buffer stack_b); (loc_buffer
     out_b)]) /\ (locs_disjoint [(loc_buffer stack_b); (loc_buffer tag_b)]) /\ (locs_disjoint
-    [(loc_buffer stack_b); (loc_buffer keys_b)]) /\ plain_num_bytes == (if win then (va_get_reg Rdx
-    va_s0) else (va_get_reg Rsi va_s0)) /\ auth_num_bytes == (if win then (va_get_reg R9 va_s0)
-    else (va_get_reg Rcx va_s0)) 
+    [(loc_buffer stack_b); (loc_buffer keys_b)]) /\ plain_num_bytes == (if win then (va_get_reg rdx
+    va_s0) else (va_get_reg rsi va_s0)) /\ auth_num_bytes == (if win then (va_get_reg r9 va_s0)
+    else (va_get_reg rcx va_s0)) 
     /\ (validSrcAddrs128 (va_get_mem va_s0) plain_ptr plain_b
     (bytes_to_quad_size plain_num_bytes)) /\ (validSrcAddrs128 (va_get_mem va_s0) auth_ptr auth_b
     (bytes_to_quad_size auth_num_bytes)) /\ (validSrcAddrs128 (va_get_mem va_s0) iv_ptr iv_b 1) 
@@ -66,7 +66,7 @@ let vale_pre (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm) (iv_BE:
     (validDstAddrs128 (va_get_mem va_s0) tag_ptr tag_b 1)
     /\ 
     (buffer_length stack_b) >= (if win then  (4 + 1 + 4 + 18) else (2 + 8)) /\ 
-    (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b (if win then 18 else 8)) 
+    (valid_stack_slots (va_get_mem va_s0) (va_get_reg rsp va_s0) stack_b (if win then 18 else 8)) 
     /\ plain_ptr + 16 `op_Multiply` (bytes_to_quad_size
     plain_num_bytes) < pow2_64 /\ auth_ptr + 16 `op_Multiply` (bytes_to_quad_size auth_num_bytes) <
     pow2_64 /\ out_ptr + 16 `op_Multiply` (bytes_to_quad_size plain_num_bytes) < pow2_64 /\
@@ -95,11 +95,11 @@ let vale_post (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm) (iv_BE
   (tag_b:buffer128) (stack_b:buffer64) (key:(aes_key_LE alg))
   (keys_b:buffer128) (va_sM:va_state) (va_fM:va_fuel) =
 ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (let plain_ptr = (if win then (va_get_reg Rcx va_s0) else (va_get_reg Rdi va_s0)) in let
-    auth_ptr = (if win then (va_get_reg R8 va_s0) else (va_get_reg Rdx va_s0)) in let iv_ptr = (if
-    win then (buffer64_read stack_b (18 + 4 + 1 + 0) (va_get_mem va_s0)) else (va_get_reg R8
+    /\ (let plain_ptr = (if win then (va_get_reg rcx va_s0) else (va_get_reg rdi va_s0)) in let
+    auth_ptr = (if win then (va_get_reg r8 va_s0) else (va_get_reg rdx va_s0)) in let iv_ptr = (if
+    win then (buffer64_read stack_b (18 + 4 + 1 + 0) (va_get_mem va_s0)) else (va_get_reg r8
     va_s0)) in let expanded_key_ptr = (if win then (buffer64_read stack_b (18 + 4 + 1 + 1)
-    (va_get_mem va_s0)) else (va_get_reg R9 va_s0)) in let out_ptr = (if win then (buffer64_read
+    (va_get_mem va_s0)) else (va_get_reg r9 va_s0)) in let out_ptr = (if win then (buffer64_read
     stack_b (18 + 4 + 1 + 2) (va_get_mem va_s0)) else (buffer64_read stack_b (8 + 0) (va_get_mem
     va_s0))) in let tag_ptr = (if win then (buffer64_read stack_b (18 + 4 + 1 + 3) (va_get_mem
     va_s0)) else (buffer64_read stack_b (8 + 1) (va_get_mem va_s0))) in (modifies_mem (loc_union
@@ -114,32 +114,32 @@ let vale_post (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm) (iv_BE
     pow2_32)) (cipher == (fst (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key)
     (be_quad32_to_bytes iv_BE) plain auth)))) ((le_quad32_to_bytes (buffer128_read tag_b 0
     (va_get_mem va_sM))) == (snd (gcm_encrypt_LE alg (seq_nat32_to_seq_nat8_LE key)
-    (be_quad32_to_bytes iv_BE) plain auth)))) /\ (va_get_reg Rsp va_sM) == (va_get_reg Rsp va_s0)
-    /\ (win ==> (va_get_reg Rbx va_sM) == (va_get_reg Rbx va_s0)) /\ (win ==> (va_get_reg Rbp
-    va_sM) == (va_get_reg Rbp va_s0)) /\ (win ==> (va_get_reg Rdi va_sM) == (va_get_reg Rdi va_s0))
-    /\ (win ==> (va_get_reg Rsi va_sM) == (va_get_reg Rsi va_s0)) /\ (win ==> (va_get_reg R12
-    va_sM) == (va_get_reg R12 va_s0)) /\ (win ==> (va_get_reg R13 va_sM) == (va_get_reg R13 va_s0))
-    /\ (win ==> (va_get_reg R14 va_sM) == (va_get_reg R14 va_s0)) /\ (win ==> (va_get_reg R15
-    va_sM) == (va_get_reg R15 va_s0)) /\ (win ==> (va_get_xmm 6 va_sM) == (va_get_xmm 6 va_s0)) /\
+    (be_quad32_to_bytes iv_BE) plain auth)))) /\ (va_get_reg rsp va_sM) == (va_get_reg rsp va_s0)
+    /\ (win ==> (va_get_reg rbx va_sM) == (va_get_reg rbx va_s0)) /\ (win ==> (va_get_reg rbp
+    va_sM) == (va_get_reg rbp va_s0)) /\ (win ==> (va_get_reg rdi va_sM) == (va_get_reg rdi va_s0))
+    /\ (win ==> (va_get_reg rsi va_sM) == (va_get_reg rsi va_s0)) /\ (win ==> (va_get_reg r12
+    va_sM) == (va_get_reg r12 va_s0)) /\ (win ==> (va_get_reg r13 va_sM) == (va_get_reg r13 va_s0))
+    /\ (win ==> (va_get_reg r14 va_sM) == (va_get_reg r14 va_s0)) /\ (win ==> (va_get_reg r15
+    va_sM) == (va_get_reg r15 va_s0)) /\ (win ==> (va_get_xmm 6 va_sM) == (va_get_xmm 6 va_s0)) /\
     (win ==> (va_get_xmm 7 va_sM) == (va_get_xmm 7 va_s0)) /\ (win ==> (va_get_xmm 8 va_sM) ==
     (va_get_xmm 8 va_s0)) /\ (win ==> (va_get_xmm 9 va_sM) == (va_get_xmm 9 va_s0)) /\ (win ==>
     (va_get_xmm 10 va_sM) == (va_get_xmm 10 va_s0)) /\ (win ==> (va_get_xmm 11 va_sM) ==
     (va_get_xmm 11 va_s0)) /\ (win ==> (va_get_xmm 12 va_sM) == (va_get_xmm 12 va_s0)) /\ (win ==>
     (va_get_xmm 13 va_sM) == (va_get_xmm 13 va_s0)) /\ (win ==> (va_get_xmm 14 va_sM) ==
     (va_get_xmm 14 va_s0)) /\ (win ==> (va_get_xmm 15 va_sM) == (va_get_xmm 15 va_s0)) /\ (~win ==>
-    (va_get_reg Rbx va_sM) == (va_get_reg Rbx va_s0)) /\ (~win ==> (va_get_reg Rbp va_sM) ==
-    (va_get_reg Rbp va_s0)) /\ (~win ==> (va_get_reg R12 va_sM) == (va_get_reg R12 va_s0)) /\ (~win
-    ==> (va_get_reg R13 va_sM) == (va_get_reg R13 va_s0)) /\ (~win ==> (va_get_reg R14 va_sM) ==
-    (va_get_reg R14 va_s0)) /\ (~win ==> (va_get_reg R15 va_sM) == (va_get_reg R15 va_s0)))) /\
-    (va_state_eq va_sM (va_update_reg Rsp va_sM (va_update_flags va_sM (va_update_mem va_sM
-    (va_update_reg Rsi va_sM (va_update_reg Rdi va_sM (va_update_reg Rbp va_sM (va_update_xmm 15
+    (va_get_reg rbx va_sM) == (va_get_reg rbx va_s0)) /\ (~win ==> (va_get_reg rbp va_sM) ==
+    (va_get_reg rbp va_s0)) /\ (~win ==> (va_get_reg r12 va_sM) == (va_get_reg r12 va_s0)) /\ (~win
+    ==> (va_get_reg r13 va_sM) == (va_get_reg r13 va_s0)) /\ (~win ==> (va_get_reg r14 va_sM) ==
+    (va_get_reg r14 va_s0)) /\ (~win ==> (va_get_reg r15 va_sM) == (va_get_reg r15 va_s0)))) /\
+    (va_state_eq va_sM (va_update_reg rsp va_sM (va_update_flags va_sM (va_update_mem va_sM
+    (va_update_reg rsi va_sM (va_update_reg rdi va_sM (va_update_reg rbp va_sM (va_update_xmm 15
     va_sM (va_update_xmm 14 va_sM (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM (va_update_xmm 11
     va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM (va_update_xmm 7
     va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM (va_update_xmm 3
-    va_sM (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM (va_update_xmm 0 va_sM (va_update_reg R15
-    va_sM (va_update_reg R14 va_sM (va_update_reg R13 va_sM (va_update_reg R12 va_sM (va_update_reg
-    R11 va_sM (va_update_reg R10 va_sM (va_update_reg R9 va_sM (va_update_reg R8 va_sM
-    (va_update_reg Rdx va_sM (va_update_reg Rcx va_sM (va_update_reg Rbx va_sM (va_update_reg Rax
+    va_sM (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM (va_update_xmm 0 va_sM (va_update_reg r15
+    va_sM (va_update_reg r14 va_sM (va_update_reg r13 va_sM (va_update_reg r12 va_sM (va_update_reg
+    r11 va_sM (va_update_reg r10 va_sM (va_update_reg r9 va_sM (va_update_reg r8 va_sM
+    (va_update_reg rdx va_sM (va_update_reg rcx va_sM (va_update_reg rbx va_sM (va_update_reg rax
     va_sM (va_update_ok va_sM va_s0)))))))))))))))))))))))))))))))))))))
 
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)

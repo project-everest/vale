@@ -310,7 +310,7 @@ fstar_default_args_nosmtencoding = ('--max_fuel 1 --max_ifuel 1' \
   # Don't remove unless you're sure you've used the axiom profiler to make sure you have no matching loops
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
   + ' --hint_info' \
-  + ('' if is_single_vaf else ' --use_hints') \
+  # + ('' if is_single_vaf else ' --use_hints') \
   + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
   + (' --use_extracted_interfaces true')
   )
@@ -609,7 +609,9 @@ def verify_fstar(env, targetfile, sourcefile):
 
   if gen_hints:
     temptargetfiles.append(hintsfile)
-  temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS 1>$TARGET 2>&1")
+  base_name = os.path.splitext(str(sourcefile))[0]
+  module_name = os.path.split(base_name)[1]
+  temptargets = env.Command(temptargetfiles, sourcefile, "$FSTAR $SOURCE $VERIFIER_FLAGS $FSTAR_Z3_PATH $FSTAR_NO_VERIFY $FSTAR_INCLUDES $FSTAR_USER_ARGS --debug " + module_name + " --debug_level print_normalized_terms 1>$TARGET 2>&1")
   temptarget = temptargets[0]
   outs.append(env.CopyAs(source = temptarget, target = targetfile))
   if gen_hints:

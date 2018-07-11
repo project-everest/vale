@@ -42,9 +42,9 @@ let implies_pre (h0:HS.mem) (src1:b8) (src2:b8) (dst:b8) : Lemma
   let addr_src2 = addrs src2 in
   let addr_dst = addrs dst in
   let regs = fun r -> begin match r with
-    | Rdi -> addr_src1
-    | Rsi -> addr_src2
-    | Rdx -> addr_dst
+    | rdi -> addr_src1
+    | rsi -> addr_src2
+    | rdx -> addr_dst
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
@@ -84,9 +84,9 @@ let ghost_quad32_xor_buffer src1 src2 dst h0 =
   let addr_src2 = addrs src2 in
   let addr_dst = addrs dst in
   let regs = fun r -> begin match r with
-    | Rdi -> addr_src1
-    | Rsi -> addr_src2
-    | Rdx -> addr_dst
+    | rdi -> addr_src1
+    | rsi -> addr_src2
+    | rdx -> addr_dst
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
@@ -98,12 +98,12 @@ let ghost_quad32_xor_buffer src1 src2 dst h0 =
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs Rbx == s1.regs Rbx);
-  assert(s0.regs Rbp == s1.regs Rbp);
-  assert(s0.regs R12 == s1.regs R12);
-  assert(s0.regs R13 == s1.regs R13);
-  assert(s0.regs R14 == s1.regs R14);
-  assert(s0.regs R15 == s1.regs R15);
+  assert(s0.regs rbx == s1.regs rbx);
+  assert(s0.regs rbp == s1.regs rbp);
+  assert(s0.regs r12 == s1.regs r12);
+  assert(s0.regs r13 == s1.regs r13);
+  assert(s0.regs r14 == s1.regs r14);
+  assert(s0.regs r15 == s1.regs r15);
   // Ensures that va_code_quad32_xor_buffer is actually Vale code, and that s1 is the result of executing this code
   assert (va_ensure_total (va_code_quad32_xor_buffer ()) s0 s1 f1);
   implies_post s0 s1 f1 src1 src2 dst ;

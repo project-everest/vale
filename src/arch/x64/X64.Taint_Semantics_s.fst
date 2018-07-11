@@ -34,8 +34,8 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | S.Adcx64 dst src -> [dst], [dst; src]
   | S.Adox64 dst src -> [dst], [dst; src]
   | S.Sub64 dst src -> [dst], [dst; src]
-  | S.Mul64 src -> [OReg Rax; OReg Rdx], [OReg Rax; src]
-  | S.Mulx64 dst_hi dst_lo src -> [dst_hi; dst_lo], [OReg Rdx; src]
+  | S.Mul64 src -> [OReg rax; OReg rdx], [OReg rax; src]
+  | S.Mulx64 dst_hi dst_lo src -> [dst_hi; dst_lo], [OReg rdx; src]
   | S.IMul64 dst src -> [dst], [dst; src]
   | S.Xor64 dst src -> [dst], [dst; src]
   | S.And64 dst src -> [dst], [dst; src]
@@ -100,7 +100,7 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : GTot traceState =
     if S.Mulx64? i then
     begin
     let S.Mulx64 dst_hi dst_lo src = i in
-    let lo = FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
+    let lo = FStar.UInt.mul_mod #64 (eval_reg rdx s) (eval_operand src s) in
     let s' = update_operand_preserve_flags' dst_lo lo s in
     let memTaint = update_taint ts.memTaint dst_lo t s in
     update_taint memTaint dst_hi t s'

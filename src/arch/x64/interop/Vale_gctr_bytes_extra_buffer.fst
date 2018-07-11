@@ -26,10 +26,10 @@ let va_pre (va_b0:va_code) (va_s0:va_state)
     va_s0) /\ (locs_disjoint [(loc_buffer plain_b); (loc_buffer iv_b); (loc_buffer keys_b);
     (loc_buffer cipher_b)]) /\ (buffer_readable (va_get_mem va_s0) plain_b) /\ (buffer_readable
     (va_get_mem va_s0) iv_b) /\ (buffer_readable (va_get_mem va_s0) keys_b) /\ (buffer_readable
-    (va_get_mem va_s0) cipher_b) /\ (va_get_reg Rdi va_s0) == (buffer_addr plain_b (va_get_mem
-    va_s0)) /\ (va_get_reg Rsi va_s0) == num_bytes /\ (va_get_reg Rdx va_s0) == (buffer_addr iv_b
-    (va_get_mem va_s0)) /\ (va_get_reg Rcx va_s0) == (buffer_addr keys_b (va_get_mem va_s0)) /\
-    (va_get_reg R8 va_s0) == (buffer_addr cipher_b (va_get_mem va_s0)) /\ (buffer_length plain_b)
+    (va_get_mem va_s0) cipher_b) /\ (va_get_reg rdi va_s0) == (buffer_addr plain_b (va_get_mem
+    va_s0)) /\ (va_get_reg rsi va_s0) == num_bytes /\ (va_get_reg rdx va_s0) == (buffer_addr iv_b
+    (va_get_mem va_s0)) /\ (va_get_reg rcx va_s0) == (buffer_addr keys_b (va_get_mem va_s0)) /\
+    (va_get_reg r8 va_s0) == (buffer_addr cipher_b (va_get_mem va_s0)) /\ (buffer_length plain_b)
     == (bytes_to_quad_size num_bytes) /\ (buffer_length cipher_b) == (buffer_length plain_b) /\
     (buffer_length iv_b) == 1 /\ (buffer_addr plain_b (va_get_mem va_s0)) + 16 `op_Multiply`
     (bytes_to_quad_size num_bytes) < pow2_64 /\ (buffer_addr cipher_b (va_get_mem va_s0)) + 16
@@ -48,10 +48,10 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
     let alg = AES_128 in
     va_pre va_b0 va_s0 plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ 
  ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (va_get_reg Rbx va_sM) == (va_get_reg Rbx va_s0) /\ (va_get_reg Rbp va_sM) == (va_get_reg
-    Rbp va_s0) /\ (va_get_reg R12 va_sM) == (va_get_reg R12 va_s0) /\ (va_get_reg R13 va_sM) ==
-    (va_get_reg R13 va_s0) /\ (va_get_reg R14 va_sM) == (va_get_reg R14 va_s0) /\ (va_get_reg R15
-    va_sM) == (va_get_reg R15 va_s0) /\ (modifies_buffer128 cipher_b (va_get_mem va_s0) (va_get_mem
+    /\ (va_get_reg rbx va_sM) == (va_get_reg rbx va_s0) /\ (va_get_reg rbp va_sM) == (va_get_reg
+    rbp va_s0) /\ (va_get_reg r12 va_sM) == (va_get_reg r12 va_s0) /\ (va_get_reg r13 va_sM) ==
+    (va_get_reg r13 va_s0) /\ (va_get_reg r14 va_sM) == (va_get_reg r14 va_s0) /\ (va_get_reg r15
+    va_sM) == (va_get_reg r15 va_s0) /\ (modifies_buffer128 cipher_b (va_get_mem va_s0) (va_get_mem
     va_sM)) /\ (buffer_readable (va_get_mem va_sM) plain_b) /\ (buffer_readable (va_get_mem va_sM)
     iv_b) /\ (buffer_readable (va_get_mem va_sM) keys_b) /\ (buffer_readable (va_get_mem va_sM)
     cipher_b) /\ (let num_blocks = num_bytes `op_Division` 16 in let plain = (Seq.slice
@@ -65,11 +65,11 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
     (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM
     (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM
     (va_update_xmm 4 va_sM (va_update_xmm 3 va_sM (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM
-    (va_update_xmm 0 va_sM (va_update_reg R15 va_sM (va_update_reg R14 va_sM (va_update_reg R13
-    va_sM (va_update_reg R12 va_sM (va_update_reg R11 va_sM (va_update_reg R10 va_sM (va_update_reg
-    R9 va_sM (va_update_reg R8 va_sM (va_update_reg Rsp va_sM (va_update_reg Rbp va_sM
-    (va_update_reg Rdi va_sM (va_update_reg Rsi va_sM (va_update_reg Rdx va_sM (va_update_reg Rcx
-    va_sM (va_update_reg Rbx va_sM (va_update_reg Rax va_sM (va_update_ok va_sM
+    (va_update_xmm 0 va_sM (va_update_reg r15 va_sM (va_update_reg r14 va_sM (va_update_reg r13
+    va_sM (va_update_reg r12 va_sM (va_update_reg r11 va_sM (va_update_reg r10 va_sM (va_update_reg
+    r9 va_sM (va_update_reg r8 va_sM (va_update_reg rsp va_sM (va_update_reg rbp va_sM
+    (va_update_reg rdi va_sM (va_update_reg rsi va_sM (va_update_reg rdx va_sM (va_update_reg rcx
+    va_sM (va_update_reg rbx va_sM (va_update_reg rax va_sM (va_update_ok va_sM
     va_s0)))))))))))))))))))))))))))))))))))))
 
 val va_lemma_gctr_bytes_extra_buffer(va_b0:va_code) (va_s0:va_state)

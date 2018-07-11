@@ -17,8 +17,8 @@ let vale_pre (t:taint) (va_b0:va_code) (va_s0:va_state)
    ((va_require_total va_b0 (va_code_Copy16 t) va_s0) /\ (va_get_ok va_s0) /\
     (locs_disjoint [(loc_buffer bsrc); (loc_buffer bdst)]) /\ (buffer_readable (va_get_mem va_s0)
     bsrc) /\ (buffer_readable (va_get_mem va_s0) bdst) /\ (buffer_length bsrc) == 2 /\
-    (buffer_length bdst) == 2 /\ (va_get_reg Rsi va_s0) == (buffer_addr bsrc (va_get_mem va_s0)) /\
-    (va_get_reg Rdi va_s0) == (buffer_addr bdst (va_get_mem va_s0)) /\ (valid_taint_buf64 bsrc
+    (buffer_length bdst) == 2 /\ (va_get_reg rsi va_s0) == (buffer_addr bsrc (va_get_mem va_s0)) /\
+    (va_get_reg rdi va_s0) == (buffer_addr bdst (va_get_mem va_s0)) /\ (valid_taint_buf64 bsrc
     (va_get_mem va_s0) (va_get_memTaint va_s0) t) /\ (valid_taint_buf64 bdst (va_get_mem va_s0)
     (va_get_memTaint va_s0) t))
 
@@ -29,11 +29,11 @@ let vale_post (t:taint) (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM
  ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
     /\ (locs_disjoint [(loc_buffer bsrc); (loc_buffer bdst)]) /\ (buffer_readable (va_get_mem
     va_sM) bsrc) /\ (buffer_readable (va_get_mem va_sM) bdst) /\ (buffer_length bsrc) == 2 /\
-    (buffer_length bdst) == 2 /\ (va_get_reg Rsi va_sM) == (buffer_addr bsrc (va_get_mem va_sM)) /\
-    (va_get_reg Rdi va_sM) == (buffer_addr bdst (va_get_mem va_sM)) /\ (forall i . 0 <= i && i < 2
+    (buffer_length bdst) == 2 /\ (va_get_reg rsi va_sM) == (buffer_addr bsrc (va_get_mem va_sM)) /\
+    (va_get_reg rdi va_sM) == (buffer_addr bdst (va_get_mem va_sM)) /\ (forall i . 0 <= i && i < 2
     ==> (buffer64_read bdst i (va_get_mem va_sM)) == (buffer64_read bsrc i (va_get_mem va_sM))) /\
     (modifies_mem (loc_buffer bdst) (va_get_mem va_s0) (va_get_mem va_sM)) /\ (va_state_eq va_sM
-    (va_update_trace va_sM (va_update_mem va_sM (va_update_reg Rcx va_sM (va_update_reg Rax va_sM
+    (va_update_trace va_sM (va_update_mem va_sM (va_update_reg rcx va_sM (va_update_reg rax va_sM
     (va_update_ok va_sM va_s0)))))))
 
 let va_post = vale_post Secret

@@ -19,9 +19,9 @@ let va_pre (va_b0:va_code) (va_s0:va_state)
      (requires ((va_require_total va_b0 (va_code_gcm_load_xor_store_buffer ()) va_s0) /\ (va_get_ok
     va_s0) /\ (locs_disjoint [(loc_buffer plain_b); (loc_buffer mask_b); (loc_buffer cipher_b)]) /\
     (buffer_readable (va_get_mem va_s0) plain_b) /\ (buffer_readable (va_get_mem va_s0) mask_b) /\
-    (buffer_readable (va_get_mem va_s0) cipher_b) /\ (va_get_reg Rdi va_s0) == (buffer_addr plain_b
-    (va_get_mem va_s0)) /\ (va_get_reg Rsi va_s0) == (buffer_addr mask_b (va_get_mem va_s0)) /\
-    (va_get_reg Rdx va_s0) == (buffer_addr cipher_b (va_get_mem va_s0)) /\ (va_get_reg Rcx va_s0)
+    (buffer_readable (va_get_mem va_s0) cipher_b) /\ (va_get_reg rdi va_s0) == (buffer_addr plain_b
+    (va_get_mem va_s0)) /\ (va_get_reg rsi va_s0) == (buffer_addr mask_b (va_get_mem va_s0)) /\
+    (va_get_reg rdx va_s0) == (buffer_addr cipher_b (va_get_mem va_s0)) /\ (va_get_reg rcx va_s0)
     == offset /\ (buffer_length plain_b) >= num_blocks /\ (buffer_length cipher_b) ==
     (buffer_length plain_b) /\ (buffer_length mask_b) == 1 /\ (let mask = (buffer128_read mask_b 0
     (va_get_mem va_s0)) in let plain = (buffer128_as_seq (va_get_mem va_s0) plain_b) in let cipher
@@ -33,10 +33,10 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
   (plain_b:buffer128) (mask_b:buffer128) (cipher_b:buffer128) (offset:nat64) (num_blocks:(nat64)) (key:(aes_key_LE AES_128)) (iv:(quad32))  =
   va_pre va_b0 va_s0 plain_b mask_b cipher_b offset num_blocks key iv /\
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (va_get_reg Rbx va_sM) == (va_get_reg Rbx va_s0) /\ (va_get_reg Rbp va_sM) == (va_get_reg
-    Rbp va_s0) /\ (va_get_reg R12 va_sM) == (va_get_reg R12 va_s0) /\ (va_get_reg R13 va_sM) ==
-    (va_get_reg R13 va_s0) /\ (va_get_reg R14 va_sM) == (va_get_reg R14 va_s0) /\ (va_get_reg R15
-    va_sM) == (va_get_reg R15 va_s0) /\ (modifies_buffer128 cipher_b (va_get_mem va_s0) (va_get_mem
+    /\ (va_get_reg rbx va_sM) == (va_get_reg rbx va_s0) /\ (va_get_reg rbp va_sM) == (va_get_reg
+    rbp va_s0) /\ (va_get_reg r12 va_sM) == (va_get_reg r12 va_s0) /\ (va_get_reg r13 va_sM) ==
+    (va_get_reg r13 va_s0) /\ (va_get_reg r14 va_sM) == (va_get_reg r14 va_s0) /\ (va_get_reg r15
+    va_sM) == (va_get_reg r15 va_s0) /\ (modifies_buffer128 cipher_b (va_get_mem va_s0) (va_get_mem
     va_sM)) /\ (let mask = (buffer128_read mask_b 0 (va_get_mem va_s0)) in let plain =
     (buffer128_as_seq (va_get_mem va_sM) plain_b) in let old_cipher = (buffer128_as_seq (va_get_mem
     va_s0) cipher_b) in let cipher = (buffer128_as_seq (va_get_mem va_sM) cipher_b) in
@@ -46,11 +46,11 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
     (va_update_xmm 11 va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM
     (va_update_xmm 7 va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM
     (va_update_xmm 3 va_sM (va_update_xmm 2 va_sM (va_update_xmm 1 va_sM (va_update_xmm 0 va_sM
-    (va_update_reg R15 va_sM (va_update_reg R14 va_sM (va_update_reg R13 va_sM (va_update_reg R12
-    va_sM (va_update_reg R11 va_sM (va_update_reg R10 va_sM (va_update_reg R9 va_sM (va_update_reg
-    R8 va_sM (va_update_reg Rsp va_sM (va_update_reg Rbp va_sM (va_update_reg Rdi va_sM
-    (va_update_reg Rsi va_sM (va_update_reg Rdx va_sM (va_update_reg Rcx va_sM (va_update_reg Rbx
-    va_sM (va_update_reg Rax va_sM (va_update_ok va_sM va_s0)))))))))))))))))))))))))))))))))))))
+    (va_update_reg r15 va_sM (va_update_reg r14 va_sM (va_update_reg r13 va_sM (va_update_reg r12
+    va_sM (va_update_reg r11 va_sM (va_update_reg r10 va_sM (va_update_reg r9 va_sM (va_update_reg
+    r8 va_sM (va_update_reg rsp va_sM (va_update_reg rbp va_sM (va_update_reg rdi va_sM
+    (va_update_reg rsi va_sM (va_update_reg rdx va_sM (va_update_reg rcx va_sM (va_update_reg rbx
+    va_sM (va_update_reg rax va_sM (va_update_ok va_sM va_s0)))))))))))))))))))))))))))))))))))))
 
 val va_lemma_gcm_load_xor_store_buffer(va_b0:va_code) (va_s0:va_state)
   (plain_b:buffer128) (mask_b:buffer128) (cipher_b:buffer128) (offset:nat64) (num_blocks:(nat64)) (key:(aes_key_LE AES_128)) (iv:(quad32)) : Ghost ((va_sM:va_state) * (va_fM:va_fuel))

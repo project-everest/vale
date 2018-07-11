@@ -28,22 +28,23 @@ let combine_xmm_taints_monotone xmms1 xmms2: Lemma
 val eq_registers: (regs1: (reg -> taint)) -> (regs2: (reg -> taint)) -> (b:bool{b <==> (regs1 == regs2)})
 
 let eq_registers regs1 regs2 =
-  let b = regs1 Rax = regs2 Rax &&
-  regs1 Rbx = regs2 Rbx &&
-  regs1 Rcx = regs2 Rcx &&
-  regs1 Rdx = regs2 Rdx &&
-  regs1 Rsi = regs2 Rsi &&
-  regs1 Rdi = regs2 Rdi &&
-  regs1 Rbp = regs2 Rbp &&
-  regs1 Rsp = regs2 Rsp &&
-  regs1 R8 = regs2 R8 &&
-  regs1 R9 = regs2 R9 &&
-  regs1 R10 = regs2 R10 &&
-  regs1 R11 = regs2 R11 &&
-  regs1 R12 = regs2 R12 &&
-  regs1 R13 = regs2 R13 &&
-  regs1 R14 = regs2 R14 &&
-  regs1 R15 = regs2 R15 in
+  let b =
+  regs1 rax = regs2 rax &&
+  regs1 rbx = regs2 rbx &&
+  regs1 rcx = regs2 rcx &&
+  regs1 rdx = regs2 rdx &&
+  regs1 rsi = regs2 rsi &&
+  regs1 rdi = regs2 rdi &&
+  regs1 rbp = regs2 rbp &&
+  regs1 rsp = regs2 rsp &&
+  regs1 r8 = regs2 r8 &&
+  regs1 r9 = regs2 r9 &&
+  regs1 r10 = regs2 r10 &&
+  regs1 r11 = regs2 r11 &&
+  regs1 r12 = regs2 r12 &&
+  regs1 r13 = regs2 r13 &&
+  regs1 r14 = regs2 r14 &&
+  regs1 r15 = regs2 r15 in
   assert (FStar.FunctionalExtensionality.feq regs1 regs2 <==> b);
   b
 
@@ -108,23 +109,23 @@ let combine_taint_states (ts1:taintState) (ts2:taintState) =
 
 let count_public_register regs r = if Public? (regs r) then 1 else 0
 
-let count_public_registers regs : nat =
-  count_public_register regs Rax +
-  count_public_register regs Rbx +
-  count_public_register regs Rcx +
-  count_public_register regs Rdx +
-  count_public_register regs Rsi +
-  count_public_register regs Rdi +
-  count_public_register regs Rbp +
-  count_public_register regs Rsp +
-  count_public_register regs R8 +
-  count_public_register regs R9 +
-  count_public_register regs R10 +
-  count_public_register regs R11 +
-  count_public_register regs R12 +
-  count_public_register regs R13 +
-  count_public_register regs R14 +
-  count_public_register regs R15
+let count_public_registers (regs:reg->taint) : nat =
+  count_public_register regs rax +
+  count_public_register regs rbx +
+  count_public_register regs rcx +
+  count_public_register regs rdx +
+  count_public_register regs rsi +
+  count_public_register regs rdi +
+  count_public_register regs rbp +
+  count_public_register regs rsp +
+  count_public_register regs r8 +
+  count_public_register regs r9 +
+  count_public_register regs r10 +
+  count_public_register regs r11 +
+  count_public_register regs r12 +
+  count_public_register regs r13 +
+  count_public_register regs r14 +
+  count_public_register regs r15
 
 let count_flagTaint ts = if Public? ts.flagsTaint then 1 else 0
 

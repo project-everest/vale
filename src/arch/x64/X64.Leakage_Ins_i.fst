@@ -11,7 +11,7 @@ let rec has_mem_operand = function
   | [] -> false
   | a::q -> if OMem? a then true else has_mem_operand q
 
-#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 80"
+#reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 300"
 
 let check_if_ins_consumes_fixed_time ins ts =
   let i, dsts, srcs = ins.ops in

@@ -437,16 +437,16 @@ let eval_ins (ins:ins) : st unit =
 
   | Mul64 src ->
     check (valid_operand src);;
-    let hi = FStar.UInt.mul_div #64 (eval_reg Rax s) (eval_operand src s) in
-    let lo = FStar.UInt.mul_mod #64 (eval_reg Rax s) (eval_operand src s) in
-    update_reg Rax lo;;
-    update_reg Rdx hi;;
+    let hi = FStar.UInt.mul_div #64 (eval_reg rax s) (eval_operand src s) in
+    let lo = FStar.UInt.mul_mod #64 (eval_reg rax s) (eval_operand src s) in
+    update_reg rax lo;;
+    update_reg rdx hi;;
     update_flags (havoc s ins)
 
   | Mulx64 dst_hi dst_lo src ->
     check (valid_operand src);;
-    let hi = FStar.UInt.mul_div #64 (eval_reg Rdx s) (eval_operand src s) in
-    let lo = FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
+    let hi = FStar.UInt.mul_div #64 (eval_reg rdx s) (eval_operand src s) in
+    let lo = FStar.UInt.mul_mod #64 (eval_reg rdx s) (eval_operand src s) in
     update_operand_preserve_flags dst_lo lo;;
     update_operand_preserve_flags dst_hi hi
 
@@ -473,17 +473,17 @@ let eval_ins (ins:ins) : st unit =
 
   | Push src ->
     check (valid_operand src);;
-    let new_rsp = ((eval_reg Rsp s) - 8) % pow2_64 in
+    let new_rsp = ((eval_reg rsp s) - 8) % pow2_64 in
     update_operand_preserve_flags (OMem (MConst new_rsp)) (eval_operand src s);;
-    update_reg Rsp new_rsp
+    update_reg rsp new_rsp
 
   | Pop dst ->
-    let stack_val = OMem (MReg Rsp 0) in
+    let stack_val = OMem (MReg rsp 0) in
     check (valid_operand stack_val);;    
     let new_dst = eval_operand stack_val s in
-    let new_rsp = ((eval_reg Rsp s) + 8) % pow2_64 in
+    let new_rsp = ((eval_reg rsp s) + 8) % pow2_64 in
     update_operand_preserve_flags dst new_dst;;
-    update_reg Rsp new_rsp
+    update_reg rsp new_rsp
 // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
 // since all possibilities are valid, thanks to dependent types 
 

@@ -244,22 +244,22 @@ val wp_sound_code (#a:Type0) (c:code) (qc:quickCode a c) (k:state -> a -> Type0)
   (ensures fun (sN, fN, gN) -> eval_code c s0 fN sN /\ k sN gN)
 
 [@va_qattr]
-let rec regs_match (regs:list reg) (r0:Regs_i.t) (r1:Regs_i.t) : Type0 =
+let rec regs_match (regs:list int) (r0:Regs_i.t) (r1:Regs_i.t) : Type0 =
   match regs with
   | [] -> True
-  | r::regs -> r0 r == r1 r /\ regs_match regs r0 r1
+  | r::regs -> Map16_i.sel r0 r == Map16_i.sel r1 r /\ regs_match regs r0 r1
 
 [@va_qattr]
 let all_regs_match (r0:Regs_i.t) (r1:Regs_i.t) : Type0
   =
-  let regs = [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp; Rsp; R8; R9; R10; R11; R12; R13; R14; R15] in
+  let regs = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15] in
   regs_match regs r0 r1
 
 [@va_qattr]
 let rec xmms_match (xmms:list xmm) (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0 =
   match xmms with
   | [] -> True
-  | r::xmms -> r0 r == r1 r /\ xmms_match xmms r0 r1
+  | r::xmms -> Map16_i.sel r0 r == Map16_i.sel r1 r /\ xmms_match xmms r0 r1
 
 [@va_qattr]
 let all_xmms_match (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0
@@ -267,13 +267,19 @@ let all_xmms_match (r0:Xmms_i.t) (r1:Xmms_i.t) : Type0
   let xmms = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15] in
   xmms_match xmms r0 r1
 
+let assert_qattr (p:Type) : Lemma
+  (requires norm [iota; zeta; simplify; primops; delta_attr va_qattr;] p)
+  (ensures p)
+  =
+  ()
+
 [@va_qattr]
 let va_state_match (s0:state) (s1:state) : Pure Type0
   (requires True)
   (ensures fun b -> b ==> state_eq s0 s1)
   =
-  assert_norm (all_regs_match s0.regs s1.regs ==> Regs_i.equal s0.regs s1.regs);
-  assert_norm (all_xmms_match s0.xmms s1.xmms ==> Xmms_i.equal s0.xmms s1.xmms);
+  assert_qattr (all_xmms_match s0.xmms s1.xmms ==> Xmms_i.equal s0.xmms s1.xmms);
+  assert_qattr (all_regs_match s0.regs s1.regs ==> Regs_i.equal s0.regs s1.regs);
   s0.ok == s1.ok /\
   all_regs_match s0.regs s1.regs /\
   all_xmms_match s0.xmms s1.xmms /\
@@ -281,6 +287,13 @@ let va_state_match (s0:state) (s1:state) : Pure Type0
   s0.mem == s1.mem /\
   s0.trace == s1.trace /\
   s0.memTaint == s1.memTaint
+
+[@va_qattr]
+unfold let expand_state (s:state) : Ghost state True (fun s' -> s == s') =
+  let regs = Map16_i.eta s.regs in
+  let xmms = Map16_i.eta s.xmms in
+  let s' = {ok = s.ok; regs = regs; xmms = xmms; flags = s.flags; mem = s.mem; trace = s.trace; memTaint = s.memTaint} in
+  s'
 
 [@va_qattr]
 unfold let wp_sound_pre (#a:Type0) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
@@ -300,8 +313,11 @@ val wp_sound_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:stat
 [@va_qattr]
 unfold let wp_sound_code_pre (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
   forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (trace:list observation) (memTaint:memtaint).
-    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; trace=trace; memTaint=memTaint} in
-    s0 == s0' ==> QProc?.wp qc s0' (k s0')
+    let regs' = Map16_i.eta regs in
+    let xmms' = Map16_i.eta xmms in
+    let s0' = {ok = ok; regs = regs'; xmms = xmms'; flags = flags; mem = mem; trace = trace; memTaint = memTaint} in
+    let s0'' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; trace = trace; memTaint = memTaint} in
+    s0 == s0'' ==> QProc?.wp qc s0' (k s0')
 
 unfold let wp_sound_code_post (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) ((sN:state), (fN:fuel), (gN:a)) : Type0 =
   eval c s0 fN sN /\
@@ -363,7 +379,14 @@ unfold let normal_steps : list string =
     "X64.Vale.QuickCode_i.__proj__QProc__item__wp";
   ]
 
-unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr; delta_only normal_steps] x
+unfold let normal (x:Type0) : Type0 =
+  norm [
+    iota; zeta; simplify; primops;
+    delta_attr va_qattr;
+    delta_attr Map16_i.norm_attr;
+    delta_only normal_steps
+  ]
+  x
 
 val wp_sound_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) :
   Ghost (state * fuel * a)

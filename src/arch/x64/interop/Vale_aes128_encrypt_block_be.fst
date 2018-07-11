@@ -24,9 +24,9 @@ let vale_pre (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm)
   (input:quad32) (key:(aes_key_LE alg)) (input_buffer:buffer128) (output_buffer:buffer128)
   (keys_buffer:buffer128) =
   ((va_require_total va_b0 (va_code_AESEncryptBlockStdcall_BE win alg) va_s0) /\
-    (va_get_ok va_s0) /\ (let output_ptr = (if win then (va_get_reg Rcx va_s0) else (va_get_reg Rdi
-    va_s0)) in let input_ptr = (if win then (va_get_reg Rdx va_s0) else (va_get_reg Rsi va_s0)) in
-    let expanded_key_ptr = (if win then (va_get_reg R8 va_s0) else (va_get_reg Rdx va_s0)) in
+    (va_get_ok va_s0) /\ (let output_ptr = (if win then (va_get_reg rcx va_s0) else (va_get_reg rdi
+    va_s0)) in let input_ptr = (if win then (va_get_reg rdx va_s0) else (va_get_reg rsi va_s0)) in
+    let expanded_key_ptr = (if win then (va_get_reg r8 va_s0) else (va_get_reg rdx va_s0)) in
     (locs_disjoint [(loc_buffer input_buffer); (loc_buffer keys_buffer)]) /\ (locs_disjoint
     [(loc_buffer output_buffer); (loc_buffer keys_buffer)]) /\ (l_or (buffers_disjoint128
     output_buffer input_buffer) (output_buffer == input_buffer)) /\ (alg = AES_128 || alg =
@@ -47,14 +47,14 @@ let vale_post (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm)
   (input:quad32) (key:(aes_key_LE alg)) (input_buffer:buffer128) (output_buffer:buffer128)
   (keys_buffer:buffer128) (va_sM:va_state) (va_fM:va_fuel) =
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
-    /\ (let output_ptr = (if win then (va_get_reg Rcx va_s0) else (va_get_reg Rdi va_s0)) in let
-    input_ptr = (if win then (va_get_reg Rdx va_s0) else (va_get_reg Rsi va_s0)) in let
-    expanded_key_ptr = (if win then (va_get_reg R8 va_s0) else (va_get_reg Rdx va_s0)) in
+    /\ (let output_ptr = (if win then (va_get_reg rcx va_s0) else (va_get_reg rdi va_s0)) in let
+    input_ptr = (if win then (va_get_reg rdx va_s0) else (va_get_reg rsi va_s0)) in let
+    expanded_key_ptr = (if win then (va_get_reg r8 va_s0) else (va_get_reg rdx va_s0)) in
     (modifies_mem (loc_buffer output_buffer) (va_get_mem va_s0) (va_get_mem va_sM)) /\
     (validSrcAddrs128 (va_get_mem va_sM) output_ptr output_buffer 1) /\ (buffer128_read
     output_buffer 0 (va_get_mem va_sM)) == (aes_encrypt_BE alg key input)) /\ (va_state_eq va_sM
     (va_update_flags va_sM (va_update_xmm 2 va_sM (va_update_xmm 0 va_sM (va_update_mem va_sM
-    (va_update_reg Rax va_sM (va_update_reg R8 va_sM (va_update_ok va_sM va_s0)))))))))
+    (va_update_reg rax va_sM (va_update_reg r8 va_sM (va_update_ok va_sM va_s0)))))))))
 
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel)
   (output_b:buffer128) (input_b:buffer128) (key:(aes_key_LE AES_128)) (keys_b:buffer128) =

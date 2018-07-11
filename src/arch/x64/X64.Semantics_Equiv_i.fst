@@ -136,11 +136,11 @@ let equiv_eval_mulx (s:state) (ins:S.ins{S.Mulx64? ins}) : Lemma (
   if not s.state.S.ok then ()
   else if not (valid_operand src s) || not (valid_operand dst_lo s) then ()
   else begin
-    let lo =  FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
+    let lo =  FStar.UInt.mul_mod #64 (eval_reg rdx s) (eval_operand src s) in
     let s_b = update_operand_preserve_flags' dst_lo lo s in
     if not (valid_operand dst_hi s_b) then ()
     else 
-    equiv_eval_operand (OReg Rdx) s;
+    equiv_eval_operand (OReg rdx) s;
     equiv_eval_operand src s;
     ()
   end
@@ -227,7 +227,7 @@ let equiv_eval_pop (s:state) (ins:S.ins{S.Pop? ins}) : Lemma (
   let s_bytes = S.run (S.eval_ins ins) s.state in
   s_hi.state.S.ok ==> s_hi.state == s_bytes) =
   let S.Pop dst = ins in
-  let stack_val = OMem (MReg Rsp 0) in
+  let stack_val = OMem (MReg rsp 0) in
   if not s.state.S.ok then ()
   else if not (valid_operand dst s) || not (valid_operand stack_val s) then ()
   else begin

@@ -51,11 +51,11 @@ let implies_pre (h0:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased 
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let regs = fun r -> begin match r with
-    | Rdi -> addr_plain_b
-    | Rsi -> num_bytes
-    | Rdx -> addr_iv_b
-    | Rcx -> addr_keys_b
-    | R8 -> addr_cipher_b
+    | rdi -> addr_plain_b
+    | rsi -> num_bytes
+    | rdx -> addr_iv_b
+    | rcx -> addr_keys_b
+    | r8 -> addr_cipher_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
@@ -71,11 +71,11 @@ let implies_pre (h0:HS.mem) (plain_b:b8) (num_bytes:nat64) (iv_old:Ghost.erased 
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let regs = fun r -> begin match r with
-    | Rdi -> addr_plain_b
-    | Rsi -> num_bytes
-    | Rdx -> addr_iv_b
-    | Rcx -> addr_keys_b
-    | R8 -> addr_cipher_b
+    | rdi -> addr_plain_b
+    | rsi -> num_bytes
+    | rdx -> addr_iv_b
+    | rcx -> addr_keys_b
+    | r8 -> addr_cipher_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in  
@@ -117,11 +117,11 @@ let ghost_gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b ciphe
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let regs = fun r -> begin match r with
-    | Rdi -> addr_plain_b
-    | Rsi -> num_bytes
-    | Rdx -> addr_iv_b
-    | Rcx -> addr_keys_b
-    | R8 -> addr_cipher_b
+    | rdi -> addr_plain_b
+    | rsi -> num_bytes
+    | rdx -> addr_iv_b
+    | rcx -> addr_keys_b
+    | r8 -> addr_cipher_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem} in
@@ -134,12 +134,12 @@ let ghost_gctr_bytes_extra_buffer plain_b num_bytes iv_old iv_b key keys_b ciphe
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs Rbx == s1.regs Rbx);
-  assert(s0.regs Rbp == s1.regs Rbp);
-  assert(s0.regs R12 == s1.regs R12);
-  assert(s0.regs R13 == s1.regs R13);
-  assert(s0.regs R14 == s1.regs R14);
-  assert(s0.regs R15 == s1.regs R15);
+  assert(s0.regs rbx == s1.regs rbx);
+  assert(s0.regs rbp == s1.regs rbp);
+  assert(s0.regs r12 == s1.regs r12);
+  assert(s0.regs r13 == s1.regs r13);
+  assert(s0.regs r14 == s1.regs r14);
+  assert(s0.regs r15 == s1.regs r15);
   // Ensures that va_code_gctr_bytes_extra_buffer is actually Vale code, and that s1 is the result of executing this code
   assert (va_ensure_total (va_code_gctr_bytes_extra_buffer ()) s0 s1 f1);
   implies_post s0 s1 f1 plain_b num_bytes iv_old iv_b key keys_b cipher_b ;
