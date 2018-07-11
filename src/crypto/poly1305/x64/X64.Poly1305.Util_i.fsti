@@ -57,14 +57,22 @@ let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
       42
   in f
 
-let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
+let rec lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
   (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
   (ensures
     ((n + n) % 2) == 0 /\ // REVIEW
     poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
     poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
   =
-  assume False
+  let s = buffer64_as_seq m b in
+  let inp = seqTo128 (buffer64_as_seq m b) in  
+  reveal_poly1305_heap_blocks h pad r s (n + n);
+  if n = 0 then () else (
+    lemma_poly1305_heap_hash_blocks_alt h pad r m b (n-1);
+    reveal_poly1305_heap_blocks h pad r s (n+n-2);
+    Opaque_s.reveal_opaque modp'; 
+    ()
+  )
 
 let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
 match l with

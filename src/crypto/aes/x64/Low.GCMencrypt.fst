@@ -439,7 +439,7 @@ let reverse_bytes_quad32_buffer (b:B.buffer U8.t) : Stack unit
      new_b == reverse_bytes_quad32 old_b)
   )
   = 
-  admit()
+  Reverse_quad32_win.reverse_bytes_quad32_buffer_win b
 
 let mk_quad32_lo0_be_1_buffer (b:B.buffer U8.t) : Stack unit
   (requires fun h ->
