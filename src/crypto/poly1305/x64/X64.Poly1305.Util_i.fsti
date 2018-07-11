@@ -37,16 +37,6 @@ val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:i
   (requires 0 <= k /\ k <= Seq.length s /\ k % 2 == 0)
   (ensures poly1305_heap_blocks h pad r s k = poly1305_heap_blocks' h pad r s k)
 
-val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
-        (len:nat{ len % 2 == 0 /\ len <= buffer_length b})
-        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : Lemma
-  (requires True)
-//i <= k && k <= i + len /\
- //           (k - i) % 16 == 0 /\
- //           validSrcAddrs m i  64 ((len + 15) / 16 * 16))
-           // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
-  (ensures poly1305_heap_blocks h pad r (buffer64_as_seq m b) k == poly1305_hash_blocks h pad r (heapletTo128 (buffer64_as_seq m b) len) k)
-
 type t_seqTo128 = int -> nat128
 let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
   let f (i:int) : nat128 =
