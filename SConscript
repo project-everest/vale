@@ -61,6 +61,7 @@ fstar_include_paths = [
   'obj/test',
   'obj/arch',
   'obj/arch/x64/',
+  'obj/arch/x64/interop',
   'obj/lib/collections/',
   'obj/lib/math',
   'obj/lib/util',
@@ -95,25 +96,21 @@ verify_options = {
   'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
 
   # Disable verification by adding 'filename': None
-  'src/test/Test.FastBlock.vaf': None,
-  #'src/arch/x64/X64.Taint_Semantics_s.fst': None,
-  #'src/arch/x64/X64.Leakage_s.fst': None,
-  #'src/arch/x64/X64.Leakage_Ins_i.fst': None,
-  #'src/arch/x64/X64.Leakage_i.fst': None,
-  #'src/arch/x64/X64.Leakage_Helpers_i.fst': None,
-#  'src/arch/x64/X64.Bytes_Semantics_i.fst': None,
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
   'src/crypto/aes/x64/Low.GCMencrypt.fst': None,
-  'src/arch/x64/interop/*.fst': None,
-  'src/arch/x64/interop/*.fsti': None,
-  'src/arch/x64/interop/*.vaf': None,
-  'src/crypto/aes/x64/Low.GCMencrypt.fst': None,
+#  'src/arch/x64/interop/*.fst': None,
+#  'src/arch/x64/interop/*.fsti': None,
 
+  
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
   'src/*/*.fst': BuildOptions(fstar_default_args),
   'src/*/*.fsti': BuildOptions(fstar_default_args),
+
+  'src/arch/x64/interop/Interop_assumptions.fst': BuildOptions(fstar_default_args),
+  'src/arch/x64/interop/Interop_Printer.fst': BuildOptions(fstar_default_args),
+  'src/arch/x64/interop/*.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
