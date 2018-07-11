@@ -39,13 +39,12 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
-  let regs = fun r -> begin match r with
-    | rsp -> addr_stack
-    | rcx -> addr_plain_b
-    | rdx -> num_bytes
-    | r8 -> addr_iv_b
-    | r9 -> addr_keys_b
-    | _ -> init_regs r end in
+  let regs = init_regs in
+  let regs = Map16_i.upd regs rsp addr_stack in
+  let regs = Map16_i.upd regs rcx addr_plain_b in
+  let regs = Map16_i.upd regs rdx num_bytes in
+  let regs = Map16_i.upd regs r8 addr_iv_b in
+  let regs = Map16_i.upd regs r9 addr_keys_b in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
@@ -68,13 +67,12 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
-  let regs = fun r -> begin match r with
-    | rsp -> addr_stack
-    | rcx -> addr_plain_b
-    | rdx -> num_bytes
-    | r8 -> addr_iv_b
-    | r9 -> addr_keys_b
-    | _ -> init_regs r end in
+  let regs = init_regs in
+  let regs = Map16_i.upd regs rsp addr_stack in
+  let regs = Map16_i.upd regs rcx addr_plain_b in
+  let regs = Map16_i.upd regs rdx num_bytes in
+  let regs = Map16_i.upd regs r8 addr_iv_b in
+  let regs = Map16_i.upd regs r9 addr_keys_b in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
   let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
@@ -113,13 +111,12 @@ let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (num_
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
-  let regs = fun r -> begin match r with
-    | rsp -> addr_stack
-    | rcx -> addr_plain_b
-    | rdx -> num_bytes
-    | r8 -> addr_iv_b
-    | r9 -> addr_keys_b
-    | _ -> init_regs r end in
+  let regs = init_regs in
+  let regs = Map16_i.upd regs rsp addr_stack in
+  let regs = Map16_i.upd regs rcx addr_plain_b in
+  let regs = Map16_i.upd regs rdx num_bytes in
+  let regs = Map16_i.upd regs r8 addr_iv_b in
+  let regs = Map16_i.upd regs r9 addr_keys_b in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
   let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in    
@@ -139,13 +136,12 @@ let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (num_
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
-  let regs = fun r -> begin match r with
-    | rsp -> addr_stack
-    | rcx -> addr_plain_b
-    | rdx -> num_bytes
-    | r8 -> addr_iv_b
-    | r9 -> addr_keys_b
-    | _ -> init_regs r end in
+  let regs = init_regs in
+  let regs = Map16_i.upd regs rsp addr_stack in
+  let regs = Map16_i.upd regs rcx addr_plain_b in
+  let regs = Map16_i.upd regs rdx num_bytes in
+  let regs = Map16_i.upd regs r8 addr_iv_b in
+  let regs = Map16_i.upd regs r9 addr_keys_b in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
   let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in  
@@ -176,13 +172,12 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
   let addr_keys_b = addrs keys_b in
   let addr_cipher_b = addrs cipher_b in
   let addr_stack:nat64 = addrs stack_b + 0 in
-  let regs = fun r -> begin match r with
-    | rsp -> addr_stack
-    | rcx -> addr_plain_b
-    | rdx -> num_bytes
-    | r8 -> addr_iv_b
-    | r9 -> addr_keys_b
-    | _ -> init_regs r end in
+  let regs = init_regs in
+  let regs = Map16_i.upd regs rsp addr_stack in
+  let regs = Map16_i.upd regs rcx addr_plain_b in
+  let regs = Map16_i.upd regs rdx num_bytes in
+  let regs = Map16_i.upd regs r8 addr_iv_b in
+  let regs = Map16_i.upd regs r9 addr_keys_b in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
   let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
@@ -196,25 +191,25 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
   // Ensures that the Vale execution was correct
   assert(s1.ok);
   // Ensures that the callee_saved registers are correct
-  assert(s0.regs rbx == s1.regs rbx);
-  assert(s0.regs rbp == s1.regs rbp);
-  assert(s0.regs rdi == s1.regs rdi);
-  assert(s0.regs rsi == s1.regs rsi);
-  assert(s0.regs rsp == s1.regs rsp);
-  assert(s0.regs r12 == s1.regs r12);
-  assert(s0.regs r13 == s1.regs r13);
-  assert(s0.regs r14 == s1.regs r14);
-  assert(s0.regs r15 == s1.regs r15);
-  assert(s0.xmms 6 == s1.xmms 6);
-  assert(s0.xmms 7 == s1.xmms 7);
-  assert(s0.xmms 8 == s1.xmms 8);
-  assert(s0.xmms 9 == s1.xmms 9);
-  assert(s0.xmms 10 == s1.xmms 10);
-  assert(s0.xmms 11 == s1.xmms 11);
-  assert(s0.xmms 12 == s1.xmms 12);
-  assert(s0.xmms 13 == s1.xmms 13);
-  assert(s0.xmms 14 == s1.xmms 14);
-  assert(s0.xmms 15 == s1.xmms 15);
+  assert(Map16_i.sel s0.regs rbx == Map16_i.sel s1.regs rbx);
+  assert(Map16_i.sel s0.regs rbp == Map16_i.sel s1.regs rbp);
+  assert(Map16_i.sel s0.regs rdi == Map16_i.sel s1.regs rdi);
+  assert(Map16_i.sel s0.regs rsi == Map16_i.sel s1.regs rsi);
+  assert(Map16_i.sel s0.regs rsp == Map16_i.sel s1.regs rsp);
+  assert(Map16_i.sel s0.regs r12 == Map16_i.sel s1.regs r12);
+  assert(Map16_i.sel s0.regs r13 == Map16_i.sel s1.regs r13);
+  assert(Map16_i.sel s0.regs r14 == Map16_i.sel s1.regs r14);
+  assert(Map16_i.sel s0.regs r15 == Map16_i.sel s1.regs r15);
+  assert(Map16_i.sel s0.xmms 6 == Map16_i.sel s1.xmms 6);
+  assert(Map16_i.sel s0.xmms 7 == Map16_i.sel s1.xmms 7);
+  assert(Map16_i.sel s0.xmms 8 == Map16_i.sel s1.xmms 8);
+  assert(Map16_i.sel s0.xmms 9 == Map16_i.sel s1.xmms 9);
+  assert(Map16_i.sel s0.xmms 10 == Map16_i.sel s1.xmms 10);
+  assert(Map16_i.sel s0.xmms 11 == Map16_i.sel s1.xmms 11);
+  assert(Map16_i.sel s0.xmms 12 == Map16_i.sel s1.xmms 12);
+  assert(Map16_i.sel s0.xmms 13 == Map16_i.sel s1.xmms 13);
+  assert(Map16_i.sel s0.xmms 14 == Map16_i.sel s1.xmms 14);
+  assert(Map16_i.sel s0.xmms 15 == Map16_i.sel s1.xmms 15);
   // Ensures that va_code_gctr_bytes_extra_buffer_win is actually Vale code, and that s1 is the result of executing this code
   assert (va_ensure_total (va_code_gctr_bytes_extra_buffer_win ()) s0 s1 f1);
   implies_post h0 s1 f1 plain_b num_bytes iv_old iv_b key keys_b cipher_b stack_b ;

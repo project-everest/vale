@@ -11,5 +11,5 @@ assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Sta
 assume val addrs: addr_map
 
 //The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
+assume val init_regs:Map16_i.map nat64
+assume val init_xmms:Map16_i.map quad32

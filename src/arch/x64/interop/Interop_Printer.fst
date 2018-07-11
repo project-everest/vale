@@ -130,18 +130,18 @@ let print_low_calling_stack (args:list arg) (stkstart) =
 let print_low_calling_args os target (args:list arg) stkstart =
   let rec aux regs (args:list arg) =
   match regs, args with
-    | [], q -> "    | _ -> init_regs r end in\n" ^ print_low_calling_stack q stkstart
-    | _, [] -> "    | _ -> init_regs r end in\n"
+    | [], q -> print_low_calling_stack q stkstart
+    | _, [] -> ""
     | re, (_, TGhost _, _)::q -> aux re q // We ignore ghost parameters
-    | r1::rn, (a, ty, _)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
+    | r1::rn, (a, ty, _)::q -> "  let regs = Map16_i.upd regs " ^ (reg_to_low r1) ^ " " ^ 
       (if TBuffer? ty then "addr_" ^ a else a) ^ 
-      "\n" ^ aux rn q
+      " in\n" ^ aux rn q
   in aux (calling_registers os target) args
 
 let print_low_callee_saved os target =
   let rec aux = function
     | [] -> ""
-    | a::q -> "  assert(s0.regs " ^ (reg_to_low a) ^ " == s1.regs " ^ (reg_to_low a) ^ ");\n" ^ aux q
+    | a::q -> "  assert(Map16_i.sel s0.regs " ^ (reg_to_low a) ^ " == Map16_i.sel s1.regs " ^ (reg_to_low a) ^ ");\n" ^ aux q
   in aux (callee_saved os target)
 
 let xmm_to_low = function
@@ -166,7 +166,7 @@ let xmm_to_low = function
 let print_low_xmm_callee_saved os target =
   let rec aux = function
     | [] -> ""
-    | a::q -> "  assert(s0.xmms " ^ (xmm_to_low a) ^ " == s1.xmms " ^ (xmm_to_low a) ^ ");\n" ^ aux q
+    | a::q -> "  assert(Map16_i.sel s0.xmms " ^ (xmm_to_low a) ^ " == Map16_i.sel s1.xmms " ^ (xmm_to_low a) ^ ");\n" ^ aux q
   in aux (xmm_callee_saved os target)
 
 let rec generate_low_addrs = function
@@ -207,8 +207,8 @@ let create_state os target args stack slots stkstart =
   "  let (mem:mem) = {addrs = addrs; ptrs = buffers; hs = h0} in\n" ^
   generate_low_addrs args ^
   (if stack then "  let addr_stack:nat64 = addrs stack_b + " ^ (string_of_int (slots `op_Multiply` 8)) ^ " in\n" else "") ^
-  "  let regs = fun r -> begin match r with\n" ^
-  (if stack then "    | rsp -> addr_stack\n" else "") ^
+  "  let regs = init_regs in\n" ^
+  (if stack then "  let regs = Map16_i.upd regs rsp addr_stack in\n" else "") ^  
   (print_low_calling_args os target args stkstart) ^
   "  let xmms = init_xmms in\n" ^
   "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in\n" ^
