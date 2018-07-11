@@ -17,21 +17,12 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open BufferViewHelpers
+open Interop_assumptions
 #set-options "--z3rlimit 40"
 
 open Vale_ghash_incremental_extra_stdcall_win
 
-assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0) (fun h0 _ h1 -> f h0 == h1)
-
-//The map from buffers to addresses in the heap, that remains abstract
-assume val addrs: addr_map
-
-//The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
-
 #set-options "--initial_fuel 6 --max_fuel 6 --initial_ifuel 2 --max_ifuel 2"
-// TODO: Prove these two lemmas if they are not proven automatically
 let implies_pre (h0:HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_hash:Ghost.erased (quad32))  (stack_b:b8) : Lemma
   (requires pre_cond h0 in_b hash_b h_b num_bytes orig_hash /\ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [in_b;hash_b;h_b])
   (ensures (
@@ -171,6 +162,5 @@ let ghost_ghash_incremental_extra_stdcall_win in_b hash_b h_b num_bytes orig_has
 let ghash_incremental_extra_stdcall_win in_b hash_b h_b num_bytes orig_hash  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 72) in
-  let h0 = get() in
   st_put (fun h -> pre_cond h in_b hash_b h_b (UInt64.v num_bytes) orig_hash /\ B.length stack_b == 72 /\ live h stack_b /\ buf_disjoint_from stack_b [in_b;hash_b;h_b]) (ghost_ghash_incremental_extra_stdcall_win in_b hash_b h_b (UInt64.v num_bytes) orig_hash stack_b);
   pop_frame()

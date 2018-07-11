@@ -58,7 +58,6 @@ let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint
 
 open FStar.Mul
 
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (plain_b:s8) (mask_b:s8) (cipher_b:s8) (offset:nat64) (num_blocks:Ghost.erased (nat64)) (key:Ghost.erased (aes_key_LE AES_128)) (iv:Ghost.erased (quad32)) = live h plain_b /\ live h mask_b /\ live h cipher_b /\ bufs_disjoint [plain_b;mask_b;cipher_b] /\ length plain_b % 16 == 0 /\ length mask_b % 16 == 0 /\ length cipher_b % 16 == 0
  /\  ( let mods = M.loc_buffer cipher_b in  
     B.live h plain_b /\ B.live h mask_b /\ B.live h cipher_b /\

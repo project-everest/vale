@@ -289,13 +289,10 @@ let translate_lowstar os target (func:func_ty) =
   (print_args_names args) ^ "))" ^
   "\n\n\n\n" ^
   "module " ^ name ^
-  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nmodule S8 = SecretByte\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\nopen BufferViewHelpers\n#set-options \"--z3rlimit 40\"\n\n" ^
+  "\n\nopen LowStar.Buffer\nmodule B = LowStar.Buffer\nmodule BV = LowStar.BufferView\nopen LowStar.Modifies\nmodule M = LowStar.Modifies\nopen LowStar.ModifiesPat\nopen FStar.HyperStack.ST\nmodule HS = FStar.HyperStack\nmodule S8 = SecretByte\nopen Interop\nopen Words_s\nopen Types_s\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\nopen BufferViewHelpers\nopen Interop_assumptions\n#set-options \"--z3rlimit 40\"\n\n" ^
   "open Vale_" ^ name ^ "\n\n" ^
-  "assume val st_put (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0) (fun h0 _ h1 -> f h0 == h1)\n\n" ^
   "let b8 = B.buffer UInt8.t\n" ^
   "let s8 = B.buffer S8.t\n\n" ^
-  "//The map from buffers to addresses in the heap, that remains abstract\n" ^
-  "assume val addrs: addr_map\n\n" ^  
    "let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =\n" ^
    "  match ls with\n" ^
    "  | [] -> True\n" ^
@@ -310,9 +307,6 @@ let translate_lowstar os target (func:func_ty) =
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
   "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
     ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
-  "//The initial registers and xmms\n" ^
-  "assume val init_regs:reg -> nat64\n" ^
-  "assume val init_xmms:xmm -> quad32\n\n" ^
   "#set-options \"--initial_fuel " ^ fuel_value ^ " --max_fuel " ^ fuel_value ^ " --initial_ifuel 2 --max_ifuel 2\"\n" ^
   "// TODO: Prove these two lemmas if they are not proven automatically\n" ^
   "let implies_pre (h0:HS.mem) " ^ (print_args_list args) ^ 
@@ -364,7 +358,6 @@ let translate_lowstar os target (func:func_ty) =
   "let " ^ name ^ " " ^ (print_args_names args) ^ " =\n" ^
   (if stack_needed then "  push_frame();\n" ^
     "  let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t " ^ string_of_int length_stack ^ ") in\n"  else "") ^
-  "  let h0 = get() in\n" ^
   "  st_put (fun h -> pre_cond h " ^ (print_args_names args) ^ stack_precond "h" ^ ") (ghost_" ^ name ^ " " ^ (print_args_names args) ^ 
   (if stack_needed then "stack_b);\n  pop_frame()\n" else ")\n")
   
@@ -386,6 +379,16 @@ let rec print_vale_loc_buff = function
 let rec print_buff_readable = function
   | [] -> ""
   | (a, TBuffer _, _)::q -> "        buffer_readable(mem, "^a^");\n" ^ print_buff_readable q
+  | a::q -> print_buff_readable q
+
+let print_ty_number = function
+  | TUInt8 -> "8"
+  | TUInt64 -> "64"
+  | TUInt128 -> "128"
+
+let rec print_valid_taints = function
+  | [] -> ""
+  | (a, TBuffer ty, t)::q -> "        valid_taint_buf" ^ (print_ty_number ty) ^ "(" ^ a ^ ", mem, memTaint, "^ taint_of_label t ^");\n" ^ print_valid_taints q
   | a::q -> print_buff_readable q
 
 let print_vale_arg_value = function
@@ -435,9 +438,9 @@ let translate_vale os target (func:func_ty) =
   "    requires/ensures\n" ^
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
   print_buff_readable args ^
+  print_valid_taints args ^
   (if stack_needed then
-  "    requires\n" ^
-(if stack_needed then  "        buffer_length(stack_b) >= " ^ (string_of_int nbr_stack_args) ^ ";\n" else "") ^
+  (if stack_needed then  "        buffer_length(stack_b) >= " ^ (string_of_int nbr_stack_args) ^ ";\n" else "") ^
   "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int slots) ^ ");\n"
   else "") ^
   // stack_b and ghost args are not real arguments

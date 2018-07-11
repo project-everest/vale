@@ -17,21 +17,12 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open BufferViewHelpers
+open Interop_assumptions
 #set-options "--z3rlimit 40"
 
 open Vale_gcm_load_xor_store_buffer_win
 
-assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)
-
-//The map from buffers to addresses in the heap, that remains abstract
-assume val addrs: addr_map
-
-//The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
-
 #set-options "--initial_fuel 6 --max_fuel 6 --initial_ifuel 2 --max_ifuel 2"
-// TODO: Prove these two lemmas if they are not proven automatically
 let implies_pre (h0:HS.mem) (plain_b:s8) (mask_b:s8) (cipher_b:s8) (offset:nat64) (num_blocks:Ghost.erased (nat64)) (key:Ghost.erased (aes_key_LE AES_128)) (iv:Ghost.erased (quad32))  (stack_b:b8) : Lemma
   (requires pre_cond h0 plain_b mask_b cipher_b offset num_blocks key iv /\ B.length stack_b == 40 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;mask_b;cipher_b])
   (ensures (
@@ -176,6 +167,5 @@ let ghost_gcm_load_xor_store_buffer_win plain_b mask_b cipher_b offset num_block
 let gcm_load_xor_store_buffer_win plain_b mask_b cipher_b offset num_blocks key iv  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 40) in
-  let h0 = get() in
-  st_put h0 (fun h -> pre_cond h plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv /\ B.length stack_b == 40 /\ live h stack_b /\ buf_disjoint_from stack_b [plain_b;mask_b;cipher_b]) (ghost_gcm_load_xor_store_buffer_win plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv stack_b);
+  st_put (fun h -> pre_cond h plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv /\ B.length stack_b == 40 /\ live h stack_b /\ buf_disjoint_from stack_b [plain_b;mask_b;cipher_b]) (ghost_gcm_load_xor_store_buffer_win plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv stack_b);
   pop_frame()

@@ -67,7 +67,6 @@ let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8 { B.length key
 
 open FStar.Mul
 
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (plain_b:s8) (num_bytes:nat64) (iv_old:Ghost.erased (quad32)) (iv_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) (cipher_b:s8) = live h plain_b /\ live h iv_b /\ live h keys_b /\ live h cipher_b /\ bufs_disjoint [plain_b;iv_b;keys_b;cipher_b] /\ length plain_b % 16 == 0 /\ length iv_b % 16 == 0 /\ length keys_b % 16 == 0 /\ length cipher_b % 16 == 0
 /\ (    let mods = M.loc_buffer cipher_b in 
     B.live h plain_b /\ B.live h iv_b /\ B.live h keys_b /\ B.live h cipher_b /\

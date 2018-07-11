@@ -17,14 +17,10 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open BufferViewHelpers
+open Interop_assumptions
 #set-options "--z3rlimit 40"
 
 open Vale_zero_quad32_buffer_win
-
-assume val st_put (h:HS.mem) (p:HS.mem -> Type0) (f:(h0:HS.mem{p h0}) -> GTot HS.mem) : Stack unit (fun h0 -> p h0 /\ h == h0) (fun h0 _ h1 -> h == h0 /\ f h == h1)
-
-//The map from buffers to addresses in the heap, that remains abstract
-assume val addrs: addr_map
 
 let rec loc_locs_disjoint_rec (l:b8) (ls:list b8) : Type0 =
   match ls with
@@ -42,12 +38,7 @@ let bufs_disjoint (ls:list b8) : Type0 = normalize (locs_disjoint_rec ls)
 unfold
 let buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
-//The initial registers and xmms
-assume val init_regs:reg -> nat64
-assume val init_xmms:xmm -> quad32
-
 #set-options "--initial_fuel 4 --max_fuel 4 --initial_ifuel 2 --max_ifuel 2"
-// TODO: Prove these two lemmas if they are not proven automatically
 let implies_pre (h0:HS.mem) (b:s8)  (stack_b:b8) : Lemma
   (requires pre_cond h0 b /\ B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b])
   (ensures (
@@ -132,6 +123,5 @@ let ghost_zero_quad32_buffer_win b stack_b h0 =
 let zero_quad32_buffer_win b  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 16) in
-  let h0 = get() in
-  st_put h0 (fun h -> pre_cond h b /\ B.length stack_b == 16 /\ live h stack_b /\ buf_disjoint_from stack_b [b]) (ghost_zero_quad32_buffer_win b stack_b);
+  st_put (fun h -> pre_cond h b /\ B.length stack_b == 16 /\ live h stack_b /\ buf_disjoint_from stack_b [b]) (ghost_zero_quad32_buffer_win b stack_b);
   pop_frame()

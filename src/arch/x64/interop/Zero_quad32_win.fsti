@@ -20,10 +20,8 @@ open X64.Vale.Decls_i
 let b8 = B.buffer UInt8.t
 let s8 = B.buffer S8.t
 
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (b:s8) = B.live h b /\
     B.length b == 16
-
 
 let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
