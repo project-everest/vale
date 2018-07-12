@@ -222,7 +222,11 @@ let lemma_slice_orig_index (#a:Type) (s s':seq a) (m n:nat) : Lemma
   (requires length s == length s' /\ m <= n /\ n <= length s /\ slice s m n == slice s' m n)
   (ensures (forall (i:int).{:pattern (index s i) \/ (index s' i)} m <= i /\ i < n ==> index s i == index s' i))
   =
-  admit ()   // TODO
+  let aux (i:nat{m <= i /\ i < n}) : Lemma (index s i == index s' i) =
+    admit();
+    lemma_index_slice s m n (i - m);
+    lemma_index_slice s' m n (i - m)
+  in Classical.forall_intro aux
 
 let lemma_ishl_32 (x:nat32) (k:nat) : Lemma
   (ensures ishl #pow2_32 x k == x * pow2 k % pow2_32)
