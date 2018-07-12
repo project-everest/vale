@@ -76,71 +76,12 @@ fsyacc --module "Parse" -v $(ProjectDir)parse.fsy -o parse.fs</PreBuildEvent>
     </Compile>
     <Compile Include="transform.fs" />
     <Compile Include="emit_common.fs" />
-    <Compile Include="emit_dafny_text.fs" />
-    <Compile Include="emit_dafny_direct.fs" />
     <Compile Include="emit_fstar_text.fs" />
     <Compile Include="emit_vale_text.fs" />
     <Compile Include="main.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="BoogieAbsInt">
-      <HintPath>..\..\Dafny\BoogieAbsInt.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieBasetypes">
-      <HintPath>..\..\Dafny\BoogieBasetypes.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieCodeContractsExtender">
-      <HintPath>..\..\Dafny\BoogieCodeContractsExtender.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieConcurrency">
-      <HintPath>..\..\Dafny\BoogieConcurrency.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieCore">
-      <HintPath>..\..\Dafny\BoogieCore.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieDoomed">
-      <HintPath>..\..\Dafny\BoogieDoomed.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieExecutionEngine">
-      <HintPath>..\..\Dafny\BoogieExecutionEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieGraph">
-      <HintPath>..\..\Dafny\BoogieGraph.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieHoudini">
-      <HintPath>..\..\Dafny\BoogieHoudini.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieModel">
-      <HintPath>..\..\Dafny\BoogieModel.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieModelViewer">
-      <HintPath>..\..\Dafny\BoogieModelViewer.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieParserHelper">
-      <HintPath>..\..\Dafny\BoogieParserHelper.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieVCExpr">
-      <HintPath>..\..\Dafny\BoogieVCExpr.dll</HintPath>
-    </Reference>
-    <Reference Include="BoogieVCGeneration">
-      <HintPath>..\..\Dafny\BoogieVCGeneration.dll</HintPath>
-    </Reference>
-    <Reference Include="Provers.SMTLib">
-      <HintPath>..\..\Dafny\Provers.SMTLib.dll</HintPath>
-    </Reference>
-    <Reference Include="DafnyPipeline">
-      <HintPath>..\..\Dafny\DafnyPipeline.dll</HintPath>
-    </Reference>
-    <Reference Include="Dafny">
-      <HintPath>..\..\Dafny\Dafny.exe</HintPath>
-    </Reference>
-    <Reference Include="DafnyInterface">
-      <HintPath>..\DafnyInterface\bin\DafnyInterface.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\Dafny\Newtonsoft.Json.dll</HintPath>
-    </Reference>
     <Reference Include="FsLexYacc.Runtime">
       <HintPath>..\..\fsharp4.0\FsLexYacc.Runtime.dll</HintPath>
     </Reference>
