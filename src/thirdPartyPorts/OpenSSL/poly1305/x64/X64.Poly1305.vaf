@@ -186,7 +186,7 @@ procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
 //        lemma_mul_strict_upper_bound(x, xb, y, yb);
 //    }
     // TODO:  This version leads Z3 off into the weeds and times out with F* (but not Dafny)
-    //assume forall x:nat, xb, y:nat, yb { x*y, xb*yb } :: x < xb && y < yb ==> x * y < xb * yb;
+    // assert forall x:nat, xb, y:nat, yb { x*y, xb*yb } :: x < xb && y < yb ==> x * y < xb * yb;
 
     lemma_mul_strict_upper_bound(h2, 7, r0, n / 16);
     lemma_mul_strict_upper_bound(h0, n, r1, n / 16);
