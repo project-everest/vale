@@ -199,7 +199,7 @@ let qIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
   )
 
 let qAssertLemma p = fun () -> ()
-let qAssumeLemma p = fun () -> assume p
+//let qAssumeLemma p = fun () -> assume p
 
 let qAssertByLemma #a p qcs s0 =
   fun () -> wp_sound [] qcs (fun _ _ -> p) s0

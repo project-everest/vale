@@ -7,7 +7,7 @@ Supplementary Material for *A Verified, Efficient Embedding of A Verifiable Asse
 [proof.txt] contains a formalization of the interoperation between Low\* and Vale code,
 as well as a proof of Theorem 4.2, which demonstrates secret independence for such hybrid programs.
 
-[SOMETHING?] contains the simplified examples presented in Section 3 as part of the exposition
+[QuickRegs1.fst] and [QuickRegs2.fst] contain the simplified examples presented in Section 3 as part of the exposition
 of our optimized verification technique.
 
 

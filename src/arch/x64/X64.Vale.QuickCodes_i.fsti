@@ -213,12 +213,12 @@ val qAssertLemma (p:Type0) : tAssertLemma p
 let qAssert (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
   QLemma r msg e e (qAssertLemma e) qcs
 
-let tAssumeLemma (p:Type0) = unit -> Lemma (requires True) (ensures p)
-val qAssumeLemma (p:Type0) : tAssumeLemma p
+//let tAssumeLemma (p:Type0) = unit -> Lemma (requires True) (ensures p)
+//val qAssumeLemma (p:Type0) : tAssumeLemma p
 
-[@va_qattr]
-let qAssume (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
-  QLemma r msg True e (qAssumeLemma e) qcs
+//[@va_qattr]
+//let qAssume (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
+//  QLemma r msg True e (qAssumeLemma e) qcs
 
 let tAssertByLemma (#a:Type) (p:Type0) (qcs:quickCodes a []) (s0:state) =
   unit -> Lemma (requires wp [] qcs (fun _ _ -> p) s0) (ensures p)

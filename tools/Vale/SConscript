@@ -128,15 +128,9 @@ vale_tool = build_vale(SRC, REFS)
 
 # copy the dependencies to the BIN directory, too
 dependencies = vale_tool
-z3 = FindFile('z3', os.environ['PATH'].split(':'))
-if z3 == None:
-  raise EnvironmentError('z3 missing from path.')
-Depends(vale_tool, z3)
-dependencies.append(z3)
-    
   
 # Return a list containing the vale.exe tool and its dependent DLLs, for
 # other scripts to use as additional dependencies.
 # Also return the path to z3 relative to the root Sconstruct file.
-vale_tool_results = collections.namedtuple('ValeToolResults', 'dependencies z3')(dependencies, z3)
+vale_tool_results = dependencies
 Return('vale_tool_results')

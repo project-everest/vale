@@ -201,6 +201,11 @@ is_single_vaf = not (single_vaf is None)
 min_test = GetOption('min_test')
 env['VALE_SCONS_ARGS'] = '-disableVerify -omitUnverified' if is_single_vaf else '-noLemmas' if no_lemmas else ''
 
+if sys.platform == 'win32':
+  gmp_dll = FindFile('libgmp-10.dll', os.environ['PATH'].split(';'))
+  if gmp_dll != None:
+    env.PrependENVPath('PATH', os.path.dirname(str(gmp_dll)))
+
 ####################################################################
 #
 #   Add support for color in the output
@@ -856,8 +861,7 @@ Export('env', 'BuildOptions', 'fstar_default_args', 'fstar_default_args_nosmtenc
 
 # Include the SConscript files themselves
 vale_tool_results = SConscript('tools/Vale/SConscript')
-vale_deps = vale_tool_results.dependencies;
-env['Z3'] = vale_tool_results.z3
+vale_deps = vale_tool_results;
 
 # Check F* version
 if do_fstar and not fstar_my_version:
@@ -883,6 +887,8 @@ if do_fstar and verify:
   env['FSTAR_Z3_PATH'] = '--smt ' + fstar_z3
 else:
   env['FSTAR_Z3_PATH'] = ''
+
+env['Z3'] = fstar_z3
 
 SConscript('./SConscript')
 
