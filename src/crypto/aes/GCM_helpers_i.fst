@@ -71,7 +71,7 @@ let pad_to_128_bits_multiples (b:seq nat8) : Lemma
   let full_blocks = (length b) / 16 * 16 in
   let full_bytes, partial_bytes = split b full_blocks in
   if length b < 16 then (
-    assert (full_bytes == createEmpty);
+    assert (full_bytes == empty);
     assert (partial_bytes == b);
     append_empty_l(pad_to_128_bits partial_bytes);
     ()

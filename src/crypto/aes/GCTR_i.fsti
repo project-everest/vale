@@ -13,7 +13,7 @@ open FStar.Math.Lemmas
 open Collections.Seqs_i
 
 let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE = 
-  if 4096 * length p < pow2_32 then p else createEmpty
+  if 4096 * length p < pow2_32 then p else empty
 
 val gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int) :
   Lemma (gctr_encrypt_block icb_BE plain_LE alg key i ==
