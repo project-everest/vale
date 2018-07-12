@@ -106,7 +106,7 @@ and string_of_var_storage (g:var_storage) =
   | XPhysical -> ""
   | XOperand -> ""
   | XInline -> "inline "
-  | XAlias _ -> "{:alias}" // TODO
+  | XAlias _ -> "{:alias}" 
   | XState e -> "{:state" + (string_of_exp_prec 5 e) + "}"
 and string_of_formal (x:id, t:typ option) = (sid x) + (match t with None -> "" | Some t -> ":" + (string_of_typ t))
 and string_of_formals (xs:formal list):string = String.concat ", " (List.map string_of_formal xs)

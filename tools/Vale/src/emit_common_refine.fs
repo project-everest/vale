@@ -1320,7 +1320,6 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
         fattrs = [];
       }
     let fReq =
-      // REVIEW: this is currently unused
       {
         fname = Reserved ("req_" + (string_of_id p.pname));
         fghost = Ghost;

@@ -308,7 +308,6 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
       | _ -> []
       in
     let p_rmods = List.collect collect_p_mods p.pspecs in
-    // TODO: process mrets
     let collect_operand (pp, ea):(mod_kind * id) list =
       match pp with
       | (_, _, XOperand, io, _) ->
@@ -349,9 +348,8 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
         )
       | _ -> []
       in
-    let (mrets, margs) = match_proc_args p lhss es in // TODO: mrets
+    let (mrets, margs) = match_proc_args p lhss es in 
     let p_rmods = List.collect collect_operand margs @ p_rmods in
-    // REVIEW: right now, Preserve is (conservatively) treated as Modify
     let (p_reads, p_mods) = List.partition (fun (m, _) -> match m with Read -> true | Modify | Preserve -> false) p_rmods in
     let p_reads = Set.ofList (List.map snd p_reads) in
     let p_mods = Set.ofList (List.map snd p_mods) in
@@ -508,7 +506,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
   let ss = List.concat (List.rev sssRev) in
   let enss = List.collect (fun s -> match s with Ensures e -> [s] | _ -> []) specs in
   let globals = List.collect (fun (x, info) -> match info with ThreadLocal _ -> [x] | _ -> []) (Map.toList env.ids) in
-  let xArgs = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _ (* TODO? InOut | Out *)) -> [x] | _ -> []) args in
+  let xArgs = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _ ) -> [x] | _ -> []) args in
   let xRets = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _) -> [x] | _ -> []) rets in
   let xfs = Set.toList (Set.unionMany [Set.ofList globals; Set.ofList xArgs; Set.ofList xRets; free_vars_specs enss]) in
   let ensAssume = List.collect (genAssume env prev) xfs in
@@ -584,7 +582,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
     let codeLemma e = e
 //      match asOperand with
 //      | None -> e
-//      | Some xo -> EOp (CodeLemmaOp, [vaApp "op" [e]; e]) // REVIEW -- should be more principled
+//      | Some xo -> EOp (CodeLemmaOp, [vaApp "op" [e]; e]) 
       in
     let constOp e =
       let ec = EOp (Uop UConst, [e]) in
@@ -598,7 +596,6 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
       (
         let rec f x info =
           match info with
-          // TODO: check for incorrect uses of old
           | GhostLocal _ -> Unchanged
           | InlineLocal _ -> (match g with NotGhost -> Replace (constOp e) | Ghost -> Unchanged)
           | OperandLocal (opIo, t) ->
@@ -711,9 +708,6 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)'; if the expression is intended as a non-const operand, try declaring operand procedures)"
         // Replace (codeLemma e)
     | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg rctx NotGhost None io env e)
-// TODO: this is a real error message, it should be uncommented
-//    | (_, EApply (x, _)) when Map.containsKey x env.procs ->
-//        err ("cannot call a procedure from inside an expression or variable declaration")
     | (Ghost, _) -> Unchanged
     in
   try
@@ -1142,7 +1136,6 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let aliases = List.filter is_alias (Set.toList (Set.union raw_reads raw_mods)) in
         let ins = in_reads @ outs in
         let in_id (x:id) : id =
-          // REVIEW: consistently apply or not apply in_id?
           match find_var x with
           | InlineLocal _ -> x
           | _ -> in_id x

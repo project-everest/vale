@@ -53,8 +53,6 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     let eApp = EApply (x, es) in
     let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
     (true, EApply (Id "qPURE", [range; msg; fApp; eTail]))
-    // TODO: return values from lemmas
-//    (true, EApply (Id "qPURE", [fApp; eTail]))
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with

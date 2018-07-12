@@ -48,8 +48,6 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
       try List.map (fun e -> ELoc (loc, e)) (build_code_stmt env benv s) with err -> raise (LocErr (loc, err))
   | SBlock b -> [rs b]
   | SQuickBlock (info, b) ->
-      // REVIEW: would be more consistent to generate a value of type "code" rather than "codes",
-      // but the normalization doesn't seem to work as well for "code".
       let p = benv.proc in
       let fParams = make_fun_params p.prets p.pargs in
       let name = benv.code_name (info.qsym + "_") in
@@ -263,7 +261,6 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
       let (sw2, fw2) = (Reserved ("sW" + i2), Reserved ("fW" + i2)) in
       let (codeCond, codeBody, sCodeVars) =
         if !fstar then
-          // REVIEW: workaround for F* issue
           let (xc, xb) = (Reserved ("sC" + i1), Reserved ("sB" + i1)) in
           let sCond = SAssign ([(xc, None)], codeCond) in
           let sBody = SAssign ([(xb, None)], codeBody) in

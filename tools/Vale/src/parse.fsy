@@ -244,7 +244,6 @@ VarType
   | COLON Type { Some $2 }
 
 Lhs
-// TODO:  : Exp1 { ($1, None) }
   : AnyId { ($1, None) }
   | THIS { (Reserved "this", None) }
   | LPAREN Var AnyId VarType RPAREN { let (_, g) = $2 in ($3, Some ($4, g)) }

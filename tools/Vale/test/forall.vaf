@@ -153,14 +153,6 @@ procedure Calls6()
     }
 }
 
-/* TODO
-procedure p()
-{
-   assert forall x, y {x + y} {y + x}:: x > 0 && y > 0 ==> x + y > x && y + x > y;
-   assert forall x, y {x + y, y + x}:: x > 0 && y > 0 ==> x + y == y + x;
-}
-*/
-
 procedure Double()
 {
    forall x:int :| x >= 0 :: opaque_double(x) >= x
