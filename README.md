@@ -40,5 +40,5 @@ distinguish trusted F\* files by appending `_s` (for specification) to the name.
 * [src/crypto](./src/crypto): verified cryptographic code for our Poly1305 and AES case studies
 * [src/thirdPartyPorts](./src/thirdPartyPorts): verified cryptographic code, derived from OpenSSL, for Poly1305 
 
-
+All files verify with F\* version `2634db3e5` and Z3 version 4.5.1.
 
