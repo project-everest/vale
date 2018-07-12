@@ -1,41 +1,44 @@
-Vale (Verified Assembly Language for Everest)
-=============================================
 
-Vale is a tool for constructing formally verified high-performance assembly language code,
-with an emphasis on cryptographic code.
-It uses existing verification frameworks,
-such as [Dafny](https://github.com/Microsoft/dafny) and [F\*](https://github.com/FStarLang/FStar),
-for formal verification.
-It supports multiple architectures, such as x86, x64, and ARM, and multiple platforms, such as Windows, Mac, and Linux.
-Additional architectures and platforms can be supported with no changes to the Vale tool.
+Supplementary Material for *A Verified, Efficient Embedding of A Verifiable Assembly Language*
+==============================================================================================
 
-Vale is part of the [Everest project](https://project-everest.github.io).
+# Organization
 
-# Installation
+[proof.txt] contains a formalization of the interoperation between Low\* and Vale code,
+as well as a proof of Theorem 4.2, which demonstrates secret independence for such hybrid programs.
 
-See the [INSTALL](./INSTALL.md) file for installing Vale and its dependencies.
+[SOMETHING?] contains the simplified examples presented in Section 3 as part of the exposition
+of our optimized verification technique.
 
-# Code Organization
 
-See the [CODE](./CODE.md) file for more details on the various files in the repository.
+The following directories contain Vale and related tools:
 
-# Documentation
+* [tools/Vale/src](./tools/Vale/src): Vale
+* [tools/Vale/test](./tools/Vale/test): test files for Vale
 
-See the [Vale documentation](./doc/index.html) for a description of the Vale language and Vale tool.
 
-You can also see our academic paper describing Vale:
+The following directories contain library code and cryptographic code verified
+by F\* and Vale.  Vale files end in `.vaf`, while F\* files end in `.fsti` for
+interfaces and `.fst` for the corresponding implementation.  We generally
+distinguish trusted F\* files by appending `_s` (for specification) to the name.
 
-> [Vale: Verifying High-Performance Cryptographic Assembly Code](https://project-everest.github.io/assets/vale2017.pdf)  
-> Barry Bond, Chris Hawblitzel, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch, Bryan Parno, Ashay Rane, Srinath Setty, Laure Thompson.  
-> In Proceedings of the USENIX Security Symposium, 2017.  
-> Distinguished Paper Award
+* [src/arch](./src/arch): definitions of basic types 
+* [src/arch/x64](./src/arch/x64): definitions and proofs related to our assembly language semantics for x64
+    - `X64.Machine_s.fst`: basic components of our machine model
+    - `X64.Bytes_Semantics_s.fst`: defines our trusted bytes-level semantics
+    - `X64.Vale.Ins*`: implements Vale procedures the provide verified Hoare-style reasoning on top of our semantics
+    - `X64.Vale.QuickCode*`: implements our efficient verified verification-condition generator
+    - `X64.Taint_Semantics_s.fst`: wraps the basic semantics in a trace-based model of information leakage
+    - `X64.Leakage_s.fst`: defines what it means for assembly code to be leakage free
+    - `X64.Leakage_i.fst`: implements a verified leakage analyzer
+    - `X64.Print_s.fst`: a trusted printer that converts an assembly AST in F\* into assembly suitable for MASM or GCC
+    - `Interop.fst`, `Views.fst`, and `interop/` defines interop between Low\* code and Vale code and proves the correctness of various stubs used in our case studies
+    - `extracted`: C files extracted from our Low\* code
 
-# License
 
-Vale is licensed under the Apache license in the [LICENSE](./LICENSE) file.
+* [src/lib](./src/lib): general-purpose libraries written in F\*
+* [src/crypto](./src/crypto): verified cryptographic code for our Poly1305 and AES case studies
+* [src/thirdPartyPorts](./src/thirdPartyPorts): verified cryptographic code, derived from OpenSSL, for Poly1305 
 
-# Version History
-- v0.1:   Initial code release, containing code written by:
-Andrew Baumann, Barry Bond, Andrew Ferraiuolo, Chris Hawblitzel,
-Jon Howell, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch,
-Bryan Parno, Ashay Rane, Srinath Setty, and Laure Thompson.
+
+
