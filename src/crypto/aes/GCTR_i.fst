@@ -223,7 +223,6 @@ let lemma_slice_orig_index (#a:Type) (s s':seq a) (m n:nat) : Lemma
   (ensures (forall (i:int).{:pattern (index s i) \/ (index s' i)} m <= i /\ i < n ==> index s i == index s' i))
   =
   let aux (i:nat{m <= i /\ i < n}) : Lemma (index s i == index s' i) =
-    admit();
     lemma_index_slice s m n (i - m);
     lemma_index_slice s' m n (i - m)
   in Classical.forall_intro aux
@@ -246,21 +245,61 @@ let lemma_ishl_ixor_32 (x y:nat32) (k:nat) : Lemma
   FStar.UInt.shift_left_logxor_lemma #32 x y k;
   ()
 
-let nat32_xor_bytewise_2_helper1 (x0 x1 x0' x1':nat16) (x x':nat32) : Lemma
+unfold let pow2_24 = 0x1000000
+let nat24 = natN pow2_24
+
+let nat32_xor_bytewise_1_helper1 (x0 x0':nat8) (x1 x1':nat24) (x x':nat32) : Lemma
   (requires
-    x == x0 + 0x10000 * x1 /\
-    x' == x0' + 0x10000 * x1' /\
-    x  * 0x10000 % 0x100000000 == x' * 0x10000 % 0x100000000
+    x == x0 + 0x100 * x1 /\
+    x' == x0' + 0x100 * x1' /\
+    x * 0x1000000 % 0x100000000 == x' * 0x1000000 % 0x100000000
   )
   (ensures x0 == x0')
   =
+  ()
+
+let nat32_xor_bytewise_2_helper1 (x0 x0' x1 x1':nat16) (x x':nat32) : Lemma
+  (requires
+    x == x0 + 0x10000 * x1 /\
+    x' == x0' + 0x10000 * x1' /\
+    x * 0x10000 % 0x100000000 == x' * 0x10000 % 0x100000000
+  )
+  (ensures x0 == x0')
+  =
+  ()
+
+let nat32_xor_bytewise_3_helper1 (x0 x0':nat24) (x1 x1':nat8) (x x':nat32) : Lemma
+  (requires
+    x == x0 + 0x1000000 * x1 /\
+    x' == x0' + 0x1000000 * x1' /\
+    x * 0x100 % 0x100000000 == x' * 0x100 % 0x100000000
+  )
+  (ensures x0 == x0')
+  =
+  ()
+
+let nat32_xor_bytewise_1_helper2 (x x':nat32) (t t':four nat8) : Lemma
+  (requires
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    x * 0x1000000 % 0x100000000 == x' * 0x1000000 % 0x100000000
+  )
+  (ensures t.lo0 == t'.lo0)
+  =
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  let t123 = t1 + 0x100 * t2 + 0x10000 * t3 in
+  let t123' = t1' + 0x100 * t2' + 0x10000 * t3' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  nat32_xor_bytewise_1_helper1 t0 t0' t123 t123' x x';
   ()
 
 let nat32_xor_bytewise_2_helper2 (x x':nat32) (t t':four nat8) : Lemma
   (requires
     x == four_to_nat 8 t /\
     x' == four_to_nat 8 t' /\
-    x  * 0x10000 % 0x100000000 == x' * 0x10000 % 0x100000000
+    x * 0x10000 % 0x100000000 == x' * 0x10000 % 0x100000000
   )
   (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1)
   =
@@ -272,7 +311,38 @@ let nat32_xor_bytewise_2_helper2 (x x':nat32) (t t':four nat8) : Lemma
   let t23' = t2' + 0x100 * t3' in
   assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
   assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
-  nat32_xor_bytewise_2_helper1 t01 t23 t01' t23' x x';
+  nat32_xor_bytewise_2_helper1 t01 t01' t23 t23' x x';
+  ()
+
+let nat32_xor_bytewise_3_helper2 (x x':nat32) (t t':four nat8) : Lemma
+  (requires
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    x * 0x100 % 0x100000000 == x' * 0x100 % 0x100000000
+  )
+  (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1 /\ t.hi2 == t'.hi2)
+  =
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  let t012 = t0 + 0x100 * t1 + 0x10000 * t2 in
+  let t012' = t0' + 0x100 * t1' + 0x10000 * t2' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  nat32_xor_bytewise_3_helper1 t012 t012' t3 t3' x x';
+  ()
+
+let nat32_xor_bytewise_1_helper3 (k k':nat32) (s s':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    s.lo0 == s'.lo0
+  )
+  (ensures k * 0x1000000 % 0x100000000 == k' * 0x1000000 % 0x100000000)
+  =
+  let Mkfour _ _ _ _ = s in
+  let Mkfour _ _ _ _  = s' in
+  assert_norm (four_to_nat 8 s  == four_to_nat_unfold 8 s );
+  assert_norm (four_to_nat 8 s' == four_to_nat_unfold 8 s');
   ()
 
 let nat32_xor_bytewise_2_helper3 (k k':nat32) (s s':four nat8) : Lemma
@@ -281,12 +351,53 @@ let nat32_xor_bytewise_2_helper3 (k k':nat32) (s s':four nat8) : Lemma
     k' == four_to_nat 8 s' /\
     s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1
   )
-  (ensures k  * 0x10000 % 0x100000000 == k' * 0x10000 % 0x100000000)
+  (ensures k * 0x10000 % 0x100000000 == k' * 0x10000 % 0x100000000)
   =
   let Mkfour _ _ _ _ = s in
   let Mkfour _ _ _ _  = s' in
   assert_norm (four_to_nat 8 s  == four_to_nat_unfold 8 s );
   assert_norm (four_to_nat 8 s' == four_to_nat_unfold 8 s');
+  ()
+
+let nat32_xor_bytewise_3_helper3 (k k':nat32) (s s':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1 /\ s.hi2 == s'.hi2
+  )
+  (ensures k * 0x100 % 0x100000000 == k' * 0x100 % 0x100000000)
+  =
+  let Mkfour _ _ _ _ = s in
+  let Mkfour _ _ _ _  = s' in
+  assert_norm (four_to_nat 8 s  == four_to_nat_unfold 8 s );
+  assert_norm (four_to_nat 8 s' == four_to_nat_unfold 8 s');
+  ()
+
+let nat32_xor_bytewise_1 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s.lo0 == s'.lo0
+  )
+  (ensures t.lo0 == t'.lo0)
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  nat32_xor_bytewise_1_helper3 k k' s s';
+  lemma_ishl_32 k 24;
+  lemma_ishl_32 k' 24;
+  lemma_ishl_32 x 24;
+  lemma_ishl_32 x' 24;
+  lemma_ishl_ixor_32 k m 24;
+  lemma_ishl_ixor_32 k' m 24;
+  assert_norm (pow2 24 == pow2_24);
+  nat32_xor_bytewise_1_helper2 x x' t t';
   ()
 
 let nat32_xor_bytewise_2 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
@@ -323,6 +434,52 @@ let nat32_xor_bytewise_2 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
   nat32_xor_bytewise_2_helper2 x x' t t';
   ()
 
+let nat32_xor_bytewise_3 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1 /\ s.hi2 == s'.hi2
+  )
+  (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1 /\ t.hi2 == t'.hi2)
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  nat32_xor_bytewise_3_helper3 k k' s s';
+  lemma_ishl_32 k 8;
+  lemma_ishl_32 k' 8;
+  lemma_ishl_32 x 8;
+  lemma_ishl_32 x' 8;
+  lemma_ishl_ixor_32 k m 8;
+  lemma_ishl_ixor_32 k' m 8;
+  nat32_xor_bytewise_3_helper2 x x' t t';
+  ()
+
+let nat32_xor_bytewise_4 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s == s'
+  )
+  (ensures t == t')
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  ()
+
 let nat32_xor_bytewise (k k' m:nat32) (s s' t t':seq4 nat8) (n:nat) : Lemma
   (requires
     n <= 4 /\
@@ -335,14 +492,16 @@ let nat32_xor_bytewise (k k' m:nat32) (s s' t t':seq4 nat8) (n:nat) : Lemma
 //  (ensures equal (slice t 0 n) (slice t' 0 n))
   (ensures (forall (i:nat).{:pattern (index t i) \/ (index t' i)} i < n ==> index t i == index t' i))
   =
-assume (n == 2);
+  assert (n > 0 ==> index (slice s 0 n) 0 == index (slice s' 0 n) 0);
+  assert (n > 1 ==> index (slice s 0 n) 1 == index (slice s' 0 n) 1);
+  assert (n > 2 ==> index (slice s 0 n) 2 == index (slice s' 0 n) 2);
+  assert (n > 3 ==> index (slice s 0 n) 3 == index (slice s' 0 n) 3);
   let x = ixor k m in
   let x' = ixor k' m in
-  assert (index (slice s 0 n) 0 == index (slice s' 0 n) 0);
-  assert (index (slice s 0 n) 1 == index (slice s' 0 n) 1);
-//  assert (index (slice s 0 n) 2 == index (slice s' 0 n) 2);
-//  assert (index (slice s 0 n) 3 == index (slice s' 0 n) 3);
-  nat32_xor_bytewise_2 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 1 then nat32_xor_bytewise_1 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 2 then nat32_xor_bytewise_2 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 3 then nat32_xor_bytewise_3 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 4 then nat32_xor_bytewise_4 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
   assert (equal (slice t 0 n) (slice t' 0 n));
   lemma_slice_orig_index t t' 0 n;
   ()
