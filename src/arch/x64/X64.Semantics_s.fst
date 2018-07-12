@@ -24,8 +24,6 @@ type codes = S.codes
 val havoc : state -> ins -> nat64
 let havoc s ins = S.havoc s.state ins
 
-// TODO: Need to be sure that load/store_mem does an appropriate little-endian load
-
 unfold let eval_reg (r:reg) (s:state) : nat64 = S.eval_reg r s.state
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = S.eval_xmm i s.state
 
@@ -64,7 +62,6 @@ let update_reg' (r:reg) (v:nat64) (s:state) : state = {s with state = S.update_r
 
 let update_xmm' (x:xmm) (v:quad32) (s:state) : state = {s with state = S.update_xmm' x v s.state}
 
-// TODO: Mem operations
 let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
   let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
   else s.state; mem = store_mem64 ptr v s.mem } in
@@ -487,7 +484,6 @@ let eval_ins (ins:ins) : GTot (st unit) =
  * These functions return an option state
  * None case arises when the while loop runs out of fuel
  *)
-// TODO: IfElse and While should havoc the flags
 val eval_code:  c:code           -> fuel:nat -> s:state -> GTot (option state) (decreases %[fuel; c])
 val eval_codes: l:codes          -> fuel:nat -> s:state -> GTot (option state) (decreases %[fuel; l])
 val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> GTot (option state) (decreases %[fuel; c])

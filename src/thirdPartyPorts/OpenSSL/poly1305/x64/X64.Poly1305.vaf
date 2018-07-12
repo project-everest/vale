@@ -180,14 +180,6 @@ procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
         modp(h * r) == modp(hh); 
         h2 < 5;
 {
-//    Previous version used a forall statement, which isn't yet supported for F*
-//    forall x:nat, xb, y:nat, yb :| x < xb && y < yb :: x * y < xb * yb
-//    {
-//        lemma_mul_strict_upper_bound(x, xb, y, yb);
-//    }
-    // TODO:  This version leads Z3 off into the weeds and times out with F* (but not Dafny)
-    // assert forall x:nat, xb, y:nat, yb { x*y, xb*yb } :: x < xb && y < yb ==> x * y < xb * yb;
-
     lemma_mul_strict_upper_bound(h2, 7, r0, n / 16);
     lemma_mul_strict_upper_bound(h0, n, r1, n / 16);
     lemma_mul_strict_upper_bound(h1, n, r0, n / 16);
@@ -228,7 +220,6 @@ procedure{:quick} poly1305_blocks(
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
         validSrcAddrs64(mem, inp, inp_b, len / 8, memTaint, Public);
-// TODO: Would be nice to have some syntax for buffer64_read
         let h0_in := buffer64_read(ctx_b, 0, mem);
         let h1_in := buffer64_read(ctx_b, 1, mem);
         let h2_in := buffer64_read(ctx_b, 2, mem);
@@ -333,9 +324,9 @@ procedure{:quick} poly1305_blocks(
 
 
         Add64Wrap_Mem(h0, inp, 0, Public, inp_b, word_index); // accumulate input
-        lemma_load_mem64(inp_b, word_index, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
+        lemma_load_mem64(inp_b, word_index, mem);   
         Adc64Wrap_Mem(h1, inp, 8, Public, inp_b, word_index+1);
-        lemma_load_mem64(inp_b, word_index + 1, mem);   // TODO: Really shouldn't need this, but it's the only connection between eval_operand and buffer64_read
+        lemma_load_mem64(inp_b, word_index + 1, mem);   
         AddLea64(inp, inp, 16);
         Adc64Wrap(h2, padbit);
 

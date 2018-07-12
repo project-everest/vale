@@ -316,7 +316,6 @@ procedure {:quick exportOnly} InitPshufbMask(inout dst:xmm, out tmp:reg_opr64)
     PinsrqImm(dst, 0x0001020304050607, 1, tmp);
 }
 
-// TODO: Lots of room to optimize this using bitwise operations
 procedure {:quick} XmmEqual()
     lets x1 @= xmm0; x2 @= xmm1; tmp @= rdx; result @= rax;
     reads x2;

@@ -419,7 +419,6 @@ procedure {:quick} gctr_bytes_extra(
         cipher == gctr_encrypt_LE(icb_BE, make_gctr_plain_LE(plain), alg, key);
         xmm1 == buffer128_read(out_b, num_blocks, mem);
 
-// TODO: Prove this inside gctr_bytes_extra_work
         // We modified out_b, but we didn't disrupt the work that was previously done
         let     cipher_blocks := slice_work_around(buffer128_as_seq(mem,      out_b), num_blocks);
         let old_cipher_blocks := slice_work_around(buffer128_as_seq(old(mem), out_b), num_blocks);

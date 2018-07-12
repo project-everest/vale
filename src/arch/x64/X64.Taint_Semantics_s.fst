@@ -19,7 +19,6 @@ noeq type traceState = {
   memTaint: memTaint_t;
 }
 
-// TODO : Add the next address also, since we're the heap addresses 64-bit values
 let mem128_to_op = function
   | Mov128Xmm _ -> []
   | Mov128Mem addr -> [OMem addr]

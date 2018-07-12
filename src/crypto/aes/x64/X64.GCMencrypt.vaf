@@ -265,15 +265,12 @@ procedure {:quick} gcm_one_pass(
 
             assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
         } else {
-            // TODO: Should update gcm_one_pass_blocks and gctr_* to give their results in terms of old(mem) and in_b, instead of mem
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
             Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
             gctr_bytes_extra(alg, old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
             Mov64(rax, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rax
             Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
             Mov128(hash, xmm3);
-            // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
-            //       and reading from xmm1 directly.  It's probably still in cache though
             ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes)); 
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
         }
@@ -354,7 +351,6 @@ procedure {:quick} gcm_core_part1(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
@@ -452,7 +448,6 @@ procedure {:quick} gcm_make_length_quad(
 }
 
 
-// TODO: Generate that for Windows as well
 procedure {:quick} gcm_make_length_quad_buffer(
   ghost plain_num_bytes:nat64,
   ghost auth_num_bytes:nat64,
@@ -638,7 +633,6 @@ procedure {:quick} gcm_core(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
@@ -888,7 +882,6 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
@@ -1006,7 +999,6 @@ procedure {:quick} gcm_encrypt_stdcall(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
@@ -1105,7 +1097,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
         validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes), memTaint, Secret);
         validDstAddrs128(mem, tag_ptr, tag_b, 1, memTaint, Secret);
 
-        buffer_length(stack_b) >= (if win then 4 + 1 + 4 + 18 else 2 + 8);       // TODO: On Windows, we need to allow room for "shadow space" (32B), ret (8B), and args
+        buffer_length(stack_b) >= (if win then 4 + 1 + 4 + 18 else 2 + 8);       
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 
@@ -1142,7 +1134,6 @@ procedure {:quick} gcm_encrypt2_stdcall(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(plain) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\

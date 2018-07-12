@@ -49,10 +49,6 @@ procedure{:quick} KeyExpansionStdcall(
     lets
         key_ptr := if win then rcx else rdi;
         key_expansion_ptr := if win then rdx else rsi;
-        // TODO: Vale's lack of subtyping won't allow this (or variants thereof), 
-        // since each branch returns different type
-        //key := (if (alg = AES_128) then quad32_to_seq(buffer128_read(input_key_b, 0, mem))
-        //        else make_AES256_key(buffer128_read(input_key_b, 0, mem), buffer128_read(input_key_b, 1, mem)));
     requires/ensures
         alg = AES_128 || alg = AES_256;
         buffers_disjoint128(input_key_b, output_key_expansion_b); 
@@ -60,7 +56,6 @@ procedure{:quick} KeyExpansionStdcall(
         validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, nr(alg) + 1, memTaint, Secret);
     ensures
         modifies_buffer128(output_key_expansion_b, old(mem), mem);
-        // TODO: Revisit when Vale has native typing
         alg = AES_128 ==>
             (let key := old(quad32_to_seq(buffer128_read(input_key_b, 0, mem))) in
              forall j {buffer128_read(output_key_expansion_b, j, mem)} :: 0 <= j <= nr(alg) ==>

@@ -76,8 +76,6 @@ noeq type state = {
 
 assume val havoc : state -> ins -> nat64
 
-// TODO: Need to be sure that load/store_mem does an appropriate little-endian load
-
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 
@@ -628,7 +626,6 @@ let eval_ins (ins:ins) : st unit =
  * These functions return an option state
  * None case arises when the while loop runs out of fuel
  *)
-// TODO: IfElse and While should havoc the flags
 val eval_code:  c:code           -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
 val eval_codes: l:codes          -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; l])
 val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])

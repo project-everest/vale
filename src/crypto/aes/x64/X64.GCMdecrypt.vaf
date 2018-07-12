@@ -265,15 +265,12 @@ procedure {:quick} gcm_one_pass(
 
             assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
         } else {
-            // TODO: Should update gcm_one_pass_blocks and gctr_* to give their results in terms of old(mem) and in_b, instead of mem
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
             Mov128(xmm3, hash); // Save hash b/c gctr_bytes_extra will clobber it
             gctr_bytes_extra(alg, old(icb), in_b, out_b, key, round_keys, keys_b, old(in_ptr), old(out_ptr), old(num_bytes));
             Mov64(rax, rsi);    // ghash_incremental_bytes_extra expects num_bytes % 16 in rax
             //Mov64(r9, r10);     // ghash_incremental_bytes_extra expects old(out_ptr) + 16 * num_blocks in r9
             Mov128(hash, xmm3);
-            // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
-            //       and reading from xmm1 directly.  It's probably still in cache though
             ghash_incremental_bytes_extra(in_b, old(in_ptr), old(hash), old(num_bytes)); 
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
         }
@@ -359,7 +356,6 @@ procedure {:quick} gcm_core_part1(
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
         let plain := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(cipher_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(cipher) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         plain == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth));
@@ -519,7 +515,6 @@ procedure {:quick} gcm_core(
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
         let plain := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(cipher_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(cipher) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         plain == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth)) /\
@@ -635,7 +630,6 @@ procedure {:quick} gcm_decrypt_stdcall_inner_inner(
         let plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),    old(cipher_num_bytes));
         let alleged_tag := le_quad32_to_bytes(buffer128_read(tag_b, 0, old(mem)));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(cipher) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         plain == fst(gcm_decrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth, alleged_tag)) /\
@@ -743,7 +737,6 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
         let plain := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(cipher_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(cipher) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         plain == fst(gcm_decrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth, le_quad32_to_bytes(buffer128_read(tag_b, 0, old(mem))))) /\
@@ -859,7 +852,6 @@ procedure {:quick} gcm_decrypt_stdcall(
         let cipher  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), cipher_b)), old(cipher_num_bytes));
         let plain := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(cipher_num_bytes));
 
-//        // TODO: First two clauses work around Vale's type limitations
         4096 * length(cipher) < pow2_32 /\ 
         4096 * length(auth) < pow2_32 /\
         plain == fst(gcm_decrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth, le_quad32_to_bytes(buffer128_read(tag_b, 0, old(mem))))) /\

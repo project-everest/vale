@@ -50,7 +50,7 @@ val lemma_poly_reduce : n:int -> p:int -> h:int -> h2:int -> h10:int -> c:int ->
   (requires
     p > 0 /\
     n * n > 0 /\
-    h >= 0 /\ h2 >= 0 /\  // TODO: Shouldn't need to add this
+    h >= 0 /\ h2 >= 0 /\  
     4 * (n * n) == p + 5 /\
     h2 == h / (n * n) /\
     h10 == h % (n * n) /\

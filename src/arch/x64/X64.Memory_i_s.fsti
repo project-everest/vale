@@ -52,7 +52,6 @@ unfold let buffer32 = buffer (TBase TUInt32)
 unfold let buffer64 = buffer (TBase TUInt64)
 unfold let buffer128 = buffer (TBase TUInt128)
 
-//TODO : Review, we may want to do this through expose interface
 noeq type state' = {
   state: S.state;
   mem: mem;

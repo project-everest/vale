@@ -69,7 +69,7 @@ let gcm_decrypt_LE_def (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (ciph
   let h_LE = aes_encrypt_LE alg key_LE (Mkfour 0 0 0 0) in
   let j0_BE = Mkfour 1 iv_BE.lo1 iv_BE.hi2 iv_BE.hi3 in
 
-  let p = gctr_encrypt_LE (inc32 j0_BE 1) cipher alg key_LE in   // TODO: Rename gctr_encrypt_LE to gctr_LE
+  let p = gctr_encrypt_LE (inc32 j0_BE 1) cipher alg key_LE in   
 
   let lengths_BE = Mkfour (8 * length cipher) 0 (8 * length auth) 0 in
   let lengths_LE = reverse_bytes_quad32 lengths_BE in

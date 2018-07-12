@@ -79,7 +79,6 @@ let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:memtaint
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
-    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (Seq.index (buffer_as_seq h2 b) i)}
                         0 <= i /\ i < buffer_length b 
                      /\ (i < start || i > last) 

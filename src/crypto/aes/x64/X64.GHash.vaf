@@ -513,7 +513,7 @@ procedure {:quick} compute_pad_to_128_bits()
 
         pad_to_128_bits_lower(old(io), num_bytes);
     } else {
-        assert num_bytes - 8 >= 0;      // TODO: Shouldn't need this with the new type checker
+        assert num_bytes - 8 >= 0;      
         // Grab the upper 64 bits and zero-out 1-7 of the bytes
         Mov64(tmp, num_bytes);
         Sub64(tmp, 8);      // Don't count the lower 64 bits

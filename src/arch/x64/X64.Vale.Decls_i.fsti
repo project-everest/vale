@@ -220,7 +220,7 @@ let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
   match o with
   | OConst n -> s
   | OReg r -> update_reg r v s
-  | OMem m -> s // TODO: support destination memory operands
+  | OMem m -> s 
 
 [@va_qattr]
 let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) =
@@ -325,7 +325,6 @@ let valid_stack_slots (m:M.mem) (rsp:int) (b:M.buffer64) (num_slots:int) =
 
 let modifies_buffer_specific128 (b:M.buffer128) (h1 h2:M.mem) (start last:nat) : GTot Type0 =
     modifies_buffer128 b h1 h2 /\
-    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
                         0 <= i /\ i < buffer_length b 
                      /\ (i < start || i > last) 
@@ -334,7 +333,6 @@ let modifies_buffer_specific128 (b:M.buffer128) (h1 h2:M.mem) (start last:nat) :
 
 let modifies_buffer_specific (b:M.buffer64) (h1 h2:M.mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\
-    // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (Seq.index (M.buffer_as_seq h2 b) i)}
                         0 <= i /\ i < buffer_length b 
                      /\ (i < start || i > last) 
