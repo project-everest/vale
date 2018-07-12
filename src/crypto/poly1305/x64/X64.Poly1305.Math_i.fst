@@ -152,24 +152,79 @@ let lemma_bytes_shift_power2 (y:nat64) =
   reveal_ishl_all 64
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 1 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 30 --z3refresh"
+
+open FStar.UInt
+open FStar.Tactics
+open FStar.Tactics.BV
+
+val lemma_bytes_and_mod0: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x1 - 1) == x % 0x1)
+val lemma_bytes_and_mod1: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x100 - 1) == x % 0x100)
+val lemma_bytes_and_mod2: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x10000 - 1) == x % 0x10000)
+val lemma_bytes_and_mod3: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x1000000 - 1) == x % 0x1000000)
+val lemma_bytes_and_mod4: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x100000000 - 1) == x % 0x100000000)
+val lemma_bytes_and_mod5: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x10000000000 - 1) == x % 0x10000000000)
+val lemma_bytes_and_mod6: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x1000000000000 - 1) == x % 0x1000000000000)
+val lemma_bytes_and_mod7: x: uint_t 64 ->
+  Lemma (logand #64 x  (0x100000000000000 - 1) == x % 0x100000000000000)
+
+let lemma_bytes_and_mod0 x = 
+  assert_by_tactic (logand #64 x (0x1 - 1) == mod #64 x 0x1) bv_tac
+
+let lemma_bytes_and_mod1 x = 
+  assert_by_tactic (logand #64 x (0x100 - 1) == mod #64 x 0x100) bv_tac
+
+let lemma_bytes_and_mod2 x = 
+  assert_by_tactic (logand #64 x (0x10000 - 1) == mod #64 x 0x10000) bv_tac
+let lemma_bytes_and_mod3 x =
+  assert_by_tactic (logand #64 x (0x1000000 - 1) == mod #64 x 0x1000000) bv_tac
+
+let lemma_bytes_and_mod4 x = 
+  assert_by_tactic (logand #64 x (0x100000000 - 1) == mod #64 x 0x100000000) bv_tac
+
+let lemma_bytes_and_mod5 x = 
+  assert_by_tactic (logand #64 x (0x10000000000 - 1) == mod #64 x 0x10000000000) bv_tac
+
+let lemma_bytes_and_mod6 x = 
+  assert_by_tactic (logand #64 x (0x1000000000000 - 1) == mod #64 x 0x1000000000000) bv_tac
+
+let lemma_bytes_and_mod7 x = 
+  assert_by_tactic (logand #64 x (0x100000000000000 - 1) == mod #64 x 0x100000000000000) bv_tac
+
 let lemma_bytes_and_mod (x:nat64) (y:nat64) =
-  lemma_bytes_and_mod x y;
-  // reveal_iand_all 64;
-  // reveal_ishl_all 64;
-  reveal_ishl 64 y 3;
-  assert_norm(shift_left64 y 3 < 64);
-  reveal_ishl 64 1 (shift_left64 y 3);
-  assert_norm(shift_left64 1 (shift_left64 y 3) <> 0);
-  reveal_iand 64 x (( shift_left64 1 (shift_left64 y 3))-1);
-  // reveal_iand 64 x (( shift_left64 1 (shift_left64 y 3))-1);
-  // reveal_ishl 64 y 3;
-  // reveal_ishl 64 1 (shift_left64 y 3);
-  euclidean_division_definition x  ( shift_left64 1 (shift_left64 y 3));
-  assert((shift_left64 1 (shift_left64 y 3) -1) < pow2_64);
-  assume False; // can't get this equality to work
-  assert_by_tactic 
-      (logand64 x (( shift_left64 1 (shift_left64 y 3))-1) == x % ( shift_left64 1 (shift_left64 y 3)))
-      (fun () -> dump "before"; norm[delta]; rewrite_eqs_from_context (); dump "after")
+  reveal_iand_all 64;
+  reveal_ishl_all 64;
+  match y with
+  | 0 ->
+      lemma_bytes_shift_constants0 ();
+      lemma_bytes_and_mod0 x
+  | 1 ->
+    lemma_bytes_shift_constants1 ();
+    lemma_bytes_and_mod1 x
+  | 2 ->
+    lemma_bytes_shift_constants2 ();
+    lemma_bytes_and_mod2 x    
+  | 3 ->
+    lemma_bytes_shift_constants3 ();
+    lemma_bytes_and_mod3 x
+  | 4 -> 
+     lemma_bytes_shift_constants4 ();
+     lemma_bytes_and_mod4 x
+  | 5 ->
+    lemma_bytes_shift_constants5 ();
+    lemma_bytes_and_mod5 x
+  | 6 ->
+    lemma_bytes_shift_constants6 ();
+    lemma_bytes_and_mod6 x
+  | 7 ->
+    lemma_bytes_shift_constants7 ();
+    lemma_bytes_and_mod7 x  
   
 let lemma_mod_factors(x0:nat) (x1:nat) (y:nat) (z:pos) :
   Lemma ((x0 + (y * z) * x1) % z == (x0 % z)) =
@@ -315,11 +370,6 @@ let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
   
 let lemma_poly_demod (p:pos) (h:int) (x:int) (r:int) = 
   distributivity_add_left (h%p) x r; // ((h%p + x)*r)% = ((h%p)*r + x*r)%p
-  assume ((h%p)*r >= 0); //lemmas are phrased for nats...
-  assume (x*r >= 0);
-  assume (h >=0);
-  assume (r >=0);
-  nat_times_nat_is_nat h r;
   modulo_distributivity ((h%p)*r) (x*r) p; // ((h%p)*r + x*r)%p = (((h%p)*r)%p + (x*r)%p)%p
   lemma_mod_mul_distr_l h r p; // ((h%p)*r)%p = (h*r)%p ==> ((h*r)%p + (x*r)%p)%p
   lemma_mod_plus_distr_r ((h*r)%p) (x*r) p;

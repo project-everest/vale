@@ -52,6 +52,7 @@ val div_exact_r (a:int) (n:pos) : Lemma
 val lemma_mod_spec (a:int) (n:pos) : Lemma (a / n = (a - a % n) / n)
 val lemma_mod_spec2 (a:int) (n:pos) : Lemma (let q = (a - (a % n)) / n in a = (a % n) + q * n)
 val lemma_mod_plus_distr_l (a:int) (b:int) (n:pos) : Lemma ((a + b) % n = ((a % n) + b) % n)
+val lemma_mod_plus_distr_r (a:int) (b:int) (n:pos) : Lemma ((a + b) % n = (a + (b % n)) % n)
 
 // OMITTED: lemma_mod_plus_mul_distr
 
@@ -71,7 +72,8 @@ val multiple_modulo_lemma (a:int) (n:pos) : Lemma ((a * n) % n = 0)
 val division_addition_lemma (a:int) (n:pos) (b:int) : Lemma ((a + b * n) / n = a / n + b)
 val division_sub_lemma (a:nat) (n:pos) (b:nat) : Lemma ((a - b * n) / n = a / n - b)
 
-// OMITTED: modulo_distributivity
+val modulo_distributivity: a:int -> b:int -> c:pos ->
+    Lemma ( (a + b) % c = (a % c + b % c) % c )
 
 val modulo_addition_lemma (a:int) (n:pos) (b:int) : Lemma ((a + b * n) % n = a % n)
 val lemma_mod_sub (a:int) (n:pos) (b:nat) : Lemma (ensures (a - b * n) % n = a % n)
