@@ -15,8 +15,6 @@ unfold let eval = eval_code
 [@va_qattr "opaque_to_smt"]
 let labeled_wrap (r:range) (msg:string) (p:Type0) : GTot Type0 = labeled r msg p
 
-// REVIEW: when used inside a function definition, 'labeled' can show up in an SMT query
-// as an uninterpreted function.  Make a wrapper around labeled that is interpreted:
 [@va_qattr "opaque_to_smt"]
 let label (r:range) (msg:string) (p:Type0) : Ghost Type (requires True) (ensures fun q -> q <==> p) =
   assert_norm (labeled_wrap r msg p <==> p);
@@ -73,10 +71,6 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
       let c::cs = cs in
       wp cs (f s0) k s0
   | QPURE r msg pre l qcs ->
-      // REVIEW: rather than just applying 'pre' directly to k,
-      // we define this in a roundabout way so that:
-      // - it works even if 'pre' isn't known to be monotonic
-      // - F*'s error reporting uses 'guard_free' to process labels inside (wp cs qcs k s0)
       (forall (p:unit -> GTot Type0).//{:pattern (pre p)}
         (forall (u:unit).{:pattern (guard_free (p u))} wp cs qcs k s0 ==> p ())
         ==>
@@ -134,7 +128,6 @@ let qblock (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) : quickCo
 
 [@va_qattr]
 let wp_InlineIf (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k:state -> a -> Type0) : Type0 =
-  // REVIEW: this duplicates k
   (b ==> QProc?.wp qc1 s0 k) /\ (not b ==> QProc?.wp qc2 s0 k)
 
 val qInlineIf_monotone (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma
@@ -193,7 +186,6 @@ let eval_cmp (s:state) (c:cmp) : GTot bool =
 
 [@va_qattr]
 let wp_If (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k:state -> a -> Type0) : Type0 =
-  // REVIEW: this duplicates k
   valid_cmp b s0 /\ (eval_cmp s0 b ==> QProc?.wp qc1 ({s0 with trace=BranchPredicate(true)::s0.trace}) k) /\ (not (eval_cmp s0 b) ==> QProc?.wp qc2 ({s0 with trace=BranchPredicate(false)::s0.trace}) k)
 
 val qIf_monotone (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (s0:state) (k1:state -> a -> Type0) (k2:state -> a -> Type0) : Lemma

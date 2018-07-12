@@ -50,7 +50,7 @@ let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
 let rec lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
   (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
   (ensures
-    ((n + n) % 2) == 0 /\ // REVIEW
+    ((n + n) % 2) == 0 /\ 
     poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
     poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
   =

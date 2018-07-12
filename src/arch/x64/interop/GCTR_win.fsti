@@ -83,7 +83,7 @@ let pre_cond (h:HS.mem) (plain_b:s8) (num_bytes:nat64) (iv_old:Ghost.erased (qua
 
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h /\
 
     // Extra reqs

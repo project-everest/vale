@@ -294,7 +294,6 @@ procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
     Mov128(xmm6, xmm2); // div(rab, m);
 
     Gf128ModulusRev(xmm2);
-    // REVIEW: h is small, so we could make a more efficient version of ClmulRev128 for this:
     (ghost var lo2), (ghost var hi2) := ClmulRev128(reverse(rd, 127), h);
     lemma_combine_define(hi2, lo2, 128);
     Mov128(xmm5, xmm2); // div(rdh, m);

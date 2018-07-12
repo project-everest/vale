@@ -131,7 +131,6 @@ let bv128_64_64_lowerUpper128u_bv_bv (x0 x1:bv_t 64) (xx0 xx1:bv_t 128) : Lemma
   =
   ()
 
-// REVIEW: it would greatly help if we could turn bit blasting off in the proofs below (e.g. selectively make bv* uninterpreted)
 
 unfold let mult (x y:int) : int = x * y
 let bv128_64_64_lowerUpper128u_bv_rhs1 (x0 x1:bv_t 64) (xx0 xx1:bv_t 128) : Lemma

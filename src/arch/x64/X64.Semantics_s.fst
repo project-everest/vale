@@ -122,7 +122,6 @@ let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : GTot state =
   let s' = update_operand_preserve_flags' o v s in
   { s' with state = {s'.state with S.flags = havoc s ins } }
 
-(* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
 let cf (flags:nat64) : bool =
   flags % 2 = 1
 

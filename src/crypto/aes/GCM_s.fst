@@ -42,10 +42,6 @@ let gcm_encrypt_LE_def (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plai
 
   (c, t)
 
-//let gcm_encrypt_LE = make_opaque gcm_encrypt_LE_def
-//REVIEW: unexpectedly, the following fails:
-//  let fails () : Lemma (gcm_encrypt_LE == make_opaque gcm_encrypt_LE_def) = ()
-//So we do this instead:
 let gcm_encrypt_LE (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (plain:seq nat8) (auth:seq nat8) :
   Pure (tuple2 (seq nat8) (seq nat8))
     (requires

@@ -266,7 +266,6 @@ let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : state 
 let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
-(* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
 let cf (flags:nat64) : bool =
   flags % 2 = 1
 

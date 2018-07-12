@@ -412,7 +412,7 @@ procedure {:quick} gcm_core_part1(
     Mov64(rcx, plain_num_bytes);
     ghost var icb_enc := iv;
 
-    assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     // Passes -- REVIEW: Seems to be necessary for it to pass at the end of the procedure; unclear why that could possibly be the case
+    assert icb_enc == inc32 (Mkfour(1,iv_BE.lo1,iv_BE.hi2,iv_BE.hi3), 1);     
     gcm_one_pass(alg, plain_b, out_b, key, round_keys, keys_b);
     y_cipher := xmm1;
     ghost var cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, out_b)), old(plain_num_bytes));

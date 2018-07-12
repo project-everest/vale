@@ -124,7 +124,7 @@ let aes128_encrypt_block_buffer
     disjoint keys_b output_b /\
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h
   )
   (ensures fun h () h' -> 
@@ -151,7 +151,7 @@ let aes128_encrypt_block_BE_buffer
     disjoint keys_b output_b /\
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h
   )
   (ensures fun h () h' -> 
@@ -190,7 +190,7 @@ let gctr_bytes_extra_buffer
 
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h /\
 
     // Extra reqs
@@ -529,7 +529,7 @@ let gcm128_one_pass_blocks
     
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h
   )
   (ensures fun h () h' -> 
@@ -573,7 +573,7 @@ let gcm128_one_pass_blocks
 
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h /\
 
     // Interesting loop invariants
@@ -670,7 +670,7 @@ let gcm128_one_pass
 
     // AES reqs
     B.length keys_b == (nr AES_128 + 1) * 16 /\
-    B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+    B.length keys_b % 16 == 0 /\  
     keys_match key keys_b h
   )
   (ensures fun h () h' ->
@@ -678,7 +678,6 @@ let gcm128_one_pass
                  (loc_union (loc_buffer iv_b) 
                             (loc_buffer hash_b))) in
     M.modifies mods h h' /\
-    // REVIEW: Do we really need to relist all of these liveness predicates?
     B.live h' plain_b /\ B.live h' iv_b /\ B.live h' keys_b /\ B.live h' cipher_b /\
     B.live h' h_b /\ B.live h' hash_b /\
     (let num_bytes = U64.v num_bytes in
@@ -822,7 +821,7 @@ let gcm_core_part1
 
       // AES reqs
       B.length keys_b == (nr AES_128 + 1) * 16 /\
-      B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+      B.length keys_b % 16 == 0 /\  
       keys_match key keys_b h            
   )
   (ensures fun h q3 h' -> 
@@ -943,7 +942,7 @@ let gcm_core
 
       // AES reqs
       B.length keys_b == (nr AES_128 + 1) * 16 /\
-      B.length keys_b % 16 == 0 /\  // REVIEW: Should be derivable from line above :(
+      B.length keys_b % 16 == 0 /\  
       keys_match key keys_b h
   )
   (ensures fun h () h' -> 

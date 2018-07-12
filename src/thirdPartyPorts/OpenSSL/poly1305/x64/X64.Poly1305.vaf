@@ -215,7 +215,7 @@ procedure{:quick} poly1305_blocks(
         trace;
     requires
         // Len is measured in bytes
-        len % 16 == 0; // REVIEW: may be stronger than necessary
+        len % 16 == 0; 
         inp + len < pow2_64;
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
@@ -247,7 +247,7 @@ procedure{:quick} poly1305_blocks(
 
         // Framing
         rcx == old(rcx);
-        ctx == old(ctx); // REVIEW: framing should add this automatically
+        ctx == old(ctx); 
 
         let r0_in := buffer64_read(ctx_b, 3, mem);
         let r1_in := buffer64_read(ctx_b, 4, mem);
@@ -286,8 +286,8 @@ procedure{:quick} poly1305_blocks(
 
     while (r15 != 0) // Slight difference: the original code uses the zero flag from "len-=16" rather than comparing len to 0
         invariant
-            n == pow2_64; // REVIEW: not as good as "let n := pow2_64", because it doesn't let F* substitute pow2_64 for n
-            n * n == pow2_64 * pow2_64; // REVIEW: see previous comment
+            n == pow2_64; 
+            n * n == pow2_64 * pow2_64; 
             p == n * n * 4 - 5;
             r == r1 * n + r0;
             h == h2 * (pow2_64 * pow2_64) + h1 * pow2_64 + h0;
@@ -309,8 +309,8 @@ procedure{:quick} poly1305_blocks(
             padbit < 2;            // Not needed with Dafny version 
             validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
             validSrcAddrs64(mem, old(inp), inp_b, length/8, memTaint, Public);
-            ctx == old(ctx); // REVIEW: framing should add this automatically
-            rcx == old(rcx); // REVIEW: framing should add this automatically
+            ctx == old(ctx); 
+            rcx == old(rcx); 
             (inp - old(inp)) % 16 == 0;             // Precondition for poly1305_heap_blocks; Not needed in Dafny version
             modp(h) == poly1305_heap_blocks(modp(h_in), padbit * (n * n), r, buffer64_as_seq(mem, inp_b), word_index);
             mem == old(mem);
@@ -511,7 +511,6 @@ procedure{:quick} poly1305_add_key_s()
 }
 
 #verbatim
-// REVIEW: not clear why TypesNative_s.reveal_iand doesn't work directly
 let reveal_logand128 (x y:nat128) : Lemma
   (requires True)
   (ensures Types_s.iand x y == FStar.UInt.logand #128 x y)
@@ -580,7 +579,7 @@ procedure{:quick} poly1305_impl(
     ghost var r:nat128 := lowerUpper128_opaque(r0, r1);
     assert r == r0 + n * r1 by { reveal_opaque(lowerUpper128); }
 
-    let mask:nat128 := 0x0ffffffc_0ffffffc_0ffffffc_0fffffff; // REVIEW: why do we need to put this constant in a variable?
+    let mask:nat128 := 0x0ffffffc_0ffffffc_0ffffffc_0fffffff; 
     assert r == iand(key_r, mask) by
     {
         reveal_opaque(lowerUpper128);
