@@ -8,6 +8,7 @@ open Types_i
 open FStar.Mul
 open FStar.Seq
 open Opaque_s
+open Words.Two_s
 open Words.Four_s
 open AES_s 
 open GCTR_s
@@ -28,6 +29,7 @@ let extra_bytes_helper (n:nat) : Lemma
   =
   ()
 
+#reset-options "--smtencoding.elim_box true --z3rlimit 25 --max_ifuel 1 --initial_fuel 0 --max_fuel 1"
 let bytes_to_quad_size_no_extra_bytes num_bytes = ()
 let no_extra_bytes_helper s num_bytes = ()
 
@@ -236,80 +238,258 @@ let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) =
   assert(12 <= i /\ i < 16 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q3) (i % 4))
 
 
-#reset-options "--smtencoding.elim_box true --z3rlimit 10 --z3refresh --max_ifuel 1 --initial_fuel 0 --max_fuel 2"
+#reset-options "--smtencoding.elim_box true --z3rlimit 40 --z3refresh --initial_ifuel 0 --max_ifuel 1 --initial_fuel 1 --max_fuel 1"
+let lemma_pad_to_32_bits (s s'':seq4 nat8) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    (forall (i:nat).{:pattern (index s i) \/ (index s'' i)} i < 4 ==>
+      index s'' i == (if i < n then index s i else 0))
+  )
+  (ensures four_to_nat 8 (seq_to_four_LE s'') == four_to_nat 8 (seq_to_four_LE s) % pow2 (8 * n))
+  =
+  assert (n == 0 \/ n == 1 \/ n == 2 \/ n == 3 \/ n == 4);
+  assert_norm (four_to_nat 8 (seq_to_four_LE s) == four_to_nat_unfold 8 (seq_to_four_LE s));
+  assert_norm (four_to_nat 8 (seq_to_four_LE s'') == four_to_nat_unfold 8 (seq_to_four_LE s''));
+  assert_norm (pow2 (0 * 8) == 1);
+  assert_norm (pow2 (1 * 8) == 0x100);
+  assert_norm (pow2 (2 * 8) == 0x10000);
+  assert_norm (pow2 (3 * 8) == 0x1000000);
+  assert_norm (pow2 (4 * 8) == 0x100000000);
+  let x = four_to_nat 8 (seq_to_four_LE s'') in
+  assert (n == 0 ==> x % pow2 (8 * n) == x % 0x1);
+  assert (n == 1 ==> x % pow2 (8 * n) == x % 0x100);
+  assert (n == 2 ==> x % pow2 (8 * n) == x % 0x10000);
+  assert (n == 3 ==> x % pow2 (8 * n) == x % 0x1000000);
+  assert (n == 4 ==> x % pow2 (8 * n) == x % 0x100000000);
+  ()
+
+let lemma_mod_n_8_lower1 (q:quad32) (n:nat) : Lemma
+  (requires n <= 4)
+  (ensures lo64 q % pow2 (8 * n) == q.lo0 % pow2 (8 * n))
+  =
+  let Mkfour _ _ _ _ = q in // avoid ifuel
+  let f (n:nat{n <= 4}) = lo64 q % pow2 (8 * n) == q.lo0 % pow2 (8 * n) in
+  assert_norm (f 0);
+  assert_norm (f 1);
+  assert_norm (f 2);
+  assert_norm (f 3);
+  assert_norm (f 4);
+  ()
+
+let lemma_mod_n_8_lower2 (q:quad32) (n:nat) : Lemma
+  (requires n <= 4)
+  (ensures lo64 q % pow2 (8 * (4 + n)) == q.lo0 + 0x100000000 * (q.lo1 % pow2 (8 * n)))
+  =
+  let Mkfour _ _ _ _ = q in // avoid ifuel
+  let f (n:nat{n <= 4}) = lo64 q % pow2 (8 * (4 + n)) == q.lo0 + 0x100000000 * (q.lo1 % pow2 (8 * n)) in
+  assert_norm (f 0);
+  assert_norm (f 1);
+  assert_norm (f 2);
+  assert_norm (f 3);
+  assert_norm (f 4);
+  ()
+
+let lemma_mod_n_8_upper1 (q:quad32) (n:nat) : Lemma
+  (requires n <= 4)
+  (ensures hi64 q % pow2 (8 * n) == q.hi2 % pow2 (8 * n))
+  =
+  let Mkfour _ _ q2 q3 = q in
+  lemma_mod_n_8_lower1 (Mkfour q2 q3 0 0) n
+
+let lemma_mod_n_8_upper2 (q:quad32) (n:nat) : Lemma
+  (requires n <= 4)
+  (ensures hi64 q % pow2 (8 * (4 + n)) == q.hi2 + 0x100000000 * (q.hi3 % pow2 (8 * n)))
+  =
+  let Mkfour _ _ q2 q3 = q in
+  lemma_mod_n_8_lower2 (Mkfour q2 q3 0 0) n
+
+let lemma_64_32_lo1 (q':quad32) (lo lo':nat64) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    lo' == lo % pow2 (8 * n) /\
+    four_to_two_two q' == Mktwo (nat_to_two 32 lo') (nat_to_two 32 0)
+  )
+  (ensures lo' < 0x100000000 /\ lo' == q'.lo0 /\ q' == Mkfour q'.lo0 0 0 0)
+  =
+  assert_norm (pow2 (0 * 8) == 1);
+  assert_norm (pow2 (1 * 8) == 0x100);
+  assert_norm (pow2 (2 * 8) == 0x10000);
+  assert_norm (pow2 (3 * 8) == 0x1000000);
+  assert_norm (pow2 (4 * 8) == 0x100000000);
+  assert_norm (nat_to_two 32 lo' == nat_to_two_unfold 32 lo');
+  assert_norm (nat_to_two 32 0 == nat_to_two_unfold 32 0);
+  ()
+
+let lemma_64_32_lo2 (q':quad32) (lo lo':nat64) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    lo' == lo % pow2 (8 * (n + 4)) /\
+    four_to_two_two q' == Mktwo (nat_to_two 32 lo') (nat_to_two 32 0)
+  )
+  (ensures lo' == q'.lo0 + 0x100000000 * q'.lo1 /\ q' == Mkfour q'.lo0 q'.lo1 0 0)
+  =
+  assert_norm (pow2 (4 * 8) == 0x100000000);
+  assert_norm (pow2 (5 * 8) == 0x10000000000);
+  assert_norm (pow2 (6 * 8) == 0x1000000000000);
+  assert_norm (pow2 (7 * 8) == 0x100000000000000);
+  assert_norm (pow2 (8 * 8) == 0x10000000000000000);
+  assert_norm (nat_to_two 32 lo' == nat_to_two_unfold 32 lo');
+  assert_norm (nat_to_two 32 0 == nat_to_two_unfold 32 0);
+  ()
+
+let lemma_64_32_hi1 (q':quad32) (hi hi':nat64) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    hi' == hi % pow2 (8 * n) /\
+    four_to_two_two q' == Mktwo (Mktwo q'.lo0 q'.lo1) (nat_to_two 32 hi')
+  )
+  (ensures hi' < 0x100000000 /\ hi' == q'.hi2 /\ q'.hi3 == 0)
+  =
+  assert_norm (pow2 (0 * 8) == 1);
+  assert_norm (pow2 (1 * 8) == 0x100);
+  assert_norm (pow2 (2 * 8) == 0x10000);
+  assert_norm (pow2 (3 * 8) == 0x1000000);
+  assert_norm (pow2 (4 * 8) == 0x100000000);
+  assert_norm (nat_to_two 32 hi' == nat_to_two_unfold 32 hi');
+  ()
+
+let lemma_64_32_hi2 (q':quad32) (hi hi':nat64) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    hi' == hi % pow2 (8 * (n + 4)) /\
+    four_to_two_two q' == Mktwo (Mktwo q'.lo0 q'.lo1) (nat_to_two 32 hi')
+  )
+  (ensures hi' == q'.hi2 + 0x100000000 * q'.hi3)
+  =
+  assert_norm (pow2 (4 * 8) == 0x100000000);
+  assert_norm (pow2 (5 * 8) == 0x10000000000);
+  assert_norm (pow2 (6 * 8) == 0x1000000000000);
+  assert_norm (pow2 (7 * 8) == 0x100000000000000);
+  assert_norm (pow2 (8 * 8) == 0x10000000000000000);
+  assert_norm (nat_to_two 32 hi' == nat_to_two_unfold 32 hi');
+  ()
+
+let lemma_slices_le_quad32_to_bytes (q:quad32) : Lemma
+  (ensures (
+    let s = le_quad32_to_bytes q in
+    q.lo0 == four_to_nat 8 (seq_to_four_LE (slice s 0 4)) /\
+    q.lo1 == four_to_nat 8 (seq_to_four_LE (slice s 4 8)) /\
+    q.hi2 == four_to_nat 8 (seq_to_four_LE (slice s 8 12)) /\
+    q.hi3 == four_to_nat 8 (seq_to_four_LE (slice s 12 16))
+  ))
+  =
+  reveal_opaque le_quad32_to_bytes_def;
+  ()
+
+let lemma_slices_le_bytes_to_quad32 (s:seqn 16 nat8) : Lemma
+  (ensures (
+    let q = le_bytes_to_quad32 s in
+    q.lo0 == four_to_nat 8 (seq_to_four_LE (slice s 0 4)) /\
+    q.lo1 == four_to_nat 8 (seq_to_four_LE (slice s 4 8)) /\
+    q.hi2 == four_to_nat 8 (seq_to_four_LE (slice s 8 12)) /\
+    q.hi3 == four_to_nat 8 (seq_to_four_LE (slice s 12 16))
+  ))
+  =
+  reveal_opaque le_bytes_to_quad32_def;
+  ()
+
+let lemma_four_zero (_:unit) : Lemma
+  (ensures four_to_nat 8 (seq_to_four_LE (create 4 0)) == 0)
+  =
+  let s = create 4 0 in
+  assert_norm (four_to_nat 8 (seq_to_four_LE s) == four_to_nat_unfold 8 (seq_to_four_LE s));
+  ()
+
 let pad_to_128_bits_lower (q:quad32) (num_bytes:int) =
-  admit();
-  let Mkfour x0 x1 x2 x3 = q in
-  assert (num_bytes * 8 < 64);
-  pow2_lt_compat 64 (num_bytes * 8);
-  modulo_range_lemma (lo64 q) (pow2 (num_bytes * 8));
-  let new_lo = (lo64 q) % pow2 (num_bytes * 8) in
-  assert_norm (pow2 64 == pow2_64); // refinement on Words_s.pow2_64?
-  assert (new_lo < pow2_64);
+  let n = num_bytes in
+  let new_lo = (lo64 q) % pow2 (n * 8) in
+  pow2_lt_compat 64 (n * 8);
+  let s = le_quad32_to_bytes q in
+  let s' = slice s 0 n in
   let q' = insert_nat64 (insert_nat64 q 0 1) new_lo 0 in
-  assert_by_tactic (insert_nat64 (Mkfour x0 x1 x2 x3) 0 1 == Mkfour x0 x1 0 0)
-    (fun () -> norm[delta;primops];  trefl ());
-  let new_lo_two = Words.Two_s.nat_to_two 32 new_lo in
+  let s'' = pad_to_128_bits s' in
+  let q'' = le_bytes_to_quad32 s'' in
 
-  let helper new_lo_o :
-    Lemma (let Mktwo new_lo_lo new_lo_hi = Words.Two_s.nat_to_two 32 new_lo_o in
-	  insert_nat64 (insert_nat64 q 0 1) new_lo_o 0 == Mkfour new_lo_lo new_lo_hi 0 0) =
-    assert_by_tactic (
-      let Mktwo new_lo_lo new_lo_hi = Words.Two_s.nat_to_two 32 new_lo_o in
-      insert_nat64 (Mkfour x0 x1 0 0) new_lo_o 0 == Mkfour new_lo_lo new_lo_hi 0 0)
-        (fun () -> norm[delta; primops]; trefl ())
-  in
-    helper new_lo;
-    assert_norm (lo64 (Mkfour x0 x1 x2 x3) == Words.Two_s.two_to_nat 32 (Mktwo x0 x1));
-    assert (new_lo == (Words.Two_s.two_to_nat_unfold 32 (Mktwo x0 x1)) % pow2 (num_bytes * 8));
-    assert (q' == Mkfour new_lo_two.lo new_lo_two.hi 0 0); 
+  let s0_4 = slice s 0 4 in
+  let s4_8 = slice s 4 8 in
+  let s8_12 = slice s 8 12 in
+  let s12_16 = slice s 12 16 in
+  let s0_4'' = slice s'' 0 4 in
+  let s4_8'' = slice s'' 4 8 in
+  let s8_12'' = slice s'' 8 12 in
+  let s12_16'' = slice s'' 12 16 in
 
-    // Easier to prove that le_quad32_to_bytes q' == ... and then derive the goal from injectivity.
-    let q'_bytes = le_quad32_to_bytes q' in
-    FStar.Classical.forall_intro (le_quad32_to_bytes_sel q');
-    FStar.Classical.forall_intro (le_quad32_to_bytes_sel q);
-    assert (q'_bytes == le_quad32_to_bytes (Mkfour new_lo_two.lo new_lo_two.hi 0 0));
-    assert (forall i. i <= 8 /\ i < 16 ==> index q'_bytes i == 0);
-    assert (forall i. i <= 8 /\ i < 16 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 0);
-    assert (forall i. i < 4 ==> index q'_bytes i == four_select (nat_to_four 8 new_lo_two.lo) i);
-    assert (forall i. i < 4 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
-			   four_select (nat_to_four 8 x0) i);
-    assert (forall i. i < 4 ==> four_select (nat_to_four 8 x0) i == four_select (nat_to_four 8 new_lo_two.hi) i);
-    assert (forall i. i <= 4 /\ i < 8 ==> index q'_bytes i == four_select (nat_to_four 8 x1) (i % 4));
-    assert (forall i. i <= 4 /\ i < 8 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
-				       four_select (nat_to_four 8 new_lo_two.hi) (i % 4));
-    assert (forall i. i <= 4 /\ i < 8 ==> four_select (nat_to_four 8 x1) i == four_select (nat_to_four 8 new_lo_two.hi) i)
-    
-            
+  let Mkfour q0 q1 q2 q3 = q in
+  let Mkfour q0' q1' q2' q3' = q' in
+  let Mkfour q0'' q1'' q2'' q3'' = q'' in
+
+  if n < 4 then
+  (
+    lemma_mod_n_8_lower1 q n;
+    lemma_64_32_lo1 q' (lo64 q) new_lo n;
+    lemma_pad_to_32_bits s0_4 s0_4'' n;
+    ()
+  )
+  else
+  (
+    lemma_mod_n_8_lower2 q (n - 4);
+    lemma_64_32_lo2 q' (lo64 q) new_lo (n - 4);
+    lemma_pad_to_32_bits s4_8 s4_8'' (n - 4);
+    ()
+  );
+
+  lemma_slices_le_quad32_to_bytes q;
+  lemma_slices_le_bytes_to_quad32 s'';
+
+  lemma_four_zero ();
+  let zero_4 : seq nat8 = create 4 0 in
+  assert (n < 4 ==> equal s4_8'' zero_4);
+  assert (equal s8_12'' zero_4);
+  assert (equal s12_16'' zero_4);
+  ()
+
 let pad_to_128_bits_upper (q:quad32) (num_bytes:int) =
-  admit();
-  let Mkfour x0 x1 x2 x3 = q in
-  let new_hi = (hi64 q) % pow2 ((num_bytes - 8) * 8) in
-  assert_norm (pow2 64 == pow2_64); // refinement on Words_s.pow2_64?
-  assert (new_hi < pow2_64);
+  let n = num_bytes in
+  let new_hi = (hi64 q) % pow2 ((n - 8) * 8) in
+  pow2_lt_compat 64 ((n - 8) * 8);
+  let s = le_quad32_to_bytes q in
+  let s' = slice s 0 n in
   let q' = insert_nat64 q new_hi 1 in
-  let new_hi_two = Words.Two_s.nat_to_two 32 new_hi in
-  assert_by_tactic (insert_nat64 (Mkfour x0 x1 x2 x3) new_hi 1 == Mkfour x0 x1 new_hi_two.lo new_hi_two.hi)
-    (fun () -> norm[delta]; trefl ());
+  let s'' = pad_to_128_bits s' in
+  let q'' = le_bytes_to_quad32 s'' in
 
-  assert_norm (hi64 (Mkfour x0 x1 x2 x3) == Words.Two_s.two_to_nat 32 (Mktwo x2 x3));
-  assert (new_hi == (Words.Two_s.two_to_nat_unfold 32 (Mktwo x2 x3)) % pow2 ((num_bytes - 8) * 8));
-  assert (q' == Mkfour x0 x1 new_hi_two.lo new_hi_two.hi); 
+  let s0_4 = slice s 0 4 in
+  let s4_8 = slice s 4 8 in
+  let s8_12 = slice s 8 12 in
+  let s12_16 = slice s 12 16 in
+  let s0_4'' = slice s'' 0 4 in
+  let s4_8'' = slice s'' 4 8 in
+  let s8_12'' = slice s'' 8 12 in
+  let s12_16'' = slice s'' 12 16 in
 
-  // Easier to prove that le_quad32_to_bytes q' == ... and then derive the goal from injectivity.
-  let q'_bytes = le_quad32_to_bytes q' in
-  FStar.Classical.forall_intro (le_quad32_to_bytes_sel q');
-  FStar.Classical.forall_intro (le_quad32_to_bytes_sel q);
-  assert (q'_bytes == le_quad32_to_bytes (Mkfour x0 x1 new_hi_two.lo new_hi_two.hi));
-  assert (forall i. i <= 8 /\ i < 12 ==> index q'_bytes i == four_select (nat_to_four 8 new_hi_two.lo) (i % 4));
-  assert (forall i. i <= 8 /\ i < 12 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
-					     four_select (nat_to_four 8 new_hi_two.lo) (i % 4));
-  assert (forall i. i <= 12 /\ i < 16 ==> index q'_bytes i == four_select (nat_to_four 8 new_hi_two.hi) (i % 4));
-  assert (forall i. i <= 12 /\ i < 16 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
-					     four_select (nat_to_four 8 new_hi_two.hi) (i % 4));
-  assert (forall i. i < 4 ==> index q'_bytes i == four_select (nat_to_four 8 x0) (i % 4));
-  assert (forall i. i < 4 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
-					     four_select (nat_to_four 8 x0) (i % 4));
-  assert (forall i. i <= 4 /\ i < 8 ==> index q'_bytes i == four_select (nat_to_four 8 x1) (i % 4));
-  assert (forall i. i <= 4 /\ i < 8 ==> index (slice (le_quad32_to_bytes q) 0 num_bytes) i == 
-				     four_select (nat_to_four 8 x1) (i % 4))
+  let Mkfour q0 q1 q2 q3 = q in
+  let Mkfour q0' q1' q2' q3' = q' in
+  let Mkfour q0'' q1'' q2'' q3'' = q'' in
+
+  if n < 12 then
+  (
+    lemma_mod_n_8_upper1 q (n - 8);
+    lemma_64_32_hi1 q' (hi64 q) new_hi (n - 8);
+    lemma_pad_to_32_bits s8_12 s8_12'' (n - 8);
+    ()
+  )
+  else
+  (
+    lemma_mod_n_8_upper2 q (n - 12);
+    lemma_64_32_hi2 q' (hi64 q) new_hi (n - 12);
+    lemma_pad_to_32_bits s12_16 s12_16'' (n - 12);
+    ()
+  );
+
+  lemma_slices_le_quad32_to_bytes q;
+  lemma_slices_le_bytes_to_quad32 s'';
+
+  lemma_four_zero ();
+  let zero_4 : seq nat8 = create 4 0 in
+  assert (n < 12 ==> equal s12_16'' zero_4);
+  ()
