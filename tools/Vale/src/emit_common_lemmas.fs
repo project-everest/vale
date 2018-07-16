@@ -440,7 +440,7 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
     in
   List.map (fun f -> (loc, DFun f)) (List.rev (f::!(benv.quick_code_funs)))
 
-let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):proc_decl =
+let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):decls =
   // generate va_lemma_Q
   let p = benv.proc in
   let loc = benv.loc in
@@ -538,16 +538,62 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let ss = stmts_refined bstmts in
       [sReveal; sOldS] @ sBlock @ [sb1] @ ss
     in
-  {
-    pname = Reserved ("lemma_" + (string_of_id p.pname));
-    pghost = Ghost;
-    pinline = Outline;
-    pargs = pargs;
-    prets = prets;
-    pspecs = (loc, req)::reqs @ (loc, ens)::(List.concat pspecs) @ ensFrame;
-    pbody = Some (sStmts);
-    pattrs = List.filter filter_proc_attr p.pattrs @ attr_no_verify "admit" p.pattrs;
-  }
+  let pLemmaSpecs = (loc, req)::reqs @ (loc, ens)::(List.concat pspecs) @ ensFrame in
+  let exportSpecsDecls =
+    let isExportSpecs = attrs_get_bool (Id "exportSpecs") false p.pattrs in
+    if not isExportSpecs then [] else
+    let fArg (x, t, _, _, _) = (x, Some t) in
+    let reqArgs = List.map fArg pargs in
+    let ensArgs = List.map fArg (pargs @ prets) in
+    let spec (isReq:bool) (_, (s:spec)):exp list =
+      match s with
+      | Requires (_, e) when isReq -> [e]
+      | Ensures (_, e) when not isReq -> [e]
+      | _ -> []
+      in
+    let xReq = Reserved ("req_" + (string_of_id p.pname)) in
+    let xEns = Reserved ("ens_" + (string_of_id p.pname)) in
+    let eReqs = List.collect (spec true) pLemmaSpecs in
+    let eEnss = List.collect (spec false) pLemmaSpecs in
+    let eReqApp = EApply (xReq, List.map (fun (x, _) -> EVar x) reqArgs) in
+    let eEnss = eReqApp::eEnss in
+    let eReq = and_of_list eReqs in
+    let eEns = and_of_list eEnss in
+    let fReq =
+      {
+        fname = xReq;
+        fghost = Ghost;
+        fargs = reqArgs;
+        fret = tProp;
+        fbody = Some eReq;
+        fattrs = [(Id "public", [])];
+      }
+      in
+    let fEns =
+      {
+        fname = xEns;
+        fghost = Ghost;
+        fargs = ensArgs;
+        fret = tProp;
+        fbody = Some eEns;
+        fattrs = [(Id "public", [])];
+      }
+      in
+    [(loc, DFun fReq); (loc, DFun fEns)]
+    in
+  let pLemma =
+    {
+      pname = Reserved ("lemma_" + (string_of_id p.pname));
+      pghost = Ghost;
+      pinline = Outline;
+      pargs = pargs;
+      prets = prets;
+      pspecs = pLemmaSpecs;
+      pbody = Some (sStmts);
+      pattrs = List.filter filter_proc_attr p.pattrs @ attr_no_verify "admit" p.pattrs;
+    }
+    in
+  exportSpecsDecls @ [(loc, DProc pLemma)]
 
 let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   gen_lemma_sym_count := 0;
@@ -606,6 +652,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           if isQuick then
             Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
-        fCodes @ (if !no_lemmas then [] else quickDecls @ (gen_quick_block_funs ()) @ [(loc, DProc pLemma)])
+        fCodes @ (if !no_lemmas then [] else quickDecls @ (gen_quick_block_funs ()) @ pLemma)
     in
   bodyDecls //@ blockLemmaDecls

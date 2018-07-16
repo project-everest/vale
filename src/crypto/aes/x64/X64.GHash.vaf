@@ -926,7 +926,7 @@ procedure {:quick} ghash_incremental_bytes_stdcall(ghost h_b:buffer128, ghost ha
 }
 
 // Only for Windows
-procedure {:quick} ghash_incremental_bytes_stdcall_win(
+procedure{:quick}{:exportSpecs} ghash_incremental_bytes_stdcall_win(
   ghost stack_b:buffer64,
   ghost h_b:buffer128,
   ghost hash_b:buffer128,
