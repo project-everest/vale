@@ -52,7 +52,7 @@ let make_ghash_plain_LE (s:seq quad32) : ghash_plain_LE = if length s = 0 then c
 
 function nat32_workaround (i:int) : nat32 extern;
 
-#reset-options "--z3rlimit 30 --z3refresh"
+#reset-options "--z3rlimit 30"
 
 ///////////////////////////
 // GCM
