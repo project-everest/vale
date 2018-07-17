@@ -49,17 +49,31 @@ let string_of_bop (op:bop):string =
   | BMod -> "%"
   | BIn | BOldAt | BCustom _ -> internalErr "binary operator"
 
-let rec string_of_typ (t:typ):string =
-  match t with
-  | TName x -> sid x
-  | TApp (t, ts) -> (string_of_typ t) + "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
-  | TArrow (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
-  | TInt (b1, b2) -> "int"
-  | TList t -> "list(" + (string_of_typ t) + ")"
-  | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
-  | _ -> internalErr (sprintf "unexpected string_of_typ %A" t)
+let string_of_kind ((KType i):kind):string = "Type(" + string i + ")"
 
-let rec string_of_exp_prec prec e =
+let rec string_of_typ_prec (prec:int) (t:typ):string =
+  let r = string_of_typ_prec in
+  let s_bnd (b:bnd):string =
+    match b with
+    | Int i when i < bigint.Zero -> "(" + string i + ")"
+    | Int i -> string i
+    | NegInf | Inf -> ""
+    in
+  let (s, tPrec) =
+    match t with
+    | TName x -> (sid x, 20)
+    | TVar (x, None) -> (sid x, 20)
+    | TVar (x, Some k) -> ("(" + sid x + ":" + string_of_kind k + ")", 20)
+    | TApp (t, ts) -> ((r 10 t) + "(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
+    | TArrow (ts, t) -> ("(" + (String.concat ", " (List.map (r 0) ts)) + ") -> " + (r 0 t), 0)
+    | TInt (NegInf, Inf) -> ("int", 0)
+    | TInt (b1, b2) -> ("int(" + s_bnd b1 + ", " + s_bnd b2 + ")", 0)
+    | TList t -> ("list(" + (r 0 t) + ")", 10)
+    | TTuple ts -> ("tuple(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
+  in if prec <= tPrec then s else "(" + s + ")"
+let string_of_typ (t:typ):string = string_of_typ_prec 99 t
+
+let rec string_of_exp_prec (prec:int) (e:exp):string =
   let r = string_of_exp_prec in
   let (s, ePrec) =
     let qbind q xs ts e = (q + " " + (string_of_formals xs) + (string_of_triggers ts) + " :: " + (r 5 e), 6) in

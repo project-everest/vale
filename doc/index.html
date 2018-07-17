@@ -183,14 +183,15 @@
     <tr><td>Grammar</td><td>Examples and notes</td></tr>
     <tr>
     <td>
-    <pre>
+      <pre>
 
-PROGRAM ::= INCLUDE ... INCLUDE DECL ... DECL
+PROGRAM ::= INCLUDE ... INCLUDE <i>[</i>module x<i>]</i> DECL ... DECL
 
 INCLUDE ::= include "STRING"
 
 DECL ::=
-  | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND <i>[</i>:= TYPE<i>]</i>
+  | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND extern ;
+  | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND := TYPE ;
   | <a href="#state">var</a> x : TYPE ;
   | const x : TYPE extern ;
   | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
@@ -257,8 +258,8 @@ STMT ::=
   | while ( EXP ) INVARIANTS DECREASE { STMTS }
   | for ( ASSIGNS ; EXP ; ASSIGNS ) INVARIANTS DECREASE { STMTS }
   | <i>[</i>ghost<i>]</i> <i>[</i>inline<i>]</i> if ( EXP ) { STMTS }
-    <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
-    <i>[</i> else { ... } <i>]</i>
+      <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
+      <i>[</i> else { ... } <i>]</i>
 
 CALC ::= EXP ; <i>[</i>CALC_OP<i>]</i> CALC_HINTS
 CALC_HINTS ::= CALC_HINT ... CALC_HINT
@@ -287,13 +288,14 @@ DECREASE ::=
 TRIGGERS ::= TRIGGER ... TRIGGER
 TRIGGER ::= { EXP <i>[</i> , ... , EXP <i>]</i> }
 
+INT ::= ... | (-2) | (-1) | 0 | 1 | 2 | 1_000_000 | 0xdead_BEEF | ... 
+
 EXP ::=
   | x
   | f
   | true | false
-  | 0 | 1 | 2 | 3 | ... | 1_000_000 | ...
+  | INT
   | 0.1 | 0.2 | ... | 3.14159 | ...
-  | 0x0 | 0x1 | ... | 0xdeadBEEF | 0x1_0000_0000 | ...
   | bv1(0) | bv32(0xdeadbeef) | bv64(7) | ...
   | "STRING"
   | ( - EXP )
@@ -335,17 +337,16 @@ TYPE ::=
   | TYPE ( TYPE , ... , TYPE )
   | tuple ( TYPE , ... , TYPE )
   | fun ( TYPE , ... , TYPE ) -> TYPE
+  | int | int ( , INT ) | int ( INT , ) | int ( INT , INT )
   | ( TYPE )
 
-KIND ::=
-  | Type ( 0 )
-  | Type ( 1 )
-  | ...
+KIND ::= Type ( 0 ) | Type ( 1 ) | ...
     </pre>
     </td>
     <td>
     <pre>
 ---
+
 
 
 
@@ -461,6 +462,7 @@ eax, (ghost var x:int), y := myProc(ebx, edx, z);
 
 
 
+
 list_append(list(10, 20), list(30, 40))
 list_append#[int](list(10, 20), list(30, 40))
 #(set(uint32))(x) // cast x to type set(uint32)
@@ -496,9 +498,7 @@ uint32
 map(int, set(uint32))
 tuple(int, int, bool)
 fun(int, int) -> bool
-
-
-
+type byte : Type(0) := int(0, 0xff);
 
 
 ---
