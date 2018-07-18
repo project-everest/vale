@@ -133,6 +133,7 @@ verify_options = {
   'src/arch/x64/interop/Zero_quad32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
   
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
+  'src/crypto/aes/GCM_helpers_i.fst': None,
 
   'src/*/*.fst': BuildOptions(fstar_default_args),
   'src/*/*.fsti': BuildOptions(fstar_default_args),
