@@ -18,7 +18,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     (va_get_ok va_s0) /\ (valid_taint_buf128 b (va_get_mem va_s0) (va_get_memTaint va_s0) Secret)
     /\ (locs_disjoint [(loc_buffer stack_b); (loc_buffer b)]) /\ (buffer_readable (va_get_mem
     va_s0) stack_b) /\ (buffer_readable (va_get_mem va_s0) b) /\ (buffer_length stack_b) >= 4 /\
-    (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0) /\ (va_get_reg Rcx
+    (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0 (va_get_memTaint va_s0)) /\ (va_get_reg Rcx
     va_s0) == plain_num_bytes /\ (va_get_reg Rdx va_s0) == auth_num_bytes /\ (va_get_reg R8 va_s0)
     == (buffer_addr b (va_get_mem va_s0)) /\ (buffer_length b) == 1 /\ 8 `op_Multiply`
     plain_num_bytes < pow2_32 /\ 8 `op_Multiply` auth_num_bytes < pow2_32)

@@ -58,6 +58,7 @@ B.length stack_b == 16 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b] /\ ( 
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) b;
   va_pre (va_code_zero_quad32_buffer_win ()) s0 stack_b b ))) =
+  assert (B.disjoint stack_b b);
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) b;
   ()

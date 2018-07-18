@@ -441,7 +441,7 @@ let translate_vale os target (func:func_ty) =
   print_valid_taints args ^
   (if stack_needed then
   (if stack_needed then  "        buffer_length(stack_b) >= " ^ (string_of_int nbr_stack_args) ^ ";\n" else "") ^
-  "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int slots) ^ ");\n"
+  "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int slots) ^ ", memTaint);\n"
   else "") ^
   // stack_b and ghost args are not real arguments
   print_calling_args os target stack_before_args real_args ^

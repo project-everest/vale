@@ -31,7 +31,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     (loc_buffer hash_b); (loc_buffer h_b)]) /\ (buffer_readable (va_get_mem va_s0) stack_b) /\
     (buffer_readable (va_get_mem va_s0) in_b) /\ (buffer_readable (va_get_mem va_s0) hash_b) /\
     (buffer_readable (va_get_mem va_s0) h_b) /\ (buffer_length stack_b) >= 9 /\ (valid_stack_slots
-    (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 4) /\ (va_get_reg Rcx va_s0) == (buffer_addr
+    (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 4 (va_get_memTaint va_s0)) /\ (va_get_reg Rcx va_s0) == (buffer_addr
     in_b (va_get_mem va_s0)) /\ (va_get_reg Rdx va_s0) == (buffer_addr hash_b (va_get_mem va_s0))
     /\ (va_get_reg R8 va_s0) == (buffer_addr h_b (va_get_mem va_s0)) /\ (va_get_reg R9 va_s0) ==
     num_bytes /\ (buffer_length in_b) == (bytes_to_quad_size num_bytes) /\ (buffer_length h_b) == 1

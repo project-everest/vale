@@ -30,7 +30,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     (loc_buffer cipher_b)]) /\ (buffer_readable (va_get_mem va_s0) stack_b) /\ (buffer_readable
     (va_get_mem va_s0) plain_b) /\ (buffer_readable (va_get_mem va_s0) iv_b) /\ (buffer_readable
     (va_get_mem va_s0) keys_b) /\ (buffer_readable (va_get_mem va_s0) cipher_b) /\ (buffer_length
-    stack_b) >= 6 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0) /\
+    stack_b) >= 6 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0 (va_get_memTaint va_s0)) /\
     (va_get_reg Rcx va_s0) == (buffer_addr plain_b (va_get_mem va_s0)) /\ (va_get_reg Rdx va_s0) ==
     num_bytes /\ (va_get_reg R8 va_s0) == (buffer_addr iv_b (va_get_mem va_s0)) /\ (va_get_reg R9
     va_s0) == (buffer_addr keys_b (va_get_mem va_s0)) /\ (buffer_read stack_b 5 (va_get_mem va_s0))

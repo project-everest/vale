@@ -98,7 +98,7 @@ procedure {:quick} inc32_buffer_win(ghost stack_b:buffer64, ghost iv_b:buffer128
         buffer_readable(mem, iv_b);
         buffer_length(iv_b) == 1;
         buffer_length(stack_b) >= 2;
-        valid_stack_slots(mem, rsp, stack_b, 0);
+        valid_stack_slots(mem, rsp, stack_b, 0, memTaint);
         rcx == buffer_addr(iv_b, mem);
     ensures
         rbx == old(rbx);
@@ -564,7 +564,7 @@ procedure {:quick} gctr_bytes_extra_buffer_win(
         buffer_readable(mem, keys_b);
         buffer_readable(mem, cipher_b);
         buffer_length(stack_b) >= 6;
-        valid_stack_slots(mem, rsp, stack_b, 0);
+        valid_stack_slots(mem, rsp, stack_b, 0, memTaint);
         rcx == buffer_addr(plain_b, mem);
         rdx == num_bytes;
         r8 == buffer_addr(iv_b, mem);

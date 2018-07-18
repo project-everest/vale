@@ -44,6 +44,8 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | S.MOVDQU dst src -> mem128_to_op dst, mem128_to_op src
   | S.Pinsrd _ src _ | S.Pinsrq _ src _ -> [], [src]
   | S.Pextrq dst _ _ -> [dst], []
+  | S.Push src -> [], [src]
+  | S.Pop dst -> [dst], [OMem (MReg Rsp 0)]
   | _ -> [], []
   
 type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
@@ -105,7 +107,14 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : GTot traceState =
     let memTaint = update_taint ts.memTaint dst_lo t s in
     update_taint memTaint dst_hi t s'
     end
-    else update_taint_list ts.memTaint dsts t s in
+    else
+    if S.Push? i then begin
+      let S.Push src = i in
+      let new_rsp = ((eval_reg Rsp s) - 8) % pow2_64 in
+      let mt = ts.memTaint.[new_rsp] <- t in
+      assert (Set.equal (Map.domain mt) (Set.complement Set.empty));
+      mt
+    end else update_taint_list ts.memTaint dsts t s in
   (* Execute the instruction *)
   let s = run (eval_ins i) s in
   {state = s; trace = ts.trace; memTaint = memTaint}

@@ -192,7 +192,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(h_b), loc_buffer(hash_b), loc_buffer(input_b)));
         buffer_readable(mem, stack_b);
         buffer_length(stack_b) >= 9;
-        valid_stack_slots(mem, rsp, stack_b, 4);
+        valid_stack_slots(mem, rsp, stack_b, 4, memTaint);
         rcx == buffer_addr(h_b, mem);
         rdx == buffer_addr(hash_b, mem);
         r8 == buffer_addr(input_b, mem);
@@ -709,7 +709,7 @@ procedure {:quick} ghash_incremental_extra_stdcall_win(
         buffer_readable(mem, hash_b);
         buffer_readable(mem, h_b);
         buffer_length(stack_b) >= 9;
-        valid_stack_slots(mem, rsp, stack_b, 4);
+        valid_stack_slots(mem, rsp, stack_b, 4, memTaint);
         rcx == buffer_addr(in_b, mem);
         rdx == buffer_addr(hash_b, mem);
         r8 == buffer_addr(h_b, mem);
@@ -945,7 +945,7 @@ procedure{:quick}{:exportSpecs} ghash_incremental_bytes_stdcall_win(
         buffer_readable(mem, hash_b);
         buffer_readable(mem, input_b);
         buffer_length(stack_b) >= 10;
-        valid_stack_slots(mem, rsp, stack_b, 5);
+        valid_stack_slots(mem, rsp, stack_b, 5, memTaint);
         rcx == buffer_addr(h_b, mem);
         rdx == buffer_addr(hash_b, mem);
         r8 == buffer_addr(input_b, mem);

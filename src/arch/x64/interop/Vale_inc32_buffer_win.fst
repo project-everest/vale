@@ -17,7 +17,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     (valid_taint_buf128 iv_b (va_get_mem va_s0) (va_get_memTaint va_s0) Secret) /\ (locs_disjoint
     [(loc_buffer stack_b); (loc_buffer iv_b)]) /\ (buffer_readable (va_get_mem va_s0) stack_b) /\
     (buffer_readable (va_get_mem va_s0) iv_b) /\ (buffer_length iv_b) == 1 /\ (buffer_length
-    stack_b) >= 2 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0) /\
+    stack_b) >= 2 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0 (va_get_memTaint va_s0)) /\
     (va_get_reg Rcx va_s0) == (buffer_addr iv_b (va_get_mem va_s0)))
 
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (stack_b:buffer64)

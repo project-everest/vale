@@ -251,6 +251,7 @@ procedure {:quick exportOnly} PushXmm(
     modifies
         rsp; mem; trace;
     requires
+        valid_taint_buf64(b, mem, memTaint, Public);
         valid_dst_addr(mem, b, index);
         valid_dst_addr(mem, b, index - 1);
         rsp - 8 == buffer_addr(b, mem) + 8 * index;
@@ -279,6 +280,7 @@ procedure {:quick exportOnly} PopXmm(
     reads mem; memTaint;
     modifies rsp; trace;
     requires
+        valid_taint_buf64(b, mem, memTaint, Public);
         valid_src_addr(mem, b, index);
         valid_src_addr(mem, b, index + 1);
         hi64(expected_xmm) == buffer64_read(b, index, mem);

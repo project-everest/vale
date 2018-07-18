@@ -20,7 +20,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     stack_b)]) /\ (locs_disjoint [(loc_buffer dst); (loc_buffer stack_b)]) /\ (buffer_readable
     (va_get_mem va_s0) stack_b) /\ (buffer_readable (va_get_mem va_s0) src1) /\ (buffer_readable
     (va_get_mem va_s0) src2) /\ (buffer_readable (va_get_mem va_s0) dst) /\ (buffer_length stack_b)
-    >= 4 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0) /\ (va_get_reg
+    >= 4 /\ (valid_stack_slots (va_get_mem va_s0) (va_get_reg Rsp va_s0) stack_b 0 (va_get_memTaint va_s0)) /\ (va_get_reg
     Rcx va_s0) == (buffer_addr src1 (va_get_mem va_s0)) /\ (va_get_reg Rdx va_s0) == (buffer_addr
     src2 (va_get_mem va_s0)) /\ (va_get_reg R8 va_s0) == (buffer_addr dst (va_get_mem va_s0)) /\
     (buffer_length src1) == 1 /\ (buffer_length src2) == 1 /\ (buffer_length dst) == 1 /\

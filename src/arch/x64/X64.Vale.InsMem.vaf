@@ -136,7 +136,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
     same_memTaint64(b, old(mem), mem, old(memTaint), memTaint);
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(), list()), Public))}{:fast_instruction}{:quick exportOnly} Pop(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(dst), list(OMem(MReg(Rsp, 0)))), Public))}{:fast_instruction}{:quick exportOnly} Pop(
     out dst: dst_opr64,
         ghost b:buffer64,
         ghost index:int)
@@ -146,15 +146,17 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(), list()), Publ
         valid_src_addr(mem, b, index);
         rsp == buffer_addr(b, mem) + 8 * index;
         rsp + 8 < pow2_64;
+        valid_taint_buf64(b, mem, memTaint, Public);
     ensures
         dst == buffer64_read(b, index, mem);
         rsp == old(rsp) + 8;
 {
     lemma_valid_mem64(b, index, mem);
     lemma_load_mem64(b, index, mem);
+    lemma_valid_taint64(b, old(memTaint), old(mem), index, Public);    
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list()), Public))}{:fast_instruction}{:quick exportOnly} Push(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list(src)), Public))}{:fast_instruction}{:quick exportOnly} Push(
         src: reg_opr64,
         ghost b:buffer64,
         ghost index:int)
@@ -162,6 +164,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list()), Pub
     modifies
         rsp; mem; trace;
     requires
+        valid_taint_buf64(b, mem, memTaint, Public);    
         valid_dst_addr(mem, b, index);
         rsp - 8 == buffer_addr(b, mem) + 8 * index;
         0 <= rsp - 8;
@@ -172,6 +175,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list()), Pub
 {
     lemma_valid_mem64(b, index, old(mem));
     lemma_store_mem64(b, index, old(src), old(mem));
+    lemma_valid_taint64(b, old(memTaint), old(mem), index, Public);        
     same_memTaint64(b, old(mem), mem, old(memTaint), memTaint);
 }
 

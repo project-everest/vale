@@ -519,7 +519,7 @@ procedure {:quick} gcm_make_length_quad_buffer_win(ghost stack_b:buffer64, ghost
         buffer_readable(mem, stack_b);
         buffer_readable(mem, b);
         buffer_length(stack_b) >= 4;
-        valid_stack_slots(mem, rsp, stack_b, 0);
+        valid_stack_slots(mem, rsp, stack_b, 0, memTaint);
         rcx == plain_num_bytes;
         rdx == auth_num_bytes;
         r8 == buffer_addr(b, mem);
@@ -691,14 +691,14 @@ procedure {:quick} gcm_core(
 #reset-options "--z3rlimit 30"
 procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64)
     requires 
-        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
+        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
     reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; xmm6; xmm7; xmm8; xmm10; xmm11; memTaint;
     modifies mem; rsp; rax; trace;
     ensures
         modifies_buffer(stack_b, old(mem), mem);
         forall i :: (if win then 18 else 8) <= i < buffer_length(stack_b) ==> buffer64_read(stack_b, i, mem) == old(buffer64_read(stack_b, i, mem));
-        valid_stack_slots(mem, rsp + (if win then 144 else 64), stack_b, if win then 18 else 8);
+        valid_stack_slots(mem, rsp + (if win then 144 else 64), stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 
         rbx == buffer64_read(stack_b, 0, mem);
@@ -748,7 +748,7 @@ procedure {:quick} callee_restore_registers(
         ghost old_xmm11:quad32
         )
     requires 
-        valid_stack_slots(mem, rsp + (if win then 144 else 64), stack_b, if win then 18 else 8);
+        valid_stack_slots(mem, rsp + (if win then 144 else 64), stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 
         win ==> lo64(old_xmm11) == buffer64_read(stack_b, 17, mem);
@@ -782,7 +782,7 @@ procedure {:quick} callee_restore_registers(
         win ==> xmm10 == old_xmm10;
         win ==> xmm11 == old_xmm11;
         
-        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
+        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 {
     Pop(rbx, stack_b, 0);
@@ -964,7 +964,7 @@ procedure {:quick} gcm_encrypt_stdcall(
         validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(plain_num_bytes), memTaint, Secret);
         validDstAddrs128(mem, tag_ptr, tag_b, 1, memTaint, Secret);
 
-        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
+        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 
         plain_ptr + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;
@@ -1100,7 +1100,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
         validDstAddrs128(mem, tag_ptr, tag_b, 1, memTaint, Secret);
 
         buffer_length(stack_b) >= (if win then 4 + 1 + 4 + 18 else 2 + 8);       // TODO: On Windows, we need to allow room for "shadow space" (32B), ret (8B), and args
-        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8);
+        valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 
         plain_ptr + 16 * bytes_to_quad_size(plain_num_bytes) < pow2_64;

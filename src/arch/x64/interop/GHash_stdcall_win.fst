@@ -51,6 +51,9 @@ B.length stack_b == 80 /\ live h0 stack_b /\ buf_disjoint_from stack_b [h_b;hash
   length_t_eq (TBase TUInt128) hash_b;
   length_t_eq (TBase TUInt128) input_b;
   va_pre (va_code_ghash_incremental_bytes_stdcall_win ()) s0 stack_b h_b hash_b input_b num_bytes ))) =
+  assert (B.disjoint stack_b h_b);
+  assert (B.disjoint stack_b hash_b);
+  assert (B.disjoint stack_b input_b);  
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) h_b;
   length_t_eq (TBase TUInt128) hash_b;
