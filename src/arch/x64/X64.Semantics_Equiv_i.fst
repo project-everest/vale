@@ -15,6 +15,54 @@ let equiv_eval_operand o s = match o with
     let addr = eval_maddr m s in
     equiv_load_mem addr s
 
+let valid_operand_implies (o:operand) (s:state) :
+  Lemma ((valid_operand o s ==> S.valid_operand o s.state)
+         //(not (valid_operand o s) ==> not (S.valid_operand o s.state))) // False?
+        )
+  =
+  ()
+  
+let valid_ocmp_implies (o:ocmp) (s:state) : 
+  Lemma (valid_ocmp o s ==> S.valid_ocmp o s.state)
+  =
+  FStar.Classical.forall_intro_2 valid_operand_implies;
+  ()
+
+let valid_ocmp_implies_forall () : 
+  Lemma (forall (o:ocmp) (s:state) . {:pattern valid_ocmp o s}
+         valid_ocmp o s ==> S.valid_ocmp o s.state)
+  =
+  FStar.Classical.forall_intro_2 valid_ocmp_implies
+
+let equiv_eval_ocmp (o:ocmp) (s:state) : Lemma
+  (requires valid_ocmp o s /\ S.valid_ocmp o s.state)
+  (ensures eval_ocmp s o == S.eval_ocmp s.state o)
+  =
+  let helper (a:operand) (b:state) :
+    Lemma (valid_operand a b ==> eval_operand a b == S.eval_operand a b.state)
+    =
+    if valid_operand a b then
+      equiv_eval_operand a b
+    else ()
+  in
+  FStar.Classical.forall_intro_2 helper;
+  ()
+
+let equiv_eval_ocmp_forall () : Lemma
+  (forall (o:ocmp) (s:state) . {:pattern (eval_ocmp s o);(S.eval_ocmp s.state o)}
+     valid_ocmp o s /\ S.valid_ocmp o s.state ==>
+     eval_ocmp s o == S.eval_ocmp s.state o)
+  =
+  let helper (a:ocmp) (b:state) :
+    Lemma (valid_ocmp a b /\ S.valid_ocmp a b.state ==> eval_ocmp b a == S.eval_ocmp b.state a)
+    =
+    if valid_ocmp a b && S.valid_ocmp a b.state then
+      equiv_eval_ocmp a b
+    else ()
+  in
+  FStar.Classical.forall_intro_2 helper;
+  ()
+
 val equiv_eval_mov128_op (o:mov128_op) (s:state) : Lemma
   (requires valid_mov128_op o s)
   (ensures eval_mov128_op o s == S.eval_mov128_op o s.state)
@@ -515,15 +563,18 @@ and monotone_ok_while_bytes b c fuel s =
   )
 
 #set-options "--z3rlimit 20"
-
 let rec equiv_eval_code code fuel s = match code with
   | Ins ins -> equiv_eval_ins s ins
   | Block l -> equiv_eval_codes l fuel s
   | IfElse ifCond ifTrue ifFalse ->
+    equiv_eval_ocmp_forall ();
+    valid_ocmp_implies_forall ();
     let s = run (check (valid_ocmp ifCond)) s in
     equiv_eval_code ifTrue fuel s;
     equiv_eval_code ifFalse fuel s;
-    admit()
+    monotone_ok_code ifTrue fuel s;
+    monotone_ok_code ifFalse fuel s;
+    ()
   | While b c -> equiv_eval_while b c fuel s
 
 and equiv_eval_codes l fuel s = match l with
@@ -538,26 +589,42 @@ and equiv_eval_codes l fuel s = match l with
     end
 
 and equiv_eval_while b c fuel s =
+  equiv_eval_ocmp_forall ();
+  valid_ocmp_implies_forall ();
   if fuel = 0 then () else
   let s0 = run (check (valid_ocmp b)) s in
+  //assert (valid_ocmp b s ==> S.valid_ocmp b s.state); // TRUE
+  //assert (valid_ocmp b s ==> eval_ocmp s0 b == S.eval_ocmp s0.state b); // TRUE
   if not (eval_ocmp s0 b) then (
-    assume (not (S.eval_ocmp s0.state b));
-    let s_hi = eval_while b c fuel s in
-    let s_bytes = S.eval_while b c fuel s.state in     
-    (if Some? s_hi && (Some?.v s_hi).state.S.ok then (
-      assert (Some? s_bytes); // /\ (Some?.v s_hi).state == Some?.v s_bytes);
-      admit()
-    ) else ());
-    admit()
+    // assert (valid_ocmp b s ==> not (S.eval_ocmp s0.state b)); // TRUE
+    //let s_hi = eval_while b c fuel s in
+    //let s_bytes = S.eval_while b c fuel s.state in   
+    ()
   )
-  else (admit();
+  else (
     match eval_code c (fuel-1) s0 with
     | None -> ()
-    | Some s1 -> 
+    | Some s1 ->       
       if s1.state.S.ok then (
         equiv_eval_code c (fuel-1) s0;
         equiv_eval_while b c (fuel-1) s1;
-        ()
+        let s_hi = eval_while b c fuel s in
+        let s_bytes = S.eval_while b c fuel s.state in   
+        let s0_bytes = S.run (S.check (S.valid_ocmp b)) s.state in
+        let s1_bytes = S.eval_code c (fuel - 1) s0_bytes in
+        if Some? s_hi && (Some?.v s_hi).state.S.ok then (
+          assert (fuel - 1 > 0);
+          assert (valid_ocmp b s ==> S.valid_ocmp b s.state);
+          monotone_ok_code c (fuel-1) s0;
+          assert s0.state.S.ok;
+          assert (valid_ocmp b s);
+          assert s.state.S.ok;
+          assert (Some? (S.eval_code c (fuel-1) s0_bytes));
+          assert (Some? (S.eval_while b c (fuel - 1) (Some?.v s1_bytes)));
+          assert (None? s_bytes ==> (S.eval_ocmp s0_bytes b /\ (None? (S.eval_code c (fuel-1) s0_bytes) \/ None? (S.eval_while b c (fuel - 1) (Some?.v s1_bytes)))));
+          assert (Some? s_bytes /\ (Some?.v s_hi).state == Some?.v s_bytes);
+          ()
+        ) else ()
       )
       else ()
  )
