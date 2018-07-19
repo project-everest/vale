@@ -153,13 +153,14 @@ val qInlineIf_proof (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1
 let qInlineIf (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) : quickCode a (if_code b c1 c2) =
   QProc (if_code b c1 c2) (wp_InlineIf b qc1 qc2) (qInlineIf_monotone b qc1 qc2) (qInlineIf_compute b qc1 qc2) (qInlineIf_proof b qc1 qc2)
 
+noeq
 type cmp =
-| Cmp_eq : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
-| Cmp_ne : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
-| Cmp_le : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
-| Cmp_ge : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
-| Cmp_lt : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
-| Cmp_gt : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
+| Cmp_eq : o1:va_operand -> o2:va_operand -> cmp
+| Cmp_ne : o1:va_operand -> o2:va_operand -> cmp
+| Cmp_le : o1:va_operand -> o2:va_operand -> cmp
+| Cmp_ge : o1:va_operand -> o2:va_operand -> cmp
+| Cmp_lt : o1:va_operand -> o2:va_operand -> cmp
+| Cmp_gt : o1:va_operand -> o2:va_operand -> cmp
 
 [@va_qattr]
 let cmp_to_ocmp (c:cmp) : ocmp =

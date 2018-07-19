@@ -522,7 +522,8 @@ let rec equiv_eval_code code fuel s = match code with
   | IfElse ifCond ifTrue ifFalse ->
     let s = run (check (valid_ocmp ifCond)) s in
     equiv_eval_code ifTrue fuel s;
-    equiv_eval_code ifFalse fuel s
+    equiv_eval_code ifFalse fuel s;
+    admit()
   | While b c -> equiv_eval_while b c fuel s
 
 and equiv_eval_codes l fuel s = match l with
@@ -539,8 +540,17 @@ and equiv_eval_codes l fuel s = match l with
 and equiv_eval_while b c fuel s =
   if fuel = 0 then () else
   let s0 = run (check (valid_ocmp b)) s in
-  if not (eval_ocmp s0 b) then ()
-  else (
+  if not (eval_ocmp s0 b) then (
+    assume (not (S.eval_ocmp s0.state b));
+    let s_hi = eval_while b c fuel s in
+    let s_bytes = S.eval_while b c fuel s.state in     
+    (if Some? s_hi && (Some?.v s_hi).state.S.ok then (
+      assert (Some? s_bytes); // /\ (Some?.v s_hi).state == Some?.v s_bytes);
+      admit()
+    ) else ());
+    admit()
+  )
+  else (admit();
     match eval_code c (fuel-1) s0 with
     | None -> ()
     | Some s1 -> 

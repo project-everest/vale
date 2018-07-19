@@ -14,12 +14,13 @@ let nat32_to_nat8s (n:nat32) : nat8*nat8*nat8*nat8 =
   let v4 = n % 0x100 in
   (v1, v2, v3, v4)
 
-#reset-options "--z3rlimit 20"
+
 let nat32_to_nat8s_to_nat32 (v1 v2 v3 v4:nat8) : 
   Lemma (nat32_to_nat8s (nat8s_to_nat32 v1 v2 v3 v4) = (v1, v2, v3, v4))
   =
   ()
-
+  
+#reset-options "--z3rlimit 30"
 let nat8s_to_nat32_injective (v1 v2 v3 v4 v1' v2' v3' v4':nat8) :
   Lemma (nat8s_to_nat32 v1 v2 v3 v4 == nat8s_to_nat32 v1' v2' v3' v4' ==>
          v1 == v1' /\
