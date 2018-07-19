@@ -593,14 +593,7 @@ and equiv_eval_while b c fuel s =
   valid_ocmp_implies_forall ();
   if fuel = 0 then () else
   let s0 = run (check (valid_ocmp b)) s in
-  //assert (valid_ocmp b s ==> S.valid_ocmp b s.state); // TRUE
-  //assert (valid_ocmp b s ==> eval_ocmp s0 b == S.eval_ocmp s0.state b); // TRUE
-  if not (eval_ocmp s0 b) then (
-    // assert (valid_ocmp b s ==> not (S.eval_ocmp s0.state b)); // TRUE
-    //let s_hi = eval_while b c fuel s in
-    //let s_bytes = S.eval_while b c fuel s.state in   
-    ()
-  )
+  if not (eval_ocmp s0 b) then ()
   else (
     match eval_code c (fuel-1) s0 with
     | None -> ()
@@ -608,22 +601,9 @@ and equiv_eval_while b c fuel s =
       if s1.state.S.ok then (
         equiv_eval_code c (fuel-1) s0;
         equiv_eval_while b c (fuel-1) s1;
-        let s_hi = eval_while b c fuel s in
-        let s_bytes = S.eval_while b c fuel s.state in   
-        let s0_bytes = S.run (S.check (S.valid_ocmp b)) s.state in
-        let s1_bytes = S.eval_code c (fuel - 1) s0_bytes in
+        let s_hi = eval_while b c fuel s in        
         if Some? s_hi && (Some?.v s_hi).state.S.ok then (
-          assert (fuel - 1 > 0);
-          assert (valid_ocmp b s ==> S.valid_ocmp b s.state);
-          monotone_ok_code c (fuel-1) s0;
-          assert s0.state.S.ok;
-          assert (valid_ocmp b s);
-          assert s.state.S.ok;
-          assert (Some? (S.eval_code c (fuel-1) s0_bytes));
-          assert (Some? (S.eval_while b c (fuel - 1) (Some?.v s1_bytes)));
-          assert (None? s_bytes ==> (S.eval_ocmp s0_bytes b /\ (None? (S.eval_code c (fuel-1) s0_bytes) \/ None? (S.eval_while b c (fuel - 1) (Some?.v s1_bytes)))));
-          assert (Some? s_bytes /\ (Some?.v s_hi).state == Some?.v s_bytes);
-          ()
+          monotone_ok_code c (fuel-1) s0
         ) else ()
       )
       else ()
