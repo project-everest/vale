@@ -35,19 +35,19 @@ let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> GTot a) (y:(_:unit{~b}) -> GTot a
 type tainted_operand =
 | TConst: n:int -> tainted_operand
 | TReg: r:reg -> tainted_operand
-| TMem: m:maddr -> b:M.buffer64 -> t:taint -> tainted_operand
+| TMem: m:maddr -> b:M.buffer64 -> index:int -> t:taint -> tainted_operand
 
 unfold let t_op_to_op (t:tainted_operand) : operand = 
   match t with 
   | TConst n -> OConst n
   | TReg r -> OReg r
-  | TMem m b t -> OMem m
+  | TMem m _ _ _ -> OMem m
 
 let get_taint (t:tainted_operand) : taint =
   match t with 
   | TConst _ -> Public
   | TReg _ -> Public
-  | TMem _ _ t -> t
+  | TMem _ _ _ t -> t
 
 let extract_taint (o1 o2:tainted_operand) : taint =
   if TMem? o1 then TMem?.t o1
@@ -59,13 +59,6 @@ let extract_taint3 (o1 o2 o3:tainted_operand) : taint =
   else if TMem? o2 then TMem?.t o2
   else if TMem? o3 then TMem?.t o3
   else Public  
-
-[@va_qattr]
-let valid_operand (t:tainted_operand) (s:state) : Type0 =
-  let o = t_op_to_op t in
-  X64.Vale.State_i.valid_operand o s /\
-  (TMem? t ==>
-   M.valid_taint_buf64 (TMem?.b t) s.mem s.memTaint (TMem?.t t))
 
 (* Type aliases *)
 unfold let va_bool = bool
@@ -116,6 +109,14 @@ unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
 unfold let loc_union = M.loc_union
 
+[@va_qattr]
+let valid_operand (t:tainted_operand) (s:state) : Type0 =
+  let o = t_op_to_op t in
+  X64.Vale.State_i.valid_operand o s /\
+  (TMem? t ==>
+   valid_src_addr s.mem (TMem?.b t) (TMem?.index t) /\
+   M.valid_taint_buf64 (TMem?.b t) s.mem s.memTaint (TMem?.t t) /\
+   eval_maddr (TMem?.m t) s == M.buffer_addr (TMem?.b t) s.mem + 8 `op_Multiply` (TMem?.index t))
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -148,10 +149,10 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 [@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
 [@va_qattr]
-unfold let va_opr_code_Mem (o:operand) (offset:int) (b:M.buffer64) (t:taint) : va_operand =
+unfold let va_opr_code_Mem (o:operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : va_operand =
   match o with
   | OConst n -> TConst (n + offset)
-  | OReg r -> TMem (MReg r offset) b t
+  | OReg r -> TMem (MReg r offset) b index t
   | _ -> TConst 42
 
 let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : Lemma
@@ -161,10 +162,10 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
     M.valid_taint_buf64 b s.mem s.memTaint t /\
     eval_operand base s + offset == M.buffer_addr b s.mem + 8 `op_Multiply` index
   )
-  (ensures valid_operand (va_opr_code_Mem base offset b t) s)
+  (ensures valid_operand (va_opr_code_Mem base offset b index t) s)
   =
   M.lemma_valid_mem64 b index s.mem
-  
+ 
 
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand (t_op_to_op o) s

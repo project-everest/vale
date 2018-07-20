@@ -22,6 +22,25 @@ module TS = X64.Taint_Semantics_s
 module P = X64.Print_s
 open X64.Taint_Semantics_i
 open FStar.List.Tot.Properties // Needed to facilitate understanding of the use of map in mk_taint_ins*
+
+// Convenient packaging for lemma_valid_taint64
+let lemma_valid_taint64_operand (o:va_operand) (s:va_state) : Lemma
+  (requires valid_operand o s)
+  (ensures TMem? o ==> Map.sel s.memTaint (X64.Memory_i.buffer_addr (TMem?.b o) s.mem + 8 `op_Multiply` (TMem?.index o)) == (TMem?.t o))
+  =
+  //admit();
+  if TMem? o then (
+    let open X64.Taint_Semantics_s in
+    let tainted_mem:X64.Memory_i_s.memtaint = (state_to_S s).memTaint in
+    let real_mem:X64.Memory_i_s.mem = s.mem in
+    lemma_valid_taint64 (TMem?.b o)
+                        tainted_mem
+                        real_mem
+                        (TMem?.index o)
+                        (TMem?.t o);
+    ()
+  ) else ()
+
 #endverbatim
 
 #reset-options "--initial_fuel 4 --max_fuel 4 --max_ifuel 2 --z3rlimit 20"
@@ -59,6 +78,8 @@ procedure{:instruction mk_taint_ins2(S.Mov64, dst, src, list(dst), list(src))}{:
     ensures
         dst == old(src);
 {
+    lemma_valid_taint64_operand(@src, old(this));
+    assume old(trace) == trace;
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), extract_taint(dst, src)))}{:quick exportOnly} Add64(inout dst: dst_opr64, src: opr64)
