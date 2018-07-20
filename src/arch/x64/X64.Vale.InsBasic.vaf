@@ -79,7 +79,6 @@ procedure{:instruction mk_taint_ins2(S.Mov64, dst, src, list(dst), list(src))}{:
         dst == old(src);
 {
     lemma_valid_taint64_operand(@src, old(this));
-    assume old(trace) == trace;
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,src), list(dst), list(dst, src)), extract_taint(dst, src)))}{:quick exportOnly} Add64(inout dst: dst_opr64, src: opr64)
