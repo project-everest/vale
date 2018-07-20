@@ -12,12 +12,11 @@ type kind =
 type bnd = Int of bigint | NegInf | Inf
 type typ =
 | TName of id
-| TApp of typ * typ list
 | TVar of id * kind option
 | TInt of bnd * bnd
-| TList of typ
 | TTuple of typ list
 | TArrow of typ list * typ
+| TApp of typ * typ list
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
@@ -25,18 +24,18 @@ type formal = id * typ option
 
 type exp_call = CallGhost | CallLemma | CallInline | CallOutline
 
+type op_type = OpBool | OpProp
+
 type uop = 
-| UNot | UNeg | UOld | UIs of id
+| UNot of op_type | UNeg | UOld | UIs of id
 | UConst
 | UReveal | UGhostOnly | UToOperand
 | UCall of exp_call
 | UCustom of string
 
 type bop =
-| BEquiv | BImply | BExply | BAnd | BOr
-| BLand | BLor // logical and, logical or
-| BSeq   // structural equality
-| BEq | BNe | BLt | BGt | BLe | BGe | BIn
+| BEquiv | BImply | BExply | BAnd of op_type | BOr of op_type
+| BEq of op_type | BNe of op_type | BLt | BGt | BLe | BGe | BIn
 | BAdd | BSub | BMul | BDiv | BMod
 | BOldAt
 | BCustom of string

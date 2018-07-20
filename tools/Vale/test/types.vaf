@@ -1,0 +1,65 @@
+module Types
+
+type bool:Type(0) extern;
+type byte:Type(0) := int(0, 0xff);
+
+var{:state ok()} ok:bool;
+
+procedure{:typecheck} Expressions(ghost x:int(10, 20)) returns(ghost y:int(15, 25))
+{
+    let a:bool := !true;
+    let b:prop := !a;
+    let c:prop := !b;
+    let d:int := 5;
+    let e:tuple(int, byte) := tuple(5, 5);
+    let f:tuple(int, byte) := let z := tuple(5, 5) in z;
+    let g:int((-20), (-10)) := (-x);
+    let h:int((-20), (-10)) := let z := x in (-z);
+    let i:int(13, 23) := x + 3;
+    let j:int(7, 17) := x - 3;
+    let k:int(30, 60) := x * 3;
+    let l:int(30, 60) := x + 2 * x;
+    let m:int(3, 6) := x / 3;
+    let n:int(0, 2) := x % 3;
+    let o:bool := a && a;
+    let p:prop := a && b;
+    let q:prop := b && a;
+    let r:prop := b && b;
+    let s:byte := if a then 10 else 20;
+    // TODO: let t := if a then 10 else 20;
+    y := 20;
+}
+
+// TODO: check that return values are assigned
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:int(10, 20)) returns(ghost y:int(15, 25))
+{
+    y := x;
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let a:bool := !5;
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let a:prop := !true;
+    let b:bool := !a;
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let a:prop := !true;
+    let b:bool := a && true;
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(p:prop)
+{
+    let a:int := if p then 10 else 10;
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let e:tuple(int, byte) := tuple(5, 555);
+}

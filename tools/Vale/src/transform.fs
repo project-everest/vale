@@ -85,15 +85,6 @@ let prev_id (x:id) = Reserved ("prev_" + (string_of_id x))
 let body_id (x:id) = Id ((string_of_id x) + "_body")
 let while_id (x:id) = Id ((string_of_id x) + "_while")
 
-let tUnit = TName (Id "unit")
-let tBool = TName (Reserved "bool")
-let tInt = TName (Reserved "int")
-let tOperand xo = TName (Reserved xo)
-let tState = TName (Reserved "state")
-let tCode = TName (Reserved "code")
-let tCodes = TName (Reserved "codes")
-let tFuel = TName (Reserved "fuel")
-
 let is_quick_body (a:attrs):bool =
   if List_mem_assoc (Id "quick") a then
     match List_assoc (Id "quick") a with
@@ -768,8 +759,8 @@ let rewrite_cond_exp (env:env) (e:exp):exp =
   | (EOp (op, es)) ->
     (
       match (op, es) with
-      | (Bop BEq, [e1; e2]) -> vaApp "cmp_eq" [r e1; r e2]
-      | (Bop BNe, [e1; e2]) -> vaApp "cmp_ne" [r e1; r e2]
+      | (Bop (BEq _), [e1; e2]) -> vaApp "cmp_eq" [r e1; r e2]
+      | (Bop (BNe _), [e1; e2]) -> vaApp "cmp_ne" [r e1; r e2]
       | (Bop BLe, [e1; e2]) -> vaApp "cmp_le" [r e1; r e2]
       | (Bop BGe, [e1; e2]) -> vaApp "cmp_ge" [r e1; r e2]
       | (Bop BLt, [e1; e2]) -> vaApp "cmp_lt" [r e1; r e2]
@@ -1203,7 +1194,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let spec_reads = List.map (mod_to_spec Read) p_reads in
         let spec_mods = List.map (mod_to_spec Modify) p_mods in
         let specs = spec_aliases @ spec_reads @ spec_mods @ reqs @ enss in
-        let e_exit = EOp (Uop UNot, [eCond]) in
+        let e_exit = EOp (Uop (UNot OpProp), [eCond]) in
         let spec_exit = inv_to_spec in_reads (REnsures Unrefined) (loc, e_exit) in
         let spec_enter_body = inv_to_spec ins (RRequires Unrefined) (loc, eCond) in
         // ed << old(ed)
@@ -1285,7 +1276,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         match spec with
         | (_, SpecRaw (RawSpec (RModifies Preserve, es))) ->
             let es = List.collect (fun (loc, e) -> match e with SpecExp e -> [(loc, e)] | SpecLet _ -> []) es in
-            List_mapSnd (fun e -> SpecExp (EOp (Bop BEq, [e; EOp (Uop UOld, [e])]))) es
+            List_mapSnd (fun e -> SpecExp (EOp (Bop (BEq OpProp), [e; EOp (Uop UOld, [e])]))) es
         | _ -> []
       )
       p.pspecs

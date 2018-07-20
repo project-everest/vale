@@ -196,7 +196,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     let eqMod x =
       let getM = stateGet {env with state = EVar sM} x in
       let getN = stateGet {env with state = EVar sN} x in
-      EOp (Bop BEq, [getM; getN])
+      EOp (Bop (BEq OpProp), [getM; getN])
       in
     let eEq = and_of_list (List.map eqMod info.qmods) in
     let fEq = EBind (Lambda, [], [(sM, Some tState); (sN, Some tState)], [], eEq) in

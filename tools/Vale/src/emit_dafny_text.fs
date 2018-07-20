@@ -16,9 +16,9 @@ let sid (x:id):string =
 let prec_of_bop (op:bop):(int * int * int) =
   match op with
   | BEquiv | BImply | BExply -> (10, 11, 11)
-  | BAnd | BOr | BLand | BLor -> (15, 16, 16) // TODO
+  | BAnd _ | BOr _ -> (15, 16, 16) // TODO
   | BLe | BGe | BLt | BGt | BIn -> (20, 20, 20)
-  | BEq | BSeq | BNe -> (25, 25, 26)
+  | BEq _ | BNe _ -> (25, 25, 26)
   | BAdd | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
   | BOldAt | BCustom _ -> internalErr ("binary operator " + (sprintf "%A" op))
@@ -28,10 +28,10 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> "<=="
-  | BAnd | BLand -> "&&"
-  | BOr | BLor -> "||"
-  | BEq | BSeq -> "=="
-  | BNe -> "!="
+  | BAnd _ -> "&&"
+  | BOr _ -> "||"
+  | BEq _ -> "=="
+  | BNe _ -> "!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
@@ -54,7 +54,6 @@ let rec string_of_typ (t:typ):string =
   | TApp (t, ts) -> (string_of_typ t) + "<" + (String.concat ", " (List.map string_of_typ ts)) + ">"
   | TArrow (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
   | TInt (b1, b2) -> "int"
-  | TList t -> "list(" + (string_of_typ t) + ")"
   | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
   | _ -> internalErr (sprintf "unexpected string_of_typ %A" t)
 
@@ -72,7 +71,7 @@ let rec string_of_exp_prec prec e =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s + "\"", 99)
     | EOp (Uop UReveal, [EVar x]) -> ("reveal_" + (sid x) + "()", 99)
-    | EOp (Uop UNot, [e]) -> ("!" + (r 99 e), 90)
+    | EOp (Uop (UNot _), [e]) -> ("!" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
     | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr ("unary operator " + (sprintf "%A" e))

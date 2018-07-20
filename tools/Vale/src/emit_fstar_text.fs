@@ -34,9 +34,9 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BEquiv -> (10, 11, 11)
   | BImply -> (12, 13, 13)
   | BExply -> notImplemented "<=="
-  | BOr | BLor -> (16, 16, 17)
-  | BAnd | BLand -> (18, 18, 19)
-  | BLe | BGe | BLt | BGt | BEq | BSeq | BNe -> (20, 20, 21)
+  | BOr _ -> (16, 16, 17)
+  | BAnd _ -> (18, 18, 19)
+  | BLe | BGe | BLt | BGt | BEq _ | BNe _ -> (20, 20, 21)
   | BAdd -> (30, 30, 31)
   | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
@@ -47,13 +47,14 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> internalErr "<=="
-  | BOr -> "||"
-  | BLor -> "\\/"
-  | BAnd -> "&&"
-  | BLand -> "/\\"
-  | BEq -> "=="
-  | BSeq -> "="
-  | BNe -> "=!="
+  | BOr OpBool -> "||"
+  | BOr OpProp -> "\\/"
+  | BAnd OpBool -> "&&"
+  | BAnd OpProp -> "/\\"
+  | BEq OpBool -> "="
+  | BEq OpProp -> "=="
+  | BNe OpBool -> "<>"
+  | BNe OpProp -> "=!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
@@ -79,7 +80,6 @@ let rec string_of_typ (t:typ):string =
   | TApp (t, ts) -> "(" + (string_of_typ t) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
   | TInt(_, _) -> "int"
   | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
-  | TList t -> "list(" + (string_of_typ t) + ")"
   | TArrow (ts, t) -> "(" + (String.concat " " (List.map string_of_typ ts)) + " " +  (string_of_typ t) + ")"
   | _ -> internalErr (sprintf "unexpected string_of_typ: %A" t)
 
@@ -99,7 +99,8 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
     | EOp (Uop UReveal, [EApply (x, es)]) -> (r prec (vaApp "reveal_opaque" [EApply (transparent_id x, es)]), prec)
     | EOp (Uop UReveal, [EVar x]) -> ("(reveal_opaque " + (sid x) + ")", prec)
-    | EOp (Uop UNot, [e]) -> ("~" + (r 99 e), 90)
+    | EOp (Uop (UNot OpBool), [e]) -> ("~" + (r 99 e), 90)
+    | EOp (Uop (UNot OpProp), [e]) -> ("not " + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
     | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr (sprintf "unary operator: %A" e)
@@ -116,7 +117,7 @@ let rec string_of_exp_prec prec e =
         | (op, EOp (Bop op1, [e11; e12])) when isChainOp op && isChainOp op1 ->
             // Convert (a <= b) < c into (a <= b) && (b < c)
             let e2 = EOp (Bop op, [e12; e2]) in
-            (r prec (EOp (Bop BAnd, [e1; e2])), 0)
+            (r prec (EOp (Bop (BAnd OpBool), [e1; e2])), 0)
         | _ ->
             let (pe, p1, p2) = prec_of_bop op in
             ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)

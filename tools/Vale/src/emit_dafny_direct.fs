@@ -37,10 +37,10 @@ let bop2opcode (op:bop):BinaryExpr.Opcode =
   | BEquiv -> BinaryExpr.Opcode.Iff
   | BImply -> BinaryExpr.Opcode.Imp
   | BExply -> BinaryExpr.Opcode.Exp
-  | BAnd | BLand -> BinaryExpr.Opcode.And
-  | BOr | BLor -> BinaryExpr.Opcode.Or
-  | BEq | BSeq -> BinaryExpr.Opcode.Eq
-  | BNe -> BinaryExpr.Opcode.Neq
+  | BAnd _ -> BinaryExpr.Opcode.And
+  | BOr _ -> BinaryExpr.Opcode.Or
+  | BEq _ -> BinaryExpr.Opcode.Eq
+  | BNe _ -> BinaryExpr.Opcode.Neq
   | BLt -> BinaryExpr.Opcode.Lt
   | BGt -> BinaryExpr.Opcode.Gt
   | BLe -> BinaryExpr.Opcode.Le
@@ -55,9 +55,8 @@ let bop2opcode (op:bop):BinaryExpr.Opcode =
 
 let is_rel_op (op:bop):bool =
   match op with
-  | BEq -> true
-  | BSeq-> true
-  | BNe -> true
+  | BEq _ -> true
+  | BNe _ -> true
   | BLt -> true
   | BGt -> true
   | BLe -> true
@@ -197,8 +196,8 @@ let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:Resize
         let tok = create_token loc (string_of_bop op) in
         // validate op against current operator chain
         match op with
-            | BEq | BSeq -> ()
-            | BNe -> if ops.Contains BinaryExpr.Opcode.Neq then err "a chain cannot have more than one != operator"
+            | BEq _ -> ()
+            | BNe _ -> if ops.Contains BinaryExpr.Opcode.Neq then err "a chain cannot have more than one != operator"
             | BLt -> if (ops.Contains BinaryExpr.Opcode.Ge || ops.Contains BinaryExpr.Opcode.Gt) then err "this operator chain cannot continue with an ascending operator"
             | BLe -> if (ops.Contains BinaryExpr.Opcode.Ge || ops.Contains BinaryExpr.Opcode.Gt) then err "this operator chain cannot continue with an ascending operator"
             | BGt -> if (ops.Contains BinaryExpr.Opcode.Le || ops.Contains BinaryExpr.Opcode.Lt) then err "this operator chain cannot continue with a descending operator"
@@ -253,7 +252,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let exp = new NameSegment(tok, tok.``val``, null) in
           let openParen = create_token loc "(" in
           new ApplySuffix(openParen, exp, new ResizeArray<Expression>()) :> Expression
-      | EOp (Uop UNot, [e]) ->
+      | EOp (Uop (UNot _), [e]) ->
           let tok = create_token loc "!" in
           let exp = create_expression built_ins loc e in
           new UnaryOpExpr(tok, UnaryOpExpr.Opcode.Not, exp) :> Expression

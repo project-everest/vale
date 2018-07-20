@@ -3,6 +3,15 @@ module Ast_util
 open Ast
 open Microsoft.FSharp.Math
 
+let tUnit = TName (Id "unit")
+let tBool = TName (Reserved "bool")
+let tInt = TName (Reserved "int")
+let tOperand xo = TName (Reserved xo)
+let tState = TName (Reserved "state")
+let tCode = TName (Reserved "code")
+let tCodes = TName (Reserved "codes")
+let tFuel = TName (Reserved "fuel")
+
 let List_mapFold (f:'s -> 't -> 'r * 's) (s:'s) (ts:'t list):('r list * 's) =
   let (rs_rev, s) = List.fold (fun (rs_rev, s) t -> let (r, s) = f s t in (r::rs_rev, s)) ([], s) ts in
   (List.rev rs_rev, s)
@@ -52,8 +61,8 @@ let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with
   | [] -> empty
   | h::t -> List.fold (fun accum e -> EOp (Bop b, [accum; e])) h t
-let and_of_list = binary_op_of_list BLand (EBool true)
-let or_of_list = binary_op_of_list BLor (EBool false)
+let and_of_list = binary_op_of_list (BAnd OpProp) (EBool true)
+let or_of_list = binary_op_of_list (BOr OpProp) (EBool false)
 
 let assert_attrs_default =
   {

@@ -20,9 +20,9 @@ let prec_of_bop (op:bop):(int * int * int) =
   | BEquiv -> (10, 10, 11)
   | BImply -> (12, 13, 13)
   | BExply -> (14, 14, 15)
-  | BOr | BLor -> (16, 16, 17)
-  | BAnd | BLand -> (18, 18, 19)
-  | BEq | BSeq | BNe -> (20, 20, 21)
+  | BOr _ -> (16, 16, 17)
+  | BAnd _ -> (18, 18, 19)
+  | BEq _ | BNe _ -> (20, 20, 21)
   | BLe | BGe | BLt | BGt -> (25, 25, 25)
   | BAdd | BSub -> (30, 30, 31)
   | BMul | BDiv | BMod -> (40, 40, 41)
@@ -33,11 +33,12 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> "<=="
-  | BAnd | BLand -> "&&"
-  | BOr | BLor -> "||"
-  | BEq -> "=="
-  | BSeq -> "="
-  | BNe -> "!="
+  | BAnd _ -> "&&"
+  | BOr _ -> "||"
+  | BEq OpBool -> "="
+  | BEq OpProp -> "=="
+  | BNe OpBool -> "<>"
+  | BNe OpProp -> "!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
@@ -68,10 +69,9 @@ let rec string_of_typ_prec (prec:int) (t:typ):string =
     | TArrow (ts, t) -> ("(" + (String.concat ", " (List.map (r 0) ts)) + ") -> " + (r 0 t), 0)
     | TInt (NegInf, Inf) -> ("int", 0)
     | TInt (b1, b2) -> ("int(" + s_bnd b1 + ", " + s_bnd b2 + ")", 0)
-    | TList t -> ("list(" + (r 0 t) + ")", 10)
     | TTuple ts -> ("tuple(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
   in if prec <= tPrec then s else "(" + s + ")"
-let string_of_typ (t:typ):string = string_of_typ_prec 99 t
+let string_of_typ (t:typ):string = string_of_typ_prec 0 t
 
 let rec string_of_exp_prec (prec:int) (e:exp):string =
   let r = string_of_exp_prec in
@@ -87,7 +87,7 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s + "\"", 99)
     | EOp (Uop UReveal, [EVar x]) -> ("reveal " + (sid x) + "()", 99)
-    | EOp (Uop UNot, [e]) -> ("!" + (r 99 e), 90)
+    | EOp (Uop (UNot _), [e]) -> ("!" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + " is " + (sid x), 90)
     | EOp (Uop UToOperand, [e]) -> ("@" + (r 99 e), 90)
@@ -116,6 +116,7 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " := " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _) -> internalErr "EBind"
+    | ECast (e, t) -> ("#" + string_of_typ_prec 20 t + "(" + r 5 e + ")", 90)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ghost (g:ghost) = match g with Ghost -> "ghost " | NotGhost -> ""

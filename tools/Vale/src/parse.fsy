@@ -113,16 +113,26 @@ Type
   | FUN LPAREN TypeArgsOpt RPAREN MINUSGT Type { TArrow ($3, $6) }
 Type1
   : Type2 { $1 }
-  | Type1 LPAREN TypeArgsOpt RPAREN { TApp ($1, $3) }
+  | Type1 LPAREN TypeArgsOpt RPAREN
+    {
+      match $1 with
+      | TName (Id "tuple") -> TTuple $3
+      | _ -> TApp ($1, $3)
+    }
 Type2
   : LPAREN Type RPAREN { $2 }
   | AnyQualifiedId { TName $1 }
 	
+Int
+  : LITINT { $1 }
+  | LPAREN MINUS LITINT RPAREN { ($1, bigint.Negate(snd $3)) }
+
+/* REVIEW: INT vs. INT LPAREN forces IntType to have low precedence -- might want different syntax */
 IntType
   : INT { TInt (NegInf, Inf) }
-  | INT LPAREN COMMA LITINT RPAREN { TInt (NegInf, Int(snd $4))}
-  | INT LPAREN LITINT COMMA RPAREN { TInt (Int (snd $3), Inf)}
-  | INT LPAREN LITINT COMMA LITINT RPAREN { TInt (Int (snd $3), Int(snd $5))}
+  | INT LPAREN COMMA Int RPAREN { TInt (NegInf, Int(snd $4))}
+  | INT LPAREN Int COMMA RPAREN { TInt (Int (snd $3), Inf)}
+  | INT LPAREN Int COMMA Int RPAREN { TInt (Int (snd $3), Int(snd $5))}
 
 TypeArgs
   : Type { [$1] }
@@ -149,11 +159,11 @@ Exp1
   | Exp1 LTEQEQGT Exp1 { makeBop BEquiv $2 $1 $3 }
   | Exp1 EQEQGT Exp1 { makeBop BImply $2 $1 $3 }
   | Exp1 LTEQEQ Exp1 { makeBop BExply $2 $1 $3 }
-  | Exp1 AMPAMP Exp1 { makeBop BAnd $2 $1 $3 }
-  | Exp1 BARBAR Exp1 { makeBop BOr $2 $1 $3 }
-  | Exp1 EQEQ Exp1 { makeBop BEq $2 $1 $3 }
-  | Exp1 EQ Exp1 { makeBop BSeq $2 $1 $3 }
-  | Exp1 NE Exp1 { makeBop BNe $2 $1 $3 }
+  | Exp1 AMPAMP Exp1 { makeBop (BAnd OpBool) $2 $1 $3 }
+  | Exp1 BARBAR Exp1 { makeBop (BOr OpBool) $2 $1 $3 }
+  | Exp1 EQEQ Exp1 { makeBop (BEq OpProp) $2 $1 $3 }
+  | Exp1 EQ Exp1 { makeBop (BEq OpBool) $2 $1 $3 }
+  | Exp1 NE Exp1 { makeBop (BNe OpProp) $2 $1 $3 }
   | Exp1 LT Exp1 { makeBop BLt $2 $1 $3 }
   | Exp1 GT Exp1 { makeBop BGt $2 $1 $3 }
   | Exp1 LE Exp1 { makeBop BLe $2 $1 $3 }
@@ -165,7 +175,7 @@ Exp1
   | Exp1 SLASH Exp1 { makeBop BDiv $2 $1 $3 }
   | Exp1 PERCENT Exp1 { makeBop BMod $2 $1 $3 }
   | LPAREN MINUS Exp1 RPAREN { makeUop UNeg $2 $3 }
-  | BANG Exp1 { makeUop UNot $1 $2 }
+  | BANG Exp1 { makeUop (UNot OpProp) $1 $2 }
   | Exp1 QLBRACKET Exp RBRACKET { expAt $2 (EOp (Bop BIn, [$3; $1])) }
   | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3])) }
   | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5])) }
@@ -231,10 +241,10 @@ CalcOp
   : LTEQEQGT { BEquiv }
   | EQEQGT { BImply }
   | LTEQEQ { BExply }
-  | AMPAMP { BAnd }
-  | BARBAR { BOr }
-  | EQEQ { BEq }
-  | EQ { BSeq }
+  | AMPAMP { BAnd OpBool }
+  | BARBAR { BOr OpBool }
+  | EQEQ { BEq OpProp }
+  | EQ { BEq OpBool }
   | LT { BLt }
   | GT { BGt }
   | LE { BLe }

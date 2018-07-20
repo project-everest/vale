@@ -1,0 +1,299 @@
+ABSTRACT SYNTAX
+
+natural literals n = 0 | 1 | 2 | ...
+integer literals i = ... | -2 | -1 | 0 | 1 | 2 | ...
+kinds k = Type(n)
+integer bounds B = i | -inf | inf
+variables x
+monotypes t = x | x(t, ..., t) | int(B1, B2) | tuple(t, ..., t) | fun(t, ..., t) -> t
+
+polytypes T =
+| forall a1:Type(0) ... an:Type(0). t
+| forall a1:Type(0) ... an:Type(0). (x:t, ..., x:t) -> t (requires e) (ensures e)
+
+bind = forall | exists | lambda
+icmp = < | > | <= | >=
+bop = && | ||
+Bop = /\ | \/ | ==> | <== | <==>
+trigger = {e, ..., e}
+triggers = trigger ... trigger
+
+expressions e =
+| e:t
+| x
+| x(e, ..., e)
+| i | true | false | "...string-literal..."
+| const(e)
+| this
+| old(e)
+| old[e](e)
+| list(e, ..., e)
+| tuple(e, ..., e)
+| (-e)
+| e * e | e / e | e % e | e + e | e - e
+| e icmp e | e = e | e <> e | e == e | e != e
+| !e | e bop e | e Bop e
+| if e then e else e
+| let x:t = e1 in e2
+| bind x:t, ..., x:t triggers :: e
+
+Note: the following expressions may be desugared into x(e, ..., e) expressions for type checking:
+| e[e] | e[e := e] | e.x | e.(x := e) | e is x
+
+inout = in | out | inout
+param = ghost | inline | inout operand
+ret = ghost
+procedure types P = (param x:t, ..., param x:t) -> (ret x:t, ..., ret x:t) (reads x ... x) (modifies x ... x) (requires e) (ensures e)
+
+environment members g =
+| x:k | x:(k, ..., k) -> k | x:k = t | x(x1:k1, ..., xn:kn):k = t  (global type declarations)
+| x:T | x:P  (global value declarations)
+| x:t  (local value declarations)
+environment G = g ... g
+
+The type checker expects G to contain the following standard x:k and x:(k, ..., k) -> k declarations:
+  prop : Type(1)
+  bool : Type(0)
+  int : Type(0)
+  string : Type(0)
+  list : (Type(0)) -> Type(0)
+  state : Type(0)
+
+
+KINDING:  G |- t : k
+
+G = ... x:k ... OR G = ... x:k = t ...
+--------------------------------------
+G |- x : k
+
+G |- ... x:(k1, ..., kn) -> k0
+G |- t1 : k1
+...
+G |- tn : kn
+------------------------------
+G |- x(t1, ..., tn) : k0
+
+G |- int(-inf, inf) : Type(0)
+
+G |- int(-inf, i) : Type(0)
+
+G |- int(i, inf) : Type(0)
+
+G |- int(i1, i2) : Type(0)
+
+G |- t1 : Type(0)
+...
+G |- tn : Type(0)
+---------------------------------
+G |- tuple(t1, ..., tn) : Type(0)
+
+G |- t0 : Type(0)
+G |- t1 : Type(0)
+...
+G |- tn : Type(0)
+-------------------------------------
+G |- fun(t1, ..., tn) -> t0 : Type(0)
+
+
+TYPE EQUALITY:  G |- t = t'
+
+G = ... x:k = t' ...
+--------------------
+G |- x = t'
+
+G = ... x(x1:k1, ..., xn:kn):k = t' ...
+G |- t1 : k1
+...
+G |- tn : kn
+-------------------------------------------------
+G |- x(t1, ..., tn) = t'[x1 <- t1, ..., xn <- tn]
+
+G |- x = x'
+G |- t1 = t1'
+...
+G |- tn = tn'
+---------------------------------------
+G |- x(t1, ..., tn) = x'(t1', ..., tn')
+
+G |- t1 = t1'
+...
+G |- tn = tn'
+----------------------------------------------
+G |- tuple(t1, ..., tn) = tuple(t1', ..., tn')
+
+
+SUBTYPING:  G |- t <: t'
+
+G |- t <: t
+
+G |- bool <: prop
+
+B1' <= B1
+B2 <= B2'
+---------------------------------
+G |- int(B1, B2) <: int(B1', B2')
+
+
+TYPING:  G |- e : t
+
+G |- t = t'
+G |- e : t
+--------------
+G |- e : t'
+
+G |- t <: t'
+G |- e : t
+--------------
+G |- e : t'
+
+G |- t':k'
+G |- t' <: t  OR  G |- t <: t'
+G |- e:t
+------------------------------ Note: downcasts incur an SMT check; downcasts from prop to bool always fail
+G |- (e:t') : t'
+
+G = ... x:t ...
+---------------
+G |- x : t
+
+T = forall a1:Type(0) ... an:Type(0). t
+G = ... x:T ...
+G |- t1 : Type(0)
+...
+G |- tn : Type(0)
+-----------------------------------
+G |- x : t[a1 <- t1, ..., an <- tn]
+
+T = forall a1:Type(0) ... an:Type(0). (x1:t1', ..., xm:tm') -> t (requires e_req) (ensures e_ens)
+G = ... x:T ...
+G |- t1 : Type(0)
+...
+G |- tn : Type(0)
+G |- e1 : t1'[a1 <- t1, ..., an <- tn]
+...
+G |- em : tm'[a1 <- t1, ..., an <- tn]
+------------------------------------------------ Note: if e_req isn't True, then it is checked by the SMT solver
+G |- x(e1, ..., en) : t[a1 <- t1, ..., an <- tn]
+
+G |- i : int(i, i)
+
+G |- true : bool
+
+G |- false : bool
+
+G |- "...string-literal..." : string
+
+G |- e : t
+-----------------
+G |- const(e) : t
+
+G |- this : state
+
+G |- e : t
+---------------
+G |- old(e) : t
+
+G |- e : t
+G |- e' : state
+-------------------
+G |- old[e'](e) : t
+
+G |- t : Type(0)
+G |- e1 : t
+...
+G |- en : t
+--------------------------------
+G |- list(e1, ..., en) : list(t)
+
+G |- tuple(t1, ..., tn) : Type(0)
+G |- e1 : t1
+...
+G |- en : tn
+--------------------------------------------
+G |- tuple(e1, ..., en) : tuple(t1, ..., tn)
+
+G |- e : int(B1, B2)
+-------------------------
+G |- (-e) : int(-B2, -B1)
+
+G |- e1 : int(B1, B1')
+G |- e2 : int(B2, B2')
+(op in {+, -, *}) OR (op in {/} AND ((B2 > 0) OR (B2' < 0)))
+S = {B1 op B2, B1' op B2, B1 op B2', B1' op B2'}
+------------------------------------------------------------ Note: (-inf + inf) is arbitrary and 0 * inf = 0 * -inf = 0
+G |- e1 op e2 : int(min(S), max(S))
+
+G |- e1 : int(B1, B1')
+G |- e2 : int(B2, B2')
+(B2 > 0) OR (B2' < 0)
+S = {abs(B2), abs(B2')}
+---------------------------------
+G |- e1 % e2 : int(0, max(S) - 1)
+
+G |- e1 : int(B1, B1')
+G |- e2 : int(B2, B2')
+----------------------
+G |- e1 icmp e2 : bool
+
+G |- e1 : t
+G |- e2 : t
+------------------ Note: this may require an SMT check that t supports decidable equality
+G |- e = e : bool
+G |- e <> e : bool
+
+G |- e1 : t
+G |- e2 : t
+------------------
+G |- e == e : prop
+G |- e != e : prop
+
+G |- e : bool
+--------------
+G |- !e : bool
+
+t in {bool, prop}
+G |- e : t
+----------------- Note: ! is overloaded for bool and prop
+G |- !e : t
+
+t in {bool, prop}
+G |- e1 : t
+G |- e2 : t
+------------------ Note: && and || are overloaded for bool and prop
+G |- e1 bop e2 : t
+
+G |- e1 : prop
+G |- e2 : prop
+---------------------
+G |- e1 Bop e2 : prop
+
+G |- e0 : bool
+G |- e1 : t
+G |- e2 : t
+--------------------------------
+G |- (if e0 then e1 else e2) : t
+
+x is not a local variable in G
+G |- e1 : t1
+G, x:t1 |- e2 : t2
+-------------------------------
+G |- (let x:t1 = e1 in e2) : t2
+
+bind in {forall, exists}
+x1...xn are distinct and are not local variables in G
+G' = G, x1:t1, ..., xn:tn
+triggers = {e11, ..., e1j} ... {em1, ..., emk}
+G' |- e11 : t11 ... G' |- e1j : t1j
+...
+G' |- em1 : tm1 ... G' |- emk : tmk
+G' |- e : prop
+-----------------------------------------------------
+G |- (bind x1:t1, ..., xn:tn triggers :: e) : prop
+
+G |- fun(t1, ..., tn) -> t : Type(0)
+x1...xn are distinct and are not local variables in G
+G' = G, x1:t1, ..., xn:tn
+G' |- e : t
+------------------------------------------------------------
+G |- (lambda x1:t1, ..., xn:tn :: e) : fun(t1, ..., tn) -> t
+
