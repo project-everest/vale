@@ -18,12 +18,7 @@ noeq type traceState = {
   trace: list observation;
   memTaint: memTaint_t;
 }
-
-// TODO : Add the next address also, since we're the heap addresses 64-bit values
-let mem128_to_op = function
-  | Mov128Xmm _ -> []
-  | Mov128Mem addr -> [OMem addr]
-  
+ 
 // Extract a list of destinations written to and a list of sources read from
 let extract_operands (i:ins) : (list operand * list operand) =
   match i with
@@ -41,7 +36,6 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | S.And64 dst src -> [dst], [dst; src]
   | S.Shr64 dst amt -> [dst], [dst; amt]
   | S.Shl64 dst amt -> [dst], [dst; amt]
-  | S.MOVDQU dst src -> mem128_to_op dst, mem128_to_op src
   | S.Pinsrd _ src _ | S.Pinsrq _ src _ -> [], [src]
   | S.Pextrq dst _ _ -> [dst], []
   | S.Push src -> [], [src]
@@ -94,9 +88,38 @@ let rec update_taint_list (memTaint:memTaint_t) (dst:list operand) t s = match d
   | [] -> memTaint
   | hd :: tl -> update_taint_list (update_taint memTaint hd t s) tl t s
 
+let taint_match128 op t (memTaint:memTaint_t) (s:state) : bool = match op with
+  | Mov128Xmm _ -> true
+  | Mov128Mem addr -> 
+    let ptr = eval_maddr addr s in
+    memTaint.[ptr] = t && memTaint.[ptr+8] = t
+
+let update_taint128 op t (memTaint:memTaint_t) (s:state) : Tot memTaint_t = match op with
+  | Mov128Xmm _ -> memTaint
+  | Mov128Mem addr -> 
+    let ptr = eval_maddr addr s in
+    let mt = memTaint.[ptr] <- t in
+    let mt = mt.[ptr+8] <- t in
+    assert (Set.equal (Map.domain mt) (Set.complement Set.empty));
+    mt    
+
+// Special treatment for movdqu
+let taint_eval_movdqu 
+  (ins:tainted_ins{let i, _, _ = ins.ops in S.MOVDQU? i}) 
+  (ts:traceState) : GTot traceState =
+  let t = ins.t in 
+  let S.MOVDQU dst src, _, _ = ins.ops in
+  let s = run (check (taint_match128 src t ts.memTaint)) ts.state in
+  let memTaint = update_taint128 dst t ts.memTaint s in
+  let s = run (eval_ins (S.MOVDQU dst src)) s in
+  {state = s; trace = ts.trace; memTaint = memTaint}  
+  
+
 let taint_eval_ins (ins:tainted_ins) (ts: traceState) : GTot traceState =
   let t = ins.t in
   let i, dsts, srcs = ins.ops in
+  if S.MOVDQU? i then taint_eval_movdqu ins ts else
+  begin
   let s = run (check (taint_match_list srcs t ts.memTaint)) ts.state in
   let memTaint =
     if S.Mulx64? i then
@@ -118,6 +141,7 @@ let taint_eval_ins (ins:tainted_ins) (ts: traceState) : GTot traceState =
   (* Execute the instruction *)
   let s = run (eval_ins i) s in
   {state = s; trace = ts.trace; memTaint = memTaint}
+  end
 
 type tainted_ocmp = |TaintedOCmp: o:ocmp -> ot:taint -> tainted_ocmp
 

@@ -192,7 +192,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst),Mov128Xmm
 {
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src), offset))), list(), list(OMem(MReg(get_reg(src), offset)))), t))}{:quick exportOnly} Load128_buffer(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst), Mov128Mem(MReg(get_reg(src), offset))), list(), list()), t))}{:quick exportOnly} Load128_buffer(
     out dst:xmm,
         src:reg_opr64,
         inline offset:int,
@@ -216,7 +216,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst), Mov128Me
     lemma_valid_taint128(b, memTaint, mem, index, t);    
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov128Xmm(src)), list(OMem(MReg(get_reg(dst), offset))), list()), t))}{:quick exportOnly} Store128_buffer(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov128Xmm(src)), list(), list()), t))}{:quick exportOnly} Store128_buffer(
         dst:reg_opr64,
         src:xmm,
         inline offset:int,
