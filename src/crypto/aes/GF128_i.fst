@@ -116,9 +116,8 @@ let lemma_gf128_constant_rev q =
   let s0_8 = slice s0_32 0 8 in
   let s8_32 = slice s0_32 8 32 in
   let l = [true; true; true; false; false; false; false; true] in
-  let sl = of_list l in
+  let sl = seq_of_list l in
   assert_norm (List.length l == 8);
-  lemma_of_list_length l;
   assert (equal sl s0_8);
   assert (equal s8_32 (UInt.to_vec #24 (UInt.zero 24)));
   Collections.Lists_i.lemma_from_list_be l;

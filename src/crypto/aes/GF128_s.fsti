@@ -6,7 +6,7 @@ open Types_s
 
 // x^7 + x^2 + x + 1
 let gf128_modulus_low_terms : poly =
-  of_seq (of_list [true; true; true; false; false; false; false; true])
+  of_seq (seq_of_list [true; true; true; false; false; false; false; true])
 
 // x^128 + x^7 + x^2 + x + 1
 let gf128_modulus : poly = add (monomial 128) gf128_modulus_low_terms

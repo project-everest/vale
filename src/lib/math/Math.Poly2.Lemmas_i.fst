@@ -67,9 +67,8 @@ let lemma_reverse_degree a n =
 
 let lemma_of_list_degree l =
   let len = List.length l in
-  let s = of_list l in
+  let s = seq_of_list l in
   let a = of_seq s in
-  lemma_of_list_length l;
   assert (forall (i:nat).{:pattern (index s i)} i < len ==> index s i == List.index l i);
   lemma_index a;
   lemma_degree a;

@@ -13,7 +13,7 @@ val list_cons_is_append (#a:Type) (h:a) (t:list a) : Lemma
   (h::t == [h] @ t)
 
 val singleton_list_seq (#a:Type) (x:a) : Lemma
-  (of_list [x] == create 1 x)
+  (seq_of_list [x] == create 1 x)
 
 val list_append_length (#a:Type) (x y:list a) : Lemma
   (List.length (x @ y) == List.length x + List.length y)
@@ -27,7 +27,7 @@ val list_append_index (#a:Type) (x y:list a) (i:nat) : Lemma
   ))
 
 val append_list_seq (#a:Type) (x y:list a) : Lemma
-  (of_list (x @ y) == append (of_list x) (of_list y))
+  (seq_of_list (x @ y) == append (seq_of_list x) (seq_of_list y))
 
 let rec from_list_le (l:list bool) : int =
   match l with
@@ -40,14 +40,12 @@ let from_list_be (l:list bool) : int =
 val lemma_from_list_le (l:list bool) : Lemma
   (ensures (
     let rl = List.rev l in
-    let s = of_list rl in
-    lemma_of_list_length rl;
+    let s = seq_of_list rl in
     from_list_le l == from_vec #(List.length rl) s
   ))
 
 val lemma_from_list_be (l:list bool) : Lemma
   (ensures (
-    let s = of_list l in
-    lemma_of_list_length l;
+    let s = seq_of_list l in
     from_list_be l == from_vec #(List.length l) s
   ))
