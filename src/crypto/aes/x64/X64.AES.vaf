@@ -45,7 +45,7 @@ procedure{:quick} KeyExpansionStdcall(
         rcx; rsi; rdi; memTaint;
     modifies
         rdx;
-        mem; xmm1; xmm2; xmm3; xmm4; efl; trace;
+        mem; xmm1; xmm2; xmm3; xmm4; efl;
     lets
         key_ptr := if win then rcx else rdi;
         key_expansion_ptr := if win then rdx else rsi;
@@ -91,7 +91,7 @@ procedure{:quick} AESEncryptBlock(
     reads
         r8; mem; memTaint;
     modifies
-        xmm0; xmm2; efl; trace;
+        xmm0; xmm2; efl;
     requires
         alg = AES_128 || alg = AES_256;
         length(round_keys) == nr(alg) + 1;
@@ -125,7 +125,7 @@ procedure{:quick} AESEncryptBlockStdcall(
         rcx; rdx; rsi; rdi; memTaint;
     modifies
         r8;
-        mem; xmm0; xmm2; efl; trace;
+        mem; xmm0; xmm2; efl;
     lets
         output_ptr := if win then rcx else rdi;
         input_ptr := if win then rdx else rsi;
@@ -166,7 +166,7 @@ procedure{:quick} AESEncryptBlockStdcall_BE(
         rcx; rdx; rsi; rdi; memTaint;
     modifies
         r8; rax;
-        mem; xmm0; xmm2; efl; trace;
+        mem; xmm0; xmm2; efl;
     lets
         output_ptr := if win then rcx else rdi;
         input_ptr := if win then rdx else rsi;

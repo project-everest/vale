@@ -43,7 +43,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src
     reads
         memTaint; mem;
     modifies
-        efl; trace;
+        efl;
     requires
         valid_src_addr(mem, b, index);
         valid_taint_buf64(b, mem, memTaint, t);
@@ -71,7 +71,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_re
     reads
         memTaint; mem;
     modifies
-        efl; trace;
+        efl;
     requires
         valid_src_addr(mem, b, index);
         valid_taint_buf64(b, mem, memTaint, t);
@@ -97,7 +97,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
     reads
         mem; memTaint;
     modifies
-        trace;
+       
     requires
         valid_src_addr(mem, b, index);
         valid_taint_buf64(b, mem, memTaint, t);
@@ -120,7 +120,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
         ghost index:int)
     reads memTaint;
     modifies
-        mem; trace;
+        mem;
     requires
         valid_dst_addr(mem, b, index);
         valid_taint_buf64(b, mem, memTaint, t);
@@ -141,7 +141,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(dst), list(OMem(
         ghost b:buffer64,
         ghost index:int)
     reads mem; memTaint;
-    modifies rsp; trace;
+    modifies rsp;
     requires
         valid_src_addr(mem, b, index);
         rsp == buffer_addr(b, mem) + 8 * index;
@@ -162,7 +162,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list(src)), 
         ghost index:int)
     reads memTaint;
     modifies
-        rsp; mem; trace;
+        rsp; mem;
     requires
         valid_taint_buf64(b, mem, memTaint, Public);    
         valid_dst_addr(mem, b, index);

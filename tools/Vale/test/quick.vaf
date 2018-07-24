@@ -158,7 +158,6 @@ procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;
-        trace;
     requires
         rax < 100;
         g1 == rax;
@@ -204,7 +203,6 @@ procedure{:quick}{:exportSpecs} CallBump3(inline b:bool, ghost g1:int) returns(g
     modifies
         efl;
         rax;
-        trace;
     requires
         rax < 100;
         g1 == rax;
@@ -248,7 +246,7 @@ procedure Incr3(ghost g:int)
 procedure{:quick} While(ghost g1:int) returns(ghost go:int)
     modifies
         efl;
-        rax; rbx; trace;
+        rax; rbx;
     requires
         rax < 200;
         rbx < 100;

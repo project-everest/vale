@@ -202,7 +202,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst), Mov128Me
     reads
         mem; memTaint;
     modifies
-        trace;
+       
     requires
         valid_src_addr(mem, b, index);
         valid_taint_buf128(b, mem, memTaint, t);
@@ -226,7 +226,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Mem(MReg(get_reg(d
     reads
         memTaint;
     modifies
-        mem; trace;
+        mem;
     requires
         valid_dst_addr(mem, b, index);
         valid_taint_buf128(b, mem, memTaint, t);
@@ -249,7 +249,7 @@ procedure {:quick exportOnly} PushXmm(
         ghost index:int)
     reads memTaint;
     modifies
-        rsp; mem; trace;
+        rsp; mem;
     requires
         valid_taint_buf64(b, mem, memTaint, Public);
         valid_dst_addr(mem, b, index);
@@ -278,7 +278,7 @@ procedure {:quick exportOnly} PopXmm(
         ghost index:int,
         ghost expected_xmm:quad32)
     reads mem; memTaint;
-    modifies rsp; trace;
+    modifies rsp;
     requires
         valid_taint_buf64(b, mem, memTaint, Public);
         valid_src_addr(mem, b, index);
@@ -322,7 +322,7 @@ procedure {:quick exportOnly} InitPshufbMask(inout dst:xmm, out tmp:reg_opr64)
 procedure {:quick} XmmEqual()
     lets x1 @= xmm0; x2 @= xmm1; tmp @= rdx; result @= rax;
     reads x2;
-    modifies x1; tmp; result; efl; trace;
+    modifies x1; tmp; result; efl;
     ensures 
         if old(x1 = x2) then result = 0 else result > 0;
 {

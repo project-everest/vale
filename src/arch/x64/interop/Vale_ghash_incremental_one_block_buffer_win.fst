@@ -59,7 +59,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     new_hash = (buffer128_read hash_b 0 (va_get_mem va_sM)) in let h_q = (buffer128_read h_b 0
     (va_get_mem va_s0)) in let input_quad = (buffer128_read input_b offset (va_get_mem va_s0)) in
     new_hash == (ghash_incremental h_q old_hash (Seq.create 1 input_quad))) /\ (va_state_eq va_sM
-    (va_update_trace va_sM (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM
+    ((va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM
     (va_update_xmm 14 va_sM (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM
     (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM
     (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM (va_update_xmm 3 va_sM

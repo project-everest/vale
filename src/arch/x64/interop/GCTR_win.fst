@@ -48,7 +48,7 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) iv_b;
@@ -77,7 +77,7 @@ B.length stack_b == 48 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
-  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   assert (B.disjoint stack_b plain_b);
   assert (B.disjoint stack_b iv_b);
   assert (B.disjoint stack_b keys_b);
@@ -122,7 +122,7 @@ let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (num_
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
-  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in    
+  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in    
     va_post (va_code_gctr_bytes_extra_buffer_win ()) va_s0 va_sM va_fM stack_b plain_b num_bytes (Ghost.reveal iv_old) iv_b (Ghost.reveal key) keys_b cipher_b) )
   (ensures post_cond h0 va_sM.mem.hs plain_b num_bytes iv_old iv_b key keys_b cipher_b ) =
   let taint_func (x:b8) : GTot taint =
@@ -148,7 +148,7 @@ let implies_post (h0:HS.mem) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (num_
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
-  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in  
+  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in  
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) iv_b;
@@ -185,7 +185,7 @@ let ghost_gctr_bytes_extra_buffer_win plain_b num_bytes iv_old iv_b key keys_b c
     | _ -> init_regs r end in
   let mem = buffer_write #(TBase TUInt64) stack_b 5 (addrs cipher_b) mem in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) iv_b;

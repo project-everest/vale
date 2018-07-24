@@ -60,7 +60,7 @@ procedure {:quick} zero_quad32_buffer(ghost b:buffer128)
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         ZeroXmm(xmm1);
         Store128_buffer(rdi, xmm1, 0, Secret, b, 0);
@@ -104,7 +104,7 @@ procedure {:quick} zero_quad32_buffer_win(ghost stack_b:buffer64, ghost b:buffer
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         ZeroXmm(xmm1);
         Store128_buffer(rcx, xmm1, 0, Secret, b, 0);
@@ -133,7 +133,7 @@ procedure {:quick} mk_quad32_lo0_be_1_buffer(ghost b:buffer128)
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
      Load128_buffer(xmm1, rdi, 0, Secret, b, 0);
      PinsrdImm(xmm1, 1, 0, rax);
@@ -180,7 +180,7 @@ procedure {:quick} mk_quad32_lo0_be_1_buffer_win(ghost stack_b:buffer64, ghost b
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
      Load128_buffer(xmm1, rcx, 0, Secret, b, 0);
      PinsrdImm(xmm1, 1, 0, rax);
@@ -223,7 +223,7 @@ procedure {:quick} quad32_xor_buffer(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         Load128_buffer(xmm1, rdi, 0, Secret, src1, 0);
         Load128_buffer(xmm2, rsi, 0, Secret, src2, 0);
@@ -283,7 +283,7 @@ procedure {:quick} quad32_xor_buffer_win(ghost stack_b:buffer64, ghost src1:buff
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         Load128_buffer(xmm1, rcx, 0, Secret, src1, 0);
         Load128_buffer(xmm2, rdx, 0, Secret, src2, 0);
@@ -346,7 +346,7 @@ procedure {:quick} gcm_load_xor_store_buffer(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
 
         IMul64(rcx, 16);
@@ -433,7 +433,7 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         IMul64(r9, 16);
         Add64(rcx, r9);
@@ -464,7 +464,7 @@ procedure {:quick} reverse_bytes_quad32_buffer(ghost b:buffer128)
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         Load128_buffer(xmm0, rdi, 0, Secret, b, 0);
         InitPshufbMask(xmm1, rax);
@@ -509,7 +509,7 @@ procedure {:quick} reverse_bytes_quad32_buffer_win(ghost stack_b:buffer64, ghost
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         Load128_buffer(xmm0, rcx, 0, Secret, b, 0);
         InitPshufbMask(xmm1, rax);

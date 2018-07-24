@@ -60,7 +60,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     va_sM) plain_b) in let old_cipher = (buffer128_as_seq (va_get_mem va_s0) cipher_b) in let
     cipher = (buffer128_as_seq (va_get_mem va_sM) cipher_b) in (gctr_partial AES_128 (offset + 1)
     plain cipher key iv) /\ (Seq.slice cipher 0 offset) == (Seq.slice old_cipher 0 offset)) /\ (va_state_eq
-    va_sM (va_update_trace va_sM (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15
+    va_sM ((va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15
     va_sM (va_update_xmm 14 va_sM (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM (va_update_xmm 11
     va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM (va_update_xmm 7
     va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM (va_update_xmm 3

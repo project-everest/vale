@@ -228,7 +228,7 @@ let create_state os target args stack slots stkstart =
   (if stack then "    | Rsp -> addr_stack\n" else "") ^
   (print_low_calling_args os target args stkstart) ^
   "  let xmms = init_xmms in\n" ^
-  "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in\n" ^
+  "  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in\n" ^
   print_length_t (if stack then ("stack_b", TBuffer TUInt64, Pub)::args else args)
 
 let print_vale_bufferty = function

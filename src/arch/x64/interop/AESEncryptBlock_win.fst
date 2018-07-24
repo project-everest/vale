@@ -44,7 +44,7 @@ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [output_b
     | R8 -> addr_keys_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) output_b;
   length_t_eq (TBase TUInt128) input_b;
@@ -87,7 +87,7 @@ let ghost_aes128_encrypt_block_win output_b input_b key keys_b stack_b h0 =
     | R8 -> addr_keys_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) output_b;
   length_t_eq (TBase TUInt128) input_b;

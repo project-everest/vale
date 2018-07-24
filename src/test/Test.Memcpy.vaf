@@ -33,7 +33,7 @@ procedure Copy16(inline t:taint, ghost bsrc:buffer64, ghost bdst:buffer64)
         rsi; rdi; memTaint;
     modifies
         rax; rcx;
-        mem; trace;
+        mem;
 {
 //    assert{:fast_block} true;
     Load64_buffer(rax, rsi, 0, t, bsrc, 0);

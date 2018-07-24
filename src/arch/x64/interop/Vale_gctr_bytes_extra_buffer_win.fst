@@ -76,8 +76,8 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     num_bytes) in cipher == (gctr_encrypt_LE iv_old (make_gctr_plain_LE plain) AES_128 key) /\ (let
     cipher_blocks = (slice_work_around (buffer128_as_seq (va_get_mem va_sM) cipher_b) num_blocks)
     in let old_cipher_blocks = (slice_work_around (buffer128_as_seq (va_get_mem va_s0) cipher_b)
-    num_blocks) in cipher_blocks == old_cipher_blocks)) /\ (va_state_eq va_sM (va_update_trace
-    va_sM (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM (va_update_xmm 14
+    num_blocks) in cipher_blocks == old_cipher_blocks)) /\ (va_state_eq va_sM (
+    (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM (va_update_xmm 14
     va_sM (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM (va_update_xmm 10
     va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM (va_update_xmm 6
     va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM (va_update_xmm 3 va_sM (va_update_xmm 2

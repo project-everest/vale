@@ -42,7 +42,7 @@ procedure{:quick} KeyExpansionRoundEven256(
     reads
         rdx; xmm3; memTaint;
     modifies
-        mem; xmm1; xmm2; xmm4; efl; trace;
+        mem; xmm1; xmm2; xmm4; efl;
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 15, memTaint, Secret);
     requires
@@ -82,7 +82,7 @@ procedure{:quick} KeyExpansionRoundOdd256(
     reads
         rdx; xmm1; memTaint;
     modifies
-        mem; xmm2; xmm3; xmm4; efl; trace;
+        mem; xmm2; xmm3; xmm4; efl;
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 15, memTaint, Secret);
     requires
@@ -120,7 +120,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
     reads
         rdx; memTaint;
     modifies
-        mem; xmm1; xmm2; xmm3; xmm4; efl; trace;
+        mem; xmm1; xmm2; xmm3; xmm4; efl;
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 15, memTaint, Secret);
     requires
@@ -158,7 +158,7 @@ procedure{:quick} KeyExpansion256Stdcall(
         rcx; rsi; rdi; memTaint;
     modifies
         rdx;
-        mem; xmm1; xmm2; xmm3; xmm4; efl; trace;
+        mem; xmm1; xmm2; xmm3; xmm4; efl;
     lets
         key_ptr := if win then rcx else rdi;
         key_expansion_ptr := if win then rdx else rsi;
@@ -212,7 +212,7 @@ procedure{:quick} AES256EncryptRound(
     reads
         r8; mem; memTaint;
     modifies
-        xmm0; xmm2; efl; trace;
+        xmm0; xmm2; efl;
     requires
         1 <= n < 14 <= length(round_keys);
         xmm0 == rounds(init, round_keys, n - 1);
@@ -236,7 +236,7 @@ procedure{:quick} AES256EncryptBlock(
     reads
         r8; mem; memTaint;
     modifies
-        xmm0; xmm2; efl; trace;
+        xmm0; xmm2; efl;
     requires
         length(round_keys) == 15;
         round_keys == key_to_round_keys_LE(AES_256, key);
@@ -285,7 +285,7 @@ procedure{:quick} AES256EncryptBlockStdcall(
         rcx; rdx; rsi; rdi; memTaint;
     modifies
         r8;
-        mem; xmm0; xmm2; efl; trace;
+        mem; xmm0; xmm2; efl;
     lets
         output_ptr := if win then rcx else rdi;
         input_ptr := if win then rdx else rsi;

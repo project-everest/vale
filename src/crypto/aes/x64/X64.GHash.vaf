@@ -144,7 +144,7 @@ procedure {:quick} ghash_incremental_one_block_buffer(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; trace; mem;
+        efl; mem;
 {
         // Save R12 register
         Mov64(rax, r12);
@@ -234,7 +234,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         ghost var old_xmm11 := xmm11;
         ghost var old_xmm6 := xmm6;
@@ -286,7 +286,7 @@ procedure {:quick} compute_ghash_incremental(
 
     modifies
         rdx; r9; r12;
-        io; efl; trace;
+        io; efl;
 
         // ReduceMul128_LE touches almost everything
         xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -352,7 +352,7 @@ procedure {:quick} compute_ghash_incremental_partial(
 
     modifies
         rdx; r9; r12;
-        io; efl; trace;
+        io; efl;
 
         // ReduceMul128_LE touches almost everything
         xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -482,7 +482,7 @@ procedure {:quick} compute_pad_to_128_bits()
     lets io @= xmm2; num_bytes @= rax; tmp @= rcx; mask @= rdx;
 
     reads num_bytes;
-    modifies io; tmp; mask; efl; trace;
+    modifies io; tmp; mask; efl;
     requires 0 < num_bytes < 16;
     ensures 
         let padded_bytes := pad_to_128_bits(slice_work_around(le_quad32_to_bytes(old(io)), num_bytes));
@@ -548,7 +548,7 @@ procedure {:quick} ghash_incremental_bytes_extra(
 
     modifies
         rcx; rdx; r12;
-        io; efl; trace;
+        io; efl;
 
         // ReduceMul128_LE touches almost everything
         xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -652,7 +652,7 @@ procedure {:quick} ghash_incremental_extra_stdcall(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
     // Save r12 register
     Mov64(r10, r12);
@@ -769,7 +769,7 @@ procedure {:quick} ghash_incremental_extra_stdcall_win(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         // Save r12 register
         Mov64(r10, r12);
@@ -826,7 +826,7 @@ procedure {:quick} ghash_incremental_bytes(
 
     modifies
         in_ptr; rcx; rdx; r9; r12;
-        io; efl; trace;
+        io; efl;
 
         // ReduceMul128_LE touches almost everything
         xmm2; xmm3; xmm4; xmm5; xmm6;
@@ -911,7 +911,7 @@ procedure {:quick} ghash_incremental_bytes_stdcall(ghost h_b:buffer128, ghost ha
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
     Mov64(r8, r12);
     InitPshufbMask(xmm8, r11);
@@ -996,7 +996,7 @@ procedure{:quick}{:exportSpecs} ghash_incremental_bytes_stdcall_win(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
         // Save registers
         Mov64(r10, r12);
@@ -1035,7 +1035,7 @@ procedure {:quick} ghash_core(
 
     modifies
         rdx; r9; r12;
-        output; efl; trace;
+        output; efl;
 
         // ReduceMul128_LE touches almost everything
         xmm2; xmm3; xmm4; xmm5; xmm6;

@@ -40,8 +40,8 @@ va_pre va_b0 va_s0 stack_b plain_num_bytes auth_num_bytes b /\
     (va_get_xmm 13 va_s0) /\ (va_get_xmm 14 va_sM) == (va_get_xmm 14 va_s0) /\ (va_get_xmm 15
     va_sM) == (va_get_xmm 15 va_s0) /\ (modifies_buffer128 b (va_get_mem va_s0) (va_get_mem va_sM))
     /\ (buffer128_read b 0 (va_get_mem va_sM)) == (reverse_bytes_quad32 (Mkfour (8 `op_Multiply`
-    plain_num_bytes) 0 (8 `op_Multiply` auth_num_bytes) 0)) /\ (va_state_eq va_sM (va_update_trace
-    va_sM (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM (va_update_xmm 14
+    plain_num_bytes) 0 (8 `op_Multiply` auth_num_bytes) 0)) /\ (va_state_eq va_sM (
+    (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM (va_update_xmm 14
     va_sM (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM (va_update_xmm 10
     va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM (va_update_xmm 6
     va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM (va_update_xmm 3 va_sM (va_update_xmm 2

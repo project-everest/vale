@@ -39,10 +39,9 @@ val lemma_to_xmm : s:state -> x:xmm -> Lemma
   (ensures s.xmms x == xmms' (state_to_S s).TS.state x)
   [SMTPat (s.xmms x)]
 
-
 val lemma_to_trace : s:state -> Lemma
-  (ensures s.trace == trace' (state_to_S s))
-  [SMTPat s.trace]
+  (ensures [] == trace' (state_to_S s))
+  [SMTPat (state_to_S s)]
 
 val lemma_to_memTaint : s:state -> Lemma
   (ensures s.memTaint == memTaint' (state_to_S s))
@@ -65,7 +64,7 @@ val lemma_of_to : s:state -> Lemma
   [SMTPat (state_of_S (state_to_S s))]
 
 val lemma_to_of : s:TS.traceState -> Lemma
-  (ensures s == state_to_S (state_of_S s))
+  (ensures state_to_S (state_of_S s) == {s with TS.trace = []})
   [SMTPat (state_to_S (state_of_S s))]
 
 unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
@@ -86,9 +85,6 @@ val lemma_valid_taint128: (b:X64.Memory_i.buffer128) ->
   (requires X64.Memory_i.valid_taint_buf128 b mem memTaint t /\ X64.Memory_i.buffer_readable mem b)
   (ensures memTaint.[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i] == t)
 
-
-val modify_trace: (s0:state) -> (b:bool) -> Lemma
-  (state_to_S ({s0 with trace=BranchPredicate(b)::s0.trace}) == ({(state_to_S s0) with TS.trace = BranchPredicate(b)::(state_to_S s0).TS.trace}))
 
 val same_memTaint64: (b:X64.Memory_i.buffer64) -> 
                    (mem0:X64.Memory_i.mem) ->

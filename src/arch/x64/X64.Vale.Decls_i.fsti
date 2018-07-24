@@ -155,7 +155,6 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
 [@va_qattr] unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
 [@va_qattr] unfold let va_get_mem (s:va_state) : M.mem = s.mem
-[@va_qattr] unfold let va_get_trace (s:va_state) : list observation = s.trace
 [@va_qattr] unfold let va_get_memTaint (s:va_state) : M.memtaint = s.memTaint
 
 [@va_qattr] let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
@@ -163,7 +162,6 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] let va_upd_mem (mem:M.mem) (s:state) : state = { s with mem = mem }
 [@va_qattr] let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
 [@va_qattr] let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
-[@va_qattr] let va_upd_trace (trace:list observation) (s:state) : state = { s with trace=trace }
 
 (* Framing: va_update_foo means the two states are the same except for foo *)
 [@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = va_upd_ok sM.ok sK
@@ -173,7 +171,6 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
 [@va_qattr] unfold let va_update_mem (sM:va_state) (sK:va_state) : va_state = va_upd_mem sM.mem sK
 [@va_qattr] unfold let va_update_xmm (x:xmm) (sM:va_state) (sK:va_state) : va_state =
   va_upd_xmm x (eval_xmm x sM) sK
-[@va_qattr] unfold let va_update_trace (sM:va_state) (sK:va_state) : va_state = va_upd_trace sM.trace sK
 
 [@va_qattr]
 let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
@@ -454,14 +451,14 @@ val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : G
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
-    sM == {s0 with trace=BranchPredicate(cond)::s0.trace}
+    sM == s0
   ))
 
 val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
     valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
-    eval_code ct ({s0 with trace=BranchPredicate(true)::s0.trace}) f0 sM
+    eval_code ct s0 f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -471,7 +468,7 @@ val va_lemma_ifElseFalse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state
   (requires
     valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
-    eval_code cf ({s0 with trace = BranchPredicate(false)::s0.trace}) f0 sM
+    eval_code cf s0 f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -489,7 +486,7 @@ val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost ((s1:va_stat
 
 val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
   (requires eval_ocmp sW b /\ valid_ocmp b sW)
-  (ensures fun (s1, f1) -> s1 == {sW with trace=BranchPredicate(true)::sW.trace} /\ f1 == fW)
+  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
 val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
   (requires
@@ -498,7 +495,7 @@ val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (
     eval_while_inv (While b c) s0 fW sW
   )
   (ensures fun (s1, f1) ->
-    s1 == {sW with trace=BranchPredicate(false)::sW.trace} /\
+    s1 == sW /\
     eval_code (While b c) s0 f1 s1
   )
 
@@ -509,7 +506,7 @@ val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_stat
     valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\
-    eval_code (While?.whileBody c) ({sM with trace=BranchPredicate(true)::sM.trace}) fM sN
+    eval_code (While?.whileBody c) sM fM sN
   )
   (ensures (fun fN ->
     eval_while_inv c s0 fN sN

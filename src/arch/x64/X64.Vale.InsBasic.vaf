@@ -43,7 +43,6 @@ var{:state reg(R14)} r14:nat64;
 var{:state reg(R15)} r15:nat64;
 var{:state flags()} efl:nat64;
 var{:state mem()} mem:mem;
-var{:state trace()} trace:trace_type;
 var{:state memTaint()} memTaint:memTaint_type;
 
 procedure{:quick exportOnly} AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))

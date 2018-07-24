@@ -164,15 +164,15 @@ let qInlineIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
 
 let qIf_monotone #a #c1 #c2 b qc1 qc2 s0 k1 k2 =
   if eval_cmp s0 b then
-    QProc?.monotone qc1 ({s0 with trace=BranchPredicate(true)::s0.trace}) k1 k2
+    QProc?.monotone qc1 s0 k1 k2
   else
-    QProc?.monotone qc2 ({s0 with trace=BranchPredicate(false)::s0.trace}) k1 k2
+    QProc?.monotone qc2 s0 k1 k2
 
 let qIf_compute #a #c1 #c2 b qc1 qc2 s0 =
   if eval_cmp s0 b then
-    QProc?.compute qc1 ({s0 with trace=BranchPredicate(true)::s0.trace})
+    QProc?.compute qc1 s0
   else
-    QProc?.compute qc2 ({s0 with trace=BranchPredicate(false)::s0.trace})
+    QProc?.compute qc2 s0
 
 let qIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
   ( match b with
@@ -187,14 +187,12 @@ let qIf_proof #a #c1 #c2 b qc1 qc2 s0 k =
   let (sM, f0, g) = qIf_compute b qc1 qc2 s0 in
   if eval_cmp s0 b then
   (
-    let s1 = {s0 with trace=BranchPredicate(true)::s0.trace} in
-    QProc?.proof qc1 s1 k;
+    QProc?.proof qc1 s0 k;
     va_lemma_ifElseTrue_total (cmp_to_ocmp b) c1 c2 s0 f0 sM
   )
   else
   (
-    let s1 = {s0 with trace=BranchPredicate(false)::s0.trace} in
-    QProc?.proof qc2 s1 k;
+    QProc?.proof qc2 s0 k;
     va_lemma_ifElseFalse_total (cmp_to_ocmp b) c1 c2 s0 f0 sM
   )
 
