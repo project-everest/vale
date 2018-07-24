@@ -1327,6 +1327,7 @@ let lemma_valid_taint64 b memTaint mem i t =
 
 let lemma_valid_taint128 b memTaint mem i t =
   length_t_eq (TBase TUInt128) b;
+  assert (memTaint.[(buffer_addr b mem + (16 `op_Multiply` i + 8))] == t);
   ()
 
 let same_memTaint (t:typ) (b:buffer t) (mem0 mem1:mem) (memT0 memT1:memtaint) : Lemma

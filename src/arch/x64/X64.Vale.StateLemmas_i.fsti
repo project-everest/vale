@@ -84,7 +84,8 @@ val lemma_valid_taint128: (b:X64.Memory_i.buffer128) ->
 			 (i:nat{i < X64.Memory_i.buffer_length b}) ->
 			 (t:taint) -> Lemma
   (requires X64.Memory_i.valid_taint_buf128 b mem memTaint t /\ X64.Memory_i.buffer_readable mem b)
-  (ensures memTaint.[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i] == t)
+  (ensures memTaint.[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i] == t /\
+           memTaint.[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i + 8] == t)
 
 
 val modify_trace: (s0:state) -> (b:bool) -> Lemma
