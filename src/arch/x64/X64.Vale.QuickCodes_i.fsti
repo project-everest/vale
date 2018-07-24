@@ -359,7 +359,7 @@ unfold let normal_steps : list string =
     "X64.Vale.QuickCode_i.__proj__QProc__item__wp";
   ]
 
-unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr va_qattr; delta_only normal_steps] x
+unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr [`%va_qattr]; delta_only normal_steps] x
 
 val wp_sound_norm (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) :
   Ghost (state * fuel * a)

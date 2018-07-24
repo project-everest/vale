@@ -42,7 +42,7 @@ let my_bool_to_nat (b:bool) : nat = if b then 1 else 0
 
 #reset-options "--z3rlimit 30"
 
-procedure{:quick} {:verify true} fast_multiply(
+procedure fast_multiply(
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
     ghost inB_b:buffer64)
@@ -204,7 +204,7 @@ procedure{:quick} {:verify true} fast_multiply(
 }
 
 // fast_mul_stdcall(dst, inA, inB)
-procedure{:quick} fast_mul_stdcall(
+procedure fast_mul_stdcall(
     inline win:bool,
     ghost dst_b:buffer64, 
     ghost inA_b:buffer64, 
