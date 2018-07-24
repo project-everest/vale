@@ -17,8 +17,9 @@ let lemma_mul_nat (x:nat) (y:nat) : Lemma (ensures 0 <= (x `op_Multiply` y)) = (
 
 let cf = Lemmas_i.cf
 let overflow = Lemmas_i.overflow
-let update_cf = Lemmas_i.update_cf
-let update_of = Lemmas_i.update_of
+// GM: For some reason I need to eta-expand these two
+let update_cf flags b = Lemmas_i.update_cf flags b
+let update_of flags b = Lemmas_i.update_of flags b
 let ins = S.ins
 type ocmp = S.ocmp
 type va_fuel = nat

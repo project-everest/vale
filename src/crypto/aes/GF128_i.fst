@@ -8,6 +8,7 @@ let lemma_of_double32_degree (d:double32) =
 let lemma_of_quad32_degree (q:quad32) =
   reveal_of_quad32 q
 
+#push-options "--z3rlimit 10"
 let lemma_to_of_quad32 q =
   reveal_of_quad32 q;
   reveal_to_quad32 (of_quad32 q);
@@ -29,6 +30,7 @@ let lemma_to_of_quad32 q =
   assert (equal s2 s2');
   assert (equal s3 s3');
   ()
+#pop-options
 
 let lemma_of_to_quad32 a =
   reveal_to_quad32 a;
@@ -37,6 +39,7 @@ let lemma_of_to_quad32 a =
   lemma_reverse_define_all ();
   lemma_equal a (of_quad32 (to_quad32 a))
 
+#reset-options "--z3rlimit 20"
 let lemma_shift_left_1 a =
   reveal_to_quad32 a;
   reveal_to_quad32 (shift a 1);
@@ -50,7 +53,6 @@ let lemma_shift_left_1 a =
   lemma_quad32_vec_equal (to_quad32 (shift a 1)) (quad32_shift_left_1 (to_quad32 a));
   ()
 
-#reset-options "--z3rlimit 20"
 let lemma_shift_2_left_1 lo hi =
   let n = monomial 128 in
   let a = hi *. n +. lo in
@@ -98,6 +100,7 @@ let lemma_gf128_degree () =
   lemma_degree_is gf128_modulus 128;
   ()
 
+#push-options "--z3rlimit 80"
 let lemma_gf128_constant_rev q =
   Types_i.lemma_quad32_xor ();
   let h = gf128_modulus_low_terms in
@@ -118,6 +121,7 @@ let lemma_gf128_constant_rev q =
   let l = [true; true; true; false; false; false; false; true] in
   let sl = seq_of_list l in
   assert_norm (List.length l == 8);
+  assert (List.length l == length sl);
   assert (equal sl s0_8);
   assert (equal s8_32 (UInt.to_vec #24 (UInt.zero 24)));
   Collections.Lists_i.lemma_from_list_be l;
@@ -127,6 +131,7 @@ let lemma_gf128_constant_rev q =
   assert_norm (pow2 24 == 0x1000000);
   assert (UInt.from_vec #32 s0_32 == 0xe1000000);
   lemma_quad32_vec_equal (to_quad32 rh) (Mkfour 0 0 0 0xe1000000)
+#pop-options
 
 let lemma_quad32_double_hi_rev a =
   let ra = reverse a 127 in
