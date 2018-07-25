@@ -151,9 +151,13 @@ let get_fst_ocmp (o:ocmp) = match o with
 let get_snd_ocmp (o:ocmp) = match o with
   | S.OEq _ o2 | S.ONe _ o2 | S.OLe _ o2 | S.OGe _ o2 | S.OLt _ o2 | S.OGt _ o2 -> o2
 
+let taint_match_ocmp (c:tainted_ocmp) (mt:memtaint) (s:state) : bool =
+  (taint_match (get_fst_ocmp c.o) c.ot mt s) &&
+  (taint_match (get_snd_ocmp c.o) c.ot mt s)
+  
 let taint_eval_ocmp (ts:traceState) (c:tainted_ocmp) : GTot (traceState * bool) =
   let t = c.ot in
-  let s = run (check (valid_ocmp c.o);; check (taint_match (get_fst_ocmp c.o) t ts.memTaint);; check (taint_match (get_snd_ocmp c.o) t ts.memTaint)) ts.state in
+  let s = run (check (valid_ocmp c.o);; check (taint_match_ocmp c ts.memTaint)) ts.state in
     {ts with state = s}, eval_ocmp s c.o
 
 type tainted_code = precode tainted_ins tainted_ocmp

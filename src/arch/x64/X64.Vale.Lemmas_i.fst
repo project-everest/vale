@@ -82,8 +82,9 @@ let rec increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
   | Ins ins -> ()
   | Block l -> increase_fuels l s0 f0 sN fN
   | IfElse b t f ->
-      let _, b0 = TS.taint_eval_ocmp (state_to_S s0) b in
-      if b0 then increase_fuel t s0 f0 sN fN else increase_fuel f s0 f0 sN fN
+      let st, b0 = TS.taint_eval_ocmp (state_to_S s0) b in
+      let s' = {st with TS.trace = BranchPredicate(b0)::(state_to_S s0).TS.trace} in
+      if b0 then increase_fuel t (state_of_S s') f0 sN fN else increase_fuel f (state_of_S s') f0 sN fN
   | While b c ->
       let s1, b0 = TS.taint_eval_ocmp (state_to_S s0) b in
       if not b0 then ()
@@ -158,7 +159,7 @@ let lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
   (sW, fW)
 
 let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
-  let f1 = fW + 1 in
+  let f1 = fW + 1 in  
   assert (state_eq_opt (TS.taint_eval_code (While b c) f1 (state_to_S s0)) (TS.taint_eval_code (While b c) 1 (state_to_S sW)));
   assert (eval_code (While b c) s0 f1 sW);
   (sW, f1)
@@ -178,7 +179,6 @@ let lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (s
       let fZ = if f > fM then f else fM in
       increase_fuel (While?.whileBody c) sM fM sN fZ;
       increase_fuel c sN f (state_of_S sZ) fZ;
-
       assert (state_eq_opt (TS.taint_eval_code c (fZ + 1) (state_to_S sM)) (Some sZ)); // via eval_code for While 
       assert (state_eq_opt (TS.taint_eval_code c (fZ + 1) (state_to_S sM)) (TS.taint_eval_code c (fZ + 1 + f0) (state_to_S s0))); // via eval_while_inv, choosing f = fZ + 1
 

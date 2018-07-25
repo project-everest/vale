@@ -124,7 +124,8 @@ val lemma_ifElseTrue_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) (
   (requires
     valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
-    eval_code ct s0 f0 sM
+    eval_code ct s0 f0 sM /\
+    TS.taint_match_ocmp ifb s0.memTaint (state_to_S s0).TS.state
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -134,7 +135,8 @@ val lemma_ifElseFalse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) 
   (requires
     valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
-    eval_code cf s0 f0 sM
+    eval_code cf s0 f0 sM  /\
+    TS.taint_match_ocmp ifb s0.memTaint (state_to_S s0).TS.state
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -157,7 +159,8 @@ val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : G
   (requires
     valid_ocmp b sW /\
     not (eval_ocmp sW b) /\
-    eval_while_inv (While b c) s0 fW sW
+    eval_while_inv (While b c) s0 fW sW /\
+    TS.taint_match_ocmp b sW.memTaint (state_to_S sW).TS.state    
   )
   (ensures fun (s1, f1) ->
     s1 == sW /\
@@ -171,7 +174,8 @@ val lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (s
     valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\
-    eval_code (While?.whileBody c) sM fM sN
+    eval_code (While?.whileBody c) sM fM sN /\
+    TS.taint_match_ocmp (While?.whileCond c) sM.memTaint (state_to_S sM).TS.state 
   )
   (ensures (fun fN ->
     eval_while_inv c s0 fN sN
