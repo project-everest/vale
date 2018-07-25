@@ -5,7 +5,7 @@ let singleton_list_rev #a x = ()
 let list_cons_is_append #a h t = ()
 
 let singleton_list_seq #a x =
-  lemma_of_list [x] 0;
+  lemma_seq_of_list_index [x] 0;
   assert (equal (seq_of_list [x]) (create 1 x))
 #reset-options
 
@@ -26,12 +26,12 @@ let rec append_list_seq #a x y =
   let index_of_append_x_y (i:nat{i < n}) : a = index (append (seq_of_list x) (seq_of_list y)) i in
   let f (i:nat{i < n}) : Lemma (index_of_x_y i == index_of_append_x_y i) =
     list_append_index x y i;
-    lemma_of_list (x @ y) i;
+    lemma_seq_of_list_index (x @ y) i;
     (
       if i < List.length x then
-        lemma_of_list x i
+        lemma_seq_of_list_index x i
       else
-        lemma_of_list y (i - List.length x)
+        lemma_seq_of_list_index y (i - List.length x)
     )
     in
   FStar.Classical.forall_intro f;
