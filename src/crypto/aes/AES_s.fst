@@ -87,7 +87,7 @@ let cipher (alg:algorithm) (input:quad32) (round_keys:seq quad32{length round_ke
 
 let rec expand_key_def (alg:algorithm) (key:aes_key_LE alg) (size:nat{size <= (nb * ((nr alg) + 1))})
   : (ek_LE:seq nat32 {length ek_LE == size}) =
-  if size = 0 then createEmpty
+  if size = 0 then empty
   else
     let w = expand_key_def alg key (size - 1) in
     let i = size - 1 in
@@ -108,7 +108,7 @@ let expand_key = make_opaque expand_key_def
 
 let rec key_schedule_to_round_keys (rounds:nat) (w:seq nat32 {length w >= 4 * rounds})
   : (round_keys:seq quad32 {length round_keys == rounds}) =
-  if rounds = 0 then createEmpty
+  if rounds = 0 then empty
   else
     let round_keys = key_schedule_to_round_keys (rounds - 1) w in
     let rk = Mkfour (index w (4 * rounds - 4)) (index w (4 * rounds - 3)) (index w (4 * rounds - 2)) (index w (4 * rounds - 1)) in

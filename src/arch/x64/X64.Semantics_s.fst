@@ -64,7 +64,6 @@ let update_reg' (r:reg) (v:nat64) (s:state) : state = {s with state = S.update_r
 
 let update_xmm' (x:xmm) (v:quad32) (s:state) : state = {s with state = S.update_xmm' x v s.state}
 
-// TODO: Mem operations
 let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
   let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
   else s.state; mem = store_mem64 ptr v s.mem } in
@@ -517,11 +516,3 @@ and eval_while b c fuel s0 =
     | Some s1 ->
       if s1.state.S.ok then eval_while b c (fuel - 1) s1  // success: continue to next iteration
       else Some s1  // failure: propagate failure immediately
-
-assume val bytes_valid (m:maddr) (s:state) : Lemma
-  (valid_maddr m s ==> S.valid_maddr m s.state)
-  [SMTPat (valid_maddr m s)]
-
-assume val bytes_valid128 (m:maddr) (s:state) : Lemma
-  (valid_maddr128 m s ==> S.valid_maddr128 m s.state)
-  [SMTPat (valid_maddr128 m s)]

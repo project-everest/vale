@@ -11,6 +11,7 @@ noeq type state = {
   xmms: Xmms_i.t;
   flags: nat64;
   mem: mem;
+  memTaint: memtaint;
 }
 
 let reg_to_int (r:reg) : int =
@@ -93,5 +94,5 @@ let state_eq (s0:state) (s1:state) : Type0 =
   Regs_i.equal s0.regs s1.regs /\
   Xmms_i.equal s0.xmms s1.xmms /\
   s0.flags == s1.flags /\
-  s0.mem == s1.mem
-
+  s0.mem == s1.mem /\
+  s0.memTaint == s1.memTaint

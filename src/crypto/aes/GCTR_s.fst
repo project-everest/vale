@@ -24,7 +24,7 @@ let gctr_encrypt_block (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:ae
 
 let rec gctr_encrypt_recursive (icb_BE:quad32) (plain:gctr_plain_internal_LE) 
 			       (alg:algorithm) (key:aes_key_LE alg) (i:int) : Tot (seq quad32) (decreases %[length plain]) =
-  if length plain = 0 then createEmpty
+  if length plain = 0 then empty
   else  
     cons (gctr_encrypt_block icb_BE (head plain) alg key i) (gctr_encrypt_recursive icb_BE (tail plain) alg key (i + 1))
 

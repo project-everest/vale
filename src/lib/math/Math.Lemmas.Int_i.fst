@@ -139,6 +139,7 @@ let lemma_mod_spec2 (a:int) (n:pos) =
   lemma_mod_spec a n
 
 let lemma_mod_plus_distr_l (a:int) (b:int) (n:pos) = lemma_mod_add_distr b a n
+let lemma_mod_plus_distr_r (a:int) (b:int) (n:pos) = lemma_mod_add_distr a b n
 
 let small_division_lemma_2 (a:int) (n:pos) = lemma_div_mod a n
 
@@ -157,6 +158,17 @@ let multiple_division_lemma (a:int) (n:pos) = cancel_mul_div a n
 let multiple_modulo_lemma (a:int) (n:pos) = cancel_mul_mod a n
 let division_addition_lemma (a:int) (n:pos) (b:int) = lemma_div_plus a b n
 let division_sub_lemma (a:nat) (n:pos) (b:nat) = lemma_div_plus a (-b) n
+
+#reset-options "--initial_fuel 0 --max_fuel 0 --z3cliopt smt.arith.nl=true --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr native"
+
+let modulo_distributivity (a:int) (b:int) (c:pos) =
+  lemma_div_mod a c;
+  lemma_div_mod b c;
+  lemma_div_mod (a % c + b % c) c;
+  division_addition_lemma  (a - (a / c) * c + b - (b / c) * c) c (a / c + b / c)
+
+#reset-options "--initial_fuel 0 --max_fuel 0 --z3cliopt smt.arith.nl=false --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped"
+
 
 let modulo_addition_lemma (a:int) (n:pos) (b:int) = lemma_mod_plus a b n
 let lemma_mod_sub (a:int) (n:pos) (b:nat) = lemma_mod_plus a (-b) n

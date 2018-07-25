@@ -31,7 +31,7 @@ let rec seq_map_i_indexed (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) :
                 })
       (decreases %[(length s)])
   =
-  if length s = 0 then createEmpty
+  if length s = 0 then empty
   else 
      cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
 

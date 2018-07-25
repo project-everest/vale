@@ -154,12 +154,12 @@ let qInlineIf (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2
   QProc (if_code b c1 c2) (wp_InlineIf b qc1 qc2) (qInlineIf_monotone b qc1 qc2) (qInlineIf_compute b qc1 qc2) (qInlineIf_proof b qc1 qc2)
 
 type cmp =
-| Cmp_eq : operand -> operand -> cmp
-| Cmp_ne : operand -> operand -> cmp
-| Cmp_le : operand -> operand -> cmp
-| Cmp_ge : operand -> operand -> cmp
-| Cmp_lt : operand -> operand -> cmp
-| Cmp_gt : operand -> operand -> cmp
+| Cmp_eq : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
+| Cmp_ne : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
+| Cmp_le : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
+| Cmp_ge : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
+| Cmp_lt : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
+| Cmp_gt : o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> cmp
 
 [@va_qattr]
 let cmp_to_ocmp (c:cmp) : ocmp =
@@ -278,12 +278,13 @@ let va_state_match (s0:state) (s1:state) : Pure Type0
   all_regs_match s0.regs s1.regs /\
   all_xmms_match s0.xmms s1.xmms /\
   s0.flags == s1.flags /\
-  s0.mem == s1.mem
+  s0.mem == s1.mem /\
+  s0.memTaint == s1.memTaint
 
 [@va_qattr]
 unfold let wp_sound_pre (#a:Type0) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem).
-    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem} in
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (memTaint:memtaint).
+    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; memTaint=memTaint} in
     s0 == s0' ==> wp cs qcs (k s0') s0'
 
 unfold let wp_sound_post (#a:Type0) (#cs:codes) (qcs:quickCodes a cs) (s0:state) (k:state -> state -> a -> Type0) ((sN:state), (fN:fuel), (gN:a)) : Type0 =
@@ -297,8 +298,8 @@ val wp_sound_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (s0:state) (k:stat
 
 [@va_qattr]
 unfold let wp_sound_code_pre (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem).
-    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem} in
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (memTaint:memtaint).
+    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; memTaint=memTaint} in
     s0 == s0' ==> QProc?.wp qc s0' (k s0')
 
 unfold let wp_sound_code_post (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) ((sN:state), (fN:fuel), (gN:a)) : Type0 =
@@ -316,21 +317,21 @@ val wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:stat
 [@va_qattr]
 let wp_final_k (#a:Type0) (update:state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (sN:state) (g:a) : Type0 =
   va_state_match sN (update sN) /\ post sN sN /\
-    (forall (ok':bool) (regs':Regs_i.t) (xmms':Xmms_i.t) (flags':nat64) (mem':mem).
-      let sN' = {ok = ok'; regs = regs'; xmms = xmms'; flags = flags'; mem = mem'} in
+    (forall (ok':bool) (regs':Regs_i.t) (xmms':Xmms_i.t) (flags':nat64) (mem':mem) (memTaint':memtaint).
+      let sN' = {ok = ok'; regs = regs'; xmms = xmms'; flags = flags'; mem = mem'; memTaint=memTaint'} in
       post sN sN' ==> k sN' g)
 
 // For efficiency, introduce shorter names (e.g. ok, mem) for components of initial state s0.
 [@va_qattr]
 let wp_wrap (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem).
-    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem} in
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (memTaint:memtaint).
+    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; memTaint=memTaint} in
     s0 == s0' ==> wp cs qcs (wp_final_k (update s0') post k) s0'
 
 [@va_qattr]
 let wp_wrap_code (#a:Type0) (c:code) (qc:quickCode a c) (update:state -> state -> state) (post:state -> state -> Type0) (k:state -> a -> Type0) (s0:state) : Type0 =
-  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem).
-    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem} in
+  forall (ok:bool) (regs:Regs_i.t) (xmms:Xmms_i.t) (flags:nat64) (mem:mem) (memTaint:memtaint).
+    let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem; memTaint=memTaint} in
     s0 == s0' ==> QProc?.wp qc s0' (wp_final_k (update s0') post k)
 
 unfold let wp_GHOST (#a:Type0) (c:code) (s0:state) (update:state -> state -> state) (fk:(state -> a -> Type0) -> Type0) (p:state * fuel * a -> Type0) : Type0 =
@@ -355,6 +356,8 @@ unfold let normal_steps : list string =
     "X64.Vale.State_i.__proj__Mkstate__item__xmms";
     "X64.Vale.State_i.__proj__Mkstate__item__flags";
     "X64.Vale.State_i.__proj__Mkstate__item__mem";
+    "X64.Vale.State_i.__proj__Mkstate__item__trace";
+    "X64.Vale.State_i.__proj__Mkstate__item__memTaint";    
 
     "X64.Vale.QuickCode_i.__proj__QProc__item__wp";
   ]

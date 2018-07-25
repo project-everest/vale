@@ -99,6 +99,15 @@ val modifies_buffer_addr (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
   (ensures buffer_addr b h == buffer_addr b h')
   [SMTPat (modifies p h h'); SMTPat (buffer_addr b h')]
 
+
+val modifies_buffer_readable (#t:typ) (b:buffer t) (p:loc) (h h':mem) : Lemma
+  (requires
+    modifies p h h' /\
+    buffer_readable h b
+  )
+  (ensures buffer_readable h' b)
+  [SMTPat (modifies p h h'); SMTPat (buffer_readable h' b)]
+
 val loc_disjoint_none_r (s:loc) : Lemma
   (ensures (loc_disjoint s loc_none))
   [SMTPat (loc_disjoint s loc_none)]
@@ -276,3 +285,22 @@ val lemma_frame_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
 val lemma_valid_store_mem128: i:int -> v:quad32 -> h:mem -> Lemma (
   let h' = store_mem128 i v h in
   forall j. valid_mem128 j h <==> valid_mem128 j h')
+
+val memtaint: Type u#0
+
+val valid_taint_buf64: (b:buffer64) -> (mem:mem) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
+val valid_taint_buf128: (b:buffer128) -> (mem:mem) -> (memTaint:memtaint) -> (taint:taint) -> GTot Type0
+
+val modifies_valid_taint64 (b:buffer64) (p:loc) (h h':mem) (memTaint:memtaint) (t:taint) : Lemma
+  (requires
+    modifies p h h'
+  )
+  (ensures valid_taint_buf64 b h memTaint t <==> valid_taint_buf64 b h' memTaint t)
+  [SMTPat (modifies p h h'); SMTPat (valid_taint_buf64 b h' memTaint t)]
+
+val modifies_valid_taint128 (b:buffer128) (p:loc) (h h':mem) (memTaint:memtaint) (t:taint) : Lemma
+  (requires
+    modifies p h h'
+  )
+  (ensures valid_taint_buf128 b h memTaint t <==> valid_taint_buf128 b h' memTaint t)
+  [SMTPat (modifies p h h'); SMTPat (valid_taint_buf128 b h' memTaint t)]

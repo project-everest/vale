@@ -41,6 +41,7 @@ let my_bool_to_nat (b:bool) : nat = if b then 1 else 0
 #endverbatim
 
 #reset-options "--z3rlimit 30"
+/*
 
 procedure{:quick exportOnly} fast_multiply(
     ghost dst_b:buffer64, 
@@ -236,7 +237,7 @@ procedure{:quick} fast_mul_stdcall(
         validDstAddrs64(mem, dst_in, dst_b, 8);
         validSrcAddrs64(mem, inA_in, inA_b, 4);
         validSrcAddrs64(mem, inB_in, inB_b, 4);
-        valid_stack_slots(mem, rsp, stack_b, 5);
+        valid_stack_slots(mem, rsp, stack_b, 5, memTaint);
     ensures
         let a0 := buffer64_read(inA_b, 0, mem);
         let a1 := buffer64_read(inA_b, 1, mem);
@@ -303,3 +304,4 @@ procedure{:quick} fast_mul_stdcall(
     Pop(rsi, stack_b, 3);
     Pop(rbx, stack_b, 4);
 }
+*/

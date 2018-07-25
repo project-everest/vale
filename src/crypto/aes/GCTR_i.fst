@@ -2,6 +2,8 @@ module GCTR_i
 
 open Opaque_s
 open Words_s
+open Words.Seq_s
+open Words.Four_s
 open Types_s
 open Types_i
 open FStar.Mul
@@ -12,36 +14,26 @@ open GCM_helpers_i
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
-let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE = 
-  if 4096 * length p < pow2_32 then p else createEmpty
-
-let gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int) :
-  Lemma (gctr_encrypt_block icb_BE plain_LE alg key i ==
-         gctr_encrypt_block (inc32 icb_BE i) plain_LE alg key 0)
-  =
+let gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int) =
   ()
 
-let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algorithm) (key:aes_key_LE alg) : 
-  Lemma (let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
-         let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
-         cipher = gctr_encrypt_LE icb_BE (make_gctr_plain_LE plain) alg key)
-  =
+let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algorithm) (key:aes_key_LE alg) =
   reveal_opaque le_bytes_to_seq_quad32_def;
   reveal_opaque gctr_encrypt_LE_def;
   let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
   let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
-  assert (plain == createEmpty);
-  assert (cipher == createEmpty);
+  assert (plain == empty);
+  assert (cipher == empty);
   assert (length plain == 0);
-  assert (make_gctr_plain_LE plain == createEmpty);
+  assert (make_gctr_plain_LE plain == empty);
   let num_extra = (length (make_gctr_plain_LE plain)) % 16 in
   assert (num_extra == 0);
   let plain_quads_LE = le_bytes_to_seq_quad32 plain in
   let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in
-  assert (equal plain_quads_LE createEmpty);     // OBSERVE
-  assert (plain_quads_LE == createEmpty);
-  assert (cipher_quads_LE == createEmpty);
-  assert (equal (le_seq_quad32_to_bytes cipher_quads_LE) createEmpty);  // OBSERVEs
+  assert (equal plain_quads_LE empty);     // OBSERVE
+  assert (plain_quads_LE == empty);
+  assert (cipher_quads_LE == empty);
+  assert (equal (le_seq_quad32_to_bytes cipher_quads_LE) empty);  // OBSERVEs
   ()
 
 (*
@@ -51,7 +43,7 @@ let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) :
                 }) 
       (decreases (length s))
   =
-  if length s = 0 then createEmpty
+  if length s = 0 then empty
   else cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
 
 let rec test (icb_BE:quad32) (plain_LE:gctr_plain_internal_LE) 
@@ -74,15 +66,6 @@ let rec test (icb_BE:quad32) (plain_LE:gctr_plain_internal_LE)
   )
 *)
 
-let aes_encrypt_BE (alg:algorithm) (key:aes_key_LE alg) (p_BE:quad32) =
-  let p_LE = reverse_bytes_quad32 p_BE in
-  aes_encrypt_LE alg key p_LE
-
-let gctr_partial (alg:algorithm) (bound:nat) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) =
-  let bound = min bound (min (length plain) (length cipher)) in
-  forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==>
-    index cipher j == quad32_xor (index plain j) (aes_encrypt_BE alg key (inc32 icb j))
-  
 let rec gctr_encrypt_recursive_length (icb:quad32) (plain:gctr_plain_internal_LE)
                                       (alg:algorithm) (key:aes_key_LE alg) (i:int) : Lemma
   (requires True)
@@ -166,20 +149,11 @@ let rec gctr_indexed (icb:quad32) (plain:gctr_plain_internal_LE)
   assert(equal cipher c)  // OBSERVE: Invoke extensionality lemmas
 
 
-let gctr_partial_completed (alg:algorithm) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) : Lemma
-  (requires length plain == length cipher /\
-            256 * (length plain) < pow2_32 /\
-            gctr_partial alg (length cipher) plain cipher key icb)
-  (ensures cipher == gctr_encrypt_recursive icb plain alg key 0)
-  =
+let gctr_partial_completed (alg:algorithm) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) =
   gctr_indexed icb plain alg key cipher;
   ()
 
-let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (cipher:seq quad32) : Lemma
-  (requires (cipher == gctr_encrypt_recursive icb_BE plain alg key 0) /\
-            (4096 * (length plain) * 16 < pow2_32))
-  (ensures le_seq_quad32_to_bytes cipher == gctr_encrypt_LE icb_BE (le_seq_quad32_to_bytes plain) alg key)
-  =
+let gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (cipher:seq quad32) =
   reveal_opaque gctr_encrypt_LE_def;
   let p = le_seq_quad32_to_bytes plain in
   assert (length p % 16 == 0);
@@ -243,6 +217,308 @@ let step1 (p:seq quad32) (num_bytes:nat{ num_bytes < 16 * length p }) : Lemma
   assert (full_quads_LE == (slice p 0 num_blocks));
   ()
 
+#reset-options "--smtencoding.elim_box true --z3rlimit 30"
+let lemma_slice_orig_index (#a:Type) (s s':seq a) (m n:nat) : Lemma
+  (requires length s == length s' /\ m <= n /\ n <= length s /\ slice s m n == slice s' m n)
+  (ensures (forall (i:int).{:pattern (index s i) \/ (index s' i)} m <= i /\ i < n ==> index s i == index s' i))
+  =
+  let aux (i:nat{m <= i /\ i < n}) : Lemma (index s i == index s' i) =
+    lemma_index_slice s m n (i - m);
+    lemma_index_slice s' m n (i - m)
+  in Classical.forall_intro aux
+
+let lemma_ishl_32 (x:nat32) (k:nat) : Lemma
+  (ensures ishl #pow2_32 x k == x * pow2 k % pow2_32)
+  =
+  TypesNative_s.reveal_ishl 32 x k;
+  FStar.UInt.shift_left_value_lemma #32 x k;
+  ()
+
+let lemma_ishl_ixor_32 (x y:nat32) (k:nat) : Lemma
+  (ensures ishl #pow2_32 (ixor x y) k == ixor (ishl x k) (ishl y k))
+  =
+  TypesNative_s.reveal_ishl 32 x k;
+  TypesNative_s.reveal_ishl 32 y k;
+  TypesNative_s.reveal_ishl 32 (ixor x y) k;
+  TypesNative_s.reveal_ixor 32 x y;
+  TypesNative_s.reveal_ixor 32 (ishl x k) (ishl y k);
+  FStar.UInt.shift_left_logxor_lemma #32 x y k;
+  ()
+
+unfold let pow2_24 = 0x1000000
+let nat24 = natN pow2_24
+
+let nat32_xor_bytewise_1_helper1 (x0 x0':nat8) (x1 x1':nat24) (x x':nat32) : Lemma
+  (requires
+    x == x0 + 0x100 * x1 /\
+    x' == x0' + 0x100 * x1' /\
+    x * 0x1000000 % 0x100000000 == x' * 0x1000000 % 0x100000000
+  )
+  (ensures x0 == x0')
+  =
+  ()
+
+let nat32_xor_bytewise_2_helper1 (x0 x0' x1 x1':nat16) (x x':nat32) : Lemma
+  (requires
+    x == x0 + 0x10000 * x1 /\
+    x' == x0' + 0x10000 * x1' /\
+    x * 0x10000 % 0x100000000 == x' * 0x10000 % 0x100000000
+  )
+  (ensures x0 == x0')
+  =
+  ()
+
+let nat32_xor_bytewise_3_helper1 (x0 x0':nat24) (x1 x1':nat8) (x x':nat32) : Lemma
+  (requires
+    x == x0 + 0x1000000 * x1 /\
+    x' == x0' + 0x1000000 * x1' /\
+    x * 0x100 % 0x100000000 == x' * 0x100 % 0x100000000
+  )
+  (ensures x0 == x0')
+  =
+  ()
+
+let nat32_xor_bytewise_1_helper2 (x x':nat32) (t t':four nat8) : Lemma
+  (requires
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    x * 0x1000000 % 0x100000000 == x' * 0x1000000 % 0x100000000
+  )
+  (ensures t.lo0 == t'.lo0)
+  =
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  let t123 = t1 + 0x100 * t2 + 0x10000 * t3 in
+  let t123' = t1' + 0x100 * t2' + 0x10000 * t3' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  nat32_xor_bytewise_1_helper1 t0 t0' t123 t123' x x';
+  ()
+
+let nat32_xor_bytewise_2_helper2 (x x':nat32) (t t':four nat8) : Lemma
+  (requires
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    x * 0x10000 % 0x100000000 == x' * 0x10000 % 0x100000000
+  )
+  (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1)
+  =
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  let t01 = t0 + 0x100 * t1 in
+  let t23 = t2 + 0x100 * t3 in
+  let t01' = t0' + 0x100 * t1' in
+  let t23' = t2' + 0x100 * t3' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  nat32_xor_bytewise_2_helper1 t01 t01' t23 t23' x x';
+  ()
+
+let nat32_xor_bytewise_3_helper2 (x x':nat32) (t t':four nat8) : Lemma
+  (requires
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    x * 0x100 % 0x100000000 == x' * 0x100 % 0x100000000
+  )
+  (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1 /\ t.hi2 == t'.hi2)
+  =
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  let t012 = t0 + 0x100 * t1 + 0x10000 * t2 in
+  let t012' = t0' + 0x100 * t1' + 0x10000 * t2' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  nat32_xor_bytewise_3_helper1 t012 t012' t3 t3' x x';
+  ()
+
+let nat32_xor_bytewise_1_helper3 (k k':nat32) (s s':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    s.lo0 == s'.lo0
+  )
+  (ensures k * 0x1000000 % 0x100000000 == k' * 0x1000000 % 0x100000000)
+  =
+  let Mkfour _ _ _ _ = s in
+  let Mkfour _ _ _ _  = s' in
+  assert_norm (four_to_nat 8 s  == four_to_nat_unfold 8 s );
+  assert_norm (four_to_nat 8 s' == four_to_nat_unfold 8 s');
+  ()
+
+let nat32_xor_bytewise_2_helper3 (k k':nat32) (s s':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1
+  )
+  (ensures k * 0x10000 % 0x100000000 == k' * 0x10000 % 0x100000000)
+  =
+  let Mkfour _ _ _ _ = s in
+  let Mkfour _ _ _ _  = s' in
+  assert_norm (four_to_nat 8 s  == four_to_nat_unfold 8 s );
+  assert_norm (four_to_nat 8 s' == four_to_nat_unfold 8 s');
+  ()
+
+let nat32_xor_bytewise_3_helper3 (k k':nat32) (s s':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1 /\ s.hi2 == s'.hi2
+  )
+  (ensures k * 0x100 % 0x100000000 == k' * 0x100 % 0x100000000)
+  =
+  let Mkfour _ _ _ _ = s in
+  let Mkfour _ _ _ _  = s' in
+  assert_norm (four_to_nat 8 s  == four_to_nat_unfold 8 s );
+  assert_norm (four_to_nat 8 s' == four_to_nat_unfold 8 s');
+  ()
+
+let nat32_xor_bytewise_1 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s.lo0 == s'.lo0
+  )
+  (ensures t.lo0 == t'.lo0)
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  nat32_xor_bytewise_1_helper3 k k' s s';
+  lemma_ishl_32 k 24;
+  lemma_ishl_32 k' 24;
+  lemma_ishl_32 x 24;
+  lemma_ishl_32 x' 24;
+  lemma_ishl_ixor_32 k m 24;
+  lemma_ishl_ixor_32 k' m 24;
+  assert_norm (pow2 24 == pow2_24);
+  nat32_xor_bytewise_1_helper2 x x' t t';
+  ()
+
+let nat32_xor_bytewise_2 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1
+  )
+  (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1)
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  nat32_xor_bytewise_2_helper3 k k' s s';
+  lemma_ishl_32 k 16;
+  lemma_ishl_32 k' 16;
+  lemma_ishl_32 x 16;
+  lemma_ishl_32 x' 16;
+  lemma_ishl_ixor_32 k m 16;
+  lemma_ishl_ixor_32 k' m 16;
+//  assert (ishl #pow2_32 k  16 == k  * 0x10000 % 0x100000000);
+//  assert (ishl #pow2_32 k' 16 == k' * 0x10000 % 0x100000000);
+//  assert (ishl #pow2_32 x  16 == x  * 0x10000 % 0x100000000);
+//  assert (ishl #pow2_32 x' 16 == x' * 0x10000 % 0x100000000);
+//  assert (ishl #pow2_32 x  16 == ixor (ishl k  16) (ishl m 16));
+//  assert (ishl #pow2_32 x' 16 == ixor (ishl k' 16) (ishl m 16));
+//  assert (x  * 0x10000 % 0x100000000 == ixor (k  * 0x10000 % 0x100000000) (ishl m 16));
+//  assert (x' * 0x10000 % 0x100000000 == ixor (k' * 0x10000 % 0x100000000) (ishl m 16));
+  nat32_xor_bytewise_2_helper2 x x' t t';
+  ()
+
+let nat32_xor_bytewise_3 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s.lo0 == s'.lo0 /\ s.lo1 == s'.lo1 /\ s.hi2 == s'.hi2
+  )
+  (ensures t.lo0 == t'.lo0 /\ t.lo1 == t'.lo1 /\ t.hi2 == t'.hi2)
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  nat32_xor_bytewise_3_helper3 k k' s s';
+  lemma_ishl_32 k 8;
+  lemma_ishl_32 k' 8;
+  lemma_ishl_32 x 8;
+  lemma_ishl_32 x' 8;
+  lemma_ishl_ixor_32 k m 8;
+  lemma_ishl_ixor_32 k' m 8;
+  nat32_xor_bytewise_3_helper2 x x' t t';
+  ()
+
+let nat32_xor_bytewise_4 (k k' x x' m:nat32) (s s' t t':four nat8) : Lemma
+  (requires
+    k == four_to_nat 8 s /\
+    k' == four_to_nat 8 s' /\
+    x == four_to_nat 8 t /\
+    x' == four_to_nat 8 t' /\
+    ixor k m == x /\
+    ixor k' m == x' /\
+    s == s'
+  )
+  (ensures t == t')
+  =
+  let Mkfour s0 s1 s2 s3 = s in
+  let Mkfour s0' s1' s2' s3' = s' in
+  let Mkfour t0 t1 t2 t3 = t in
+  let Mkfour t0' t1' t2' t3' = t' in
+  assert_norm (four_to_nat 8 t  == four_to_nat_unfold 8 t );
+  assert_norm (four_to_nat 8 t' == four_to_nat_unfold 8 t');
+  ()
+
+let nat32_xor_bytewise (k k' m:nat32) (s s' t t':seq4 nat8) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    k == four_to_nat 8 (seq_to_four_LE s) /\
+    k' == four_to_nat 8 (seq_to_four_LE s') /\
+    ixor k m == four_to_nat 8 (seq_to_four_LE t) /\
+    ixor k' m == four_to_nat 8 (seq_to_four_LE t') /\
+    equal (slice s 0 n) (slice s' 0 n)
+  )
+//  (ensures equal (slice t 0 n) (slice t' 0 n))
+  (ensures (forall (i:nat).{:pattern (index t i) \/ (index t' i)} i < n ==> index t i == index t' i))
+  =
+  assert (n > 0 ==> index (slice s 0 n) 0 == index (slice s' 0 n) 0);
+  assert (n > 1 ==> index (slice s 0 n) 1 == index (slice s' 0 n) 1);
+  assert (n > 2 ==> index (slice s 0 n) 2 == index (slice s' 0 n) 2);
+  assert (n > 3 ==> index (slice s 0 n) 3 == index (slice s' 0 n) 3);
+  let x = ixor k m in
+  let x' = ixor k' m in
+  if n = 1 then nat32_xor_bytewise_1 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 2 then nat32_xor_bytewise_2 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 3 then nat32_xor_bytewise_3 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  if n = 4 then nat32_xor_bytewise_4 k k' x x' m (seq_to_four_LE s) (seq_to_four_LE s') (seq_to_four_LE t) (seq_to_four_LE t');
+  assert (equal (slice t 0 n) (slice t' 0 n));
+  lemma_slice_orig_index t t' 0 n;
+  ()
+
+// REVIEW: should be shared with GCM_helpers_i
+let lemma_slices_le_quad32_to_bytes (q:quad32) : Lemma
+  (ensures (
+    let s = le_quad32_to_bytes q in
+    q.lo0 == four_to_nat 8 (seq_to_four_LE (slice s 0 4)) /\
+    q.lo1 == four_to_nat 8 (seq_to_four_LE (slice s 4 8)) /\
+    q.hi2 == four_to_nat 8 (seq_to_four_LE (slice s 8 12)) /\
+    q.hi3 == four_to_nat 8 (seq_to_four_LE (slice s 12 16))
+  ))
+  =
+  reveal_opaque le_quad32_to_bytes_def;
+  ()
+
 let quad32_xor_bytewise (q q' r:quad32) (n:nat{ n <= 16 }) : Lemma
   (requires (let q_bytes  = le_quad32_to_bytes q in
              let q'_bytes = le_quad32_to_bytes q' in
@@ -253,8 +529,34 @@ let quad32_xor_bytewise (q q' r:quad32) (n:nat{ n <= 16 }) : Lemma
             let q'r_bytes = le_quad32_to_bytes (quad32_xor q' r) in                      
             slice qr_bytes 0 n == slice q'r_bytes 0 n))
   =
-  admit()       //////////////////////////////////////////////////////////////////////////////// TODO!!!
-
+  let s = le_quad32_to_bytes q in
+  let s' = le_quad32_to_bytes q' in
+  let t = le_quad32_to_bytes (quad32_xor q r) in
+  let t' = le_quad32_to_bytes (quad32_xor q' r) in
+  lemma_slices_le_quad32_to_bytes q;
+  lemma_slices_le_quad32_to_bytes q';
+  lemma_slices_le_quad32_to_bytes (quad32_xor q r);
+  lemma_slices_le_quad32_to_bytes (quad32_xor q' r);
+  lemma_slice_orig_index s s' 0 n;
+  if n < 4 then nat32_xor_bytewise q.lo0 q'.lo0 r.lo0 (slice s 0 4) (slice s' 0 4) (slice t 0 4) (slice t' 0 4) n
+  else
+  (
+    nat32_xor_bytewise q.lo0 q'.lo0 r.lo0 (slice s 0 4) (slice s' 0 4) (slice t 0 4) (slice t' 0 4) 4;
+    if n < 8 then nat32_xor_bytewise q.lo1 q'.lo1 r.lo1 (slice s 4 8) (slice s' 4 8) (slice t 4 8) (slice t' 4 8) (n - 4)
+    else
+    (
+      nat32_xor_bytewise q.lo1 q'.lo1 r.lo1 (slice s 4 8) (slice s' 4 8) (slice t 4 8) (slice t' 4 8) 4;
+      if n < 12 then nat32_xor_bytewise q.hi2 q'.hi2 r.hi2 (slice s 8 12) (slice s' 8 12) (slice t 8 12) (slice t' 8 12) (n - 8)
+      else
+      (
+        nat32_xor_bytewise q.hi2 q'.hi2 r.hi2 (slice s 8 12) (slice s' 8 12) (slice t 8 12) (slice t' 8 12) 4;
+        nat32_xor_bytewise q.hi3 q'.hi3 r.hi3 (slice s 12 16) (slice s' 12 16) (slice t 12 16) (slice t' 12 16) (n - 12);
+        ()
+      )
+    )
+  );
+  assert (equal (slice t 0 n) (slice t' 0 n));
+  ()
 
 let slice_pad_to_128_bits (s:seq nat8 {  0 < length s /\ length s < 16 }) :
   Lemma(slice (pad_to_128_bits s) 0 (length s) == s)
@@ -301,19 +603,7 @@ let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:qua
 #reset-options "--z3rlimit 30" 
 open FStar.Seq.Properties
 
-let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
-  (requires (1 <= num_bytes /\ 
-             num_bytes < 16 * length plain /\
-             16 * (length plain - 1) < num_bytes /\
-             num_bytes % 16 <> 0 /\ 4096 * num_bytes < pow2_32 /\
-             length plain == length cipher /\
-             (let num_blocks = num_bytes / 16 in
-              slice cipher 0 num_blocks == gctr_encrypt_recursive icb_BE (slice plain 0 num_blocks) alg key 0 /\
-              index cipher num_blocks == gctr_encrypt_block icb_BE (index plain num_blocks) alg key num_blocks)))
-  (ensures (let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
-            let cipher_bytes = slice (le_seq_quad32_to_bytes cipher) 0 num_bytes in
-            cipher_bytes == gctr_encrypt_LE icb_BE plain_bytes alg key))
-  =
+let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) =
   reveal_opaque gctr_encrypt_LE_def;
   let num_blocks = num_bytes / 16 in
   let plain_bytes = slice (le_seq_quad32_to_bytes plain) 0 num_bytes in
@@ -363,9 +653,7 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq
   ()
 
 
-let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) :
-  Lemma(gctr_encrypt_LE icb_BE (le_quad32_to_bytes plain) alg key =
-        le_seq_quad32_to_bytes (create 1 (quad32_xor plain (aes_encrypt_BE alg key icb_BE)))) =
+let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE alg) =
   reveal_opaque gctr_encrypt_LE_def;
   assert(inc32 icb_BE 0 == icb_BE);
   let encrypted_icb = aes_encrypt_BE alg key icb_BE in
@@ -389,8 +677,8 @@ let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE
   assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == quad32_xor plain (aes_encrypt_LE alg key (reverse_bytes_quad32 icb_BE)));
   assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == quad32_xor plain (aes_encrypt_BE alg key icb_BE));
   assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == quad32_xor plain encrypted_icb);
-  assert(gctr_encrypt_recursive icb_BE (tail p_seq) alg key 1 == createEmpty);   // OBSERVE
-  //assert(gctr_encrypt_LE icb p alg key == cons (quad32_xor plain encrypted_icb) createEmpty);
+  assert(gctr_encrypt_recursive icb_BE (tail p_seq) alg key 1 == empty);   // OBSERVE
+  //assert(gctr_encrypt_LE icb p alg key == cons (quad32_xor plain encrypted_icb) empty);
   let x = quad32_xor plain encrypted_icb in
   append_empty_r (create 1 x);                 // This is the missing piece
   ()

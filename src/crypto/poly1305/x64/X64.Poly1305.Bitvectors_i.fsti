@@ -14,9 +14,9 @@ val lemma_and_mod_n: x:uint_t 64 -> Lemma (logand #64 x 3 == mod #64 x 4 /\
 				   [SMTPat (logand #64 x 3); 
 				    SMTPat (logand #64 x 15)]
 				    
-val lemma_clear_lower_2: x:uint_t 8 -> 
-  Lemma (logand #8 x 0xfc == mul_mod #8 (udiv #8 x 4) 4)
-  [SMTPat (logand #8 x 0xfc)]
+val lemma_clear_lower_2: x:uint_t 64 -> 
+  Lemma (logand #64 x 0xfffffffffffffffc == mul_mod #64 (udiv #64 x 4) 4)
+  [SMTPat (logand #64 x 0xfffffffffffffffc)]
 val lemma_and_constants: x:uint_t 64 ->
   Lemma (logand #64 x 0 == 0 /\ logand #64 x 0xffffffffffffffff == x)
   [SMTPat (logand #64 x 0); SMTPat (logand #64 x 0xffffffffffffffff)]
@@ -48,10 +48,23 @@ val lemma_bv128_64_64_and: x:bv_t 128 -> x0:bv_t 64 -> x1:bv_t 64 ->
   z:bv_t 128 -> z0:bv_t 64 -> z1:bv_t 64 ->
   Lemma (requires (z0 == bvand #64 x0 y0 /\
 		   z1 == bvand #64 x1 y1 /\
-		   x == bv128_64_64 x1 x0 /\
-		   y == bv128_64_64 y1 y0 /\
-		   z == bv128_64_64 z1 z0))
+		   x == bv128_64_64 x0 x1 /\
+		   y == bv128_64_64 y0 y1 /\
+		   z == bv128_64_64 z0 z1))
 	(ensures (z == bvand #128 x y))
+
+let lowerUpper128u (l:uint_t 64) (u:uint_t 64) : uint_t 128 =
+    0x10000000000000000 `op_Multiply` u + l
+
+val lemma_lowerUpper128_andu : x:uint_t 128 -> x0:uint_t 64 -> x1:uint_t 64 -> y:uint_t 128 -> 
+			    y0:uint_t 64 -> y1:uint_t 64 -> z:uint_t 128 -> z0:uint_t 64 -> 
+			    z1:uint_t 64 -> Lemma
+  (requires z0 == logand #64 x0 y0 /\
+            z1 == logand #64 x1 y1 /\
+            x == lowerUpper128u x0 x1 /\
+            y == lowerUpper128u y0 y1 /\
+            z == lowerUpper128u z0 z1)
+  (ensures z == logand #128 x y)
 
 val lemma_bytes_shift_constants0: unit -> Lemma
     (shift_left #64 0 3 == 0 /\

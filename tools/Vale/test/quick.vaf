@@ -199,7 +199,7 @@ procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
 }
 #reset-options
 
-procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+procedure{:quick}{:exportSpecs} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     modifies
         efl;
         rax;

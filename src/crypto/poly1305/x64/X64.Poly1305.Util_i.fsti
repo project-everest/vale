@@ -5,6 +5,7 @@ open Opaque_s
 open Poly1305.Spec_s
 open X64.Machine_s
 open X64.Poly1305.Math_i
+open X64.Vale.State_i
 open X64.Vale.Decls_i
 open Opaque_s
 open X64.Memory_i
@@ -36,16 +37,6 @@ val reveal_poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:i
   (requires 0 <= k /\ k <= Seq.length s /\ k % 2 == 0)
   (ensures poly1305_heap_blocks h pad r s k = poly1305_heap_blocks' h pad r s k)
 
-val lemma_poly1305_heap_hash_blocks (h:int) (pad:int) (r:int)  (m:mem) (b:buffer64) // { buffer_length b % 2 == 0 }) 
-        (len:nat{ len % 2 == 0 /\ len <= buffer_length b})
-        (k:int{0 <= k /\ k <= buffer_length b /\ k % 2 == 0}) : Lemma
-  (requires True)
-//i <= k && k <= i + len /\
- //           (k - i) % 16 == 0 /\
- //           validSrcAddrs m i  64 ((len + 15) / 16 * 16))
-           // (forall j . i <= j /\ j < i + (len + 15) / 16 * 16 && (j - i) % 8 = 0 ==> m `Map.contains` j))
-  (ensures poly1305_heap_blocks h pad r (buffer64_as_seq m b) k == poly1305_hash_blocks h pad r (heapletTo128 (buffer64_as_seq m b) len) k)
-
 type t_seqTo128 = int -> nat128
 let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
   let f (i:int) : nat128 =
@@ -56,14 +47,22 @@ let seqTo128 (s:Seq.seq nat64) : t_seqTo128 =
       42
   in f
 
-let lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
+let rec lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b:buffer64) (n:int) : Lemma
   (requires 0 <= n /\ n + n <= buffer_length b /\ n + n <= Seq.length (buffer64_as_seq m b))
   (ensures
     ((n + n) % 2) == 0 /\ // REVIEW
     poly1305_heap_blocks h pad r (buffer64_as_seq m b) (n + n) ==
     poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
   =
-  assume False
+  let s = buffer64_as_seq m b in
+  let inp = seqTo128 (buffer64_as_seq m b) in  
+  reveal_poly1305_heap_blocks h pad r s (n + n);
+  if n = 0 then () else (
+    lemma_poly1305_heap_hash_blocks_alt h pad r m b (n-1);
+    reveal_poly1305_heap_blocks h pad r s (n+n-2);
+    Opaque_s.reveal_opaque modp'; 
+    ()
+  )
 
 let rec buffers_readable (h: mem) (l: list buffer64) : GTot Type0 (decreases l) =
 match l with
@@ -72,10 +71,11 @@ match l with
 
 unfold let modifies_buffer (b:buffer64) (h1 h2:mem) = modifies_mem (loc_buffer b) h1 h2
 
-let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) =
+let validSrcAddrs64 (m:mem) (addr:int) (b:buffer64) (len:int) (memTaint:memtaint) (t:taint) =
     buffer_readable m b /\
     len <= buffer_length b /\
-    buffer_addr b m == addr
+    buffer_addr b m == addr /\
+    valid_taint_buf64 b m memTaint t
 
 let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Type0 =
     modifies_buffer b h1 h2 /\

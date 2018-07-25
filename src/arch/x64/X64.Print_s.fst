@@ -5,6 +5,7 @@ module X64.Print_s
 open X64.Machine_s
 open X64.Semantics_s
 open X64.Bytes_Semantics_s
+open X64.Taint_Semantics_s
 open FStar.IO
 
 noeq type printer = {
@@ -136,7 +137,7 @@ let cmp_not(o:ocmp) : ocmp =
 // Sanity check
 let _ = assert (forall o . o == cmp_not (cmp_not o))
 
-let print_ins (ins:ins) (p:printer) =
+let print_ins (ins:tainted_ins) (p:printer) =
   let print_pair (dst src:string) =
     let first, second = p.op_order dst src in
       first ^ ", " ^ second
@@ -166,6 +167,7 @@ let print_ins (ins:ins) (p:printer) =
     let first, second = p.op_order (print_xmm dst p) (print_xmm src p) in
       first ^ ", " ^ second
   in  
+  let ins, _, _ = ins.ops in
   match ins with
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
@@ -226,21 +228,21 @@ let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   | OLt o1 o2 -> print_ops o1 o2 ^ "  jb " ^ "L" ^ string_of_int counter ^ "\n"
   | OGt o1 o2 -> print_ops o1 o2 ^ "  ja " ^ "L" ^ string_of_int counter ^ "\n"
 
-let rec print_block (b:codes) (n:int) (p:printer) : string * int =
+let rec print_block (b:tainted_codes) (n:int) (p:printer) : string * int =
   match b with
   | Nil -> "", n
   | head :: tail ->
     let head_str, n' = print_code head n p in
     let rest, n'' = print_block tail n' p in
     head_str ^ rest, n''
-and print_code (c:code) (n:int) (p:printer) : string * int =
+and print_code (c:tainted_code) (n:int) (p:printer) : string * int =
   match c with
   | Ins ins -> (print_ins ins p ^ "\n", n)
   | Block b -> print_block b n p
   | IfElse cond true_code false_code ->
     let n1 = n in
     let n2 = n + 1 in
-    let cmp = print_cmp (cmp_not cond) n1 p in
+    let cmp = print_cmp (cmp_not cond.o) n1 p in
     let true_str, n' = print_code true_code (n + 2) p in
     let jmp = "  jmp L" ^ string_of_int n2 ^ "\n" in
     let label1 = "L" ^ string_of_int n1 ^ ":\n" in
@@ -254,13 +256,13 @@ and print_code (c:code) (n:int) (p:printer) : string * int =
     let label1 = p.align() ^ " 16\nL" ^ string_of_int n1 ^ ":\n" in
     let body_str, n' = print_code body (n + 2) p in
     let label2 = p.align() ^ " 16\nL" ^ string_of_int n2 ^ ":\n" in
-    let cmp = print_cmp cond n1 p in
+    let cmp = print_cmp cond.o n1 p in
     jmp ^ label1 ^ body_str ^ label2 ^ cmp, n'
 
 let print_header (p:printer) =
   print_string (p.header())
 
-let print_proc (name:string) (code:code) (label:int) (p:printer) : FStar.All.ML int =
+let print_proc (name:string) (code:tainted_code) (label:int) (p:printer) : FStar.All.ML int =
   let proc = p.proc_name name in
   let code_str, final_label = print_code code label p in
   let ret = p.ret name in
