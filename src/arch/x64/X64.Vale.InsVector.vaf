@@ -33,6 +33,27 @@ open X64.Vale.Decls_i
 module S = X64.Bytes_Semantics_s
 module TS = X64.Taint_Semantics_s
 module P = X64.Print_s
+
+
+// Convenient packaging for lemma_valid_taint64 // TODO: Eliminate duplication with the version in InsBasic
+let lemma_valid_taint64_operand (o:va_operand) (s:va_state) : Lemma
+  (requires valid_operand o s)
+  (ensures TMem? o ==> Map.sel s.memTaint (X64.Memory_i.buffer_addr (TMem?.b o) s.mem + 8 `op_Multiply` (TMem?.index o)) == (TMem?.t o))
+  =
+  //admit();
+  if TMem? o then (
+    let open X64.Taint_Semantics_s in
+    let tainted_mem:X64.Memory_i_s.memtaint = (state_to_S s).memTaint in
+    let real_mem:X64.Memory_i_s.mem = s.mem in
+    lemma_valid_taint64 (TMem?.b o)
+                        tainted_mem
+                        real_mem
+                        (TMem?.index o)
+                        (TMem?.t o);
+    ()
+  ) else ()
+
+
 #reset-options "--initial_fuel 2 --max_fuel 4 --max_ifuel 2 --z3rlimit 20"
 #endverbatim
 
@@ -161,7 +182,7 @@ procedure {:quick exportOnly}
     Pinsrd(dst, tmp, index);
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pinsrq(dst, t_op_to_op(src), index), list(), list(t_op_to_op(src))), Public))}{:quick exportOnly}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pinsrq(dst, t_op_to_op(src), index), list(), list(t_op_to_op(src))), get_taint(src)))}{:quick exportOnly}
           Pinsrq(inout dst:xmm, src:opr64, inline index:imm8)
     requires
         index < 2;
