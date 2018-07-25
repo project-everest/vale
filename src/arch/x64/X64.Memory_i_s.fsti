@@ -339,23 +339,23 @@ val equiv_load_mem128: ptr:int -> s:state -> Lemma
 open Types_s
 open Words_s
 
+val valid128_64 (ptr:int) (s:state) : Lemma
+  (requires valid_mem128 ptr s.mem)
+  (ensures valid_mem64 ptr s.mem /\ valid_mem64 (ptr+8) s.mem)
+
 val load128_64 (ptr:int) (s:state) : Lemma
   (requires valid_mem128 ptr s.mem)
   (ensures
     (let v = load_mem128 ptr s.mem in
      let v_lo = load_mem64 ptr s.mem in
      let v_hi = load_mem64 (ptr+8) s.mem in
-     v.lo0 + 0x10000 `op_Multiply` v.lo1 == v_lo /\
-     v.hi2 + 0x10000 `op_Multiply` v.hi3 == v_hi))
-
-val valid128_64 (ptr:int) (s:state) : Lemma
-  (requires valid_mem128 ptr s.mem)
-  (ensures valid_mem64 ptr s.mem /\ valid_mem64 (ptr+8) s.mem)
+     v.lo0 + 0x100000000 `op_Multiply` v.lo1 == v_lo /\
+     v.hi2 + 0x100000000 `op_Multiply` v.hi3 == v_hi))
 
 val store128_64 (ptr:int) (v:quad32) (s:state) : Lemma
   (requires valid_mem128 ptr s.mem)
-  (ensures store_mem128 ptr v s.mem == store_mem64 ptr (v.lo0 + 0x10000 `op_Multiply` v.lo1)
-    (store_mem64 (ptr+8) (v.hi2 + 0x10000 `op_Multiply` v.hi3) s.mem))
+  (ensures store_mem128 ptr v s.mem == store_mem64 ptr (v.lo0 + 0x100000000 `op_Multiply` v.lo1)
+    (store_mem64 (ptr+8) (v.hi2 + 0x100000000 `op_Multiply` v.hi3) s.mem))
 
 //Memtaint related functions
 

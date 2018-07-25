@@ -293,10 +293,10 @@ val load64_128_eq (ptr1 ptr2:int) (s1 s2:traceState) : Lemma
           load_mem128 ptr1 s1.state.mem == load_mem128 ptr2 s2.state.mem)
 
 val nat32_64_inj (v1 v2:nat32) (v:nat64) : Lemma
-  (requires v1 + 0x10000 `op_Multiply` v2 == v)
-  (ensures forall (v3 v4:nat32). v3 + 0x10000 `op_Multiply` v4 == v ==> v1 == v3 /\ v2 == v4)
+  (requires v1 + 0x100000000 `op_Multiply` v2 == v)
+  (ensures forall (v3 v4:nat32). v3 + 0x100000000 `op_Multiply` v4 == v ==> v1 == v3 /\ v2 == v4)
 
-let nat32_64_inj v1 v2 v = admit()
+let nat32_64_inj v1 v2 v = ()
 
 let load64_128_eq ptr1 ptr2 s1 s2 =
   let v_lo1 = load_mem64 ptr1 s1.state.mem in
@@ -328,10 +328,10 @@ let lemma_if_movdqu_leakage_free_aux ins ts s1 s2 fuel =
       else
       let v1 = eval_xmm x s1.state in
       let v2 = eval_xmm x s2.state in
-      let v1_1 = v1.lo0 + 0x10000 `op_Multiply` v1.lo1 in
-      let v1_2 = v1.hi2 + 0x10000 `op_Multiply` v1.hi3 in
-      let v2_1 = v2.lo0 + 0x10000 `op_Multiply` v2.lo1 in
-      let v2_2 = v2.hi2 + 0x10000 `op_Multiply` v2.hi3 in
+      let v1_1 = v1.lo0 + 0x100000000 `op_Multiply` v1.lo1 in
+      let v1_2 = v1.hi2 + 0x100000000 `op_Multiply` v1.hi3 in
+      let v2_1 = v2.lo0 + 0x100000000 `op_Multiply` v2.lo1 in
+      let v2_2 = v2.hi2 + 0x100000000 `op_Multiply` v2.hi3 in
       store128_64 ptr1 v1 s1.state;
       store128_64 ptr2 v2 s2.state;
       valid128_64 ptr1 s1.state;

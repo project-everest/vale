@@ -1311,10 +1311,6 @@ let equiv_load_mem128 ptr s =
   lemma_load_mem128 b i h;
   ()
 
-// #reset-options "--initial_fuel 2 --max_fuel 2 --initial_ifuel 1 --max_ifuel 1 --z3rlimit 50 --z3cliopt smt.arith.nl=true --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr native"
-
-let load128_64 ptr s = admit()
-
 let valid128_64 ptr s =
   let h = s.mem in
   let b = get_addr_ptr (TBase TUInt128) ptr h h.ptrs in
@@ -1329,9 +1325,13 @@ let valid128_64 ptr s =
   FStar.Math.Lemmas.distributivity_add_right 8 (2 `op_Multiply` i) 1;
   FStar.Math.Lemmas.paren_add_right (h.addrs b) (8 `op_Multiply` (2 `op_Multiply` i)) 8
 
-let store128_64 ptr v s = admit()
+let load128_64 ptr s =
+  let v = load_mem128 ptr s.mem in
+  let v_lo = load_mem64 ptr s.mem in
+  let v_hi = load_mem64 (ptr+8) s.mem in
+  admit()
 
-#reset-options "--initial_fuel 2 --max_fuel 2 --initial_ifuel 1 --max_ifuel 1 --z3rlimit 50"
+let store128_64 ptr v s = admit()
 
 open X64.Machine_s
 
