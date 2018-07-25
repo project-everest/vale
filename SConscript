@@ -144,7 +144,8 @@ verify_options = {
 
   # Needed to significantly speed up verification of interop files (and use the checked Memory_i_s.fst with expose_interfaces)
   'src/arch/x64/Views.fst': BuildOptions(fstar_default_args + ' --expose_interfaces SecretByte.fst'),
-  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
+  # TODO: Why doesn't it work from command-line?
+  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst' + ' --admit_smt_queries true'),
 
   'obj/lib/collections/Collections.Lists_i.fst': BuildOptions(fstar_default_args.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
   'src/crypto/poly1305/x64/X64.Poly1305.Util_i.fst': BuildOptions(fstar_default_args_nosmtencoding),

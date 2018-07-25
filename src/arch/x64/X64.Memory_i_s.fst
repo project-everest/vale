@@ -189,7 +189,10 @@ val index128_get_heap_val128 (h:mem)
     (S.get_heap_val32 (addr + 16 `op_Multiply` i +12) heap)
  )
 
-#set-options "--z3rlimit 50 --max_fuel 6 --initial_fuel 6"
+#reset-options "--z3rlimit 50 --max_fuel 8 --initial_fuel 8"
+
+open Words.Four_s
+open Words.Seq_s
 
 let index128_get_heap_val128_aux (s:Seq.lseq UInt8.t 16) (ptr:int) (heap:S.heap) : Lemma
   (requires (forall (j:nat) . j < 16 ==> UInt8.v (Seq.index s j) == heap.[ptr+j]))
@@ -201,6 +204,10 @@ let index128_get_heap_val128_aux (s:Seq.lseq UInt8.t 16) (ptr:int) (heap:S.heap)
   Opaque_s.reveal_opaque S.get_heap_val32_def;
   Opaque_s.reveal_opaque Views.get128_def;
   Opaque_s.reveal_opaque Types_s.le_bytes_to_quad32_def;
+  assert (S.get_heap_val32 ptr heap == four_to_nat 8 (Seq.index (seq_to_seq_four_LE (Views.seq_U8_to_seq_nat8 s)) 0) );
+  assert (S.get_heap_val32 (ptr+4) heap == four_to_nat 8 (Seq.index (seq_to_seq_four_LE (Views.seq_U8_to_seq_nat8 s)) 1) );
+  assert (S.get_heap_val32 (ptr+8) heap == four_to_nat 8 (Seq.index (seq_to_seq_four_LE (Views.seq_U8_to_seq_nat8 s)) 2) );  
+  assert (S.get_heap_val32 (ptr+12) heap == four_to_nat 8 (Seq.index (seq_to_seq_four_LE (Views.seq_U8_to_seq_nat8 s)) 3) );
   ()
 
 let index128_get_heap_val128 h b heap i =

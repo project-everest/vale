@@ -1,18 +1,14 @@
 module X64.Bytes_Semantics_i
 open Opaque_s
 open Views
+open Words_s
+open Words.Four_s
 
-#reset-options "--z3rlimit 100 --max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
+#reset-options "--z3rlimit 100 --max_fuel 2 --initial_fuel 2 --max_ifuel 2 --initial_ifuel 1"
 
-let nat32_to_nat8s (n:nat32) : nat8*nat8*nat8*nat8 =
-  let v1 = n % 0x100 in
-  let n = n / 0x100 in
-  let v2 = n % 0x100 in
-  let n = n / 0x100 in
-  let v3 = n % 0x100 in
-  let n = n / 0x100 in
-  let v4 = n % 0x100 in
-  (v1, v2, v3, v4)
+let nat32_to_nat8s (n:nat32) : nat8*nat8*nat8*nat8 = 
+  let f = nat_to_four 8 n in
+  f.lo0, f.lo1, f.hi2, f.hi3
 
 #reset-options "--z3rlimit 20"
 let nat32_to_nat8s_to_nat32 (v1 v2 v3 v4:nat8) : 
@@ -204,7 +200,7 @@ let correct_update_get128 ptr v s =
   frame_update_heap32 (ptr+12) v.hi3 mem3;
   correct_update_get32 (ptr+12) v.hi3 mem3
 
-#reset-options "--max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
+#reset-options "--max_fuel 2 --initial_fuel 2 --max_ifuel 2 --initial_ifuel 1"
 
 let same_domain_update128 ptr v mem =
   let memf = update_heap128 ptr v mem in
