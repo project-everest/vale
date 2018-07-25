@@ -60,12 +60,28 @@ let extract_taint3 (o1 o2 o3:tainted_operand) : taint =
   else if TMem? o3 then TMem?.t o3
   else Public  
 
+noeq
+type tainted_ocmp =
+  | OEq: o1:tainted_operand -> o2:tainted_operand -> tainted_ocmp
+  | ONe: o1:tainted_operand -> o2:tainted_operand -> tainted_ocmp
+  | OLe: o1:tainted_operand -> o2:tainted_operand -> tainted_ocmp
+  | OGe: o1:tainted_operand -> o2:tainted_operand -> tainted_ocmp
+  | OLt: o1:tainted_operand -> o2:tainted_operand -> tainted_ocmp
+  | OGt: o1:tainted_operand -> o2:tainted_operand -> tainted_ocmp
+
+let get_fst_ocmp (o:tainted_ocmp) = match o with
+  | OEq o1 _ | ONe o1 _ | OLe o1 _ | OGe o1 _ | OLt o1 _ | OGt o1 _ -> o1
+
+let get_snd_ocmp (o:tainted_ocmp) = match o with
+  | OEq _ o2 | ONe _ o2 | OLe _ o2 | OGe _ o2 | OLt _ o2 | OGt _ o2 -> o2
+
 (* Type aliases *)
 unfold let va_bool = bool
 unfold let va_prop = Type0
 unfold let va_int = int
 val ins : Type0
-val ocmp : Type0
+
+unfold let ocmp = tainted_ocmp
 unfold let va_code = precode ins ocmp
 unfold let va_codes = list va_code
 let va_tl (cs:va_codes) : Ghost va_codes (requires Cons? cs) (ensures fun tl -> tl == Cons?.tl cs) = Cons?.tl cs
@@ -401,10 +417,19 @@ let va_require_total (c0:va_code) (c1:va_code) (s0:va_state) : Type0 =
 let va_ensure_total (c0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type0 =
   eval_code c0 s0 f1 s1
 
+// There can only be one!
+let max_one_mem (o1 o2:va_operand) : bool =
+  (if TMem? o1 then not (TMem? o2) else false) &&
+  (if TMem? o2 then not (TMem? o1) else false)
+  
+let valid_ocmp (c:ocmp) (s:va_state) : GTot Type0 =
+  let fst = get_fst_ocmp c in
+  let snd = get_snd_ocmp c in
+  max_one_mem fst snd /\
+  valid_operand fst s /\ valid_operand snd s
+
 val eval_ocmp : s:va_state -> c:ocmp -> GTot bool
 unfold let va_evalCond (b:ocmp) (s:va_state) : GTot bool = eval_ocmp s b
-
-val valid_ocmp : c:ocmp -> s:va_state -> GTot bool
 
 val lemma_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
   (requires True)

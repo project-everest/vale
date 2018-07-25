@@ -21,21 +21,21 @@ let overflow = Lemmas_i.overflow
 let update_cf = Lemmas_i.update_cf
 let update_of = Lemmas_i.update_of
 let ins = TS.tainted_ins
-type ocmp = TS.tainted_ocmp
+//type ocmp = TS.tainted_ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
-let va_cmp_eq o1 o2 = TS.TaintedOCmp (BS.OEq (t_op_to_op o1) (t_op_to_op o2)) Public
-let va_cmp_ne o1 o2 = TS.TaintedOCmp (BS.ONe (t_op_to_op o1) (t_op_to_op o2)) Public
-let va_cmp_le o1 o2 = TS.TaintedOCmp (BS.OLe (t_op_to_op o1) (t_op_to_op o2)) Public
-let va_cmp_ge o1 o2 = TS.TaintedOCmp (BS.OGe (t_op_to_op o1) (t_op_to_op o2)) Public
-let va_cmp_lt o1 o2 = TS.TaintedOCmp (BS.OLt (t_op_to_op o1) (t_op_to_op o2)) Public
-let va_cmp_gt o1 o2 = TS.TaintedOCmp (BS.OGt (t_op_to_op o1) (t_op_to_op o2)) Public
+let va_cmp_eq o1 o2 = OEq o1 o2
+let va_cmp_ne o1 o2 = ONe o1 o2
+let va_cmp_le o1 o2 = OLe o1 o2
+let va_cmp_ge o1 o2 = OGe o1 o2
+let va_cmp_lt o1 o2 = OLt o1 o2
+let va_cmp_gt o1 o2 = OGt o1 o2
 
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv
 let eval_ocmp = Lemmas_i.eval_ocmp
-let valid_ocmp = Lemmas_i.valid_ocmp
+//let valid_ocmp = Lemmas_i.valid_ocmp
 
 unfold let va_eval_ins = Lemmas_i.eval_ins
 
