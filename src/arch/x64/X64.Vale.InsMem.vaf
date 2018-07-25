@@ -27,12 +27,12 @@ module P = X64.Print_s
 
 #reset-options "--initial_fuel 2 --max_fuel 4 --max_ifuel 2 --z3rlimit 20"
 
-procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int) returns(o:opr)
+procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int, inline t:taint) returns(o:opr)
     reads
         mem;
     extern;
 
-
+/*
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Add64Wrap_Mem(
     inout dst:dst_opr64,
     src:reg_opr64,
@@ -86,6 +86,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_re
     lemma_load_mem64(b, index, mem);
     lemma_valid_taint64(b, memTaint, mem, index, t);    
 }
+*/
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(src), offset))), list(dst), list(OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
     out dst: dst_opr64,
