@@ -45,7 +45,7 @@ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [in_b;has
     | R9 -> num_bytes
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) in_b;
   length_t_eq (TBase TUInt128) hash_b;
@@ -70,7 +70,7 @@ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [in_b;has
     | R9 -> num_bytes
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in  
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in  
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) in_b;
   length_t_eq (TBase TUInt128) hash_b;
@@ -125,7 +125,7 @@ let ghost_ghash_incremental_extra_stdcall_win in_b hash_b h_b num_bytes orig_has
     | R9 -> num_bytes
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) in_b;
   length_t_eq (TBase TUInt128) hash_b;

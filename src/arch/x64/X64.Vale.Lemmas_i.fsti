@@ -16,8 +16,16 @@ let overflow (flags:int) : bool = S.overflow (int_to_nat64 flags)
 let update_cf (flags:int) (new_cf:bool) = S.update_cf (int_to_nat64 flags) new_cf
 let update_of (flags:int) (new_of:bool) = S.update_of (int_to_nat64 flags) new_of
 
+let state_eq_S (s1 s2:TS.traceState) =
+  s1 == {s2 with TS.trace = s1.TS.trace}
+
+let state_eq_opt (s1 s2:option TS.traceState) =
+  match (s1, s2) with
+  | (Some s1, Some s2) -> state_eq_S s1 s2
+  | _ -> s1 == s2
+
 let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : Type0 =
-  Some (state_to_S s1) == TS.taint_eval_code c f0 (state_to_S s0)
+  state_eq_opt (TS.taint_eval_code c f0 (state_to_S s0)) (Some (state_to_S s1))
 
 let eval_ins (c:code) (s0:state) : Ghost ((sM:state) * (f0:fuel))
   (requires Ins? c)
@@ -109,14 +117,14 @@ val lemma_ifElse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) : Ghost (bool *
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
-    sM == {s0 with trace=BranchPredicate(cond)::s0.trace}
+    sM == s0
   ))
 
 val lemma_ifElseTrue_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) (sM:state) : Lemma
   (requires
     valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
-    eval_code ct ({s0 with trace=BranchPredicate(true)::s0.trace}) f0 sM
+    eval_code ct s0 f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -126,7 +134,7 @@ val lemma_ifElseFalse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) 
   (requires
     valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
-    eval_code cf ({s0 with trace=BranchPredicate(false)::s0.trace}) f0 sM
+    eval_code cf s0 f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -143,7 +151,7 @@ val lemma_while_total (b:ocmp) (c:code) (s0:state) : Ghost ((s1:state) * (f1:fue
 
 val lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Ghost ((s1:state) * (f1:fuel))
   (requires eval_ocmp sW b)
-  (ensures fun (s1, f1) -> s1 == {sW with trace=BranchPredicate(true)::sW.trace} /\ f1 == fW)
+  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
 val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Ghost ((s1:state) * (f1:fuel))
   (requires
@@ -152,7 +160,7 @@ val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : G
     eval_while_inv (While b c) s0 fW sW
   )
   (ensures fun (s1, f1) ->
-    s1 == {sW with trace=BranchPredicate(false)::sW.trace} /\
+    s1 == sW /\
     eval_code (While b c) s0 f1 s1
   )
 
@@ -163,7 +171,7 @@ val lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (s
     valid_ocmp (While?.whileCond c) sM /\
     eval_ocmp sM (While?.whileCond c) /\
     eval_while_inv c s0 f0 sM /\
-    eval_code (While?.whileBody c) ({sM with trace=BranchPredicate(true)::sM.trace}) fM sN
+    eval_code (While?.whileBody c) sM fM sN
   )
   (ensures (fun fN ->
     eval_while_inv c s0 fN sN

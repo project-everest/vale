@@ -11,7 +11,6 @@ noeq type state = {
   xmms: Xmms_i.t;
   flags: nat64;
   mem: mem;
-  trace: list observation;
   memTaint: memtaint;
 }
 
@@ -96,5 +95,4 @@ let state_eq (s0:state) (s1:state) : Type0 =
   Xmms_i.equal s0.xmms s1.xmms /\
   s0.flags == s1.flags /\
   s0.mem == s1.mem /\
-  // s0.trace == s1.trace /\ // Functional verification doesn't care about the state of the trace, so let it float
   s0.memTaint == s1.memTaint

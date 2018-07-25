@@ -74,7 +74,7 @@ procedure {:quick} gcm_one_pass_blocks(
         r8; in_ptr; out_ptr; len; mask; h; memTaint;
 
     modifies
-        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl; trace;
+        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -201,7 +201,7 @@ procedure {:quick} gcm_one_pass(
         r8; out_ptr; mask; h; memTaint;
 
     modifies
-        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl; trace;
+        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -318,7 +318,7 @@ procedure {:quick} gcm_core_part1(
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
-        mem; efl; trace; 
+        mem; efl; 
 
 
     requires
@@ -479,7 +479,7 @@ procedure {:quick} gcm_core(
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
-        mem; efl; trace; 
+        mem; efl; 
 
 
     requires
@@ -575,7 +575,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner_inner(
     reads memTaint; 
     modifies
         rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; trace; 
+        mem; efl; 
     lets
         args_ptr := r9;
 
@@ -685,7 +685,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     reads memTaint; 
     modifies
         rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; trace; 
+        mem; efl; 
     lets
         args_ptr := r9;
 
@@ -788,7 +788,7 @@ procedure {:quick} gcm_decrypt_stdcall(
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
         rbp; rdi; rsi; 
-        mem; efl; trace; rsp;
+        mem; efl; rsp;
     lets
         args_ptr := if win then rcx else rdi;
 

@@ -55,7 +55,7 @@ let vale_post (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm)
     (modifies_mem (loc_buffer output_buffer) (va_get_mem va_s0) (va_get_mem va_sM)) /\
     (validSrcAddrs128 (va_get_mem va_sM) output_ptr output_buffer 1 (va_get_memTaint va_sM) Secret)
     /\ (buffer128_read output_buffer 0 (va_get_mem va_sM)) == (aes_encrypt_BE alg key input)) /\
-    (va_state_eq va_sM (va_update_trace va_sM (va_update_flags va_sM (va_update_xmm 2 va_sM
+    (va_state_eq va_sM ((va_update_flags va_sM (va_update_xmm 2 va_sM
     (va_update_xmm 0 va_sM (va_update_mem va_sM (va_update_reg Rax va_sM (va_update_reg R8 va_sM
     (va_update_ok va_sM va_s0))))))))))
     

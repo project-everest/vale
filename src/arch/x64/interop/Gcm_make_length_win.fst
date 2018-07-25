@@ -40,7 +40,7 @@ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b] /\ ( 
     | R8 -> addr_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) b;
   va_pre (va_code_gcm_make_length_quad_buffer_win ()) s0 stack_b plain_num_bytes auth_num_bytes b ))) =
@@ -76,7 +76,7 @@ let ghost_gcm_make_length_quad_buffer_win plain_num_bytes auth_num_bytes b stack
     | R8 -> addr_b
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) b;
   implies_pre h0 plain_num_bytes auth_num_bytes b stack_b ;

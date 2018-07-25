@@ -222,7 +222,7 @@ procedure{:quick} poly1305_blocks(
         rax; r15;
         efl;
         mem;
-        trace;
+       
     requires
         // Len is measured in bytes
         len % 16 == 0; // REVIEW: may be stronger than necessary
@@ -375,7 +375,7 @@ procedure{:quick} poly1305_last_block()
     reads
         r0; s1; nExtra;
     modifies
-        rax; rcx; rdx; r8; r9; r10; h0; h1; h2; efl; trace;
+        rax; rcx; rdx; r8; r9; r10; h0; h1; h2; efl;
     requires
         h2 < 5;
         r0 < n / 16;
@@ -543,7 +543,7 @@ procedure{:quick} poly1305_impl(
         rax; rcx; rdx; rdi; rsi; rbx; rbp; r8; r9; r10; r11; r12; r13; r14; r15;
         efl;
         mem;
-        trace;
+       
     requires
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
@@ -672,7 +672,7 @@ procedure{:quick} poly1305(
         p := n * n * 4 - 5;
     reads memTaint;
     modifies
-        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem; trace;
+        rax; rcx; r8; r9; r10; r13; r15; ctx; inp; len; r0; r1; h0; h1; h2; efl; mem;
     requires
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx_in, ctx_b, 24, memTaint, Public);

@@ -45,7 +45,7 @@ B.length stack_b == 40 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
     | R9 -> offset
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) mask_b;
@@ -70,7 +70,7 @@ B.length stack_b == 40 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
     | R9 -> offset
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in  
+  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in  
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) mask_b;
@@ -130,7 +130,7 @@ let ghost_gcm_load_xor_store_buffer_win plain_b mask_b cipher_b offset num_block
     | R9 -> offset
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) mask_b;

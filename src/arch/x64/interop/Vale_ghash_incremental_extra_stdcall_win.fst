@@ -70,7 +70,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     (slice_work_around (le_seq_quad32_to_bytes (buffer128_as_seq (va_get_mem va_sM) in_b))
     num_bytes) in let padded_bytes = (pad_to_128_bits input_bytes) in let input_quads =
     (le_bytes_to_seq_quad32 padded_bytes) in (l_and ((Seq.length input_quads) > 0) (new_hash ==
-    (ghash_incremental h_val orig_hash input_quads)))) /\ (va_state_eq va_sM (va_update_trace va_sM
+    (ghash_incremental h_val orig_hash input_quads)))) /\ (va_state_eq va_sM (
     (va_update_mem va_sM (va_update_flags va_sM (va_update_xmm 15 va_sM (va_update_xmm 14 va_sM
     (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM (va_update_xmm 11 va_sM (va_update_xmm 10 va_sM
     (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM (va_update_xmm 7 va_sM (va_update_xmm 6 va_sM

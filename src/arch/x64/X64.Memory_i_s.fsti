@@ -336,6 +336,27 @@ val equiv_load_mem128: ptr:int -> s:state -> Lemma
   (requires valid_mem128 ptr s.mem)
   (ensures load_mem128 ptr s.mem == S.eval_mem128 ptr s.state)
 
+open Types_s
+open Words_s
+
+val load128_64 (ptr:int) (s:state) : Lemma
+  (requires valid_mem128 ptr s.mem)
+  (ensures
+    (let v = load_mem128 ptr s.mem in
+     let v_lo = load_mem64 ptr s.mem in
+     let v_hi = load_mem64 (ptr+8) s.mem in
+     v.lo0 + 0x10000 `op_Multiply` v.lo1 == v_lo /\
+     v.hi2 + 0x10000 `op_Multiply` v.hi3 == v_hi))
+
+val valid128_64 (ptr:int) (s:state) : Lemma
+  (requires valid_mem128 ptr s.mem)
+  (ensures valid_mem64 ptr s.mem /\ valid_mem64 (ptr+8) s.mem)
+
+val store128_64 (ptr:int) (v:quad32) (s:state) : Lemma
+  (requires valid_mem128 ptr s.mem)
+  (ensures store_mem128 ptr v s.mem == store_mem64 ptr (v.lo0 + 0x10000 `op_Multiply` v.lo1)
+    (store_mem64 (ptr+8) (v.hi2 + 0x10000 `op_Multiply` v.hi3) s.mem))
+
 //Memtaint related functions
 
 type memtaint = memTaint_t
@@ -357,7 +378,7 @@ val lemma_valid_taint128: (b:buffer128) ->
 			 (i:nat{i < buffer_length b}) ->
 			 (t:taint) -> Lemma
   (requires valid_taint_buf128 b mem memTaint t /\ buffer_readable mem b)
-  (ensures Map.sel memTaint (buffer_addr b mem + 16 `op_Multiply` i) == t)
+  (ensures Map.sel memTaint (buffer_addr b mem + 16 `op_Multiply` i) == t /\ Map.sel memTaint (buffer_addr b mem + 16 `op_Multiply` i + 8) == t)
 
 val same_memTaint64: (b:buffer64) -> 
                    (mem0:mem) ->
@@ -390,3 +411,4 @@ val modifies_valid_taint128 (b:buffer128) (p:loc) (h h':mem) (memTaint:memtaint)
   )
   (ensures valid_taint_buf128 b h memTaint t <==> valid_taint_buf128 b h' memTaint t)
   [SMTPat (modifies p h h'); SMTPat (valid_taint_buf128 b h' memTaint t)]
+

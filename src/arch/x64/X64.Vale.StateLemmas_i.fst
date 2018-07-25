@@ -19,7 +19,7 @@ let state_to_S (s:state) : GTot TS.traceState =
     BS.mem = ME.get_heap s.mem
   } in
   { ME.state = s'; ME.mem = s.mem});
-  TS.trace = s.trace;
+  TS.trace = [];
   TS.memTaint = s.memTaint;
   }
 
@@ -32,7 +32,6 @@ let state_of_S (s:TS.traceState) : GTot state =
     xmms = (fun x -> xmms x);
     flags = flags;
     mem = mem;
-    trace = s.TS.trace;
     memTaint = s.TS.memTaint;
   }
 
@@ -66,13 +65,6 @@ let lemma_to_of s =
 
 let lemma_valid_taint64 = ME.lemma_valid_taint64
 let lemma_valid_taint128  = ME.lemma_valid_taint128
-
-let modify_trace s0 b =
-  let s1 = {s0 with trace = BranchPredicate(b)::s0.trace} in
-  let s0' = state_to_S s0 in
-  let s1' = state_to_S s1 in
-  assert (FunctionalExtensionality.feq s0'.TS.state.ME.state.BS.regs s1'.TS.state.ME.state.BS.regs);
-  assert (FunctionalExtensionality.feq s0'.TS.state.ME.state.BS.xmms s1'.TS.state.ME.state.BS.xmms)  
 
 let same_memTaint64 = ME.same_memTaint64
 let same_memTaint128 = ME.same_memTaint128

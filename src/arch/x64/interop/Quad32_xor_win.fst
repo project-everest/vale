@@ -44,7 +44,7 @@ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src
     | R8 -> addr_dst
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) src1;
   length_t_eq (TBase TUInt128) src2;
@@ -96,7 +96,7 @@ let ghost_quad32_xor_buffer_win src1 src2 dst stack_b h0 =
     | R8 -> addr_dst
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; trace = []; memTaint = create_valid_memtaint mem buffers taint_func} in
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) src1;
   length_t_eq (TBase TUInt128) src2;

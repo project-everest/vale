@@ -36,7 +36,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     (va_get_xmm 15 va_sM) == (va_get_xmm 15 va_s0) /\ (modifies_buffer128 b (va_get_mem va_s0)
     (va_get_mem va_sM)) /\ (let old_b = (buffer128_read b 0 (va_get_mem va_s0)) in let new_b =
     (buffer128_read b 0 (va_get_mem va_sM)) in new_b == (Mkfour 1 old_b.lo1 old_b.hi2 old_b.hi3))
-    /\ (va_state_eq va_sM (va_update_trace va_sM (va_update_mem va_sM (va_update_flags va_sM
+    /\ (va_state_eq va_sM ((va_update_mem va_sM (va_update_flags va_sM
     (va_update_xmm 15 va_sM (va_update_xmm 14 va_sM (va_update_xmm 13 va_sM (va_update_xmm 12 va_sM
     (va_update_xmm 11 va_sM (va_update_xmm 10 va_sM (va_update_xmm 9 va_sM (va_update_xmm 8 va_sM
     (va_update_xmm 7 va_sM (va_update_xmm 6 va_sM (va_update_xmm 5 va_sM (va_update_xmm 4 va_sM

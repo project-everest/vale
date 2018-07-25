@@ -1311,6 +1311,28 @@ let equiv_load_mem128 ptr s =
   lemma_load_mem128 b i h;
   ()
 
+// #reset-options "--initial_fuel 2 --max_fuel 2 --initial_ifuel 1 --max_ifuel 1 --z3rlimit 50 --z3cliopt smt.arith.nl=true --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr native"
+
+let load128_64 ptr s = admit()
+
+let valid128_64 ptr s =
+  let h = s.mem in
+  let b = get_addr_ptr (TBase TUInt128) ptr h h.ptrs in
+  let i = get_addr_in_ptr (TBase TUInt128) (buffer_length b) (buffer_addr b h) ptr 0 in
+  let b:b8 = b in
+  length_t_eq (TBase TUInt128) b;
+  Math.Lemmas.Int_i.mod_mult_exact (B.length b) 8 2;
+  length_t_eq (TBase TUInt64) b;
+  lemma_valid_mem64 b (2 `op_Multiply` i) h;
+  lemma_valid_mem64 b (2 `op_Multiply` i + 1) h;
+  FStar.Math.Lemmas.paren_mul_right 8 2 i;
+  FStar.Math.Lemmas.distributivity_add_right 8 (2 `op_Multiply` i) 1;
+  FStar.Math.Lemmas.paren_add_right (h.addrs b) (8 `op_Multiply` (2 `op_Multiply` i)) 8
+
+let store128_64 ptr v s = admit()
+
+#reset-options "--initial_fuel 2 --max_fuel 2 --initial_ifuel 1 --max_ifuel 1 --z3rlimit 50"
+
 open X64.Machine_s
 
 let valid_taint_buf (b:b8) (mem:mem) (memTaint:memtaint) t =
@@ -1327,6 +1349,7 @@ let lemma_valid_taint64 b memTaint mem i t =
 
 let lemma_valid_taint128 b memTaint mem i t =
   length_t_eq (TBase TUInt128) b;
+  assert (memTaint.[(buffer_addr b mem + (16 `op_Multiply` i + 8))] == t);
   ()
 
 let same_memTaint (t:typ) (b:buffer t) (mem0 mem1:mem) (memT0 memT1:memtaint) : Lemma

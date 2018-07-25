@@ -39,7 +39,7 @@ procedure{:quick} KeyExpansionRound(
     reads
         rdx; memTaint;
     modifies
-        mem; xmm1; xmm2; xmm3; efl; trace;
+        mem; xmm1; xmm2; xmm3; efl;
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 11, memTaint, Secret);
     requires
@@ -74,7 +74,7 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
     reads
         rdx; memTaint;
     modifies
-        mem; xmm1; xmm2; xmm3; efl; trace;
+        mem; xmm1; xmm2; xmm3; efl;
     requires/ensures
         validDstAddrs128(mem, rdx, dst, 11, memTaint, Secret);
     requires
@@ -103,7 +103,7 @@ procedure{:quick} KeyExpansion128Stdcall(
         rcx; rsi; rdi; memTaint;
     modifies
         rdx;
-        mem; xmm1; xmm2; xmm3; efl; trace;
+        mem; xmm1; xmm2; xmm3; efl;
     lets
         key_ptr := if win then rcx else rdi;
         key_expansion_ptr := if win then rdx else rsi;
@@ -151,7 +151,7 @@ procedure{:quick} AES128EncryptRound(
     reads
         r8; mem; memTaint;
     modifies
-        xmm0; xmm2; efl; trace;
+        xmm0; xmm2; efl;
     requires
         1 <= n < 10 <= length(round_keys);
         xmm0 == rounds(init, round_keys, n - 1);
@@ -175,7 +175,7 @@ procedure{:quick} AES128EncryptBlock(
     reads
         r8; mem; memTaint;
     modifies
-        xmm0; xmm2; efl; trace;
+        xmm0; xmm2; efl;
     requires
         length(round_keys) == 11;
         round_keys == key_to_round_keys_LE(AES_128, key);
@@ -220,7 +220,7 @@ procedure{:quick} AES128EncryptBlockStdcall(
         rcx; rdx; rsi; rdi; memTaint;
     modifies
         r8;
-        mem; xmm0; xmm2; efl; trace;
+        mem; xmm0; xmm2; efl;
     lets
         output_ptr := if win then rcx else rdi;
         input_ptr := if win then rdx else rsi;

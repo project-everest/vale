@@ -70,7 +70,7 @@ procedure {:quick} gcm_one_pass_blocks(
         r8; in_ptr; out_ptr; len; mask; h; memTaint;
 
     modifies
-        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl; trace;
+        rdx; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -200,7 +200,7 @@ procedure {:quick} gcm_one_pass(
         r8; out_ptr; mask; h; memTaint;
 
     modifies
-        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl; trace;
+        in_ptr; num_bytes; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; icb; one; mem; efl;
 
     requires
         // GCTR reqs
@@ -313,7 +313,7 @@ procedure {:quick} gcm_core_part1(
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
-        mem; efl; trace; 
+        mem; efl; 
 
 
     requires
@@ -481,7 +481,7 @@ procedure {:quick} gcm_make_length_quad_buffer(
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; trace; mem;
+        efl; mem;
 {
         // Save r13
         Mov64(rcx, r13);
@@ -554,7 +554,7 @@ procedure {:quick} gcm_make_length_quad_buffer_win(ghost stack_b:buffer64, ghost
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        efl; mem; trace;
+        efl; mem;
 {
 
         InitPshufbMask(xmm0, rax);
@@ -598,7 +598,7 @@ procedure {:quick} gcm_core(
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
         xmm6; 
-        mem; efl; trace; 
+        mem; efl; 
 
 
     requires
@@ -694,7 +694,7 @@ procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
     reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; xmm6; xmm7; xmm8; xmm10; xmm11; memTaint;
-    modifies mem; rsp; rax; trace;
+    modifies mem; rsp; rax;
     ensures
         modifies_buffer(stack_b, old(mem), mem);
         forall i :: (if win then 18 else 8) <= i < buffer_length(stack_b) ==> buffer64_read(stack_b, i, mem) == old(buffer64_read(stack_b, i, mem));
@@ -764,7 +764,7 @@ procedure {:quick} callee_restore_registers(
     reads mem; memTaint; 
     modifies  
         rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
-        xmm6; xmm7; xmm8; xmm10; xmm11; trace;
+        xmm6; xmm7; xmm8; xmm10; xmm11;
         rsp;
     ensures
         rbx == buffer64_read(stack_b, 0, mem);
@@ -822,7 +822,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
     reads memTaint; 
     modifies
         rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; trace; 
+        mem; efl; 
     lets
         args_ptr := r9;
 
@@ -928,7 +928,7 @@ procedure {:quick} gcm_encrypt_stdcall(
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
         rbp; rdi; rsi; 
-        mem; efl; trace; rsp;
+        mem; efl; rsp;
     lets
         args_ptr := if win then rcx else rdi;
 
@@ -1069,7 +1069,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
         rbp; rdi; rsi; 
-        mem; efl; trace; rsp;
+        mem; efl; rsp;
     lets
         plain_ptr        := if win then rcx else rdi;
         auth_ptr         := if win then r8  else rdx;
