@@ -282,11 +282,11 @@ let lemma_mod_n_8_lower2 (q:quad32) (n:nat) : Lemma
   =
   let Mkfour _ _ _ _ = q in // avoid ifuel
   let f (n:nat{n <= 4}) = lo64 q % pow2 (8 * (4 + n)) == q.lo0 + 0x100000000 * (q.lo1 % pow2 (8 * n)) in
-  assert_norm (f 0);
-  assert_norm (f 1);
-  assert_norm (f 2);
-  assert_norm (f 3);
   assert_norm (f 4);
+  assert_norm (f 3);
+  assert_norm (f 2);
+  assert_norm (f 1);
+  assert_norm (f 0);
   ()
 
 let lemma_mod_n_8_upper1 (q:quad32) (n:nat) : Lemma
