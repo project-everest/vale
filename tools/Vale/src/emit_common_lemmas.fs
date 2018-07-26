@@ -36,7 +36,7 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+    | EApply (Id x, _, es) when Map.containsKey (Id x) env.procs ->
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in
@@ -69,7 +69,7 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
         }
         in
       benv.quick_code_funs := f::!(benv.quick_code_funs);
-      let e = EApply (name, List.map (fun (x, _) -> EVar x) fParams) in
+      let e = eapply name (List.map (fun (x, _) -> EVar x) fParams) in
 //      [e]
       [vaApp "Block" [e]]
   | SIfElse (SmPlain, cmp, ss1, ss2) ->
@@ -179,7 +179,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, es) when Map.containsKey x env.procs ->
+    | EApply (x, _, es) when Map.containsKey x env.procs ->
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
@@ -480,11 +480,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let pargs = (if total then [argS] else [argS; argR]) @ pargs in
   let xReq = "require" + total_suffix total in
   let xEns = "ensure" + total_suffix total in
-  let req = require (vaApp xReq ([EVar b0; EApply (codeName, fArgs); EVar s0] @ listIfNot total [EVar sN])) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
+  let req = require (vaApp xReq ([EVar b0; eapply codeName fArgs; EVar s0] @ listIfNot total [EVar sN])) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
   let ens = ensure (vaApp xEns (if total then [EVar b0; EVar s0; EVar sM; EVar fM] else [EVar b0; EVar bM; EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
   let lCM  = (cM, Some (Some tCode, NotGhost)) in
   let sBlock = lemma_block total (sM, None) lCM (bM, None) (f0, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
-  let eReveal = if !precise_opaque then EApply (codeName, fArgs) else EVar codeName in
+  let eReveal = if !precise_opaque then eapply codeName fArgs else EVar codeName in
   let sReveal = SAssign ([], EOp (Uop UReveal, [eReveal])) in // reveal_va_code_Q();
   let sOldS = SVar (Reserved "old_s", Some tState, Immutable, XPhysical, [], Some (EVar s0)) in
   let eb1 = vaApp "get_block" [EVar (if total then b0 else cM)] in
@@ -533,10 +533,10 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let range = EVar (Id "range1") in
       let msg = EString ("***** MODIFIES CLAUSE NOT MET AT " + string_of_loc loc + " *****") in
       let eFrameX = vaApp "state_match" [EVar sM; eFrameExp] in
-      let eFrameL = EApply (Id "label", [range; msg; eFrameX]) in
+      let eFrameL = eapply (Id "label") [range; msg; eFrameX] in
       let (_, enssL) = collect_specs true (List.concat pspecs) in
       let enssL = enssL @ [eFrameL] in
-      Emit_common_quick_code.build_proc_body env loc p (EApply (codeName, fArgs)) (and_of_list enssL)
+      Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
     else if benv.is_operand then
       err "operand procedures must be declared extern"
     else

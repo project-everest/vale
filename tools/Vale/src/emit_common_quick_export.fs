@@ -107,7 +107,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let eArgs = List.map (fun x -> EVar x) xArgs in
   let tArgsCode = List.map (fun x -> TName x) xArgsCode in
   let eArgsCode = List.map (fun x -> EVar x) xArgsCode in
-  let eUnit = EApply (Id "tuple", []) in
+  let eUnit = eapply (Id "tuple") [] in
   let eTrue = EVar (Id "True") in
   let tType0 = TName (Id "Type0") in
   let tUnit = TName (Id "unit") in
@@ -137,7 +137,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let tContinue = TApp (TName (Id "fun"), [tState; tA; tType0]) in
   let argContinue = (k, Some tContinue) in
   let tCode = TApp (TName (Reserved ("code_" + (string_of_id p.pname))), tArgsCode) in
-  let eCode = EApply (Reserved ("code_" + (string_of_id p.pname)), eArgsCode) in
+  let eCode = eapply (Reserved ("code_" + (string_of_id p.pname))) eArgsCode in
 
   let reqIsExps =
     (List.collect (Emit_common_lemmas.reqIsArg s0 true) p.prets) @
@@ -145,13 +145,13 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     in
 
   // wp_X
-  let ghostRetTuple = EApply (Id "tuple", List.map (fun (x, _) -> EVar x) ghostRets) in
+  let ghostRetTuple = eapply (Id "tuple") (List.map (fun (x, _) -> EVar x) ghostRets) in
   let ghostRetFormals = List.map (fun (x, t) -> (x, Some t)) ghostRets in
   let (pspecs, pmods) = List.unzip (List.map (Emit_common_lemmas.build_lemma_spec env s0 (EVar sM)) p.pspecs) in
   let (updatesX, wpFormals) = makeFrame env p s0 sM in
   let (wpReqs, wpEnss) = collect_specs false (List.concat pspecs) in
   let (wpReq, wpEns) = (and_of_list (reqIsExps @ wpReqs), and_of_list wpEnss) in
-  let continueM = EApply (k, [EVar sM; ghostRetTuple]) in
+  let continueM = eapply k [EVar sM; ghostRetTuple] in
   let ensContinue = EOp (Bop BImply, [wpEns; continueM]) in
   let letEnsContinue = EBind (BindLet, [updatesX], [(sM, None)], [], ensContinue) in
   let wpForall = EBind (Forall, [], wpFormals @ ghostRetFormals, [], letEnsContinue) in
@@ -171,16 +171,16 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     in
 
   // wpMonotone_X declaration
-  let applyOpt f args = match args with [] -> EVar f | _ -> EApply (f, args) in
+  let applyOpt f args = match args with [] -> EVar f | _ -> eapply f args in
   let appArgs x = applyOpt x eArgs in
   let arg x t = (x, t, XGhost, In, []) in
   let pS0 = arg s0 tState in
   let pK1 = arg k1 tContinue in
   let pK2 = arg k2 tContinue in
-  let appSG k = EApply (k, [EVar s; EVar g]) in
+  let appSG k = eapply k [EVar s; EVar g] in
   let reqImp = EOp (Bop BImply, [appSG k1; appSG k2]) in
   let reqForall = EBind (Forall, [], [(s, Some tState); (g, Some tA)], [], reqImp) in // TODO: triggers
-  let appWp k = EApply (wp_X, eArgs @ [EVar s0; EVar k]) in
+  let appWp k = eapply wp_X (eArgs @ [EVar s0; EVar k]) in
   let ensImp = EOp (Bop BImply, [appWp k1; appWp k2]) in
   let specReq = Requires (Unrefined, reqForall) in
   let specEns = Ensures (Unrefined, ensImp) in
@@ -202,11 +202,11 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let rSM = arg sM tState in
   let rF0 = arg f0 tFuel in
   let rG = arg g tA in
-  let specReq = Requires (Unrefined, EApply (wp_X, eArgs @ [EVar s0; EVar k_true])) in
+  let specReq = Requires (Unrefined, eapply wp_X (eArgs @ [EVar s0; EVar k_true])) in
   let specEns = Ensures (Unrefined, eTrue) in
   // wpCompute_X body
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
-  let sCallLemma = SAssign ((sM, None)::(f0, None)::gAssigns, EApply (lemma_X, eCode::(EVar s0)::eArgs)) in
+  let sCallLemma = SAssign ((sM, None)::(f0, None)::gAssigns, eapply lemma_X (eCode::(EVar s0)::eArgs)) in
   let sAssignG = SAssign ([(g, None)], ghostRetTuple) in
   let pCompute=
     {
@@ -224,10 +224,10 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   // wpProof_X declaration
   let pK = arg k tContinue in
   let specEnsArgs = [eCode; appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; EVar s0; EVar k] in
-  let specReq = Requires (Unrefined, EApply (wp_X, eArgs @ [EVar s0; EVar k])) in
-  let specEns = Ensures (Unrefined, EApply (Id "t_ensure", specEnsArgs)) in
+  let specReq = Requires (Unrefined, eapply wp_X (eArgs @ [EVar s0; EVar k])) in
+  let specEns = Ensures (Unrefined, eapply (Id "t_ensure") specEnsArgs) in
   // wpProof_X body
-  let sLemmaUpd = SAssign ([], EApply (Reserved "lemma_upd_update", [EVar sM])) in
+  let sLemmaUpd = SAssign ([], eapply (Reserved "lemma_upd_update") [EVar sM]) in
   let (_, eqUpdates) = Emit_common_lemmas.makeFrame env p s0 sM in
   let sAssertEq = SAssert (assert_attrs_default, eqUpdates) in
   let pProof =
@@ -247,7 +247,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpProof_X ARGS)
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
   let tRetQuick = TApp (TName (Reserved "quickCode"), [tA; tCode]) in
-  let eQuick = EApply (Reserved "QProc", [eCode; appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; appArgs wpProof_X]) in
+  let eQuick = eapply (Reserved "QProc") [eCode; appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; appArgs wpProof_X] in
   let fQuick =
     {
       fname = Reserved ("quick_" + (string_of_id p.pname));

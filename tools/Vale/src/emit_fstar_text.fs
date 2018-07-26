@@ -97,7 +97,7 @@ let rec string_of_exp_prec prec e =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (x, es)]) -> (r prec (vaApp "reveal_opaque" [EApply (transparent_id x, es)]), prec)
+    | EOp (Uop UReveal, [EApply (x, _, es)]) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id x) es]), prec)
     | EOp (Uop UReveal, [EVar x]) -> ("(reveal_opaque " + (sid x) + ")", prec)
     | EOp (Uop (UNot OpBool), [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop (UNot OpProp), [e]) -> ("not " + (r 99 e), 90)
@@ -123,8 +123,8 @@ let rec string_of_exp_prec prec e =
             ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
       )
     | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr (sprintf "binary operator: %A" e)
-    | EApply (Id "tuple", es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (Id "list", es) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
+    | EApply (Id "tuple", _, es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EApply (Id "list", _, es) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
 //    | EOp (MultiOp MSet, es) -> notImplemented "MSet"
     | EOp (Subscript, [e1; e2]) -> (r prec (vaApp "subscript" [e1; e2]), prec)
     | EOp (Update, [e1; e2; e3]) -> (r prec (vaApp "update" [e1; e2; e3]), prec)
@@ -132,7 +132,7 @@ let rec string_of_exp_prec prec e =
     | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2]) -> ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
-    | EApply (x, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
+    | EApply (x, _, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
     | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
@@ -407,7 +407,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
       | Some e -> printBody header true (sid (transparent_id f.fname)) e
     );
     let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
-    let eOpaque = vaApp "make_opaque" [EApply (transparent_id f.fname, fArgs)] in
+    let eOpaque = vaApp "make_opaque" [eapply (transparent_id f.fname) fArgs] in
     let header = if isRecursive then "and " else "let " in
     printBody header true (sid f.fname) eOpaque
   else if isPublicDecl then

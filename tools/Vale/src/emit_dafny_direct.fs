@@ -285,7 +285,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
               | BExply -> new BinaryExpr(tok, opcode, e2, e1) :> Expression
               | _ -> new BinaryExpr(tok, opcode, e1, e2) :> Expression
       | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr "binary operator"
-      | EApply (Id "tuple", es) ->
+      | EApply (Id "tuple", _, es) ->
           let tok = create_token loc "(" in
           let args = new ResizeArray<Expression>() in
           List.iter (fun x -> args.Add(create_expression built_ins loc x)) es
@@ -293,12 +293,12 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           else
             let tmp = built_ins.TupleType(tok, args.Count, true) in
             new DatatypeValue(tok, BuiltIns.TupleTypeName(args.Count), BuiltIns.TupleTypeCtorNamePrefix + (string args.Count), args) :> Expression
-      | EApply (Id "seq", es) ->
+      | EApply (Id "seq", _, es) ->
           let tok = create_token loc "[" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
           new SeqDisplayExpr(tok, elements) :> Expression
-      | EApply (Id "set", es) ->
+      | EApply (Id "set", _, es) ->
           let tok = create_token loc "{" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
@@ -333,7 +333,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           updates.Add((id, id.``val``, e2))
           new DatatypeUpdateExpr(tok, e1, updates) :> Expression
       | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
-      | EApply (x, es) ->
+      | EApply (x, _, es) ->
           let tok = create_token loc (sid x) in
           if (sid x).Equals("int")
           then

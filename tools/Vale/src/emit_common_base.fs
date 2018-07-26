@@ -120,7 +120,7 @@ let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
       if addLabels then
         let range = EVar (Id "range1") in
         let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
-        EApply (Id "label", [range; msg; e])
+        eapply (Id "label") [range; msg; e]
       else e
       in
     match s with

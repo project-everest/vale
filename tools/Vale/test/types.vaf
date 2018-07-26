@@ -3,6 +3,9 @@ module Types
 type bool:Type(0) extern;
 type byte:Type(0) := int(0, 0xff);
 
+function byte_test(x:byte, y:byte):byte extern;
+function id #[a:Type(0)] (x:a):a extern;
+
 var{:state ok()} ok:bool;
 
 procedure{:typecheck} Expressions(ghost x:int(10, 20)) returns(ghost y:int(15, 25))
@@ -27,10 +30,24 @@ procedure{:typecheck} Expressions(ghost x:int(10, 20)) returns(ghost y:int(15, 2
     let r:prop := b && b;
     let s:byte := if a then 10 else 20;
     // TODO: let t := if a then 10 else 20;
+    let u:byte := byte_test(x, byte_test(x, x));
+    let v:byte := id(u);
+    let w:tuple(byte, bool) := id(tuple(id(10), id(true)));
+    let x := id#[byte](10);
     y := 20;
 }
 
 // TODO: check that return values are assigned
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let a:byte := byte_test(5);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let a:byte := byte_test(200, 500);
+}
 
 procedure{:typecheck}{:testShouldFail} Fail(ghost x:int(10, 20)) returns(ghost y:int(15, 25))
 {
@@ -62,4 +79,9 @@ procedure{:typecheck}{:testShouldFail} Fail(p:prop)
 procedure{:typecheck}{:testShouldFail} Fail()
 {
     let e:tuple(int, byte) := tuple(5, 555);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let y:bool := id(100);
 }

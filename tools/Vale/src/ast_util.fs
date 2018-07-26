@@ -12,6 +12,8 @@ let tCode = TName (Reserved "code")
 let tCodes = TName (Reserved "codes")
 let tFuel = TName (Reserved "fuel")
 
+let eapply (x:id) (es:exp list):exp = EApply (x, None, es)
+
 let List_mapFold (f:'s -> 't -> 'r * 's) (s:'s) (ts:'t list):('r list * 's) =
   let (rs_rev, s) = List.fold (fun (rs_rev, s) t -> let (r, s) = f s t in (r::rs_rev, s)) ([], s) ts in
   (List.rev rs_rev, s)
@@ -122,9 +124,8 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
     | EBind (b, es, fs, ts, e) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
-    | EApply (x, es) -> EApply (x, List.map r es)
-    | EApplyTyped(x, ts, es) -> EApplyTyped (x, ts, List.map r es)
-    | ECast(e, t) -> ECast(r e, t)
+    | EApply (x, ts, es) -> EApply (x, ts, List.map r es)
+    | ECast (e, t) -> ECast (r e, t)
   )
 
 let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
@@ -135,8 +136,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> []
     | EBind (b, es, fs, ts, e) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
     | EOp (op, es) -> List.map r es
-    | EApply (x, es) -> List.map r es
-    | EApplyTyped(x, ts, es) -> List.map r es
+    | EApply (x, ts, es) -> List.map r es
     | ECast (e, t) -> [r e]
   in f e children
 

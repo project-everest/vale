@@ -39,7 +39,7 @@ let rec build_code_stmt (env:env) (s:stmt):exp list =
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+    | EApply (Id x, _, es) when Map.containsKey (Id x) env.procs ->
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in
@@ -426,7 +426,7 @@ let rec stmts_of_estmt (physical:bool) (ghost:bool) (s:estmt):stmt list =
           let tr = if ghost then sTrigger else [] in
           let gh =
             if ghost && tmps <> [] then
-              let trEx = EApply (Reserved ("triggerexists_" + (string_of_id p.pname)), List.map (fun (x, _) -> EVar x) tmps) in
+              let trEx = eapply (Reserved ("triggerexists_" + (string_of_id p.pname))) (List.map (fun (x, _) -> EVar x) tmps) in
               SExists (tmps, [[trEx]], EOp (Bop (BAnd OpBool), [trEx;ens])) :: assigns
             else
               []
@@ -534,10 +534,10 @@ let drop_ghosts (ff:pformal list):pformal list =
   List.filter (fun f -> not (is_ghost_formal f)) ff
 
 let makeSpecTrigger (name:id) (id:exp) (es:exp list):exp =
-  EApply (Reserved ("trigger_" + (string_of_id name)), id::es)
+  eapply (Reserved ("trigger_" + (string_of_id name))) (id::es)
 
 let makeSpecTriggerExists (name:id) (es:exp list):exp =
-  EApply (Reserved ("triggerexists_" + (string_of_id name)), es)
+  eapply (Reserved ("triggerexists_" + (string_of_id name))) es
 
 let makeSpecForalls (names:(id * exp list) list) (id:int option) (xs:formal list) (e:exp):exp =
   let es = List.map (fun (x, _) -> EVar x) xs in
@@ -570,7 +570,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (src, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, es) when Map.containsKey x env.procs ->
+    | EApply (x, _, es) when Map.containsKey x env.procs ->
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
@@ -742,7 +742,7 @@ let rec build_lemma_stmt (env:env) (benv:build_env) (block:id) (b1:id) (code:id)
             | SAssign (xs, e) ->
               (
                 match skip_loc e with
-                | EApply (xf, es) ->
+                | EApply (xf, _, es) ->
                     // Reveal specs of current procedure Q and called procedure P:
                     //   reveal_va_spec_P();
                     //   reveal_va_spec_Q();
@@ -980,7 +980,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
     | AciCall (guards, c) ->
         let args = List.map make_arg ((*List.map ArgState c.esc_procArgs @*) c.esc_specMods) in
         let args = c.esc_nonmod_exps @ args in
-        let e = makeSpecForall c.esc_proc.pname (Some c.esc_call_id) c.esc_foralls (EApply (spec_of_call c, args)) in
+        let e = makeSpecForall c.esc_proc.pname (Some c.esc_call_id) c.esc_foralls (eapply (spec_of_call c) args) in
         [(c.esc_loc, require (add_antecedents guards e))]
     | AciIfElse (guards, i) ->
         let build_ite (e, i, x, y) = EOp (Bop (BEq OpBool), [EVar i; EOp (Cond, [e; EVar x; EVar y])]) in
@@ -1020,7 +1020,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
   // Generate single postcondition for procedure Q:
   //    ensures  forall va_id:va_int, g:int{:trigger va_trigger_Q(va_id, g)} :: va_trigger_Q(va_id, g) ==> va_spec_Q(iii, g, va_old_dummy, dummy, ..., va_x23_ebx)
   let ensForalls = List.collect ghostFormal p.pargs in
-  let eEns = EApply (benv.spec_name, List.map (fun x -> EVar x) ((List.map specArgEns specArgs) @ specModsEns)) in
+  let eEns = eapply benv.spec_name (List.map (fun x -> EVar x) ((List.map specArgEns specArgs) @ specModsEns)) in
   let opaqueEnss = [(loc, ensure (makeSpecForall p.pname None ensForalls eEns))] in
 
   (* Generate body of abstract lemma Q as a forall statement:
@@ -1086,11 +1086,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
   let prets = area_proc_params true emitArea p.prets p.pargs in
   let pargs = area_proc_params false emitArea p.prets p.pargs in
   let pargs = [argS; argR] @ pargs in
-  let req = require (vaApp "require" [EVar b0; EApply (codeName, fArgs); EVar s0; EVar sN]) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
+  let req = require (vaApp "require" [EVar b0; eapply codeName fArgs; EVar s0; EVar sN]) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
   let ens = ensure (vaApp "ensure" ([EVar b0] @ (if !concise_lemmas then [EVar bM] else []) @ [EVar s0; EVar sM; EVar sN])) in // va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
   let lCM  = (cM, Some (Some tCode, NotGhost)) in
   let sBlock = lemma_block (sM, None) lCM (bM, None) (EVar b0) (EVar s0) (EVar sN) in // ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
-  let eReveal = if !precise_opaque then EApply (codeName, fArgs) else EVar codeName in
+  let eReveal = if !precise_opaque then eapply codeName fArgs else EVar codeName in
   let sReveal = SAssign ([], EOp (Uop UReveal, [eReveal])) in // reveal_va_code_Q();
   let sOldS = SVar (Reserved "old_s", (if !concise_lemmas then Some tState else None), Immutable, XPhysical, [], Some (EVar s0)) in
   let eb1 = vaApp "get_block" [EVar cM] in
@@ -1143,7 +1143,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
       List.collect g specModsIo
       in
     let ensForalls = List.collect ghostFormal p.pargs in // ensures forall va_id:va_int, g:int ...
-    let eEns = EApply (benv.spec_name, specArgsEns @ specModsEns) in // ensures ... va_spec_Q(iii, g, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
+    let eEns = eapply benv.spec_name (specArgsEns @ specModsEns) in // ensures ... va_spec_Q(iii, g, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_ok(va_sM), va_get_reg(EAX, va_s0), va_get_reg(EAX, va_sM), va_get_reg(EBX, va_s0), va_get_reg(EBX, va_sM))
     let enss = [(loc, ensure (makeSpecForall p.pname None ensForalls eEns)); (loc, ensure eFrame)] in
 
     let (sLocalsToAbstract, sStmts) =
@@ -1168,7 +1168,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let absArgs = absArgsIo @ absArgsMods @ absArgsCalls in
         // Generate call from concrete lemma to abstract lemma:
         //   va_abstract_Q(iii, va_eval_operand_int(va_s0, dummy), va_eval_operand_int(va_sM, dummy), va_eval_operand_int(va_sM, dummy2), va_get_ok(va_s0), va_get_reg(EAX, va_s0), ..., va_get_reg(EAX, va_s17));
-        let sAbstract = SAssign ([], EApply (Reserved (benv.prefix + "abstract_" + (string_of_id p.pname)), absArgs)) in
+        let sAbstract = SAssign ([], eapply (Reserved (benv.prefix + "abstract_" + (string_of_id p.pname))) absArgs) in
         (sLocalsToAbstract, ss @ [sAbstract])
       in
     let pspecs_unrefined = List.collect get_unrefined p.pspecs in
@@ -1220,7 +1220,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (estmts:est
         let args = List.collect (fun (x, _, storage, _, _) -> match storage with XGhost -> [] | _ -> [EVar x]) pargs in
         let rets = List.map (fun (x, _, _, _, _) -> (x, None)) prets in
         let ghostArgs = ghostFormal
-        let sRefined = SAssign (rets, EApply (Reserved ("refined_" + (string_of_id p.pname)), args)) in
+        let sRefined = SAssign (rets, eapply (Reserved ("refined_" + (string_of_id p.pname))) args) in
         let ghostArgs = List.map (fun (x, _) -> EVar x) (List.collect ghostFormal p.pargs) in
         let sTrigger = SAssert (assert_attrs_default, makeSpecTrigger p.pname (EInt (bigint.Zero)) ghostArgs) in
         [reveal_spec; sRefined] @ (match ghostArgs with [] -> [] | _::_ -> [sTrigger])

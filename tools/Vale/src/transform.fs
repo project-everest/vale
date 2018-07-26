@@ -52,7 +52,7 @@ let empty_env:env =
     checkMods = false;
   }
 
-let vaApp (s:string) (es:exp list):exp = EApply (Reserved s, es)
+let vaApp (s:string) (es:exp list):exp = eapply (Reserved s) es
 
 let vaAppOp (prefix:string) (t:typ) (es:exp list):exp =
   match t with
@@ -132,8 +132,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         let r = env_map_exp f env in
         EBind (b, es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
-    | EApply (x, es) -> EApply (x, List.map r es)
-    | EApplyTyped(x, ts, es) -> EApplyTyped (x, ts, List.map r es)
+    | EApply (x, ts, es) -> EApply (x, ts, List.map r es)
     | ECast (e, t) -> ECast (r e, t)
   )
 
@@ -316,7 +315,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
               [((match io with In -> Read | InOut | Out -> Modify), x)]
             )
           | EOp (Uop UConst, _) | EInt _ -> []
-          | EApply (xa, args) when Map.containsKey (operandProc xa io) env0.procs ->
+          | EApply (xa, _, args) when Map.containsKey (operandProc xa io) env0.procs ->
             (
               let xa_in = operandProc xa In in
               let xa_out = operandProc xa Out in
@@ -366,7 +365,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   | SAssign (lhss, e) ->
       let (rs0, mods0) =
         match skip_loc e with
-        | EApply (x, es) when Map.containsKey x env0.procs ->
+        | EApply (x, _, es) when Map.containsKey x env0.procs ->
             let p = Map.find x env0.procs in
             compute_call p lhss es
         | _ -> (Set.empty, Set.empty)
@@ -413,12 +412,12 @@ let rec resolve_overload_expr (env:env) (e:exp):exp =
     | EOp (Uop (UCustom op), l) ->
         match Map.tryFind (Operator op) env.funs with
         | Some {fargs = [_]; fattrs = attrs} ->
-            Replace (EApply (attrs_get_id (Reserved "alias") attrs, rs l))
+            Replace (eapply (attrs_get_id (Reserved "alias") attrs) (rs l))
         | _ -> err ("operator '" + op + "' must be overloaded to use as a prefix operator")
     | EOp (Bop (BCustom op), l) ->
         match Map.tryFind (Operator op) env.funs with
         | Some {fargs = [_; _]; fattrs = attrs} ->
-            Replace (EApply (attrs_get_id (Reserved "alias") attrs, rs l))
+            Replace (eapply (attrs_get_id (Reserved "alias") attrs) (rs l))
         | _ -> err ("operator '" + op + "' must be overloaded to use as a infix operator")
     | _ -> Unchanged
     in
@@ -636,7 +635,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
       )
     | (NotGhost, EOp (Uop UConst, [ec])) -> Replace (constOp (rewrite_vars_exp rctx env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
-    | (NotGhost, EApply (xa, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
+    | (NotGhost, EApply (xa, _, args)) when (asOperand <> None && Map.containsKey (operandProc xa io) env.procs) ->
       (
         let xa_in = operandProc xa In in
         let xa_out = operandProc xa Out in
@@ -666,14 +665,14 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> e | _ -> e) es in
         let xa_fc = Reserved ("opr_code_" + (string_of_id xa)) in
         let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
-        let eCode = EApply (xa_fc, ecs) in
+        let eCode = eapply xa_fc ecs in
         if !fstar then
           let ofStateOp (e:exp):exp =
             match e with
             | EOp (StateOp (x, prefix, t), es) -> vaApp ("op_" + prefix) es
             | _ -> e
             in
-          let eLemma = EApply (xa_fl, env.state::(List.map ofStateOp es)) in
+          let eLemma = eapply xa_fl (env.state::(List.map ofStateOp es)) in
           let sLemma = SAssign ([], eLemma) in
           let sLemma = match locs with [] -> sLemma | loc::_ -> SLoc (loc, sLemma) in
           match rctx with
@@ -682,7 +681,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
               calls := sLemma::!calls;
               Replace (EOp (CodeLemmaOp, [eCode; eCode]))
         else
-          let eLemma = EApply (xa_fl, env.state::es) in
+          let eLemma = eapply xa_fl (env.state::es) in
           Replace (EOp (CodeLemmaOp, [eCode; eLemma]))
       )
 (*
@@ -709,7 +708,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         // Replace (codeLemma e)
     | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg rctx NotGhost None io env e)
 // TODO: this is a real error message, it should be uncommented
-//    | (_, EApply (x, _)) when Map.containsKey x env.procs ->
+//    | (_, EApply (x, _, _)) when Map.containsKey x env.procs ->
 //        err ("cannot call a procedure from inside an expression or variable declaration")
     | (Ghost, _) -> Unchanged
     in
@@ -755,7 +754,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
 let rewrite_cond_exp (env:env) (e:exp):exp =
   let r = rewrite_vars_arg None NotGhost (Some "cmp") In env in
   match skip_loc e with
-  | (EApply (Id xf, es)) -> vaApp ("cmp_" + xf) (List.map r es)
+  | (EApply (Id xf, _, es)) -> vaApp ("cmp_" + xf) (List.map r es)
   | (EOp (op, es)) ->
     (
       match (op, es) with
@@ -774,14 +773,14 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
   | (_, ELoc (loc, e)) ->
       try let (lhss, e) = rewrite_vars_assign rctx env lhss e in (lhss, ELoc (loc, e))
       with err -> raise (LocErr (loc, err))
-  | (_, EApply(x, es)) ->
+  | (_, EApply(x, ts, es)) ->
     (
       match Map.tryFind x env.procs with
       | None -> (lhss, rewrite_vars_exp rctx env e)
       | Some p ->
           check_mods env p;
           let (lhss, args) = rewrite_vars_args rctx env p lhss es in
-          (lhss, EApply(x, args))
+          (lhss, EApply(x, ts, args))
     )
   | _ -> (lhss, rewrite_vars_exp rctx env e)
 
@@ -930,7 +929,7 @@ let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt li
     let rec assign e =
       match e with
       | ELoc (loc, e) -> try assign e with err -> raise (LocErr (loc, err))
-      | EApply (x, es) when Map.containsKey x env.raw_procs ->
+      | EApply (x, _, es) when Map.containsKey x env.raw_procs ->
         let pCall = Map.find x env.raw_procs in
         if List.length es = List.length pCall.pargs then
           (* Generate one assertion for each precondition of the procedure pCall that we're calling.
@@ -1015,7 +1014,7 @@ let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
   | ELoc (loc, e) ->
       try collect_mods_assign env lhss e
       with err -> raise (LocErr (loc, err))
-  | EApply(x, es) ->
+  | EApply(x, _, es) ->
     (
       match Map.tryFind x env.procs with
       | None -> []
@@ -1076,7 +1075,7 @@ let add_quick_type_stmts (ss:stmt list):stmt list =
     | SAssert ({is_quicktype = true}, e) ->
         incr sym;
         let x = Reserved ("u" + (string !sym)) in
-        Replace [SAssign ([(x, Some (None, Ghost))], EApply (Id "AssertQuickType", [e]))]
+        Replace [SAssign ([(x, Some (None, Ghost))], eapply (Id "AssertQuickType") [e])]
     | _ -> Unchanged
     in
   map_stmts (fun e -> e) fs ss
@@ -1199,11 +1198,11 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let spec_enter_body = inv_to_spec ins (RRequires Unrefined) (loc, eCond) in
         // ed << old(ed)
         // precedes(ed, old(ed))
-        let lexList (es:exp list) = List.foldBack (fun e ls -> EApply (Id "lexCons", [e; ls])) es (EVar (Id "LexTop")) in
+        let lexList (es:exp list) = List.foldBack (fun e ls -> eapply (Id "lexCons") [e; ls]) es (EVar (Id "LexTop")) in
         let (lEd, eds) = ed in
         let edIn = EOp (Uop UOld, [subst_ins ins (lexList eds)]) in
         let edOut = subst_ins in_reads (lexList eds) in
-        let precedes = EApply (Id "precedes_wrap", [edOut; edIn]) in
+        let precedes = eapply (Id "precedes_wrap") [edOut; edIn] in
         let spec_precedes = inv_to_spec [] (REnsures Unrefined) (lEd, precedes) in
         let sInitIn (x:id) = SVar (x, Some (getType x), Mutable, XGhost, [], Some (EVar (in_id x))) in
         let sInitOut (x:id) = SAssign ([(x, None)], (EVar (in_id x))) in
@@ -1213,8 +1212,8 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let lhss = List.map (fun x -> (x, None)) outs in
         let args = (List.map EVar ins) in
         let oldThis = EOp (Uop UOld, [EVar (Reserved "this")]) in
-        let callBody = SAssign (lhss, EApply (xp_body, (EVar s_old)::args)) in
-        let callWhile = SAssign (lhss, EApply (xp_while, oldThis::args)) in
+        let callBody = SAssign (lhss, eapply xp_body ((EVar s_old)::args)) in
+        let callWhile = SAssign (lhss, eapply xp_while (oldThis::args)) in
         let sWhile = SWhile (eCond, invs, ed, [callBody]) in
         let p_body =
           {
@@ -1400,7 +1399,7 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
   | DVar (x, t, XState e, _) ->
     (
       match skip_loc e with
-      | EApply (Id id, es) ->
+      | EApply (Id id, _, es) ->
           let env = {env with ids = Map.add x (StateInfo (id, es, t)) env.ids} in
           ([(env, env, d)], env)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")

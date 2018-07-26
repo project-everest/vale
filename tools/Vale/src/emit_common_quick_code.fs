@@ -37,10 +37,10 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     let e = vaApp ("quick_" + x) es in
     let f g eTail =
       let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); g], [], eTail) in
-      (uses_state e, EApply (Id "QBind", [range; msg; e; fTail]))
+      (uses_state e, eapply (Id "QBind") [range; msg; e; fTail])
       in
     match (needsState, rets) with
-    | (false, []) -> (uses_state e, EApply (Id "QSeq", [range; msg; e; eTail]))
+    | (false, []) -> (uses_state e, eapply (Id "QSeq") [range; msg; e; eTail])
     | (true, []) -> f (Id "_", None) eTail
     | (_, [g]) -> f g eTail
     | _ ->
@@ -50,17 +50,17 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     in
   let lemma_call (x:id) (rets:formal list) (es:exp list):(bool * exp) =
     let es = List.map qlemma_exp es in
-    let eApp = EApply (x, es) in
+    let eApp = eapply x es in
     let fApp = EBind (Lambda, [], [(Id "_", Some tUnit)], [], eApp) in
-    (true, EApply (Id "qPURE", [range; msg; fApp; eTail]))
+    (true, eapply (Id "qPURE") [range; msg; fApp; eTail])
     // TODO: return values from lemmas
-//    (true, EApply (Id "qPURE", [fApp; eTail]))
+//    (true, eapply (Id "qPURE") [fApp; eTail])
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with
-    | EApply (Id xp, es) when Map.containsKey (Id xp) env.procs ->
+    | EApply (Id xp, _, es) when Map.containsKey (Id xp) env.procs ->
         inline_call xp [(x, tOpt)] es
-//    | EApply (xp, es) when allowLemma ->
+//    | EApply (xp, _, es) when allowLemma ->
 //        lemma_call xp [(x, tOpt)] es
     | _ ->
         let e = qlemma_exp e in
@@ -86,9 +86,9 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         in
       let xs = List.map formal_of_lhs xs in
       match skip_loc e with
-      | EApply (Id x, es) when Map.containsKey (Id x) env.procs ->
+      | EApply (Id x, _, es) when Map.containsKey (Id x) env.procs ->
           inline_call x xs es
-      | EApply (x, es) ->
+      | EApply (x, _, es) ->
           lemma_call x xs es
       | EOp (Uop UReveal, es) ->
           let x = "reveal_opaque" in
@@ -108,20 +108,20 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       build_qcode_stmt env outs loc s (needsState, eTailLet)
   | SAssume e ->
       let e = qlemma_exp e in
-      (true, EApply (Id "qAssume", [range; msg; e; eTail]))
+      (true, eapply (Id "qAssume") [range; msg; e; eTail])
   | SAssert (_, e) ->
       let e = qlemma_exp e in
-      (true, EApply (Id "qAssert", [range; msg; e; eTail]))
+      (true, eapply (Id "qAssert") [range; msg; e; eTail])
   | SIfElse (((SmInline | SmPlain) as sm), eb, ss1, ss2) ->
       let eb_alt () =
         // HACK
         match eb with
-        | EApply (Reserved "cmp_eq", args) -> EApply (Id "Cmp_eq", args)
-        | EApply (Reserved "cmp_ne", args) -> EApply (Id "Cmp_ne", args)
-        | EApply (Reserved "cmp_le", args) -> EApply (Id "Cmp_le", args)
-        | EApply (Reserved "cmp_ge", args) -> EApply (Id "Cmp_ge", args)
-        | EApply (Reserved "cmp_lt", args) -> EApply (Id "Cmp_lt", args)
-        | EApply (Reserved "cmp_gt", args) -> EApply (Id "Cmp_gt", args)
+        | EApply (Reserved "cmp_eq", ts, args) -> EApply (Id "Cmp_eq", ts, args)
+        | EApply (Reserved "cmp_ne", ts, args) -> EApply (Id "Cmp_ne", ts, args)
+        | EApply (Reserved "cmp_le", ts, args) -> EApply (Id "Cmp_le", ts, args)
+        | EApply (Reserved "cmp_ge", ts, args) -> EApply (Id "Cmp_ge", ts, args)
+        | EApply (Reserved "cmp_lt", ts, args) -> EApply (Id "Cmp_lt", ts, args)
+        | EApply (Reserved "cmp_gt", ts, args) -> EApply (Id "Cmp_gt", ts, args)
         | _ -> internalErr "SIfElse"
         in
       let eb = qlemma_exp eb in
@@ -132,19 +132,19 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         | SmInline -> ("qInlineIf", eb)
         | _ -> ("qIf", qlemma_exp (eb_alt ()))
         in
-      let eIf = EApply (Id sq, [eCmp; eqc1; eqc2]) in
+      let eIf = eapply (Id sq) [eCmp; eqc1; eqc2] in
       let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); (Reserved "g", None)], [], eTail) in
-      (true, EApply (Id "QBind", [range; msg; eIf; fTail]))
+      (true, eapply (Id "QBind") [range; msg; eIf; fTail])
   | SForall ([], [], EBool true, ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
       let s = Reserved "s" in
-      let eAssertBy = EApply (Id "qAssertBy", [range; msg; ep; eQcs; EVar s; eTail]) in
+      let eAssertBy = eapply (Id "qAssertBy") [range; msg; ep; eQcs; EVar s; eTail] in
       (true, eAssertBy)
   | _ -> err ()
 and build_qcode_stmts (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
-  let outTuple = EApply (Id "tuple", List.map EVar outs) in
-  let empty = EApply (Id "QEmpty", [outTuple]) in
+  let outTuple = eapply (Id "tuple") (List.map EVar outs) in
+  let empty = eapply (Id "QEmpty") [outTuple] in
   let (needsState, e) = List.foldBack (build_qcode_stmt env outs loc) ss (false, empty) in
   e
 and build_qcode_block (add_old:bool) (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
@@ -152,7 +152,7 @@ and build_qcode_block (add_old:bool) (env:env) (outs:id list) (loc:loc) (ss:stmt
   let eStmts = build_qcode_stmts env outs loc ss in
   let eLet = if add_old then EBind (BindLet, [EVar s], [(Reserved "old_s", Some tState)], [], eStmts) else eStmts in
   let fApp = EBind (Lambda, [], [(s, Some tState)], [], eLet) in
-  EApply (Id "qblock", [fApp])
+  eapply (Id "qblock") [fApp]
 
 let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
   let funs = ref ([]:decls) in
@@ -188,8 +188,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
         (fun (s0:state) (sN:state) -> va_update_reg Rax sN (va_update_flags sN s0))
         (fun (sN:state) (sN':state) -> va_get_reg Rax sN == va_get_reg Rax sN' /\ va_get_flags sN == va_get_flags sN')
     *)
-    let eCode = EApply (cid, fArgs) in
-    let eQCode = EApply (id, pArgs) in
+    let eCode = eapply cid fArgs in
+    let eQCode = eapply id pArgs in
     let s0 = Reserved "s0" in
     let sM = Reserved "sM" in
     let sN = Reserved "sN" in
@@ -207,7 +207,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
       in
     let eUpdate = List.fold frameMod (EVar s0) info.qmods in
     let fUpdate = EBind (Lambda, [], [(s0, Some tState); (sN, Some tState)], [], eUpdate) in
-    let sLemma = SAssign (outs, EApply (Id "wp_run_norm", eCode::eQCode::args @ [fUpdate; fEq])) in
+    let sLemma = SAssign (outs, eapply (Id "wp_run_norm") (eCode::eQCode::args @ [fUpdate; fEq])) in
     [sLemma]
     in
   let gen_quick_block_funs () = List.rev !funs in
@@ -270,7 +270,7 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
   let letGs = EBind (BindLet, [EVar g], gAssigns, [], hide_ifs ens) in
   let funCont = EBind (Lambda, [], [(s0, None); (sM, None); (g, None)], [], letGs) in
-  let eWpSound = EApply (wpSound_X, [code; EApply (qCodes_X, args); EVar s0; funCont]) in
+  let eWpSound = eapply wpSound_X [code; eapply qCodes_X args; EVar s0; funCont] in
   let sWpSound = SAssign ([(sM, None); (fM, None); (g, None)], eWpSound) in
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
   let sAssignGs =
