@@ -23,71 +23,24 @@ open X64.Vale.InsBasic
 module S = X64.Bytes_Semantics_s
 module TS = X64.Taint_Semantics_s
 module P = X64.Print_s
+open X64.Taint_Semantics_i
 #endverbatim
 
 #reset-options "--initial_fuel 2 --max_fuel 4 --max_ifuel 2 --z3rlimit 20"
 
-procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int) returns(o:opr)
+procedure{:operand} Mem_in(base:opr, inline offset:int, ghost b:buffer64, ghost index:int, inline t:taint) returns(o:opr)
     reads
         mem;
     extern;
 
-
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Add64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Add64Wrap_Mem(
-    inout dst:dst_opr64,
-    src:reg_opr64,
-    inline offset:int,
-    inline t:taint,
-    ghost b:buffer64,
-    ghost index:int)
-    reads
-        memTaint; mem;
-    modifies
-        efl;
-    requires
-        valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, mem, memTaint, t);
-        src + offset == buffer_addr(b, mem) + 8 * index;
-    ensures
-        valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, mem, memTaint, t);
-        dst == old(add_wrap(dst, buffer64_read(b, index, mem)));
-        cf(efl) == old(dst + buffer64_read(b, index, mem) >= pow2_64);
-{
-    lemma_valid_mem64(b, index, mem);
-    lemma_load_mem64(b, index, mem);
-    lemma_valid_taint64(b, memTaint, mem, index, t);
-}
-
-
-
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.AddCarry64(dst,OMem(MReg(get_reg(src), offset))), list(dst), list(dst, OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Adc64Wrap_Mem(
-    inout dst:dst_opr64,
-    src:reg_opr64,
-    inline offset:int,
-    inline t:taint,
-    ghost b:buffer64,
-    ghost index:int)
-    reads
-        memTaint; mem;
-    modifies
-        efl;
-    requires
-        valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, mem, memTaint, t);
-        src + offset == buffer_addr(b, mem) + 8 * index;
-    ensures
-        valid_src_addr(mem, b, index);
-        valid_taint_buf64(b, mem, memTaint, t);
-        dst == old(add_wrap(add_wrap(dst, buffer64_read(b, index, mem)), (if cf(efl) then 1 else 0)));
-        cf(efl) == old(dst + buffer64_read(b, index, mem) + (if cf(efl) then 1 else 0) >= pow2_64);
-{
-    lemma_valid_mem64(b, index, mem);
-    lemma_load_mem64(b, index, mem);
-    lemma_valid_taint64(b, memTaint, mem, index, t);    
-}
-
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(src), offset))), list(dst), list(OMem(MReg(get_reg(src), offset)))), t))}{:fast_instruction}{:quick exportOnly} Load64_buffer(
+// We can't actually build a TMem here, since b and index are passed in as ghost arguments, 
+// and hence aren't available when building the AST.  Hence the following doesn't work:    
+//procedure{:instruction mk_taint_ins2(S.Mov64, dst, TMem(MReg(get_reg(src), offset), b, index, t), 
+//                                     list(dst), list(TMem(MReg(get_reg(src), offset), b, index, t)))}
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(t_op_to_op(dst), OMem(MReg(get_reg(src), offset))), 
+                                               list(t_op_to_op(dst)), list(OMem(MReg(get_reg(src), offset)))), t))}
+         {:fast_instruction}{:quick exportOnly} 
+    Load64_buffer(
     out dst: dst_opr64,
         src:reg_opr64,
         inline offset:int,
@@ -111,9 +64,12 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(dst, OMem(MReg(get_reg(sr
     lemma_valid_taint64(b, memTaint, mem, index, t);    
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), offset)), src), list(OMem(MReg(get_reg(dst), offset))), list(src)), t))}{:fast_instruction}{:quick exportOnly} Store64_buffer(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), offset)), t_op_to_op(src)), 
+                                         list(OMem(MReg(get_reg(dst), offset))), list(t_op_to_op(src))), t))}
+         {:fast_instruction}{:quick exportOnly} 
+    Store64_buffer(
         dst:reg_opr64,
-        src: opr64,
+        src: reg_opr64,
         inline offset:int,
         inline t:taint,
         ghost b:buffer64,
@@ -136,7 +92,9 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Mov64(OMem(MReg(get_reg(dst), o
     same_memTaint64(b, old(mem), mem, old(memTaint), memTaint);
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(dst), list(OMem(MReg(Rsp, 0)))), Public))}{:fast_instruction}{:quick exportOnly} Pop(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(t_op_to_op(dst)), list(t_op_to_op(dst)), list(OMem(MReg(Rsp, 0)))), Public))}
+         {:fast_instruction}{:quick exportOnly} 
+    Pop(
     out dst: dst_opr64,
         ghost b:buffer64,
         ghost index:int)
@@ -156,7 +114,9 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pop(dst), list(dst), list(OMem(
     lemma_valid_taint64(b, old(memTaint), old(mem), index, Public);    
 }
 
-procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(src), list(), list(src)), Public))}{:fast_instruction}{:quick exportOnly} Push(
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Push(t_op_to_op(src)), list(), list(t_op_to_op(src))), Public))}
+         {:fast_instruction}{:quick exportOnly} 
+    Push(
         src: reg_opr64,
         ghost b:buffer64,
         ghost index:int)
