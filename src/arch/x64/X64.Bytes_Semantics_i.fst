@@ -31,10 +31,13 @@ let nat8s_to_nat64_alt (v1 v2 v3 v4 v5 v6 v7 v8:nat8) : nat64 =
   +
   pow2_32 `op_Multiply` nat8s_to_nat32 v5 v6 v7 v8
 
+#set-options "--max_fuel 8"
 let nat8s_to_nat64_alt_equiv (v1 v2 v3 v4 v5 v6 v7 v8:nat8) :
   Lemma (nat8s_to_nat64_alt v1 v2 v3 v4 v5 v6 v7 v8 == nat8s_to_nat64 v1 v2 v3 v4 v5 v6 v7 v8)
   =
   ()
+
+#set-options "--max_fuel 2"
 
 let nat64_to_nat8s (n:nat64) : nat8*nat8*nat8*nat8*nat8*nat8*nat8*nat8 =
   let lower = n % 0x100000000 in
@@ -176,6 +179,8 @@ let frame_update_heap128 ptr v s =
   frame_update_heap32 (ptr+8) v.hi2 mem2;
   let mem4 = update_heap32 (ptr+12) v.hi3 mem3 in  
   frame_update_heap32 (ptr+12) v.hi3 mem3
+
+#set-options "--z3rlimit 40 --max_fuel 8 --max_ifuel 2"
 
 let correct_update_get32 (ptr:int) (v:nat32) (mem:heap) : Lemma
   (get_heap_val32 ptr (update_heap32 ptr v mem) == v) =

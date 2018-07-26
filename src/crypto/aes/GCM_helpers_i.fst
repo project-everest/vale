@@ -276,6 +276,9 @@ let lemma_mod_n_8_lower1 (q:quad32) (n:nat) : Lemma
   assert_norm (f 4);
   ()
 
+
+#reset-options "--smtencoding.elim_box true --smtencoding.nl_arith_repr native --z3rlimit 40 --z3refresh --initial_ifuel 0 --max_ifuel 1 --initial_fuel 1 --max_fuel 1"
+
 let lemma_mod_n_8_lower2 (q:quad32) (n:nat) : Lemma
   (requires n <= 4)
   (ensures lo64 q % pow2 (8 * (4 + n)) == q.lo0 + 0x100000000 * (q.lo1 % pow2 (8 * n)))
