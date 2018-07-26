@@ -59,7 +59,7 @@ let make_ghash_plain_LE (s:seq quad32) : ghash_plain_LE = if length s = 0 then c
 // GCM
 ///////////////////////////
 
-#reset-options "--z3rlimit 30"
+#reset-options "--z3rlimit 50"
 procedure {:quick} gcm_one_pass_blocks(
     inline alg:algorithm,
     ghost in_b:buffer128,
@@ -438,8 +438,8 @@ procedure {:quick} gcm_make_length_quad(
     modifies xmm2; rax; efl;
     requires
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-        8 * cipher_num_bytes < pow2_32;
-        8 * auth_num_bytes < pow2_32;
+        cipher_num_bytes * 8 < pow2_32;
+        auth_num_bytes * 8 < pow2_32;
     ensures
         xmm2 == reverse_bytes_quad32(Mkfour(nat32_workaround(8 * old(cipher_num_bytes)), 0, nat32_workaround(8 * old(auth_num_bytes)), 0));
 {
@@ -766,7 +766,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     decrypt_helper(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth, rax, alleged_tag_quad, computed_tag); 
 }
 
-#reset-options "--z3rlimit 30"
+#reset-options "--z3rlimit 50"
 procedure {:quick} gcm_decrypt_stdcall(
     inline win:bool,
     inline alg:algorithm,

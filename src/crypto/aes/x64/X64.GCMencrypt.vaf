@@ -433,8 +433,8 @@ procedure {:quick} gcm_make_length_quad(
     modifies xmm2; rax; efl;
     requires
         mask == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203);
-        8 * plain_num_bytes < pow2_32;
-        8 * auth_num_bytes < pow2_32;
+        plain_num_bytes * 8 < pow2_32;
+        auth_num_bytes * 8 < pow2_32;
     ensures
         xmm2 == reverse_bytes_quad32(Mkfour(nat32_workaround(8 * old(plain_num_bytes)), 0, nat32_workaround(8 * old(auth_num_bytes)), 0));
 {
@@ -465,8 +465,8 @@ procedure {:quick} gcm_make_length_quad_buffer(
         rsi == auth_num_bytes;
         rdx == buffer_addr(b, mem);
         buffer_length(b) == 1;
-        8 * plain_num_bytes < pow2_32;
-        8 * auth_num_bytes < pow2_32;
+        plain_num_bytes * 8 < pow2_32;
+        auth_num_bytes * 8 < pow2_32;
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -525,8 +525,8 @@ procedure {:quick} gcm_make_length_quad_buffer_win(ghost stack_b:buffer64, ghost
         r8 == buffer_addr(b, mem);
 
         buffer_length(b) == 1;
-        8 * plain_num_bytes < pow2_32;
-        8 * auth_num_bytes < pow2_32;        
+        plain_num_bytes * 8 < pow2_32;
+        auth_num_bytes * 8 < pow2_32;        
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
