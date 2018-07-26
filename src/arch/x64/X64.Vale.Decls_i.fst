@@ -25,12 +25,12 @@ type ocmp = TS.tainted_ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
-let va_cmp_eq o1 o2 = TS.TaintedOCmp (BS.OEq o1 o2) Public
-let va_cmp_ne o1 o2 = TS.TaintedOCmp (BS.ONe o1 o2) Public
-let va_cmp_le o1 o2 = TS.TaintedOCmp (BS.OLe o1 o2) Public
-let va_cmp_ge o1 o2 = TS.TaintedOCmp (BS.OGe o1 o2) Public
-let va_cmp_lt o1 o2 = TS.TaintedOCmp (BS.OLt o1 o2) Public
-let va_cmp_gt o1 o2 = TS.TaintedOCmp (BS.OGt o1 o2) Public
+let va_cmp_eq o1 o2 = TS.TaintedOCmp (BS.OEq (t_op_to_op o1) (t_op_to_op o2)) Public
+let va_cmp_ne o1 o2 = TS.TaintedOCmp (BS.ONe (t_op_to_op o1) (t_op_to_op o2)) Public
+let va_cmp_le o1 o2 = TS.TaintedOCmp (BS.OLe (t_op_to_op o1) (t_op_to_op o2)) Public
+let va_cmp_ge o1 o2 = TS.TaintedOCmp (BS.OGe (t_op_to_op o1) (t_op_to_op o2)) Public
+let va_cmp_lt o1 o2 = TS.TaintedOCmp (BS.OLt (t_op_to_op o1) (t_op_to_op o2)) Public
+let va_cmp_gt o1 o2 = TS.TaintedOCmp (BS.OGt (t_op_to_op o1) (t_op_to_op o2)) Public
 
 let eval_code = Lemmas_i.eval_code
 let eval_while_inv = Lemmas_i.eval_while_inv
