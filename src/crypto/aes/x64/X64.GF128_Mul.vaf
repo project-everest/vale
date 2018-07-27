@@ -44,6 +44,9 @@ procedure{:quick} ShiftLeft128_1(ghost a:poly)
     lemma_shift_left_1(a);
 }
 
+#verbatim{:implementation}
+#push-options "--z3rlimit 25"
+#endverbatim
 procedure{:quick} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
     modifies
         efl; r12;
@@ -95,6 +98,9 @@ procedure{:quick} ShiftLeft2_128_1(ghost lo:poly, ghost hi:poly)
 
     lemma_shift_2_left_1(lo, hi);
 }
+#verbatim{:implementation}
+#pop-options
+#endverbatim
 
 procedure{:quick} ClmulRev64(ghost a:poly, ghost b:poly, inline dstHi:bool, inline srcHi:bool)
     reads
@@ -265,6 +271,9 @@ procedure{:quick exportOnly} Gf128ModulusRev(inout dst:xmm)
     PinsrdImm(dst, 0xe100_0000, 3, r12);
 }
 
+#verbatim{:implementation}
+#push-options "--z3rlimit 25"
+#endverbatim
 procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
     modifies
         efl; r12;
@@ -308,3 +317,6 @@ procedure{:quick} ReduceMulRev128(ghost a:poly, ghost b:poly)
     AddPoly(xmm1, xmm5, rdhLh, div(rdh, m));
     AddPoly(xmm1, xmm6, add(rdhLh, div(rdh, m)), div(rab, m));
 }
+#verbatim{:implementation}
+#pop-options
+#endverbatim
