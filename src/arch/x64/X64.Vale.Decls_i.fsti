@@ -108,14 +108,21 @@ unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
 unfold let loc_union = M.loc_union
 
+let valid_maddr (m:maddr) (s:state) (b:M.buffer64) (index:int) (t:taint) = 
+  valid_src_addr s.mem b index /\
+  M.valid_taint_buf64 b s.mem s.memTaint t /\
+  eval_maddr m s == M.buffer_addr b s.mem + 8 `op_Multiply` index
+
+
 [@va_qattr]
 let valid_operand (t:tainted_operand) (s:state) : Type0 =
   let o = t_op_to_op t in
   X64.Vale.State_i.valid_operand o s /\
   (TMem? t ==> (exists (b:M.buffer64) (index:int) .  // REVIEW: Adding a pattern seems to make it unprovable: {:pattern valid_src_addr s.mem b index}
+   valid_maddr (TMem?.m t) s b index (TMem?.t t))) (*
    valid_src_addr s.mem b index /\
    M.valid_taint_buf64 b s.mem s.memTaint (TMem?.t t) /\
-   eval_maddr (TMem?.m t) s == M.buffer_addr b s.mem + 8 `op_Multiply` index))
+   eval_maddr (TMem?.m t) s == M.buffer_addr b s.mem + 8 `op_Multiply` index)) *)
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -163,7 +170,10 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
   )
   (ensures valid_operand (va_opr_code_Mem base offset t) s)
   =
-  M.lemma_valid_mem64 b index s.mem
+  let t = va_opr_code_Mem base offset t in
+  M.lemma_valid_mem64 b index s.mem;
+  assert (valid_maddr (TMem?.m t) s b index (TMem?.t t))
+  
  
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand (t_op_to_op o) s

@@ -22,3 +22,11 @@ let generic_injective_proof #a #b f g l =
   in
   FStar.Classical.forall_intro_2 helper;
   ()
+
+
+let exists_elim2 (goal:Type) (#a:Type) (#b:(a -> Type))  (#p:(x:a -> b x -> Type)) (_:squash (exists (x:a) (y:b x). p x y))
+  (f:(x:a -> y:b x{p x y} -> GTot (squash goal))) :Lemma goal
+  = let open FStar.Classical in 
+    exists_elim goal () (fun (x:a{exists (y:b x). p x y}) ->
+    exists_elim goal () (fun (y:b x{p x y}) ->
+    f x y))
