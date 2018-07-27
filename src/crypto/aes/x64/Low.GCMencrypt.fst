@@ -86,6 +86,7 @@ let buffer_to_seq_quad32_0 (b:B.buffer U8.t { B.length b % 16 == 0 /\ B.length b
 let keys_match (alg:algorithm) (key:Ghost.erased (aes_key_LE alg)) (keys_b:B.buffer U8.t { B.length keys_b % 16 == 0 }) (h:HS.mem) =
   let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
   let round_keys = key_to_round_keys_LE alg (Ghost.reveal key) in
+  (AES_128? alg || AES_256? alg) /\
   BV.as_seq h keys128_b == round_keys
 
 unfold let disjoint_or_eq (#a:Type0) (b1:B.buffer a) (b2:B.buffer a) =
