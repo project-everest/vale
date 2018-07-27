@@ -155,18 +155,18 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 [@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
 [@va_qattr]
-unfold let va_opr_code_Mem (o:operand) (offset:int) (t:taint) : va_operand =
+unfold let va_opr_code_Mem (o:va_operand) (offset:int) (t:taint) : va_operand =
   match o with
-  | OConst n -> TConst (n + offset)
-  | OReg r -> TMem (MReg r offset) t
+  | TConst n -> TConst (n + offset)
+  | TReg r -> TMem (MReg r offset) t
   | _ -> TConst 42
 
-let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : Lemma
+let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : Lemma
   (requires
-    OReg? base /\
+    TReg? base /\
     valid_src_addr s.mem b index /\
     M.valid_taint_buf64 b s.mem s.memTaint t /\
-    eval_operand base s + offset == M.buffer_addr b s.mem + 8 `op_Multiply` index
+    eval_operand (t_op_to_op base) s + offset == M.buffer_addr b s.mem + 8 `op_Multiply` index
   )
   (ensures valid_operand (va_opr_code_Mem base offset t) s)
   =
@@ -174,7 +174,6 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
   M.lemma_valid_mem64 b index s.mem;
   assert (valid_maddr (TMem?.m t) s b index (TMem?.t t))
   
- 
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand (t_op_to_op o) s
 [@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : GTot nat64 = eval_operand (t_op_to_op o) s
