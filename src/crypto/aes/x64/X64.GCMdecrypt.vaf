@@ -766,7 +766,7 @@ procedure {:quick} gcm_decrypt_stdcall_inner(
     decrypt_helper(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), cipher, auth, rax, alleged_tag_quad, computed_tag); 
 }
 
-#reset-options "--z3rlimit 50"
+#reset-options "--z3rlimit 70"
 procedure {:quick} gcm_decrypt_stdcall(
     inline win:bool,
     inline alg:algorithm,
