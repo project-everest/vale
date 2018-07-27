@@ -20,8 +20,8 @@ let cf = Lemmas_i.cf
 let overflow = Lemmas_i.overflow
 let update_cf flags b = Lemmas_i.update_cf flags b
 let update_of flags b = Lemmas_i.update_of flags b
-let ins = S.ins
-type ocmp = S.ocmp
+let ins = TS.tainted_ins
+type ocmp = TS.tainted_ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
