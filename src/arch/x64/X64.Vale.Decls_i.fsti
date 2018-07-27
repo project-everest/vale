@@ -31,23 +31,22 @@ let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> GTot a) (y:(_:unit{~b}) -> GTot a
   if b then x () else y ()
 
 (* Define a tainted operand to wrap the base operand type *)
-[@va_qattr] noeq  // REVIEW: Will using noeq cause normalization problems?
 type tainted_operand =
 | TConst: n:int -> tainted_operand
 | TReg: r:reg -> tainted_operand
-| TMem: m:maddr -> b:M.buffer64 -> index:int -> t:taint -> tainted_operand
+| TMem: m:maddr -> t:taint -> tainted_operand
 
 unfold let t_op_to_op (t:tainted_operand) : operand = 
   match t with 
   | TConst n -> OConst n
   | TReg r -> OReg r
-  | TMem m _ _ _ -> OMem m
+  | TMem m _ -> OMem m
 
 let get_taint (t:tainted_operand) : taint =
   match t with 
   | TConst _ -> Public
   | TReg _ -> Public
-  | TMem _ _ _ t -> t
+  | TMem _ t -> t
 
 let extract_taint (o1 o2:tainted_operand) : taint =
   if TMem? o1 then TMem?.t o1
@@ -113,10 +112,10 @@ unfold let loc_union = M.loc_union
 let valid_operand (t:tainted_operand) (s:state) : Type0 =
   let o = t_op_to_op t in
   X64.Vale.State_i.valid_operand o s /\
-  (TMem? t ==>
-   valid_src_addr s.mem (TMem?.b t) (TMem?.index t) /\
-   M.valid_taint_buf64 (TMem?.b t) s.mem s.memTaint (TMem?.t t) /\
-   eval_maddr (TMem?.m t) s == M.buffer_addr (TMem?.b t) s.mem + 8 `op_Multiply` (TMem?.index t))
+  (TMem? t ==> (exists (b:M.buffer64) (index:int) .  // REVIEW: Adding a pattern seems to make it unprovable: {:pattern valid_src_addr s.mem b index}
+   valid_src_addr s.mem b index /\
+   M.valid_taint_buf64 b s.mem s.memTaint (TMem?.t t) /\
+   eval_maddr (TMem?.m t) s == M.buffer_addr b s.mem + 8 `op_Multiply` index))
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -149,10 +148,10 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
 [@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
 [@va_qattr]
-unfold let va_opr_code_Mem (o:operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : va_operand =
+unfold let va_opr_code_Mem (o:operand) (offset:int) (t:taint) : va_operand =
   match o with
   | OConst n -> TConst (n + offset)
-  | OReg r -> TMem (MReg r offset) b index t
+  | OReg r -> TMem (MReg r offset) t
   | _ -> TConst 42
 
 let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : Lemma
@@ -162,11 +161,10 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) (b:M.buffer64) (in
     M.valid_taint_buf64 b s.mem s.memTaint t /\
     eval_operand base s + offset == M.buffer_addr b s.mem + 8 `op_Multiply` index
   )
-  (ensures valid_operand (va_opr_code_Mem base offset b index t) s)
+  (ensures valid_operand (va_opr_code_Mem base offset t) s)
   =
   M.lemma_valid_mem64 b index s.mem
  
-
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand (t_op_to_op o) s
 [@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : GTot nat64 = eval_operand (t_op_to_op o) s
