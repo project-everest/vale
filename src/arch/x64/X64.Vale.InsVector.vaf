@@ -23,41 +23,15 @@ let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = let m:nat = n in m
 #endverbatim
 
 #verbatim
-open Types_s
-open X64.Machine_s
-open X64.Memory_i
 open X64.Vale
-open X64.Vale.State_i
 open X64.Vale.StateLemmas_i
-open X64.Vale.Decls_i
+open X64.Vale.InsLemmas_i
+open X64.Taint_Semantics_i
 module S = X64.Bytes_Semantics_s
 module TS = X64.Taint_Semantics_s
-module P = X64.Print_s
-
-
-// Convenient packaging for lemma_valid_taint64 // TODO: Eliminate duplication with the version in InsBasic
-let lemma_valid_taint64_operand (o:va_operand) (s:va_state) : Lemma
-  (requires valid_operand o s)
-  (ensures TMem? o ==> Map.sel s.memTaint (eval_maddr (TMem?.m o) s) == (TMem?.t o))
-  =
-  if TMem? o then (
-    let open X64.Taint_Semantics_s in
-    let tainted_mem:X64.Memory_i_s.memtaint = (state_to_S s).memTaint in
-    let real_mem:X64.Memory_i_s.mem = s.mem in
-    Meta.exists_elim2 (TMem? o ==> Map.sel tainted_mem (eval_maddr (TMem?.m o) s) == (TMem?.t o))
-                      ()
-                      (fun (b:X64.Memory_i.buffer64) 
-                         (index:nat{valid_maddr (TMem?.m o) s b index (TMem?.t o)}) ->
-                         lemma_valid_taint64 b
-                                             tainted_mem
-                                             real_mem
-                                             index
-                                             (TMem?.t o));
-    ()
-  ) else ()
+#endverbatim
 
 #reset-options "--initial_fuel 2 --max_fuel 4 --max_ifuel 2 --z3rlimit 20"
-#endverbatim
 
 var{:state xmm(0)} xmm0:quad32;
 var{:state xmm(1)} xmm1:quad32;
@@ -170,7 +144,6 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pinsrd(dst, t_op_to_op(src), in
     ensures
         dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index);
 {
-    lemma_valid_taint64_operand(@src, old(this));
 }
 
 procedure {:quick exportOnly} 
@@ -191,7 +164,6 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pinsrq(dst, t_op_to_op(src), in
     ensures
         dst == insert_nat64(old(dst), src, index);
 {
-    lemma_valid_taint64_operand(@src, old(this));
 }
 
 procedure {:quick exportOnly}

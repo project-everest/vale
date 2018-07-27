@@ -620,9 +620,8 @@ procedure {:quick} ghash_incremental_extra_stdcall(
 
         buffer_addr(in_b, mem) + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
 
-        num_bytes * 4096 < pow2_32;
+        4096 * num_bytes < pow2_32;
         256 * bytes_to_quad_size(num_bytes) < pow2_32;
-        num_bytes / 16 * 16 < pow2_64;  // Redundant requires to satisfy IMul precondition
 
         let old_hash := buffer128_read(hash_b, 0, mem);
         let input := slice_work_around(buffer128_as_seq(mem, in_b), num_bytes / 16);
@@ -688,7 +687,6 @@ procedure {:quick} ghash_incremental_extra_stdcall(
 }
 
 
-#reset-options "--z3rlimit 30"
 // Only valid for windows
 procedure {:quick} ghash_incremental_extra_stdcall_win(
   ghost stack_b:buffer64,
@@ -723,9 +721,8 @@ procedure {:quick} ghash_incremental_extra_stdcall_win(
 
         buffer_addr(in_b, mem) + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
 
-        num_bytes * 4096  < pow2_32;
-        bytes_to_quad_size(num_bytes) * 256 < pow2_32;
-        num_bytes / 16 * 16 < pow2_64;  // Redundant requires to satisfy IMul precondition
+        4096 * num_bytes  < pow2_32;
+        256 * bytes_to_quad_size(num_bytes) < pow2_32;
 
         let old_hash := buffer128_read(hash_b, 0, mem);
         let input := slice_work_around(buffer128_as_seq(mem, in_b), num_bytes / 16);
@@ -929,7 +926,6 @@ procedure {:quick} ghash_incremental_bytes_stdcall(ghost h_b:buffer128, ghost ha
 }
 
 // Only for Windows
-#reset-options "--z3rlimit 30"
 procedure{:quick}{:exportSpecs} ghash_incremental_bytes_stdcall_win(
   ghost stack_b:buffer64,
   ghost h_b:buffer128,
