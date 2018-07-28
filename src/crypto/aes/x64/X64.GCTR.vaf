@@ -476,7 +476,6 @@ procedure {:quick} gctr_bytes_extra_stdcall(
 
         4096 * num_bytes < pow2_32;
         256 * bytes_to_quad_size(num_bytes) < pow2_32;
-        num_bytes / 16 * 16 < pow2_64;  // Redundant requires to satisfy IMul precondition
 
         alg = AES_128 || alg = AES_256;
         buffer_length(keys_b) == nr(alg) + 1;
@@ -582,7 +581,6 @@ procedure {:quick} gctr_bytes_extra_buffer_win(
 
         4096 * num_bytes < pow2_32;
         256 * bytes_to_quad_size(num_bytes) < pow2_32;
-        num_bytes / 16 * 16 < pow2_64;  // Redundant requires to satisfy IMul precondition
 
         alg = AES_128 || alg = AES_256;
         buffer_length(keys_b) == nr(alg) + 1;

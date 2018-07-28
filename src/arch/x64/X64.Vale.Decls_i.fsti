@@ -31,11 +31,13 @@ let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> GTot a) (y:(_:unit{~b}) -> GTot a
   if b then x () else y ()
 
 (* Define a tainted operand to wrap the base operand type *)
+[@va_qattr]
 type tainted_operand =
 | TConst: n:int -> tainted_operand
 | TReg: r:reg -> tainted_operand
 | TMem: m:maddr -> t:taint -> tainted_operand
 
+[@va_qattr]
 unfold let t_op_to_op (t:tainted_operand) : operand = 
   match t with 
   | TConst n -> OConst n
@@ -108,21 +110,19 @@ unfold let loc_buffer(#t:M.typ) (b:M.buffer t) = M.loc_buffer #t b
 unfold let locs_disjoint = M.locs_disjoint
 unfold let loc_union = M.loc_union
 
-let valid_maddr (m:maddr) (s:state) (b:M.buffer64) (index:int) (t:taint) = 
-  valid_src_addr s.mem b index /\
-  M.valid_taint_buf64 b s.mem s.memTaint t /\
-  eval_maddr m s == M.buffer_addr b s.mem + 8 `op_Multiply` index
+let valid_maddr (addr:int) (s_mem:M.mem) (s_memTaint:M.memtaint) (b:M.buffer64) (index:int) (t:taint) = 
+  valid_src_addr s_mem b index /\
+  M.valid_taint_buf64 b s_mem s_memTaint t /\
+  addr == M.buffer_addr b s_mem + 8 `op_Multiply` index
 
+let valid_mem_operand (addr:int) (t:taint) (s_mem:M.mem) (s_memTaint:M.memtaint) : Type0 =
+  exists (b:M.buffer64) (index:int).{:pattern (valid_maddr addr s_mem s_memTaint b index t)}
+    valid_maddr addr s_mem s_memTaint b index t
 
 [@va_qattr]
 let valid_operand (t:tainted_operand) (s:state) : Type0 =
-  let o = t_op_to_op t in
-  X64.Vale.State_i.valid_operand o s /\
-  (TMem? t ==> (exists (b:M.buffer64) (index:int) .  // REVIEW: Adding a pattern seems to make it unprovable: {:pattern valid_src_addr s.mem b index}
-   valid_maddr (TMem?.m t) s b index (TMem?.t t))) (*
-   valid_src_addr s.mem b index /\
-   M.valid_taint_buf64 b s.mem s.memTaint (TMem?.t t) /\
-   eval_maddr (TMem?.m t) s == M.buffer_addr b s.mem + 8 `op_Multiply` index)) *)
+  X64.Vale.State_i.valid_operand (t_op_to_op t) s /\
+  (match t with TMem m t -> valid_mem_operand (eval_maddr m s) t s.mem s.memTaint | _ -> True)
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
@@ -161,7 +161,7 @@ unfold let va_opr_code_Mem (o:va_operand) (offset:int) (t:taint) : va_operand =
   | TReg r -> TMem (MReg r offset) t
   | _ -> TConst 42
 
-let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : Lemma
+val va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) : Lemma
   (requires
     TReg? base /\
     valid_src_addr s.mem b index /\
@@ -169,11 +169,9 @@ let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) (b:M.buffer64) 
     eval_operand (t_op_to_op base) s + offset == M.buffer_addr b s.mem + 8 `op_Multiply` index
   )
   (ensures valid_operand (va_opr_code_Mem base offset t) s)
-  =
-  let t = va_opr_code_Mem base offset t in
-  M.lemma_valid_mem64 b index s.mem;
-  assert (valid_maddr (TMem?.m t) s b index (TMem?.t t))
-  
+
+val taint_at (memTaint:M.memtaint) (addr:int) : taint
+
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand (t_op_to_op o) s
 [@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : GTot nat64 = eval_operand (t_op_to_op o) s
@@ -565,3 +563,12 @@ val print_proc : (name:string) -> (code:va_code) -> (label:int) -> (p:printer) -
 val print_footer : printer -> FStar.All.ML unit
 val masm : printer
 val gcc : printer
+
+unfold let memTaint_type = map int taint
+
+// There can only be one!
+[@va_qattr]
+let max_one_mem (o1 o2:va_operand) : Type0 =
+  match (o1, o2) with
+  | (TMem _ _, TMem _ _) -> False
+  | _ -> True

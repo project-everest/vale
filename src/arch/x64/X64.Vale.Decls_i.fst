@@ -25,6 +25,14 @@ type ocmp = TS.tainted_ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
+let va_opr_lemma_Mem (s:va_state) (base:va_operand) (offset:int) (b:M.buffer64) (index:int) (t:taint) =
+  let t = va_opr_code_Mem base offset t in
+  M.lemma_valid_mem64 b index s.mem;
+  let TMem m t = t in
+  assert (valid_maddr (eval_maddr m s) s.mem s.memTaint b index t)
+
+let taint_at memTaint addr = Map.sel memTaint addr
+
 let va_cmp_eq o1 o2 = TS.TaintedOCmp (BS.OEq (t_op_to_op o1) (t_op_to_op o2)) Public
 let va_cmp_ne o1 o2 = TS.TaintedOCmp (BS.ONe (t_op_to_op o1) (t_op_to_op o2)) Public
 let va_cmp_le o1 o2 = TS.TaintedOCmp (BS.OLe (t_op_to_op o1) (t_op_to_op o2)) Public
