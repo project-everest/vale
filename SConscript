@@ -145,7 +145,7 @@ verify_options = {
   '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
   # Needed to significantly speed up verification of interop files (and use the checked Memory_i_s.fst with expose_interfaces)
-  'src/arch/x64/Views.fst': BuildOptions(fstar_default_args + ' --expose_interfaces SecretByte.fst'),
+  'src/arch/x64/Views.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
   'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
 
   'obj/lib/collections/Collections.Lists_i.fst': BuildOptions(fstar_default_args.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
