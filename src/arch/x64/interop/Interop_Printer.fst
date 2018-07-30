@@ -396,46 +396,63 @@ let print_vale_arg_value = function
   | (a, TBuffer ty, _) -> "buffer_addr(" ^ a ^ ", mem)"
   | (a, TBase ty, _) -> a
 
-let print_vale_calling_stack sstart (args:list arg) =
+let print_vale_calling_stack is_win sstart (args:list arg) =
   let rec aux (i:nat) (args:list arg) : Tot string (decreases %[args])  =
   match args with
   | [] -> ""
-  | a::q -> "        buffer_read(stack_b, " ^ (string_of_int (sstart + i)) ^ ", mem) == " ^  print_vale_arg_value a ^ ";\n" ^ aux (i+1) q
+  | a::q -> "        " ^ is_win ^ " " ^ "buffer_read(stack_b, " ^ (string_of_int (sstart + i)) ^ ", mem) == " ^  print_vale_arg_value a ^ ";\n" ^ aux (i+1) q
   in aux 0 args
 
-let print_calling_args os target sstart (args:list arg) =
+let print_calling_args_aux is_win os target sstart (args:list arg) =
   let rec aux regs (args:list arg) =
   match regs, args with
-    | [], q -> print_vale_calling_stack sstart q
+    | [], q -> print_vale_calling_stack is_win sstart q
     | _, [] -> ""
-    | r1::rn, a::q -> "        " ^ r1 ^ " == " ^ print_vale_arg_value a ^ ";\n" ^ aux rn q
+    | r1::rn, a::q -> "        " ^ is_win ^ " " ^ r1 ^ " == " ^ print_vale_arg_value a ^ ";\n" ^ aux rn q
   in aux (calling_registers os target) args
 
-let print_callee_saved os target =
+
+let print_calling_args target sstart (args:list arg) =
+  // Windows calling conventions
+  print_calling_args_aux "win ==>" Windows target sstart args ^
+  // Linux calling conventions
+  print_calling_args_aux "!win ==>" Linux target sstart args
+
+let print_callee_saved_aux is_win os target =
   let rec aux = function
     | [] -> ""
-    | a::q -> "        " ^ a ^ " == old(" ^ a ^ ");\n" ^ aux q
+    | a::q -> "        " ^ is_win ^ " " ^ a ^ " == old(" ^ a ^ ");\n" ^ aux q
   in aux (callee_saved os target)
 
-let print_xmm_callee_saved os target =
+let print_callee_saved target =
+  // Windows calling conventions
+  print_callee_saved_aux "win ==> " Windows target ^
+  // Linux calling conventions
+  print_callee_saved_aux "!win ==> " Linux target
+
+let print_xmm_callee_saved_aux is_win os target =
   let rec aux = function
     | [] -> ""
-    | a::q -> "        " ^ a ^ " == old(" ^ a ^ ");\n" ^ aux q
+    | a::q -> "        " ^ is_win ^ " " ^ a ^ " == old(" ^ a ^ ");\n" ^ aux q
   in aux (xmm_callee_saved os target)
 
-let translate_vale os target (func:func_ty) =
+let print_xmm_callee_saved target =
+  print_xmm_callee_saved_aux "win ==> " Windows target ^
+  print_xmm_callee_saved_aux "!win ==> " Linux target
+
+let translate_vale target (func:func_ty) =
   let name, args, Stk slots = func in
   let real_args = List.Tot.Base.filter not_ghost args in
-  let stack_before_args = slots + (if os = Windows then 5 else 0) in // Account for shadow space on windows
+  let stack_before_args = slots + 5 in // Account for shadow space on windows
   let nbr_stack_args = stack_before_args + List.Tot.Base.length real_args - 
-    List.Tot.Base.length (calling_registers os target) in
+    4 in
   let stack_needed = nbr_stack_args > 0 in  
   let args = if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args in
   "module Vale_" ^ name ^
   "\n#verbatim{:interface}{:implementation}\n" ^ 
   "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^
-  "procedure {:quick} " ^ name ^ "(" ^ print_vale_args args ^")\n" ^
-  "    requires/ensures\n" ^
+  "procedure {:quick}{:exportSpecs} " ^ name ^ "(inline win:bool," ^ print_vale_args args ^")\n" ^
+  "    requires\n" ^
   "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
   print_buff_readable args ^
   print_valid_taints args ^
@@ -444,8 +461,8 @@ let translate_vale os target (func:func_ty) =
   "        valid_stack_slots(mem, rsp, stack_b, " ^ (string_of_int slots) ^ ", memTaint);\n"
   else "") ^
   // stack_b and ghost args are not real arguments
-  print_calling_args os target stack_before_args real_args ^
-  "    ensures\n" ^ print_callee_saved os target ^ print_xmm_callee_saved os target ^
+  print_calling_args target stack_before_args real_args ^
+  "    ensures\n" ^ print_callee_saved target ^ print_xmm_callee_saved target ^
   "    modifies\n" ^
   "        rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;\n" ^
   "        xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;\n" ^

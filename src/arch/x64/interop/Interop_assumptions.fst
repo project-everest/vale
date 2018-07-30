@@ -13,3 +13,6 @@ assume val addrs: addr_map
 //The initial registers and xmms
 assume val init_regs:reg -> nat64
 assume val init_xmms:xmm -> quad32
+
+// Abstract current operating system from Low*
+assume val win:bool
