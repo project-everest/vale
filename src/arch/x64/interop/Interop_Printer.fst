@@ -113,9 +113,17 @@ let namelist_of_args args =
   | (a, _, _)::q -> a ^ ";" ^ aux q in
   "[" ^ aux args ^ "]" 
 
+(* Only called with a list of buffer args *)
+let rec disj_disjoint a = function
+  | [] -> ""
+  | (b, _, _)::q -> "  disjoint_or_eq " ^ a ^ " " ^ b ^ " /\ \n" ^ disj_disjoint a q
+
 let disjoint args =
   let args = List.Tot.Base.filter is_buffer args in
-  "bufs_disjoint " ^ namelist_of_args args
+  let rec aux (args: list arg) = match args with
+  | [] -> ""
+  | (a, _, _)::q -> disj_disjoint a q ^ aux q in
+  aux args
 
 let reg_to_low = function
   | "rax" -> "Rax"
@@ -368,6 +376,8 @@ let translate_lowstar target (func:func_ty) =
   "open Vale_" ^ name ^ "\n\n" ^
   "let b8 = B.buffer UInt8.t\n" ^
   "let s8 = B.buffer S8.t\n\n" ^
+  "unfold let disjoint_or_eq (#a:Type0) (b1:B.buffer a) (b2:B.buffer a) =
+  M.(loc_disjoint (loc_buffer b1) (loc_buffer b2)) \/ b1 == b2\n\n" ^
    "let rec loc_locs_disjoint_rec (l:s8) (ls:list s8) : Type0 =\n" ^
    "  match ls with\n" ^
    "  | [] -> True\n" ^
@@ -379,7 +389,7 @@ let translate_lowstar target (func:func_ty) =
   "unfold\nlet bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)\n\n" ^
   "unfold\nlet buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
-  "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
+  "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ (print_lengths args) ^ "\n" ^
   "let post_cond (h:HS.mem) (h:HS.mem) " ^ (print_args_list args) ^ "= " 
     ^ (liveness "h" args) ^ " /\\ " ^ (liveness "h'" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
   "val " ^ name ^ ": " ^ (print_low_args args) ^

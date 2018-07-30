@@ -478,7 +478,6 @@ let gcm_make_length_quad_buffer
   = 
   Gcm_make_length_win.gcm_make_length_quad_buffer_win plain_num_bytes auth_num_bytes b
 
-
 let quad32_xor_buffer 
   (src1 src2 dst:B.buffer U8.t)
   : Stack unit
@@ -500,7 +499,7 @@ let quad32_xor_buffer
      dst = quad32_xor src1 src2)
   )
   =
-  admit() //Quad32_xor_win.quad32_xor_buffer_win src1 src2 dst
+  Quad32_xor.quad32_xor_buffer src1 src2 dst
   
 (*** Actual Low* code ***)
 
