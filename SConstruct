@@ -29,7 +29,6 @@ if (sys.platform == 'win32' and os.getenv('PLATFORM')=='X64') or platform.machin
   
 envDict = {'TARGET_ARCH':target_arch,
            'X':target_x,
-           'ARCH':'src/arch/x$X',
            'SHA_ARCH_DIR':sha_arch_dir,
            'AES_ARCH_DIR':aes_arch_dir}
 
@@ -298,7 +297,7 @@ if 'KREMLIN_HOME' in os.environ:
   kremlib_path = kremlin_path + '/kremlib'
 
 env['VALE'] = File('bin/vale.exe')
-env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
+env['VALE_INCLUDE'] = '-include ' + str(File('code/lib/util/operator.vaf'))
 
 # Useful Dafny command lines
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
@@ -388,18 +387,21 @@ def replace_extension(path, new_ext):
 ####################################################################
 
 # The obj directory structure is based on the src and tools directory structures:
-#   src/... --> obj/...
+#   code/... --> obj/...
+#   specs/... --> obj/...
 #   tools/... --> obj/...
 def to_obj_dir(path):
   path = os.path.relpath(path)
   path = path.replace('\\', '/')
   if path.startswith('obj/'):
     return path
-  if path.startswith('src/'):
-    return path.replace('src/', 'obj/', 1)
+  if path.startswith('code/'):
+    return path.replace('code/', 'obj/', 1)
+  if path.startswith('specs/'):
+    return path.replace('specs/', 'obj/', 1)
   if path.startswith('tools/'):
     return path.replace('tools/', 'obj/', 1)
-  raise Exception('expected src/... or tools/..., found ' + path)
+  raise Exception('expected code/... or specs/... or tools/..., found ' + path)
 
 # obj/... -> hints/...
 def to_hints_dir(path):
@@ -412,7 +414,7 @@ def to_hints_dir(path):
 def has_obj_dir(path):
   path = os.path.relpath(path)
   path = path.replace('\\', '/')
-  return path.startswith('obj/') or path.startswith('src/') or path.startswith('tools/')
+  return path.startswith('obj/') or path.startswith('code/') or path.startswith('specs/') or path.startswith('tools/')
 
 ####################################################################
 #
@@ -472,7 +474,7 @@ def vale_fstar_file_scan(node, env, path):
 
   v_vaf_includes = []
   for (attrs, inc) in includes:
-    f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+    f = os.path.join('code' if vale_from_base_re.search(attrs) else dirname, inc)
     if not vale_verbatim_re.search(attrs):
       v_vaf_includes.append(f)
       # if A.vaf includes B.vaf, then manually establish these dependencies:
@@ -682,7 +684,7 @@ def add_kremlin(env):
                            emitter = kremlin_emitter)
   # Copy pre-generated FStar.h; could be regenerared using
   # krml -fnouint128 -I ../kremlin/kremlib -skip-compilation ulib/FStar.UInt128.fst
-  env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
+  #env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
   env.Append(BUILDERS = {'Kremlin' : kremlin})
 
 # Pseudo-builder that takes Dafny code and extracts it via Kremlin
@@ -738,7 +740,7 @@ def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name)
   alg_cmx = ml_out_name(alg_name, '.cmx')
   cmdline_ml = ml_out_name(cmdline_name, '.ml')
   cmdline_cmx = ml_out_name(cmdline_name, '.cmx')
-  pointer_src = 'src/lib/util/FStar_Pointer_Base.ml'
+  pointer_src = 'code/lib/util/FStar_Pointer_Base.ml'
   pointer_ml = ml_out_name(pointer_src, '.ml')
   pointer_cmx = ml_out_name(pointer_src, '.cmx')
   env.Command(pointer_ml, pointer_src, Copy("$TARGET", "$SOURCE"))
@@ -838,14 +840,14 @@ def extract_vale_code(env, vads, vad_main_dfy, output_base_name):
 def build_test(env, inputs, include_dir, output_base_name):
   testenv = env.Clone()
   if 'KREMLIN_HOME' in os.environ:
-    testenv.Append(CPPPATH=[kremlib_path, 'src/lib/util', include_dir])
+    testenv.Append(CPPPATH=[kremlib_path, 'code/lib/util', include_dir])
   else:
     # We need gcc_compat.h from kremlib:
-    testenv.Append(CPPPATH=['#tools/Kremlin/kremlib', 'src/lib/util', include_dir])
+    testenv.Append(CPPPATH=['#tools/Kremlin/kremlib', 'code/lib/util', include_dir])
   inputs_obj = []
   for inp in inputs:
     inps = str(inp)
-    if inps.startswith('src/'):
+    if inps.startswith('code/'):
       inp = env.CopyAs(source=inp, target=to_obj_dir(inps))
     inputs_obj.append(inp)
   if sys.platform == 'win32':
@@ -1201,10 +1203,10 @@ env.VerifyFilesIn(verify_paths)
 # build aesgcm
 #
 if fstar_extract and stage2:
-  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/x64/Main.ml', 'src/crypto/aes/x64/X64.GCMdecrypt.vaf', 'src/lib/util/CmdLineParser.ml')
+  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'code/crypto/aes/x64/Main.ml', 'code/crypto/aes/x64/X64.GCMdecrypt.vaf', 'code/lib/util/CmdLineParser.ml')
   if env['TARGET_ARCH'] == 'amd64': 
     aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
-    aesgcmtest_src = 'src/crypto/aes/x64/TestAesGcm.cpp'
+    aesgcmtest_src = 'code/crypto/aes/x64/TestAesGcm.cpp'
     aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
     env.Command(aesgcmtest_cpp, aesgcmtest_src, Copy("$TARGET", "$SOURCE"))
     aesgcmtest_exe = env.Program(source = [aesgcmasm_obj, aesgcmtest_cpp], target = 'obj/TestAesGcm.exe')

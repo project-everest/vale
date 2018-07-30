@@ -3,7 +3,6 @@ open X64.Machine_s
 open X64.Vale.State_i
 open FStar.FunctionalExtensionality
 module S = X64.Semantics_s
-module M = TransparentMap
 module BS = X64.Bytes_Semantics_s
 module ME = X64.Memory_i_s
 module TS = X64.Taint_Semantics_s

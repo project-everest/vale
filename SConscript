@@ -13,8 +13,8 @@ Import('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_
 # Verify *.vad and *.dfy under src/test/ and tools/vale/test/
 #
 verify_paths = [
-  'src/',
-  'tools/Vale/test',
+  'code/',
+  'specs/',
 ]
 Export('verify_paths')
 
@@ -59,14 +59,17 @@ Export('manual_dependencies')
 # so the include path should contain obj/... for any .vaf files.
 #
 fstar_include_paths = [
-  'obj/Vale/test',
   'obj/test',
   'obj/arch',
   'obj/arch/x64/',
   'obj/arch/x64/interop',
+  'obj/defs/',
+  'obj/hardware/',
   'obj/lib/collections/',
   'obj/lib/math',
   'obj/lib/util',
+  'obj/math/',
+  'obj/crypto/',
   'obj/crypto/aes/',
   'obj/crypto/aes/x64',
   'obj/crypto/poly1305/',
@@ -92,69 +95,70 @@ verify_options = {
   'src/lib/util/operations.i.dfy': BuildOptions(dafny_default_args_larith + ' /proverOpt:OPTIMIZE_FOR_BV=true'),
   'obj/crypto/aes/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
   'obj/crypto/aes/x64/cbc.gen.dfy': BuildOptions(dafny_default_args_larith + ' /timeLimit:120'),
-  'src/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
+  'code/lib/util/operator.vaf': BuildOptions(fstar_default_args, valeIncludes = ''),
 
   # Any use of expose_interfaces requires adding to manual_dependencies
-  'src/arch/x64/X64.Vale.InsLemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'code/arch/x64/X64.Vale.InsLemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
   'obj/arch/x64/X64.Vale.InsBasic.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
   'obj/arch/x64/X64.Vale.InsMem.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
   'obj/arch/x64/X64.Vale.InsVector.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
   'obj/arch/x64/X64.Vale.InsAes.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Vale.Decls_i.fst' + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
-  'src/arch/x64/X64.Vale.StateLemmas_i.fsti': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
-  'src/arch/x64/X64.Vale.StateLemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
-  'src/arch/x64/X64.Vale.Lemmas_i.fsti': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
-  'src/arch/x64/X64.Vale.Lemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
-  'src/arch/x64/X64.Vale.Decls_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'code/arch/x64/X64.Vale.StateLemmas_i.fsti': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'code/arch/x64/X64.Vale.StateLemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'code/arch/x64/X64.Vale.Lemmas_i.fsti': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'code/arch/x64/X64.Vale.Lemmas_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
+  'code/arch/x64/X64.Vale.Decls_i.fst': BuildOptions(fstar_default_args + ' --expose_interfaces obj/arch/x64/X64.Memory_i.fst'),
 
   # .dfy files default to this set of options
   '.dfy': BuildOptions(dafny_default_args_larith),
 
   # Special treatment for sensitive modules
-  'src/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
+  'code/arch/x64/X64.Leakage_Ins_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
 
   # Disable verification by adding 'filename': None
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
-  'src/crypto/aes/x64/Low.GCMencrypt.fst': None,
+  'code/crypto/aes/x64/Low.GCMencrypt.fst': None,
 #  'src/arch/x64/interop/*.fst': None,
 #  'src/arch/x64/interop/*.fsti': None,
 
   # Interop stubs
-  'src/arch/x64/interop/AESEncryptBlock_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/AESEncryptBE_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Gcm_load_xor_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Gcm_make_length_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/GCTR_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/GHash_extra_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/GHash_one_block_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/GHash_stdcall_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Inc32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Mk_quad32_1_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Quad32_xor_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Reverse_quad32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
-  'src/arch/x64/interop/Zero_quad32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/AESEncryptBlock_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/AESEncryptBE_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Gcm_load_xor_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Gcm_make_length_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/GCTR_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/GHash_extra_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/GHash_one_block_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/GHash_stdcall_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Inc32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Mk_quad32_1_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Quad32_xor_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Reverse_quad32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
+  'code/arch/x64/interop/Zero_quad32_win.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst'),
   
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
-  'src/*/*.fst': BuildOptions(fstar_default_args),
-  'src/*/*.fsti': BuildOptions(fstar_default_args),
-
+  'code/*/*.fst': BuildOptions(fstar_default_args),
+  'code/*/*.fsti': BuildOptions(fstar_default_args),
+  'specs/*/*.fst': BuildOptions(fstar_default_args),
+  'specs/*/*.fsti': BuildOptions(fstar_default_args),
 
   # .fst/.fsti files default to this set of options
   '.fst': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
   '.fsti': BuildOptions(fstar_default_args + ' --use_two_phase_tc false'),
 
   # Needed to significantly speed up verification of interop files (and use the checked Memory_i_s.fst with expose_interfaces)
-  'src/arch/x64/Views.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
-  'src/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
+  'code/arch/x64/Views.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
+  'code/arch/x64/X64.Bytes_Semantics_i.fst': BuildOptions(fstar_default_args.replace('--smtencoding.nl_arith_repr wrapped', '--smtencoding.nl_arith_repr native') + ' --expose_interfaces SecretByte.fst'),
 
   'obj/lib/collections/Collections.Lists_i.fst': BuildOptions(fstar_default_args.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100','')),
-  'src/crypto/poly1305/x64/X64.Poly1305.Util_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
-  'src/crypto/poly1305/x64/X64.Poly1305.Util_i.fsti': BuildOptions(fstar_default_args_nosmtencoding),
-  'src/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces obj/arch/SecretByte.fst'),
-  'src/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '') + '--smtencoding.elim_box true '),
-  'src/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
-  'src/lib/util/BufferViewHelpers.fst' : BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.arith.nl=false', '')),
+  'code/crypto/poly1305/x64/X64.Poly1305.Util_i.fst': BuildOptions(fstar_default_args_nosmtencoding),
+  'code/crypto/poly1305/x64/X64.Poly1305.Util_i.fsti': BuildOptions(fstar_default_args_nosmtencoding),
+  'code/arch/x64/X64.Memory_i_s.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst'),
+  'code/arch/x64/Interop.fst': BuildOptions(fstar_default_args_nosmtencoding.replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '') + '--smtencoding.elim_box true '),
+  'code/arch/Memory_s.fst': BuildOptions(fstar_default_args.replace('--use_extracted_interfaces true', '')),
+  'code/lib/util/BufferViewHelpers.fst' : BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.arith.nl=false', '')),
 
   # We copy these files from F*'s library because we need to generate a .checked file for them,
   # but we don't need to reverify them:
@@ -165,8 +169,8 @@ verify_options = {
   '.vaf': BuildOptions(fstar_default_args  + ' --use_two_phase_tc false'),
 }
 if env['TARGET_ARCH'] != 'x86':
-  verify_options['src/test/memcpy.vad'] = None
-  verify_options['src/test/stack-test.vad'] = None
+  verify_options['code/test/memcpy.vad'] = None
+  verify_options['code/test/stack-test.vad'] = None
 
 if do_fstar and stage1:
   for x in ['CanonCommSwaps.fst', 'CanonCommMonoid.fst', 'CanonCommSemiring.fst']:

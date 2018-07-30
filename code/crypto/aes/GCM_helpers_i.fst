@@ -276,8 +276,6 @@ let lemma_mod_n_8_lower1 (q:quad32) (n:nat) : Lemma
   assert_norm (f 4);
   ()
 
-#push-options "--smtencoding.nl_arith_repr native"
-
 let lemma_mod_n_8_lower2 (q:quad32) (n:nat) : Lemma
   (requires n <= 4)
   (ensures lo64 q % pow2 (8 * (4 + n)) == q.lo0 + 0x100000000 * (q.lo1 % pow2 (8 * n)))
@@ -290,8 +288,6 @@ let lemma_mod_n_8_lower2 (q:quad32) (n:nat) : Lemma
   assert_norm (f 1);
   assert_norm (f 0);
   ()
-
-#pop-options
 
 let lemma_mod_n_8_upper1 (q:quad32) (n:nat) : Lemma
   (requires n <= 4)
