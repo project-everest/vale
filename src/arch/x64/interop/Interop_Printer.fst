@@ -380,8 +380,8 @@ let translate_lowstar target (func:func_ty) =
   "unfold\nlet buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
-  "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
-    ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
+  "let post_cond (h:HS.mem) (h:HS.mem) " ^ (print_args_list args) ^ "= " 
+    ^ (liveness "h" args) ^ " /\\ " ^ (liveness "h'" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
   "val " ^ name ^ ": " ^ (print_low_args args) ^
   "\n\t(requires (fun h -> pre_cond h " ^ (print_args_names args) ^ "))\n\t" ^
   "(ensures (fun h0 _ h1 -> post_cond h0 h1 " ^ (print_args_names args) ^ "))\n\n" ^    
@@ -407,12 +407,25 @@ let rec print_vale_args = function
   | [arg] -> print_vale_arg arg
   | arg::q -> print_vale_arg arg ^ ", " ^ print_vale_args q
 
-let rec print_vale_loc_buff = function
+let rec print_vale_disjoint_or_eq_aux a = function
   | [] -> ""
-  | [(_, TBase _, _)] | [(_, TGhost _, _)] -> ""
-  | [(a, TBuffer _, _)] -> "loc_buffer("^a^")"
-  | (a, TBuffer _, _)::q -> "loc_buffer("^a^"), " ^ print_vale_loc_buff q
-  | a::q -> print_vale_loc_buff q
+  | (b, TBuffer _, _)::q -> "        locs_disjoint(list(loc_buffer("^a^"), loc_buffer("^b^"))) \/ "^a^ " == "^b ^ ";\n"^ print_vale_disjoint_or_eq_aux a q
+  | _::q -> print_vale_disjoint_or_eq_aux a q
+
+let rec print_vale_disjoint_or_eq = function
+  | [] -> ""
+  | (a, TBuffer _, _)::q -> print_vale_disjoint_or_eq_aux a q ^ print_vale_disjoint_or_eq q
+  | a::q -> print_vale_disjoint_or_eq q
+
+let rec print_vale_disjoint_aux a = function
+  | [] -> ""
+  | (b, TBuffer _, _)::q -> "        locs_disjoint(list(loc_buffer("^a^"), loc_buffer("^b^")));\n" ^ print_vale_disjoint_aux a q
+  | _::q -> print_vale_disjoint_aux a q
+
+let rec print_vale_disjoint = function
+  | [] -> ""
+  | (a, TBuffer _, _)::q -> print_vale_disjoint_aux a q ^ print_vale_disjoint q
+  | a::q -> print_vale_disjoint q
 
 let rec print_buff_readable = function
   | [] -> ""
@@ -491,7 +504,10 @@ let translate_vale target (func:func_ty) =
   "\nopen X64.Machine_s\nopen X64.Memory_i\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^
   "procedure {:quick}{:exportSpecs} " ^ name ^ "(inline win:bool," ^ print_vale_args args ^")\n" ^
   "    requires\n" ^
-  "        locs_disjoint(list(" ^ print_vale_loc_buff args ^ "));\n" ^
+  // By default, buffer arguments are disjoint or equal
+  print_vale_disjoint_or_eq (List.Tot.Base.tl args) ^
+  // stack_b is disjoint from all other buffers
+  print_vale_disjoint_aux "stack_b" (List.Tot.Base.tl args) ^
   print_buff_readable args ^
   print_valid_taints args ^
   (if stack_needed then
