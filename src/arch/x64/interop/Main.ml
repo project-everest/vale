@@ -15,12 +15,12 @@ let memcpy = ("memcpy", [("dst", TBuffer TUInt64, Sec); ("src", TBuffer TUInt64,
   ],
     Stk (Prims.parse_int "18"))
 *)
-
+(*
 let aes_encrypt_block = ("aes128_encrypt_block_win", [
   ("output_b", TBuffer TUInt128, Sec); ("input_b", TBuffer TUInt128, Sec);
   ("key", TGhost "aes_key_LE AES_128", Pub); ("keys_b", TBuffer TUInt128, Sec)
   ], Stk (Prims.parse_int "0"))
-
+*)
 
 (*
 let ghash = ("ghash_incremental_bytes_stdcall_win", [
@@ -87,12 +87,12 @@ let mk_quad1 = ("mk_quad32_lo0_be_1_buffer_win", [("b", TBuffer TUInt128, Sec)],
 (*
 let zero_quad32_buffer = ("zero_quad32_buffer_win", [("b", TBuffer TUInt128, Sec)], Stk (Prims.parse_int "0"))
 *)
+(*
 let reverse_quad32 = ("reverse_bytes_quad32_buffer_win", [("b", TBuffer TUInt128, Sec)], Stk (Prims.parse_int "0"))
+*)
 
-let os = Windows
+let name = memcpy 
 
-let name = reverse_quad32 
-
-let _ = print_string (translate_vale os X86 name)
+let _ = print_string (translate_vale X86 name)
 let _ = print_newline()
-let _ = print_string (translate_lowstar os X86 name)
+let _ = print_string (translate_lowstar X86 name)
