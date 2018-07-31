@@ -1,0 +1,101 @@
+include "../../../../arch/x64/X64.Vale.InsBasic.vaf"
+include "../../../../arch/x64/X64.Vale.InsMem.vaf"
+include "../../../../arch/x64/X64.Vale.InsVector.vaf"
+include "../../../../arch/x64/X64.Vale.InsAes.vaf"
+
+module X64.AESCTR
+
+#verbatim{:interface}{:implementation}
+//open Opaque_s
+open Types_s
+open FStar.Seq.Base
+open AES_s
+open X64.Machine_s
+open X64.Memory_i
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+open X64.Vale.InsVector
+open X64.Vale.InsAes
+open X64.Vale.QuickCode_i
+open X64.Vale.QuickCodes_i
+open X64.Poly1305.Math_i    // For lemma_poly_bits64()
+open GCM_helpers_i
+//open Types_i
+//open AES256_helpers_i
+#endverbatim
+
+// TODO: Add XMM memory operands, so we can avoid using xmm3 to hold constants
+
+procedure aes_ctr_inner(
+    ghost plain_b:buffer128,
+    ghost plain_num_bytes:nat64,
+    ghost out_b:buffer128,
+
+    ghost key:aes_key_LE(AES_128),
+    ghost round_keys:seq(quad32),
+    ghost keys_b:buffer128
+    )
+    lets 
+        plain_ptr @= rdi; num_bytes @= r8; out_ptr @= rsi; key_ptr @= r9;
+        ivec @= rdx; nonce @= rcx; // r12 = num_rounds (nr)
+    requires
+        validSrcAddrs128(mem, plain_ptr,  plain_b,  bytes_to_quad_size(num_bytes), memTaint, Secret);
+        validDstAddrs128(mem, out_ptr, out_b, bytes_to_quad_size(num_bytes), memTaint, Secret);
+        plain_ptr  + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        out_ptr + 16 * bytes_to_quad_size(num_bytes) < pow2_64;
+        buffer_length(plain_b)  <= buffer_length(out_b);
+        num_bytes < pow2_32;
+    reads key_ptr; ivec; nonce; memTaint;
+    modifies rax; r10; xmm0; xmm1; xmm2; xmm3; plain_ptr; num_bytes; out_ptr; efl; mem;
+    ensures 
+        true;
+{
+    lemma_poly_bits64();
+
+    Mov64(r10, r8);
+    Shr64(r8, 4);   // r8 := num_bytes / 16 == num_blocks
+    And64(r10, 15); // r10 := num_bytes % 16 (note that OpenSSL uses Shl64(r10, 60))
+    assert r8 == old(num_bytes) / 16;
+    assert r10 == old(num_bytes) % 16;
+    if (r10 > 0) {
+        Add64(r8, 1);  // Add one to account for trailing blocks
+    }
+    ghost var num_blocks := r8;
+
+    // OpenSSL: NO_PARTS_4
+    Mov64(r10, r8);
+    And64(r10, 15); // r10 := num_blocks % 4 (note that OpenSSL uses Shl64(r10, 60); Shr64(r10,60))
+    assert r10 == num_blocks % 4;
+
+    // Initialize masks and counters
+    Pinsrq(xmm0, nonce, 1);     // Put ivec in the upper 64 bits of xmm0
+    Pinsrd(xmm0, rcx, 1);       // Put nonce in the upper 32 bits of the lower 64 bits of xmm0
+    Psrldq(xmm0, 4);
+    Mov128(xmm2, xmm0);             // Copy xmm0 into xmm2
+    InitPshufbDupMask(xmm3, rax);   // xmm3 := dup_mask
+    Pshufb(xmm2, xmm3);             // LSB: 0 | bswap(ivec_hi) | 0 | bswap(ivec_hi) 
+    PinsrdImm(xmm3, 2, 0, rax);
+    PinsrdImm(xmm3, 1, 2, rax);     // xmm3 := TWO_N_ONE
+    Paddd(xmm2, xmm3);
+    Mov128(xmm1, xmm2);
+    PinsrdImm(xmm3, 2, 2, rax);     // xmm3 := TWO_N_TWO
+    Paddd(xmm2, xmm3);
+    InitPshufb64Mask(xmm3, rax);
+    Pshufb(xmm1, xmm3);             // xmm1 == LSB: ivec_hi | bswap(2) | ivec_hi | bswap(1)
+    Pshufb(xmm2, xmm3);             // xmm2 == LSB: ivec_hi | bswap(4) | ivec_hi | bswap(3)
+
+    Shr64(r8, 2);
+    assert r8 == num_blocks / 4;
+
+    if (r8 > 0) {
+//        Sub64(plain_ptr, 64);     // TODO: We would need to prove that plain_ptr >= 64...
+//        Sub64(out_ptr, 64);
+        //aes_ctr_loop();
+    }
+
+    
+    // OpenSSL: REMAINDER_4
+
+}

@@ -380,6 +380,27 @@ procedure {:quick exportOnly} InitPshufbMask(inout dst:xmm, out tmp:reg_opr64)
     PinsrqImm(dst, 0x0001020304050607, 1, tmp);
 }
 
+procedure {:quick exportOnly} InitPshufbDupMask(inout dst:xmm, out tmp:reg_opr64)
+    modifies efl;
+    ensures
+        dst == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x0C0D0E0F, 0x08090A0B);
+{
+    assert two_to_nat(32, Mktwo(0x0C0D0E0F, 0x08090A0B)) == 0x08090A0B0C0D0E0F; // OBSERVE
+    PinsrqImm(dst, 0x08090A0B0C0D0E0F, 0, tmp);
+    PinsrqImm(dst, 0x08090A0B0C0D0E0F, 1, tmp);
+}
+
+procedure {:quick exportOnly} InitPshufb64Mask(inout dst:xmm, out tmp:reg_opr64)
+    modifies efl;
+    ensures
+        dst == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B);
+{
+    assert two_to_nat(32, Mktwo(0x0C0D0E0F, 0x08090A0B)) == 0x08090A0B0C0D0E0F; // OBSERVE
+    assert two_to_nat(32, Mktwo(0x04050607, 0x00010203)) == 0x0001020304050607; // OBSERVE
+    PinsrqImm(dst, 0x0001020304050607, 0, tmp);
+    PinsrqImm(dst, 0x08090A0B0C0D0E0F, 1, tmp);
+}
+
 // TODO: Lots of room to optimize this using bitwise operations
 procedure {:quick} XmmEqual()
     lets x1 @= xmm0; x2 @= xmm1; tmp @= rdx; result @= rax;
