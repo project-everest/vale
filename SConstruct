@@ -1140,13 +1140,13 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage1', 'stage2', 'fstar_extract')
 
 # Include the SConscript files themselves
-vale_tool_results = SConscript('tools/Vale/SConscript')
-vale_deps = vale_tool_results.dependencies;
-env['Z3'] = vale_tool_results.z3
-if sys.platform == 'win32':
-  env['DAFNY_Z3_PATH'] = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
-else:
-  env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
+#vale_tool_results = SConscript('tools/Vale/SConscript')
+vale_deps = [] #vale_tool_results.dependencies;
+#env['Z3'] = vale_tool_results.z3
+#if sys.platform == 'win32':
+#  env['DAFNY_Z3_PATH'] = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
+#else:
+#  env['DAFNY_Z3_PATH'] = '/z3exe:$Z3'
 
 # Check F* version
 if do_fstar and not fstar_my_version:
