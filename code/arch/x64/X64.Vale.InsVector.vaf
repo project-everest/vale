@@ -95,6 +95,20 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Psrldq(dst, amt), list(), list(
 {
 }
 
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Shufpd(dst, src, permutation), list(), list()), Public))}{:quick exportOnly}
+          Shufpd(inout dst:xmm, src:xmm, inline permutation:imm8)
+    requires permutation < 4;
+    modifies efl;
+    ensures
+        dst == old(Mkfour(
+                    (if permutation = 0 || permutation = 2 then dst.lo0 else dst.hi2),
+                    (if permutation = 0 || permutation = 2 then dst.lo1 else dst.hi3),
+                    (if permutation = 0 || permutation = 1 then src.lo0 else src.hi2),
+                    (if permutation = 0 || permutation = 1 then src.lo1 else src.hi3)));
+{
+}
+
+
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufb(dst, src), list(), list()), Public))}{:quick exportOnly}
           Pshufb(inout dst:xmm, src:xmm)
     requires
@@ -104,6 +118,57 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufb(dst, src), list(), list(
         dst == reverse_bytes_quad32(old(dst));
 {
 }
+
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufb(dst, src), list(), list()), Public))}{:quick exportOnly}
+          PshufbDup(inout dst:xmm, src:xmm)
+    requires
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x0C0D0E0F, 0x08090A0B);
+    modifies efl;
+    ensures
+        dst == old(Mkfour(reverse_bytes_nat32(dst.hi3),
+                          reverse_bytes_nat32(dst.hi2),
+                          reverse_bytes_nat32(dst.hi3),
+                          reverse_bytes_nat32(dst.hi2)));
+{
+}
+
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufb(dst, src), list(), list()), Public))}{:quick exportOnly}
+          Pshufb64(inout dst:xmm, src:xmm)
+    requires
+        src == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B);
+    modifies efl;
+    ensures
+        dst == old(Mkfour(reverse_bytes_nat32(dst.lo1),
+                          reverse_bytes_nat32(dst.lo0),
+                          reverse_bytes_nat32(dst.hi3),
+                          reverse_bytes_nat32(dst.hi2)));
+{
+}
+
+/*
+procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufb(dst, src), list(), list()), Public))}{:quick exportOnly}
+          Pshufb(inout dst:xmm, src:xmm)
+    requires
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203) ||
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x0C0D0E0F, 0x08090A0B) ||
+        src == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B);
+    modifies efl;
+    ensures
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203) ==> 
+            dst == reverse_bytes_quad32(old(dst));
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x0C0D0E0F, 0x08090A0B) ==> 
+            dst == Mkfour(reverse_bytes_nat32(dst.hi3),
+                          reverse_bytes_nat32(dst.hi2),
+                          reverse_bytes_nat32(dst.hi3),
+                          reverse_bytes_nat32(dst.hi2));
+        src == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B) ==> 
+            dst == Mkfour(reverse_bytes_nat32(dst.lo1),
+                          reverse_bytes_nat32(dst.lo0),
+                          reverse_bytes_nat32(dst.hi3),
+                          reverse_bytes_nat32(dst.hi2));
+{
+}
+*/
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufd(dst, src, permutation), list(), list()), Public))}{:quick exportOnly}
           Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)

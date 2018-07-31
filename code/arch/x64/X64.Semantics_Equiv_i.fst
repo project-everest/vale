@@ -266,6 +266,12 @@ let equiv_eval_psrldq (s:state) (ins:S.ins{S.Psrldq? ins}) : Lemma (
   s_hi.state.S.ok ==> s_hi.state == s_bytes) =
   ()
 
+let equiv_eval_shufpd (s:state) (ins:S.ins{S.Shufpd? ins}) : Lemma (
+  let s_hi = run (eval_ins ins) s in
+  let s_bytes = S.run (S.eval_ins ins) s.state in
+  s_hi.state.S.ok ==> s_hi.state == s_bytes) =
+  ()
+
 let equiv_eval_pshufb (s:state) (ins:S.ins{S.Pshufb? ins}) : Lemma (
   let s_hi = run (eval_ins ins) s in
   let s_bytes = S.run (S.eval_ins ins) s.state in
@@ -393,6 +399,7 @@ let equiv_eval_ins s ins = match ins with
   | S.Pslld _ _ -> equiv_eval_pslld s ins
   | S.Psrld _ _ -> equiv_eval_psrld s ins
   | S.Psrldq _ _ -> equiv_eval_psrldq s ins
+  | S.Shufpd _ _ _ -> equiv_eval_shufpd s ins
   | S.Pshufb _ _ -> equiv_eval_pshufb s ins
   | S.Pshufd _ _ _ -> equiv_eval_pshufd s ins
   | S.Pcmpeqd _ _ -> equiv_eval_pcmpeqd s ins

@@ -84,6 +84,15 @@ let check_if_psrldq_leakage_free ins ts =
   let ts' = set_xmm_taint ts dst taint in
   true, TaintState ts'.regTaint ts.flagsTaint ts.cfFlagsTaint ts'.xmmTaint
 
+val check_if_shufpd_leakage_free: (ins:tainted_ins{let i, _, _ = ins.ops in S.Shufpd? i}) -> (ts:taintState) -> (res:(bool*taintState){let b, ts' = res in b2t b ==>
+     isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'})
+
+let check_if_shufpd_leakage_free ins ts =
+  let S.Shufpd dst src _, _, _ = ins.ops in
+  let taint = merge_taint (xmm_taint ts dst) (xmm_taint ts src) in
+  let ts' = set_xmm_taint ts dst taint in
+  true, TaintState ts'.regTaint Secret Secret ts'.xmmTaint
+
 val check_if_pshufb_leakage_free: (ins:tainted_ins{let i, _, _ = ins.ops in S.Pshufb? i}) -> (ts:taintState) -> (res:(bool*taintState){let b, ts' = res in b2t b ==>
      isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'})
 
@@ -410,6 +419,7 @@ let check_if_xmm_ins_consumes_fixed_time ins ts =
     | S.Pslld dst amt -> check_if_pslld_leakage_free ins ts
     | S.Psrld dst amt -> check_if_psrld_leakage_free ins ts
     | S.Psrldq _ _ -> check_if_psrldq_leakage_free ins ts
+    | S.Shufpd _ _ _ -> check_if_shufpd_leakage_free ins ts
     | S.Pshufb dst src -> check_if_pshufb_leakage_free ins ts
     | S.Pshufd dst src permutation -> check_if_pshufd_leakage_free ins ts
     | S.Pinsrd _ _ _  -> check_if_pinsrd_leakage_free ins ts

@@ -199,6 +199,7 @@ let print_ins (ins:tainted_ins) (p:printer) =
   | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
   | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
   | Psrldq dst amt         -> "  psrldq "     ^ print_pair (print_xmm dst p) (print_imm8 amt p)
+  | Shufpd dst src perm    -> "  shufpd "     ^ print_pair (print_xmms dst src) (print_imm8 perm p)
   | Pshufb dst src         -> "  pshufb "     ^ print_xmms dst src
   | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count p)
   | Pcmpeqd dst src        -> "  pcmpeqd "    ^ print_xmms dst src

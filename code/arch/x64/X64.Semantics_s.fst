@@ -374,15 +374,34 @@ let eval_ins (ins:ins) : GTot (st unit) =
     let dst_q = le_bytes_to_quad32 (append zero_pad remaining_bytes) in
     update_xmm_preserve_flags dst dst_q
 
-   | S.Pshufb dst src -> 
+  | S.Shufpd dst src permutation ->
+    check_imm (0 <= permutation && permutation < 4);;
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
-    // We only spec a restricted version sufficient for doing a byte reversal
-    check_imm (src_q.lo0 = 0x0C0D0E0F &&
-	       src_q.lo1 = 0x08090A0B &&
-	       src_q.hi2 = 0x04050607 &&
-	       src_q.hi3 = 0x00010203);;
-    update_xmm dst ins (reverse_bytes_quad32 dst_q)
+    let result = Mkfour (if permutation % 2 = 0 then dst_q.lo0 else dst_q.hi2)
+                        (if permutation % 2 = 0 then dst_q.lo1 else dst_q.hi3)
+                        (if (permutation / 2) % 2 = 0 then src_q.lo0 else src_q.hi2)
+                        (if (permutation / 2) % 2 = 0 then src_q.lo1 else src_q.hi3) in                    
+    update_xmm dst ins result
+
+  | S.Pshufb dst src -> 
+    let src_q = eval_xmm src s in
+    let dst_q = eval_xmm dst s in
+    // We only spec a restricted version sufficient for a handful of standard patterns
+    check_imm (S.is_full_byte_reversal_mask src_q || S.is_high_dup_reversal_mask src_q || S.is_lower_upper_byte_reversal_mask src_q);;
+    if S.is_full_byte_reversal_mask src_q then
+      update_xmm dst ins (reverse_bytes_quad32 dst_q)
+    else if S.is_high_dup_reversal_mask src_q then
+      update_xmm dst ins (Mkfour (reverse_bytes_nat32 dst_q.hi3)
+                                 (reverse_bytes_nat32 dst_q.hi2)
+                                 (reverse_bytes_nat32 dst_q.hi3)
+                                 (reverse_bytes_nat32 dst_q.hi2))
+    else if S.is_lower_upper_byte_reversal_mask src_q then
+      update_xmm dst ins (Mkfour (reverse_bytes_nat32 dst_q.lo1)
+                                 (reverse_bytes_nat32 dst_q.lo0)
+                                 (reverse_bytes_nat32 dst_q.hi3)
+                                 (reverse_bytes_nat32 dst_q.hi2))
+    else fail                                 
     
   | S.Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
