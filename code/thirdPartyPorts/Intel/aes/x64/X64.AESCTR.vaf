@@ -42,10 +42,174 @@ let aes_reqs (alg:algorithm) (key:aes_key_LE(alg)) (round_keys:seq(quad32)) (key
 
 #endverbatim
 
+procedure {:quick exportOnly} aes_round_4way(
+    inline n:int,
+    round_key:xmm,
+    ghost init1:quad32,
+    ghost init2:quad32,
+    ghost init3:quad32,
+    ghost init4:quad32,
+    ghost round_keys:seq(quad32)
+    )
+    modifies
+        xmm11; xmm12; xmm13; xmm14; efl;
+    requires
+        1 <= n < 10 <= length(round_keys);
+        xmm11 == rounds(init1, round_keys, n - 1);
+        xmm12 == rounds(init2, round_keys, n - 1);
+        xmm13 == rounds(init3, round_keys, n - 1);
+        xmm14 == rounds(init4, round_keys, n - 1);
+        round_key == index(round_keys, n);
+        11 != @round_key;
+        12 != @round_key;
+        13 != @round_key;
+        14 != @round_key;
+    ensures
+        xmm11 == rounds(init1, round_keys, n);
+        xmm12 == rounds(init2, round_keys, n);
+        xmm13 == rounds(init3, round_keys, n);
+        xmm14 == rounds(init4, round_keys, n);
+{
+    commute_sub_bytes_shift_rows_forall();
+    AESNI_enc(xmm11, round_key);
+    AESNI_enc(xmm12, round_key);
+    AESNI_enc(xmm13, round_key);
+    AESNI_enc(xmm14, round_key);
+}
+/*
+procedure {:quick exportOnly} aes_finalize_4way(
+    round_key:xmm,
+    ghost init1:quad32,
+    ghost init2:quad32,
+    ghost init3:quad32,
+    ghost init4:quad32,
+    ghost round_keys:seq(quad32)
+    )
+    modifies
+        xmm11; xmm12; xmm13; xmm14; efl;
+    requires
+        xmm11 == rounds(init1, round_keys, 9);
+        xmm12 == rounds(init2, round_keys, 9);
+        xmm13 == rounds(init3, round_keys, 9);
+        xmm14 == rounds(init4, round_keys, 9);
+        round_key == index(round_keys, 10);
+        11 != @round_key;
+        12 != @round_key;
+        13 != @round_key;
+        14 != @round_key;
+    ensures
+        xmm11 == rounds(init1, round_keys, n);
+        xmm12 == rounds(init2, round_keys, n);
+        xmm13 == rounds(init3, round_keys, n);
+        xmm14 == rounds(init4, round_keys, n);
+{
+    commute_sub_bytes_shift_rows_forall();
+    AESNI_enc(xmm11, round_key);
+    AESNI_enc(xmm12, round_key);
+    AESNI_enc(xmm13, round_key);
+    AESNI_enc(xmm14, round_key);
+}
+*/
+
+procedure {:quick} aes_2rounds_4way(
+    inline n:int,
+    ghost init1:quad32,
+    ghost init2:quad32,
+    ghost init3:quad32,
+    ghost init4:quad32,
+    ghost round_keys:seq(quad32)
+    )
+    reads
+        xmm8; xmm9;
+    modifies
+        xmm11; xmm12; xmm13; xmm14; efl;
+    requires
+        1 <= n < 9 && 10 <= length(round_keys);
+        xmm11 == rounds(init1, round_keys, n - 1);
+        xmm12 == rounds(init2, round_keys, n - 1);
+        xmm13 == rounds(init3, round_keys, n - 1);
+        xmm14 == rounds(init4, round_keys, n - 1);
+        xmm8  == index(round_keys, n);
+        xmm9  == index(round_keys, n + 1);
+    ensures
+        xmm11 == rounds(init1, round_keys, n + 1);
+        xmm12 == rounds(init2, round_keys, n + 1);
+        xmm13 == rounds(init3, round_keys, n + 1);
+        xmm14 == rounds(init4, round_keys, n + 1);
+{
+    aes_round_4way(n,     xmm8,  init1, init2, init3, init4, round_keys);
+    aes_round_4way(n + 1, xmm9,  init1, init2, init3, init4, round_keys);
+}
+
+procedure {:quick} aes_3rounds_4way(
+    inline n:int,
+    ghost init1:quad32,
+    ghost init2:quad32,
+    ghost init3:quad32,
+    ghost init4:quad32,
+    ghost round_keys:seq(quad32)
+    )
+    reads
+        xmm7; xmm9; xmm10;
+    modifies
+        xmm11; xmm12; xmm13; xmm14; efl;
+    requires
+        1 <= n < 7 && 10 <= length(round_keys);
+        xmm11 == rounds(init1, round_keys, n - 1);
+        xmm12 == rounds(init2, round_keys, n - 1);
+        xmm13 == rounds(init3, round_keys, n - 1);
+        xmm14 == rounds(init4, round_keys, n - 1);
+        xmm9  == index(round_keys, n + 0);
+        xmm10 == index(round_keys, n + 1);
+        xmm7  == index(round_keys, n + 2);
+    ensures
+        xmm11 == rounds(init1, round_keys, n + 2);
+        xmm12 == rounds(init2, round_keys, n + 2);
+        xmm13 == rounds(init3, round_keys, n + 2);
+        xmm14 == rounds(init4, round_keys, n + 2);
+{
+    aes_round_4way(n + 0, xmm9,  init1, init2, init3, init4, round_keys);
+    aes_round_4way(n + 1, xmm10, init1, init2, init3, init4, round_keys);
+    aes_round_4way(n + 2, xmm7,  init1, init2, init3, init4, round_keys);
+}
+
+procedure {:quick} aes_4rounds_4way(
+    inline n:int,
+    ghost init1:quad32,
+    ghost init2:quad32,
+    ghost init3:quad32,
+    ghost init4:quad32,
+    ghost round_keys:seq(quad32)
+    )
+    reads
+        xmm7; xmm8; xmm9; xmm10;
+    modifies
+        xmm11; xmm12; xmm13; xmm14; efl;
+    requires
+        1 <= n < 6 && 10 <= length(round_keys);
+        xmm11 == rounds(init1, round_keys, n - 1);
+        xmm12 == rounds(init2, round_keys, n - 1);
+        xmm13 == rounds(init3, round_keys, n - 1);
+        xmm14 == rounds(init4, round_keys, n - 1);
+        xmm8  == index(round_keys, n);
+        xmm9  == index(round_keys, n + 1);
+        xmm10 == index(round_keys, n + 2);
+        xmm7  == index(round_keys, n + 3);
+    ensures
+        xmm11 == rounds(init1, round_keys, n + 3);
+        xmm12 == rounds(init2, round_keys, n + 3);
+        xmm13 == rounds(init3, round_keys, n + 3);
+        xmm14 == rounds(init4, round_keys, n + 3);
+{
+    aes_round_4way(n,     xmm8,  init1, init2, init3, init4, round_keys);
+    aes_round_4way(n + 1, xmm9,  init1, init2, init3, init4, round_keys);
+    aes_round_4way(n + 2, xmm10, init1, init2, init3, init4, round_keys);
+    aes_round_4way(n + 3, xmm7,  init1, init2, init3, init4, round_keys);
+}
 
 #reset-options "--z3rlimit 30"
 // Intel's LOOP_4
-procedure {:quick} aes_ctr_loop_body(
+procedure {:quick} {:verify true} aes_ctr_loop_body(
     inline alg:algorithm,
     ghost plain_b:buffer128,
     ghost out_b:buffer128,
@@ -91,6 +255,9 @@ procedure {:quick} aes_ctr_loop_body(
     Shufpd(xmm13, ctr3_4, 2); // xmm13 = LSB: nonce | ivec_lo | ivec_hi | bswap(3)
     Shufpd(xmm14, ctr3_4, 0); // xmm14 = LSB: nonce | ivec_lo | ivec_hi | bswap(4)
     ghost var ctr1 := xmm11;
+    ghost var ctr2 := xmm12;
+    ghost var ctr3 := xmm13;
+    ghost var ctr4 := xmm14;
 
     Pshufb64(xmm1, mask);     // xmm1 = LSB: 2 | bswap(ivec_hi) | 1 | bswap(ivec_hi)
     Pshufb64(xmm2, mask);     // xmm2 = LSB: 4 | bswap(ivec_hi) | 3 | bswap(ivec_hi)
@@ -115,27 +282,16 @@ procedure {:quick} aes_ctr_loop_body(
     Pxor(xmm12, xmm8);
     Pxor(xmm13, xmm8);
     Pxor(xmm14, xmm8);
+    ghost var init1 := xmm11;
+    ghost var init2 := xmm12;
+    ghost var init3 := xmm13;
+    ghost var init4 := xmm14;
 
     Pshufb64(xmm1, mask);      // xmm1 = LSB: ivec_hi | bswap(6) | ivec_hi | bswap(5)
     Pshufb64(xmm2, mask);      // xmm2 = LSB: ivec_hi | bswap(8) | ivec_hi | bswap(7)
 
-    // Compute one AES round with key block 1 for all four counters
-    AESNI_enc(xmm11, xmm9);
-    AESNI_enc(xmm12, xmm9);
-    AESNI_enc(xmm13, xmm9);
-    AESNI_enc(xmm14, xmm9);
-    
-    // Compute one AES round with key block 2 for all four counters
-    AESNI_enc(xmm11, xmm10);
-    AESNI_enc(xmm12, xmm10);
-    AESNI_enc(xmm13, xmm10);
-    AESNI_enc(xmm14, xmm10);
-
-    // Compute one AES round with key block 3 for all four counters
-    AESNI_enc(xmm11, xmm7);
-    AESNI_enc(xmm12, xmm7);
-    AESNI_enc(xmm13, xmm7);
-    AESNI_enc(xmm14, xmm7);
+    // Compute three AES rounds for all four counters
+    aes_3rounds_4way(1, init1, init2, init3, init4, round_keys);
 
     // Load the next four round key blocks
     Load128_buffer(xmm8,  key_ptr,  64, Secret, keys_b, 4);
@@ -148,25 +304,7 @@ procedure {:quick} aes_ctr_loop_body(
     assert xmm7  == index(round_keys, 7);
 
     // Do another 4 AES rounds for each of the four counters = 7 rounds total (not counting xor step)
-    AESNI_enc(xmm11, xmm8);
-    AESNI_enc(xmm12, xmm8);
-    AESNI_enc(xmm13, xmm8);
-    AESNI_enc(xmm14, xmm8);
-    
-    AESNI_enc(xmm11, xmm9);
-    AESNI_enc(xmm12, xmm9);
-    AESNI_enc(xmm13, xmm9);
-    AESNI_enc(xmm14, xmm9);
-    
-    AESNI_enc(xmm11, xmm10);
-    AESNI_enc(xmm12, xmm10);
-    AESNI_enc(xmm13, xmm10);
-    AESNI_enc(xmm14, xmm10);
-
-    AESNI_enc(xmm11, xmm7);
-    AESNI_enc(xmm12, xmm7);
-    AESNI_enc(xmm13, xmm7);
-    AESNI_enc(xmm14, xmm7);
+    aes_4rounds_4way(4, init1, init2, init3, init4, round_keys);
 
     // Load the next three round key blocks
     Load128_buffer(xmm8,  key_ptr, 128, Secret, keys_b, 8);
@@ -177,15 +315,7 @@ procedure {:quick} aes_ctr_loop_body(
     assert xmm10 == index(round_keys, 10);
 
     // Do another 2 AES rounds for each of the four counters = 9 rounds total (not counting xor step)
-    AESNI_enc(xmm11, xmm8);
-    AESNI_enc(xmm12, xmm8);
-    AESNI_enc(xmm13, xmm8);
-    AESNI_enc(xmm14, xmm8);
-    
-    AESNI_enc(xmm11, xmm9);
-    AESNI_enc(xmm12, xmm9);
-    AESNI_enc(xmm13, xmm9);
-    AESNI_enc(xmm14, xmm9);
+    aes_2rounds_4way(8, init1, init2, init3, init4, round_keys);
 
     // TODO: AES_192 and AES_256 would do a few more rounds here
 
@@ -199,6 +329,9 @@ procedure {:quick} aes_ctr_loop_body(
     
     commute_sub_bytes_shift_rows_forall();
     assert xmm11 == aes_encrypt_LE(alg, key, ctr1);
+    assert xmm12 == aes_encrypt_LE(alg, key, ctr2);
+    assert xmm13 == aes_encrypt_LE(alg, key, ctr3);
+    assert xmm14 == aes_encrypt_LE(alg, key, ctr4);
 
     // Xor the plaintext with the encrypted counter
     // TODO: Intel does this using XMM operands
