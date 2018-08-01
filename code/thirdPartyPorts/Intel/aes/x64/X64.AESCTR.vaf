@@ -6,6 +6,15 @@ include "../../../../arch/x64/X64.Vale.InsAes.vaf"
 module X64.AESCTR
 
 #verbatim{:interface}{:implementation}
+
+open X64.Machine_s
+open X64.Memory_i
+open X64.Vale.State_i
+open X64.Vale.Decls_i
+open X64.Vale.InsBasic
+open X64.Vale.InsMem
+
+(*
 open Opaque_s
 open Words_s
 open Types_s
@@ -27,30 +36,30 @@ open X64.Poly1305.Math_i    // For lemma_poly_bits64()
 open GCM_helpers_i
 //open Types_i
 //open AES256_helpers_i
-
+*)
 #endverbatim
 
-#verbatim{:interface}
-
-let aes_reqs (alg:algorithm) (key:aes_key_LE(alg)) (round_keys:seq(quad32)) (keys_b:buffer128)
-             (key_ptr:nat64) (mem:mem) (memTaint:memtaint) : Type0 =
-    alg == AES_128 /\
-    length(round_keys) == nr(alg) + 1 /\
-    round_keys == key_to_round_keys_LE alg key /\
-    key_ptr == buffer_addr keys_b mem /\
-    validSrcAddrs128 mem key_ptr keys_b (nr alg + 1) memTaint Secret /\
-    buffer128_as_seq mem keys_b == round_keys
-
-#endverbatim
+//#verbatim{:interface}
+//
+//let aes_reqs (alg:algorithm) (key:aes_key_LE(alg)) (round_keys:seq(quad32)) (keys_b:buffer128)
+//             (key_ptr:nat64) (mem:mem) (memTaint:memtaint) : Type0 =
+//    alg == AES_128 /\
+//    length(round_keys) == nr(alg) + 1 /\
+//    round_keys == key_to_round_keys_LE alg key /\
+//    key_ptr == buffer_addr keys_b mem /\
+//    validSrcAddrs128 mem key_ptr keys_b (nr alg + 1) memTaint Secret /\
+//    buffer128_as_seq mem keys_b == round_keys
+//
+//#endverbatim
 
 
 procedure test()
     requires true;
     ensures true;
-    reads r8;
-    modifies r10;
+    reads rax;
+    modifies rbx;
 {
-    Mov64(r10, r8);
+    Mov64(rbx, rax);
 }
 
 
