@@ -90,6 +90,7 @@ procedure {:quick} aes_ctr_loop_body(
     Shufpd(xmm12, ctr2_1, 0); // xmm12 = LSB: nonce | ivec_lo | ivec_hi | bswap(2)
     Shufpd(xmm13, ctr3_4, 2); // xmm13 = LSB: nonce | ivec_lo | ivec_hi | bswap(3)
     Shufpd(xmm14, ctr3_4, 0); // xmm14 = LSB: nonce | ivec_lo | ivec_hi | bswap(4)
+    ghost var ctr1 := xmm11;
 
     Pshufb64(xmm1, mask);     // xmm1 = LSB: 2 | bswap(ivec_hi) | 1 | bswap(ivec_hi)
     Pshufb64(xmm2, mask);     // xmm2 = LSB: 4 | bswap(ivec_hi) | 3 | bswap(ivec_hi)
@@ -99,6 +100,11 @@ procedure {:quick} aes_ctr_loop_body(
     Load128_buffer(xmm9,  key_ptr, 16, Secret, keys_b, 1);
     Load128_buffer(xmm10, key_ptr, 32, Secret, keys_b, 2);
     Load128_buffer(xmm7,  key_ptr, 48, Secret, keys_b, 3);
+    assert{:quick_type} length(round_keys) == 11;
+    assert xmm8  == index(round_keys, 0);
+    assert xmm9  == index(round_keys, 1);
+    assert xmm10 == index(round_keys, 2);
+    assert xmm7  == index(round_keys, 3);
 
     // Pre-emptively increment our counters
     Paddd(xmm1, four);        // xmm1 = LSB: 6 | bswap(ivec_hi) | 5 | bswap(ivec_hi)
@@ -136,6 +142,10 @@ procedure {:quick} aes_ctr_loop_body(
     Load128_buffer(xmm9,  key_ptr,  80, Secret, keys_b, 5);
     Load128_buffer(xmm10, key_ptr,  96, Secret, keys_b, 6);
     Load128_buffer(xmm7,  key_ptr, 112, Secret, keys_b, 7);
+    assert xmm8  == index(round_keys, 4);
+    assert xmm9  == index(round_keys, 5);
+    assert xmm10 == index(round_keys, 6);
+    assert xmm7  == index(round_keys, 7);
 
     // Do another 4 AES rounds for each of the four counters = 7 rounds total (not counting xor step)
     AESNI_enc(xmm11, xmm8);
@@ -162,6 +172,9 @@ procedure {:quick} aes_ctr_loop_body(
     Load128_buffer(xmm8,  key_ptr, 128, Secret, keys_b, 8);
     Load128_buffer(xmm9,  key_ptr, 144, Secret, keys_b, 9);
     Load128_buffer(xmm10, key_ptr, 160, Secret, keys_b, 10);
+    assert xmm8  == index(round_keys, 8);
+    assert xmm9  == index(round_keys, 9);
+    assert xmm10 == index(round_keys, 10);
 
     // Do another 2 AES rounds for each of the four counters = 9 rounds total (not counting xor step)
     AESNI_enc(xmm11, xmm8);
@@ -183,6 +196,9 @@ procedure {:quick} aes_ctr_loop_body(
     AESNI_enc_last(xmm12, xmm10);
     AESNI_enc_last(xmm13, xmm10);
     AESNI_enc_last(xmm14, xmm10);
+    
+    commute_sub_bytes_shift_rows_forall();
+    assert xmm11 == aes_encrypt_LE(alg, key, ctr1);
 
     // Xor the plaintext with the encrypted counter
     // TODO: Intel does this using XMM operands

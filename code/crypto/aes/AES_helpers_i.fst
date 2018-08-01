@@ -118,3 +118,9 @@ let lemma_simd_round_key (prev:quad32) (rcon:nat32) : Lemma
   =
   commute_rot_word_sub_word prev.hi3;
   Types_i.xor_lemmas ()
+
+let commute_sub_bytes_shift_rows_forall () :
+  Lemma (forall q . {:pattern sub_bytes (shift_rows_LE q) \/ shift_rows_LE (sub_bytes q) }
+         sub_bytes (shift_rows_LE q) == shift_rows_LE (sub_bytes q))
+  =
+  FStar.Classical.forall_intro commute_sub_bytes_shift_rows
