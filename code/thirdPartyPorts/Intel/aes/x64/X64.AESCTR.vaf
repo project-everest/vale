@@ -43,7 +43,7 @@ let aes_reqs (alg:algorithm) (key:aes_key_LE(alg)) (round_keys:seq(quad32)) (key
 #endverbatim
 
 
-/*
+#reset-options "--z3rlimit 30"
 // Intel's LOOP_4
 procedure {:quick} aes_ctr_loop_body(
     inline alg:algorithm,
@@ -59,6 +59,9 @@ procedure {:quick} aes_ctr_loop_body(
         ctr2_1 @= xmm1; ctr3_4 @= xmm2; iv @= xmm0; mask @= xmm3; four @= xmm4;
         tmp_xmm @= xmm5;
     requires
+        // There's at least one block of four left to do
+        num_quad_blocks > 0;
+
         // Valid ptrs and buffers
         validSrcAddrs128(mem, plain_ptr,  plain_b, num_quad_blocks * 64, memTaint, Secret);
         validDstAddrs128(mem, out_ptr,    out_b,   num_quad_blocks * 64, memTaint, Secret);
@@ -88,8 +91,8 @@ procedure {:quick} aes_ctr_loop_body(
     Shufpd(xmm13, ctr3_4, 2); // xmm13 = LSB: nonce | ivec_lo | ivec_hi | bswap(3)
     Shufpd(xmm14, ctr3_4, 0); // xmm14 = LSB: nonce | ivec_lo | ivec_hi | bswap(4)
 
-    PshufbMask(xmm1, mask);   // xmm1 = LSB: 2 | bswap(ivec_hi) | 1 | bswap(ivec_hi)
-    PshufbMask(xmm2, mask);   // xmm2 = LSB: 4 | bswap(ivec_hi) | 3 | bswap(ivec_hi)
+    Pshufb64(xmm1, mask);     // xmm1 = LSB: 2 | bswap(ivec_hi) | 1 | bswap(ivec_hi)
+    Pshufb64(xmm2, mask);     // xmm2 = LSB: 4 | bswap(ivec_hi) | 3 | bswap(ivec_hi)
 
     // Load the next four round key blocks
     Load128_buffer(xmm8,  key_ptr,  0, Secret, keys_b, 0);
@@ -107,8 +110,8 @@ procedure {:quick} aes_ctr_loop_body(
     Pxor(xmm13, xmm8);
     Pxor(xmm14, xmm8);
 
-    Pshufb(xmm1, mask);      // xmm1 = LSB: ivec_hi | bswap(6) | ivec_hi | bswap(5)
-    Pshufb(xmm2, mask);      // xmm2 = LSB: ivec_hi | bswap(8) | ivec_hi | bswap(7)
+    Pshufb64(xmm1, mask);      // xmm1 = LSB: ivec_hi | bswap(6) | ivec_hi | bswap(5)
+    Pshufb64(xmm2, mask);      // xmm2 = LSB: ivec_hi | bswap(8) | ivec_hi | bswap(7)
 
     // Compute one AES round with key block 1 for all four counters
     AESNI_enc(xmm11, xmm9);
@@ -156,9 +159,9 @@ procedure {:quick} aes_ctr_loop_body(
     AESNI_enc(xmm14, xmm7);
 
     // Load the next three round key blocks
-    Load128_buffer(xmm8,  key_ptr, 128, Secret, keys_b, 7);
-    Load128_buffer(xmm9,  key_ptr, 144, Secret, keys_b, 8);
-    Load128_buffer(xmm10, key_ptr, 160, Secret, keys_b, 9);
+    Load128_buffer(xmm8,  key_ptr, 128, Secret, keys_b, 8);
+    Load128_buffer(xmm9,  key_ptr, 144, Secret, keys_b, 9);
+    Load128_buffer(xmm10, key_ptr, 160, Secret, keys_b, 10);
 
     // Do another 2 AES rounds for each of the four counters = 9 rounds total (not counting xor step)
     AESNI_enc(xmm11, xmm8);
@@ -202,10 +205,9 @@ procedure {:quick} aes_ctr_loop_body(
     Add64(plain_ptr, 64);
     Add64(out_ptr, 64);
 }
-*/
 
 // TODO: Add XMM memory operands, so we can avoid using xmm3 to hold constants
-
+/*
 procedure {:quick} aes_ctr_inner(
     inline alg:algorithm,
     ghost plain_b:buffer128,
@@ -287,7 +289,7 @@ procedure {:quick} aes_ctr_inner(
 
             // Intel: IN_LOOP_4
             Mov128(xmm11, xmm0);    // Save a copy of current counter value (xmm0) in xmm11
-            PshufbMask(xmm0, mask);
+            Pshufb64(xmm0, mask);
 
             // Load next four key blocks (TODO: Intel does this via XMM memory operands)
             Load128_buffer(xmm8,  key_ptr,  0, Secret, keys_b, 0);
@@ -299,7 +301,7 @@ procedure {:quick} aes_ctr_inner(
             Paddd(xmm0, one);    // Increment the counter by 1
             AESNI_enc(xmm11, xmm9);   // Compute AES round 1
             AESNI_enc(xmm11, xmm10);  // Compute AES round 2
-            PshufbMask(xmm0, mask);       // Bswap the upper and lower 64-bit slots of xmm0 
+            Pshufb64(xmm0, mask);     // Bswap the upper and lower 64-bit slots of xmm0 
             AESNI_enc(xmm11, xmm7);   // Compute AES round 3
 
             // Load next four key blocks (TODO: Intel does this via XMM memory operands)
@@ -338,4 +340,4 @@ procedure {:quick} aes_ctr_inner(
     }
 */
 }
-
+*/
