@@ -56,7 +56,7 @@ procedure aes_ctr_inner(
 
     Mov64(r10, r8);
     Shr64(r8, 4);   // r8 := num_bytes / 16 == num_blocks
-    And64(r10, 15); // r10 := num_bytes % 16 (note that OpenSSL uses Shl64(r10, 60))
+    And64(r10, 15); // r10 := num_bytes % 16 (note that Intel uses Shl64(r10, 60))
     assert r8 == old(num_bytes) / 16;
     assert r10 == old(num_bytes) % 16;
     if (r10 > 0) {
@@ -64,9 +64,9 @@ procedure aes_ctr_inner(
     }
     ghost var num_blocks := r8;
 
-    // OpenSSL: NO_PARTS_4
+    // Intel: NO_PARTS_4
     Mov64(r10, r8);
-    And64(r10, 15); // r10 := num_blocks % 4 (note that OpenSSL uses Shl64(r10, 60); Shr64(r10,60))
+    And64(r10, 15); // r10 := num_blocks % 4 (note that Intel uses Shl64(r10, 60); Shr64(r10,60))
     assert r10 == num_blocks % 4;
 
     // Initialize masks and counters
@@ -96,6 +96,6 @@ procedure aes_ctr_inner(
     }
 
     
-    // OpenSSL: REMAINDER_4
+    // Intel: REMAINDER_4
 
 }
