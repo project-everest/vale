@@ -77,6 +77,7 @@ fstar_include_paths = [
   'obj/crypto/poly1305/',
   'obj/crypto/poly1305/x64/',
   'obj/thirdPartyPorts/OpenSSL/poly1305/x64/',
+  'obj/thirdPartyPorts/Intel/aes/x64/',
   'obj/external/'
 ]
 Export('fstar_include_paths')
