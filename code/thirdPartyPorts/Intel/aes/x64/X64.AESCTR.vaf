@@ -211,7 +211,7 @@ procedure {:quick} aes_4rounds_4way(
     aes_round_4way(n + 3, xmm7,  init1, init2, init3, init4, round_keys);
 }
 
-#reset-options "--z3rlimit 60"
+#reset-options "--z3rlimit 90"
 // Intel's LOOP_4
 procedure {:quick} {:verify true} aes_ctr_loop_body(
     inline alg:algorithm,
@@ -245,6 +245,7 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
         four == Mkfour(4, 0, 4, 0);
 
         // Counters are correct
+        count < pow2_32 - 4;
         ctr2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 1)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 0)));
         ctr4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 3)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 2)));
 
@@ -271,10 +272,11 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
         num_quad_blocks == old(num_quad_blocks) - 1;
 
         // Counters are incremented 
-        ctr2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 5)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 4)));
-        ctr4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 7)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 6)));
+        ctr2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 1)), iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 0)));
+        ctr4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 3)), iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 2)));
         
         // GCTR progress
+        gctr_partial(alg, 4, old(buffer128_as_seq(mem, plain_b)), buffer128_as_seq(mem, out_b), key, inc32(icb_BE, count));
 {
     Mov128(xmm11, iv);        // xmm11==12==13==14 == LSB: nonce | ivec_lo | ivec_hi | 0
     Mov128(xmm12, iv);
