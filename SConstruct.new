@@ -787,6 +787,10 @@ def compute_fstar_deps(env, src_directories, fstar_includes):
       dummies_name = str(Dir('obj/dummies'))
       sources = [str(File(x)).replace(dummies_name, obj_name) for x in sources]
       targets = [str(File(x)).replace(dummies_name, obj_name) for x in targets]
+      for source in sources:
+        for target in targets:
+          if target.startswith('specs') and (source.startswith('obj') or source.startswith('code')):
+            print(f'{yellow}Warning: file {target} in specs directory depends on file {source} outside specs directory{uncolor}')
       sources_ver = [to_obj_dir(File(re.sub('\.fst$', '.fst.verified', re.sub('\.fsti$', '.fsti.verified', x)))) for x in sources if is_our_file(File(x))]
       targets_ver = [to_obj_dir(File(re.sub('\.fst$', '.fst.verified.tmp', re.sub('\.fsti$', '.fsti.verified.tmp', x)))) for x in targets if is_our_file(File(x))]
       Depends(targets_ver, sources_ver)
