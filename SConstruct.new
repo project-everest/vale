@@ -106,12 +106,19 @@ if sys.version_info < (3, 6):
 #
 ##################################################################################################
 
+if 'VALE_HOME' in os.environ:
+  vale_default_path = os.environ['VALE_HOME']
+else:
+  vale_default_path = 'tools/Vale'
+
 if 'FSTAR_HOME' in os.environ:
   fstar_default_path = os.environ['FSTAR_HOME']
 else:
   fstar_default_path = 'tools/FStar'
 
 # Retrieve tool-specific command overrides passed in by the user
+AddOption('--VALEPATH', dest = 'vale_path', type = 'string', default = vale_default_path, action = 'store',
+  help = 'Specify the path to Vale tool')
 AddOption('--FSTARPATH', dest = 'fstar_path', type = 'string', default = fstar_default_path, action = 'store',
   help = 'Specify the path to F* tool')
 AddOption('--FSTARZ3', dest = 'fstar_z3', type = 'string', default = '', action = 'store',
@@ -147,6 +154,7 @@ AddOption('--FSTAR-EXTRACT', dest = 'fstar_extract', default = False, action = '
 AddOption('--MIN_TEST', dest = 'min_test', default = False, action = 'store_true',
   help = "Only run on a minimal set of test files")
 
+vale_path = Dir(GetOption('vale_path')).abspath
 fstar_path = Dir(GetOption('fstar_path')).abspath
 fstar_user_args = GetOption('fstar_user_args')
 vale_user_args = GetOption('vale_user_args')
@@ -369,8 +377,8 @@ if verify:
 else:
   fstar_z3_path = ''
 
+vale_exe = File(f'{vale_path}/bin/vale.exe')
 fstar_exe = File(f'{fstar_path}/bin/fstar.exe')
-vale_exe = File('bin/vale.exe')
 
 ##################################################################################################
 #
