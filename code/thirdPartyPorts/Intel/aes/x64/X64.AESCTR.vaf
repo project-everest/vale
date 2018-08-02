@@ -42,6 +42,7 @@ let aes_reqs (alg:algorithm) (key:aes_key_LE(alg)) (round_keys:seq(quad32)) (key
 
 #endverbatim
 
+// These procedures help walk F* through the recursive definition of rounds
 procedure {:quick exportOnly} aes_round_4way(
     inline n:int,
     round_key:xmm,
@@ -211,6 +212,7 @@ procedure {:quick} aes_4rounds_4way(
 // Intel's LOOP_4
 procedure {:quick} {:verify true} aes_ctr_loop_body(
     inline alg:algorithm,
+    ghost count:nat32,
     ghost plain_b:buffer128,
     ghost out_b:buffer128,
 
@@ -238,8 +240,8 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
         four == Mkfour(4, 0, 4, 0);
 
         // Counters are correct
-        ctr2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(2), iv.hi2, reverse_bytes_nat32(1));
-        ctr4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(4), iv.hi2, reverse_bytes_nat32(3));
+        ctr2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 1)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 0)));
+        ctr4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 3)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 2)));
 
         // AES reqs
         aes_reqs(alg, key, round_keys, keys_b, key_ptr, mem, memTaint);
@@ -247,7 +249,16 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
     modifies r10; xmm1; xmm2; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; 
              tmp_xmm; plain_ptr; num_quad_blocks; out_ptr; efl; mem;
     ensures 
-        true;
+        // Valid ptrs and buffers
+        validSrcAddrs128(mem, old(plain_ptr),  plain_b, old(num_quad_blocks) * 64, memTaint, Secret);
+        validDstAddrs128(mem, old(out_ptr),    out_b,   old(num_quad_blocks) * 64, memTaint, Secret);
+        plain_ptr == old(plain_ptr) + 64;
+        out_ptr   == old(out_ptr)   + 64;
+        num_quad_blocks == old(num_quad_blocks) - 1;
+
+        // Counters are incremented 
+        ctr2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 5)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 4)));
+        ctr4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count, 7)), iv.hi2, reverse_bytes_nat32(add_wrap(count, 6)));
 {
     Mov128(xmm11, iv);        // xmm11==12==13==14 == LSB: nonce | ivec_lo | ivec_hi | 0
     Mov128(xmm12, iv);
@@ -264,9 +275,7 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
     ghost var ctr4 := xmm14;
 
     Pshufb64(ctr2_1, mask);     // ctr2_1 = LSB: 2 | bswap(ivec_hi) | 1 | bswap(ivec_hi)
-    assert ctr2_1 == Mkfour(2, reverse_bytes_nat32(iv.hi2), 1, reverse_bytes_nat32(iv.hi2));
     Pshufb64(ctr4_3, mask);     // ctr4_3 = LSB: 4 | bswap(ivec_hi) | 3 | bswap(ivec_hi)
-    assert ctr4_3 == Mkfour(4, reverse_bytes_nat32(iv.hi2), 3, reverse_bytes_nat32(iv.hi2));
 
     // Load the next four round key blocks
     Load128_buffer(xmm8,  key_ptr,  0, Secret, keys_b, 0);
@@ -283,8 +292,6 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
     Paddd(ctr2_1, four);        // ctr2_1 = LSB: 6 | bswap(ivec_hi) | 5 | bswap(ivec_hi)
     Paddd(ctr4_3, four);        // ctr4_3 = LSB: 8 | bswap(ivec_hi) | 7 | bswap(ivec_hi)
 
-    assert ctr2_1 == Mkfour(6, reverse_bytes_nat32(iv.hi2), 5, reverse_bytes_nat32(iv.hi2));
-    assert ctr4_3 == Mkfour(8, reverse_bytes_nat32(iv.hi2), 7, reverse_bytes_nat32(iv.hi2));
     /*
     // Begin AES block encrypt by xor'ing four blocks of counters with the key block 0 
     Pxor(xmm11, xmm8);
@@ -295,10 +302,12 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
     ghost var init2 := xmm12;
     ghost var init3 := xmm13;
     ghost var init4 := xmm14;
+    */
 
     Pshufb64(ctr2_1, mask);      // ctr2_1 = LSB: ivec_hi | bswap(6) | ivec_hi | bswap(5)
     Pshufb64(ctr4_3, mask);      // ctr4_3 = LSB: ivec_hi | bswap(8) | ivec_hi | bswap(7)
 
+    /*
     // Compute three AES rounds for all four counters
     aes_3rounds_4way(1, init1, init2, init3, init4, round_keys);
 
@@ -359,10 +368,10 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
     Store128_buffer(out_ptr, xmm13, 32, Secret, out_b, 2);
     Store128_buffer(out_ptr, xmm14, 48, Secret, out_b, 3);
 
+    */
     Sub64(r8, 1);
     Add64(plain_ptr, 64);
     Add64(out_ptr, 64);
-    */
 }
 
 // TODO: Add XMM memory operands, so we can avoid using xmm3 to hold constants
