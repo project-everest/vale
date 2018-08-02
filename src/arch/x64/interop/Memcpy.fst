@@ -125,7 +125,6 @@ let implies_post (w:bool) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (dst
   length_t_eq (TBase TUInt64) src;
   let dst_b = BV.mk_buffer_view dst Views.view64 in
   let src_b = BV.mk_buffer_view src Views.view64 in
-  // assert (buffer64_read dst 0 (va_get_mem va_sM) == UInt64.v (Seq.index (BV.as_seq va_sM.mem.hs dst_b) 0);
   let t = TBase TUInt64 in
   assert (Seq.equal (seq_nat64_to_seq_U64 (buffer_as_seq #t (va_get_mem va_sM) src)) (BV.as_seq va_sM.mem.hs src_b));  
   assert (Seq.equal (seq_nat64_to_seq_U64 (buffer_as_seq #t (va_get_mem va_sM) dst)) (BV.as_seq va_sM.mem.hs dst_b));  
@@ -144,7 +143,7 @@ val lemma_ghost_memcpy:  w:bool -> dst:s8 -> src:s8 ->  stack_b:b8 -> (h0:HS.mem
     )
 
 
-let lemma_ghost_memcpy w dst src stack_b h0 = admit() (*
+let lemma_ghost_memcpy w dst src stack_b h0 =
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt64) dst;
   length_t_eq (TBase TUInt64) src;
@@ -154,7 +153,6 @@ let lemma_ghost_memcpy w dst src stack_b h0 = admit() (*
   let s_v, f_v = va_lemma_memcpy (va_code_memcpy w) (state_of_S s0) w stack_b dst src in  
   implies_post w (state_of_S s0) s_v f_v dst src stack_b;
   Some?.v (TS.taint_eval_code (va_code_memcpy w) f_v s0), f_v, s_v.mem.hs
-*)
 
 let memcpy dst src  =
   push_frame();
