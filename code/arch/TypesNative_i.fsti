@@ -122,3 +122,14 @@ val reveal_ishr_all (n:pos) : Lemma
   (forall (m:_{m==pow2_norm n}) (x:natN (pow2_norm n)) (y:nat).{:pattern (ishr #m x y)}
     ishr #m x y == UInt.shift_right #n x y)
 
+val lemma_nat32_xor_commutes (x y:nat32) : Lemma
+  (nat32_xor x y = nat32_xor y x)
+
+val lemma_nat32_xor_commutes_forall (_:unit) : Lemma
+  (forall (x y:nat32) . nat32_xor x y = nat32_xor y x)
+
+val lemma_quad32_xor_commutes (x y:quad32) :Lemma
+  (quad32_xor x y = quad32_xor y x)
+
+val lemma_quad32_xor_commutes_forall (_:unit) : Lemma
+  (forall (x y:quad32) . {:pattern (quad32_xor x y)} quad32_xor x y = quad32_xor y x)

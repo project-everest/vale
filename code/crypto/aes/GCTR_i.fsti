@@ -33,6 +33,13 @@ let gctr_partial (alg:algorithm) (bound:nat) (plain cipher:seq quad32) (key:aes_
   forall j . {:pattern (index cipher j)} 0 <= j /\ j < bound ==>
     index cipher j == quad32_xor (index plain j) (aes_encrypt_BE alg key (inc32 icb j))
 
+let test (alg:algorithm) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) (count:nat32) : Lemma
+  (requires length plain >= 4 /\ length cipher >= 4 /\
+            index_work_around_quad32 cipher 0 == quad32_xor (index_work_around_quad32 plain 0) (aes_encrypt_BE alg key (inc32 icb count)))
+  (ensures gctr_partial alg 1 plain cipher key (inc32 icb count))
+  =
+  ()
+
 val gctr_partial_completed (alg:algorithm) (plain cipher:seq quad32) (key:aes_key_LE alg) (icb:quad32) : Lemma
   (requires length plain == length cipher /\
             256 * (length plain) < pow2_32 /\

@@ -27,6 +27,7 @@ open X64.Poly1305.Math_i    // For lemma_poly_bits64()
 open GCM_helpers_i
 open GCTR_s
 open GCTR_i
+open TypesNative_i
 //open Types_i
 //open AES256_helpers_i
 #endverbatim
@@ -395,7 +396,7 @@ procedure {:quick} {:verify true} aes_ctr_loop_body(
     Store128_buffer(out_ptr, xmm14, 48, Secret, out_b, 3);
 
     ghost var cipher := buffer128_as_seq(mem, out_b);
-    assume forall q1, q2 :: quad32_xor(q1, q2) == quad32_xor(q2, q1);
+    lemma_quad32_xor_commutes_forall();
 //    assert length(plain) >= old(num_quad_blocks) * 4;
 //    assert length(cipher) >= old(num_quad_blocks) * 4;
 ////    assert xmm11 == quad32_xor(aes_encrypt_BE(alg, key, inc32(icb_BE, count)), index_work_around_quad32(plain, 0));

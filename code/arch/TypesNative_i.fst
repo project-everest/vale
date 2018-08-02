@@ -88,3 +88,35 @@ let reveal_ishl_all n =
 let reveal_ishr_all n =
   FStar.Classical.forall_intro_2 (reveal_ishr n)
 
+let lemma_nat32_xor_commutes (x y:nat32) : Lemma
+  (nat32_xor x y = nat32_xor y x)
+  =
+  reveal_ixor 32 x y;
+  assert (nat32_xor x y = FStar.UInt.logxor #32 x y);
+  FStar.UInt.logxor_commutative #32 x y;
+  assert (FStar.UInt.logxor #32 x y = FStar.UInt.logxor #32 y x);
+  reveal_ixor 32 y x;
+  assert (nat32_xor y x = FStar.UInt.logxor #32 y x);
+  ()
+
+let lemma_nat32_xor_commutes_forall () : Lemma
+  (forall (x y:nat32) . nat32_xor x y = nat32_xor y x)
+  =
+  FStar.Classical.forall_intro_2 lemma_nat32_xor_commutes
+
+let lemma_quad32_xor_commutes (x y:quad32) :Lemma
+  (quad32_xor x y = quad32_xor y x)
+  =
+  //lemma_nat32_xor_commutes_forall() // REVIEW: Why doesn't this work?
+  let Mkfour x0 x1 x2 x3 = x in
+  let Mkfour y0 y1 y2 y3 = y in
+  lemma_nat32_xor_commutes x0 y0;
+  lemma_nat32_xor_commutes x1 y1;
+  lemma_nat32_xor_commutes x2 y2;
+  lemma_nat32_xor_commutes x3 y3;
+  ()
+
+let lemma_quad32_xor_commutes_forall () : Lemma
+  (forall (x y:quad32) . {:pattern (quad32_xor x y)} quad32_xor x y = quad32_xor y x)
+  =
+  FStar.Classical.forall_intro_2 lemma_quad32_xor_commutes
