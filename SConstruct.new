@@ -446,6 +446,13 @@ def is_our_file(file):
   path = file.path
   return True in [path.startswith(str(Dir(p))) for p in ['obj'] + verify_paths]
 
+def compute_include_paths(src_include_paths, obj_include_paths, obj_prefix):
+  return src_include_paths + [str(Dir('obj/external'))] + [str(Dir(f'{obj_prefix}/{x}')) for x in obj_include_paths]
+
+def compute_includes(src_include_paths, obj_include_paths, obj_prefix):
+  fstar_include_paths = compute_include_paths(src_include_paths, obj_include_paths, obj_prefix)
+  return " ".join(["--include " + x for x in fstar_include_paths])
+
 ##################################################################################################
 #
 #   Configuration and environment functions
@@ -520,6 +527,15 @@ def check_z3_version(fstar_z3):
     for line in lines:
       print_error('  ' + line)
     print_error_Exit('Get a recent Z3 executable from https://github.com/FStarLang/binaries/tree/master/z3-tested, modify .fstar_z3_version, or use the --FSTAR-Z3-MY-VERSION option to override')
+
+def print_dump_args():
+  print('Currently using the following F* args:')
+  fstar_includes = compute_includes(src_include_paths, obj_include_paths, 'obj')
+  for option in [fstar_z3_path, fstar_no_verify, fstar_includes, fstar_user_args, fstar_default_args]:
+    if len(option) > 0:
+      print(f'{option} ', end='')
+  print()
+  Exit(1)
 
 # extract a string filename out of a build failure
 def bf_to_filename(bf):
@@ -724,8 +740,8 @@ def process_files_in(env, directories):
   for file in vafs:
     include_vale_file(env, file)
   # Process and verify files:
-  fstar_include_paths = src_include_paths + [str(Dir('obj/external'))] + [str(Dir(f'obj/{x}')) for x in obj_include_paths]
-  fstar_includes = " ".join(["--include " + x for x in fstar_include_paths])
+  fstar_include_paths = compute_include_paths(src_include_paths, obj_include_paths, 'obj')
+  fstar_includes = compute_includes(src_include_paths, obj_include_paths, 'obj')
   if is_single_vaf:
     process_vale_file(env, single_vaf, fstar_includes)
   else:
@@ -854,4 +870,7 @@ for x in ['CanonCommSwaps.fst', 'CanonCommMonoid.fst', 'CanonCommSemiring.fst']:
 
 print('Processing source files')
 process_files_in(env, verify_paths)
-compute_fstar_deps(env, verify_paths, src_include_paths + [str(Dir('obj/external'))] + [str(Dir(f'obj/dummies/{x}')) for x in obj_include_paths])
+compute_fstar_deps(env, verify_paths, compute_include_paths(src_include_paths, obj_include_paths, 'obj/dummies'))
+
+if dump_args:
+  print_dump_args()
