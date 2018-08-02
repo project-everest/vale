@@ -61,7 +61,8 @@ procedure {:quick}{:exportSpecs} memcpy(inline win:bool,ghost stack_b:buffer64, 
         win ==>  xmm14 == old(xmm14);
         win ==>  xmm15 == old(xmm15);
 
-        forall i :: 0 <= i && i < 2 ==> buffer64_read(dst, i, mem) == buffer64_read(src, i, mem);
+        buffer_as_seq(mem, dst) == buffer_as_seq(mem, src);
+    //    forall i :: 0 <= i && i < 2 ==> buffer64_read(dst, i, mem) == buffer64_read(src, i, mem);
         modifies_mem(loc_buffer(dst), old(mem), mem);        
     reads memTaint;
     modifies
@@ -82,4 +83,5 @@ procedure {:quick}{:exportSpecs} memcpy(inline win:bool,ghost stack_b:buffer64, 
     Store64_buffer(rdi, rcx, 8, Secret, dst, 1);
 
   }
+  assert(Seq.equal(buffer_as_seq(mem, dst), buffer_as_seq(mem, src)));
 }

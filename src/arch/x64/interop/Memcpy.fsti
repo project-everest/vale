@@ -42,7 +42,7 @@ let pre_cond (h:HS.mem) (dst:s8) (src:s8) = live h dst /\ live h src /\ bufs_dis
 let post_cond (h0:HS.mem) (h1:HS.mem) (dst:s8) (src:s8) = live h0 dst /\ live h0 src /\ live h1 dst /\ live h1 src /\ length dst % 8 == 0 /\ length src % 8 == 0 /\
   (let dst_b = BV.mk_buffer_view dst Views.view64 in
   let src_b = BV.mk_buffer_view src Views.view64 in
-  forall i. i >= 0 /\ i < 2 ==> Seq.index (BV.as_seq h1 dst_b) i == Seq.index (BV.as_seq h1 src_b) i)
+  Seq.equal (BV.as_seq h1 dst_b) (BV.as_seq h1 src_b))
 
 val memcpy: dst:s8 -> src:s8 -> Stack unit
 	(requires (fun h -> pre_cond h dst src ))
