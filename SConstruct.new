@@ -138,6 +138,8 @@ AddOption('--NOVERIFY', dest = 'noverify', default = False, action = 'store_true
   help = 'Verify and compile, or compile only')
 AddOption('--ONE', dest = 'single_vaf', type = 'string', default = None, action = 'store',
   help = 'Only verify one specified .vaf file, and in that file, only verify procedures or verbatim blocks marked as {:verify}.')
+AddOption('--NOCOLOR', dest='no_color', default=False, action='store_true',
+  help="Don't add color to build output")
 AddOption('--DUMPARGS', dest = 'dump_args', default = False, action = 'store_true',
   help = "Print arguments that will be passed to the verification tools")
 AddOption('--FSTAR-EXTRACT', dest = 'fstar_extract', default = False, action = 'store_true',
@@ -155,6 +157,8 @@ fstar_my_version = GetOption('fstar_my_version')
 fstar_z3_my_version = GetOption('fstar_z3_my_version')
 fstar_extract = GetOption('fstar_extract')
 gen_hints = GetOption('gen_hints')
+no_color = GetOption('no_color')
+dump_args = GetOption('dump_args')
 single_vaf = GetOption('single_vaf')
 is_single_vaf = not (single_vaf is None)
 min_test = GetOption('min_test')
@@ -344,20 +348,23 @@ if not verify:
   fstar_no_verify = '--lax'
 
 # Find Z3 for F*
+found_z3 = False
 if verify:
   fstar_z3 = GetOption('fstar_z3')
   if fstar_z3 == '':
     fstar_z3 = File('tools/Z3/z3.exe').path if sys.platform == 'win32' else 'tools/Z3/z3'
-    if not os.path.isfile(fstar_z3):
+    if os.path.isfile(fstar_z3):
+      found_z3 = True
+    else:
       if sys.platform == 'win32':
         find_z3 = FindFile('z3.exe', os.environ['PATH'].split(';'))
       else:
         find_z3 = FindFile('z3', os.environ['PATH'].split(':'))
-      if find_z3 == None:
-        print('Could not find z3 executable.  Either put z3 in your path, or put it in the directory tools/Z3/, or use the --FSTARZ3=<z3-executable> option.')
-        Exit(1)
-      else:
+      if find_z3 != None:
+        found_z3 = True
         fstar_z3 = str(find_z3)
+  else:
+    found_z3 = True
   fstar_z3_path = '--smt ' + fstar_z3
 else:
   fstar_z3_path = ''
@@ -384,11 +391,28 @@ vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
 vale_open_re = re.compile(r'open\s+([a-zA-Z0-9_.]+)')
 vale_import_re = re.compile(r'module\s+[a-zA-Z0-9_]+\s*[=]\s*([a-zA-Z0-9_.]+)')
 
+if (not sys.stdout.isatty()) or no_color:
+  # No color if the output is not a terminal or user opts out
+  yellow = ''
+  red = ''
+  uncolor = ''
+else:
+  yellow = '\033[93m'
+  red = '\033[91;40;38;5;217m'
+  uncolor = '\033[0m'
+
 ##################################################################################################
 #
 #   Utility functions
 #
 ##################################################################################################
+
+def print_error(s):
+  print(f'{red}{s}{uncolor}')
+
+def print_error_exit(s):
+  print_error(s)
+  Exit(1)
 
 # Given a File node for dir/dir/.../m.extension, return m
 def file_module_name(file):
@@ -416,7 +440,7 @@ def is_our_file(file):
 
 ##################################################################################################
 #
-#   Configuration functions
+#   Configuration and environment functions
 #
 ##################################################################################################
 
@@ -452,11 +476,10 @@ def check_fstar_version():
         key, v = line.split('=', 1)
         if key == 'commit' and v == version:
           return
-    print(f'Expected F* version commit={version}, but fstar --version returned the following:')
+    print_error(f'Expected F* version commit={version}, but fstar --version returned the following:')
     for line in lines:
-      print('  ' + line)
-    print('Get F* version %s from https://github.com/FStarLang/FStar, modify .fstar_version, or use the --FSTAR-MY-VERSION option to override%s')
-    Exit(1)
+      print_error('  ' + line)
+    print_error_exit(f'Get F* version {version} from https://github.com/FStarLang/FStar, modify .fstar_version, or use the --FSTAR-MY-VERSION option to override')
 
 def check_z3_version(fstar_z3):
   import subprocess
@@ -485,11 +508,53 @@ def check_z3_version(fstar_z3):
         if higher or (not lower and len(nums) >= len(versions)):
           return
         break
-    print('%sExpected Z3 version >= %s%s%s, but z3 --version returned the following:%s' % (colors['red'], colors['yellow'], version, colors['red'], colors['end']))
+    print_error(f'Expected Z3 version >= {version}, but z3 --version returned the following:')
     for line in lines:
-      print('  ' + line)
-    print('%sGet a recent Z3 executable from https://github.com/FStarLang/binaries/tree/master/z3-tested, modify .fstar_z3_version, or use the --FSTAR-Z3-MY-VERSION option to override%s' % (colors['cyan'], colors['end']))
-    Exit(1)
+      print_error('  ' + line)
+    print_error_Exit('Get a recent Z3 executable from https://github.com/FStarLang/binaries/tree/master/z3-tested, modify .fstar_z3_version, or use the --FSTAR-Z3-MY-VERSION option to override')
+
+# extract a string filename out of a build failure
+def bf_to_filename(bf):
+  import SCons.Errors
+  if bf is None: # unknown targets product None in list
+    return '(unknown tgt)'
+  elif isinstance(bf, SCons.Errors.StopError):
+    return str(bf)
+  elif bf.node:
+    return str(bf.node)
+  elif bf.filename:
+    return bf.filename
+  return '(unknown failure)'
+
+def report_verification_failures():
+  import time
+  from SCons.Script import GetBuildFailures
+  bf = GetBuildFailures()
+  if bf:
+    # bf is normally a list of build failures; if an element is None,
+    # it's because of a target that scons doesn't know anything about.
+    for x in bf:
+      if x is not None:
+        filename = bf_to_filename(x)
+        if filename.endswith('.tmp') and os.path.isfile(filename):
+          error_filename = filename[:-len('.tmp')] + '.error'
+          stderr_filename = filename[:-len('.tmp')] + '.stderr'
+          if os.path.isfile(error_filename):
+            os.remove(error_filename)
+          report_filename = stderr_filename if os.path.isfile(stderr_filename) else filename
+          print()
+          print(f'##### {red}Verification error{uncolor}')
+          print('Printing contents of ' + report_filename + ' #####')
+          with open (report_filename, 'r') as myfile:
+            lines = myfile.read().splitlines()
+            valeErrors = [line for line in lines if ("*****" in line)]
+            for line in lines:
+              if 'error was reported' in line or '(Error)' in line or ' failed' in line:
+                line = f'{red}{line}{uncolor}'
+              print(line)
+          print()
+          time.sleep(1)
+          os.rename(filename, error_filename)
 
 ##################################################################################################
 #
@@ -537,21 +602,22 @@ def include_vale_file(env, file):
 # Verify a .fst or .fsti file
 def verify_fstar_file(options, targetfile, sourcefile, fstar_includes):
   env = options.env
+  stderrfile = File(f'{targetfile}.stderr')
   temptargetfile = File(f'{targetfile}.tmp')
   temptargetfiles = [temptargetfile]
   #hintsfile = f'{sourcefile}.hints'
   #hhintsfile = to_hints_dir(hintsfile)
   outs = []
   if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
-    print("Skipping %s because it is on the min_test_suite_blacklist defined in SConscript" % sourcefile)
+    print(f'Skipping {sourcefile} because it is on the min_test_suite_blacklist defined in SConscript')
     return outs
   # else:
-  #   print("File %s is not on the blacklist" % str(sourcefile))
+  #   print(f'File {sourcefile} is not on the blacklist')
   #if gen_hints:
   #  temptargetfiles.append(hintsfile)
   temptargets = env.Command(temptargetfiles, sourcefile,
     f'{fstar_exe} {sourcefile} {options.verifier_flags} {fstar_z3_path} {fstar_no_verify}' +
-    f' {fstar_includes} {" ".join(fstar_user_args)} 1> {temptargetfile} 2>&1')
+    f' {fstar_includes} {" ".join(fstar_user_args)} 1> {temptargetfile} 2> {stderrfile}')
   temptarget = temptargets[0]
   outs.append(env.CopyAs(source = temptarget, target = targetfile))
   #if gen_hints:
@@ -751,25 +817,29 @@ def compute_fstar_deps(env, src_directories, fstar_includes):
 #
 ##################################################################################################
 
+atexit.register(report_verification_failures)
+env = common_env
+
 # Create obj directory and any subdirectories needed during dependency analysis
 # (SCons will create other subdirectories during build)
 distutils.dir_util.mkpath('obj')
 distutils.dir_util.mkpath('obj/external')
 distutils.dir_util.mkpath('obj/cache_checked')
 
-# Check F* version
+# Check F* and Z3 versions
 if not fstar_my_version:
   check_fstar_version()
 if verify and not fstar_z3_my_version:
+  if not found_z3:
+    print_error_exit('Could not find z3 executable.  Either put z3 in your path, or put it in the directory tools/Z3/, or use the --FSTARZ3=<z3-executable> option.')
   check_z3_version(fstar_z3)
 
+# HACK: copy external files
 for x in ['CanonCommSwaps.fst', 'CanonCommMonoid.fst', 'CanonCommSemiring.fst']:
   source = f'{fstar_path}/examples/tactics/{x}'
   target = f'obj/external/{x}'
   shutil.copy(source, target)
 
-env = common_env
 print('Processing source files')
 process_files_in(env, verify_paths)
 compute_fstar_deps(env, verify_paths, src_include_paths + [str(Dir('obj/external'))] + [str(Dir(f'obj/dummies/{x}')) for x in obj_include_paths])
-
