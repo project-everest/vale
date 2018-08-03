@@ -22,6 +22,8 @@ external_files = [
   'obj/external/CanonCommSwaps.fst',
   'obj/external/CanonCommMonoid.fst',
   'obj/external/CanonCommSemiring.fst',
+  'obj/external/C.Loops.fst',
+  'obj/external/Spec.Loops.fst',
 ]
 Export('external_files')
 
@@ -176,7 +178,7 @@ if do_fstar and stage1:
   for x in ['CanonCommSwaps.fst', 'CanonCommMonoid.fst', 'CanonCommSemiring.fst']:
     env.Command('obj/external/' + x, env['FSTAR_PATH'] + '/examples/tactics/' + x, Copy("$TARGET", "$SOURCE"))
   if 'KREMLIN_HOME' in os.environ:
-    for x in ['C.Loops.fst']:
+    for x in ['C.Loops.fst', 'Spec.Loops.fst']:
       env.Command('obj/external/' + x, env['KREMLIN_HOME'] + '/kremlib/' + x, Copy("$TARGET", "$SOURCE"))
  
 

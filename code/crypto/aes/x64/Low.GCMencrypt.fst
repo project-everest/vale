@@ -425,7 +425,7 @@ let zero_quad32_buffer (b:B.buffer U8.t) : Stack unit
      new_b == Mkfour 0 0 0 0)
   )
   = 
-  Zero_quad32_win.zero_quad32_buffer b
+  Zero_quad32_win.zero_quad32_buffer_win b
 
 let reverse_bytes_quad32_buffer (b:B.buffer U8.t) : Stack unit
   (requires fun h ->
