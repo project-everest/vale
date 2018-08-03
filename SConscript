@@ -120,7 +120,6 @@ verify_options = {
   # Disable verification by adding 'filename': None
   'tools/Vale/test/vale-debug.vad': None,
   'tools/Vale/test/tactics1.vaf': None,
-  'code/crypto/aes/x64/Low.GCMencrypt.fst': None,
 #  'src/arch/x64/interop/*.fst': None,
 #  'src/arch/x64/interop/*.fsti': None,
 

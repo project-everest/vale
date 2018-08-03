@@ -37,6 +37,9 @@ let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
 unfold 
 let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
+unfold let disjoint_or_eq (#a:Type0) (b1:B.buffer a) (b2:B.buffer a) =
+  M.(loc_disjoint (loc_buffer b1) (loc_buffer b2)) \/ b1 == b2
+
 let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8 { B.length keys_b % 16 == 0 }) (h:HS.mem) =
   let keys128_b = BV.mk_buffer_view keys_b Views.view128 in
   let round_keys = key_to_round_keys_LE AES_128 (Ghost.reveal key) in
@@ -47,8 +50,8 @@ open FStar.Mul
 let pre_cond (h:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) =
 live h output_b /\ live h input_b /\ live h keys_b /\    
     disjoint_or_eq input_b output_b /\
-    disjoint keys_b input_b /\
-    disjoint keys_b output_b /\ length output_b % 16 == 0 /\ length input_b % 16 == 0 /\ length keys_b % 16 == 0 /\ B.length keys_b == (nr AES_128 + 1) * 16 /\
+    bufs_disjoint [keys_b;input_b] /\
+    bufs_disjoint [keys_b;output_b] /\ length output_b % 16 == 0 /\ length input_b % 16 == 0 /\ length keys_b % 16 == 0 /\ B.length keys_b == (nr AES_128 + 1) * 16 /\
   keys_match key keys_b h
   /\ B.length output_b >= 1 /\ B.length input_b >= 1
 
