@@ -189,13 +189,15 @@ common_env['TARGET_ARCH'] = target_arch
 
 mono = ''
 if sys.platform == 'win32':
+  import importlib.util
   common_env.Replace(CCPDBFLAGS = '/Zi /Fd${TARGET.base}.pdb')
   # Use kremlib.h without primitive support for uint128_t.
   common_env.Append(CCFLAGS = ['/Ox', '/Gz', '/DKRML_NOUINT128'])
   common_env.Append(LINKFLAGS = ['/DEBUG'])
   if os.getenv('PLATFORM') == 'X64':
     common_env['AS'] = 'ml64'
-  if 'SHELL' in os.environ:  # Special job handling for cygwin
+  if 'SHELL' in os.environ and importlib.util.find_spec('win32job') != None and importlib.util.find_spec('win32api'):
+    # Special job handling for cygwin so that child processes exit when the parent process exits
     import win32job
     import win32api
     hdl = win32job.CreateJobObject(None, "")
