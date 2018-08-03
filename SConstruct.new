@@ -849,7 +849,7 @@ def extract_assembly_code(env, output_base_name, main_file, alg_file, cmdline_fi
   def collect_cmxs_in_order(x_ml):
     if not (x_ml in done):
       done.add(x_ml)
-      for y_ml in ml_out_deps[x_ml]:
+      for y_ml in sorted(ml_out_deps[x_ml]): # sorting makes the order deterministic, so scons doesn't needlessly rebuild
         # if x depends on y, y must appear first in ocaml link step
         Depends(ml_out_file(x_ml, '.cmx'), ml_out_file(y_ml, '.cmx'))
         collect_cmxs_in_order(y_ml)
