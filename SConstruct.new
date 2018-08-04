@@ -111,17 +111,24 @@ if 'VALE_HOME' in os.environ:
 else:
   vale_default_path = 'tools/Vale'
 
+if 'KREMLIN_HOME' in os.environ:
+  kremlin_default_path = os.environ['KREMLIN_HOME']
+else:
+  kremlin_default_path = 'tools/Kremlin'
+
 if 'FSTAR_HOME' in os.environ:
   fstar_default_path = os.environ['FSTAR_HOME']
 else:
   fstar_default_path = 'tools/FStar'
 
 # Retrieve tool-specific command overrides passed in by the user
-AddOption('--VALEPATH', dest = 'vale_path', type = 'string', default = vale_default_path, action = 'store',
+AddOption('--VALE-PATH', dest = 'vale_path', type = 'string', default = vale_default_path, action = 'store',
   help = 'Specify the path to Vale tool')
-AddOption('--FSTARPATH', dest = 'fstar_path', type = 'string', default = fstar_default_path, action = 'store',
+AddOption('--KREMLIN-PATH', dest = 'kremlin_path', type = 'string', default = kremlin_default_path, action = 'store',
+  help = 'Specify the path to kreMLin')
+AddOption('--FSTAR-PATH', dest = 'fstar_path', type = 'string', default = fstar_default_path, action = 'store',
   help = 'Specify the path to F* tool')
-AddOption('--FSTARZ3', dest = 'fstar_z3', type = 'string', default = '', action = 'store',
+AddOption('--FSTAR-Z3', dest = 'fstar_z3', type = 'string', default = '', action = 'store',
   help = 'Specify the path to z3 or z3.exe for F*')
 AddOption('--FSTAR-MY-VERSION', dest = 'fstar_my_version', default = False, action = 'store_true',
   help = 'Use version of F* that does not necessarily match .fstar_version')
@@ -141,22 +148,23 @@ AddOption('--CARGS', dest = 'c_user_args', type = 'string', default = [], action
   help = 'Supply temporary additional arguments to the C compiler')
 AddOption('--OPENSSL', dest = 'openssl_path', type = 'string', default = None, action = 'store',
   help = 'Specify the path to the root of an OpenSSL source tree')
-AddOption('--CACHEDIR', dest = 'cache_dir', type = 'string', default = None, action = 'store',
+AddOption('--CACHE-DIR', dest = 'cache_dir', type = 'string', default = None, action = 'store',
   help = 'Specify the SCons Shared Cache Directory')
-AddOption('--NOVERIFY', dest = 'noverify', default = False, action = 'store_true',
+AddOption('--NO-VERIFY', dest = 'noverify', default = False, action = 'store_true',
   help = 'Verify and compile, or compile only')
 AddOption('--ONE', dest = 'single_vaf', type = 'string', default = None, action = 'store',
   help = 'Only verify one specified .vaf file, and in that file, only verify procedures or verbatim blocks marked as {:verify}.')
-AddOption('--NOCOLOR', dest='no_color', default=False, action='store_true',
+AddOption('--NO-COLOR', dest='no_color', default=False, action='store_true',
   help="Don't add color to build output")
-AddOption('--DUMPARGS', dest = 'dump_args', default = False, action = 'store_true',
+AddOption('--DUMP-ARGS', dest = 'dump_args', default = False, action = 'store_true',
   help = "Print arguments that will be passed to the verification tools")
 AddOption('--FSTAR-EXTRACT', dest = 'fstar_extract', default = False, action = 'store_true',
   help = "Extract .ml files from F* files")
-AddOption('--MIN_TEST', dest = 'min_test', default = False, action = 'store_true',
+AddOption('--MIN-TEST', dest = 'min_test', default = False, action = 'store_true',
   help = "Only run on a minimal set of test files")
 
 vale_path = Dir(GetOption('vale_path')).abspath
+kremlin_path = Dir(GetOption('kremlin_path')).abspath
 fstar_path = Dir(GetOption('fstar_path')).abspath
 fstar_user_args = GetOption('fstar_user_args')
 vale_user_args = GetOption('vale_user_args')
@@ -259,6 +267,8 @@ external_files = [
   'obj/external/CanonCommSwaps.fst',
   'obj/external/CanonCommMonoid.fst',
   'obj/external/CanonCommSemiring.fst',
+  'obj/external/C.Loops.fst',
+  'obj/external/Spec.Loops.fst',
 ]
 
 no_extraction_files = [File(x) for x in [
@@ -986,6 +996,10 @@ if verify and not fstar_z3_my_version:
 # HACK: copy external files
 for x in ['CanonCommSwaps.fst', 'CanonCommMonoid.fst', 'CanonCommSemiring.fst']:
   source = f'{fstar_path}/examples/tactics/{x}'
+  target = f'obj/external/{x}'
+  shutil.copy(source, target)
+for x in ['C.Loops.fst', 'Spec.Loops.fst']:
+  source = f'{kremlin_path}/kremlib/{x}'
   target = f'obj/external/{x}'
   shutil.copy(source, target)
 
