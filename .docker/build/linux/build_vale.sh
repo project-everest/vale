@@ -5,6 +5,7 @@
 target=$1
 out_file=$2
 threads=$3
+branchname=$4
 
 function export_home() {
     if command -v cygpath >/dev/null 2>&1; then
