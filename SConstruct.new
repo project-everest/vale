@@ -127,8 +127,10 @@ AddOption('--FSTAR-MY-VERSION', dest = 'fstar_my_version', default = False, acti
   help = 'Use version of F* that does not necessarily match .fstar_version')
 AddOption('--FSTAR-Z3-MY-VERSION', dest = 'fstar_z3_my_version', default = False, action = 'store_true',
   help = 'Use version of Z3 that does not necessarily match .fstar_z3_version')
-AddOption('--GEN-HINTS', dest = 'gen_hints', default = False, action = 'store_true',
-  help = 'Generate new F* .hints files and copy them into the hints directory')
+AddOption('--RECORD-HINTS', dest = 'record_hints', default = False, action = 'store_true',
+  help = 'Record new F* .hints files into the hints directory')
+AddOption('--USE-HINTS', dest = 'use_hints', default = False, action = 'store_true',
+  help = 'Use F* .hints files from the hints directory')
 AddOption('--FARGS', dest = 'fstar_user_args', type = 'string', default = [], action = 'append',
   help = 'Supply temporary additional arguments to the F* compiler')
 AddOption('--VARGS', dest = 'vale_user_args', type = 'string', default = [], action = 'append',
@@ -164,7 +166,8 @@ openssl_path = GetOption('openssl_path')
 fstar_my_version = GetOption('fstar_my_version')
 fstar_z3_my_version = GetOption('fstar_z3_my_version')
 fstar_extract = GetOption('fstar_extract')
-gen_hints = GetOption('gen_hints')
+record_hints = GetOption('record_hints')
+use_hints = GetOption('use_hints')
 no_color = GetOption('no_color')
 dump_args = GetOption('dump_args')
 single_vaf = GetOption('single_vaf')
@@ -210,6 +213,7 @@ else:
   mono = 'mono'
 
 if sys.platform == 'win32':
+  # fstar.exe relies on libgmp-10.dll
   gmp_dll = FindFile('libgmp-10.dll', os.environ['PATH'].split(';'))
   if gmp_dll != None:
     common_env.PrependENVPath('PATH', os.path.dirname(str(gmp_dll)))
@@ -234,8 +238,8 @@ fstar_default_args_nosmtencoding = ('--max_fuel 1 --max_ifuel 1'
   # Don't remove unless you're sure you've used the axiom profiler to make sure you have no matching loops
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'
   + ' --hint_info'
-  #+ ('' if is_single_vaf else ' --use_hints')
-  + (' --record_hints' if gen_hints else ' --cache_checked_modules')
+  + (' --use_hints --use_hint_hashes' if use_hints else '')
+  + (' --record_hints' if record_hints else ' --cache_checked_modules')
   + ' --cache_dir obj/cache_checked'
   + ' --use_extracted_interfaces true'
   )
@@ -456,8 +460,8 @@ def to_obj_dir(file):
   else:
     return File(f'obj/{file}')
 
-def CopyFile(target, source):
-  return Command(target, source, Copy(target, source))
+def to_hint_file(file):
+  return File(f'hints/{file.name}.hints')
 
 def ml_out_file(sourcefile, suffix):
   module_name = file_module_name(sourcefile).replace('.', '_')
@@ -474,6 +478,10 @@ def compute_include_paths(src_include_paths, obj_include_paths, obj_prefix):
 def compute_includes(src_include_paths, obj_include_paths, obj_prefix):
   fstar_include_paths = compute_include_paths(src_include_paths, obj_include_paths, obj_prefix)
   return " ".join(["--include " + x for x in fstar_include_paths])
+
+def CopyFile(target, source):
+  Command(target, source, Copy(target, source))
+  return target
 
 ##################################################################################################
 #
@@ -668,37 +676,34 @@ def verify_fstar_file(options, targetfile, sourcefile, fstar_includes):
   stderrfile = File(f'{targetfile}.stderr')
   temptargetfile = File(f'{targetfile}.tmp')
   temptargetfiles = [temptargetfile]
-  #hintsfile = f'{sourcefile}.hints'
-  #hhintsfile = to_hints_dir(hintsfile)
+  hintfile = to_hint_file(sourcefile)
   outs = []
   if min_test and on_black_list(sourcefile, min_test_suite_blacklist):
     print(f'Skipping {sourcefile} because it is on the min_test_suite_blacklist defined in SConscript')
     return outs
-  # else:
-  #   print(f'File {sourcefile} is not on the blacklist')
-  #if gen_hints:
-  #  temptargetfiles.append(hintsfile)
+  if record_hints:
+    temptargetfiles.append(hintfile)
+  elif use_hints and os.path.isfile(str(hintfile)):
+    Depends(temptargetfiles, hintfile)
   temptargets = env.Command(temptargetfiles, sourcefile,
     f'{fstar_exe} {sourcefile} {options.verifier_flags} {fstar_z3_path} {fstar_no_verify}' +
-    f' {fstar_includes} {" ".join(fstar_user_args)} 1> {temptargetfile} 2> {stderrfile}')
+    f' {fstar_includes} {" ".join(fstar_user_args)} --hint_file {hintfile}' +
+    f' 1> {temptargetfile} 2> {stderrfile}')
   temptarget = temptargets[0]
-  outs.append(env.CopyAs(source = temptarget, target = targetfile))
-  #if gen_hints:
-  #  outs.append(env.CopyAs(source = temptargets[1], target = hhintsfile))
-  #elif os.path.isfile(hhintsfile):
-  #  Depends(temptargets, env.CopyAs(source = hhintsfile, target = hintsfile))
+  outs.append(CopyFile(targetfile, temptarget))
   return outs
 
 def extract_fstar_file(options, sourcefile, fstar_includes):
   env = options.env
   base_name = file_drop_extension(sourcefile)
   module_name = file_module_name(sourcefile)
+  hintfile = to_hint_file(sourcefile)
   mlfile = ml_out_file(sourcefile, '.ml')
   Depends(mlfile, to_obj_dir(base_name + '.fst.verified'))
   verifier_flags = options.verifier_flags.replace('--use_extracted_interfaces true', '')
   return env.Command(mlfile, sourcefile,
     f'{fstar_exe} {sourcefile} {verifier_flags} {fstar_z3_path} {fstar_no_verify}' +
-    f' {fstar_includes} {" ".join(fstar_user_args)}' +
+    f' {fstar_includes} {" ".join(fstar_user_args)} --hint_file {hintfile}' +
     f' --odir obj/ml_out --codegen OCaml --admit_smt_queries true --extract_module {module_name}')
 
 # Process a .fst or .fsti file
