@@ -915,7 +915,7 @@ let unwritten_buffer_down_aux (t:typ) (b:buffer t) (i:nat{i < buffer_length b}) 
     let base = h.addrs a in    
     let s0 = B.as_seq h.hs a in
     let s1 = B.as_seq h1.hs a in
-    assert (B.disjoint a b);
+    assert (I.disjoint a b);
     heap_shift mem1 mem2 base (B.length a)
 
 let unwritten_buffer_down (t:typ) (b:buffer t) (i:nat{i < buffer_length b}) (v:type_of_typ t)

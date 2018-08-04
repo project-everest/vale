@@ -28,7 +28,10 @@ inline_for_extraction
 let b8 = B.buffer UInt8.t
 
 unfold
-let disjoint_or_eq ptr1 ptr2 = B.disjoint ptr1 ptr2 \/ ptr1 == ptr2
+let disjoint ptr1 ptr2 = M.loc_disjoint (M.loc_buffer ptr1) (M.loc_buffer ptr2)
+
+unfold
+let disjoint_or_eq ptr1 ptr2 = disjoint ptr1 ptr2 \/ ptr1 == ptr2
 
 let list_disjoint_or_eq (#a:Type0) (ptrs:list (B.buffer a)) =
   forall p1 p2. List.memP p1 ptrs /\ List.memP p2 ptrs ==> disjoint_or_eq p1 p2
@@ -38,7 +41,7 @@ let disjoint_addr addr1 length1 addr2 length2 =
   addr1 + length1 < addr2 || addr2 + length2 < addr1
 
 type addr_map = (m:(b8 -> nat64){
-  (forall (buf1 buf2:b8). B.disjoint buf1 buf2 ==> 
+  (forall (buf1 buf2:b8). disjoint buf1 buf2 ==> 
     disjoint_addr (m buf1) (B.length buf1) (m buf2) (B.length buf2)) /\
   (forall (b:b8). m b + B.length b < pow2_64)})
 
@@ -46,12 +49,6 @@ unfold
 let list_live mem ptrs = forall p . List.memP p ptrs ==> B.live mem p
 
 (* Additional hypotheses, which should be added to the corresponding libraries at some point *)
-
-//This lemma will be available in the next version of Low*
-assume val buffers_disjoint (b1 b2:b8) : Lemma
-  (requires M.loc_disjoint (M.loc_buffer b1) (M.loc_buffer b2))
-  (ensures B.disjoint b1 b2)
-  [SMTPat (B.disjoint b1 b2)]
 
 (* If two refs have the same address, and are in the heap, they are equal *)
 assume val ref_extensionality (#a:Type0) (#rel:Preorder.preorder a) (h:Heap.heap) (r1 r2:Heap.mref a rel) : Lemma 
@@ -179,14 +176,14 @@ let correct_down_p_cancel mem (addrs:addr_map) heap (p:b8) : Lemma
   Classical.forall_intro aux
       
 let correct_down_p_frame mem (addrs:addr_map) (heap:heap) (p:b8) : Lemma
-  (forall p'. B.disjoint p p' /\ correct_down_p mem addrs heap p' ==>       
+  (forall p'. disjoint p p' /\ correct_down_p mem addrs heap p' ==>       
       (let length = B.length p in
       let contents = B.as_seq mem p in
       let addr = addrs p in
       let new_heap = write_vale_mem contents length addr 0 heap in
       correct_down_p mem addrs new_heap p')) = 
   let rec aux (p':b8) : Lemma 
-    (B.disjoint p p' /\ correct_down_p mem addrs heap p' ==> (let length = B.length p in
+    (disjoint p p' /\ correct_down_p mem addrs heap p' ==> (let length = B.length p in
       let contents = B.as_seq mem p in
       let addr = addrs p in
       let new_heap = write_vale_mem contents length addr 0 heap in
