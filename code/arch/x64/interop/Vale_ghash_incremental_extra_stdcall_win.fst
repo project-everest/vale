@@ -81,7 +81,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     Rbp va_sM (va_update_reg Rdi va_sM (va_update_reg Rsi va_sM (va_update_reg Rdx va_sM
     (va_update_reg Rcx va_sM (va_update_reg Rbx va_sM (va_update_reg Rax va_sM (va_update_ok va_sM
     va_s0))))))))))))))))))))))))))))))))))))))
-    
+
 val va_lemma_ghash_incremental_extra_stdcall_win(va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
 (in_b:buffer128) (hash_b:buffer128) (h_b:buffer128) (num_bytes:nat64) (orig_hash:(quad32)) : Ghost ((va_sM:va_state) * (va_fM:va_fuel))
   (requires va_pre va_b0 va_s0 stack_b in_b hash_b h_b num_bytes orig_hash )

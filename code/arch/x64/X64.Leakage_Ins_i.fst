@@ -39,22 +39,22 @@ let check_if_ins_consumes_fixed_time ins ts =
   let b, ts' = match i with
     | S.Mov64 dst _ | S.AddLea64 dst _ _ -> begin
       match dst with
-	| OConst _ -> false, ts (* Should not happen *)
-	| OReg r -> fixedTime, ts'
-	| OMem m -> fixedTime, ts'
+        | OConst _ -> false, ts (* Should not happen *)
+        | OReg r -> fixedTime, ts'
+        | OMem m -> fixedTime, ts'
     end
      | S.Mul64 _ -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
-    
+
     | S.Xor64 dst src ->
         (* Special case for Xor : xor-ing an operand with itself erases secret data *)
         if dst = src then
-    	  let ts' = set_taint dst ts' Public in
-    	  fixedTime, TaintState ts'.regTaint Secret Secret ts'.xmmTaint
+              let ts' = set_taint dst ts' Public in
+              fixedTime, TaintState ts'.regTaint Secret Secret ts'.xmmTaint
         else
-    	begin match dst with
-    	  | OConst _ -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
-    	  | OReg r -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
-    	  | OMem m -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+            begin match dst with
+              | OConst _ -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
+              | OReg r -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+              | OMem m -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
         end
    | S.Push src -> if Secret? (ts'.regTaint Rsp) || Secret? (operand_taint src ts' Public) then false, ts
      else fixedTime, ts'
@@ -62,15 +62,15 @@ let check_if_ins_consumes_fixed_time ins ts =
    | S.Adox64 _ _ -> false, ts (* Unhandled yet *)
    | S.Add64 _ _ | S.AddCarry64 _ _ | S.Adcx64 _ _  -> begin
           match dsts with
-	| [OConst _] -> true, (TaintState ts'.regTaint Secret taint ts'.xmmTaint) (* Should not happen *)
-	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret taint ts'.xmmTaint)
-	| [OMem m] -> fixedTime, (TaintState ts'.regTaint Secret taint ts'.xmmTaint)    
+        | [OConst _] -> true, (TaintState ts'.regTaint Secret taint ts'.xmmTaint) (* Should not happen *)
+        | [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret taint ts'.xmmTaint)
+        | [OMem m] -> fixedTime, (TaintState ts'.regTaint Secret taint ts'.xmmTaint)
     end
     | _ ->
       match dsts with
-    	| [OConst _] -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
-    	| [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
-    	| [OMem m] ->  fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+            | [OConst _] -> false, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint) (* Should not happen *)
+            | [OReg r] -> fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
+            | [OMem m] ->  fixedTime, (TaintState ts'.regTaint Secret Secret ts'.xmmTaint)
   in
   b, ts'
 
@@ -147,22 +147,22 @@ let lemma_mov_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src] -> 
-	  let v1 = eval_operand src s1.state in
-	  let v2 = eval_operand src s2.state in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
-	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src] ->
+          let v1 = eval_operand src s1.state in
+          let v2 = eval_operand src s2.state in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+          lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_add_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Add64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -177,26 +177,26 @@ let lemma_add_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12) % pow2_64 in
-	  let v2 = (v21 + v22) % pow2_64 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = (v11 + v12) % pow2_64 in
+          let v2 = (v21 + v22) % pow2_64 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 
 val lemma_mulx_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Mulx64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
@@ -226,8 +226,8 @@ let lemma_mulx_same_public ts ins s1 s2 fuel =
       let v2_lo = FStar.UInt.mul_mod #64 v21 v22 in
       let s1' = update_operand_preserve_flags' (OMem m2) v1_lo s1.state in
       let s2' = update_operand_preserve_flags' (OMem m2) v2_lo s2.state in
-      if not (valid_mem64 ptr1_hi s1'.mem) || not (valid_mem64 ptr2_hi s2'.mem) 
-	|| not (valid_mem64 ptr1_lo s1.state.mem) || not (valid_mem64 ptr2_lo s2.state.mem) then ()
+      if not (valid_mem64 ptr1_hi s1'.mem) || not (valid_mem64 ptr2_hi s2'.mem)
+        || not (valid_mem64 ptr1_lo s1.state.mem) || not (valid_mem64 ptr2_lo s2.state.mem) then ()
       else begin
       lemma_store_load_mem64 ptr1_hi v1_hi s1'.mem;
       lemma_store_load_mem64 ptr2_hi v2_hi s2'.mem;
@@ -257,7 +257,7 @@ let lemma_mulx_same_public ts ins s1 s2 fuel =
       let v2_hi = FStar.UInt.mul_div #64 v21 v22 in
       let v2_lo = FStar.UInt.mul_mod #64 v21 v22 in
       let s1' = update_operand_preserve_flags' o v1_lo s1.state in
-      let s2' = update_operand_preserve_flags' o v2_lo s2.state in      
+      let s2' = update_operand_preserve_flags' o v2_lo s2.state in
       let ptr1_hi = eval_maddr m1 s1' in
       let ptr2_hi = eval_maddr m1 s2' in
       if not (valid_mem64 ptr1_hi s1.state.mem) || not (valid_mem64 ptr2_hi s2.state.mem) then ()
@@ -290,7 +290,7 @@ let lemma_mulx_same_public ts ins s1 s2 fuel =
       lemma_valid_store_mem64 ptr1_lo v1_lo s1.state.mem;
       lemma_valid_store_mem64 ptr2_lo v2_lo s2.state.mem;
       lemma_frame_store_mem64 ptr1_lo v1_lo s1.state.mem;
-      lemma_frame_store_mem64 ptr2_lo v2_lo s2.state.mem      
+      lemma_frame_store_mem64 ptr2_lo v2_lo s2.state.mem
       end
       end
     | _ -> ()
@@ -307,26 +307,26 @@ let lemma_sub_same_public ts ins s1 s2 fuel =
  match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 - v12) % pow2_64 in
-	  let v2 = (v21 - v22) % pow2_64 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = (v11 - v12) % pow2_64 in
+          let v2 = (v21 - v22) % pow2_64 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_imul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.IMul64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -340,26 +340,26 @@ let lemma_imul_same_public ts ins s1 s2 fuel =
  match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = FStar.UInt.mul_mod #64 v11 v12 in
-	  let v2 = FStar.UInt.mul_mod #64 v21 v22 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = FStar.UInt.mul_mod #64 v11 v12 in
+          let v2 = FStar.UInt.mul_mod #64 v21 v22 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_and_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.And64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -373,26 +373,26 @@ let lemma_and_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.iand v11 v12 in
-	  let v2 = Types_s.iand v21 v22 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = Types_s.iand v11 v12 in
+          let v2 = Types_s.iand v21 v22 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_addlea_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.AddLea64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -406,26 +406,26 @@ let lemma_addlea_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [dst; src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12) % pow2_64 in
-	  let v2 = (v21 + v22) % pow2_64 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [dst; src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = (v11 + v12) % pow2_64 in
+          let v2 = (v21 + v22) % pow2_64 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_addcarry_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.AddCarry64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -439,28 +439,28 @@ let lemma_addcarry_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let c1 = if cf(s1.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
-	  let c2 = if cf(s2.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12 + c1) % pow2_64 in
-	  let v2 = (v21 + v22 + c2) % pow2_64 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let c1 = if cf(s1.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+          let c2 = if cf(s2.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = (v11 + v12 + c1) % pow2_64 in
+          let v2 = (v21 + v22 + c2) % pow2_64 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_adcx_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Adcx64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -476,28 +476,28 @@ let lemma_adcx_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let c1 = if cf(s1.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
-	  let c2 = if cf(s2.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = (v11 + v12 + c1) % pow2_64 in
-	  let v2 = (v21 + v22 + c2) % pow2_64 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let c1 = if cf(s1.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+          let c2 = if cf(s2.state.X64.Memory_i_s.state.S.flags) then 1 else 0 in
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = (v11 + v12 + c1) % pow2_64 in
+          let v2 = (v21 + v22 + c2) % pow2_64 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_mul_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Mul64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -517,26 +517,26 @@ let lemma_shr_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.ishr v11 v12 in
-	  let v2 = Types_s.ishr v21 v22 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = Types_s.ishr v11 v12 in
+          let v2 = Types_s.ishr v21 v22 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_shl_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Shl64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -550,26 +550,26 @@ let lemma_shl_same_public ts ins s1 s2 fuel =
   match dsts with
     | [OConst _] -> ()
     | [OReg _] ->  ()
-    | [OMem m] -> 
+    | [OMem m] ->
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.ishl v11 v12 in
-	  let v2 = Types_s.ishl v21 v22 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = Types_s.ishl v11 v12 in
+          let v2 = Types_s.ishl v21 v22 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 val lemma_xor_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins.ops in S.Xor64? i}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_ins_consumes_fixed_time ins ts in
@@ -577,7 +577,7 @@ val lemma_xor_same_public: (ts:taintState) -> (ins:tainted_ins{let i, _, _ = ins
 
 val lemma_aux_xor: (x:nat64) -> Lemma (Types_s.ixor x x = 0)
 
-let lemma_aux_xor x = 
+let lemma_aux_xor x =
   TypesNative_s.reveal_ixor 64 x x;
   FStar.UInt.logxor_self #64 x
 
@@ -594,22 +594,22 @@ let lemma_xor_same_public ts ins s1 s2 fuel =
       let ptr1 = eval_maddr m s1.state in
       let ptr2 = eval_maddr m s2.state in
       match srcs with
-	| [src1; src2] ->
-	  let v11 = eval_operand src1 s1.state in
-	  let v12 = eval_operand src2 s1.state in
-	  let v21 = eval_operand src1 s2.state in
-	  let v22 = eval_operand src2 s2.state in	  
-	  let v1 = Types_s.ixor v11 v12 in
-	  let v2 = Types_s.ixor v21 v22 in
-	  if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
-	  else begin
- 	  lemma_store_load_mem64 ptr1 v1 s1.state.mem;
-	  lemma_store_load_mem64 ptr2 v2 s2.state.mem;
-	  lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
-	  lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-	  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
-	  end
+        | [src1; src2] ->
+          let v11 = eval_operand src1 s1.state in
+          let v12 = eval_operand src2 s1.state in
+          let v21 = eval_operand src1 s2.state in
+          let v22 = eval_operand src2 s2.state in
+          let v1 = Types_s.ixor v11 v12 in
+          let v2 = Types_s.ixor v21 v22 in
+          if not (valid_mem64 ptr1 s1.state.mem) || not (valid_mem64 ptr2 s2.state.mem) then ()
+          else begin
+           lemma_store_load_mem64 ptr1 v1 s1.state.mem;
+          lemma_store_load_mem64 ptr2 v2 s2.state.mem;
+          lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
+          lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
+          lemma_frame_store_mem64 ptr2 v2 s2.state.mem
+          end
 
 #reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 20"
 val lemma_ins_same_public: (ts:taintState) -> (ins:tainted_ins{not (is_xmm_ins ins)}) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma

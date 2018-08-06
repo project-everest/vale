@@ -8,7 +8,7 @@ module TS = X64.Taint_Semantics_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2"
 
-let state_to_S (s:state) : GTot TS.traceState = 
+let state_to_S (s:state) : GTot TS.traceState =
   {
   TS.state = (let s' = {
     BS.ok = s.ok;

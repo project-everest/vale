@@ -140,14 +140,14 @@ procedure{:quick exportOnly}{:recursive}{:decrease n} KeyExpansionRoundUnrolledR
     inline if (1 < n <= 14) {
         KeyExpansionRoundUnrolledRecursive256(key, dst, n - 1);
         ghost var old_mem := mem;
-        inline if (n % 2 = 0) { 
+        inline if (n % 2 = 0) {
             KeyExpansionRoundEven256(n - 1, aes_rcon(n / 2 - 1), dst, key);
         }  else {
             KeyExpansionRoundOdd256(n - 1, aes_rcon(n / 2 - 1), dst, key);
         }
         assert forall j {buffer128_read(dst, j, mem)} :: 0 <= j < n ==>
             buffer128_read(dst, j, mem) == buffer128_read(dst, j, old_mem);
-    } 
+    }
 }
 
 procedure{:quick} KeyExpansion256Stdcall(
@@ -164,7 +164,7 @@ procedure{:quick} KeyExpansion256Stdcall(
         key_expansion_ptr := if win then rdx else rsi;
         key := make_AES256_key(buffer128_read(input_key_b, 0, mem), buffer128_read(input_key_b, 1, mem));
     requires/ensures
-        buffers_disjoint128(input_key_b, output_key_expansion_b); 
+        buffers_disjoint128(input_key_b, output_key_expansion_b);
         validSrcAddrs128(mem, key_ptr, input_key_b, 2, memTaint, Secret);
         validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, 15, memTaint, Secret);
     ensures

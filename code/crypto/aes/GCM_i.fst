@@ -70,7 +70,7 @@ let lemma_gcm_encrypt_decrypt_equiv (alg:algorithm) (key:aes_key_LE alg) (iv_BE:
   reveal_opaque (gcm_encrypt_LE_def alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) cipher auth);
   reveal_opaque (gcm_decrypt_LE_def alg (seq_nat32_to_seq_nat8_LE key) (be_quad32_to_bytes iv_BE) cipher auth alleged_tag);
   ()
-  
+
 
 let gcm_decrypt_LE_tag (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (cipher:seq nat8) (auth:seq nat8) :
   Pure (seq nat8)
@@ -95,8 +95,8 @@ let gcm_decrypt_LE_tag (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (ciph
   let s_LE = ghash_LE h_LE hash_input_LE in
   let t = gctr_encrypt_LE j0_BE (le_quad32_to_bytes s_LE) alg key_LE in
   t
-  
-  
+
+
 let decrypt_helper (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (cipher:seq nat8) (auth:seq nat8)
                    (rax:nat64) (alleged_tag_quad computed_tag:quad32) : Lemma
   (requires 4096 * length cipher < pow2_32 /\
@@ -105,7 +105,7 @@ let decrypt_helper (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (cipher:s
             le_quad32_to_bytes computed_tag == gcm_decrypt_LE_tag alg key iv cipher auth
   )
   (ensures  (rax = 0) == snd (gcm_decrypt_LE alg key iv cipher auth (le_quad32_to_bytes alleged_tag_quad)))
-  = 
+  =
   reveal_opaque (gcm_decrypt_LE_def alg key iv cipher auth (le_quad32_to_bytes alleged_tag_quad));
   (*
   let b = snd (gcm_decrypt_LE alg key iv cipher auth (le_quad32_to_bytes alleged_tag_quad)) in

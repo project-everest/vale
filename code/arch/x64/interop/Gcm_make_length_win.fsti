@@ -47,13 +47,13 @@ let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem
   assert (BV.length b128 > 0);
   BV.sel h b128 0
 
-let pre_cond (h:HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat64) (b:s8) = 
+let pre_cond (h:HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat64) (b:s8) =
     B.live h b /\
     B.length b == 16 /\
     8 * plain_num_bytes < pow2_32 /\
     8 * auth_num_bytes < pow2_32
 
-let post_cond (h:HS.mem) (h':HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat64) (b:s8) = 
+let post_cond (h:HS.mem) (h':HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat64) (b:s8) =
     8 * plain_num_bytes < pow2_32 /\
     8 * auth_num_bytes < pow2_32 /\
   length b == 16 /\     M.modifies (M.loc_buffer b) h h' /\
@@ -61,5 +61,5 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_num_bytes:nat64) (auth_num_bytes:nat
      new_b == reverse_bytes_quad32 (Mkfour (8 * plain_num_bytes) 0 (8 * auth_num_bytes) 0))
 
 val gcm_make_length_quad_buffer_win: plain_num_bytes:UInt64.t -> auth_num_bytes:UInt64.t -> b:s8 -> Stack unit
-	(requires (fun h -> pre_cond h (UInt64.v plain_num_bytes) (UInt64.v auth_num_bytes) b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 (UInt64.v plain_num_bytes) (UInt64.v auth_num_bytes) b ))
+        (requires (fun h -> pre_cond h (UInt64.v plain_num_bytes) (UInt64.v auth_num_bytes) b ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 (UInt64.v plain_num_bytes) (UInt64.v auth_num_bytes) b ))

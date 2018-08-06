@@ -47,7 +47,7 @@ let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (s
     (va_update_reg Rdi va_sM (va_update_reg Rsi va_sM (va_update_reg Rdx va_sM (va_update_reg Rcx
     va_sM (va_update_reg Rbx va_sM (va_update_reg Rax va_sM (va_update_ok va_sM
     va_s0))))))))))))))))))))))))))))))))))))))
-  
+
 
 val va_lemma_inc32_buffer_win(va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
 (iv_b:buffer128) : Ghost ((va_sM:va_state) * (va_fM:va_fuel))

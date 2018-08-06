@@ -120,7 +120,7 @@ procedure{:instruction mk_taint_ins2(S.Adox64, dst, src, list(dst), list(dst, sr
 procedure{:instruction mk_taint_ins2(S.Sub64, dst, src, list(dst), list(dst, src))}{:fast_instruction}{:quick exportOnly} Sub64(inout dst: dst_opr64, src: opr64)
     requires
         0 <= dst - src;
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(dst) - old(src);
@@ -176,18 +176,18 @@ procedure{:instruction mk_taint_ins2(S.IMul64, dst, src, list(dst), list(dst, sr
 }
 
 procedure{:instruction mk_taint_ins2(S.Xor64, dst, src, list(dst), list(dst, src))}{:quick exportOnly} Xor64(inout dst: dst_opr64, src: opr64)
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(ixor(dst,src));
         !overflow(efl);
         !cf(efl);
-        
+
 {
 }
 
 procedure{:instruction mk_taint_ins2(S.And64, dst, src, list(dst), list(dst, src))}{:fast_instruction}{:quick exportOnly} And64(inout dst: dst_opr64, src: opr64)
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(iand(dst,src));

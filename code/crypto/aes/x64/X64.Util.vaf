@@ -56,7 +56,7 @@ procedure {:quick} zero_quad32_buffer(ghost b:buffer128)
 
         modifies_buffer128(b, old(mem), mem);
         buffer128_read(b, 0, mem) == Mkfour(0, 0, 0, 0);
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -71,7 +71,7 @@ procedure {:quick} zero_quad32_buffer_win(ghost stack_b:buffer64, ghost b:buffer
         buffer_readable(mem, b);
         valid_taint_buf128(b, mem, memTaint, Secret);
         buffer_length(b) == 1;
-    requires        
+    requires
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(b)));
         buffer_readable(mem, stack_b);
         buffer_length(stack_b) >= 2;
@@ -129,7 +129,7 @@ procedure {:quick} mk_quad32_lo0_be_1_buffer(ghost b:buffer128)
         let old_b := buffer128_read(b, 0, old(mem));
         let new_b := buffer128_read(b, 0, mem);
         new_b == Mkfour (1, old_b.lo1, old_b.hi2, old_b.hi3);
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -150,7 +150,7 @@ procedure {:quick} mk_quad32_lo0_be_1_buffer_win(ghost stack_b:buffer64, ghost b
         buffer_length(stack_b) >= 2;
         valid_stack_slots(mem, rsp, stack_b, 0, memTaint);
         rcx == buffer_addr(b, mem);
-        valid_taint_buf128(b, mem, memTaint, Secret);        
+        valid_taint_buf128(b, mem, memTaint, Secret);
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -208,7 +208,7 @@ procedure {:quick} quad32_xor_buffer(
         rdx == buffer_addr(dst, mem);
         buffer_length(src1) == 1;
         buffer_length(src2) == 1;
-        buffer_length(dst) == 1;        
+        buffer_length(dst) == 1;
    ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -219,7 +219,7 @@ procedure {:quick} quad32_xor_buffer(
 
         modifies_buffer128(dst, old(mem), mem);
         buffer128_read(dst, 0, mem) == quad32_xor(buffer128_read(src1, 0, old(mem)), buffer128_read(src2, 0, old(mem)));
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -323,7 +323,7 @@ procedure {:quick} gcm_load_xor_store_buffer(
         let cipher := buffer128_as_seq(mem, cipher_b);
         offset < num_blocks;
         buffer_addr(plain_b, mem) + offset * 16 < pow2_64;
-        buffer_addr(cipher_b, mem) + offset * 16 < pow2_64;                
+        buffer_addr(cipher_b, mem) + offset * 16 < pow2_64;
         mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
         gctr_partial(AES_128, offset, plain, cipher, key, iv);
 
@@ -342,7 +342,7 @@ procedure {:quick} gcm_load_xor_store_buffer(
         let cipher := buffer128_as_seq(mem, cipher_b);
         gctr_partial(AES_128, offset + 1, plain, cipher, key, iv);
         slice(cipher, 0, offset) == slice(old_cipher, 0, offset);
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -376,7 +376,7 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
 
         valid_taint_buf128(plain_b, mem, memTaint, Secret);
         valid_taint_buf128(mask_b, mem, memTaint, Secret);
-        valid_taint_buf128(cipher_b, mem, memTaint, Secret);  
+        valid_taint_buf128(cipher_b, mem, memTaint, Secret);
     requires
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(plain_b), loc_buffer(mask_b), loc_buffer(cipher_b)));
         buffer_readable(mem, stack_b);
@@ -396,11 +396,11 @@ procedure {:quick} gcm_load_xor_store_buffer_win(
         let plain := buffer128_as_seq(mem, plain_b);
         let cipher := buffer128_as_seq(mem, cipher_b);
         offset < num_blocks;
-        buffer_addr(plain_b, mem) + offset * 16 < pow2_64;        
-        buffer_addr(cipher_b, mem) + offset * 16 < pow2_64;        
+        buffer_addr(plain_b, mem) + offset * 16 < pow2_64;
+        buffer_addr(cipher_b, mem) + offset * 16 < pow2_64;
         mask == aes_encrypt_BE(AES_128, key, inc32(iv, offset));
         gctr_partial(AES_128, offset, plain, cipher, key, iv);
-        
+
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -481,7 +481,7 @@ procedure {:quick} reverse_bytes_quad32_buffer_win(ghost stack_b:buffer64, ghost
         buffer_length(stack_b) >= 2;
         valid_stack_slots(mem, rsp, stack_b, 0, memTaint);
         rcx == buffer_addr(b, mem);
-        buffer_length(b) == 1;        
+        buffer_length(b) == 1;
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -504,7 +504,7 @@ procedure {:quick} reverse_bytes_quad32_buffer_win(ghost stack_b:buffer64, ghost
         xmm15 == old(xmm15);
 
         modifies_buffer128(b, old(mem), mem);
-        buffer128_read(b, 0, mem) == reverse_bytes_quad32(buffer128_read(b, 0, old(mem)));        
+        buffer128_read(b, 0, mem) == reverse_bytes_quad32(buffer128_read(b, 0, old(mem)));
     reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;

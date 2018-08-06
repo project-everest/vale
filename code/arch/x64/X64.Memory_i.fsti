@@ -11,7 +11,7 @@ unfold let nat32 = Words_s.nat32
 unfold let nat64 = Words_s.nat64
 unfold let quad32 = Types_s.quad32
 
-type base_typ = 
+type base_typ =
 | TUInt8
 | TUInt16
 | TUInt32
@@ -205,7 +205,7 @@ val load_mem64 : ptr:int -> h:mem -> GTot nat64 // the 64-bit word at ptr (if va
 val store_mem64 : ptr:int -> v:nat64 -> h:mem -> GTot mem
 
 val valid_mem128 (ptr:int) (h:mem) : GTot bool
-val load_mem128  (ptr:int) (h:mem) : GTot quad32 
+val load_mem128  (ptr:int) (h:mem) : GTot quad32
 val store_mem128 (ptr:int) (v:quad32) (h:mem) : GTot mem
 
 val lemma_valid_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma

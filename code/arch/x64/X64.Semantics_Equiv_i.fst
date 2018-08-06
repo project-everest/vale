@@ -11,7 +11,7 @@ val equiv_eval_operand (o:operand) (s:state) : Lemma
 
 let equiv_eval_operand o s = match o with
   | OConst _ | OReg _ -> ()
-  | OMem m -> 
+  | OMem m ->
     let addr = eval_maddr m s in
     equiv_load_mem addr s
 
@@ -21,7 +21,7 @@ val equiv_eval_mov128_op (o:mov128_op) (s:state) : Lemma
 
 let equiv_eval_mov128_op o s = match o with
   | Mov128Xmm _ -> ()
-  | Mov128Mem m -> 
+  | Mov128Mem m ->
     let addr = eval_maddr m s in
     equiv_load_mem128 addr s
 
@@ -36,7 +36,7 @@ let equiv_eval_mov (s:state) (ins:S.ins{S.Mov64? ins}) : Lemma (
     equiv_eval_operand src s;
     ()
   end
-  
+
 let equiv_eval_add (s:state) (ins:S.ins{S.Add64? ins}) : Lemma (
   let s_hi = run (eval_ins ins) s in
   let s_bytes = S.run (S.eval_ins ins) s.state in
@@ -139,7 +139,7 @@ let equiv_eval_mulx (s:state) (ins:S.ins{S.Mulx64? ins}) : Lemma (
     let lo =  FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
     let s_b = update_operand_preserve_flags' dst_lo lo s in
     if not (valid_operand dst_hi s_b) then ()
-    else 
+    else
     equiv_eval_operand (OReg Rdx) s;
     equiv_eval_operand src s;
     ()
@@ -422,14 +422,14 @@ val monotone_ok_ins (ins:S.ins) (s:state) : Lemma (
   (s_hi.state.S.ok ==> s.state.S.ok) /\
   (s_bytes.S.ok ==> s.state.S.ok))
 
-val monotone_ok_code (code:code) (fuel:nat) (s:state) : Lemma 
+val monotone_ok_code (code:code) (fuel:nat) (s:state) : Lemma
   (requires True)
   (ensures (
   let s_hi = eval_code code fuel s in
   (Some? s_hi /\ (Some?.v s_hi).state.S.ok ==> s.state.S.ok)))
   (decreases %[fuel; code])
 
-val monotone_ok_codes (l:codes) (fuel:nat) (s:state) : Lemma 
+val monotone_ok_codes (l:codes) (fuel:nat) (s:state) : Lemma
   (requires True)
   (ensures (
   let s_hi = eval_codes l fuel s in
@@ -444,23 +444,23 @@ val monotone_ok_while (b:ocmp) (code:code) (fuel:nat) (s:state) : Lemma
   (decreases %[fuel; code])
 
 
-val monotone_ok_code_bytes (code:code) (fuel:nat) (s:S.state) : Lemma 
+val monotone_ok_code_bytes (code:code) (fuel:nat) (s:S.state) : Lemma
   (requires True)
   (ensures (
   let s_bytes = S.eval_code code fuel s in
   (Some? s_bytes /\ (Some?.v s_bytes).S.ok ==> s.S.ok)))
   (decreases %[fuel; code])
 
-val monotone_ok_codes_bytes (l:codes) (fuel:nat) (s:S.state) : Lemma 
+val monotone_ok_codes_bytes (l:codes) (fuel:nat) (s:S.state) : Lemma
   (requires True)
   (ensures
     (let s_bytes = S.eval_codes l fuel s in
   (Some? s_bytes /\ (Some?.v s_bytes).S.ok ==> s.S.ok)))
   (decreases %[fuel; l])
 
-val monotone_ok_while_bytes (b:ocmp) (code:code) (fuel:nat) (s:S.state) : Lemma 
+val monotone_ok_while_bytes (b:ocmp) (code:code) (fuel:nat) (s:S.state) : Lemma
   (requires True)
-  (ensures 
+  (ensures
   (let s_bytes = S.eval_while b code fuel s in
   (Some? s_bytes /\ (Some?.v s_bytes).S.ok ==> s.S.ok)))
   (decreases %[fuel; code])
@@ -470,7 +470,7 @@ let monotone_ok_ins ins s = ()
 let rec monotone_ok_code code fuel s = match code with
   | Ins ins -> monotone_ok_ins ins s
   | Block l -> monotone_ok_codes l fuel s
-  | IfElse ifCond ifTrue ifFalse -> 
+  | IfElse ifCond ifTrue ifFalse ->
     let s_hi = run (check (valid_ocmp ifCond)) s in
     monotone_ok_code ifTrue fuel s_hi;
     monotone_ok_code ifFalse fuel s_hi
@@ -497,7 +497,7 @@ and monotone_ok_while b c fuel s =
 let rec monotone_ok_code_bytes code fuel s = match code with
   | Ins ins -> ()
   | Block l -> monotone_ok_codes_bytes l fuel s
-  | IfElse ifCond ifTrue ifFalse -> 
+  | IfElse ifCond ifTrue ifFalse ->
     let s_bytes = S.run (S.check (S.valid_ocmp ifCond)) s in
     monotone_ok_code_bytes ifTrue fuel s_bytes;
     monotone_ok_code_bytes ifFalse fuel s_bytes
@@ -536,7 +536,7 @@ and equiv_eval_codes l fuel s = match l with
   | [] -> ()
   | c::tl -> let s_opt = eval_code c fuel s in
     let s_bytes = S.eval_code c fuel s.state in
-    if None? s_opt then () 
+    if None? s_opt then ()
     else if not (Some?.v s_opt).state.S.ok then monotone_ok_codes tl fuel (Some?.v s_opt)
     else begin
       equiv_eval_code c fuel s;
@@ -550,7 +550,7 @@ and equiv_eval_while b c fuel s =
   else (
     match eval_code c (fuel-1) s0 with
     | None -> ()
-    | Some s1 -> 
+    | Some s1 ->
       if s1.state.S.ok then (
         equiv_eval_code c (fuel-1) s0;
         equiv_eval_while b c (fuel-1) s1;
@@ -558,4 +558,4 @@ and equiv_eval_while b c fuel s =
       )
       else ()
  )
- 
+

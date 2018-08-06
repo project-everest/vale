@@ -89,7 +89,7 @@ let rec increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
       if not b0 then ()
       else
       (
-        let s1 = {s1 with TS.trace=BranchPredicate(true)::s1.TS.trace} in  
+        let s1 = {s1 with TS.trace=BranchPredicate(true)::s1.TS.trace} in
         match TS.taint_eval_code c (f0 - 1) s1 with
         | None -> ()
         | Some s2 ->
@@ -162,7 +162,7 @@ let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
   assert (state_eq_opt (TS.taint_eval_code (While b c) f1 (state_to_S s0)) (TS.taint_eval_code (While b c) 1 (state_to_S sW)));
   assert (eval_code (While b c) s0 f1 sW);
   (sW, f1)
-  
+
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 30"
 let lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) =
   let fN:nat = f0 + fM + 1 in
@@ -179,7 +179,7 @@ let lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (s
       increase_fuel (While?.whileBody c) sM fM sN fZ;
       increase_fuel c sN f (state_of_S sZ) fZ;
 
-      assert (state_eq_opt (TS.taint_eval_code c (fZ + 1) (state_to_S sM)) (Some sZ)); // via eval_code for While 
+      assert (state_eq_opt (TS.taint_eval_code c (fZ + 1) (state_to_S sM)) (Some sZ)); // via eval_code for While
       assert (state_eq_opt (TS.taint_eval_code c (fZ + 1) (state_to_S sM)) (TS.taint_eval_code c (fZ + 1 + f0) (state_to_S s0))); // via eval_while_inv, choosing f = fZ + 1
 
       // Two assertions above prove (TS.taint_eval_code c (fZ + 1 + f0) (state_to_S s0)) equals (Some sZ)

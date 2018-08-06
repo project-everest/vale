@@ -76,5 +76,5 @@ let post_cond (h:HS.mem) (h':HS.mem) (h_b:s8) (hash_b:s8) (input_b:s8) (offset:n
 
 
 val ghash_incremental_one_block_buffer_win: h_b:s8 -> hash_b:s8 -> input_b:s8 -> offset:UInt64.t -> Stack unit
-	(requires (fun h -> pre_cond h h_b hash_b input_b (UInt64.v offset) ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 h_b hash_b input_b (UInt64.v offset) ))
+        (requires (fun h -> pre_cond h h_b hash_b input_b (UInt64.v offset) ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 h_b hash_b input_b (UInt64.v offset) ))

@@ -16,7 +16,7 @@ let gf128_mul_LE (a_LE b_LE:quad32) : quad32 =
   let ab_BE = gf128_to_quad32 (gf128_mul (gf128_of_quad32 a_BE) (gf128_of_quad32 b_BE)) in
   reverse_bytes_quad32 ab_BE
 
-let rec ghash_LE_def (h_LE:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
+let rec ghash_LE_def (h_LE:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) =
   let y_i_minus_1 =
     (if length x = 1 then
        Mkfour 0 0 0 0

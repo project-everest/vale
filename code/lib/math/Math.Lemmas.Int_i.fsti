@@ -9,7 +9,7 @@ val lemma_div_mod (a:int) (n:pos) : Lemma (a == (a / n) * n + a % n)
 
 val lemma_div_lt (a:int) (n:nat) (m:nat) : Lemma
   (requires m <= n /\ a < pow2 n)
-	(ensures a / pow2 m < pow2 (n-m))
+        (ensures a / pow2 m < pow2 (n-m))
 
 val bounded_multiple_is_zero (x:int) (n:pos) : Lemma
   (requires -n < x * n /\ x * n < n)

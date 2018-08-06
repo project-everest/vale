@@ -14,32 +14,32 @@ let lemma_all_but_last_append (#t:Type) (a:seq t) (b:seq t{length b > 0}) :
   let app_a_b = append a (all_but_last b) in
   assert (equal ab app_a_b)  // OBSERVE: extensionality
 
-let reverse_seq_append (#a:eqtype) (s:seq a) (t:seq a) : 
+let reverse_seq_append (#a:eqtype) (s:seq a) (t:seq a) :
   Lemma(ensures reverse_seq (append s t) == append (reverse_seq t) (reverse_seq s))
   =
   assert (equal (reverse_seq (append s t)) (append (reverse_seq t) (reverse_seq s)))
 
-let reverse_reverse_seq (#a:Type) (s:seq a) : 
+let reverse_reverse_seq (#a:Type) (s:seq a) :
   Lemma(ensures reverse_seq (reverse_seq s) == s)
   =
   assert (equal (reverse_seq (reverse_seq s)) s)
 
 
-let rec seq_map_i_indexed (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
+let rec seq_map_i_indexed (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) :
   Tot (s':seq b { length s' == length s /\
                   (forall j . {:pattern index s' j} 0 <= j /\ j < length s ==> index s' j == f (i + j) (index s j))
                 })
       (decreases %[(length s)])
   =
   if length s = 0 then empty
-  else 
+  else
      cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
 
-let seq_map_i (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) : 
+let seq_map_i (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) :
   Tot (s':seq b { length s' == length s /\
                   (forall j . {:pattern index s' j} 0 <= j /\ j < length s ==> index s' j == f j (index s j))
-                })   
-  = 
+                })
+  =
   seq_map_i_indexed f s 0
 
 let seq_map_internal_associative (#a:Type) (#b:eqtype) (f:int->a->b) (s:seq a) (pivot:int{0 <= pivot /\ pivot < length s}) :
@@ -75,7 +75,7 @@ let slice_seq_map_commute (#a #b:Type) (f:a -> b) (s:seq a) (i:nat) (j:nat{ i <=
   assert (equal (slice (seq_map f s) i j) (seq_map f (slice s i j)));
   ()
 
-let append_distributes_seq_map (#a #b:Type) (f:a -> b) (s1 s2:seq a) : 
+let append_distributes_seq_map (#a #b:Type) (f:a -> b) (s1 s2:seq a) :
   Lemma (seq_map f (s1 @| s2) == seq_map f s1 @| seq_map f s2)
   =
   assert (equal (seq_map f (s1 @| s2)) (seq_map f s1 @| seq_map f s2));

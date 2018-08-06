@@ -12,12 +12,12 @@ open X64.Memory_i
 
 // Note, we need the len parameter, as using buffer_length pushes everything into ghost, including Poly1305 spec
 let heapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) : int->nat128 =
-  fun index -> if 0 <= index && index < len / 2 then 
-               (Seq.index s (2*index)) + 0x10000000000000000 * (Seq.index s (2*index + 1)) 
+  fun index -> if 0 <= index && index < len / 2 then
+               (Seq.index s (2*index)) + 0x10000000000000000 * (Seq.index s (2*index + 1))
             else 42
 
 let applyHeapletTo128 (s:Seq.seq nat64) (len:nat{ len % 2 == 0 /\ len <= Seq.length s}) (index:int) : nat128 =
-  heapletTo128 s len index 
+  heapletTo128 s len index
 
 let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
         (k:int{0 <= k /\ k <= Seq.length s /\ k % 2 == 0})
@@ -26,9 +26,9 @@ let rec poly1305_heap_blocks' (h:int) (pad:int) (r:int) (s:Seq.seq nat64)
     if k = 0 then h
     else
         let kk = k - 2 in
-	//assert (i >= 0 ==> precedes (kk - i) (k-i));
-	//assert (i < 0 ==> precedes (kk - i) (k-i));
-	let hh = poly1305_heap_blocks' h pad r s kk in
+        //assert (i >= 0 ==> precedes (kk - i) (k-i));
+        //assert (i < 0 ==> precedes (kk - i) (k-i));
+        let hh = poly1305_heap_blocks' h pad r s kk in
         modp((hh + pad + pow2_64 * (Seq.index s (kk + 1)) + (Seq.index s kk)) * r)
 
 val poly1305_heap_blocks (h:int) (pad:int) (r:int) (s:Seq.seq nat64) (k:int) : int
@@ -55,12 +55,12 @@ let rec lemma_poly1305_heap_hash_blocks_alt (h:int) (pad:int) (r:int) (m:mem) (b
     poly1305_hash_blocks h pad r (seqTo128 (buffer64_as_seq m b)) n)
   =
   let s = buffer64_as_seq m b in
-  let inp = seqTo128 (buffer64_as_seq m b) in  
+  let inp = seqTo128 (buffer64_as_seq m b) in
   reveal_poly1305_heap_blocks h pad r s (n + n);
   if n = 0 then () else (
     lemma_poly1305_heap_hash_blocks_alt h pad r m b (n-1);
     reveal_poly1305_heap_blocks h pad r s (n+n-2);
-    Opaque_s.reveal_opaque modp'; 
+    Opaque_s.reveal_opaque modp';
     ()
   )
 
@@ -81,8 +81,8 @@ let modifies_buffer_specific (b:buffer64) (h1 h2:mem) (start last:nat) : GTot Ty
     modifies_buffer b h1 h2 /\
     // TODO: Consider replacing this with: modifies (loc_buffer (gsub_buffer b i len)) h1 h2
     (forall (i:nat) . {:pattern (Seq.index (buffer_as_seq h2 b) i)}
-                        0 <= i /\ i < buffer_length b 
-                     /\ (i < start || i > last) 
+                        0 <= i /\ i < buffer_length b
+                     /\ (i < start || i > last)
                     ==> buffer64_read b i h1
                      == buffer64_read b i h2)
 

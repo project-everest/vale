@@ -6,7 +6,7 @@ open X64.Semantics_s
 open X64.Taint_Semantics_s
 module S = X64.Bytes_Semantics_s
 
-noeq type taintState = 
+noeq type taintState =
   | TaintState: regTaint: (reg -> taint) -> flagsTaint: taint -> cfFlagsTaint: taint ->
   xmmTaint: (xmm -> taint) -> taintState
 

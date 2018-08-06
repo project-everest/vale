@@ -18,25 +18,25 @@ open X64.Poly1305.Bitvectors_i
 
 val lemma_mul_div_comm: a:nat -> b:pos -> c:nat ->
     Lemma (requires (c % b = 0 /\ a % b = 0))
-	  (ensures (a/b)*c == a * (c/b))
+          (ensures (a/b)*c == a * (c/b))
 let lemma_mul_div_comm a b c =
     ()
 
 val lemma_exact_mul: a:nat -> b:pos -> c:nat ->
     Lemma (requires (c % b = 0))
-	  (ensures ((a*c) % b = 0))
-let lemma_exact_mul a b c = 
+          (ensures ((a*c) % b = 0))
+let lemma_exact_mul a b c =
   (* a*c = c*a *)
-  swap_mul a c; 
+  swap_mul a c;
 
   (* (c*a)%b = ((c%b)*a)%b *)
   lemma_mod_mul_distr_l c a b;
   ()
-  
+
 val lemma_mul_div_sep: a:nat -> b:pos -> c:nat ->
     Lemma (requires (c % b = 0) /\ (a*c) % b = 0)
-	  (ensures (a*c)/b == a * (c/b))
-let lemma_mul_div_sep a b c = () 
+          (ensures (a*c)/b == a * (c/b))
+let lemma_mul_div_sep a b c = ()
 
 val swap_add: a:int -> b:int -> c:int -> Lemma
       (a + b + c = a + c + b)
@@ -57,8 +57,8 @@ let multiplication_order_eq_lemma_int a b p = ()
 
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
 
-let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:int) (h1:int) 
-			(h2:int) (s1:int) (d0:int) (d1:int) (d2:int) (hh:int) =
+let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:int) (h1:int)
+                        (h2:int) (s1:int) (d0:int) (d1:int) (d2:int) (hh:int) =
   let r1_4 = r1 / 4 in
   let h_r_expand = (h2 * (n * n) + h1 * n + h0) * ((r1_4 * 4) * n + r0) in
   let hh_expand = (h2 * r0) * (n * n) + (h0 * (r1_4 * 4) + h1 * r0 + h2 * (5 * r1_4)) * n
@@ -70,7 +70,7 @@ let lemma_poly_multiply (n:int) (p:int) (r:int) (h:int) (r0:int) (r1:int) (h0:in
   assert_by_tactic (h_r_expand == hh_expand + b * (n * n * 4 + (-5)))
     (fun _ -> canon_semiring int_cr);
   ()
-      
+
 
 let lemma_poly_reduce (n:int) (p:int) (h:int) (h2:int) (h10:int) (c:int) (hh:int) =
    let h2_4 = h2 / 4 in
@@ -91,19 +91,19 @@ let lemma_shr2_nat (x:nat64) :
   reveal_ishr 64 x 2
 let lemma_shr4_nat (x:nat64) :
   Lemma (shift_right64 x 4 == x / 16) =
-  reveal_ishr 64 x 4  
+  reveal_ishr 64 x 4
 let lemma_and_mod_n_nat (x:nat64) :
- Lemma (logand64 x 3 == x % 4 /\ 
+ Lemma (logand64 x 3 == x % 4 /\
         logand64 x 15 == x % 16) =
   reveal_iand 64 x 3;
   reveal_iand 64 x 15
 let lemma_and_constants_nat (x:nat64) :
-  Lemma (logand64 x 0 == 0 /\ 
-	 logand64 x 0xffffffffffffffff == x) =
+  Lemma (logand64 x 0 == 0 /\
+         logand64 x 0xffffffffffffffff == x) =
   reveal_iand 64 x 0;
   reveal_iand 64 x 0xffffffffffffffff
 
-let lemma_clear_lower_2_nat (x:nat64) : 
+let lemma_clear_lower_2_nat (x:nat64) :
   Lemma (logand64 x 0xfffffffffffffffc == (x/4)*4) =
   reveal_iand 64 x 0xfffffffffffffffc;
   assert (x < pow2_64);
@@ -113,8 +113,8 @@ let lemma_clear_lower_2_nat (x:nat64) :
 // reveal_iand_all 64 does not work here.
 let lemma_poly_constants_nat (x:nat64) :
   Lemma (logand64 x 0x0ffffffc0fffffff < 0x1000000000000000 /\
-	 logand64 x 0x0ffffffc0ffffffc < 0x1000000000000000 /\
-	 (logand64 x 0x0ffffffc0ffffffc) % 4 == 0) =
+         logand64 x 0x0ffffffc0ffffffc < 0x1000000000000000 /\
+         (logand64 x 0x0ffffffc0ffffffc) % 4 == 0) =
   reveal_iand 64 x 0x0ffffffc0fffffff;
   reveal_iand 64 x 0x0ffffffc0ffffffc
 
@@ -122,7 +122,7 @@ let lemma_and_commutes_nat (x y:nat64) :
   Lemma (logand64 x y == logand64 y x) =
   reveal_iand_all 64;
   lemma_and_commutes x y
-  	 
+
 
 // using forall_intro on original bitvector lemmas and
 // ireveal_and_all etc. does not solve the goal
@@ -138,14 +138,14 @@ let lemma_poly_bits64 () =
 let lemma_mul_strict_upper_bound (x:int) (x_bound:int) (y:int) (y_bound:int) =
   lemma_mult_lt_right y x x_bound;
   if x_bound = 0 || y_bound = 0 then ()
-  else 
+  else
     if y = 0 then
     begin
-      assert_norm(x*0 = 0); 
+      assert_norm(x*0 = 0);
       pos_times_pos_is_pos x_bound y_bound
     end
     else
-      lemma_mult_lt_left x_bound y y_bound 
+      lemma_mult_lt_left x_bound y y_bound
 
 let lemma_bytes_shift_power2 (y:nat64) =
   lemma_bytes_shift_power2 y;
@@ -175,27 +175,27 @@ val lemma_bytes_and_mod6: x: uint_t 64 ->
 val lemma_bytes_and_mod7: x: uint_t 64 ->
   Lemma (logand #64 x  (0x100000000000000 - 1) == x % 0x100000000000000)
 
-let lemma_bytes_and_mod0 x = 
+let lemma_bytes_and_mod0 x =
   assert_by_tactic (logand #64 x (0x1 - 1) == mod #64 x 0x1) bv_tac
 
-let lemma_bytes_and_mod1 x = 
+let lemma_bytes_and_mod1 x =
   assert_by_tactic (logand #64 x (0x100 - 1) == mod #64 x 0x100) bv_tac
 
-let lemma_bytes_and_mod2 x = 
+let lemma_bytes_and_mod2 x =
   assert_by_tactic (logand #64 x (0x10000 - 1) == mod #64 x 0x10000) bv_tac
 let lemma_bytes_and_mod3 x =
   assert_by_tactic (logand #64 x (0x1000000 - 1) == mod #64 x 0x1000000) bv_tac
 
-let lemma_bytes_and_mod4 x = 
+let lemma_bytes_and_mod4 x =
   assert_by_tactic (logand #64 x (0x100000000 - 1) == mod #64 x 0x100000000) bv_tac
 
-let lemma_bytes_and_mod5 x = 
+let lemma_bytes_and_mod5 x =
   assert_by_tactic (logand #64 x (0x10000000000 - 1) == mod #64 x 0x10000000000) bv_tac
 
-let lemma_bytes_and_mod6 x = 
+let lemma_bytes_and_mod6 x =
   assert_by_tactic (logand #64 x (0x1000000000000 - 1) == mod #64 x 0x1000000000000) bv_tac
 
-let lemma_bytes_and_mod7 x = 
+let lemma_bytes_and_mod7 x =
   assert_by_tactic (logand #64 x (0x100000000000000 - 1) == mod #64 x 0x100000000000000) bv_tac
 
 let lemma_bytes_and_mod (x:nat64) (y:nat64) =
@@ -210,11 +210,11 @@ let lemma_bytes_and_mod (x:nat64) (y:nat64) =
     lemma_bytes_and_mod1 x
   | 2 ->
     lemma_bytes_shift_constants2 ();
-    lemma_bytes_and_mod2 x    
+    lemma_bytes_and_mod2 x
   | 3 ->
     lemma_bytes_shift_constants3 ();
     lemma_bytes_and_mod3 x
-  | 4 -> 
+  | 4 ->
      lemma_bytes_shift_constants4 ();
      lemma_bytes_and_mod4 x
   | 5 ->
@@ -225,8 +225,8 @@ let lemma_bytes_and_mod (x:nat64) (y:nat64) =
     lemma_bytes_and_mod6 x
   | 7 ->
     lemma_bytes_shift_constants7 ();
-lemma_bytes_and_mod7 x 
-  
+lemma_bytes_and_mod7 x
+
 let lemma_mod_factors(x0:nat) (x1:nat) (y:nat) (z:pos) :
   Lemma ((x0 + (y * z) * x1) % z == (x0 % z)) =
   nat_times_nat_is_nat y x1;
@@ -235,7 +235,7 @@ let lemma_mod_factors(x0:nat) (x1:nat) (y:nat) (z:pos) :
 
 let lemma_mul_pos_pos_is_pos_inverse (x:pos) (y:int) :
   Lemma (requires y*x > 0)
-	(ensures y > 0) = 
+        (ensures y > 0) =
   if y = 0 then assert_norm (0*x == 0)
   else if y < 0 then
     begin
@@ -243,13 +243,13 @@ let lemma_mul_pos_pos_is_pos_inverse (x:pos) (y:int) :
       assert_norm (y*x <= 0)
     end
   else ()
-  
+
 #reset-options "--z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3 --z3cliopt smt.arith.nl=false --max_fuel 0 --max_ifuel 1 --smtencoding.elim_box true --smtencoding.nl_arith_repr wrapped --smtencoding.l_arith_repr native --z3rlimit 8"
 let lemma_mod_factor_lo(x0:nat64) (x1:nat64) (y:int) (z:pos) :
   Lemma (requires z < 0x10000000000000000 /\
-		  y * z == 0x10000000000000000)
-	(ensures ((x0 % z) < pow2_64) /\ 
-		 lowerUpper128 x0 x1 % z == lowerUpper128 (x0 % z) 0) =
+                  y * z == 0x10000000000000000)
+        (ensures ((x0 % z) < pow2_64) /\
+                 lowerUpper128 x0 x1 % z == lowerUpper128 (x0 % z) 0) =
   lemma_mul_pos_pos_is_pos_inverse z y;
   modulo_range_lemma x0 z;
   lemma_mod_factors x0 x1 y z;
@@ -280,8 +280,8 @@ let lemma_part_bound1(a:nat) (b:pos) (c:pos):
     lemma_mul_pos_pos_is_pos b c;
     lemma_div_mod (b*(a/b)) (b*c);
     assert (b*(a/b) % (b*c) = b*(a/b) - (b*c)*((b*(a/b))/(b*c)));
-    assert_by_tactic (b*(a/b) - (b*c)*((b*(a/b))/(b*c)) == b*(a/b) - b*(c*((b*(a/b))/(b*c)))) 
-		     canon; // associativity of mul
+    assert_by_tactic (b*(a/b) - (b*c)*((b*(a/b))/(b*c)) == b*(a/b) - b*(c*((b*(a/b))/(b*c))))
+                     canon; // associativity of mul
     distributivity_sub_right b (a/b) (c*((b*(a/b))/(b*c)));
     assert (b*(a/b) - b*(c*((b*(a/b))/(b*c))) == b*((a/b) - (c*((b*(a/b))/(b*c)))));
 
@@ -297,18 +297,18 @@ let lemma_part_bound1(a:nat) (b:pos) (c:pos):
 
 let lemma_lt_le_trans (a : nat) (b c : pos) :
   Lemma (requires (a < b) /\ b <= c)
-	(ensures a < c) = ()
+        (ensures a < c) = ()
 
 let lemma_part_bound2 (a : nat) (b c: pos) :
-    Lemma(0 < b*c /\ (a%b)%(b*c) < b) = 
-    pos_times_pos_is_pos b c; 
+    Lemma(0 < b*c /\ (a%b)%(b*c) < b) =
+    pos_times_pos_is_pos b c;
     lemma_mod_lt a b; // a%b < b
     assert (0 <= a%b);
     lemma_mul_increases c b; // b <= b * c
     assert (a%b < b);
     lemma_lt_le_trans (a%b) b (b*c);
     assert (a%b < b * c);
-    modulo_lemma (a%b) (b*c)  
+    modulo_lemma (a%b) (b*c)
 
 let lemma_truncate_middle (x:nat) (b c:pos) :
   Lemma (0 < b * c /\ (b*x)%(b*c) == b*(x%c)) =
@@ -347,29 +347,29 @@ let lemma_mod_breakdown (a:nat) (b:pos) (c:pos) :
   nat_times_nat_is_nat b (a/b);
   assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) < b*c);
   modulo_lemma ((b*(a/b)) % (b*c) + (a%b) % (b*c)) (b*c);
-  modulo_distributivity (b*(a/b)) (a%b) (b*c); // ((b*(a/b))%(b*c) + (a%b)%(b*c))%(b*c) = ((b*(a/b)) + 
-											  //(a%b))%(b*c)
+  modulo_distributivity (b*(a/b)) (a%b) (b*c); // ((b*(a/b))%(b*c) + (a%b)%(b*c))%(b*c) = ((b*(a/b)) +
+                                                                                          //(a%b))%(b*c)
   assert ((b*(a/b) + a%b) % (b*c) == (b*(a/b)) % (b*c) + (a%b) % (b*c));
   lemma_mul_increases c b; // b <= b*c
-  
+
   swap_mul b (a/b);
   modulo_lemma (a%b) (b*c);
   assert ((a%b) % (b*c) == a%b);
   assert ((b*(a/b)) % (b*c) + (a%b) % (b*c) == (b*(a/b)) % (b*c) + a%b);
-  lemma_truncate_middle (a/b) b c 
-  
+  lemma_truncate_middle (a/b) b c
+
 
 let lemma_mod_hi (x0:nat64) (x1:nat64) (z:nat64) =
-  let n = 0x10000000000000000 in   
+  let n = 0x10000000000000000 in
   assert(lowerUpper128 x0 x1 % lowerUpper128 0 z = (x1 * n + x0) % (z * n));
-  lemma_mod_breakdown (x1 * n + x0) n z;  
+  lemma_mod_breakdown (x1 * n + x0) n z;
   assert ((x1 * n + x0) % (z * n) == n * (((x1 * n + x0) / n) % z) + (x1 * n + x0) % n);
   lemma_mod_plus x0 x1 n;
   assert (n * (((x1 * n + x0) / n) % z) + (x1 * n + x0) % n == n * (((x1 * n + x0) / n) % z) + x0 % n);
   assert(n * (((x1 * n + x0) / n) % z) + x0 % n == n * (x1 % z) + x0);
   reveal_opaque(lowerUpper128)
-  
-let lemma_poly_demod (p:pos) (h:int) (x:int) (r:int) = 
+
+let lemma_poly_demod (p:pos) (h:int) (x:int) (r:int) =
   distributivity_add_left (h%p) x r; // ((h%p + x)*r)% = ((h%p)*r + x*r)%p
   modulo_distributivity ((h%p)*r) (x*r) p; // ((h%p)*r + x*r)%p = (((h%p)*r)%p + (x*r)%p)%p
   lemma_mod_mul_distr_l h r p; // ((h%p)*r)%p = (h*r)%p ==> ((h*r)%p + (x*r)%p)%p
@@ -395,24 +395,24 @@ let lemma_reduce128  (h:int) (h2:nat64) (h1:nat64) (h0:nat64) (g:int) (g2:nat64)
   else
   begin
     assert (0 <= h);
-    assert (h - 0x3fffffffffffffffffffffffffffffffb < 
-	      0x3fffffffffffffffffffffffffffffffb);
+    assert (h - 0x3fffffffffffffffffffffffffffffffb <
+              0x3fffffffffffffffffffffffffffffffb);
 
     assert (modp(h) == h % 0x3fffffffffffffffffffffffffffffffb);
-    assert (h - 0x3fffffffffffffffffffffffffffffffb == h % 
-	      0x3fffffffffffffffffffffffffffffffb);
+    assert (h - 0x3fffffffffffffffffffffffffffffffb == h %
+              0x3fffffffffffffffffffffffffffffffb);
     assert (mod2_128(modp(h)) == mod2_128(h - 0x3fffffffffffffffffffffffffffffffb));
-    assert(mod2_128(h - 0x3fffffffffffffffffffffffffffffffb) == 
-		      mod2_128(g - 0x400000000000000000000000000000000));
+    assert(mod2_128(h - 0x3fffffffffffffffffffffffffffffffb) ==
+                      mod2_128(g - 0x400000000000000000000000000000000));
     assert(mod2_128(g - 0x400000000000000000000000000000000) == mod2_128(g));
     assert_norm (mod2_128'(g) == lowerUpper128 g0 g1)
   end
 
-let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) = 
+let lemma_add_key (old_h0:nat64) (old_h1:nat64) (h_in:int) (key_s0:nat64) (key_s1:nat64) (key_s:int) (h0:nat64) (h1:nat64) =
   reveal_opaque lowerUpper128;
   reveal_opaque mod2_128';
   ()
-  
+
 
 let lemma_lowerUpper128_and (x:nat128) (x0:nat64) (x1:nat64) (y:nat128) (y0:nat64) (y1:nat64) (z:nat128) (z0:nat64) (z1:nat64) =
   reveal_opaque (lowerUpper128);

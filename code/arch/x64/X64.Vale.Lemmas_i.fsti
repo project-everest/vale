@@ -38,7 +38,7 @@ let eval_ins (c:code) (s0:state) : Ghost ((sM:state) * (f0:fuel))
 
 let eval_ocmp (s:state) (c:ocmp) : GTot bool = snd (TS.taint_eval_ocmp (state_to_S s) c)
 
-let valid_ocmp (c:ocmp) (s:state) : GTot bool = 
+let valid_ocmp (c:ocmp) (s:state) : GTot bool =
   S.valid_ocmp c.TS.o (state_to_S s).TS.state
 
 let ensure_valid_ocmp (c:ocmp) (s:state) : GTot state = state_of_S (fst (TS.taint_eval_ocmp (state_to_S s) c))
@@ -47,27 +47,27 @@ val lemma_cmp_eq : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem
   (ensures eval_ocmp s (TS.TaintedOCmp (BS.OEq o1 o2) t) <==> eval_operand o1 s == eval_operand o2 s)
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (BS.OEq o1 o2) t))]
 
-val lemma_cmp_ne : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint 
+val lemma_cmp_ne : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint
   -> Lemma
   (ensures eval_ocmp s (TS.TaintedOCmp (BS.ONe o1 o2) t) <==> eval_operand o1 s <> eval_operand o2 s)
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (BS.ONe o1 o2) t))]
 
-val lemma_cmp_le : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint 
+val lemma_cmp_le : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint
   -> Lemma
   (ensures eval_ocmp s (TS.TaintedOCmp (BS.OLe o1 o2) t) <==> eval_operand o1 s <= eval_operand o2 s)
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (BS.OLe o1 o2) t))]
 
-val lemma_cmp_ge : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint 
+val lemma_cmp_ge : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint
   -> Lemma
   (ensures eval_ocmp s (TS.TaintedOCmp (BS.OGe o1 o2) t) <==> eval_operand o1 s >= eval_operand o2 s)
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (BS.OGe o1 o2) t))]
 
-val lemma_cmp_lt : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint 
+val lemma_cmp_lt : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint
   -> Lemma
   (ensures eval_ocmp s (TS.TaintedOCmp (BS.OLt o1 o2) t) <==> eval_operand o1 s < eval_operand o2 s)
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (BS.OLt o1 o2) t))]
 
-val lemma_cmp_gt : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint 
+val lemma_cmp_gt : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint
   -> Lemma
   (ensures eval_ocmp s (TS.TaintedOCmp (BS.OGt o1 o2) t) <==> eval_operand o1 s > eval_operand o2 s)
   [SMTPat (eval_ocmp s (TS.TaintedOCmp (BS.OGt o1 o2) t))]
@@ -79,7 +79,7 @@ val lemma_valid_cmp_eq : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not
 val lemma_valid_cmp_ne : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint -> Lemma
   (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (TS.TaintedOCmp (BS.ONe o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (BS.ONe o1 o2) t) s)]
-  
+
 val lemma_valid_cmp_le : s:state -> o1:operand{not (OMem? o1)} -> o2:operand{not (OMem? o2)} -> t:taint -> Lemma
   (ensures valid_operand o1 s /\ valid_operand o2 s ==> valid_ocmp (TS.TaintedOCmp (BS.OLe o1 o2) t) s)
   [SMTPat (valid_ocmp (TS.TaintedOCmp (BS.OLe o1 o2) t) s)]

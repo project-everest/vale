@@ -37,8 +37,8 @@ type ins =
   | Psrld      : dst:xmm -> amt:int -> ins
   | Psrldq     : dst:xmm -> amt:int -> ins
   | Shufpd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
-  | Pshufb     : dst:xmm -> src:xmm -> ins  
-  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
+  | Pshufb     : dst:xmm -> src:xmm -> ins
+  | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins
   | Pcmpeqd    : dst:xmm -> src:xmm -> ins
   | Pextrq     : dst:operand -> src:xmm -> index:imm8 -> ins
   | Pinsrd     : dst:xmm -> src:operand -> index:imm8 -> ins
@@ -124,7 +124,7 @@ let eval_operand (o:operand) (s:state) : nat64 =
   | OMem m -> eval_mem (eval_maddr m s) s
 
 let eval_mov128_op (o:mov128_op) (s:state) : quad32 =
-  match o with 
+  match o with
   | Mov128Xmm i -> eval_xmm i s
   | Mov128Mem m -> eval_mem128 (eval_maddr m s) s
 
@@ -221,13 +221,13 @@ let valid_addr128 (ptr:int) (mem:heap) =
   valid_addr (ptr+15) mem
 
 let valid_maddr (m:maddr) (s:state) : bool =
-  let ptr = eval_maddr m s in 
+  let ptr = eval_maddr m s in
   valid_addr64 ptr s.mem
-  
+
 let valid_maddr128 (m:maddr) (s:state) : bool =
   let ptr = eval_maddr m s in
   valid_addr128 ptr s.mem
-  
+
 let valid_operand (o:operand) (s:state) : bool =
   match o with
   | OConst n -> true
@@ -241,7 +241,7 @@ let valid_mov128_op (o:mov128_op) (s:state) : bool =
 
 let valid_shift_operand (o:operand) (s:state) : bool =
   valid_operand o s && (eval_operand o s) < 64
-  
+
 let valid_ocmp (c:ocmp) (s:state) :bool =
   match c with
   | OEq o1 o2 -> valid_operand o1 s && valid_operand o2 s
@@ -265,7 +265,7 @@ let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : state 
   | Mov128Xmm i -> update_xmm' i v s
   | Mov128Mem m -> update_mem128 (eval_maddr m s) v s
 
-// Default version havocs flags 
+// Default version havocs flags
 let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
@@ -303,19 +303,19 @@ let update_of (flags:nat64) (new_of:bool) : (new_flags:nat64{overflow new_flags 
     else
       flags
 
-let is_full_byte_reversal_mask (q:quad32) : bool = 
+let is_full_byte_reversal_mask (q:quad32) : bool =
   q.lo0 = 0x0C0D0E0F &&
   q.lo1 = 0x08090A0B &&
   q.hi2 = 0x04050607 &&
   q.hi3 = 0x00010203
 
-let is_high_dup_reversal_mask (q:quad32) : bool = 
+let is_high_dup_reversal_mask (q:quad32) : bool =
   q.lo0 = 0x0C0D0E0F &&
   q.lo1 = 0x08090A0B &&
   q.hi2 = 0x0C0D0E0F &&
   q.hi3 = 0x08090A0B
 
-let is_lower_upper_byte_reversal_mask (q:quad32) : bool = 
+let is_lower_upper_byte_reversal_mask (q:quad32) : bool =
   q.lo0 = 0x04050607 &&
   q.lo1 = 0x00010203 &&
   q.hi2 = 0x0C0D0E0F &&
@@ -416,7 +416,7 @@ let eval_ins (ins:ins) : st unit =
   | Add64 dst src ->
     check (valid_operand src);;
     let sum = (eval_operand dst s) + (eval_operand src s) in
-    let new_carry = sum >= pow2_64 in    
+    let new_carry = sum >= pow2_64 in
     update_operand dst ins ((eval_operand dst s + eval_operand src s) % pow2_64);;
     update_flags (update_cf s.flags new_carry)
 
@@ -477,7 +477,7 @@ let eval_ins (ins:ins) : st unit =
     check (valid_operand src);;
     update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s));;
     update_cf_of false false
-    
+
   | And64 dst src ->
     check (valid_operand src);;
     update_operand dst ins (Types_s.iand (eval_operand dst s) (eval_operand src s))
@@ -498,21 +498,21 @@ let eval_ins (ins:ins) : st unit =
 
   | Pop dst ->
     let stack_val = OMem (MReg Rsp 0) in
-    check (valid_operand stack_val);;    
+    check (valid_operand stack_val);;
     let new_dst = eval_operand stack_val s in
     let new_rsp = ((eval_reg Rsp s) + 8) % pow2_64 in
     update_operand_preserve_flags dst new_dst;;
     update_reg Rsp new_rsp
 // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
-// since all possibilities are valid, thanks to dependent types 
+// since all possibilities are valid, thanks to dependent types
 
   | Paddd dst src ->
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     update_xmm dst ins (Mkfour ((dst_q.lo0 + src_q.lo0) % pow2_32)
-			       ((dst_q.lo1 + src_q.lo1) % pow2_32)
-			       ((dst_q.hi2 + src_q.hi2) % pow2_32)
-			       ((dst_q.hi3 + src_q.hi3) % pow2_32))
+                               ((dst_q.lo1 + src_q.lo1) % pow2_32)
+                               ((dst_q.hi2 + src_q.hi2) % pow2_32)
+                               ((dst_q.hi3 + src_q.hi3) % pow2_32))
 
   | Pxor dst src ->
     update_xmm_preserve_flags dst (quad32_xor (eval_xmm dst s) (eval_xmm src s))
@@ -524,7 +524,7 @@ let eval_ins (ins:ins) : st unit =
   | Psrld dst amt ->
     check_imm (0 <= amt && amt < 32);;
     update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
- 
+
   | Psrldq dst amt ->
     check_imm (0 <= amt && amt < 16);;
     let src_q = eval_xmm dst s in
@@ -542,10 +542,10 @@ let eval_ins (ins:ins) : st unit =
     let result = Mkfour (if permutation % 2 = 0 then dst_q.lo0 else dst_q.hi2)
                         (if permutation % 2 = 0 then dst_q.lo1 else dst_q.hi3)
                         (if (permutation / 2) % 2 = 0 then src_q.lo0 else src_q.hi2)
-                        (if (permutation / 2) % 2 = 0 then src_q.lo1 else src_q.hi3) in                    
+                        (if (permutation / 2) % 2 = 0 then src_q.lo1 else src_q.hi3) in
     update_xmm dst ins result
 
-  | Pshufb dst src -> 
+  | Pshufb dst src ->
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     // We only spec a restricted version sufficient for a handful of standard patterns
@@ -562,9 +562,9 @@ let eval_ins (ins:ins) : st unit =
                                  (reverse_bytes_nat32 dst_q.lo0)
                                  (reverse_bytes_nat32 dst_q.hi3)
                                  (reverse_bytes_nat32 dst_q.hi2))
-    else fail                                 
-    
-  | Pshufd dst src permutation ->  
+    else fail
+
+  | Pshufd dst src permutation ->
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
     let permuted_xmm = Mkfour
@@ -590,8 +590,8 @@ let eval_ins (ins:ins) : st unit =
   | Pextrq dst src index ->
     let src_q = eval_xmm src s in
     let src_two = four_to_two_two src_q in
-    let extracted_nat64 = two_to_nat 32 (two_select src_two (index % 2)) in			  
-    update_operand_preserve_flags dst extracted_nat64		   
+    let extracted_nat64 = two_to_nat 32 (two_select src_two (index % 2)) in
+    update_operand_preserve_flags dst extracted_nat64
 
   | Pinsrd dst src index ->
     check (valid_operand src);;
@@ -610,7 +610,7 @@ let eval_ins (ins:ins) : st unit =
     update_xmm_preserve_flags dst shifted_xmm
 
   | MOVDQU dst src ->
-    check (valid_mov128_op src);; 
+    check (valid_mov128_op src);;
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
   | Pclmulqdq dst src imm ->
@@ -656,12 +656,12 @@ let eval_ins (ins:ins) : st unit =
 
   | AESNI_keygen_assist dst src imm ->
     let src_q = eval_xmm src s in
-    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1) 
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
-			       (AES_s.sub_word src_q.hi3)
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
- 
- 
+    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1)
+                               (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
+                               (AES_s.sub_word src_q.hi3)
+                               (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
+
+
 (*
  * These functions return an option state
  * None case arises when the while loop runs out of fuel
@@ -676,7 +676,7 @@ let rec eval_code c fuel s =
   | Ins ins                       -> Some (run (eval_ins ins) s)
   | Block l                       -> eval_codes l fuel s
   | IfElse ifCond ifTrue ifFalse  -> let s = run (check (valid_ocmp ifCond)) s in
-	   if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
+           if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
   | While b c                     -> eval_while b c fuel s
 
 and eval_codes l fuel s =

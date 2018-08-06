@@ -17,8 +17,8 @@ let set_xmm_taint (ts:taintState) (xmm:xmm) (taint:taint) : taintState =
   TaintState ts.regTaint ts.flagsTaint ts.cfFlagsTaint (fun x -> if x = xmm then taint else ts.xmmTaint x)
 
 #reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 80"
-  
-val quad32_xor_lemma: (x:quad32) -> Lemma (quad32_xor x x == Mkfour 0 0 0 0) 
+
+val quad32_xor_lemma: (x:quad32) -> Lemma (quad32_xor x x == Mkfour 0 0 0 0)
 
 let quad32_xor_lemma x =
   assert (quad32_xor x x == Mkfour (nat32_xor x.lo0 x.lo0) (nat32_xor x.lo1 x.lo1)
@@ -41,7 +41,7 @@ let check_if_pxor_leakage_free ins ts =
     let ts' = set_xmm_taint ts dst Public in
     Classical.forall_intro quad32_xor_lemma;
     true, TaintState ts'.regTaint ts.flagsTaint ts.cfFlagsTaint ts'.xmmTaint
-  end 
+  end
   else begin
     let taint = merge_taint (xmm_taint ts dst) (xmm_taint ts src) in
     let ts' = set_xmm_taint ts dst taint in
@@ -135,7 +135,7 @@ let check_if_pextrq_leakage_free_aux (ins:tainted_ins{let i, _, _ = ins.ops in S
   if OMem? dst && taint <> ins.t then false, ts
   else
   let ts' = set_taint dst ts taint in
-  fixedTime, TaintState ts'.regTaint ts.flagsTaint ts.cfFlagsTaint ts'.xmmTaint  
+  fixedTime, TaintState ts'.regTaint ts.flagsTaint ts.cfFlagsTaint ts'.xmmTaint
 
 val lemma_if_pextrq_leakage_free_aux: (ins:tainted_ins{let i, _, _ = ins.ops in S.Pextrq? i}) -> (ts:taintState) -> (s1:traceState) -> (s2:traceState) -> (fuel:nat) -> Lemma
 (let b, ts' = check_if_pextrq_leakage_free_aux ins ts in b2t b ==>
@@ -163,7 +163,7 @@ let lemma_if_pextrq_leakage_free_aux ins ts s1 s2 fuel =
   lemma_valid_store_mem64 ptr1 v1 s1.state.mem;
   lemma_valid_store_mem64 ptr2 v2 s2.state.mem;
   lemma_frame_store_mem64 ptr1 v1 s1.state.mem;
-  lemma_frame_store_mem64 ptr2 v2 s2.state.mem  
+  lemma_frame_store_mem64 ptr2 v2 s2.state.mem
   end
 
 
@@ -194,7 +194,7 @@ let check_if_pinsrq_leakage_free ins ts =
   let taint = merge_taint taint ins.t in
   let ts' = set_xmm_taint ts dst taint in
   fixedTime, TaintState ts'.regTaint ts.flagsTaint ts.cfFlagsTaint ts'.xmmTaint
-  
+
 val check_if_vpslldq_leakage_free: (ins:tainted_ins{let i, _, _ = ins.ops in S.VPSLLDQ? i}) -> (ts:taintState) -> (res:(bool*taintState){let b, ts' = res in b2t b ==>
      isConstantTime (Ins ins) ts /\ isLeakageFree (Ins ins) ts ts'})
 
@@ -352,7 +352,7 @@ let lemma_if_movdqu_leakage_free_aux ins ts s1 s2 fuel =
       lemma_valid_store_mem64 (ptr1+8) v1_2 s1.state.mem;
       lemma_valid_store_mem64 (ptr2+8) v2_2 s2.state.mem;
       lemma_frame_store_mem64 (ptr1+8) v1_2 s1.state.mem;
-      lemma_frame_store_mem64 (ptr2+8) v2_2 s2.state.mem;     
+      lemma_frame_store_mem64 (ptr2+8) v2_2 s2.state.mem;
       lemma_store_load_mem64 ptr1 v1_1 mem1;
       lemma_store_load_mem64 ptr2 v2_1 mem2;
       lemma_valid_store_mem64 ptr1 v1_1 mem1;
@@ -363,10 +363,10 @@ let lemma_if_movdqu_leakage_free_aux ins ts s1 s2 fuel =
  | Mov128Mem m -> begin
     let ptr1 = eval_maddr m s1.state in
     let ptr2 = eval_maddr m s2.state in
-    if not (valid_mem128 ptr1 s1.state.mem) || not (valid_mem128 ptr2 s2.state.mem) then () 
+    if not (valid_mem128 ptr1 s1.state.mem) || not (valid_mem128 ptr2 s2.state.mem) then ()
     else (
     valid128_64 ptr1 s1.state;
-    valid128_64 ptr2 s2.state;   
+    valid128_64 ptr2 s2.state;
     load128_64 ptr1 s1.state;
     load128_64 ptr2 s2.state;
     load64_128_eq ptr1 ptr2 s1 s2;
@@ -385,9 +385,9 @@ let lemma_if_movdqu_leakage_free_aux ins ts s1 s2 fuel =
       if not (valid_mem128 ptr1 s1.state.mem) || not (valid_mem128 ptr2 s2.state.mem) then ()
       else (
       store128_64 ptr1 v1 s1.state;
-      store128_64 ptr2 v2 s2.state;  
+      store128_64 ptr2 v2 s2.state;
       valid128_64 ptr1 s1.state;
-      valid128_64 ptr2 s2.state;        
+      valid128_64 ptr2 s2.state;
       let mem1 = store_mem64 (ptr1+8) v1_2 s1.state.mem in
       let mem2 = store_mem64 (ptr2+8) v2_2 s2.state.mem in
       lemma_store_load_mem64 (ptr1+8) v1_2 s1.state.mem;
@@ -395,7 +395,7 @@ let lemma_if_movdqu_leakage_free_aux ins ts s1 s2 fuel =
       lemma_valid_store_mem64 (ptr1+8) v1_2 s1.state.mem;
       lemma_valid_store_mem64 (ptr2+8) v2_2 s2.state.mem;
       lemma_frame_store_mem64 (ptr1+8) v1_2 s1.state.mem;
-      lemma_frame_store_mem64 (ptr2+8) v2_2 s2.state.mem;     
+      lemma_frame_store_mem64 (ptr2+8) v2_2 s2.state.mem;
       lemma_store_load_mem64 ptr1 v1_1 mem1;
       lemma_store_load_mem64 ptr2 v2_1 mem2;
       lemma_valid_store_mem64 ptr1 v1_1 mem1;
@@ -435,4 +435,4 @@ let check_if_xmm_ins_consumes_fixed_time ins ts =
     | S.AESNI_dec_last dst src -> check_if_aesni_dec_last_leakage_free ins ts
     | S.AESNI_imc dst src -> check_if_aesni_imc_leakage_free ins ts
     | S.AESNI_keygen_assist dst src imm -> check_if_aesni_keygen_leakage_free ins ts
-    
+

@@ -18,7 +18,7 @@ noeq type traceState = {
   trace: list observation;
   memTaint: memTaint_t;
 }
- 
+
 // Extract a list of destinations written to and a list of sources read from
 let extract_operands (i:ins) : (list operand * list operand) =
   match i with
@@ -41,8 +41,8 @@ let extract_operands (i:ins) : (list operand * list operand) =
   | S.Push src -> [], [src]
   | S.Pop dst -> [dst], [OMem (MReg Rsp 0)]
   | _ -> [], []
-  
-type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i} 
+
+type tainted_ins = |TaintedIns: ops:(ins * list operand * list operand){let i, d, s = ops in (d,s) = extract_operands i}
                                 -> t:taint -> tainted_ins
 
 let operand_obs (s:traceState) (o:operand) : list observation =
@@ -66,9 +66,9 @@ let ins_obs (ins:tainted_ins) (s:traceState) : (list observation) =
 let taint_match (o:operand) (t:taint) (memTaint:memTaint_t) (s:state) : bool =
   match o with
     | OConst _ | OReg _ -> true
-    | OMem m -> 
+    | OMem m ->
         let ptr = eval_maddr m s in
-	memTaint.[ptr] = t
+        memTaint.[ptr] = t
 
 let rec taint_match_list o t memTaint s : bool = match o with
   | [] -> true
@@ -80,8 +80,8 @@ let update_taint (memTaint:memTaint_t) (dst:operand) (t:taint) (s:state) : Tot m
     | OReg _ -> memTaint
     | OMem m -> let ptr = eval_maddr m s in
         let mt = memTaint.[ptr] <- t in
-	assert (Set.equal (Map.domain mt) (Set.complement Set.empty));
-	mt
+        assert (Set.equal (Map.domain mt) (Set.complement Set.empty));
+        mt
 
 val update_taint_list: (memTaint:memTaint_t) -> (dst:list operand) -> (t:taint) -> (s:state) -> Tot (memTaint_t) (decreases %[dst])
 let rec update_taint_list (memTaint:memTaint_t) (dst:list operand) t s = match dst with
@@ -90,30 +90,30 @@ let rec update_taint_list (memTaint:memTaint_t) (dst:list operand) t s = match d
 
 let taint_match128 op t (memTaint:memTaint_t) (s:state) : bool = match op with
   | Mov128Xmm _ -> true
-  | Mov128Mem addr -> 
+  | Mov128Mem addr ->
     let ptr = eval_maddr addr s in
     memTaint.[ptr] = t && memTaint.[ptr+8] = t
 
 let update_taint128 op t (memTaint:memTaint_t) (s:state) : Tot memTaint_t = match op with
   | Mov128Xmm _ -> memTaint
-  | Mov128Mem addr -> 
+  | Mov128Mem addr ->
     let ptr = eval_maddr addr s in
     let mt = memTaint.[ptr] <- t in
     let mt = mt.[ptr+8] <- t in
     assert (Set.equal (Map.domain mt) (Set.complement Set.empty));
-    mt    
+    mt
 
 // Special treatment for movdqu
-let taint_eval_movdqu 
-  (ins:tainted_ins{let i, _, _ = ins.ops in S.MOVDQU? i}) 
+let taint_eval_movdqu
+  (ins:tainted_ins{let i, _, _ = ins.ops in S.MOVDQU? i})
   (ts:traceState) : GTot traceState =
-  let t = ins.t in 
+  let t = ins.t in
   let S.MOVDQU dst src, _, _ = ins.ops in
   let s = run (check (taint_match128 src t ts.memTaint)) ts.state in
   let memTaint = update_taint128 dst t ts.memTaint s in
   let s = run (eval_ins (S.MOVDQU dst src)) s in
-  {state = s; trace = ts.trace; memTaint = memTaint}  
-  
+  {state = s; trace = ts.trace; memTaint = memTaint}
+
 
 let taint_eval_ins (ins:tainted_ins) (ts: traceState) : GTot traceState =
   let t = ins.t in
@@ -172,29 +172,29 @@ let rec taint_eval_code c fuel s =
   match c with
     | Ins ins -> let obs = ins_obs ins s in
       Some ({taint_eval_ins ins s with trace = obs @ s.trace})
-    
+
     | Block l -> taint_eval_codes l fuel s
-    
+
     | IfElse ifCond ifTrue ifFalse ->
       let st, b = taint_eval_ocmp s ifCond in
       (* We add the BranchPredicate to the trace *)
       let s' = {st with trace=BranchPredicate(b)::s.trace} in
       (* We evaluate the branch with the new trace *)
       if b then taint_eval_code ifTrue fuel s' else taint_eval_code ifFalse fuel s'
-    
+
     | While _ _ -> taint_eval_while c fuel s
 
 and taint_eval_codes l fuel s =
 match l with
       | [] -> Some s
-      | c::tl -> 
-	let s_opt = taint_eval_code c fuel s in
-	if None? s_opt then None
-	(* Recursively evaluate on the tail *)
-	else taint_eval_codes
-	  tl
-	  fuel
-	  (Some?.v s_opt)
+      | c::tl ->
+        let s_opt = taint_eval_code c fuel s in
+        if None? s_opt then None
+        (* Recursively evaluate on the tail *)
+        else taint_eval_codes
+          tl
+          fuel
+          (Some?.v s_opt)
 
 and taint_eval_while c fuel s0 =
   if fuel = 0 then None else
@@ -213,11 +213,11 @@ and taint_eval_while c fuel s0 =
 let is_xmm_ins (ins:tainted_ins) =
   let i, _, _ = ins.ops in
   match i with
-    | S.Paddd _ _ | S.Pxor _ _ | S.Pslld _ _ | S.Psrld _ _ | S.Psrldq _ _ | S.Shufpd _ _ _ | S.Pshufb _ _ 
+    | S.Paddd _ _ | S.Pxor _ _ | S.Pslld _ _ | S.Psrld _ _ | S.Psrldq _ _ | S.Shufpd _ _ _ | S.Pshufb _ _
     | S.Pshufd _ _ _ | S.Pcmpeqd _ _ | S.Pextrq _ _ _ | S.Pinsrd _ _ _ | S.Pinsrq _ _ _
     | S.VPSLLDQ _ _ _ | S.MOVDQU _ _
-    | S.Pclmulqdq _ _ _ | S.AESNI_enc _ _ | S.AESNI_enc_last _ _ 
-    | S.AESNI_dec _ _ | S.AESNI_dec_last _ _ | S.AESNI_imc _ _ 
+    | S.Pclmulqdq _ _ _ | S.AESNI_enc _ _ | S.AESNI_enc_last _ _
+    | S.AESNI_dec _ _ | S.AESNI_dec_last _ _ | S.AESNI_imc _ _
     | S.AESNI_keygen_assist _ _ _ -> true
     | _ -> false
-  
+

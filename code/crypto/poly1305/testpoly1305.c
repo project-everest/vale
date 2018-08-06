@@ -14,7 +14,7 @@ struct ctxt
     uint64_t key_s0;
     uint64_t key_s1;
     uint64_t scratch0;
-    
+
     uint64_t scratch[24 - 8];
 };
 

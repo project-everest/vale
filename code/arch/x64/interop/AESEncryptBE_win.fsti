@@ -34,7 +34,7 @@ let rec locs_disjoint_rec (ls:list s8) : Type0 =
 unfold
 let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
 
-unfold 
+unfold
 let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
 unfold let disjoint_or_eq (#a:Type0) (b1:B.buffer a) (b2:B.buffer a) =
@@ -48,7 +48,7 @@ let keys_match (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8 { B.length key
 open FStar.Mul
 
 let pre_cond (h:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) =
-live h output_b /\ live h input_b /\ live h keys_b /\    
+live h output_b /\ live h input_b /\ live h keys_b /\
     disjoint_or_eq input_b output_b /\
     bufs_disjoint [keys_b;input_b] /\
     bufs_disjoint [keys_b;output_b] /\ length output_b % 16 == 0 /\ length input_b % 16 == 0 /\ length keys_b % 16 == 0 /\ B.length keys_b == (nr AES_128 + 1) * 16 /\
@@ -65,10 +65,10 @@ let post_cond (h0:HS.mem) (h1:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.eras
     (let  input128_b = BV.mk_buffer_view  input_b Views.view128 in
      let output128_b = BV.mk_buffer_view output_b Views.view128 in
      BV.length input128_b >= 1 /\ BV.length output128_b >= 1 /\
-    (let  input_q = Seq.index (BV.as_seq h0 input128_b) 0 in 
+    (let  input_q = Seq.index (BV.as_seq h0 input128_b) 0 in
      let output_q = Seq.index (BV.as_seq h1 output128_b) 0 in
      output_q == aes_encrypt_BE AES_128 (Ghost.reveal key) input_q))
 
 val aes128_encrypt_block_be_win: output_b:s8 -> input_b:s8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:s8 -> Stack unit
-	(requires (fun h -> pre_cond h output_b input_b key keys_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 output_b input_b key keys_b ))
+        (requires (fun h -> pre_cond h output_b input_b key keys_b ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 output_b input_b key keys_b ))

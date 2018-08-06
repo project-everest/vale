@@ -31,7 +31,7 @@ extern "C" int gcm256_decrypt(args *a);
 
 byte key[32] =
     { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-     16,17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31 }; 
+     16,17,18,19,20,21,22,23,24,25, 26, 27, 28, 29, 30, 31 };
 byte key_expansion[15 * (128/8)];
 
 byte plain[32] =
@@ -115,7 +115,7 @@ void test_lowstar() {
 
     int auth_num_bytes = 0;
     int plain_num_bytes = 19;
-    int num_rounds = 10; 
+    int num_rounds = 10;
     args a;
     a.plain_ptr = plain;
     a.plain_num_bytes = plain_num_bytes;
@@ -178,7 +178,7 @@ int main()
 {
     printf("hello\n");
 
-#ifdef LOWSTAR    
+#ifdef LOWSTAR
     test_lowstar();
 #else // !LOWSTAR
     printf("\nBeginning 128-bit test...\n");

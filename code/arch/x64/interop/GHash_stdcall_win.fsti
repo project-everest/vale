@@ -67,12 +67,12 @@ let post_cond (h0:HS.mem) (h1:HS.mem) (h_b:s8) (hash_b:s8) (input_b:s8) (num_byt
     (let old_hash = buffer_to_quad hash_b h0  in
      let new_hash = buffer_to_quad hash_b h1 in
      let h_q      = buffer_to_quad h_b    h0  in
-     let num_bytes = num_bytes in 
+     let num_bytes = num_bytes in
      (num_bytes == 0 ==> new_hash == old_hash) /\
      (let input_bytes = Seq.slice (le_seq_quad32_to_bytes (buffer_to_seq_quad input_b h0)) 0 num_bytes in
       let padded_bytes = pad_to_128_bits input_bytes in
       let input_quads = le_bytes_to_seq_quad32 padded_bytes in
-      num_bytes > 0 ==>  
+      num_bytes > 0 ==>
         Seq.length input_quads > 0 /\
         new_hash == ghash_incremental h_q old_hash input_quads
      )
@@ -83,5 +83,5 @@ let full_post_cond (h0:HS.mem) (h1:HS.mem) (h_b:s8) (hash_b:s8) (input_b:s8) (nu
     post_cond h0 h1 h_b hash_b input_b num_bytes
 
 val ghash_incremental_bytes_stdcall_win: h_b:s8 -> hash_b:s8 -> input_b:s8 -> num_bytes:UInt64.t -> Stack unit
-	(requires (fun h -> pre_cond h h_b hash_b input_b (UInt64.v num_bytes) ))
-	(ensures (fun h0 _ h1 -> full_post_cond h0 h1 h_b hash_b input_b (UInt64.v num_bytes) ))
+        (requires (fun h -> pre_cond h h_b hash_b input_b (UInt64.v num_bytes) ))
+        (ensures (fun h0 _ h1 -> full_post_cond h0 h1 h_b hash_b input_b (UInt64.v num_bytes) ))

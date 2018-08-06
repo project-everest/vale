@@ -12,7 +12,7 @@ unfold let nat32 = Words_s.nat32
 unfold let nat64 = Words_s.nat64
 unfold let quad32 = Types_s.quad32
 
-type base_typ = 
+type base_typ =
 | TUInt8
 | TUInt16
 | TUInt32
@@ -60,14 +60,14 @@ noeq type state' = {
 
 val valid_state (s:state') : Type0
 
-val frame_valid (s1:state') : Lemma 
+val frame_valid (s1:state') : Lemma
    (forall s2. s1.state.S.mem == s2.state.S.mem /\ s1.mem == s2.mem ==>
      (valid_state s1 <==> valid_state s2))
    [SMTPat (valid_state s1)]
 
 type state = (s:state'{valid_state s})
 
-val get_heap: (h:mem) -> GTot (m:S.heap{forall s. 
+val get_heap: (h:mem) -> GTot (m:S.heap{forall s.
   s.state.S.mem == m /\ s.mem == h ==> valid_state s})
 
 val same_heap: (s1:state) -> (s2:state) -> Lemma (
@@ -227,7 +227,7 @@ val load_mem64 : ptr:int -> h:mem -> GTot nat64 // the 64-bit word at ptr (if va
 val store_mem64 : ptr:int -> v:nat64 -> h:mem -> GTot mem
 
 val valid_mem128 (ptr:int) (h:mem) : GTot bool
-val load_mem128  (ptr:int) (h:mem) : GTot quad32 
+val load_mem128  (ptr:int) (h:mem) : GTot quad32
 val store_mem128 (ptr:int) (v:quad32) (h:mem) : GTot mem
 
 val lemma_valid_mem64 : b:buffer64 -> i:nat -> h:mem -> Lemma
@@ -314,7 +314,7 @@ val bytes_valid (i:int) (s:state) : Lemma
   [SMTPat (S.valid_addr64 i s.state.S.mem)]
 
 val valid_state_store_mem64: ptr:int -> v:nat64 -> s:state -> Lemma (
-  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
+  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state
   else s.state; mem = store_mem64 ptr v s.mem } in
   valid_state s')
 
@@ -324,7 +324,7 @@ val bytes_valid128 (i:int) (s:state) : Lemma
   [SMTPat (S.valid_addr128 i s.state.S.mem)]
 
 val valid_state_store_mem128: ptr:int -> v:quad32 -> s:state -> Lemma (
-  let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state 
+  let s' = { state = if valid_mem128 ptr s.mem then S.update_mem128 ptr v s.state
   else s.state; mem = store_mem128 ptr v s.mem } in
   valid_state s')
 
@@ -365,36 +365,36 @@ val valid_taint_buf64 (b:buffer64) (mem:mem) (memTaint:memtaint) (t:taint) : GTo
 val valid_taint_buf128 (b:buffer128) (mem:mem) (memTaint:memtaint) (t:taint) : GTot Type0
 
 val lemma_valid_taint64: (b:buffer64) ->
-			 (memTaint:memtaint) ->
-			 (mem:mem) ->
-			 (i:nat{i < buffer_length b}) ->
-			 (t:taint) -> Lemma
+                         (memTaint:memtaint) ->
+                         (mem:mem) ->
+                         (i:nat{i < buffer_length b}) ->
+                         (t:taint) -> Lemma
   (requires valid_taint_buf64 b mem memTaint t /\ buffer_readable mem b)
   (ensures Map.sel memTaint (buffer_addr b mem + 8 `op_Multiply` i) == t)
 
 val lemma_valid_taint128: (b:buffer128) ->
-			 (memTaint:memtaint) ->
-			 (mem:mem) ->
-			 (i:nat{i < buffer_length b}) ->
-			 (t:taint) -> Lemma
+                         (memTaint:memtaint) ->
+                         (mem:mem) ->
+                         (i:nat{i < buffer_length b}) ->
+                         (t:taint) -> Lemma
   (requires valid_taint_buf128 b mem memTaint t /\ buffer_readable mem b)
   (ensures Map.sel memTaint (buffer_addr b mem + 16 `op_Multiply` i) == t /\ Map.sel memTaint (buffer_addr b mem + 16 `op_Multiply` i + 8) == t)
 
-val same_memTaint64: (b:buffer64) -> 
+val same_memTaint64: (b:buffer64) ->
                    (mem0:mem) ->
-		   (mem1:mem) ->
-		   (memtaint0:memtaint) ->
-		   (memtaint1:memtaint) -> Lemma
-  (requires (modifies (loc_buffer b) mem0 mem1 /\ 
+                   (mem1:mem) ->
+                   (memtaint0:memtaint) ->
+                   (memtaint1:memtaint) -> Lemma
+  (requires (modifies (loc_buffer b) mem0 mem1 /\
     (forall p. Map.sel memtaint0 p == Map.sel memtaint1 p)))
   (ensures memtaint0 == memtaint1)
 
-val same_memTaint128: (b:buffer128) -> 
+val same_memTaint128: (b:buffer128) ->
                    (mem0:mem) ->
-		   (mem1:mem) ->
-		   (memtaint0:memtaint) ->
-		   (memtaint1:memtaint) -> Lemma
-  (requires (modifies (loc_buffer b) mem0 mem1 /\ 
+                   (mem1:mem) ->
+                   (memtaint0:memtaint) ->
+                   (memtaint1:memtaint) -> Lemma
+  (requires (modifies (loc_buffer b) mem0 mem1 /\
     (forall p. Map.sel memtaint0 p == Map.sel memtaint1 p)))
   (ensures memtaint0 == memtaint1)
 

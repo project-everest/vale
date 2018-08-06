@@ -56,7 +56,7 @@ let four_to_nat_to_four_8 (x:natN (pow2_norm 32)) :
   assert_norm (nat_to_four 8 x == Mkfour (x % n1) ((x / n1) % n1) ((x / n2) % n1) ((x / n3) % n1));
   let Mkfour x0 x1 x2 x3 = fourX in
   let x' = x0 + x1 * n1 + x2 * n2 + x3 * n3 in
-  assert_norm (four_to_nat 8 fourX == int_to_natN n4 (x0 + x1 * n1 + x2 * n2 + x3 * n3));  
+  assert_norm (four_to_nat 8 fourX == int_to_natN n4 (x0 + x1 * n1 + x2 * n2 + x3 * n3));
   lemma_fundamental_div_mod_4 x;
   ()
 
@@ -102,9 +102,9 @@ let four_to_seq_to_four_BE (#a:Type) (x:seq4 a) :
 
 let seq_to_four_to_seq_BE (#a:Type) (x:four a) :
   Lemma (seq_to_four_BE (four_to_seq_BE x) == x)
-  = 
+  =
   ()
-  
+
 (*
 let seq_four_to_seq_LE (#a:Type) (x:seq (four a)) : seq a =
   let f (n:nat{n < length x * 4}) = four_select (index x (n / 4)) (n % 4) in
@@ -120,7 +120,7 @@ val four_to_seq_LE (#a:Type) (x:four a) : Pure (seq4 a)
   )
 *)
 
-let four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) : 
+let four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) :
   Lemma (four_to_seq_LE x == seq_four_to_seq_LE (create 1 x))
   =
   let s0 = four_to_seq_LE x  in
@@ -142,30 +142,30 @@ let seq_four_to_seq_LE_injective (a:eqtype) :
   in
   generic_injective_proof (seq_four_to_seq_LE_stronger) (seq_to_seq_four_LE #a) (seq_to_seq_four_to_seq_LE #a);
   ()
-  
+
 let seq_four_to_seq_LE_injective_specific (#a:eqtype) (x x':seq (four a)) :
   Lemma (seq_four_to_seq_LE x == seq_four_to_seq_LE x' ==> x == x')
   =
   seq_four_to_seq_LE_injective a
-  
+
 let four_to_seq_LE_injective (a:eqtype) :
   Lemma (forall (x x': four a) . four_to_seq_LE x == four_to_seq_LE x' ==> x == x')
   =
   generic_injective_proof #(four a) #(seq4 a) (four_to_seq_LE #a) (seq_to_four_LE #a) (seq_to_four_to_seq_LE #a)
-  
-let four_to_nat_8_injective () : 
+
+let four_to_nat_8_injective () :
   Lemma (forall (x x':four (natN (pow2_norm 8))) . four_to_nat 8 x == four_to_nat 8 x' ==> x == x')
   =
   generic_injective_proof (four_to_nat 8) (nat_to_four 8) nat_to_four_to_nat
 
-let nat_to_four_8_injective () : 
+let nat_to_four_8_injective () :
   Lemma (forall (x x':natN (pow2_norm 32)) . nat_to_four 8 x == nat_to_four 8 x' ==> x == x')
   =
   generic_injective_proof (nat_to_four 8) (four_to_nat 8) four_to_nat_to_four_8
 
 (*
 let seq_to_four_LE_injective () :
-  Lemma (forall (#a:Type) (x x':seq4 a) . seq_to_four_LE x == seq_to_four_LE x' ==> x == x') 
+  Lemma (forall (#a:Type) (x x':seq4 a) . seq_to_four_LE x == seq_to_four_LE x' ==> x == x')
   =
   generic_injective_proof seq_to_four_LE four_to_seq_LE four_to_seq_to_four_LE
 *)

@@ -1,7 +1,7 @@
 module SecretByte
 
 // Type for secrets.  We don't reveal anything about them concretely
-inline_for_extraction 
+inline_for_extraction
 val t:Type0
 
 // But for specification purposes, we can obtain ghost copies
@@ -26,4 +26,4 @@ val vu_inv (x : FStar.UInt.uint_t 8) : Lemma
 val v_inj (x1 x2: t): Lemma
   (requires (v x1 == v x2))
   (ensures (x1 == x2))
- 
+

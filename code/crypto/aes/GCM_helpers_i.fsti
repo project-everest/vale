@@ -7,7 +7,7 @@ open Types_s
 open Types_i
 open FStar.Mul
 open FStar.Seq
-open AES_s 
+open AES_s
 open GCTR_s
 open FStar.Math.Lemmas
 open Collections.Seqs_i
@@ -23,7 +23,7 @@ val index_work_around_quad32 (s:seq quad32) (i:int) : Pure quad32
   (requires True)
   (ensures fun s' -> 0 <= i && i < length s ==> s' == index s i)
 
-val bytes_to_quad_size_no_extra_bytes (num_bytes:nat) : Lemma 
+val bytes_to_quad_size_no_extra_bytes (num_bytes:nat) : Lemma
   (requires num_bytes % 16 == 0)
   (ensures bytes_to_quad_size num_bytes = num_bytes / 16)
 
@@ -35,7 +35,7 @@ val no_extra_bytes_helper (s:seq quad32) (num_bytes:int) : Lemma
            slice_work_around s (num_bytes / 16) == s)
 
 val le_seq_quad32_to_bytes_tail_prefix (s:seq quad32) (num_bytes:nat) : Lemma
-  (requires (1 <= num_bytes /\ 
+  (requires (1 <= num_bytes /\
              num_bytes < 16 * length s /\
              16 * (length s - 1) < num_bytes /\
              num_bytes % 16 <> 0))
@@ -46,7 +46,7 @@ val le_seq_quad32_to_bytes_tail_prefix (s:seq quad32) (num_bytes:nat) : Lemma
             x == x'))
 
 val pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) : Lemma
-  (requires 1 <= num_bytes /\ 
+  (requires 1 <= num_bytes /\
              num_bytes < 16 * length s /\
              16 * (length s - 1) < num_bytes /\
              num_bytes % 16 <> 0 /\
@@ -61,10 +61,10 @@ val pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) : Lemma
 
 val le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) :
     Lemma(let Mkfour q0 q1 q2 q3 = q in
-	      (i < 4 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q0) (i % 4)) /\
-	      (4 <= i /\ i < 8 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q1) (i % 4)) /\
- 	      (8 <= i /\ i < 12  ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q2) (i % 4)) /\
-	      (12 <= i /\ i < 16 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q3) (i % 4)))
+              (i < 4 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q0) (i % 4)) /\
+              (4 <= i /\ i < 8 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q1) (i % 4)) /\
+               (8 <= i /\ i < 12  ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q2) (i % 4)) /\
+              (12 <= i /\ i < 16 ==> index (le_quad32_to_bytes q) i = four_select (nat_to_four 8 q3) (i % 4)))
 
 val pad_to_128_bits_lower (q:quad32) (num_bytes:int) : Lemma
   (requires 1 <= num_bytes /\ num_bytes < 8)
@@ -72,12 +72,12 @@ val pad_to_128_bits_lower (q:quad32) (num_bytes:int) : Lemma
             new_lo < pow2_64 /\
             (let q' = insert_nat64 (insert_nat64 q 0 1) new_lo 0 in
              q' == le_bytes_to_quad32 (pad_to_128_bits (slice (le_quad32_to_bytes q) 0 num_bytes)))))
-            
+
 val pad_to_128_bits_upper (q:quad32) (num_bytes:int) : Lemma
   (requires 8 <= num_bytes /\ num_bytes < 16)
   (ensures (let new_hi = (hi64 q) % pow2 ((num_bytes - 8) * 8) in
             new_hi < pow2_64 /\
             (let q' = insert_nat64 q new_hi 1 in
              q' == le_bytes_to_quad32 (pad_to_128_bits (slice (le_quad32_to_bytes q) 0 num_bytes)))))
-                   
-  
+
+

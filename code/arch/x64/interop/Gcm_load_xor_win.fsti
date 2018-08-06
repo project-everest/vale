@@ -59,7 +59,7 @@ let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint
 open FStar.Mul
 
 let pre_cond (h:HS.mem) (plain_b:s8) (mask_b:s8) (cipher_b:s8) (offset:nat64) (num_blocks:Ghost.erased (nat64)) (key:Ghost.erased (aes_key_LE AES_128)) (iv:Ghost.erased (quad32)) = live h plain_b /\ live h mask_b /\ live h cipher_b /\ bufs_disjoint [plain_b;mask_b;cipher_b] /\ length plain_b % 16 == 0 /\ length mask_b % 16 == 0 /\ length cipher_b % 16 == 0
- /\  ( let mods = M.loc_buffer cipher_b in  
+ /\  ( let mods = M.loc_buffer cipher_b in
     B.live h plain_b /\ B.live h mask_b /\ B.live h cipher_b /\
     M.loc_disjoint (M.loc_buffer plain_b) mods /\
     M.loc_disjoint (M.loc_buffer mask_b)  mods /\
@@ -102,5 +102,5 @@ let post_cond (h:HS.mem) (h':HS.mem) (plain_b:s8) (mask_b:s8) (cipher_b:s8) (off
     )
 
 val gcm_load_xor_store_buffer_win: plain_b:s8 -> mask_b:s8 -> cipher_b:s8 -> offset:UInt64.t -> num_blocks:Ghost.erased (nat64) -> key:Ghost.erased (aes_key_LE AES_128) -> iv:Ghost.erased (quad32) -> Stack unit
-	(requires (fun h -> pre_cond h plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv ))
+        (requires (fun h -> pre_cond h plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 plain_b mask_b cipher_b (UInt64.v offset) num_blocks key iv ))

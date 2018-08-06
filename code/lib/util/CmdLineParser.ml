@@ -13,17 +13,17 @@ let is_it_win b =
 
 let proc_name : string -> platform -> string =
   fun name plat ->
-    let prefix = 
+    let prefix =
       match plat with
         | MacOS -> "_"
         | _ -> ""
     in
     prefix ^ name
-     
+
 let parse_cmdline :
   (string * (Prims.bool ->
     (X64_Vale_Decls_i.ins,X64_Vale_Decls_i.ocmp) X64_Machine_s.precode)) list -> unit
-  = 
+  =
   fun l  ->
   let argc = Array.length Sys.argv in
   if argc < 3
@@ -50,7 +50,7 @@ let parse_cmdline :
         raise (Invalid_argument
                  "Please choose a correct assembler option: GCC or MASM\n")
     in
-    let printer = 
+    let printer =
       match asm_choice with
       | GCC -> X64_Vale_Decls_i.gcc
       | MASM -> X64_Vale_Decls_i.masm
@@ -58,8 +58,8 @@ let parse_cmdline :
     let windows = platform_choice = Win in
     X64_Vale_Decls_i.print_header printer;
     let _ = List.fold_left (fun label_count (name, code) ->
-                           X64_Vale_Decls_i.print_proc (proc_name name platform_choice) 
-                                                       (code windows) 
+                           X64_Vale_Decls_i.print_proc (proc_name name platform_choice)
+                                                       (code windows)
                                                        label_count printer)
                            (Prims.parse_int "0") l in
     X64_Vale_Decls_i.print_footer printer

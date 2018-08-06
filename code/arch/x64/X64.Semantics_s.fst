@@ -47,7 +47,7 @@ let eval_operand (o:operand) (s:state) : GTot nat64 =
   | OMem m -> eval_mem (eval_maddr m s) s
 
 let eval_mov128_op (o:mov128_op) (s:state) : GTot quad32 =
-  match o with 
+  match o with
   | Mov128Xmm i -> eval_xmm i s
   | Mov128Mem m -> eval_mem128 (eval_maddr m s) s
 
@@ -65,7 +65,7 @@ let update_reg' (r:reg) (v:nat64) (s:state) : state = {s with state = S.update_r
 let update_xmm' (x:xmm) (v:quad32) (s:state) : state = {s with state = S.update_xmm' x v s.state}
 
 let update_mem (ptr:int) (v:nat64) (s:state) : GTot state =
-  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state 
+  let s' = { state = if valid_mem64 ptr s.mem then S.update_mem ptr v s.state
   else s.state; mem = store_mem64 ptr v s.mem } in
   valid_state_store_mem64 ptr v s;
   s'
@@ -95,7 +95,7 @@ let valid_mov128_op (o:mov128_op) (s:state) : GTot bool =
 
 let valid_shift_operand (o:operand) (s:state) : GTot bool =
   valid_operand o s && (eval_operand o s) < 64
-  
+
 let valid_ocmp (c:ocmp) (s:state) : GTot bool =
   match c with
   | S.OEq o1 o2 -> valid_operand o1 s && valid_operand o2 s
@@ -119,7 +119,7 @@ let update_mov128_op_preserve_flags' (o:mov128_op) (v:quad32) (s:state) : GTot s
   | Mov128Xmm i -> update_xmm' i v s
   | Mov128Mem m -> update_mem128 (eval_maddr m s) v s
 
-// Default version havocs flags 
+// Default version havocs flags
 let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : GTot state =
   let s' = update_operand_preserve_flags' o v s in
   { s' with state = {s'.state with S.flags = havoc s ins } }
@@ -254,7 +254,7 @@ let eval_ins (ins:ins) : GTot (st unit) =
   | S.Add64 dst src ->
     check (valid_operand src);;
     let sum = (eval_operand dst s) + (eval_operand src s) in
-    let new_carry = sum >= pow2_64 in    
+    let new_carry = sum >= pow2_64 in
     update_operand dst ins ((eval_operand dst s + eval_operand src s) % pow2_64);;
     update_flags (update_cf s.state.S.flags new_carry)
 
@@ -315,7 +315,7 @@ let eval_ins (ins:ins) : GTot (st unit) =
     check (valid_operand src);;
     update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s));;
     update_cf_of false false
-    
+
   | S.And64 dst src ->
     check (valid_operand src);;
     update_operand dst ins (Types_s.iand (eval_operand dst s) (eval_operand src s))
@@ -336,22 +336,22 @@ let eval_ins (ins:ins) : GTot (st unit) =
 
   | S.Pop dst ->
     let stack_val = OMem (MReg Rsp 0) in
-    check (valid_operand stack_val);;    
+    check (valid_operand stack_val);;
     let new_dst = eval_operand stack_val s in
     let new_rsp = ((eval_reg Rsp s) + 8) % pow2_64 in
     update_operand_preserve_flags dst new_dst;;
     update_reg Rsp new_rsp
 
   // In the XMM-related instructions below, we generally don't need to check for validity of the operands,
-  // since all possibilities are valid, thanks to dependent types 
+  // since all possibilities are valid, thanks to dependent types
 
   | S.Paddd dst src ->
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     update_xmm dst ins (Mkfour ((dst_q.lo0 + src_q.lo0) % pow2_32)
-			       ((dst_q.lo1 + src_q.lo1) % pow2_32)
-			       ((dst_q.hi2 + src_q.hi2) % pow2_32)
-			       ((dst_q.hi3 + src_q.hi3) % pow2_32))
+                               ((dst_q.lo1 + src_q.lo1) % pow2_32)
+                               ((dst_q.hi2 + src_q.hi2) % pow2_32)
+                               ((dst_q.hi3 + src_q.hi3) % pow2_32))
 
   | S.Pxor dst src ->
     update_xmm_preserve_flags dst (quad32_xor (eval_xmm dst s) (eval_xmm src s))
@@ -381,10 +381,10 @@ let eval_ins (ins:ins) : GTot (st unit) =
     let result = Mkfour (if permutation % 2 = 0 then dst_q.lo0 else dst_q.hi2)
                         (if permutation % 2 = 0 then dst_q.lo1 else dst_q.hi3)
                         (if (permutation / 2) % 2 = 0 then src_q.lo0 else src_q.hi2)
-                        (if (permutation / 2) % 2 = 0 then src_q.lo1 else src_q.hi3) in                    
+                        (if (permutation / 2) % 2 = 0 then src_q.lo1 else src_q.hi3) in
     update_xmm dst ins result
 
-  | S.Pshufb dst src -> 
+  | S.Pshufb dst src ->
     let src_q = eval_xmm src s in
     let dst_q = eval_xmm dst s in
     // We only spec a restricted version sufficient for a handful of standard patterns
@@ -401,9 +401,9 @@ let eval_ins (ins:ins) : GTot (st unit) =
                                  (reverse_bytes_nat32 dst_q.lo0)
                                  (reverse_bytes_nat32 dst_q.hi3)
                                  (reverse_bytes_nat32 dst_q.hi2))
-    else fail                                 
-    
-  | S.Pshufd dst src permutation ->  
+    else fail
+
+  | S.Pshufd dst src permutation ->
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
     let permuted_xmm = Mkfour
@@ -429,8 +429,8 @@ let eval_ins (ins:ins) : GTot (st unit) =
   | S.Pextrq dst src index ->
     let src_q = eval_xmm src s in
     let src_two = four_to_two_two src_q in
-    let extracted_nat64 = two_to_nat 32 (two_select src_two (index % 2)) in			  
-    update_operand_preserve_flags dst extracted_nat64		   
+    let extracted_nat64 = two_to_nat 32 (two_select src_two (index % 2)) in
+    update_operand_preserve_flags dst extracted_nat64
 
   | S.Pinsrd dst src index ->
     check (valid_operand src);;
@@ -449,7 +449,7 @@ let eval_ins (ins:ins) : GTot (st unit) =
     update_xmm_preserve_flags dst shifted_xmm
 
   | S.MOVDQU dst src ->
-    check (valid_mov128_op src);; 
+    check (valid_mov128_op src);;
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
   | S.Pclmulqdq dst src imm ->
@@ -495,12 +495,12 @@ let eval_ins (ins:ins) : GTot (st unit) =
 
   | S.AESNI_keygen_assist dst src imm ->
     let src_q = eval_xmm src s in
-    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1) 
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
-			       (AES_s.sub_word src_q.hi3)
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
- 
- 
+    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1)
+                               (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
+                               (AES_s.sub_word src_q.hi3)
+                               (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
+
+
 (*
  * These functions return an option state
  * None case arises when the while loop runs out of fuel
@@ -515,7 +515,7 @@ let rec eval_code c fuel s =
   | Ins ins                       -> Some (run (eval_ins ins) s)
   | Block l                       -> eval_codes l fuel s
   | IfElse ifCond ifTrue ifFalse  -> let s = run (check (valid_ocmp ifCond)) s in
-	   if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
+           if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
   | While b c                     -> eval_while b c fuel s
 
 and eval_codes l fuel s =

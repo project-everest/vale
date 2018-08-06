@@ -10,13 +10,13 @@ open FStar.Seq
 open Opaque_s
 open Words.Two_s
 open Words.Four_s
-open AES_s 
+open AES_s
 open GCTR_s
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
 let slice_work_around (s:seq 'a) (i:int) =
-  if 0 <= i && i <= length s then slice s 0 i 
+  if 0 <= i && i <= length s then slice s 0 i
   else slice s 0 0
 
 let index_work_around_quad32 (s:seq quad32) (i:int) =
@@ -112,7 +112,7 @@ let pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) =
   //    This follows from slice_commutes_le_seq_quad32_to_bytes0
   // le_seq_quad32_to_bytes full_quads == le_seq_quad32_to_bytes (slice s 0 num_blocks)
 
-  slice_commutes_le_seq_quad32_to_bytes0 s num_blocks;  
+  slice_commutes_le_seq_quad32_to_bytes0 s num_blocks;
   // ==>
   (*
     assert (slice (le_seq_quad32_to_bytes s) 0 (num_blocks * 16) ==
@@ -125,13 +125,13 @@ let pad_to_128_bits_le_quad32_to_bytes (s:seq quad32) (num_bytes:int) =
   // F* believes assert (final_quad == index s num_blocks), so we have:
   //               == slice (le_quad32_to_bytes (index s num_blocks)) 0 num_extra
   //
-  //               == slice (le_quad32_to_bytes (index s num_blocks)) 0 num_extra 
+  //               == slice (le_quad32_to_bytes (index s num_blocks)) 0 num_extra
   // from le_seq_quad32_to_bytes_tail_prefix
   //               == slice (le_seq_quad32_to_bytes s) (num_blocks * 16) num_bytes
   //               == slice (le_seq_quad32_to_bytes s) full_blocks num_bytes
   //  From slice_slice
-  // partial_bytes == slice (slice (le_seq_quad32_to_bytes s) 0 num_bytes) full_blocks num_bytes 
-  
+  // partial_bytes == slice (slice (le_seq_quad32_to_bytes s) 0 num_bytes) full_blocks num_bytes
+
   slice_slice (le_seq_quad32_to_bytes s) 0 num_bytes full_blocks num_bytes;
   le_seq_quad32_to_bytes_tail_prefix s num_bytes;
   ()
@@ -143,8 +143,8 @@ let slice_le_quad32_to_bytes_is_mod (q:quad32) (num_bytes:int) : Lemma
   (ensures four_to_nat 32 (slice (le_quad32_to_bytes q) 0 num_bytes) == (four_to_nat 32 q) % (pow2 (8*num_bytes)))
   =
   ()
-      
-let insert_0_is_padding (q:quad32) : 
+
+let insert_0_is_padding (q:quad32) :
   Lemma (let q' = insert_nat64 q 0 1 in
          q' == le_bytes_to_quad32 (pad_to_128_bits (slice (le_quad32_to_bytes q) 0 8)))
   =
@@ -203,35 +203,35 @@ let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) =
   assert(i < 4 ==> (fun n ->
     four_select (index (init (length (four_to_seq_LE q))
                        (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-			    (n / 4))
-		       (n % 4)) i == four_select (nat_to_four 8 q0) i);
+                            (n / 4))
+                       (n % 4)) i == four_select (nat_to_four 8 q0) i);
   assert(4 <= i /\ i < 8 ==> (fun n ->
     four_select (index (init (length (four_to_seq_LE q))
                 (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-		(n / 4))
-		   (n % 4)) i == four_select (nat_to_four 8 q1) (i % 4));
+                (n / 4))
+                   (n % 4)) i == four_select (nat_to_four 8 q1) (i % 4));
   assert(8 <= i /\ i < 12 ==> (fun n ->
     four_select (index (init (length (four_to_seq_LE q))
                 (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-		(n / 4))
-		   (n % 4)) i == four_select (nat_to_four 8 q2) (i % 4));
+                (n / 4))
+                   (n % 4)) i == four_select (nat_to_four 8 q2) (i % 4));
   assert(12 <= i /\ i < 16 ==> (fun n ->
     four_select (index (init (length (four_to_seq_LE q))
                 (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-		(n / 4))
-		   (n % 4)) i == four_select (nat_to_four 8 q3) (i % 4));
-  assert_by_tactic (i < 16 ==> index (le_quad32_to_bytes_def q) i = 
-		   (index (init (length (init (length (four_to_seq_LE q))
-			  (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x))) *
-								      4)
-			  (fun n ->
-			    four_select (index (init (length (four_to_seq_LE q))
-					(fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
-			    (n / 4))
-			  (n % 4))) i))
-    		   (fun () -> norm[primops; delta_only ["Types_s.le_quad32_to_bytes_def"; 
-    		      "Collections.Seqs_s.seq_map"; "Collections.Seqs_s.compose"; 
-    			"Words.Seq_s.seq_four_to_seq_LE"]]; dump " after norm2");
+                (n / 4))
+                   (n % 4)) i == four_select (nat_to_four 8 q3) (i % 4));
+  assert_by_tactic (i < 16 ==> index (le_quad32_to_bytes_def q) i =
+                   (index (init (length (init (length (four_to_seq_LE q))
+                          (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x))) *
+                                                                      4)
+                          (fun n ->
+                            four_select (index (init (length (four_to_seq_LE q))
+                                        (fun x -> nat_to_four 8 (index (four_to_seq_LE q) x)))
+                            (n / 4))
+                          (n % 4))) i))
+                       (fun () -> norm[primops; delta_only ["Types_s.le_quad32_to_bytes_def";
+                          "Collections.Seqs_s.seq_map"; "Collections.Seqs_s.compose";
+                            "Words.Seq_s.seq_four_to_seq_LE"]]; dump " after norm2");
   assert(i < 4 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q0) i);
   assert(4 <= i /\ i < 8 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q1) (i % 4));
   assert(8 <= i /\ i < 12 ==> index (le_quad32_to_bytes_def q) i == four_select (nat_to_four 8 q2) (i % 4));

@@ -71,7 +71,7 @@
 # Built in top-level functions like "Command(...)" and "Object(...)" execute in a default
 # environment.  To run them in a custom environment, simply call them as methods of an
 # environment object:
-# 
+#
 #   env.Command(b, [a1, a2], f'cmd1 {a1} {a2} > {b}')
 #   env.Command(c, b, f'cmd2 {b} > {c}')
 #   foo_obj = env.Object(foo_c)
@@ -344,7 +344,7 @@ verify_options = [
   ('code/arch/x64/interop/Quad32_xor_win.fst', BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst')),
   ('code/arch/x64/interop/Reverse_quad32_win.fst', BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst')),
   ('code/arch/x64/interop/Zero_quad32_win.fst', BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst')),
-  
+
   #'src/thirdPartyPorts/OpenSSL/poly1305/x64/X64.Poly1305.vaf': None,
 
   ('code/*/*.fst', BuildOptions(fstar_default_args)),
@@ -501,7 +501,7 @@ def CopyFile(target, source):
 #
 ##################################################################################################
 
-# Helper to look up a BuildOptions matching a srcpath File node, from the 
+# Helper to look up a BuildOptions matching a srcpath File node, from the
 # verify_options[] list, falling back on a default if no specific override is present.
 def get_build_options(srcnode):
   srcpath = srcnode.path
@@ -511,7 +511,7 @@ def get_build_options(srcnode):
   else:
     for key, options in verify_options: # Fuzzy match
       if fnmatch.fnmatch (srcpath, key):
-        return options 
+        return options
     ext = os.path.splitext(srcpath)[1]
     if ext in verify_options_dict:      # Exact extension match
       return verify_options_dict[ext]
@@ -759,7 +759,7 @@ def translate_vale_file(options, source_vaf):
   target = file_drop_extension(to_obj_dir(source_vaf))
   target_fst = File(target + '.fst')
   target_fsti = File(target + '.fsti')
-  targets = [target_fst, target_fsti]  
+  targets = [target_fst, target_fsti]
   opt_vale_includes = vale_includes if options.vale_includes == None else options.vale_includes
   env.Command(targets, source_vaf,
     f'{mono} {vale_exe} -fstarText {opt_vale_includes}' +
@@ -1013,7 +1013,7 @@ if fstar_extract:
   # Build AES-GCM
   aesgcm_asm = extract_assembly_code(env, 'aesgcm', File('code/crypto/aes/x64/Main.ml'),
     File('code/crypto/aes/x64/X64.GCMdecrypt.vaf'), File('code/lib/util/CmdLineParser.ml'))
-  if env['TARGET_ARCH'] == 'amd64': 
+  if env['TARGET_ARCH'] == 'amd64':
     aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
     aesgcmtest_src = File('code/crypto/aes/x64/TestAesGcm.cpp')
     aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)

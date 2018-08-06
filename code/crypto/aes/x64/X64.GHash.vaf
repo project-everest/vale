@@ -38,7 +38,7 @@ let get_last_slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
   if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
     last (slice s start_pos end_pos)
   else
-    Mkfour 0 0 0 0 
+    Mkfour 0 0 0 0
 
 //let slice_workaround (s:seq quad32) (start_pos end_pos:int)  =
 //  if 0 <= start_pos && start_pos < end_pos && end_pos <= length s then
@@ -149,7 +149,7 @@ procedure {:quick} ghash_incremental_one_block_buffer(
         // Save R12 register
         Mov64(rax, r12);
 
-        
+
         // Input into xmm2
         IMul64(rcx, 16);
         Add64(rcx, rdx);
@@ -159,7 +159,7 @@ procedure {:quick} ghash_incremental_one_block_buffer(
         Load128_buffer(xmm1, rsi, 0, Secret, hash_b, 0);
 
         // mask into xmm8
-        InitPshufbMask(xmm8, r11);        
+        InitPshufbMask(xmm8, r11);
 
         // h into xmm11
         Load128_buffer(xmm11, rdi, 0, Secret, h_b, 0);
@@ -187,7 +187,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
 
         valid_taint_buf128(h_b, mem, memTaint, Secret);
         valid_taint_buf128(hash_b, mem, memTaint, Secret);
-        valid_taint_buf128(input_b, mem, memTaint, Secret);  
+        valid_taint_buf128(input_b, mem, memTaint, Secret);
     requires
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(h_b), loc_buffer(hash_b), loc_buffer(input_b)));
         buffer_readable(mem, stack_b);
@@ -201,7 +201,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
         buffer_length(input_b) >= offset + 1;
         buffer_length(h_b) >= 1;
         buffer_length(hash_b) >= 1;
-        buffer_addr(input_b, mem) + offset * 16 < pow2_64;        
+        buffer_addr(input_b, mem) + offset * 16 < pow2_64;
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -256,7 +256,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
 
         // mask into xmm8
         InitPshufbMask(xmm8, r11);
-        
+
         // old_hash into xmm1
         Load128_buffer(xmm1, rdx, 0, Secret, hash_b, 0);
 
@@ -279,7 +279,7 @@ procedure {:quick} ghash_incremental_one_block_buffer_win(
 procedure {:quick} compute_ghash_incremental(
     ghost in_b:buffer128
     )
-    lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11; 
+    lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11;
     reads
         in_ptr; len; h; mask;
         mem; memTaint;
@@ -311,7 +311,7 @@ procedure {:quick} compute_ghash_incremental(
                 //////////////////// Basic indexing //////////////////////
                 0 <= rdx <= len;
                 r9 == in_ptr + 16 * rdx;
-                
+
                 //////////////////// From requires //////////////////////
                 // GHash reqs
                 validSrcAddrs128(mem, in_ptr, in_b, len, memTaint, Secret);
@@ -345,7 +345,7 @@ procedure {:quick} compute_ghash_incremental(
 procedure {:quick} compute_ghash_incremental_partial(
     ghost in_b:buffer128
     )
-    lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11; 
+    lets in_ptr @= rax; len @= rcx; io @= xmm1; mask @= xmm8; h @= xmm11;
     reads
         in_ptr; len; h; mask;
         mem; memTaint;
@@ -379,7 +379,7 @@ procedure {:quick} compute_ghash_incremental_partial(
                 //////////////////// Basic indexing //////////////////////
                 0 <= rdx <= len;
                 r9 == in_ptr + 16 * rdx;
-                
+
                 //////////////////// From requires //////////////////////
                 // GHash reqs
                 validSrcAddrs128(mem, in_ptr, in_b, len, memTaint, Secret);
@@ -437,7 +437,7 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
         let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
         let padded_bytes := pad_to_128_bits(input_bytes);
         let input_quads := le_bytes_to_seq_quad32(padded_bytes);
-        num_bytes > 0 ==> length(input_quads) > 0 /\ 
+        num_bytes > 0 ==> length(input_quads) > 0 /\
                           io == ghash_incremental(h, old_io, input_quads);
 {
     ghost var num_blocks := num_bytes / 16;
@@ -469,14 +469,14 @@ procedure {:quick exportOnly} ghash_incremental_bytes_no_extra(
 }
 
 
-/*   
+/*
  * Note: More efficient options would be:
- *  a) Write a routine to build 16 masks for Pshufb, each of which implements a shift by 0-16 bytes. 
- *     Ask GCM caller to pass in that buffer.  
+ *  a) Write a routine to build 16 masks for Pshufb, each of which implements a shift by 0-16 bytes.
+ *     Ask GCM caller to pass in that buffer.
  *  b) Write a 16-way switch statement using Psrldq with immediates
  *     Note that a switch statement will likely be much more efficient than a 16-way if/else,
  *     but Vale currently doesn't support switch statements
- */ 
+ */
 #reset-options "--z3rlimit 30"
 procedure {:quick} compute_pad_to_128_bits()
     lets io @= xmm2; num_bytes @= rax; tmp @= rcx; mask @= rdx;
@@ -484,7 +484,7 @@ procedure {:quick} compute_pad_to_128_bits()
     reads num_bytes;
     modifies io; tmp; mask; efl;
     requires 0 < num_bytes < 16;
-    ensures 
+    ensures
         let padded_bytes := pad_to_128_bits(slice_work_around(le_quad32_to_bytes(old(io)), num_bytes));
         length(padded_bytes) = 16 && io = le_bytes_to_quad32(padded_bytes);
 {
@@ -495,13 +495,13 @@ procedure {:quick} compute_pad_to_128_bits()
 
         // Grab the lower 64 bits and zero-out 1-7 of the bytes
         Mov64(tmp, num_bytes);
-        Shl64(tmp, 3);      // tmp == 8 (bits/byte) * num_bytes 
+        Shl64(tmp, 3);      // tmp == 8 (bits/byte) * num_bytes
         lemma_bytes_shift_power2(num_bytes); // ==>
         assert tmp == 8 * num_bytes;
         Mov64(mask, 1);
         Shl64(mask, tmp);
         Sub64(mask, 1);
-        Pextrq(tmp, io, 0);     
+        Pextrq(tmp, io, 0);
         ghost var old_lower128 := tmp;
         And64(tmp, mask);
         lemma_bytes_and_mod(old_lower128, num_bytes); // ==>
@@ -522,7 +522,7 @@ procedure {:quick} compute_pad_to_128_bits()
         Mov64(mask, 1);
         Shl64(mask, tmp);
         Sub64(mask, 1);
-        Pextrq(tmp, io, 1);     
+        Pextrq(tmp, io, 1);
         ghost var old_upper128 := tmp;
         And64(tmp, mask);
         lemma_bytes_and_mod(old_upper128, num_bytes - 8); // ==>
@@ -577,19 +577,19 @@ procedure {:quick} ghash_incremental_bytes_extra(
         let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), orig_num_bytes);
         let padded_bytes := pad_to_128_bits(input_bytes);
         let input_quads := le_bytes_to_seq_quad32(padded_bytes);
-        orig_num_bytes > 0 ==> length(input_quads) > 0 /\ 
+        orig_num_bytes > 0 ==> length(input_quads) > 0 /\
                           io == ghash_incremental(h, old_io, input_quads);
 {
     ghost var num_blocks := orig_num_bytes / 16;
 
-    Load128_buffer(xmm2, in_ptr, 0, Secret, in_b, num_blocks);  
+    Load128_buffer(xmm2, in_ptr, 0, Secret, in_b, num_blocks);
     ghost var final_quad := xmm2;
 
     compute_pad_to_128_bits();
     ghost var final_quad_padded := xmm2;
 
     compute_ghash_incremental_register();
-    
+
     lemma_ghash_incremental_bytes_extra_helper(h, old_io, old(io), io, buffer128_as_seq(mem, in_b), final_quad, final_quad_padded, orig_num_bytes);
 }
 
@@ -648,7 +648,7 @@ procedure {:quick} ghash_incremental_extra_stdcall(
         let padded_bytes := pad_to_128_bits(input_bytes);
         let input_quads := le_bytes_to_seq_quad32(padded_bytes);
         length(input_quads) > 0 /\ new_hash == ghash_incremental(h_val, orig_hash, input_quads);
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -682,7 +682,7 @@ procedure {:quick} ghash_incremental_extra_stdcall(
     // Update the hash
     Store128_buffer(rsi, xmm1, 0, Secret, hash_b, 0);
 
-    // Restore r12                                       
+    // Restore r12
     Mov64(r12, r10);
 }
 
@@ -701,7 +701,7 @@ procedure {:quick} ghash_incremental_extra_stdcall_win(
         buffer_readable(mem, h_b);
         valid_taint_buf128(in_b, mem, memTaint, Secret);
         valid_taint_buf128(hash_b, mem, memTaint, Secret);
-        valid_taint_buf128(h_b, mem, memTaint, Secret);  
+        valid_taint_buf128(h_b, mem, memTaint, Secret);
     requires
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(in_b), loc_buffer(hash_b), loc_buffer(h_b)));
         buffer_readable(mem, stack_b);
@@ -845,7 +845,7 @@ procedure {:quick} ghash_incremental_bytes(
         let input_bytes := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem, in_b)), num_bytes);
         let padded_bytes := pad_to_128_bits(input_bytes);
         let input_quads := le_bytes_to_seq_quad32(padded_bytes);
-        num_bytes > 0 ==> length(input_quads) > 0 /\ 
+        num_bytes > 0 ==> length(input_quads) > 0 /\
             io == ghash_incremental(h, old(io), input_quads);
 {
     ghost var num_blocks := old(num_bytes) / 16;
@@ -856,7 +856,7 @@ procedure {:quick} ghash_incremental_bytes(
         Mov64(rcx, num_bytes);
         Shr64(rcx, 4);
         assert rcx == num_blocks;
-     
+
         compute_ghash_incremental_partial(in_b);
 
         Mov64(rax, num_bytes);
@@ -866,7 +866,7 @@ procedure {:quick} ghash_incremental_bytes(
         if (rax == 0) {
             ghash_incremental_bytes_no_extra(in_b, old(io), old(in_ptr), old(num_bytes), io, h);
         } else {
-            ghash_incremental_bytes_extra(in_b, old(in_ptr), old(io), old(num_bytes)); 
+            ghash_incremental_bytes_extra(in_b, old(in_ptr), old(io), old(num_bytes));
         }
     }
 }
@@ -907,7 +907,7 @@ procedure {:quick} ghash_incremental_bytes_stdcall(ghost h_b:buffer128, ghost ha
         let io := buffer128_read(hash_b, 0, mem);
         num_bytes > 0 ==> length(input_quads) > 0 /\
             io == ghash_incremental(h, old_io, input_quads);
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -937,7 +937,7 @@ procedure{:quick}{:exportSpecs} ghash_incremental_bytes_stdcall_win(
         buffer_readable(mem, h_b);
         buffer_readable(mem, hash_b);
         valid_taint_buf128(h_b, mem, memTaint, Secret);
-        valid_taint_buf128(hash_b, mem, memTaint, Secret);  
+        valid_taint_buf128(hash_b, mem, memTaint, Secret);
     requires
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(h_b), loc_buffer(hash_b), loc_buffer(input_b)));
         buffer_readable(mem, stack_b);
@@ -1017,7 +1017,7 @@ procedure{:quick}{:exportSpecs} ghash_incremental_bytes_stdcall_win(
         Pop(rdx, stack_b, 0);
         Store128_buffer(rdx, xmm1, 0, Secret, hash_b, 0);
 
-        // Restore registers                            
+        // Restore registers
         Mov64(r12, r10);
         PopXmm(xmm6, rax, stack_b, 1, old_xmm6);
         PopXmm(xmm11, rax, stack_b, 3, old_xmm11);

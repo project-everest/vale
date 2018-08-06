@@ -36,7 +36,7 @@ let round_key_256_rcon (prev0 prev1:quad32) (rcon:nat32) (round:int) : quad32 =
   let w2 = v2 *^ w1 in
   let w3 = v3 *^ w2 in
   Mkfour w0 w1 w2 w3
- 
+
 let round_key_256 (prev0 prev1:quad32) (round:nat) : quad32 =
   round_key_256_rcon prev0 prev1 (aes_rcon (round / 2 - 1)) round
 

@@ -4,7 +4,7 @@
 // See https://github.com/openssl/openssl/blob/master/crypto/poly1305/asm/poly1305-x86_64.pl
 // The original file contains the following notices:
 //
-// # ==================================================================== 
+// # ====================================================================
 // # Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
 // #
 // # Licensed under the OpenSSL license (the "License").  You may not use
@@ -17,7 +17,7 @@
 // # project. The module is, however, dual licensed under OpenSSL and
 // # CRYPTOGAMS licenses depending on where you obtain it. For further
 // # details see http://www.openssl.org/~appro/cryptogams/.
-// # ==================================================================== 
+// # ====================================================================
 //
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -179,7 +179,7 @@ procedure{:quick} poly1305_iteration(ghost r1:nat64) returns(ghost hh:int)
         rax == r1;
     ensures
         hh == (n * n) * h2 + n * h1 + h0;
-        modp(h * r) == modp(hh); 
+        modp(h * r) == modp(hh);
         h2 < 5;
 {
 //    Previous version used a forall statement, which isn't yet supported for F*
@@ -210,7 +210,7 @@ procedure{:quick} poly1305_blocks(
     ghost ctx_b:buffer64,
     ghost inp_b:buffer64)
     returns(ghost h:int)
-    lets 
+    lets
         ctx @= rdi; inp @= rsi; len @= rdx; padbit @= rcx; d1 @= r8; d2 @= r9; d3 @= r10;
         r0 @= r11; r1 @= r12; s1 @= r13; h0 @= r14; h1 @= rbx; h2 @= rbp;
         n:nat := pow2_64;
@@ -218,11 +218,11 @@ procedure{:quick} poly1305_blocks(
     reads
         ctx; padbit; memTaint;
     modifies
-        inp; len; d1; d2; d3; r0; r1; s1; h0; h1; h2; 
+        inp; len; d1; d2; d3; r0; r1; s1; h0; h1; h2;
         rax; r15;
         efl;
         mem;
-       
+
     requires
         // Len is measured in bytes
         len % 16 == 0; // REVIEW: may be stronger than necessary
@@ -287,10 +287,10 @@ procedure{:quick} poly1305_blocks(
     Add64(s1, r1); // s1 = r1 + (r1 >> 2)
 
     h := h_in;
-    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * (n * n), r, buffer64_as_seq(mem, inp_b), 0) by 
+    assert modp(h) == poly1305_heap_blocks(modp(h_in), padbit * (n * n), r, buffer64_as_seq(mem, inp_b), 0) by
     {
         reveal_opaque(modp');
-        reveal_poly1305_heap_blocks(modp(h_in), padbit * (n * n), r, buffer64_as_seq(mem, inp_b), 0); 
+        reveal_poly1305_heap_blocks(modp(h_in), padbit * (n * n), r, buffer64_as_seq(mem, inp_b), 0);
     }
 
     ghost var word_index:nat := 0;
@@ -317,7 +317,7 @@ procedure{:quick} poly1305_blocks(
             inp + 0 /* offset */ == buffer_addr(inp_b, mem) + 8 * word_index;
 
             r15 * 16 <= length;    // Not needed with Dafny version
-            padbit < 2;            // Not needed with Dafny version 
+            padbit < 2;            // Not needed with Dafny version
             validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
             validSrcAddrs64(mem, old(inp), inp_b, length/8, memTaint, Public);
             ctx == old(ctx); // REVIEW: framing should add this automatically
@@ -543,7 +543,7 @@ procedure{:quick} poly1305_impl(
         rax; rcx; rdx; rdi; rsi; rbx; rbp; r8; r9; r10; r11; r12; r13; r14; r15;
         efl;
         mem;
-       
+
     requires
         buffers_disjoint(ctx_b, inp_b);
         validSrcAddrs64(mem, ctx, ctx_b, 24, memTaint, Public);
@@ -607,7 +607,7 @@ procedure{:quick} poly1305_impl(
     Store64_buffer(ctx, rax, 56, Public, ctx_b, 7);
     Store64_buffer(ctx, len, 64, Public, ctx_b, 8);
 
-   
+
     Mov64(rcx, 1);
     h := poly1305_blocks(r, 0, ctx_b, inp_b);
     assert modp(0) == 0 by
@@ -623,7 +623,7 @@ procedure{:quick} poly1305_impl(
     assert h == lowerUpper192_opaque(lowerUpper128_opaque(h0, h1), h2)
         by { reveal_opaque(lowerUpper192); reveal_opaque(lowerUpper128); }
 
-    Load64_buffer(r15, ctx, 56, Public, ctx_b, 7); 
+    Load64_buffer(r15, ctx, 56, Public, ctx_b, 7);
     // assert r15 == len_in % 16;
     if (r15 != 0)
     {
@@ -702,7 +702,7 @@ procedure{:quick} poly1305(
         h0 == old(h0);
         r15 == old(r15);
 {
-    h := 0; 
+    h := 0;
     Mov64(rax, ctx);
     Mov64(r9, inp);
     inline if (win)

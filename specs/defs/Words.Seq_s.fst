@@ -23,7 +23,7 @@ let four_to_seq_LE #a x =
   lemma_seq_of_list_index l 0;
   lemma_seq_of_list_index l 1;
   lemma_seq_of_list_index l 2;
-  lemma_seq_of_list_index l 3;  
+  lemma_seq_of_list_index l 3;
   seq_of_list l
 
 let four_to_seq_BE #a x =
@@ -32,6 +32,6 @@ let four_to_seq_BE #a x =
   lemma_seq_of_list_index l 0;
   lemma_seq_of_list_index l 1;
   lemma_seq_of_list_index l 2;
-  lemma_seq_of_list_index l 3;  
+  lemma_seq_of_list_index l 3;
   seq_of_list l
 #reset-options

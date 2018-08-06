@@ -4,5 +4,5 @@ all:
 
 clean:
 	rm Main.native Interop_Printer.ml
-	rm -r _build/ 
+	rm -r _build/
 

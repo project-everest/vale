@@ -53,7 +53,7 @@ B.length stack_b == 80 /\ live h0 stack_b /\ buf_disjoint_from stack_b [h_b;hash
   va_pre (va_code_ghash_incremental_bytes_stdcall_win ()) s0 stack_b h_b hash_b input_b num_bytes ))) =
   assert (B.disjoint stack_b h_b);
   assert (B.disjoint stack_b hash_b);
-  assert (B.disjoint stack_b input_b);  
+  assert (B.disjoint stack_b input_b);
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) h_b;
   length_t_eq (TBase TUInt128) hash_b;
@@ -70,7 +70,7 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (h_b:s8) (has
   length_t_eq (TBase TUInt128) input_b;
   assert (Seq.equal
     (buffer128_as_seq (va_get_mem va_sM) input_b)
-    (buffer_to_seq_quad input_b va_s0.mem.hs));    
+    (buffer_to_seq_quad input_b va_s0.mem.hs));
   ()
 
 val ghost_ghash_incremental_bytes_stdcall_win: h_b:s8 -> hash_b:s8 -> input_b:s8 -> num_bytes:nat64 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 h_b hash_b input_b num_bytes /\ B.length stack_b == 80 /\ live h0 stack_b /\ buf_disjoint_from stack_b [h_b;hash_b;input_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 h_b hash_b input_b num_bytes  /\ M.modifies (M.loc_union (M.loc_buffer hash_b) (M.loc_buffer stack_b)) h0 h1})

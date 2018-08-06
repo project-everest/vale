@@ -12,14 +12,14 @@ open GCM_helpers_i
 open FStar.Math.Lemmas
 open Collections.Seqs_i
 
-let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE = 
+let make_gctr_plain_LE (p:seq nat8) : gctr_plain_LE =
   if 4096 * length p < pow2_32 then p else empty
 
 val gctr_encrypt_block_offset (icb_BE:quad32) (plain_LE:quad32) (alg:algorithm) (key:aes_key_LE alg) (i:int) :
   Lemma (gctr_encrypt_block icb_BE plain_LE alg key i ==
          gctr_encrypt_block (inc32 icb_BE i) plain_LE alg key 0)
 
-val gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algorithm) (key:aes_key_LE alg) : 
+val gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algorithm) (key:aes_key_LE alg) :
   Lemma (let plain = slice_work_around (le_seq_quad32_to_bytes plain_LE) 0 in
          let cipher = slice_work_around (le_seq_quad32_to_bytes cipher_LE) 0 in
          cipher = gctr_encrypt_LE icb_BE (make_gctr_plain_LE plain) alg key)
@@ -54,7 +54,7 @@ val gctr_partial_to_full_basic (icb_BE:quad32) (plain:seq quad32) (alg:algorithm
 open FStar.Seq.Properties
 
 val gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) : Lemma
-  (requires (1 <= num_bytes /\ 
+  (requires (1 <= num_bytes /\
              num_bytes < 16 * length plain /\
              16 * (length plain - 1) < num_bytes /\
              num_bytes % 16 <> 0 /\ 4096 * num_bytes < pow2_32 /\

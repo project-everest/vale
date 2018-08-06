@@ -50,7 +50,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
 
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (stack_b:buffer64)
 (plain_b:buffer128) (num_bytes:nat64) (iv_old:(quad32)) (iv_b:buffer128) (key:(aes_key_LE AES_128)) (keys_b:buffer128) (cipher_b:buffer128)  =
-    va_pre va_b0 va_s0 stack_b plain_b num_bytes iv_old iv_b key keys_b cipher_b /\ 
+    va_pre va_b0 va_s0 stack_b plain_b num_bytes iv_old iv_b key keys_b cipher_b /\
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)
     /\ (valid_taint_buf128 plain_b (va_get_mem va_sM) (va_get_memTaint va_sM) Secret) /\
     (valid_taint_buf128 iv_b (va_get_mem va_sM) (va_get_memTaint va_sM) Secret) /\

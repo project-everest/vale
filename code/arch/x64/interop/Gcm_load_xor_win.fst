@@ -70,7 +70,7 @@ B.length stack_b == 40 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
     | R9 -> offset
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in  
+  let va_s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) plain_b;
   length_t_eq (TBase TUInt128) mask_b;
@@ -83,7 +83,7 @@ B.length stack_b == 40 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;
     (buffer_to_seq_quad32 cipher_b va_s0.mem.hs));
   let mask128 = BV.mk_buffer_view mask_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) mask_b) (BV.as_seq va_s0.mem.hs mask128));
-  BV.as_seq_sel h0 mask128 0;  
+  BV.as_seq_sel h0 mask128 0;
   ()
 
 let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) (mask_b:s8) (cipher_b:s8) (offset:nat64) (num_blocks:Ghost.erased (nat64)) (key:Ghost.erased (aes_key_LE AES_128)) (iv:Ghost.erased (quad32))  (stack_b:b8) : Lemma
@@ -102,10 +102,10 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_b:s8) 
     (buffer_to_seq_quad32 cipher_b va_sM.mem.hs));
   assert (Seq.equal
     (buffer128_as_seq (va_get_mem va_sM) plain_b)
-    (buffer_to_seq_quad32 plain_b va_sM.mem.hs));    
+    (buffer_to_seq_quad32 plain_b va_sM.mem.hs));
   let mask128 = BV.mk_buffer_view mask_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) mask_b) (BV.as_seq va_s0.mem.hs mask128));
-  BV.as_seq_sel va_s0.mem.hs mask128 0;      
+  BV.as_seq_sel va_s0.mem.hs mask128 0;
   ()
 
 val ghost_gcm_load_xor_store_buffer_win: plain_b:s8 -> mask_b:s8 -> cipher_b:s8 -> offset:nat64 -> num_blocks:Ghost.erased (nat64) -> key:Ghost.erased (aes_key_LE AES_128) -> iv:Ghost.erased (quad32) ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_b mask_b cipher_b offset num_blocks key iv /\ B.length stack_b == 40 /\ live h0 stack_b /\ buf_disjoint_from stack_b [plain_b;mask_b;cipher_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_b mask_b cipher_b offset num_blocks key iv })

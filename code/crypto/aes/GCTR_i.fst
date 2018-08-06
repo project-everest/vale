@@ -37,23 +37,23 @@ let gctr_encrypt_empty (icb_BE:quad32) (plain_LE cipher_LE:seq quad32) (alg:algo
   ()
 
 (*
-let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) : 
+let rec seq_map_i_indexed' (#a:Type) (#b:Type) (f:int->a->b) (s:seq a) (i:int) :
   Tot (s':seq b { length s' == length s /\
                   (forall j . {:pattern index s' j} 0 <= j /\ j < length s ==> index s' j == f (i + j) (index s j))
-                }) 
+                })
       (decreases (length s))
   =
   if length s = 0 then empty
   else cons (f i (head s)) (seq_map_i_indexed f (tail s) (i + 1))
 
-let rec test (icb_BE:quad32) (plain_LE:gctr_plain_internal_LE) 
-	 (alg:algorithm) (key:aes_key_LE alg) (i:int) :
+let rec test (icb_BE:quad32) (plain_LE:gctr_plain_internal_LE)
+         (alg:algorithm) (key:aes_key_LE alg) (i:int) :
   Lemma (ensures
      (let gctr_encrypt_block_curried (j:int) (p:quad32) = gctr_encrypt_block icb_BE p alg key j in
-     
-      gctr_encrypt_recursive icb_BE plain_LE alg key i == seq_map_i_indexed' gctr_encrypt_block_curried plain_LE i)) 
+
+      gctr_encrypt_recursive icb_BE plain_LE alg key i == seq_map_i_indexed' gctr_encrypt_block_curried plain_LE i))
      (decreases (length plain_LE))
-  = 
+  =
   let gctr_encrypt_block_curried (j:int) (p:quad32) = gctr_encrypt_block icb_BE p alg key j in
   let g = gctr_encrypt_recursive icb_BE plain_LE alg key i in
   let s = seq_map_i_indexed' gctr_encrypt_block_curried plain_LE i in
@@ -89,19 +89,19 @@ let rec gctr_encrypt_length (icb_BE:quad32) (plain:gctr_plain_LE)
   if num_extra = 0 then (
     let plain_quads_LE = le_bytes_to_seq_quad32 plain in
     gctr_encrypt_recursive_length icb_BE plain_quads_LE alg key 0
-  ) else ( 
+  ) else (
     let full_bytes_len = (length plain) - num_extra in
     let full_blocks, final_block = split plain full_bytes_len in
-    
+
     let full_quads_LE = le_bytes_to_seq_quad32 full_blocks in
     let final_quad_LE = le_bytes_to_quad32 (pad_to_128_bits final_block) in
-    
+
     let cipher_quads_LE = gctr_encrypt_recursive icb_BE full_quads_LE alg key 0 in
     let final_cipher_quad_LE = gctr_encrypt_block icb_BE final_quad_LE alg key (full_bytes_len / 16) in
-    
+
     let cipher_bytes_full_LE = le_seq_quad32_to_bytes cipher_quads_LE in
     let final_cipher_bytes_LE = slice (le_quad32_to_bytes final_cipher_quad_LE) 0 num_extra in
-    
+
     gctr_encrypt_recursive_length icb_BE full_quads_LE alg key 0;
     assert (length result == length cipher_bytes_full_LE + length final_cipher_bytes_LE);
     assert (length cipher_quads_LE == length full_quads_LE);
@@ -170,13 +170,13 @@ Want to show that:
    ==
    gctr_encrypt_LE icb_BE (slice (le_seq_quad32_to_bytes (buffer128_as_seq(mem, in_b))) 0 num_bytes) ...
 
-We know that 
+We know that
    slice (buffer128_as_seq(mem, out_b) 0 num_blocks
    ==
    gctr_encrypt_recursive icb_BE (slice buffer128_as_seq(mem, in_b) 0 num_blocks) ...
 
 And we know that:
-  get_mem out_b num_blocks 
+  get_mem out_b num_blocks
   ==
   gctr_encrypt_block(icb_BE, (get_mem inb num_blocks), alg, key, num_blocks);
 
@@ -186,7 +186,7 @@ Internally gctr_encrypt_LE will compute:
 
   We'd like to show that
   Step1:  le_bytes_to_seq_quad32 full_blocks == slice buffer128_as_seq(mem, in_b) 0 num_blocks
-    and 
+    and
   Step2:  final_block == slice (le_quad32_to_bytes (get_mem inb num_blocks)) 0 num_extra
 
   Then we need to break down the byte-level effects of gctr_encrypt_block to show that even though the
@@ -522,11 +522,11 @@ let lemma_slices_le_quad32_to_bytes (q:quad32) : Lemma
 let quad32_xor_bytewise (q q' r:quad32) (n:nat{ n <= 16 }) : Lemma
   (requires (let q_bytes  = le_quad32_to_bytes q in
              let q'_bytes = le_quad32_to_bytes q' in
-             slice q_bytes 0 n == slice q'_bytes 0 n))             
+             slice q_bytes 0 n == slice q'_bytes 0 n))
   (ensures (let q_bytes  = le_quad32_to_bytes q in
             let q'_bytes = le_quad32_to_bytes q' in
-            let qr_bytes  = le_quad32_to_bytes (quad32_xor q r) in 
-            let q'r_bytes = le_quad32_to_bytes (quad32_xor q' r) in                      
+            let qr_bytes  = le_quad32_to_bytes (quad32_xor q r) in
+            let q'r_bytes = le_quad32_to_bytes (quad32_xor q' r) in
             slice qr_bytes 0 n == slice q'r_bytes 0 n))
   =
   let s = le_quad32_to_bytes q in
@@ -572,19 +572,19 @@ let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:qua
         let q_cipher_bytes = slice (le_quad32_to_bytes q_cipher) 0 (length s) in
         let s_quad = le_bytes_to_quad32 (pad_to_128_bits s) in
         let s_cipher = gctr_encrypt_block icb_BE s_quad alg key i in
-        let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in       
+        let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in
         s == q_bytes_prefix ==> s_cipher_bytes == q_cipher_bytes)
-  = 
+  =
   let q_bytes = le_quad32_to_bytes q in
   let q_bytes_prefix = slice q_bytes 0 (length s) in
   let q_cipher = gctr_encrypt_block icb_BE q alg key i in
   let q_cipher_bytes = slice (le_quad32_to_bytes q_cipher) 0 (length s) in
   let s_quad = le_bytes_to_quad32 (pad_to_128_bits s) in
   let s_cipher = gctr_encrypt_block icb_BE s_quad alg key i in
-  let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in 
+  let s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s) in
   let enc_ctr = aes_encrypt_LE alg key (reverse_bytes_quad32 (inc32 icb_BE i)) in
   let icb_LE = reverse_bytes_quad32 (inc32 icb_BE i) in
-  
+
   if s = q_bytes_prefix then (
      //  s_cipher_bytes = slice (le_quad32_to_bytes s_cipher) 0 (length s)
      //                 = slice (le_quad32_to_bytes (gctr_encrypt_block icb_BE s_quad alg key i)) 0 (length s)
@@ -600,7 +600,7 @@ let step2 (s:seq nat8 {  0 < length s /\ length s < 16 }) (q:quad32) (icb_BE:qua
     ();
   ()
 
-#reset-options "--z3rlimit 30" 
+#reset-options "--z3rlimit 30"
 open FStar.Seq.Properties
 
 let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq quad32) (alg:algorithm) (key:aes_key_LE alg) (num_bytes:nat) =
@@ -646,7 +646,7 @@ let gctr_partial_to_full_advanced (icb_BE:quad32) (plain:seq quad32) (cipher:seq
   assert (slice (slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) (length cipher * 16)) 0 num_extra ==
           slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes);
   slice_append_adds (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes;
-  assert (slice (le_seq_quad32_to_bytes cipher) 0 (num_blocks * 16) @| 
+  assert (slice (le_seq_quad32_to_bytes cipher) 0 (num_blocks * 16) @|
           slice (le_seq_quad32_to_bytes cipher) (num_blocks * 16) num_bytes ==
           slice (le_seq_quad32_to_bytes cipher) 0 num_bytes);
   assert (cipher_bytes == (le_seq_quad32_to_bytes (slice cipher 0 num_blocks)) @| slice (le_quad32_to_bytes (index cipher num_blocks)) 0 num_extra);
@@ -663,11 +663,11 @@ let gctr_encrypt_one_block (icb_BE plain:quad32) (alg:algorithm) (key:aes_key_LE
   assert (length p == 16);
   le_bytes_to_seq_quad32_to_bytes_one_quad plain;
   assert (p_seq == plain_quads_LE);
-  let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in  
+  let cipher_quads_LE = gctr_encrypt_recursive icb_BE plain_quads_LE alg key 0 in
   assert (cipher_quads_LE == cons (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0) (gctr_encrypt_recursive icb_BE (tail plain_quads_LE) alg key (1)));
   assert (head plain_quads_LE == plain);
 
-  assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 == 
+  assert (gctr_encrypt_block icb_BE (head plain_quads_LE) alg key 0 ==
           (let icb_LE = reverse_bytes_quad32 (inc32 icb_BE 0) in
            quad32_xor (head plain_quads_LE) (aes_encrypt_LE alg key icb_LE)));
   assert (quad32_xor plain (aes_encrypt_LE alg key (reverse_bytes_quad32 icb_BE))

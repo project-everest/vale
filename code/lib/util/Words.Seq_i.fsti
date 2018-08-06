@@ -39,7 +39,7 @@ val four_to_seq_to_four_BE (#a:Type) (x:seq4 a) :
 val seq_to_four_to_seq_BE (#a:Type) (x:four a) :
   Lemma (seq_to_four_BE (four_to_seq_BE x) == x)
 
-val four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) : 
+val four_to_seq_LE_is_seq_four_to_seq_LE(#a:Type) (x:four a) :
   Lemma (four_to_seq_LE x == seq_four_to_seq_LE (create 1 x))
 
 val seq_nat8_to_seq_nat32_to_seq_nat8_LE (x:seq nat32) :
@@ -59,14 +59,14 @@ val four_to_seq_LE_injective (a:eqtype) :
 val seq_to_seq_four_LE_injective: unit ->
   Lemma (forall (#a:Type) (x:seq a{length x % 4 == 0}) (x':seq a{length x' % 4 == 0}) . seq_to_seq_four_LE x == seq_to_seq_four_LE x' ==> x == x')
 *)
-val four_to_nat_8_injective: unit -> 
+val four_to_nat_8_injective: unit ->
   Lemma (forall (x x':four (natN (pow2_norm 8))) . four_to_nat 8 x == four_to_nat 8 x' ==> x == x')
-  
-val nat_to_four_8_injective: unit -> 
+
+val nat_to_four_8_injective: unit ->
   Lemma (forall (x x':natN (pow2_norm 32)) . nat_to_four 8 x == nat_to_four 8 x' ==> x == x')
 (*
 val seq_to_four_LE_injective: unit ->
-  Lemma (forall (#a:Type) (x x':seq4 a) . seq_to_four_LE x == seq_to_four_LE x' ==> x == x') 
+  Lemma (forall (#a:Type) (x x':seq4 a) . seq_to_four_LE x == seq_to_four_LE x' ==> x == x')
 *)
 
 val append_distributes_seq_to_seq_four_LE (#a:Type) (x:seq a{length x % 4 == 0}) (y:seq a{length y % 4 == 0}) :

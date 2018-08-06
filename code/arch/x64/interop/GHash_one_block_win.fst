@@ -67,14 +67,14 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (h_b:s8) (has
   length_t_eq (TBase TUInt128) input_b;
   let h128_b = BV.mk_buffer_view h_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) h_b) (BV.as_seq va_s0.mem.hs h128_b));
-  BV.as_seq_sel va_s0.mem.hs h128_b 0;  
+  BV.as_seq_sel va_s0.mem.hs h128_b 0;
   let hash128_b = BV.mk_buffer_view hash_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) hash_b) (BV.as_seq va_s0.mem.hs hash128_b));
-  BV.as_seq_sel va_s0.mem.hs hash128_b 0;  
+  BV.as_seq_sel va_s0.mem.hs hash128_b 0;
   let hash128_b = BV.mk_buffer_view hash_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) hash_b) (BV.as_seq va_sM.mem.hs hash128_b));
-  BV.as_seq_sel va_sM.mem.hs hash128_b 0;  
-  assert (Seq.equal (buffer_to_seq_quad32 input_b va_s0.mem.hs) (buffer128_as_seq (va_get_mem va_s0) input_b));     
+  BV.as_seq_sel va_sM.mem.hs hash128_b 0;
+  assert (Seq.equal (buffer_to_seq_quad32 input_b va_s0.mem.hs) (buffer128_as_seq (va_get_mem va_s0) input_b));
   ()
 
 val ghost_ghash_incremental_one_block_buffer_win: h_b:s8 -> hash_b:s8 -> input_b:s8 -> offset:nat64 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 h_b hash_b input_b offset /\ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [h_b;hash_b;input_b]}) -> GTot (h1:HS.mem{partial_post_cond h0 h1 h_b hash_b input_b offset  /\ M.modifies (M.loc_union (M.loc_buffer hash_b) (M.loc_buffer stack_b)) h0 h1})

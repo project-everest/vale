@@ -109,7 +109,7 @@ procedure{:quick} KeyExpansion128Stdcall(
         key_expansion_ptr := if win then rdx else rsi;
         key := quad32_to_seq(buffer128_read(input_key_b, 0, mem));
     requires/ensures
-        buffers_disjoint128(input_key_b, output_key_expansion_b); 
+        buffers_disjoint128(input_key_b, output_key_expansion_b);
         validSrcAddrs128(mem, key_ptr, input_key_b, 1, memTaint, Secret);
         validDstAddrs128(mem, key_expansion_ptr, output_key_expansion_b, 11, memTaint, Secret);
     ensures
@@ -290,7 +290,7 @@ procedure KeyInversionRound(
 //        EqInvkey_expansion_partial(key, AES_128, dw_in, round);
 //        forall j :: 0 <= j <= round ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_in[4*j], dw_in[4*j+1], dw_in[4*j+2], dw_in[4*j+3]);
 //        forall j :: round < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
-    reads 
+    reads
         rdx;
     modifies
         mem; xmm1; efl;
@@ -344,7 +344,7 @@ procedure {:recursive} KeyInversionRoundUnrolledRecursive(
 //        mem[k_b].quads[rdx+16*0].v == Quadword(dw_in[4*0], dw_in[4*0+1], dw_in[4*0+2], dw_in[4*0+3]);
 //        forall j :: 0 <= j <= 0 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(dw_in[4*j], dw_in[4*j+1], dw_in[4*j+2], dw_in[4*j+3]);
 //        forall j :: 0 < j <= 10 ==> mem[k_b].quads[rdx + 16*j].v == Quadword(w[4*j], w[4*j+1], w[4*j+2], w[4*j+3]);
-    reads 
+    reads
         rdx;
     modifies
         mem; xmm1; efl;

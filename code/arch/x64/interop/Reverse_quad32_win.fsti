@@ -50,5 +50,5 @@ let post_cond (h:HS.mem) (h':HS.mem) (b:s8) = length b == 16 /\
      new_b == reverse_bytes_quad32 old_b)
 
 val reverse_bytes_quad32_buffer_win: b:s8 -> Stack unit
-	(requires (fun h -> pre_cond h b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 b ))
+        (requires (fun h -> pre_cond h b ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 b ))

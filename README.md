@@ -26,9 +26,9 @@ See the [documentation](./doc/compilation.txt) for commands necessary to extract
 
 You can also see our academic paper describing Vale:
 
-> [Vale: Verifying High-Performance Cryptographic Assembly Code](https://project-everest.github.io/assets/vale2017.pdf)  
-> Barry Bond, Chris Hawblitzel, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch, Bryan Parno, Ashay Rane, Srinath Setty, Laure Thompson.  
-> In Proceedings of the USENIX Security Symposium, 2017.  
+> [Vale: Verifying High-Performance Cryptographic Assembly Code](https://project-everest.github.io/assets/vale2017.pdf)
+> Barry Bond, Chris Hawblitzel, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch, Bryan Parno, Ashay Rane, Srinath Setty, Laure Thompson.
+> In Proceedings of the USENIX Security Symposium, 2017.
 > Distinguished Paper Award
 
 # License
@@ -36,7 +36,7 @@ You can also see our academic paper describing Vale:
 Our Vale code is licensed under the Apache license in the [LICENSE](./LICENSE) file.
 
 # Version History
-- v0.2: Vale/F* code release. 
+- v0.2: Vale/F* code release.
 - v0.1: Initial code release, containing code written by:
 Andrew Baumann, Barry Bond, Andrew Ferraiuolo, Chris Hawblitzel,
 Jon Howell, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch,

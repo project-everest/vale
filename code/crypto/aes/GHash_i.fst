@@ -13,7 +13,7 @@ open Collections.Seqs_i
 open FStar.Seq
 
 #reset-options "--use_two_phase_tc true"
-let rec ghash_incremental_def (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) = 
+let rec ghash_incremental_def (h_LE:quad32) (y_prev:quad32) (x:ghash_plain_LE) : Tot quad32 (decreases %[length x]) =
   let y_i_minus_1 =
     (if length x = 1 then
        y_prev
@@ -34,12 +34,12 @@ let rec ghash_incremental_to_ghash (h:quad32) (x:ghash_plain_LE) :
   if length x = 1 then ()
   else ghash_incremental_to_ghash h (all_but_last x)
 
-let rec lemma_hash_append (h:quad32) (y_prev:quad32) (a b:ghash_plain_LE) : 
-  Lemma(ensures 
-        ghash_incremental h y_prev (append a b) == 
-	(let y_a = ghash_incremental h y_prev a in
-	 ghash_incremental h y_a b))
-	(decreases %[length b])
+let rec lemma_hash_append (h:quad32) (y_prev:quad32) (a b:ghash_plain_LE) :
+  Lemma(ensures
+        ghash_incremental h y_prev (append a b) ==
+        (let y_a = ghash_incremental h y_prev a in
+         ghash_incremental h y_a b))
+        (decreases %[length b])
   =
   reveal_opaque ghash_incremental_def;
   let ab = append a b in
@@ -48,12 +48,12 @@ let rec lemma_hash_append (h:quad32) (y_prev:quad32) (a b:ghash_plain_LE) :
     (lemma_slice_first_exactly_in_append a b;
      assert (all_but_last ab == a);
      ())
-  else 
+  else
     lemma_hash_append h y_prev a (all_but_last b);
     lemma_all_but_last_append a b;
     assert(all_but_last ab == append a (all_but_last b));
   ()
-   
+
 let ghash_incremental0 (h:quad32) (y_prev:quad32) (x:seq quad32) : quad32 =
   if length x > 0 then ghash_incremental h y_prev x else y_prev
 
@@ -103,7 +103,7 @@ let lemma_hash_append3 (h y_init y_mid1 y_mid2 y_final:quad32) (s1 s2 s3:seq qua
 #reset-options "--z3rlimit 30"
 open FStar.Mul
 let lemma_ghash_incremental_bytes_extra_helper (h y_init y_mid y_final:quad32) (input:seq quad32) (final final_padded:quad32) (num_bytes:nat) : Lemma
-  (requires (1 <= num_bytes /\ 
+  (requires (1 <= num_bytes /\
              num_bytes < 16 * length input /\
              16 * (length input - 1) < num_bytes /\
              num_bytes % 16 <> 0 /\ //4096 * num_bytes < pow2_32 /\
@@ -148,5 +148,5 @@ let lemma_ghash_incremental_bytes_extra_helper (h y_init y_mid y_final:quad32) (
   assert (input_quads == full_blocks @| (le_bytes_to_seq_quad32 padded_bytes));
   le_bytes_to_seq_quad_of_singleton final_padded padded_bytes;
   assert (input_quads == full_blocks @| (create 1 final_padded));
-  
+
   ()

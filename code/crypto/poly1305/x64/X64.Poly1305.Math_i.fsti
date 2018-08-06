@@ -43,7 +43,7 @@ val lemma_poly_multiply : n:int -> p:int -> r:int -> h:int -> r0:int -> r1:int -
     d1 == h0 * r1 + h1 * r0 + h2 * s1 /\
     d2 == h2 * r0 /\
     hh == d2 * (n * n) + d1 * n + d0)
-	(ensures (h * r) % p == hh % p)
+        (ensures (h * r) % p == hh % p)
 
 // p used to be a refinement to p > 0 and h a nat.
 val lemma_poly_reduce : n:int -> p:int -> h:int -> h2:int -> h10:int -> c:int -> hh:int -> Lemma
@@ -74,35 +74,35 @@ val lemma_poly_bits64 : u:unit -> Lemma
     (forall (x:nat64)  (y:nat64) . (logand64 x y) == (logand64 y x)))
 
 val lemma_mul_strict_upper_bound : x:int -> x_bound:int -> y:int -> y_bound:int -> Lemma
-  (requires 
+  (requires
     0 <= x /\ x < x_bound /\
     0 <= y /\ y < y_bound)
   (ensures x * y < x_bound * y_bound)
 
 val lemma_bytes_shift_power2 : y:nat64 -> Lemma
   (requires y < 8)
-  (ensures 
+  (ensures
     shift_left64 y 3 < 64 /\
     shift_left64 y 3 == y * 8 /\
     pow2 (shift_left64 y 3) == shift_left64 1 (shift_left64 y 3))
-    
+
 val lemma_bytes_and_mod : x:nat64 -> y:nat64 -> Lemma
   (requires y < 8)
-  (ensures 
+  (ensures
     shift_left64 y 3 < 64 /\
     (let z = shift_left64 1 (shift_left64 y 3) in
      z <> 0 /\ logand64 x (z-1) == x % z))
 
 val lemma_mod_power2_lo : x0:nat64 -> x1:nat64 -> y:int -> z:int -> Lemma
-  (requires 
+  (requires
     0 <= y /\ y < 8 /\
     z == pow2 (y * 8))
-  (ensures 
+  (ensures
     z > 0 /\
-    0 <= x0 % z /\ 
+    0 <= x0 % z /\
     x0 % z < 0x10000000000000000 /\
     (lowerUpper128_opaque x0 x1) % z == (lowerUpper128_opaque (x0 % z) 0))
-    
+
 val lemma_power2_add64 : n:nat -> Lemma
   (requires True)
   (ensures pow2(64 + n) == 0x10000000000000000 * pow2(n))
@@ -141,7 +141,7 @@ val lemma_lowerUpper128_and : x:nat128 -> x0:nat64 -> x1:nat64 -> y:nat128 -> y0
             y == lowerUpper128_opaque y0 y1 /\
             z == lowerUpper128_opaque z0 z1)
   (ensures z == logand128 x y)
-  
+
 val lemma_add_mod128 (x y :int) : Lemma
   (requires True)
   (ensures mod2_128 ((mod2_128 x) + y) == mod2_128 (x + y))
@@ -153,5 +153,5 @@ let modp_0 () : Lemma
     reveal_opaque modp';
     ()
 
-let bare_r (key_r:nat128) : nat128 = iand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff 
+let bare_r (key_r:nat128) : nat128 = iand key_r 0x0ffffffc0ffffffc0ffffffc0fffffff
 

@@ -35,7 +35,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     input_b (va_get_mem va_s0)) /\ (va_get_reg R9 va_s0) == offset /\ (buffer_length input_b) >=
     offset + 1 /\ (buffer_length h_b) >= 1 /\ (buffer_length hash_b) >= 1 /\ (buffer_addr input_b
     (va_get_mem va_s0)) + offset `op_Multiply` 16 < pow2_64)
-    
+
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (stack_b:buffer64)
 (h_b:buffer128) (hash_b:buffer128) (input_b:buffer128) (offset:nat64)  =
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)

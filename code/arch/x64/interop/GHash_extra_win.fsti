@@ -61,11 +61,11 @@ let buffer_to_seq_quad32 (b:s8 { B.length b % 16 == 0 }) (h:HS.mem) : GTot (s:Se
 open FStar.Mul
 
 let pre_cond (h:HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_hash:Ghost.erased (quad32)) = live h in_b /\ live h hash_b /\ live h h_b /\ bufs_disjoint [in_b;hash_b;h_b] /\ length in_b % 16 == 0 /\ length hash_b % 16 == 0 /\ length h_b % 16 == 0 /\
-   ( let mods = M.loc_buffer hash_b in 
-    B.live h in_b /\ B.live h hash_b /\ B.live h h_b /\ 
+   ( let mods = M.loc_buffer hash_b in
+    B.live h in_b /\ B.live h hash_b /\ B.live h h_b /\
     M.loc_disjoint (M.loc_buffer in_b) mods /\
     M.loc_disjoint (M.loc_buffer h_b)  mods /\
-    
+
     B.length in_b  == bytes_to_quad_size num_bytes * 16 /\
     B.length in_b % 16 == 0 /\
 
@@ -74,8 +74,8 @@ let pre_cond (h:HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_h
 
     4096 * num_bytes < pow2_32 /\
     256 * bytes_to_quad_size num_bytes < pow2_32 /\
-    
-    (let num_blocks = num_bytes / 16 in    
+
+    (let num_blocks = num_bytes / 16 in
      let old_hash = buffer_to_quad32 hash_b h in
      //let new_hash = buffer_to_quad32 hash_b h' in
      let h_val = buffer_to_quad32 h_b h in
@@ -83,9 +83,9 @@ let pre_cond (h:HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_h
      // GHash reqs
      let input = Seq.slice (buffer_to_seq_quad32 in_b h) 0 num_blocks in
      old_hash == ghash_incremental0 h_val (Ghost.reveal orig_hash) input /\
-     
+
      // Extra reqs
-     num_bytes % 16 <> 0 /\ 
+     num_bytes % 16 <> 0 /\
      0 < num_bytes /\ num_bytes < 16 * bytes_to_quad_size num_bytes /\
      16 * (bytes_to_quad_size num_bytes - 1) < num_bytes /\
 
@@ -107,15 +107,15 @@ let post_cond (h:HS.mem) (h':HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:n
      let input_bytes = Seq.slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32 in_b h')) 0 num_bytes in
      let padded_bytes = pad_to_128_bits input_bytes in
      let input_quads = le_bytes_to_seq_quad32 padded_bytes in
-     (num_bytes > 0 ==> Seq.length input_quads > 0 /\ 
+     (num_bytes > 0 ==> Seq.length input_quads > 0 /\
                        new_hash == ghash_incremental h_val (Ghost.reveal orig_hash) input_quads)
     )
-  ) 
+  )
 
-let full_post_cond (h:HS.mem) (h':HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_hash:Ghost.erased (quad32)) = 
+let full_post_cond (h:HS.mem) (h':HS.mem) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_hash:Ghost.erased (quad32)) =
     let mods = M.loc_buffer hash_b in
     M.modifies mods h h' /\ post_cond h h' in_b hash_b h_b num_bytes orig_hash
 
 val ghash_incremental_extra_stdcall_win: in_b:s8 -> hash_b:s8 -> h_b:s8 -> num_bytes:UInt64.t -> orig_hash:Ghost.erased (quad32) -> Stack unit
-	(requires (fun h -> pre_cond h in_b hash_b h_b (UInt64.v num_bytes) orig_hash ))
-	(ensures (fun h0 _ h1 -> full_post_cond h0 h1 in_b hash_b h_b (UInt64.v num_bytes) orig_hash ))
+        (requires (fun h -> pre_cond h in_b hash_b h_b (UInt64.v num_bytes) orig_hash ))
+        (ensures (fun h0 _ h1 -> full_post_cond h0 h1 in_b hash_b h_b (UInt64.v num_bytes) orig_hash ))

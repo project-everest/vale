@@ -45,7 +45,7 @@ let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem
   assert (BV.length b128 > 0);
   BV.sel h b128 0
 
-let pre_cond (h:HS.mem) (iv_b:s8) =     
+let pre_cond (h:HS.mem) (iv_b:s8) =
     B.live h iv_b /\
     B.length iv_b == 16
 
@@ -57,5 +57,5 @@ let post_cond (h:HS.mem) (h':HS.mem) (iv_b:s8) =
      new_iv == inc32 old_iv 1)
 
 val inc32_buffer_win: iv_b:s8 -> Stack unit
-	(requires (fun h -> pre_cond h iv_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 iv_b ))
+        (requires (fun h -> pre_cond h iv_b ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 iv_b ))

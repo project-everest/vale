@@ -43,7 +43,7 @@ type operand =
 type imm8 = i:int { 0 <= i && i < 256}
 type xmm = i:int{ 0 <= i /\ i < 16 }
 
-type mov128_op =   
+type mov128_op =
   | Mov128Xmm: x:xmm -> mov128_op
   | Mov128Mem: m:maddr -> mov128_op
 

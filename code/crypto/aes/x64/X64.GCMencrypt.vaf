@@ -103,7 +103,7 @@ procedure {:quick} gcm_one_pass_blocks(
         icb == inc32(old(icb), old(len));
 
         // GHash
-        len == 0 ==> hash == old(hash); 
+        len == 0 ==> hash == old(hash);
         len > 0 ==> length(buffer128_as_seq(mem, out_b)) > 0 /\ hash == ghash_incremental(h, old(hash), slice_work_around(buffer128_as_seq(mem, out_b), len));
 {
     Mov64(rdx, 0);
@@ -121,7 +121,7 @@ procedure {:quick} gcm_one_pass_blocks(
             r9 == in_ptr + 16 * rdx;
             r10 == out_ptr + 16 * rdx;
             icb == inc32(old(icb), rdx);
-            
+
             //////////////////// From requires //////////////////////
             // GCTR reqs
             buffers_disjoint128(in_b, out_b);
@@ -130,7 +130,7 @@ procedure {:quick} gcm_one_pass_blocks(
             validDstAddrs128(mem, out_ptr, out_b, len, memTaint, Secret);
             in_ptr  + 16 * len < pow2_64;
             out_ptr + 16 * len < pow2_64;
-            buffer_length(in_b) == buffer_length(out_b); 
+            buffer_length(in_b) == buffer_length(out_b);
 
             // AES reqs
             alg = AES_128 || alg = AES_256;
@@ -151,8 +151,8 @@ procedure {:quick} gcm_one_pass_blocks(
             rdx == 0 ==> hash == old(hash);
             rdx > 0 ==> hash == ghash_incremental(h, old(hash), slice_work_around(buffer128_as_seq(mem, out_b), rdx));
 
-//            forall j :: 0 <= j < rdx ==> 
-//                        buffer128_read(out_b, j, mem) == 
+//            forall j :: 0 <= j < rdx ==>
+//                        buffer128_read(out_b, j, mem) ==
 //                        quad32_xor(index_workaround(buffer128_as_seq(mem, in_b), j), aes_encrypt_LE(alg, key, inc32(old(icb), j)));
 
         decreases
@@ -179,7 +179,7 @@ procedure {:quick} gcm_one_pass_blocks(
 //    assert length(buffer128_as_seq(mem, in_b)) == length(buffer128_as_seq(mem, out_b));
 //    assert 256 * length(buffer128_as_seq(mem, in_b)) < pow2_32;
 //    assert gctr_partial(alg, length(buffer128_as_seq(mem, out_b)), buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
-//    
+//
 
 //// Call a helpful lemma
 //    gctr_partial_completed(alg, buffer128_as_seq(mem, in_b), buffer128_as_seq(mem, out_b), key, old(icb));
@@ -238,11 +238,11 @@ procedure {:quick} gcm_one_pass(
         icb.hi3 == old(icb.hi3);
 
         // GHash
-        old(num_bytes) == 0 ==> hash == old(hash); 
+        old(num_bytes) == 0 ==> hash == old(hash);
 
         let cipher_padded_bytes := pad_to_128_bits(cipher);
         let cipher_padded_quads := le_bytes_to_seq_quad32(cipher_padded_bytes);
-        old(num_bytes) > 0 ==> length(cipher_padded_quads) > 0 /\ 
+        old(num_bytes) > 0 ==> length(cipher_padded_quads) > 0 /\
             hash == ghash_incremental(h, old(hash), cipher_padded_quads);
 {
     if (num_bytes > 0) {
@@ -274,10 +274,10 @@ procedure {:quick} gcm_one_pass(
             Mov128(hash, xmm3);
             // TODO: Can optimize here by skipping the memory load in ghash_incremental_bytes_extra
             //       and reading from xmm1 directly.  It's probably still in cache though
-            ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes)); 
+            ghash_incremental_bytes_extra(out_b, old(out_ptr), old(hash), old(num_bytes));
 //            assert buffer128_as_seq(old(mem),  in_b) == buffer128_as_seq(mem,  in_b);       // OBSERVE
         }
-    } 
+    }
 
     // Handle the else case:
     ghost var plain  := buffer128_as_seq(old(mem),  in_b);
@@ -312,8 +312,8 @@ procedure {:quick} gcm_core_part1(
 
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
-        xmm6; 
-        mem; efl; 
+        xmm6;
+        mem; efl;
 
 
     requires
@@ -355,10 +355,10 @@ procedure {:quick} gcm_core_part1(
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
 //        // TODO: First two clauses work around Vale's type limitations
-        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(plain) < pow2_32 /\
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
-        
+
         // Intermediate hash state needed for the next step
         let auth_padded_bytes := pad_to_128_bits(auth);
         let auth_padded_quads := le_bytes_to_seq_quad32(auth_padded_bytes);
@@ -477,7 +477,7 @@ procedure {:quick} gcm_make_length_quad_buffer(
 
         modifies_buffer128(b, old(mem), mem);
         buffer128_read(b, 0, mem) == reverse_bytes_quad32(Mkfour(8 * plain_num_bytes, 0, 8 * auth_num_bytes, 0));
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; rsi; rdi; rbp; rsp; r8; r9; r10; r11; r12; r13; r14; r15;
         xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
@@ -526,7 +526,7 @@ procedure {:quick} gcm_make_length_quad_buffer_win(ghost stack_b:buffer64, ghost
 
         buffer_length(b) == 1;
         plain_num_bytes * 8 < pow2_32;
-        auth_num_bytes * 8 < pow2_32;        
+        auth_num_bytes * 8 < pow2_32;
     ensures
         rbx == old(rbx);
         rbp == old(rbp);
@@ -597,8 +597,8 @@ procedure {:quick} gcm_core(
 
     modifies
         rax; rcx; rdx; rsi; r9; r10; r12; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm10; xmm11; iv; mask;
-        xmm6; 
-        mem; efl; 
+        xmm6;
+        mem; efl;
 
 
     requires
@@ -639,7 +639,7 @@ procedure {:quick} gcm_core(
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
 //        // TODO: First two clauses work around Vale's type limitations
-        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(plain) < pow2_32 /\
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
         le_quad32_to_bytes(xmm1) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
@@ -661,14 +661,14 @@ procedure {:quick} gcm_core(
     lemma_hash_append3(h, y_0, y_auth, y_cipher, y_final,
                        auth_padded_quads, //buffer128_as_seq(mem, auth_b),
                        cipher_padded_quads, //buffer128_as_seq(mem, out_b),
-                       create(1, length_quad32)); 
+                       create(1, length_quad32));
 
 
     PinsrdImm(iv, 1, 0, r12);   // Reconstruct j0 (this is all we need, since gctr_core says it only changes iv.lo0)
 //    assert iv == iv_BE.(lo0 := 1);
 
     // Encrypt the hash value with gctr_register; result goes in xmm1
-    gctr_register(alg, key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value 
+    gctr_register(alg, key, round_keys, keys_b); // Encrypt using j0 and xmm0 = hash_value
 
     ghost var plain  := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(old(mem), plain_b)), old(plain_num_bytes));
 
@@ -690,7 +690,7 @@ procedure {:quick} gcm_core(
 
 #reset-options "--z3rlimit 30"
 procedure {:quick} callee_save_registers(inline win:bool, ghost stack_b:buffer64)
-    requires 
+    requires
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
     reads rbx; rbp; rdi; rsi; r12; r13; r14; r15; xmm6; xmm7; xmm8; xmm10; xmm11; memTaint;
@@ -747,7 +747,7 @@ procedure {:quick} callee_restore_registers(
         ghost old_xmm10:quad32,
         ghost old_xmm11:quad32
         )
-    requires 
+    requires
         valid_stack_slots(mem, rsp + (if win then 144 else 64), stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 
@@ -761,9 +761,9 @@ procedure {:quick} callee_restore_registers(
         win ==> hi64(old_xmm7)  == buffer64_read(stack_b, 10, mem);
         win ==> lo64(old_xmm6)  == buffer64_read(stack_b, 9, mem);
         win ==> hi64(old_xmm6)  == buffer64_read(stack_b, 8, mem);
-    reads mem; memTaint; 
-    modifies  
-        rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15; 
+    reads mem; memTaint;
+    modifies
+        rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15;
         xmm6; xmm7; xmm8; xmm10; xmm11;
         rsp;
     ensures
@@ -781,7 +781,7 @@ procedure {:quick} callee_restore_registers(
         win ==> xmm8  == old_xmm8;
         win ==> xmm10 == old_xmm10;
         win ==> xmm11 == old_xmm11;
-        
+
         valid_stack_slots(mem, rsp, stack_b, if win then 18 else 8, memTaint);
         valid_taint_buf64(stack_b, mem, memTaint, Public);
 {
@@ -819,10 +819,10 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    reads memTaint; 
+    reads memTaint;
     modifies
-        rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        mem; efl; 
+        rax; rbx; rcx; rdx; rsi; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11;
+        mem; efl;
     lets
         args_ptr := r9;
 
@@ -842,7 +842,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
-        
+
         validSrcAddrs128(mem, plain_ptr, plain_b, bytes_to_quad_size(plain_num_bytes), memTaint, Secret);
         validSrcAddrs128(mem, auth_ptr, auth_b, bytes_to_quad_size(auth_num_bytes), memTaint, Secret);
         validSrcAddrs128(mem, iv_ptr, iv_b, 1, memTaint, Secret);
@@ -883,7 +883,7 @@ procedure {:quick} gcm_encrypt_stdcall_inner(
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
 //        // TODO: First two clauses work around Vale's type limitations
-        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(plain) < pow2_32 /\
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
         le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
@@ -924,10 +924,10 @@ procedure {:quick} gcm_encrypt_stdcall(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    reads memTaint; 
+    reads memTaint;
     modifies
-        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11; 
-        rbp; rdi; rsi; 
+        rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm10; xmm11;
+        rbp; rdi; rsi;
         mem; efl; rsp;
     lets
         args_ptr := if win then rcx else rdi;
@@ -948,7 +948,7 @@ procedure {:quick} gcm_encrypt_stdcall(
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
-        
+
         buffers_disjoint(args_b, stack_b);
 
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(plain_b)));
@@ -1001,7 +1001,7 @@ procedure {:quick} gcm_encrypt_stdcall(
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
 //        // TODO: First two clauses work around Vale's type limitations
-        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(plain) < pow2_32 /\
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
         le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
@@ -1065,10 +1065,10 @@ procedure {:quick} gcm_encrypt2_stdcall(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    reads memTaint; 
+    reads memTaint;
     modifies
         rax; rbx; rcx; rdx; r8; r9; r10; r11; r12; r13; r14; r15; xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
-        rbp; rdi; rsi; 
+        rbp; rdi; rsi;
         mem; efl; rsp;
     lets
         plain_ptr        := if win then rcx else rdi;
@@ -1083,7 +1083,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
         buffers_disjoint128(auth_b, out_b);
         buffers_disjoint128(keys_b, out_b);
         buffers_disjoint128(out_b, tag_b);
-        
+
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(plain_b)));
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(auth_b)));
         locs_disjoint(list(loc_buffer(stack_b), loc_buffer(iv_b)));
@@ -1137,7 +1137,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
         let cipher := slice_work_around(le_seq_quad32_to_bytes(buffer128_as_seq(mem,      out_b)),   old(plain_num_bytes));
 
 //        // TODO: First two clauses work around Vale's type limitations
-        4096 * length(plain) < pow2_32 /\ 
+        4096 * length(plain) < pow2_32 /\
         4096 * length(auth) < pow2_32 /\
         cipher == fst(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth)) /\
         le_quad32_to_bytes(buffer128_read(tag_b, 0, mem)) == snd(gcm_encrypt_LE(alg, seq_nat32_to_seq_nat8_LE(key), be_quad32_to_bytes(iv_BE), plain, auth));
@@ -1183,7 +1183,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
         Mov64(r13, rdx);
         Mov64(rax, r8);
         Mov64(r11, r9);
-        
+
         // These are offset, since we already moved rsp during callee_save_registers
         Load64_buffer(r10, rsp, 144 + 40 + 0, Public, stack_b, 18 + 4 + 1 + 0);
         Load64_buffer(r8,  rsp, 144 + 40 + 8, Public, stack_b, 18 + 4 + 1 + 1);
@@ -1209,7 +1209,7 @@ procedure {:quick} gcm_encrypt2_stdcall(
 
     // Auth tag is still in xmm1, so save it to memory
     Store128_buffer(r15, xmm1, 0, Secret, tag_b, 0);
-    
+
     callee_restore_registers(win, stack_b, old(xmm6), old(xmm7), old(xmm8), old(xmm10), old(xmm11));
 }
 

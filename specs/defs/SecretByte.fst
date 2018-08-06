@@ -2,14 +2,14 @@ module SecretByte
 
 module U8 = FStar.UInt8
 
-inline_for_extraction 
+inline_for_extraction
 let t = U8.t
 
 let reveal (x:t) : (Ghost.erased UInt8.t) =
   Ghost.hide x
 
 inline_for_extraction
-let uint_to_t (x:FStar.UInt.uint_t 8) 
+let uint_to_t (x:FStar.UInt.uint_t 8)
   =
   UInt8.uint_to_t x
 

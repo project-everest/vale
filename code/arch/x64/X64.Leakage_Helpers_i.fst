@@ -24,8 +24,8 @@ let maddr_does_not_use_secrets addr ts =
     | MReg r _ -> Public? (operand_taint (OReg r) ts Public)
     | MIndex base _ index _ ->
         let baseTaint = operand_taint (OReg base) ts Public in
-	let indexTaint = operand_taint (OReg index) ts Public in
-	(Public? baseTaint) && (Public? indexTaint)
+        let indexTaint = operand_taint (OReg index) ts Public in
+        (Public? baseTaint) && (Public? indexTaint)
 
 let operand_does_not_use_secrets op ts =
   match op with
@@ -39,7 +39,7 @@ let lemma_operand_obs ts dst s1 s2 = match dst with
   | OConst _ | OReg _ -> ()
   | OMem m -> ()
 #reset-options "--initial_ifuel 2 --max_ifuel 2 --initial_fuel 4 --max_fuel 4 --z3rlimit 5"
-  
+
 let set_taint (dst:operand) ts taint : Tot taintState =
   match dst with
   | OConst _ -> ts  (* Shouldn't actually happen *)
@@ -82,13 +82,13 @@ forall src. List.Tot.Base.mem src s /\ Public? (sources_taint s ts ins.t) ==> Pu
 
 let lemma_taint_sources ins ts = ()
 
-val lemma_public_op_are_same: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
+val lemma_public_op_are_same: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts Public) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
 (ensures eval_operand op s1.state == eval_operand op s2.state)
 
 let lemma_public_op_are_same ts op s1 s2 = ()
 
-val lemma_public_op_are_same2: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma 
+val lemma_public_op_are_same2: (ts:taintState) -> (op:operand) -> (s1:traceState) -> (s2:traceState) -> Lemma
 (requires operand_does_not_use_secrets op ts /\ Public? (operand_taint op ts Secret) /\ publicValuesAreSame ts s1 s2 /\ taint_match op Public s1.memTaint s1.state /\ taint_match op Public s2.memTaint s2.state /\ valid_operand op s1.state /\ valid_operand op s2.state)
 (ensures eval_operand op s1.state == eval_operand op s2.state)
 

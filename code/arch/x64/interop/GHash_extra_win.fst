@@ -70,7 +70,7 @@ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [in_b;has
     | R9 -> num_bytes
     | _ -> init_regs r end in
   let xmms = init_xmms in
-  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in  
+  let s0 = {ok = true; regs = regs; xmms = xmms; flags = 0; mem = mem; memTaint = create_valid_memtaint mem buffers taint_func} in
   length_t_eq (TBase TUInt64) stack_b;
   length_t_eq (TBase TUInt128) in_b;
   length_t_eq (TBase TUInt128) hash_b;
@@ -78,10 +78,10 @@ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [in_b;has
   assert (Seq.equal (buffer_to_seq_quad32 in_b h0) (buffer128_as_seq (va_get_mem s0) in_b));
   let h128_b = BV.mk_buffer_view h_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem s0) h_b) (BV.as_seq h0 h128_b));
-  BV.as_seq_sel h0 h128_b 0;  
+  BV.as_seq_sel h0 h128_b 0;
   let hash128_b = BV.mk_buffer_view hash_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem s0) hash_b) (BV.as_seq h0 hash128_b));
-  BV.as_seq_sel h0 hash128_b 0;   
+  BV.as_seq_sel h0 hash128_b 0;
   ()
 
 let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (in_b:s8) (hash_b:s8) (h_b:s8) (num_bytes:nat64) (orig_hash:Ghost.erased (quad32))  (stack_b:b8) : Lemma
@@ -100,7 +100,7 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (in_b:s8) (ha
   BV.as_seq_sel va_sM.mem.hs hash128_b 0;
   let h128_b = BV.mk_buffer_view h_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) h_b) (BV.as_seq va_s0.mem.hs h128_b));
-  BV.as_seq_sel va_s0.mem.hs h128_b 0;   
+  BV.as_seq_sel va_s0.mem.hs h128_b 0;
   ()
 
 val ghost_ghash_incremental_extra_stdcall_win: in_b:s8 -> hash_b:s8 -> h_b:s8 -> num_bytes:nat64 -> orig_hash:Ghost.erased (quad32) ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 in_b hash_b h_b num_bytes orig_hash /\ B.length stack_b == 72 /\ live h0 stack_b /\ buf_disjoint_from stack_b [in_b;hash_b;h_b]}) -> GTot (h1:HS.mem{post_cond h0 h1 in_b hash_b h_b num_bytes orig_hash /\ M.modifies (M.loc_union (M.loc_buffer hash_b) (M.loc_buffer stack_b)) h0 h1 })

@@ -29,7 +29,7 @@ val lemma_to_flags : s:state -> Lemma
 val lemma_to_mem : s:state -> Lemma
   (ensures s.mem == mem' (state_to_S s).TS.state)
   [SMTPat s.mem]
-  
+
 val lemma_to_reg : s:state -> r:reg -> Lemma
   (ensures s.regs r == regs' (state_to_S s).TS.state r)
   [SMTPat (s.regs r)]
@@ -69,37 +69,37 @@ val lemma_to_of : s:TS.traceState -> Lemma
 unfold let op_String_Access (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 
 val lemma_valid_taint64: (b:X64.Memory_i.buffer64) ->
-			 (memTaint:X64.Memory_i.memtaint) ->
-			 (mem:X64.Memory_i.mem) ->
-			 (i:nat{i < X64.Memory_i.buffer_length b}) ->
-			 (t:taint) -> Lemma
+                         (memTaint:X64.Memory_i.memtaint) ->
+                         (mem:X64.Memory_i.mem) ->
+                         (i:nat{i < X64.Memory_i.buffer_length b}) ->
+                         (t:taint) -> Lemma
   (requires X64.Memory_i.valid_taint_buf64 b mem memTaint t /\ X64.Memory_i.buffer_readable mem b)
   (ensures memTaint.[X64.Memory_i.buffer_addr b mem + 8 `op_Multiply` i] == t)
 
 val lemma_valid_taint128: (b:X64.Memory_i.buffer128) ->
-			 (memTaint:X64.Memory_i.memtaint) ->
-			 (mem:X64.Memory_i.mem) ->
-			 (i:nat{i < X64.Memory_i.buffer_length b}) ->
-			 (t:taint) -> Lemma
+                         (memTaint:X64.Memory_i.memtaint) ->
+                         (mem:X64.Memory_i.mem) ->
+                         (i:nat{i < X64.Memory_i.buffer_length b}) ->
+                         (t:taint) -> Lemma
   (requires X64.Memory_i.valid_taint_buf128 b mem memTaint t /\ X64.Memory_i.buffer_readable mem b)
   (ensures memTaint.[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i] == t /\
            memTaint.[X64.Memory_i.buffer_addr b mem + 16 `op_Multiply` i + 8] == t)
 
 
-val same_memTaint64: (b:X64.Memory_i.buffer64) -> 
+val same_memTaint64: (b:X64.Memory_i.buffer64) ->
                    (mem0:X64.Memory_i.mem) ->
-		   (mem1:X64.Memory_i.mem) ->
-		   (memtaint0:X64.Memory_i.memtaint) ->
-		   (memtaint1:X64.Memory_i.memtaint) -> Lemma
-  (requires (X64.Memory_i.modifies (X64.Memory_i.loc_buffer b) mem0 mem1 /\ 
+                   (mem1:X64.Memory_i.mem) ->
+                   (memtaint0:X64.Memory_i.memtaint) ->
+                   (memtaint1:X64.Memory_i.memtaint) -> Lemma
+  (requires (X64.Memory_i.modifies (X64.Memory_i.loc_buffer b) mem0 mem1 /\
     (forall p. Map.sel memtaint0 p == Map.sel memtaint1 p)))
   (ensures memtaint0 == memtaint1)
 
-val same_memTaint128: (b:X64.Memory_i.buffer128) -> 
+val same_memTaint128: (b:X64.Memory_i.buffer128) ->
                    (mem0:X64.Memory_i.mem) ->
-		   (mem1:X64.Memory_i.mem) ->
-		   (memtaint0:X64.Memory_i.memtaint) ->
-		   (memtaint1:X64.Memory_i.memtaint) -> Lemma
-  (requires (X64.Memory_i.modifies (X64.Memory_i.loc_buffer b) mem0 mem1 /\ 
+                   (mem1:X64.Memory_i.mem) ->
+                   (memtaint0:X64.Memory_i.memtaint) ->
+                   (memtaint1:X64.Memory_i.memtaint) -> Lemma
+  (requires (X64.Memory_i.modifies (X64.Memory_i.loc_buffer b) mem0 mem1 /\
     (forall p. Map.sel memtaint0 p == Map.sel memtaint1 p)))
   (ensures memtaint0 == memtaint1)

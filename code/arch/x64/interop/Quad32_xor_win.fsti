@@ -36,7 +36,7 @@ unfold
 let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
 unfold let disjoint_or_eq (#a:Type0) (b1:B.buffer a) (b2:B.buffer a) =
-  M.(loc_disjoint (loc_buffer b1) (loc_buffer b2)) \/ b1 == b2 
+  M.(loc_disjoint (loc_buffer b1) (loc_buffer b2)) \/ b1 == b2
 
 let buffer_to_quad32 (b:s8 { B.length b % 16 == 0 /\ B.length b > 0 }) (h:HS.mem) : GTot quad32 =
   let b128 = BV.mk_buffer_view b Views.view128 in
@@ -58,5 +58,5 @@ B.length src1 == 16 /\ B.length src2 == 16 /\ B.length dst == 16 /\
      dst = quad32_xor src1 src2)
 
 val quad32_xor_buffer_win: src1:s8 -> src2:s8 -> dst:s8 -> Stack unit
-	(requires (fun h -> pre_cond h src1 src2 dst ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 src1 src2 dst ))
+        (requires (fun h -> pre_cond h src1 src2 dst ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 src1 src2 dst ))

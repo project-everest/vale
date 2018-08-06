@@ -72,7 +72,7 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (src1:s8) (sr
   BV.as_seq_sel va_s0.mem.hs src2_128 0;
   let dst128 = BV.mk_buffer_view dst Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) dst) (BV.as_seq va_sM.mem.hs dst128));
-  BV.as_seq_sel va_sM.mem.hs dst128 0;    
+  BV.as_seq_sel va_sM.mem.hs dst128 0;
   ()
 
 val ghost_quad32_xor_buffer_win: src1:s8 -> src2:s8 -> dst:s8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 src1 src2 dst /\ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [src1;src2;dst]}) -> GTot (h1:HS.mem{post_cond h0 h1 src1 src2 dst })

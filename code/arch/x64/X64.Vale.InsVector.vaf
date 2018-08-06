@@ -89,7 +89,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Psrldq(dst, amt), list(), list(
         0 <= amt < 16;
     ensures
         let src_bytes := le_quad32_to_bytes(old(dst));
-        let zero_pad := Seq.create(amt, 0); 
+        let zero_pad := Seq.create(amt, 0);
         let remaining_bytes := Seq.slice(src_bytes, amt, Seq.length(src_bytes));
         dst == le_bytes_to_quad32(Seq.append(zero_pad, remaining_bytes));
 {
@@ -154,14 +154,14 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pshufb(dst, src), list(), list(
         src == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B);
     modifies efl;
     ensures
-        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203) ==> 
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x04050607, 0x00010203) ==>
             dst == reverse_bytes_quad32(old(dst));
-        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x0C0D0E0F, 0x08090A0B) ==> 
+        src == Mkfour(0x0C0D0E0F, 0x08090A0B, 0x0C0D0E0F, 0x08090A0B) ==>
             dst == Mkfour(reverse_bytes_nat32(dst.hi3),
                           reverse_bytes_nat32(dst.hi2),
                           reverse_bytes_nat32(dst.hi3),
                           reverse_bytes_nat32(dst.hi2));
-        src == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B) ==> 
+        src == Mkfour(0x04050607, 0x00010203, 0x0C0D0E0F, 0x08090A0B) ==>
             dst == Mkfour(reverse_bytes_nat32(dst.lo1),
                           reverse_bytes_nat32(dst.lo0),
                           reverse_bytes_nat32(dst.hi3),
@@ -211,7 +211,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.Pinsrd(dst, t_op_to_op(src), in
 {
 }
 
-procedure {:quick exportOnly} 
+procedure {:quick exportOnly}
           PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, out tmp:reg_opr64)
     requires
         index < 4;
@@ -264,7 +264,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst), Mov128Me
     reads
         mem; memTaint;
     modifies
-       
+
     requires
         valid_src_addr(mem, b, index);
         valid_taint_buf128(b, mem, memTaint, t);
@@ -275,7 +275,7 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Xmm(dst), Mov128Me
 {
     lemma_valid_mem128(b, index, mem);
     lemma_load_mem128(b, index, mem);
-    lemma_valid_taint128(b, memTaint, mem, index, t);    
+    lemma_valid_taint128(b, memTaint, mem, index, t);
 }
 
 procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Mem(MReg(get_reg(dst), offset)), Mov128Xmm(src)), list(), list()), t))}{:quick exportOnly} Store128_buffer(
@@ -301,13 +301,13 @@ procedure{:instruction Ins(TS.TaintedIns(tuple(S.MOVDQU(Mov128Mem(MReg(get_reg(d
     lemma_valid_mem128(b, index, old(mem));
     lemma_store_mem128(b, index, old(src), old(mem));
     lemma_valid_taint128(b, old(memTaint), old(mem), index, t);
-    same_memTaint128(b, old(mem), mem, old(memTaint), memTaint);    
+    same_memTaint128(b, old(mem), mem, old(memTaint), memTaint);
 }
 
 procedure {:quick exportOnly} PushXmm(
-        src:xmm, 
-    out tmp:reg_opr64, 
-        ghost b:buffer64, 
+        src:xmm,
+    out tmp:reg_opr64,
+        ghost b:buffer64,
         ghost index:int)
     reads memTaint;
     modifies
@@ -321,15 +321,15 @@ procedure {:quick exportOnly} PushXmm(
     ensures
         modifies_mem(loc_buffer(b), old(mem), mem);
 
-        let src_lo := lo64(src); 
+        let src_lo := lo64(src);
         let src_hi := hi64(src);
         mem == old(buffer64_write(b, index - 1, src_hi, buffer64_write(b, index, src_lo, mem)));
 
         rsp == old(rsp) - 16;
 {
-    Pextrq(tmp, src, 0);   
+    Pextrq(tmp, src, 0);
     Push(tmp, b, index);
-    Pextrq(tmp, src, 1);   
+    Pextrq(tmp, src, 1);
     Push(tmp, b, index - 1);
 }
 
@@ -406,7 +406,7 @@ procedure {:quick} XmmEqual()
     lets x1 @= xmm0; x2 @= xmm1; tmp @= rdx; result @= rax;
     reads x2;
     modifies x1; tmp; result; efl;
-    ensures 
+    ensures
         if old(x1 = x2) then result = 0 else result > 0;
 {
     Pcmpeqd(x1, x2);
@@ -443,7 +443,7 @@ procedure {:quick} XmmEqual()
 #reset-options "--z3rlimit 150 --z3refresh"
 procedure {:quick exportOnly} XmmEqual(inout x1:xmm, x2:xmm, out tmp:reg_opr64, out result:reg_opr64)
     modifies efl;
-    ensures 
+    ensures
 //        if old(x1 = x2) then result = 0 else result > 0;
 {
     Pcmpeqd(x1, x2);

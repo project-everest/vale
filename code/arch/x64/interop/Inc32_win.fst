@@ -58,7 +58,7 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (iv_b:s8)  (s
   BV.as_seq_sel va_sM.mem.hs iv128_b 0;
   let iv128_b = BV.mk_buffer_view iv_b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_s0) iv_b) (BV.as_seq va_s0.mem.hs iv128_b));
-  BV.as_seq_sel va_s0.mem.hs iv128_b 0;    
+  BV.as_seq_sel va_s0.mem.hs iv128_b 0;
   ()
 
 

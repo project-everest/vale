@@ -58,7 +58,7 @@ let vale_post (va_b0:va_code) (va_s0:va_state) (win:bool) (alg:algorithm)
     (va_state_eq va_sM ((va_update_flags va_sM (va_update_xmm 2 va_sM
     (va_update_xmm 0 va_sM (va_update_mem va_sM (va_update_reg Rax va_sM (va_update_reg R8 va_sM
     (va_update_ok va_sM va_s0))))))))))
-    
+
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (stack_b:buffer64)
   (output_b:buffer128) (input_b:buffer128) (key:(aes_key_LE AES_128)) (keys_b:buffer128) =
   vale_post va_b0 va_s0 is_win AES_128

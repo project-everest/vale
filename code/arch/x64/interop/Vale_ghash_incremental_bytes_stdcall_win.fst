@@ -32,7 +32,7 @@ let va_pre (va_b0:va_code) (va_s0:va_state) (stack_b:buffer64)
     `op_Multiply` (bytes_to_quad_size num_bytes) < pow2_64) /\ (num_bytes > 0 ==> (buffer_length
     input_b) == (bytes_to_quad_size num_bytes)) /\ (buffer_length h_b) > 0 /\ (buffer_length
     hash_b) > 0)
-    
+
 let va_post (va_b0:va_code) (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (stack_b:buffer64)
 (h_b:buffer128) (hash_b:buffer128) (input_b:buffer128) (num_bytes:nat64)  =
   ((va_ensure_total va_b0 va_s0 va_sM va_fM) /\ (va_get_ok va_sM)

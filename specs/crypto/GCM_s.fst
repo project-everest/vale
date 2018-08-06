@@ -90,5 +90,5 @@ let gcm_decrypt_LE (alg:algorithm) (key:aes_key alg) (iv:seqn 16 nat8) (cipher:s
       4096 * length auth < pow2_32
     )
     (ensures fun (p, t) -> True)
-  = 
+  =
   make_opaque (gcm_decrypt_LE_def alg key iv cipher auth tag)

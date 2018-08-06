@@ -56,7 +56,7 @@ let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) (plain_num_by
   length_t_eq (TBase TUInt128) b;
   let b128 = BV.mk_buffer_view b Views.view128 in
   assert (Seq.equal (buffer_as_seq (va_get_mem va_sM) b) (BV.as_seq va_sM.mem.hs b128));
-  BV.as_seq_sel va_sM.mem.hs b128 0;     
+  BV.as_seq_sel va_sM.mem.hs b128 0;
   ()
 
 val ghost_gcm_make_length_quad_buffer_win: plain_num_bytes:nat64 -> auth_num_bytes:nat64 -> b:s8 ->  stack_b:b8 -> (h0:HS.mem{pre_cond h0 plain_num_bytes auth_num_bytes b /\ B.length stack_b == 32 /\ live h0 stack_b /\ buf_disjoint_from stack_b [b]}) -> GTot (h1:HS.mem{post_cond h0 h1 plain_num_bytes auth_num_bytes b })

@@ -53,20 +53,20 @@ let pre_cond (h:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE
   B.length keys_b == (nr AES_128 + 1) * 16 /\
     keys_match key keys_b h
     /\ B.length output_b >= 1 /\ B.length input_b >= 1
-  
 
 
-let post_cond (h0:HS.mem) (h1:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) = 
+
+let post_cond (h0:HS.mem) (h1:HS.mem) (output_b:s8) (input_b:s8) (key:Ghost.erased (aes_key_LE AES_128)) (keys_b:s8) =
  length input_b % 16 == 0 /\ length output_b % 16 == 0 /\ length keys_b % 16 == 0 /\
     B.live h1 input_b /\ B.live h1 keys_b /\
     M.modifies (M.loc_buffer output_b) h0 h1 /\
     (let  input128_b = BV.mk_buffer_view  input_b Views.view128 in
      let output128_b = BV.mk_buffer_view output_b Views.view128 in
      BV.length input128_b >= 1 /\ BV.length output128_b >= 1 /\
-    (let  input_q = Seq.index (BV.as_seq h0 input128_b) 0 in 
+    (let  input_q = Seq.index (BV.as_seq h0 input128_b) 0 in
      let output_q = Seq.index (BV.as_seq h1 output128_b) 0 in
      output_q == aes_encrypt_LE AES_128 (Ghost.reveal key) input_q))
 
 val aes128_encrypt_block_win: output_b:s8 -> input_b:s8 -> key:Ghost.erased (aes_key_LE AES_128) -> keys_b:s8 -> Stack unit
-	(requires (fun h -> pre_cond h output_b input_b key keys_b ))
-	(ensures (fun h0 _ h1 -> post_cond h0 h1 output_b input_b key keys_b ))
+        (requires (fun h -> pre_cond h output_b input_b key keys_b ))
+        (ensures (fun h0 _ h1 -> post_cond h0 h1 output_b input_b key keys_b ))

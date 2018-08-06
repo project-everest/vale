@@ -45,7 +45,7 @@ let aes_reqs (alg:algorithm) (key:aes_key_LE(alg)) (round_keys:seq(quad32)) (key
 
 #endverbatim
 
-// TODO: Write one procedure that unrolls to these variants?                                            
+// TODO: Write one procedure that unrolls to these variants?
 // These procedures help walk F* through the recursive definition of rounds
 procedure {:quick exportOnly} aes_round_4way(
     ghost alg:algorithm,
@@ -196,7 +196,7 @@ procedure{:quick} aes_ctr_loop_body(
 
     ghost icb_BE:quad32
     )
-    lets 
+    lets
         plain_ptr @= rdi; num_quad_blocks @= r8; out_ptr @= rsi; key_ptr @= r9;
         const2_1 @= xmm1; const4_3 @= xmm2; iv @= xmm0; mask64 @= xmm3; four @= xmm4;
         rk1 @= xmm8; rk2 @= xmm9; rk3 @= xmm10; rk4 @= xmm7;        // Round keys
@@ -236,7 +236,7 @@ procedure{:quick} aes_ctr_loop_body(
     reads key_ptr; iv; mask64; four; memTaint;
     modifies r10; const2_1; const4_3; rk4; rk1; rk2; rk3; ctr1; ctr2; ctr3; ctr4;
              tmp_xmm; plain_ptr; num_quad_blocks; out_ptr; efl; mem;
-    ensures 
+    ensures
         // Valid ptrs and buffers
         validSrcAddrs128(mem, old(plain_ptr),  plain_b, old(num_quad_blocks) * 4, memTaint, Secret);
         validDstAddrs128(mem, old(out_ptr),    out_b,   old(num_quad_blocks) * 4, memTaint, Secret);
@@ -244,10 +244,10 @@ procedure{:quick} aes_ctr_loop_body(
         out_ptr   == old(out_ptr)   + 64;
         num_quad_blocks == old(num_quad_blocks) - 1;
 
-        // Counters are incremented 
+        // Counters are incremented
         const2_1 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 1)), iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 0)));
         const4_3 == Mkfour(iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 3)), iv.hi2, reverse_bytes_nat32(add_wrap(count + 4, 2)));
-        
+
         // GCTR progress
         gctr_partial(alg, 4, old(buffer128_as_seq(mem, plain_b)), buffer128_as_seq(mem, out_b), key, inc32(icb_BE, count));
 {
@@ -285,7 +285,7 @@ procedure{:quick} aes_ctr_loop_body(
     Paddd(const2_1, four);        // const2_1 = LSB: 6 | bswap(ivec_hi) | 5 | bswap(ivec_hi)
     Paddd(const4_3, four);        // const4_3 = LSB: 8 | bswap(ivec_hi) | 7 | bswap(ivec_hi)
 
-    // Begin AES block encrypt by xor'ing four blocks of counters with the key block 0 
+    // Begin AES block encrypt by xor'ing four blocks of counters with the key block 0
     Pxor(ctr1, rk1);
     Pxor(ctr2, rk1);
     Pxor(ctr3, rk1);
@@ -353,7 +353,7 @@ procedure{:quick} aes_ctr_loop_body(
     AESNI_enc_last(ctr2, rk3);
     AESNI_enc_last(ctr3, rk3);
     AESNI_enc_last(ctr4, rk3);
-    
+
     commute_sub_bytes_shift_rows_forall();
 
     // Xor the plaintext with the encrypted counter
@@ -366,7 +366,7 @@ procedure{:quick} aes_ctr_loop_body(
     Pxor(ctr3, tmp_xmm);
     Load128_buffer(tmp_xmm, plain_ptr, 48, Secret, plain_b, 3);
     Pxor(ctr4, tmp_xmm);
-    
+
     // Store the cipher text in output
     Store128_buffer(out_ptr, ctr1,  0, Secret, out_b, 0);
     Store128_buffer(out_ptr, ctr2, 16, Secret, out_b, 1);
@@ -391,7 +391,7 @@ procedure {:quick} aes_ctr_inner(
     ghost round_keys:seq(quad32),
     ghost keys_b:buffer128
     )
-    lets 
+    lets
         plain_ptr @= rdi; num_bytes @= r8; out_ptr @= rsi; key_ptr @= r9;
         ivec @= rdx; nonce @= rcx; tmp_xmm @= xmm5; // r12 = num_rounds (nr)
     requires
@@ -407,7 +407,7 @@ procedure {:quick} aes_ctr_inner(
         aes_reqs(alg, key, round_keys, keys_b, key_ptr, mem, memTaint);
     reads key_ptr; ivec; nonce; memTaint;
     modifies rax; r10; xmm0; xmm1; xmm2; xmm3; plain_ptr; num_bytes; out_ptr; tmp_xmm; efl; mem;
-    ensures 
+    ensures
         true;
 {
     lemma_poly_bits64();
@@ -433,7 +433,7 @@ procedure {:quick} aes_ctr_inner(
     Psrldq(xmm0, 4);
     Mov128(xmm2, xmm0);             // Copy xmm0 into xmm2
     InitPshufbDupMask(xmm3, rax);   // xmm3 := dup_mask
-    PshufbDup(xmm2, xmm3);          // LSB: 0 | bswap(ivec_hi) | 0 | bswap(ivec_hi) 
+    PshufbDup(xmm2, xmm3);          // LSB: 0 | bswap(ivec_hi) | 0 | bswap(ivec_hi)
     PinsrdImm(xmm3, 2, 0, rax);
     PinsrdImm(xmm3, 1, 2, rax);     // xmm3 := TWO_N_ONE
     Paddd(xmm2, xmm3);
@@ -452,11 +452,11 @@ procedure {:quick} aes_ctr_inner(
 //        Sub64(out_ptr, 64);
         //aes_ctr_loop();
     }
-    
+
     // Intel: REMAINDER_4
     if (r10 != 0) {
         Shufpd(xmm0, xmm1, 2);      // xmm0 := LSB: 4 | nonce | ivec + 1
-        
+
         while (r10 > 0) {
             // BP: This isn't doing anything particularly interesting w.r.t. AES
             //     We can probably replace almost all of this with AESEncryptBlock
@@ -475,7 +475,7 @@ procedure {:quick} aes_ctr_inner(
             Paddd(xmm0, one);    // Increment the counter by 1
             AESNI_enc(xmm11, xmm9);   // Compute AES round 1
             AESNI_enc(xmm11, xmm10);  // Compute AES round 2
-            Pshufb64(xmm0, mask);     // Bswap the upper and lower 64-bit slots of xmm0 
+            Pshufb64(xmm0, mask);     // Bswap the upper and lower 64-bit slots of xmm0
             AESNI_enc(xmm11, xmm7);   // Compute AES round 3
 
             // Load next four key blocks (TODO: Intel does this via XMM memory operands)
@@ -504,7 +504,7 @@ procedure {:quick} aes_ctr_inner(
             // Load the plain text
             // TODO: Intel does this using XMM operands
             Load128_buffer(tmp_xmm, plain_ptr,  0, Secret, plain_b, 0); // TODO: Fix indexing
-            Pxor(xmm11, tmp_xmm);              
+            Pxor(xmm11, tmp_xmm);
             // Store the cipher text in output
             Store128_buffer(out_ptr, xmm11,  0, Secret, out_b, 0);  // TODO: Fix indexing
             Add64(plain_ptr, 16);

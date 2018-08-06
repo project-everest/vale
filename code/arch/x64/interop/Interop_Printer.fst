@@ -2,7 +2,7 @@ module Interop_Printer
 
 #set-options "--initial_fuel 4 --initial_ifuel 2 --max_fuel 4 --max_ifuel 2"
 
-type base_type = 
+type base_type =
   | TUInt8
   | TUInt64
   | TUInt128
@@ -64,7 +64,7 @@ let rec print_args_list = function
 
 let rec print_args_names = function
   | [] -> ""
-  | (a, _, _)::q -> a ^ " " ^ print_args_names q  
+  | (a, _, _)::q -> a ^ " " ^ print_args_names q
 
 let rec print_args_names_reveal = function
   | [] -> ""
@@ -74,7 +74,7 @@ let rec print_args_names_reveal = function
 
 let rec print_buffers_list = function
   | [] -> "[]"
-  | (a,ty, _)::q -> 
+  | (a,ty, _)::q ->
     (if TBuffer? ty then a ^ "::" else "") ^
     print_buffers_list q
 
@@ -87,7 +87,7 @@ let rec liveness heap args =
   let args = List.Tot.Base.filter is_buffer args in
   let rec aux heap = function
   | [] -> "True"
-  | [(a,TBuffer ty, _)] -> "live " ^ heap ^ " " ^ a 
+  | [(a,TBuffer ty, _)] -> "live " ^ heap ^ " " ^ a
   | [(a, TBase ty, _)] | [(a, TGhost ty, _)] -> "" // Should not happen
   | (a, TBuffer ty, _)::q -> "live " ^ heap ^ " " ^ a ^ " /\\ " ^ aux heap q
   | (a, TBase ty, _)::q | (a, TGhost ty, _)::q -> aux heap q // Should not happen
@@ -111,7 +111,7 @@ let namelist_of_args args =
   | [] -> ""
   | [a, _, _] -> a
   | (a, _, _)::q -> a ^ ";" ^ aux q in
-  "[" ^ aux args ^ "]" 
+  "[" ^ aux args ^ "]"
 
 let disjoint (args:list arg) =  //AR: added an annotation, see #1502
   let args = List.Tot.Base.filter is_buffer args in
@@ -150,8 +150,8 @@ let print_low_calling_args os target (args:list arg) stkstart =
     | [], q -> "    | _ -> init_regs r end in\n" ^ print_low_calling_stack q stkstart
     | _, [] -> "    | _ -> init_regs r end in\n"
     | re, (_, TGhost _, _)::q -> aux re q // We ignore ghost parameters
-    | r1::rn, (a, ty, _)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^ 
-      (if TBuffer? ty then "addr_" ^ a else a) ^ 
+    | r1::rn, (a, ty, _)::q -> "    | " ^ (reg_to_low r1) ^ " -> " ^
+      (if TBuffer? ty then "addr_" ^ a else a) ^
       "\n" ^ aux rn q
   in aux (calling_registers os target) args
 
@@ -169,7 +169,7 @@ let xmm_to_low = function
   | "xmm4" -> "4"
   | "xmm5" -> "5"
   | "xmm6" -> "6"
-  | "xmm7" -> "7"  
+  | "xmm7" -> "7"
   | "xmm8" -> "8"
   | "xmm9" -> "9"
   | "xmm10" -> "10"
@@ -179,7 +179,7 @@ let xmm_to_low = function
   | "xmm14" -> "14"
   | "xmm15" -> "15"
   | _ -> "error"
-  
+
 let print_low_xmm_callee_saved os target =
   let rec aux = function
     | [] -> ""
@@ -211,7 +211,7 @@ let taint_of_label = function
   | Sec -> "Secret"
   | Pub -> "Public"
 
-let create_taint_fun (args:list arg) = 
+let create_taint_fun (args:list arg) =
   let rec aux args = match args with
   | [] -> "    Public "
   | (a, TBuffer _, t)::q -> "    if StrongExcludedMiddle.strong_excluded_middle (x == "^a^") then " ^ taint_of_label t ^ " else\n" ^ aux q
@@ -238,7 +238,7 @@ let print_vale_bufferty = function
 
 let print_vale_ty = function
   | TUInt8 -> "nat8"
-  | TUInt64 -> "nat64"  
+  | TUInt64 -> "nat64"
   | TUInt128 -> "quad32"
 
 let print_vale_full_ty = function
@@ -255,7 +255,7 @@ let translate_lowstar os target (func:func_ty) =
   let additional = (if os = Windows then 5 else 0) in
   let buffer_args = List.Tot.Base.filter is_buffer args in
   let real_args = List.Tot.Base.filter not_ghost args in
-  let nbr_stack_args = List.Tot.Base.length real_args - 
+  let nbr_stack_args = List.Tot.Base.length real_args -
     List.Tot.Base.length (calling_registers os target) in
   let length_stack = (slots + additional + nbr_stack_args) `op_Multiply` 8 in
   let stack_needed = length_stack > 0 in
@@ -268,7 +268,7 @@ let translate_lowstar os target (func:func_ty) =
     " /\ live " ^ memname ^ " stack_b /\ buf_disjoint_from stack_b " ^ (namelist_of_args (buffer_args))
   else "" in
   let separator0 = if (List.Tot.Base.length buffer_args = 0) then "" else " /\\ " in
-  let separator1 = if (List.Tot.Base.length buffer_args <= 1) then "" else " /\\ " in  
+  let separator1 = if (List.Tot.Base.length buffer_args <= 1) then "" else " /\\ " in
   "module Vale_" ^ name ^
   "\n\nopen X64.Machine_s\nopen X64.Memory_i\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n\n" ^
   "val va_code_" ^ name ^ ": unit -> va_code\n\n" ^
@@ -284,7 +284,7 @@ let translate_lowstar os target (func:func_ty) =
   (print_args_vale_list args) ^ ": Ghost ((va_sM:va_state) * (va_fM:va_fuel))\n  " ^
   "(requires va_pre va_b0 va_s0 " ^ (if stack_needed then "stack_b " else "") ^
   (print_args_names args) ^ ")\n  " ^
-  "(ensures (fun (va_sM, va_fM) -> va_post va_b0 va_s0 va_sM va_fM " ^ 
+  "(ensures (fun (va_sM, va_fM) -> va_post va_b0 va_s0 va_sM va_fM " ^
   (if stack_needed then "stack_b " else "") ^
   (print_args_names args) ^ "))" ^
   "\n\n\n\n" ^
@@ -305,20 +305,20 @@ let translate_lowstar os target (func:func_ty) =
   "unfold\nlet buf_disjoint_from (b:b8) (ls:list b8) : Type0 = normalize (loc_locs_disjoint_rec b ls)\n\n" ^
   "// TODO: Complete with your pre- and post-conditions\n" ^
   "let pre_cond (h:HS.mem) " ^ (print_args_list args) ^ "= " ^ (liveness "h" args) ^ separator1 ^ (disjoint args) ^ separator0 ^ (print_lengths args) ^ "\n" ^
-  "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= " 
+  "let post_cond (h0:HS.mem) (h1:HS.mem) " ^ (print_args_list args) ^ "= "
     ^ (liveness "h0" args) ^ " /\\ " ^ (liveness "h1" args) ^ separator0 ^ (print_lengths args) ^ "\n\n" ^
   "#set-options \"--initial_fuel " ^ fuel_value ^ " --max_fuel " ^ fuel_value ^ " --initial_ifuel 2 --max_ifuel 2\"\n" ^
   "// TODO: Prove these two lemmas if they are not proven automatically\n" ^
-  "let implies_pre (h0:HS.mem) " ^ (print_args_list args) ^ 
+  "let implies_pre (h0:HS.mem) " ^ (print_args_list args) ^
   (if stack_needed then " (stack_b:b8) " else "") ^
   ": Lemma\n" ^
   "  (requires pre_cond h0 " ^ (print_args_names args) ^ stack_precond "h0" ^ ")\n" ^
   "  (ensures (\n" ^ implies_precond ^ "(" ^
-  (create_state os target args stack_needed slots (slots + additional)) ^ 
-  "  va_pre (va_code_" ^ name ^ " ()) s0 " ^ 
+  (create_state os target args stack_needed slots (slots + additional)) ^
+  "  va_pre (va_code_" ^ name ^ " ()) s0 " ^
   (if stack_needed then "stack_b " else "") ^
   (print_args_names_reveal args) ^ "))) =\n" ^
-  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args) ^ 
+  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args) ^
   "  ()\n\n" ^
   "let implies_post (va_s0:va_state) (va_sM:va_state) (va_fM:va_fuel) " ^ (print_args_list args) ^
   (if stack_needed then " (stack_b:b8)" else "") ^
@@ -328,20 +328,20 @@ let translate_lowstar os target (func:func_ty) =
   (if stack_needed then "stack_b " else "") ^
   (print_args_names_reveal args) ^ ")\n" ^
   "  (ensures post_cond va_s0.mem.hs va_sM.mem.hs " ^ (print_args_names args) ^ ") =\n" ^
-  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args) ^ 
+  print_length_t (if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args) ^
   "  ()\n\n" ^
   "val " ^ name ^ ": " ^ (print_low_args args) ^
   "\n\t(requires (fun h -> pre_cond h " ^ (print_args_names args) ^ "))\n\t" ^
   "(ensures (fun h0 _ h1 -> post_cond h0 h1 " ^ (print_args_names args) ^ "))\n\n" ^
-  "val ghost_" ^ name ^ ": " ^ (print_low_args_and args) ^ 
+  "val ghost_" ^ name ^ ": " ^ (print_low_args_and args) ^
   (if stack_needed then " stack_b:b8 -> " else "") ^
-    "(h0:HS.mem{pre_cond h0 " ^ (print_args_names args) ^ 
+    "(h0:HS.mem{pre_cond h0 " ^ (print_args_names args) ^
     stack_precond "h0" ^
     "}) -> GTot (h1:HS.mem{post_cond h0 h1 " ^ (print_args_names args) ^ "})\n\n" ^
   "let ghost_" ^ name ^ " " ^ (print_args_names args) ^
   (if stack_needed then "stack_b " else "") ^ "h0 =\n" ^
   (create_state os target args stack_needed slots (slots+additional)) ^
-  "  implies_pre h0 " ^ (print_args_names args) ^ 
+  "  implies_pre h0 " ^ (print_args_names args) ^
   (if stack_needed then "stack_b " else "") ^ ";\n" ^
   "  let s1, f1 = va_lemma_" ^ name ^ " (va_code_" ^ name ^ " ()) s0 " ^
   (if stack_needed then "stack_b " else "") ^
@@ -352,15 +352,15 @@ let translate_lowstar os target (func:func_ty) =
   (print_low_callee_saved os target) ^ (print_low_xmm_callee_saved os target) ^
   "  // Ensures that va_code_" ^ name ^ " is actually Vale code, and that s1 is the result of executing this code\n" ^
   "  assert (va_ensure_total (va_code_" ^ name ^ " ()) s0 s1 f1);\n" ^
-  "  implies_post s0 s1 f1 " ^ (print_args_names args) ^ 
+  "  implies_post s0 s1 f1 " ^ (print_args_names args) ^
   (if stack_needed then "stack_b " else "") ^ ";\n" ^
   "  s1.mem.hs\n\n" ^
   "let " ^ name ^ " " ^ (print_args_names args) ^ " =\n" ^
   (if stack_needed then "  push_frame();\n" ^
     "  let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t " ^ string_of_int length_stack ^ ") in\n"  else "") ^
-  "  st_put (fun h -> pre_cond h " ^ (print_args_names args) ^ stack_precond "h" ^ ") (ghost_" ^ name ^ " " ^ (print_args_names args) ^ 
+  "  st_put (fun h -> pre_cond h " ^ (print_args_names args) ^ stack_precond "h" ^ ") (ghost_" ^ name ^ " " ^ (print_args_names args) ^
   (if stack_needed then "stack_b);\n  pop_frame()\n" else ")\n")
-  
+
 let print_vale_arg = function
   | (a, ty, _) -> "ghost " ^ a ^ ":" ^ print_vale_full_ty ty
 
@@ -427,12 +427,12 @@ let translate_vale os target (func:func_ty) =
   let name, args, Stk slots = func in
   let real_args = List.Tot.Base.filter not_ghost args in
   let stack_before_args = slots + (if os = Windows then 5 else 0) in // Account for shadow space on windows
-  let nbr_stack_args = stack_before_args + List.Tot.Base.length real_args - 
+  let nbr_stack_args = stack_before_args + List.Tot.Base.length real_args -
     List.Tot.Base.length (calling_registers os target) in
-  let stack_needed = nbr_stack_args > 0 in  
+  let stack_needed = nbr_stack_args > 0 in
   let args = if stack_needed then ("stack_b", TBuffer TUInt64, Pub)::args else args in
   "module Vale_" ^ name ^
-  "\n#verbatim{:interface}{:implementation}\n" ^ 
+  "\n#verbatim{:interface}{:implementation}\n" ^
   "\nopen X64.Machine_s\nopen X64.Memory_i_s\nopen X64.Vale.State_i\nopen X64.Vale.Decls_i\n#set-options \"--z3rlimit 20\"\n#endverbatim\n\n" ^
   "procedure {:quick} " ^ name ^ "(" ^ print_vale_args args ^")\n" ^
   "    requires/ensures\n" ^
