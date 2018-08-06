@@ -48,14 +48,14 @@ let nat64_to_nat8s (n:nat64) : nat8*nat8*nat8*nat8*nat8*nat8*nat8*nat8 =
   (v1, v2, v3, v4, v5, v6, v7, v8)
 
 let nat64_to_nat8s_to_nat64_alt (v1 v2 v3 v4 v5 v6 v7 v8:nat8) :
-  Lemma (nat64_to_nat8s (nat8s_to_nat64_alt v1 v2 v3 v4 v5 v6 v7 v8) = (v1, v2, v3, v4, v5, v6, v7, v8))
+  Lemma (nat64_to_nat8s (nat8s_to_nat64_alt v1 v2 v3 v4 v5 v6 v7 v8) == (v1, v2, v3, v4, v5, v6, v7, v8))
   =
   nat32_to_nat8s_to_nat32 v1 v2 v3 v4;
   nat32_to_nat8s_to_nat32 v5 v6 v7 v8;
   ()
 
 let nat64_to_nat8s_to_nat64 (v1 v2 v3 v4 v5 v6 v7 v8:nat8) :
-  Lemma (nat64_to_nat8s (nat8s_to_nat64 v1 v2 v3 v4 v5 v6 v7 v8) = (v1, v2, v3, v4, v5, v6, v7, v8))
+  Lemma (nat64_to_nat8s (nat8s_to_nat64 v1 v2 v3 v4 v5 v6 v7 v8) == (v1, v2, v3, v4, v5, v6, v7, v8))
   =
   nat8s_to_nat64_alt_equiv v1 v2 v3 v4 v5 v6 v7 v8;
   nat64_to_nat8s_to_nat64_alt v1 v2 v3 v4 v5 v6 v7 v8;
