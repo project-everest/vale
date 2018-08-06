@@ -23,7 +23,7 @@ open X64.Vale.QuickCode
 open X64.Vale.QuickCodes
 open Arch.Types
 open AES_helpers
-open X64.Poly1305.Math_i    // For lemma_poly_bits64()
+open X64.Poly1305.Math    // For lemma_poly_bits64()
 open GCM_helpers
 open GCTR_s
 open GCTR
