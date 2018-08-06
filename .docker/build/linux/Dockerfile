@@ -43,7 +43,7 @@ COPY --chown=everest / ${MYHOME}/FStar/vale/
 
 # Remove extra files.
 RUN rm ${MYHOME}/FStar/vale/Dockerfile
-RUN rm ${MYHOME}/FStar/vale/build_fstar.sh
+RUN rm ${MYHOME}/FStar/vale/build_vale.sh
 RUN rm ${MYHOME}/FStar/vale/build.sh
 RUN rm ${MYHOME}/FStar/vale/id_rsa
 RUN rm ${MYHOME}/FStar/vale/commitinfofilename.json
