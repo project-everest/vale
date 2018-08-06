@@ -138,7 +138,7 @@ let bv128_64_64_lowerUpper128u_bv_rhs1 (x0 x1:bv_t 64) (xx0 xx1:bv_t 128) : Lemm
   (requires xx0 == bv_uext #64 #64 x0 /\ xx1 == bv_uext #64 #64 x1)
   (ensures bv128_64_64 x0 x1 == bvor (bvshl xx1 64) xx0)
   =
-  assert (bv128_64_64 x0 x1 == bvor (bvshl xx1 64) xx0) by (fun () ->
+  assert (bv128_64_64 x0 x1 == bvor (bvshl xx1 64) xx0) by (
 	  norm[delta];
     destruct_conj ();
     rewrite_eqs_from_context ();
