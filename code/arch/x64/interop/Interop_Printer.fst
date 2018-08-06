@@ -113,7 +113,7 @@ let namelist_of_args args =
   | (a, _, _)::q -> a ^ ";" ^ aux q in
   "[" ^ aux args ^ "]" 
 
-let disjoint args =
+let disjoint (args:list arg) =  //AR: added an annotation, see #1502
   let args = List.Tot.Base.filter is_buffer args in
   "bufs_disjoint " ^ namelist_of_args args
 
