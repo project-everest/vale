@@ -18,6 +18,8 @@ ARG COMMITID
 
 RUN export FSTAR_HOME=${MYHOME}/FStar
 
+WORKDIR ${MYHOME}/FStar
+
 # Do some cleanup
 RUN rm -rf hacl-star
 RUN rm -rf hacl-star-old
@@ -39,9 +41,12 @@ RUN rm -f commitinfofilename.json
 RUN mkdir ${MYHOME}/FStar/vale
 COPY --chown=everest / ${MYHOME}/FStar/vale/
 
-# vale make calls git clean, which will delete buildlogfile.txt
-# Because of that we will first output on the parent folder
-WORKDIR ${MYHOME}/FStar
+# Remove extra files.
+RUN rm ${MYHOME}/vale/Dockerfile
+RUN rm ${MYHOME}/vale/build_fstar.sh
+RUN rm ${MYHOME}/vale/build.sh
+RUN rm ${MYHOME}/vale/id_rsa
+RUN rm ${MYHOME}/vale/commitinfofilename.json
 
 # ADD SSH KEY
 RUN mkdir -p ${MYHOME}/.ssh
