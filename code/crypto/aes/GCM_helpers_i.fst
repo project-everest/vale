@@ -239,15 +239,15 @@ let le_quad32_to_bytes_sel (q : quad32) (i:nat{i < 16}) =
 
 
 #reset-options "--smtencoding.elim_box true --z3rlimit 40 --z3refresh --initial_ifuel 0 --max_ifuel 1 --initial_fuel 1 --max_fuel 1"
-let lemma_pad_to_32_bits (s s'':seq4 nat8) (n:nat) : Lemma
+let lemma_pad_to_32_bits_helper (s s'':seq4 nat8) (n:nat) : Lemma
   (requires
-    n <= 4 /\
+    n <= 2 /\
     (forall (i:nat).{:pattern (index s i) \/ (index s'' i)} i < 4 ==>
       index s'' i == (if i < n then index s i else 0))
   )
   (ensures four_to_nat 8 (seq_to_four_LE s'') == four_to_nat 8 (seq_to_four_LE s) % pow2 (8 * n))
   =
-  assert (n == 0 \/ n == 1 \/ n == 2 \/ n == 3 \/ n == 4);
+  assert (n == 0 \/ n == 1 \/ n == 2);
   assert_norm (four_to_nat 8 (seq_to_four_LE s) == four_to_nat_unfold 8 (seq_to_four_LE s));
   assert_norm (four_to_nat 8 (seq_to_four_LE s'') == four_to_nat_unfold 8 (seq_to_four_LE s''));
   assert_norm (pow2 (0 * 8) == 1);
@@ -259,6 +259,26 @@ let lemma_pad_to_32_bits (s s'':seq4 nat8) (n:nat) : Lemma
   assert (n == 0 ==> x % pow2 (8 * n) == x % 0x1);
   assert (n == 1 ==> x % pow2 (8 * n) == x % 0x100);
   assert (n == 2 ==> x % pow2 (8 * n) == x % 0x10000);
+  ()
+
+let lemma_pad_to_32_bits (s s'':seq4 nat8) (n:nat) : Lemma
+  (requires
+    n <= 4 /\
+    (forall (i:nat).{:pattern (index s i) \/ (index s'' i)} i < 4 ==>
+      index s'' i == (if i < n then index s i else 0))
+  )
+  (ensures four_to_nat 8 (seq_to_four_LE s'') == four_to_nat 8 (seq_to_four_LE s) % pow2 (8 * n))
+  =
+  if n <= 2 then lemma_pad_to_32_bits_helper s s'' n else
+  assert (n == 3 \/ n == 4);
+  assert_norm (four_to_nat 8 (seq_to_four_LE s) == four_to_nat_unfold 8 (seq_to_four_LE s));
+  assert_norm (four_to_nat 8 (seq_to_four_LE s'') == four_to_nat_unfold 8 (seq_to_four_LE s''));
+  assert_norm (pow2 (0 * 8) == 1);
+  assert_norm (pow2 (1 * 8) == 0x100);
+  assert_norm (pow2 (2 * 8) == 0x10000);
+  assert_norm (pow2 (3 * 8) == 0x1000000);
+  assert_norm (pow2 (4 * 8) == 0x100000000);
+  let x = four_to_nat 8 (seq_to_four_LE s'') in
   assert (n == 3 ==> x % pow2 (8 * n) == x % 0x1000000);
   assert (n == 4 ==> x % pow2 (8 * n) == x % 0x100000000);
   ()
