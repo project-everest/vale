@@ -1,5 +1,7 @@
 Vale (Verified Assembly Language for Everest)
 =============================================
+(Legacy branch for older Dafny code)
+=============================================
 
 Vale is a tool for constructing formally verified high-performance assembly language code,
 with an emphasis on cryptographic code.
