@@ -1,7 +1,7 @@
 module X64.Semantics_s
 
 open X64.Machine_s
-open X64.Memory_i_s
+open X64.Memory_s
 open Words_s
 open Words.Two_s
 open Words.Four_s

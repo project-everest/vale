@@ -1,9 +1,9 @@
 module Vale_inc32_buffer_win
 
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
 open GCTR_s
 open X64.GCTR
 

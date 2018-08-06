@@ -10,27 +10,27 @@ open Opaque_s
 open FStar.Seq
 open Words_s
 open Types_s
-open Types_i
+open Arch.Types
 open AES_s
 open GHash_s
-open GHash_i
+open GHash
 open GF128_s
-open GF128_i
+open GF128
 open GCTR_s
-open GCM_helpers_i
+open GCM_helpers
 open Math.Poly2_s
-open X64.Poly1305.Math_i
+open X64.Poly1305.Math
 open X64.GF128_Mul
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
 open X64.Vale.InsBasic
 open X64.Vale.InsMem
 open X64.Vale.InsVector
 open X64.Vale.InsAes
-open X64.Vale.QuickCode_i
-open X64.Vale.QuickCodes_i
+open X64.Vale.QuickCode
+open X64.Vale.QuickCodes
 #endverbatim
 
 #verbatim{:interface}
@@ -93,7 +93,7 @@ procedure {:quick} compute_ghash_incremental_register()
     ensures
         io == ghash_incremental(h, old(io), create(1, old(input)));
 {
-    Pxor(io, input);    // Y_i := Y_{i-1} ^ x_i
+    Pxor(io, input);    // Y_i := Y_{i-1} ^ x
     Mov128(xmm2, h);    // Move h into the register that ReduceMul128_LE expects
 
     lemma_to_of_quad32(reverse_bytes_quad32(io));   // Help satisfy precondition
@@ -328,7 +328,7 @@ procedure {:quick} compute_ghash_incremental(
                 len - rdx;
         {
             Load128_buffer(xmm2, r9, 0, Secret, in_b, rdx);
-            Pxor(io, xmm2);        // Y_i := Y_{i-1} ^ x_i
+            Pxor(io, xmm2);        // Y_i := Y_{i-1} ^ x
             Mov128(xmm2, h);       // xmm2 := H
 
             lemma_to_of_quad32(reverse_bytes_quad32(xmm1));   // Help satisfy precondition
@@ -396,7 +396,7 @@ procedure {:quick} compute_ghash_incremental_partial(
                 len - rdx;
         {
             Load128_buffer(xmm2, r9, 0, Secret, in_b, rdx);
-            Pxor(io, xmm2);        // Y_i := Y_{i-1} ^ x_i
+            Pxor(io, xmm2);        // Y_i := Y_{i-1} ^ x
             Mov128(xmm2, h);       // xmm2 := H
 
             lemma_to_of_quad32(reverse_bytes_quad32(xmm1));   // Help satisfy precondition

@@ -2,18 +2,18 @@ module Vale_ghash_incremental_extra_stdcall_win
 
 open Words_s
 open Types_s
-open Types_i
+open Arch.Types
 open AES_s
 open GHash_s
-open GHash_i
+open GHash
 open GF128_s
-open GF128_i
+open GF128
 open GCTR_s
-open GCM_helpers_i
+open GCM_helpers
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
 open X64.GHash
 
 val va_code_ghash_incremental_extra_stdcall_win: unit -> va_code

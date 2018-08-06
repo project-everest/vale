@@ -2,13 +2,13 @@ module Vale_aes128_encrypt_block_win
 
 open FStar.Seq
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
 open AES_s
-open Types_i
-//open AES_helpers_i
-open AES256_helpers_i
+open Arch.Types
+//open AES_helpers
+open AES256_helpers
 //open Opaque_s
 open X64.AES128
 open X64.AES256

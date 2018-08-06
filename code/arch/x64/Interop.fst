@@ -15,7 +15,7 @@ module M = LowStar.Modifies
 open Opaque_s
 open X64.Machine_s
 open X64.Bytes_Semantics_s
-open X64.Bytes_Semantics_i
+open X64.Bytes_Semantics
 
 #reset-options "--max_fuel 2 --initial_fuel 2 --max_ifuel 1 --initial_ifuel 1"
 

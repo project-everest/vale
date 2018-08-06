@@ -5,25 +5,25 @@ module X64.Vale.InsMem
 #verbatim{:interface}
 open Types_s
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
-open X64.Vale.QuickCode_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.QuickCode
 open X64.Vale.InsBasic
 #endverbatim
 
 #verbatim
 open X64.Machine_s
-open X64.Memory_i
+open X64.Memory
 open X64.Vale
-open X64.Vale.State_i
-open X64.Vale.StateLemmas_i
-open X64.Vale.Decls_i
+open X64.Vale.State
+open X64.Vale.StateLemmas
+open X64.Vale.Decls
 open X64.Vale.InsBasic
 module S = X64.Bytes_Semantics_s
 module TS = X64.Taint_Semantics_s
 module P = X64.Print_s
-open X64.Taint_Semantics_i
+open X64.Taint_Semantics
 #endverbatim
 
 #reset-options "--initial_fuel 2 --max_fuel 4 --max_ifuel 2 --z3rlimit 20"

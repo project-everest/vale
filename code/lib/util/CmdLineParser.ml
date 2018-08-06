@@ -22,7 +22,7 @@ let proc_name : string -> platform -> string =
 
 let parse_cmdline :
   (string * (Prims.bool ->
-    (X64_Vale_Decls_i.ins,X64_Vale_Decls_i.ocmp) X64_Machine_s.precode)) list -> unit
+    (X64_Vale_Decls.ins,X64_Vale_Decls.ocmp) X64_Machine_s.precode)) list -> unit
   =
   fun l  ->
   let argc = Array.length Sys.argv in
@@ -52,14 +52,14 @@ let parse_cmdline :
     in
     let printer =
       match asm_choice with
-      | GCC -> X64_Vale_Decls_i.gcc
-      | MASM -> X64_Vale_Decls_i.masm
+      | GCC -> X64_Vale_Decls.gcc
+      | MASM -> X64_Vale_Decls.masm
     in
     let windows = platform_choice = Win in
-    X64_Vale_Decls_i.print_header printer;
+    X64_Vale_Decls.print_header printer;
     let _ = List.fold_left (fun label_count (name, code) ->
-                           X64_Vale_Decls_i.print_proc (proc_name name platform_choice)
+                           X64_Vale_Decls.print_proc (proc_name name platform_choice)
                                                        (code windows)
                                                        label_count printer)
                            (Prims.parse_int "0") l in
-    X64_Vale_Decls_i.print_footer printer
+    X64_Vale_Decls.print_footer printer

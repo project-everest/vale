@@ -13,14 +13,14 @@ open Interop
 open Words_s
 open Types_s
 open X64.Machine_s
-open X64.Memory_i_s
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory_s
+open X64.Vale.State
+open X64.Vale.Decls
 open AES_s
 open GCTR_s
 open GCM_s
-open GCM_helpers_i
-open GHash_i
+open GCM_helpers
+open GHash
 
 open FStar.Mul
 

@@ -12,7 +12,7 @@ module S8 = SecretByte
 open Interop
 open Words_s
 open Types_s
-open X64.Memory_i_s
+open X64.Memory_s
 
 let s8 = B.buffer S8.t
 

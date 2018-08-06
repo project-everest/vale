@@ -8,13 +8,13 @@ open Words_s
 open Words.Two_s
 open Words.Four_s
 open Types_s
-open Types_i
+open Arch.Types
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
-open X64.Vale.QuickCode_i
-open X64.Vale.QuickCodes_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.QuickCode
+open X64.Vale.QuickCodes
 open X64.Vale.InsBasic
 open X64.Vale.InsMem
 
@@ -24,9 +24,9 @@ let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = let m:nat = n in m
 
 #verbatim
 open X64.Vale
-open X64.Vale.StateLemmas_i
-open X64.Vale.InsLemmas_i
-open X64.Taint_Semantics_i
+open X64.Vale.StateLemmas
+open X64.Vale.InsLemmas
+open X64.Taint_Semantics
 module S = X64.Bytes_Semantics_s
 module TS = X64.Taint_Semantics_s
 #endverbatim
@@ -366,7 +366,7 @@ procedure {:quick exportOnly} ZeroXmm(inout dst:xmm)
         dst == Mkfour(0, 0, 0, 0);
 {
     Pxor(dst, dst);
-    Types_i.lemma_quad32_xor();
+    Arch.Types.lemma_quad32_xor();
 }
 
 procedure {:quick exportOnly} InitPshufbMask(inout dst:xmm, out tmp:reg_opr64)

@@ -6,23 +6,23 @@ module X64.Vale.InsAes
 #verbatim{:interface}
 open Words_s
 open Types_s
-open Types_i
+open Arch.Types
 open AES_s
 open Math.Poly2_s
 open Math.Poly2.Bits_s
 open X64.Machine_s
-open X64.Vale.State_i
-open X64.Vale.Decls_i
-open X64.Vale.QuickCode_i
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.QuickCode
 #endverbatim
 
 #verbatim
 open Types_s
 open X64.Machine_s
 open X64.Vale
-open X64.Vale.State_i
-open X64.Vale.StateLemmas_i
-open X64.Vale.Decls_i
+open X64.Vale.State
+open X64.Vale.StateLemmas
+open X64.Vale.Decls
 module S = X64.Bytes_Semantics_s
 module TS = X64.Taint_Semantics_s
 module P = X64.Print_s

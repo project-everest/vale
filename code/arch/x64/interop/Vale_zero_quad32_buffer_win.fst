@@ -2,9 +2,9 @@ module Vale_zero_quad32_buffer_win
 
 open Words_s
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
 open X64.Util
 
 val va_code_zero_quad32_buffer_win: unit -> va_code

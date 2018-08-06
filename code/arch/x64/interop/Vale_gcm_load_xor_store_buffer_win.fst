@@ -1,12 +1,12 @@
 module Vale_gcm_load_xor_store_buffer_win
 
 open X64.Machine_s
-open X64.Memory_i
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory
+open X64.Vale.State
+open X64.Vale.Decls
 open X64.Util
 open AES_s
-open GCTR_i
+open GCTR
 open GCTR_s
 
 val va_code_gcm_load_xor_store_buffer_win: unit -> va_code

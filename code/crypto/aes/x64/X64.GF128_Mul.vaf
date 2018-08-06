@@ -6,23 +6,23 @@ module X64.GF128_Mul
 
 #verbatim{:interface}{:implementation}
 open Types_s
-open Types_i
+open Arch.Types
 open Math.Poly2_s
-open Math.Poly2_i
+open Math.Poly2
 open Math.Poly2.Bits_s
-open Math.Poly2.Bits_i
-open Math.Poly2.Lemmas_i
+open Math.Poly2.Bits
+open Math.Poly2.Lemmas
 open GF128_s
-open GF128_i
+open GF128
 open X64.Machine_s
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Vale.State
+open X64.Vale.Decls
 open X64.Vale.InsBasic
 open X64.Vale.InsMem
 open X64.Vale.InsVector
 open X64.Vale.InsAes
-open X64.Vale.QuickCode_i
-open X64.Vale.QuickCodes_i
+open X64.Vale.QuickCode
+open X64.Vale.QuickCodes
 #endverbatim
 
 procedure{:quick} ShiftLeft128_1(ghost a:poly)

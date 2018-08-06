@@ -13,9 +13,9 @@ open Interop
 open Words_s
 open Types_s
 open X64.Machine_s
-open X64.Memory_i_s
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory_s
+open X64.Vale.State
+open X64.Vale.Decls
 
 let b8 = B.buffer UInt8.t
 let s8 = B.buffer S8.t

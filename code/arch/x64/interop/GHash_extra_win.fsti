@@ -12,17 +12,17 @@ module S8 = SecretByte
 open Interop
 open Words_s
 open Words.Seq_s
-open Types_i
+open Arch.Types
 open Types_s
 open X64.Machine_s
-open X64.Memory_i_s
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory_s
+open X64.Vale.State
+open X64.Vale.Decls
 open GCTR_s
-open GCTR_i
+open GCTR
 open GCM_s
-open GCM_helpers_i
-open GHash_i
+open GCM_helpers
+open GHash
 
 let s8 = B.buffer S8.t
 

@@ -13,12 +13,12 @@ open Interop
 open Words_s
 open Types_s
 open X64.Machine_s
-open X64.Memory_i_s
-open X64.Vale.State_i
-open X64.Vale.Decls_i
+open X64.Memory_s
+open X64.Vale.State
+open X64.Vale.Decls
 open AES_s
 open GCTR_s
-open GCTR_i
+open GCTR
 
 let s8 = B.buffer S8.t
 

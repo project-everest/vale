@@ -14,17 +14,17 @@ module ST = FStar.HyperStack.ST
 module HST = FStar.HyperStack.ST
 
 open Types_s
-open Types_i
+open Arch.Types
 open Words_s
 open Words.Seq_s
 open AES_s
 open GCTR_s
-open GCTR_i
+open GCTR
 open GCM_s
-open GCM_helpers_i
+open GCM_helpers
 open GHash_s
-open GHash_i
-open X64.Memory_i_s
+open GHash
+open X64.Memory_s
 open BufferViewHelpers
 open FStar.Seq
 
@@ -891,7 +891,7 @@ let gcm_core_part1
   gcm128_one_pass plain_b plain_num_bytes iv_b key keys_b cipher_b h_b hash_b;
   let h4 = ST.get() in
   let y_cipher = Ghost.elift2 buffer_to_quad32 (Ghost.hide hash_b) (Ghost.hide h4) in
-  GCM_i.gcm_encrypt_LE_fst_helper
+  GCM.gcm_encrypt_LE_fst_helper
     (Ghost.reveal icb_enc)
     (Ghost.reveal iv_BE)
     (slice (le_seq_quad32_to_bytes (buffer_to_seq_quad32  plain_b h0)) 0 (U64.v plain_num_bytes))
@@ -1031,7 +1031,7 @@ let gcm_core
 
   le_seq_quad32_to_bytes_of_singleton (buffer_to_quad32 tag_b h6);
 
-  GCM_i.gcm_encrypt_LE_snd_helper
+  GCM.gcm_encrypt_LE_snd_helper
     (Ghost.reveal iv_BE)
     (buffer_to_quad32 length_quad_b h3)
     (Ghost.reveal y_final)
