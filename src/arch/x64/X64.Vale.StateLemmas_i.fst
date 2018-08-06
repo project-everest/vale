@@ -2,7 +2,6 @@ module X64.Vale.StateLemmas_i
 open X64.Machine_s
 open X64.Vale.State_i
 module S = X64.Semantics_s
-module M = TransparentMap
 module BS = X64.Bytes_Semantics_s
 module ME = X64.Memory_i_s
 

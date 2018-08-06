@@ -2,12 +2,11 @@
 
 include "../../lib/util/operations.s.dfy"
 include "../../lib/util/words_and_bytes.s.dfy"
-include "../../crypto/aes/aes.s.dfy"
 
 module x64_def_s {
 
 import opened operations_s
-import opened AESModule
+import opened words_and_bytes_s
 
 datatype taint = Public | Secret
 datatype x86reg =
@@ -46,15 +45,7 @@ datatype ins =
 | Shl64(dstShlConst64:operand, amountShlConst64:operand)
 | Shr32(dstShrConst:operand, amountShrConst:operand)
 | Shr64(dstShrConst64:operand, amountShrConst64:operand)
-| AESNI_enc(dstEnc:operand, srcEnc:operand)
-| AESNI_enc_last(dstEncLast:operand, srcEncLast:operand)
-| AESNI_dec(dstDec:operand, srcDec:operand)
-| AESNI_dec_last(dstDecLast:operand, srcDecLast:operand)
-| AESNI_imc(dstImc:operand, srcImc:operand)
-| AESNI_keygen_assist(dstKeygenAssist:operand, srcKeygenAssist:operand, imm8KeygenAssist:operand)
 | Pxor(dstPXor:operand, srcPXor:operand)
-| Pshufd(dstPshufd:operand, srcPshufd:operand, permutationPshufd:operand)
-| VPSLLDQ(dstVPSLLDQ:operand, srcVPSLLDQ:operand, countVPSLLDQ:operand)
 | MOVDQU(dstMovdqu:operand, srcMovdqu:operand)
 
 datatype codes = CNil | va_CCons(hd:code, tl:codes)
@@ -541,15 +532,7 @@ predicate ValidInstruction(s:state, ins:ins)
         case Shl64(dstShrConst, amountShr) => Valid64BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand64(s, amountShr) && Valid64BitSourceOperand(s, dstShrConst)
         case Shr32(dstShrConst, amountShr) => Valid32BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand(s, amountShr) && Valid32BitSourceOperand(s, dstShrConst)
         case Shr64(dstShrConst, amountShr) => Valid64BitDestinationOperand(s, dstShrConst) && ValidShiftAmountOperand64(s, amountShr) && Valid64BitSourceOperand(s, dstShrConst)
-        case AESNI_enc(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
-        case AESNI_enc_last(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
-        case AESNI_dec(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
-        case AESNI_dec_last(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
-        case AESNI_imc(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
-        case AESNI_keygen_assist(dst, src, imm8) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src) && ValidImm8(s, imm8)
         case Pxor(dst, src) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src)
-        case Pshufd(dst, src, permutation) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src) && ValidImm8(s, permutation)
-        case VPSLLDQ(dst, src, count) => ValidXmmDestinationOperand(s, dst) && ValidXmmSourceOperand(s, src) && ValidImm8(s, count) && eval_op32(s, count) == 4
         case MOVDQU(dst, src) => Valid128BitDestinationOperand(s, dst) && Valid128BitSourceOperand(s, src) && !src.OConst? && (IsXmmOperand(dst) || IsXmmOperand(src))
 }
 
@@ -603,15 +586,7 @@ function insObs(s:state, ins:ins):seq<observation>
         case Shl64(dst, amount) => operandObs(s, 64, dst) + operandObs(s, 64, amount)
         case Shr32(dst, amount) => operandObs(s, 32, dst) + operandObs(s, 32, amount)
         case Shr64(dst, amount) => operandObs(s, 64, dst) + operandObs(s, 64, amount)
-        case AESNI_enc(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
-        case AESNI_enc_last(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
-        case AESNI_dec(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
-        case AESNI_dec_last(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
-        case AESNI_imc(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
-        case AESNI_keygen_assist(dst, src, imm8) => operandObs(s, 128, dst) + operandObs(s, 128, src)
         case Pxor(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
-        case Pshufd(dst, src, permutation) => operandObs(s, 128, dst) +  operandObs(s, 128, src)
-        case VPSLLDQ(dst, src, count) => operandObs(s, 128, dst) + operandObs(s, 128, src)
         case MOVDQU(dst, src) => operandObs(s, 128, dst) + operandObs(s, 128, src)
 }
 
@@ -682,25 +657,7 @@ predicate evalIns(ins:ins, s:state, r:state)
             case Shr64(dst, amount) =>
                 var n := if amount.OConst? then amount.n else s.regs[X86Ecx];
                 if 0 <= n < 64 then evalUpdateAndHavocFlags64(s, dst, BitwiseShr64(eval_op64(s, dst), n), r, obs) else !r.ok
-            case AESNI_enc(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(MixColumns(SubBytes(ShiftRows(s.xmms[dst.r.xmm]))), s.xmms[src.r.xmm]), r, obs)
-            case AESNI_enc_last(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(SubBytes(ShiftRows(s.xmms[dst.r.xmm])), s.xmms[src.r.xmm]), r, obs)
-            case AESNI_dec(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(InvMixColumns(InvSubBytes(InvShiftRows(s.xmms[dst.r.xmm]))), s.xmms[src.r.xmm]), r, obs)
-            case AESNI_dec_last(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(InvSubBytes(InvShiftRows(s.xmms[dst.r.xmm])), s.xmms[src.r.xmm]), r, obs)
-            case AESNI_imc(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, InvMixColumns(s.xmms[src.r.xmm]), r, obs)
-            case AESNI_keygen_assist(dst, src, imm8) => evalUpdateXmmsAndHavocFlags(s, dst, Quadword(
-                                                                                                SubWord(s.xmms[src.r.xmm].mid_lo), 
-                                                                                                BitwiseXor(RotWord(SubWord(s.xmms[src.r.xmm].mid_lo)), eval_op32(s, imm8)),
-                                                                                                SubWord(s.xmms[src.r.xmm].hi),
-                                                                                                BitwiseXor(RotWord(SubWord(s.xmms[src.r.xmm].hi)), eval_op32(s, imm8))
-                                                                                                ), r, obs)
             case Pxor(dst, src) => evalUpdateXmmsAndHavocFlags(s, dst, QuadwordXor(s.xmms[dst.r.xmm], s.xmms[src.r.xmm]), r, obs)
-            case Pshufd(dst, src, permutation) => evalUpdateXmmsAndHavocFlags(s, dst, Quadword(
-                                                                             select_word(s.xmms[src.r.xmm], byte_to_bits(eval_op32(s,permutation)).lo),
-                                                                             select_word(s.xmms[src.r.xmm], byte_to_bits(eval_op32(s,permutation)).mid_lo),
-                                                                             select_word(s.xmms[src.r.xmm], byte_to_bits(eval_op32(s,permutation)).mid_hi),
-                                                                             select_word(s.xmms[src.r.xmm], byte_to_bits(eval_op32(s,permutation)).hi)
-                                                                             ), r, obs)
-            case VPSLLDQ(dst, src, count) => evalUpdateXmmsAndHavocFlags(s, dst, Quadword(0, s.xmms[src.r.xmm].lo, s.xmms[src.r.xmm].mid_lo, s.xmms[src.r.xmm].mid_hi), r, obs)
             case MOVDQU(dst, src) => evalUpdate128AndHavocFlags(s, dst, Eval128BitOperand(s, src), r, obs)
 }
 

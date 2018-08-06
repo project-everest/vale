@@ -309,7 +309,7 @@ fstar_default_args_nosmtencoding = ('--max_fuel 1 --max_ifuel 1' \
   # Don't remove unless you're sure you've used the axiom profiler to make sure you have no matching loops
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
   + ' --hint_info' \
-  + ('' if is_single_vaf else ' --use_hints') \
+  #+ ('' if is_single_vaf else ' --use_hints') \
   + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
   + (' --use_extracted_interfaces true')
   )
@@ -681,7 +681,7 @@ def add_kremlin(env):
                            emitter = kremlin_emitter)
   # Copy pre-generated FStar.h; could be regenerared using
   # krml -fnouint128 -I ../kremlin/kremlib -skip-compilation ulib/FStar.UInt128.fst
-  env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
+  #env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
   env.Append(BUILDERS = {'Kremlin' : kremlin})
 
 # Pseudo-builder that takes Dafny code and extracts it via Kremlin
@@ -1195,18 +1195,6 @@ if do_fstar and stage2 and not is_single_vaf:
 # Verification
 env.VerifyFStarFiles(external_files)
 env.VerifyFilesIn(verify_paths)
-
-#
-# build aesgcm
-#
-if fstar_extract and stage2:
-  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/x64/Main.ml', 'src/crypto/aes/x64/X64.GCMdecrypt.vaf', 'src/lib/util/CmdLineParser.ml')
-  if env['TARGET_ARCH'] == 'amd64': 
-    aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
-    aesgcmtest_src = 'src/crypto/aes/x64/TestAesGcm.cpp'
-    aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
-    env.Command(aesgcmtest_cpp, aesgcmtest_src, Copy("$TARGET", "$SOURCE"))
-    aesgcmtest_exe = env.Program(source = [aesgcmasm_obj, aesgcmtest_cpp], target = 'obj/TestAesGcm.exe')
 
 # extract a string filename out of a build failure
 def bf_to_filename(bf):

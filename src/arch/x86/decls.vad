@@ -343,78 +343,6 @@ procedure{:instruction Ins(GetCf(dst))} GetCf(out dst:opr)
 }
 */
 
-procedure {:refined} {:instruction Ins(AESNI_enc(dst, src))} AESNI_enc(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(QuadwordXor(MixColumns(SubBytes(ShiftRows(dst))), src));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
-procedure {:refined} {:instruction Ins(AESNI_enc_last(dst, src))} AESNI_enc_last(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(QuadwordXor(SubBytes(ShiftRows(dst)), src));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
-procedure {:refined} {:instruction Ins(AESNI_dec(dst, src))} AESNI_dec(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(QuadwordXor(InvMixColumns(InvSubBytes(InvShiftRows(dst))), src));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
-procedure {:refined} {:instruction Ins(AESNI_dec_last(dst, src))} 
-          AESNI_dec_last(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(QuadwordXor(InvSubBytes(InvShiftRows(dst)), src));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
-procedure {:refined} {:instruction Ins(AESNI_imc(dst, src))} AESNI_imc(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(InvMixColumns(src));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
-procedure {:refined} {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} 
-          AESNI_keygen_assist(inout dst:opr_quad, src:opr_quad, imm8:opr_imm8)
-  modifies efl;
-  ensures
-    dst == old(Quadword(SubWord(src.mid_lo),
-                   BitwiseXor(RotWord(SubWord(src.mid_lo)), imm8),
-                   SubWord(src.hi),
-                   BitwiseXor(RotWord(SubWord(src.hi)), imm8)
-                   ));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
 procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
@@ -426,112 +354,7 @@ procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad,
     this := this.(heaplets := old(this).heaplets);
 }
 
-procedure {:refined} {:instruction Ins(Pshufd(dst, src, permutation))} 
-          Pshufd(inout dst:opr_quad, src:opr_quad, permutation:opr_imm8)
-  modifies efl;
-  ensures
-    dst == old(Quadword(select_word(src, byte_to_bits(permutation).lo),
-                        select_word(src, byte_to_bits(permutation).mid_lo),
-                        select_word(src, byte_to_bits(permutation).mid_hi),
-                        select_word(src, byte_to_bits(permutation).hi)));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
-procedure {:refined} {:instruction Ins(VPSLLDQ(dst, src, OConst(4)))} VPSLLDQ4(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(Quadword(0, src.lo, src.mid_lo, src.mid_hi));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
-}
-
 /*
-
-procedure {:instruction Ins(AESNI_keygen_assist(dst, src, imm8))} AESNI_keygen_assist(inout dst:opr, src:opr, imm8:opr)
-  requires/ensures
-    x86_ValidState(this);
-    x86_ValidXmmDestinationOperand(this, @dst);
-    x86_ValidXmmSourceOperand(this, @src);
-    ValidImm8(to_state(this), to_operand(@imm8));
-  requires
-    Has(this, ResolveOperand(this, @imm8));
-  ensures
-    ValidInstruction(to_state(old(this)), AESNI_keygen_assist(to_operand(@dst), to_operand(@src), to_operand(@imm8)));
-    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(XMM(
-                                            SubWord(this.xmms[@src.r.xmm].mid_lo),
-                                            BitwiseXor(RotWord(SubWord(this.xmms[@src.r.xmm].mid_lo)), imm8),
-                                            SubWord(this.xmms[@src.r.xmm].hi),
-                                            BitwiseXor(RotWord(SubWord(this.xmms[@src.r.xmm].hi)), imm8)
-                                   )), this, x86_insObservations(old(this), Ins(AESNI_keygen_assist(to_operand(@dst), to_operand(@src), to_operand(@imm8)))));
-{
-    reveal evalCodeOpaque;
-    reveal va_code_AESNI_enc;
-    reveal x86_ValidState;
-    reveal valid_state;
-    reveal Has;
-    reveal Get;
-    this := this.(heaplets := old(this).heaplets);
-    ghost var v;
-    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
-}
-
-
-procedure {:instruction Ins(Pshufd(dst, src, permutation))} Pshufd(inout dst:opr, src:opr, permutation:opr)
-  requires/ensures
-    x86_ValidState(this);
-    x86_ValidXmmDestinationOperand(this, @dst);
-    x86_ValidXmmSourceOperand(this, @src);
-    ValidImm8(to_state(this), to_operand(@permutation));
-    Has(this, ResolveOperand(this, @permutation));
-  ensures
-    ValidInstruction(to_state(old(this)), Pshufd(to_operand(@dst), to_operand(@src), to_operand(@permutation)));
-    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(XMM(
-                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).lo),
-                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).mid_lo),
-                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).mid_hi),
-                                            select_word(this.xmms[@src.r.xmm], byte_to_bits(permutation).hi)
-                                            )), this, x86_insObservations(old(this), Ins(Pshufd(to_operand(@dst), to_operand(@src), to_operand(@permutation)))));
-{
-    reveal evalCodeOpaque;
-    reveal va_code_AESNI_enc;
-    reveal x86_ValidState;
-    reveal valid_state;
-    reveal Has;
-    reveal Get;
-    this := this.(heaplets := old(this).heaplets);
-    ghost var v;
-    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
-}
-
-procedure {:instruction Ins(VPSLLDQ(dst, src, count))} VPSLLDQ(inout dst:opr, src:opr, count:opr)
-  requires/ensures
-    x86_ValidState(this);
-    x86_ValidXmmDestinationOperand(this, @dst);
-    x86_Valid32BitSourceOperand(this, @count);
-    x86_ValidXmmSourceOperand(this, @src);
-    ValidImm8(to_state(this), to_operand(@count));
-    count == 4;
-  ensures
-    ValidInstruction(to_state(old(this)), VPSLLDQ(to_operand(@dst), to_operand(@src), to_operand(@count)));
-    x86_evalUpdate128AndHavocFlags(old(this), @dst, old(XMM(0, this.xmms[@src.r.xmm].lo, this.xmms[@src.r.xmm].mid_lo, this.xmms[@src.r.xmm].mid_hi)), this, x86_insObservations(old(this), Ins(VPSLLDQ(to_operand(@dst), to_operand(@src), to_operand(@count)))));
-{
-    reveal evalCodeOpaque;
-    reveal va_code_AESNI_enc;
-    reveal x86_ValidState;
-    reveal valid_state;
-    reveal Has;
-    reveal Get;
-    this := this.(heaplets := old(this).heaplets);
-    ghost var v;
-    lemma_HeapletsUpdatedCorrectly128(old(this), this, @dst, v);
-}
 
 procedure {:instruction Ins(MOVDQU(dst, src))} MOVDQU(inout dst:opr, src:opr)
   requires/ensures
@@ -545,7 +368,6 @@ procedure {:instruction Ins(MOVDQU(dst, src))} MOVDQU(inout dst:opr, src:opr)
     x86_evalUpdate128AndHavocFlags(old(this), @dst, old(Eval128BitOperand(to_state(this), to_operand(@src))), this, x86_insObservations(old(this), Ins(MOVDQU(to_operand(@dst), to_operand(@src)))));
 {
     reveal evalCodeOpaque;
-    reveal va_code_AESNI_enc;
     reveal x86_ValidState;
     reveal valid_state;
     reveal Has;

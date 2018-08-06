@@ -1056,156 +1056,6 @@ method checkIfShr64ConsumesFixedTime(ins:ins, ts:taintState)
     lemma_Shr64Helper2(ins, fixedTime, ts, ts');
 }
 
-method checkIfAESNI_encConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.AESNI_enc?;
-    requires ins.srcEnc.OReg? && ins.srcEnc.r.X86Xmm?;
-    requires ins.dstEnc.OReg? && ins.dstEnc.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcEnc;
-    var dst := ins.dstEnc;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    var dstTaint := operandTaint(dst, ts);
-    var mergedTaint := mergeTaint(srcTaint, dstTaint);
-
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := mergedTaint],
-               flagsTaint := Secret);
-
-    lemma_AESNI_encHelper1(ins, fixedTime, ts, ts');
-    lemma_AESNI_encHelper2(ins, fixedTime, ts, ts');
-}
-
-method checkIfAESNI_enc_lastConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.AESNI_enc_last?;
-    requires ins.srcEncLast.OReg? && ins.srcEncLast.r.X86Xmm?;
-    requires ins.dstEncLast.OReg? && ins.dstEncLast.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcEncLast;
-    var dst := ins.dstEncLast;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    var dstTaint := operandTaint(dst, ts);
-    var mergedTaint := mergeTaint(srcTaint, dstTaint);
-
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := mergedTaint],
-               flagsTaint := Secret);
-
-    lemma_AESNI_enc_lastHelper1(ins, fixedTime, ts, ts');
-    lemma_AESNI_enc_lastHelper2(ins, fixedTime, ts, ts');
-}
-
-method checkIfAESNI_decConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.AESNI_dec?;
-    requires ins.srcDec.OReg? && ins.srcDec.r.X86Xmm?;
-    requires ins.dstDec.OReg? && ins.dstDec.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcDec;
-    var dst := ins.dstDec;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    var dstTaint := operandTaint(dst, ts);
-    var mergedTaint := mergeTaint(srcTaint, dstTaint);
-
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := mergedTaint],
-               flagsTaint := Secret);
-
-    lemma_AESNI_decHelper1(ins, fixedTime, ts, ts');
-    lemma_AESNI_decHelper2(ins, fixedTime, ts, ts');
-}
-
-method checkIfAESNI_dec_lastConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.AESNI_dec_last?;
-    requires ins.srcDecLast.OReg? && ins.srcDecLast.r.X86Xmm?;
-    requires ins.dstDecLast.OReg? && ins.dstDecLast.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcDecLast;
-    var dst := ins.dstDecLast;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    var dstTaint := operandTaint(dst, ts);
-    var mergedTaint := mergeTaint(srcTaint, dstTaint);
-
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := mergedTaint],
-               flagsTaint := Secret);
-
-    lemma_AESNI_dec_lastHelper1(ins, fixedTime, ts, ts');
-    lemma_AESNI_dec_lastHelper2(ins, fixedTime, ts, ts');
-}
-
-method checkIfAESNI_imcConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.AESNI_imc?;
-    requires ins.srcImc.OReg? && ins.srcImc.r.X86Xmm?;
-    requires ins.dstImc.OReg? && ins.dstImc.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcImc;
-    var dst := ins.dstImc;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := srcTaint],
-               flagsTaint := Secret);
-
-    lemma_AESNI_imcHelper1(ins, fixedTime, ts, ts');
-    lemma_AESNI_imcHelper2(ins, fixedTime, ts, ts');
-}
-
-method checkIfVPSLLDQConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.VPSLLDQ?;
-    requires ins.srcVPSLLDQ.OReg? && ins.srcVPSLLDQ.r.X86Xmm?;
-    requires ins.dstVPSLLDQ.OReg? && ins.dstVPSLLDQ.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcVPSLLDQ;
-    var dst := ins.dstVPSLLDQ;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := srcTaint],
-               flagsTaint := Secret);
-
-    lemma_VPSLLDQHelper1(ins, fixedTime, ts, ts');
-    lemma_VPSLLDQHelper2(ins, fixedTime, ts, ts');
-}
-
 method checkIfMOVDQUConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -1243,29 +1093,6 @@ method checkIfMOVDQUConsumesFixedTime(ins:ins, ts:taintState)
     lemma_MOVDQUHelper2(ins, fixedTime, ts, ts');
 }
 
-method checkIfPshufdConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.Pshufd?;
-    requires ins.srcPshufd.OReg? && ins.srcPshufd.r.X86Xmm?;
-    requires ins.dstPshufd.OReg? && ins.dstPshufd.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcPshufd;
-    var dst := ins.dstPshufd;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := srcTaint],
-               flagsTaint := Secret);
-
-    lemma_PshufdHelper1(ins, fixedTime, ts, ts');
-    lemma_PshufdHelper2(ins, fixedTime, ts, ts');
-}
-
 method checkIfPxorConsumesFixedTime(ins:ins, ts:taintState)
     returns (fixedTime:bool, ts':taintState)
 
@@ -1294,29 +1121,6 @@ method checkIfPxorConsumesFixedTime(ins:ins, ts:taintState)
     }
     lemma_PxorHelper1(ins, fixedTime, ts, ts');
     lemma_PxorHelper2(ins, fixedTime, ts, ts');
-}
-
-method checkIfAESNI_keygen_assistConsumesFixedTime(ins:ins, ts:taintState)
-    returns (fixedTime:bool, ts':taintState)
-
-    requires ins.AESNI_keygen_assist?;
-    requires ins.srcKeygenAssist.OReg? && ins.srcKeygenAssist.r.X86Xmm?;
-    requires ins.dstKeygenAssist.OReg? && ins.dstKeygenAssist.r.X86Xmm?;
-    ensures  specTaintCheckIns(ins, ts, ts', fixedTime);
-    ensures  fixedTime ==> isConstantTime(Ins(ins), ts);
-    ensures  fixedTime ==> isLeakageFree(Ins(ins), ts, ts');
-{
-    var src := ins.srcKeygenAssist;
-    var dst := ins.dstKeygenAssist;
-
-    fixedTime := true;
-
-    var srcTaint := operandTaint(src, ts);
-    ts' := ts.(xmmTaint := ts.xmmTaint[dst.r.xmm := srcTaint],
-               flagsTaint := Secret);
-
-    lemma_AESNI_keygen_assistHelper1(ins, fixedTime, ts, ts');
-    lemma_AESNI_keygen_assistHelper2(ins, fixedTime, ts, ts');
 }
 
 method checkIfInstructionConsumesFixedTime(ins:ins, ts:taintState)
@@ -1355,15 +1159,7 @@ method checkIfInstructionConsumesFixedTime(ins:ins, ts:taintState)
         case Shr32(dst, amount) => fixedTime, ts' := checkIfShr32ConsumesFixedTime(ins, ts);
         case Shr64(dst, amount) => fixedTime, ts' := checkIfShr64ConsumesFixedTime(ins, ts);
         case BSwap32(dst)       => fixedTime, ts' := checkIfBSwap32ConsumesFixedTime(ins, ts);
-        case AESNI_enc(dst, src)                => fixedTime, ts' := checkIfAESNI_encConsumesFixedTime(ins, ts);
-        case AESNI_enc_last(dst, src)           => fixedTime, ts' := checkIfAESNI_enc_lastConsumesFixedTime(ins, ts);
-        case AESNI_dec(dst, src)                => fixedTime, ts' := checkIfAESNI_decConsumesFixedTime(ins, ts);
-        case AESNI_dec_last(dst, src)           => fixedTime, ts' := checkIfAESNI_dec_lastConsumesFixedTime(ins, ts);
-        case AESNI_imc(dst, src)                => fixedTime, ts' := checkIfAESNI_imcConsumesFixedTime(ins, ts);
-        case AESNI_keygen_assist(dst, src, imm) => fixedTime, ts' := checkIfAESNI_keygen_assistConsumesFixedTime(ins, ts);
         case Pxor(dst, src)                     => fixedTime, ts' := checkIfPxorConsumesFixedTime(ins, ts);
-        case Pshufd(dst, src, perm)             => fixedTime, ts' := checkIfPshufdConsumesFixedTime(ins, ts);
-        case VPSLLDQ(dst, src, _)               => fixedTime, ts' := checkIfVPSLLDQConsumesFixedTime(ins, ts);
         case MOVDQU(dst, src)                   => fixedTime, ts' := checkIfMOVDQUConsumesFixedTime(ins, ts);
     }
 }
