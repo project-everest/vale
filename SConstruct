@@ -647,17 +647,17 @@ def add_include_dir_for_file(include_paths, file):
 
 def include_fstar_file(env, file):
   options = get_build_options(file)
+  add_include_dir_for_file(src_include_paths, file)
   if options != None:
     if (file_extension(file) == ".fst"):
       add_module_for_file(file)
-    add_include_dir_for_file(src_include_paths, file)
     fsti_map[file_module_name(file)] = file
 
 def include_vale_file(env, file):
   options = get_build_options(file)
+  add_include_dir_for_file(obj_include_paths, file)
   if options != None:
     add_module_for_file(file)
-    add_include_dir_for_file(obj_include_paths, file)
     module_name = file_module_name(file)
     fsti_map[module_name] = f'{file_drop_extension(to_obj_dir(file))}.fsti'
     for extension in ['.fst', '.fsti']:
