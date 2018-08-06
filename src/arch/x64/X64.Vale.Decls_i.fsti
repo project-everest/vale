@@ -32,6 +32,7 @@ let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
 
 (* Type aliases *)
 unfold let va_bool = bool
+unfold let va_prop = Type0
 unfold let va_int = int
 val ins : Type0
 val ocmp : Type0
