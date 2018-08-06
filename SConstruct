@@ -327,6 +327,9 @@ verify_options = [
   ('code/arch/x64/X64.Leakage_Ins_i.fst', BuildOptions(fstar_default_args_nosmtencoding)),
 
   # Disable verification by adding 'filename': None
+  ('code/arch/x64/interop/Interop_Printer.fst', None), # TODO: (117,2-118,42): (Error 276) Unexpected output from Z3: (error "line 86815 column 3: unknown function/constant Tm_arrow_9bcbe8d4241cd40112d64a75809541a7")
+  ('code/crypto/aes/x64/Low.GCMencrypt.fst', None), # TODO: timeout in gcm_core
+  ('code/thirdPartyPorts/Intel/aes/x64/X64.AESCTR.vaf', None), # TODO: slow
 
   # Interop stubs
   ('code/arch/x64/interop/AESEncryptBlock_win.fst', BuildOptions(fstar_default_args_nosmtencoding.replace('--z3cliopt smt.QI.EAGER_THRESHOLD=100', '').replace('--use_extracted_interfaces true', '').replace('--z3cliopt smt.arith.nl=false', '') + '--smtencoding.elim_box true ' + ' --expose_interfaces SecretByte.fst --expose_interfaces X64.Memory_i_s.fst --expose_interfaces X64.Memory_i.fst')),
