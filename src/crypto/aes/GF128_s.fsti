@@ -5,8 +5,7 @@ open FStar.Seq
 open Types_s
 
 // x^7 + x^2 + x + 1
-let gf128_modulus_low_terms : poly =
-  of_seq (of_list [true; true; true; false; false; false; false; true])
+let gf128_modulus_low_terms : poly = of_fun 8 (fun (i:nat) -> i = 0 || i = 1 || i = 2 || i = 7)
 
 // x^128 + x^7 + x^2 + x + 1
 let gf128_modulus : poly = add (monomial 128) gf128_modulus_low_terms

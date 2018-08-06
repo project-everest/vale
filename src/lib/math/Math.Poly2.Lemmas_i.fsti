@@ -51,7 +51,7 @@ val lemma_of_list_degree (l:list bool) : Lemma
   ))
   (ensures (
     let len = normalize_term (List.length l) in
-    let a = of_seq (of_list l) in
+    let a = of_seq (seq_of_list l) in
     degree a == len - 1 /\
     (forall (i:int).{:pattern a.[i]} a.[i] ==> (0 <= i && i < len))
   ))

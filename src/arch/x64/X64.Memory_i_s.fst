@@ -640,6 +640,7 @@ let lemma_frame_store_mem64 ptr v h =
     let aux_diff_buf () : Lemma
       (requires b1 =!= b2)
       (ensures load_mem64 i' h == load_mem64 i' h1) =
+      assert (I.disjoint_or_eq b1 b2);
       BV.as_seq_sel h.hs (BV.mk_buffer_view b2 uint64_view) i2;    
       BV.as_seq_sel h1.hs (BV.mk_buffer_view b2 uint64_view) i2
     in let aux_same_buf () : Lemma
@@ -720,6 +721,7 @@ let lemma_frame_store_mem128 ptr v h =
     let aux_diff_buf () : Lemma
       (requires b1 =!= b2)
       (ensures load_mem128 i' h == load_mem128 i' h1) =
+      assert (I.disjoint_or_eq b1 b2);
       BV.as_seq_sel h.hs (BV.mk_buffer_view b2 uint128_view) i2;    
       BV.as_seq_sel h1.hs (BV.mk_buffer_view b2 uint128_view) i2
     in let aux_same_buf () : Lemma
