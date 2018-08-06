@@ -434,53 +434,6 @@ let eval_ins (ins:ins) : GTot (st unit) =
     check (valid_mov128_op src);; 
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
-  | S.Pclmulqdq dst src imm ->
-    (
-      let Mkfour a0 a1 a2 a3 = eval_xmm dst s in
-      let Mkfour b0 b1 b2 b3 = eval_xmm src s in
-      let f x0 x1 y0 y1 =
-        let x = Math.Poly2.Bits_s.of_double32 (Mktwo x0 x1) in
-        let y = Math.Poly2.Bits_s.of_double32 (Mktwo y0 y1) in
-        update_xmm dst ins (Math.Poly2.Bits_s.to_quad32 (Math.Poly2_s.mul x y))
-        in
-      match imm with
-      | 0 -> f a0 a1 b0 b1
-      | 1 -> f a2 a3 b0 b1
-      | 16 -> f a0 a1 b2 b3
-      | 17 -> f a2 a3 b2 b3
-      | _ -> fail
-    )
-
-  | S.AESNI_enc dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.mix_columns_LE (AES_s.sub_bytes (AES_s.shift_rows_LE dst_q))) src_q)
-
-  | S.AESNI_enc_last dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows_LE dst_q)) src_q)
-
-  | S.AESNI_dec dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns_LE (AES_s.inv_sub_bytes (AES_s.inv_shift_rows_LE dst_q))) src_q)
-
-  | S.AESNI_dec_last dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows_LE dst_q)) src_q)
-
-  | S.AESNI_imc dst src ->
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (AES_s.inv_mix_columns_LE src_q)
-
-  | S.AESNI_keygen_assist dst src imm ->
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1) 
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
-			       (AES_s.sub_word src_q.hi3)
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
  
  
 (*

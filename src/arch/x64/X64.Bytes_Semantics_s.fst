@@ -44,13 +44,6 @@ type ins =
   | Pinsrq     : dst:xmm -> src:operand -> index:imm8 -> ins
   | VPSLLDQ    : dst:xmm -> src:xmm -> count:imm8 -> ins
   | MOVDQU     : dst:mov128_op -> src:mov128_op -> ins  // We let the assembler complain about attempts to use two memory ops
-  | Pclmulqdq  : dst:xmm -> src:xmm -> imm:int -> ins
-  | AESNI_enc           : dst:xmm -> src:xmm -> ins
-  | AESNI_enc_last      : dst:xmm -> src:xmm -> ins
-  | AESNI_dec           : dst:xmm -> src:xmm -> ins
-  | AESNI_dec_last      : dst:xmm -> src:xmm -> ins
-  | AESNI_imc           : dst:xmm -> src:xmm -> ins
-  | AESNI_keygen_assist : dst:xmm -> src:xmm -> imm8 -> ins
 
 type ocmp =
   | OEq: o1:operand -> o2:operand -> ocmp
@@ -543,54 +536,6 @@ let eval_ins (ins:ins) : st unit =
     check (valid_mov128_op src);; 
     update_mov128_op_preserve_flags dst (eval_mov128_op src s)
 
-  | Pclmulqdq dst src imm ->
-    (
-      let Mkfour a0 a1 a2 a3 = eval_xmm dst s in
-      let Mkfour b0 b1 b2 b3 = eval_xmm src s in
-      let f x0 x1 y0 y1 =
-        let x = Math.Poly2.Bits_s.of_double32 (Mktwo x0 x1) in
-        let y = Math.Poly2.Bits_s.of_double32 (Mktwo y0 y1) in
-        update_xmm dst ins (Math.Poly2.Bits_s.to_quad32 (Math.Poly2_s.mul x y))
-        in
-      match imm with
-      | 0 -> f a0 a1 b0 b1
-      | 1 -> f a2 a3 b0 b1
-      | 16 -> f a0 a1 b2 b3
-      | 17 -> f a2 a3 b2 b3
-      | _ -> fail
-    )
-
-  | AESNI_enc dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.mix_columns_LE (AES_s.sub_bytes (AES_s.shift_rows_LE dst_q))) src_q)
-
-  | AESNI_enc_last dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.sub_bytes (AES_s.shift_rows_LE dst_q)) src_q)
-
-  | AESNI_dec dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_mix_columns_LE (AES_s.inv_sub_bytes (AES_s.inv_shift_rows_LE dst_q))) src_q)
-
-  | AESNI_dec_last dst src ->
-    let dst_q = eval_xmm dst s in
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (quad32_xor (AES_s.inv_sub_bytes (AES_s.inv_shift_rows_LE dst_q)) src_q)
-
-  | AESNI_imc dst src ->
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (AES_s.inv_mix_columns_LE src_q)
-
-  | AESNI_keygen_assist dst src imm ->
-    let src_q = eval_xmm src s in
-    update_xmm dst ins (Mkfour (AES_s.sub_word src_q.lo1) 
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.lo1)) imm)
-			       (AES_s.sub_word src_q.hi3)
-			       (ixor (AES_s.rot_word_LE (AES_s.sub_word src_q.hi3)) imm))
- 
  
 (*
  * These functions return an option state

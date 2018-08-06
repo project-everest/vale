@@ -205,13 +205,6 @@ let print_ins (ins:ins) (p:printer) =
   | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index p)
   | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count p)
   | MOVDQU dst src         -> "  movdqu "     ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
-  | Pclmulqdq dst src imm  -> "  pclmulqdq "  ^ print_pair (print_xmms dst src) (print_imm8 imm p)
-  | AESNI_enc dst src      -> "  aesenc "     ^ print_xmms dst src
-  | AESNI_enc_last dst src -> "  aesenclast " ^ print_xmms dst src
-  | AESNI_dec dst src      -> "  aesdec "     ^ print_xmms dst src
-  | AESNI_dec_last dst src -> "  aesdeclast " ^ print_xmms dst src
-  | AESNI_imc dst src      -> "  aesimc "     ^ print_xmms dst src
-  | AESNI_keygen_assist dst src imm -> "  aeskeygenassist " ^ print_pair (print_xmms dst src) (print_imm8 imm p)
  
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =

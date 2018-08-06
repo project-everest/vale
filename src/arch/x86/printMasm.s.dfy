@@ -173,15 +173,7 @@ method printIns(ins:ins)
             }
             print("\n");
 
-        case AESNI_enc(dst, src) => print ("  aesenc "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case AESNI_enc_last(dst, src) => print ("  aesenclast "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case AESNI_dec(dst, src) => print ("  aesdec "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case AESNI_dec_last(dst, src) => print ("  aesdeclast "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case AESNI_imc(dst, src) => print ("  aesimc "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case AESNI_keygen_assist(dst, src, imm8) => print ("  aeskeygenassist "); printOprnd(dst); print(", "); printOprnd(src); print(", "); printOprnd(imm8); print("\n");
         case Pxor(dst, src) => print ("  pxor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case Pshufd(dst, src, permutation) => print ("  pshufd "); printOprnd(dst); print(", "); printOprnd(src); print(", "); printOprnd(permutation); print("\n");
-        case VPSLLDQ(dst, src, count) => print ("  vpslldq "); printOprnd(dst); print(", "); printOprnd(src); print(", "); printOprnd(count); print("\n");
         case MOVDQU(dst, src) => print ("  movdqu "); printXmmOprnd(dst); print(", "); printXmmOprnd(src); print("\n");
 }
 

@@ -267,16 +267,7 @@ method printIns(ins:ins)
         case Shl32(dst, src)    => printName1("  shl", dst); printShiftOprnd(src, 32); print ", "; printOprnd(dst); print("\n");
         case Shr32(dst, src)    => printName1("  shr", dst); printShiftOprnd(src, 32); print ", "; printOprnd(dst); print("\n");
 
-        case AESNI_enc(dst, src)      => print ("  aesenc ");     printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case AESNI_enc_last(dst, src) => print ("  aesenclast "); printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case AESNI_dec(dst, src)      => print ("  aesdec ");     printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case AESNI_dec_last(dst, src) => print ("  aesdeclast "); printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case AESNI_imc(dst, src)      => print ("  aesimc ");     printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case AESNI_keygen_assist(dst, src, imm8) => print ("  aeskeygenassist "); printOprnd(imm8); print(", "); printOprnd(src); print(", "); printOprnd(dst);  print("\n");
-
         case Pxor(dst, src)                => print ("  pxor ");    printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case Pshufd(dst, src, permutation) => print ("  pshufd ");  printOprnd(permutation); print(", "); printOprnd(src); print(", "); printOprnd(dst); print("\n"); 
-        case VPSLLDQ(dst, src, count)      => print ("  vpslldq "); printOprnd(count); print(", "); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case MOVDQU(dst, src)              => print ("  movdqu ");  printOprnd(src); print(", "); printOprnd(dst); print("\n");
 }
 

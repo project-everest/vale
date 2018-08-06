@@ -5,6 +5,7 @@ open Microsoft.FSharp.Math
 
 let tUnit = TName (Id "unit")
 let tBool = TName (Reserved "bool")
+let tProp = TName (Reserved "prop")
 let tInt = TName (Reserved "int")
 let tOperand xo = TName (Reserved xo)
 let tState = TName (Reserved "state")

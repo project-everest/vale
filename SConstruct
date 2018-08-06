@@ -304,13 +304,16 @@ env['VALE_INCLUDE'] = '-include ' + str(File('src/lib/util/operator.vaf'))
 dafny_default_args_nlarith =   '/ironDafny /allocated:1 /induction:1 /compile:0 /timeLimit:30 /errorLimit:1 /errorTrace:0 /trace'
 dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
-fstar_default_args_nosmtencoding = '--max_fuel 1 --max_ifuel 1' \
+fstar_default_args_nosmtencoding = ('--max_fuel 1 --max_ifuel 1' \
   + (' --initial_ifuel 1' if is_single_vaf else ' --initial_ifuel 0') \
+  # The main purpose of --z3cliopt smt.QI.EAGER_THRESHOLD=100 is to make sure that matching loops get caught
+  # Don't remove unless you're sure you've used the axiom profiler to make sure you have no matching loops
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3' \
   + ' --hint_info' \
-  + ('' if is_single_vaf else ' --use_hints') \
+  #+ ('' if is_single_vaf else ' --use_hints') \
   + (' --record_hints' if gen_hints else ' --cache_checked_modules') \
   + (' --use_extracted_interfaces true')
+  )
 fstar_default_args = fstar_default_args_nosmtencoding \
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
 
@@ -693,7 +696,7 @@ def add_kremlin(env):
                            emitter = kremlin_emitter)
   # Copy pre-generated FStar.h; could be regenerared using
   # krml -fnouint128 -I ../kremlin/kremlib -skip-compilation ulib/FStar.UInt128.fst
-  env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
+  #env.CopyAs(source='src/crypto/hashing/FStar.h', target='obj/crypto/hashing/FStar.h')
   env.Append(BUILDERS = {'Kremlin' : kremlin})
 
 # Pseudo-builder that takes Dafny code and extracts it via Kremlin
@@ -767,7 +770,7 @@ def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name)
     x_cmx = ml_out_name(x_ml, '.cmx')
     if x_ml != pointer_ml:
       Depends(x_cmx, pointer_cmx)
-    cmx = ocaml_env.Command(x_cmx, x_ml, "ocamlfind ocamlopt -c -package fstarlib -o $TARGET $SOURCE -I obj/ml_out")
+    cmx = ocaml_env.Command(x_cmx, x_ml, "ocamlfind ocamlopt -c -package fstarlib -package fstar-tactics-lib -o $TARGET $SOURCE -I obj/ml_out")
     cmxs.append(cmx[0])
     Depends(main_exe, cmx[0])
   def collect_cmxs_in_order(x_ml):
@@ -784,7 +787,7 @@ def extract_vale_ocaml(env, output_base_name, main_name, alg_name, cmdline_name)
   add_cmx(cmdline_ml)
   add_cmx(main_ml)
   cmxs_string = " ".join([str(cmx) for cmx in cmxs])
-  exe = ocaml_env.Command(main_exe, cmxs, "ocamlfind ocamlopt -linkpkg -package fstarlib " + cmxs_string + " -o $TARGET")
+  exe = ocaml_env.Command(main_exe, cmxs, "ocamlfind ocamlopt -linkpkg -package fstarlib -package fstar-tactics-lib " + cmxs_string + " -o $TARGET")
 
   output_target_base = 'obj/' + output_base_name
   masm_win = env.Command(output_target_base + '.asm', exe, '$SOURCE MASM Win > $TARGET')
@@ -905,13 +908,15 @@ def verify_fstar_files(env, files):
     options = get_build_options(f)
     if options != None and verify:
       o = to_obj_dir(f)
-      env.Command(o, f, Copy("$TARGET", "$SOURCE"))
+      if not os.path.relpath(f).replace('\\', '/').startswith('obj/'):
+        env.Command(o, f, Copy("$TARGET", "$SOURCE"))
       if stage2:
         target = o + '.verified'
         options.env.FStar(target, o)
         if fstar_extract:
           if os.path.splitext(o)[1] == '.fst':
-            options.env.FStarExtract(o)
+            if not (ml_out_name(o, '.ml') in no_extraction_files):
+              options.env.FStarExtract(o)
 
 # Verify a set of Vale files by creating verification targets for each,
 # which in turn causes a dependency scan to verify all of their dependencies.
@@ -1146,6 +1151,8 @@ def predict_fstar_deps(env, verify_options, src_directories, fstar_include_paths
       if fstar_extract:
         sources_ml = [ml_out_name(x, '.ml') for x in sources if has_obj_dir(x)]
         targets_ml = [ml_out_name(x, '.ml') for x in targets if has_obj_dir(x)]
+        sources_ml = [x for x in sources_ml if not (x in no_extraction_files)]
+        targets_ml = [x for x in targets_ml if not (x in no_extraction_files)]
         sources_ml = [x for x in sources_ml if not (x in targets_ml)]
         Depends(targets_ml, sources_ml)
         for t in targets_ml:
@@ -1186,7 +1193,7 @@ env.AddMethod(verify_fstar_files, "VerifyFStarFiles")
 #
 
 # Export identifiers to make them visible inside SConscript files
-Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage2', 'fstar_extract')
+Export('env', 'BuildOptions', 'dafny_default_args_nlarith', 'dafny_default_args_larith', 'fstar_default_args', 'fstar_default_args_nosmtencoding', 'do_dafny', 'do_fstar', 'stage1', 'stage2', 'fstar_extract')
 
 # Include the SConscript files themselves
 SConscript('tools/ImportFStarTypes/SConscript')
@@ -1227,6 +1234,8 @@ SConscript('./SConscript')
 
 # Import identifiers defined inside SConscript files, which the SConstruct consumes
 Import(['manual_dependencies', 'verify_options', 'verify_paths', 'fstar_include_paths', 'min_test_suite_blacklist'])
+Import('external_files')
+Import('no_extraction_files')
 
 env['FSTAR_INCLUDES'] = " ".join(["--include " + x for x in fstar_include_paths])
 
@@ -1246,19 +1255,8 @@ if do_fstar and stage2 and not is_single_vaf:
     compute_module_types(env, x)
 
 # Verification
+env.VerifyFStarFiles(external_files)
 env.VerifyFilesIn(verify_paths)
-
-#
-# build aesgcm
-#
-if fstar_extract and stage2:
-  aesgcm_asm = env.ExtractValeOCaml('aesgcm', 'src/crypto/aes/x64/Main.ml', 'src/crypto/aes/x64/X64.GCMdecrypt.vaf', 'src/lib/util/CmdLineParser.ml')
-  if env['TARGET_ARCH'] == 'amd64': 
-    aesgcmasm_obj = env.Object('obj/aesgcmasm_openssl', aesgcm_asm[0])
-    aesgcmtest_src = 'src/crypto/aes/x64/TestAesGcm.cpp'
-    aesgcmtest_cpp = to_obj_dir(aesgcmtest_src)
-    env.Command(aesgcmtest_cpp, aesgcmtest_src, Copy("$TARGET", "$SOURCE"))
-    aesgcmtest_exe = env.Program(source = [aesgcmasm_obj, aesgcmtest_cpp], target = 'obj/TestAesGcm.exe')
 
 # extract a string filename out of a build failure
 def bf_to_filename(bf):
