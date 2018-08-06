@@ -42,11 +42,11 @@ RUN mkdir ${MYHOME}/FStar/vale
 COPY --chown=everest / ${MYHOME}/FStar/vale/
 
 # Remove extra files.
-RUN rm ${MYHOME}/vale/Dockerfile
-RUN rm ${MYHOME}/vale/build_fstar.sh
-RUN rm ${MYHOME}/vale/build.sh
-RUN rm ${MYHOME}/vale/id_rsa
-RUN rm ${MYHOME}/vale/commitinfofilename.json
+RUN rm ${MYHOME}/FStar/vale/Dockerfile
+RUN rm ${MYHOME}/FStar/vale/build_fstar.sh
+RUN rm ${MYHOME}/FStar/vale/build.sh
+RUN rm ${MYHOME}/FStar/vale/id_rsa
+RUN rm ${MYHOME}/FStar/vale/commitinfofilename.json
 
 # ADD SSH KEY
 RUN mkdir -p ${MYHOME}/.ssh
