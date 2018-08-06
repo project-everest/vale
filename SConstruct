@@ -656,6 +656,8 @@ def include_fstar_file(env, file):
 def include_vale_file(env, file):
   options = get_build_options(file)
   add_include_dir_for_file(obj_include_paths, file)
+  dummy_dir = File(f'obj/dummies/{file_drop_extension(file)}').dir
+  distutils.dir_util.mkpath(str(dummy_dir))
   if options != None:
     add_module_for_file(file)
     module_name = file_module_name(file)
