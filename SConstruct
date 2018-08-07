@@ -81,7 +81,7 @@ AddOption('--DAFNY',
   help='Verify Dafny files')
 AddOption('--NODAFNY',
   dest='do_dafny',
-  default=False,
+  default=True,
   action='store_false',
   help='Do not verify Dafny files')
 AddOption('--DAFNYPATH',
