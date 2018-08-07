@@ -9,7 +9,6 @@ The following directories contain library code and cryptographic code verified b
 
 * [src/lib](./src/lib): general-purpose libraries for Dafny
 * [src/arch](./src/arch): definitions of assembly language architectures (x86, x64, ARM)
-* [src/crypto](./src/crypto): verified cryptographic code
 * [src/test](./src/test): test files for libraries, architecture code, and cryptography code
 
 Dafny files with a suffix .s.dfy are specification files that are part of the trusted computing base.

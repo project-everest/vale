@@ -76,7 +76,7 @@ AddOption('--STAGE2',
   help='F* stage 2 (of 2)')
 AddOption('--DAFNY',
   dest='do_dafny',
-  default=False,
+  default=True,
   action='store_true',
   help='Verify Dafny files')
 AddOption('--NODAFNY',
@@ -92,12 +92,12 @@ AddOption('--DAFNYPATH',
   help='Specify the path to Dafny tool binaries')
 AddOption('--FSTAR',
   dest='do_fstar',
-  default=True,
+  default=False,
   action='store_true',
   help='Verify F* files')
 AddOption('--NOFSTAR',
   dest='do_fstar',
-  default=True,
+  default=False,
   action='store_false',
   help='Do not verify F* files')
 AddOption('--FSTARPATH',
