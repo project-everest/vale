@@ -4,15 +4,16 @@ open Ast
 open Microsoft.FSharp.Math
 
 let tUnit = TName (Id "unit")
-let tBool = TName (Reserved "bool")
-let tProp = TName (Reserved "prop")
-let tInt = TName (Reserved "int")
+let tBool = TBool BpBool
+let tProp = TBool BpProp
+let tInt = TInt (NegInf, Inf)
 let tOperand xo = TName (Reserved xo)
 let tState = TName (Reserved "state")
 let tCode = TName (Reserved "code")
 let tCodes = TName (Reserved "codes")
 let tFuel = TName (Reserved "fuel")
 
+let tapply (x:id) (ts:typ list):typ = TApply (x, ts)
 let eapply (x:id) (es:exp list):exp = EApply (x, None, es)
 
 let List_mapFold (f:'s -> 't -> 'r * 's) (s:'s) (ts:'t list):('r list * 's) =
@@ -64,8 +65,8 @@ let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with
   | [] -> empty
   | h::t -> List.fold (fun accum e -> EOp (Bop b, [accum; e])) h t
-let and_of_list = binary_op_of_list (BAnd OpProp) (EBool true)
-let or_of_list = binary_op_of_list (BOr OpProp) (EBool false)
+let and_of_list = binary_op_of_list (BAnd BpProp) (EBool true)
+let or_of_list = binary_op_of_list (BOr BpProp) (EBool false)
 
 let assert_attrs_default =
   {

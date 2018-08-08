@@ -47,14 +47,14 @@ let string_of_bop (op:bop):string =
   | BEquiv -> "<==>"
   | BImply -> "==>"
   | BExply -> internalErr "<=="
-  | BOr OpBool -> "||"
-  | BOr OpProp -> "\\/"
-  | BAnd OpBool -> "&&"
-  | BAnd OpProp -> "/\\"
-  | BEq OpBool -> "="
-  | BEq OpProp -> "=="
-  | BNe OpBool -> "<>"
-  | BNe OpProp -> "=!="
+  | BOr BpBool -> "||"
+  | BOr BpProp -> "\\/"
+  | BAnd BpBool -> "&&"
+  | BAnd BpProp -> "/\\"
+  | BEq BpBool -> "="
+  | BEq BpProp -> "=="
+  | BNe BpBool -> "<>"
+  | BNe BpProp -> "=!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
@@ -73,15 +73,15 @@ let string_of_var_storage (g:var_storage) = ""
 let rec string_of_typ (t:typ):string =
   match t with
   | TName x -> sid x
-  | TApp (TName (Id "tuple"), []) -> "unit"
-  | TApp (TName (Id "tuple"), ts) -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
-  | TApp (TName (Id "fun"), ts) -> "(" + (String.concat " -> " (List.map string_of_typ ts)) + ")"
-  | TApp (t, []) -> "(" + (string_of_typ t) + " ())"
-  | TApp (t, ts) -> "(" + (string_of_typ t) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
-  | TInt(_, _) -> "int"
+  | TApply (x, []) -> "(" + (sid x) + " ())"
+  | TApply (x, ts) -> "(" + (sid x) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
+  | TBool BpBool -> "bool"
+  | TBool BpProp -> "prop"
+  | TInt (_, _) -> "int"
+  | TTuple [] -> "unit"
   | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
-  | TArrow (ts, t) -> "(" + (String.concat " " (List.map string_of_typ ts)) + " " +  (string_of_typ t) + ")"
-  | _ -> internalErr (sprintf "unexpected string_of_typ: %A" t)
+  | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
+  | TVar _ -> internalErr "string_of_typ: TVar"
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -99,8 +99,8 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
     | EOp (Uop UReveal, [EApply (x, _, es)]) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id x) es]), prec)
     | EOp (Uop UReveal, [EVar x]) -> ("(reveal_opaque " + (sid x) + ")", prec)
-    | EOp (Uop (UNot OpBool), [e]) -> ("~" + (r 99 e), 90)
-    | EOp (Uop (UNot OpProp), [e]) -> ("not " + (r 99 e), 90)
+    | EOp (Uop (UNot BpBool), [e]) -> ("~" + (r 99 e), 90)
+    | EOp (Uop (UNot BpProp), [e]) -> ("not " + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
     | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
     | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr (sprintf "unary operator: %A" e)
@@ -117,15 +117,14 @@ let rec string_of_exp_prec prec e =
         | (op, EOp (Bop op1, [e11; e12])) when isChainOp op && isChainOp op1 ->
             // Convert (a <= b) < c into (a <= b) && (b < c)
             let e2 = EOp (Bop op, [e12; e2]) in
-            (r prec (EOp (Bop (BAnd OpBool), [e1; e2])), 0)
+            (r prec (EOp (Bop (BAnd BpBool), [e1; e2])), 0)
         | _ ->
             let (pe, p1, p2) = prec_of_bop op in
             ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
       )
     | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr (sprintf "binary operator: %A" e)
-    | EApply (Id "tuple", _, es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EOp (TupleOp _, es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EApply (Id "list", _, es) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
-//    | EOp (MultiOp MSet, es) -> notImplemented "MSet"
     | EOp (Subscript, [e1; e2]) -> (r prec (vaApp "subscript" [e1; e2]), prec)
     | EOp (Update, [e1; e2; e3]) -> (r prec (vaApp "update" [e1; e2; e3]), prec)
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)

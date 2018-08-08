@@ -1193,7 +1193,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let spec_reads = List.map (mod_to_spec Read) p_reads in
         let spec_mods = List.map (mod_to_spec Modify) p_mods in
         let specs = spec_aliases @ spec_reads @ spec_mods @ reqs @ enss in
-        let e_exit = EOp (Uop (UNot OpProp), [eCond]) in
+        let e_exit = EOp (Uop (UNot BpProp), [eCond]) in
         let spec_exit = inv_to_spec in_reads (REnsures Unrefined) (loc, e_exit) in
         let spec_enter_body = inv_to_spec ins (RRequires Unrefined) (loc, eCond) in
         // ed << old(ed)
@@ -1275,7 +1275,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         match spec with
         | (_, SpecRaw (RawSpec (RModifies Preserve, es))) ->
             let es = List.collect (fun (loc, e) -> match e with SpecExp e -> [(loc, e)] | SpecLet _ -> []) es in
-            List_mapSnd (fun e -> SpecExp (EOp (Bop (BEq OpProp), [e; EOp (Uop UOld, [e])]))) es
+            List_mapSnd (fun e -> SpecExp (EOp (Bop (BEq BpProp), [e; EOp (Uop UOld, [e])]))) es
         | _ -> []
       )
       p.pspecs

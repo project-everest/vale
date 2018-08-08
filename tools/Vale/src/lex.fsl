@@ -33,6 +33,7 @@ let operatorToken (tok:string) (isCustom:bool) (s:string):(loc -> token) option 
   | "<" -> Some (fun loc -> LT (loc, (isCustom, s)))
   | ">" -> Some (fun loc -> GT (loc, (isCustom, s)))
   | "=" -> Some (fun loc -> EQ (loc, (isCustom, s)))
+  | "|" -> Some (fun loc -> BAR (loc, (isCustom, s)))
   | ":=" -> Some (fun loc -> COLONEQ (loc, (isCustom, s)))
   | "@=" -> Some (fun loc -> ATEQ (loc, (isCustom, s)))
   | "<=" -> Some (fun loc -> LE (loc, (isCustom, s)))
@@ -227,6 +228,11 @@ and lextoken = parse
 | "inline" { INLINE (curLoc lexbuf) }
 | "operator" { OPERATOR (curLoc lexbuf) }
 | "include" { INCLUDE (curLoc lexbuf) }
+| "operand_type" { OPERAND_TYPE (curLoc lexbuf) }
+| "tuple" { TUPLE (curLoc lexbuf) }
+| "bool" { BOOL (curLoc lexbuf) }
+| "prop" { PROP (curLoc lexbuf) }
+| "int_range" { INT_RANGE (curLoc lexbuf) }
 | "bv"['0'-'9']+ { BV ((curLoc lexbuf), System.Int32.Parse((lexeme lexbuf).Substring(2))) }
 | ['"'][^'"''\n''\r''\t''\\']*['"'] { let s = lexeme lexbuf in STRING (curLoc lexbuf, s.Substring(1, s.Length - 2)) }
 | "0x"['0'-'9''a'-'f''A'-'F']['0'-'9''a'-'f''A'-'F''_']*

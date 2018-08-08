@@ -427,7 +427,7 @@ let rec stmts_of_estmt (physical:bool) (ghost:bool) (s:estmt):stmt list =
           let gh =
             if ghost && tmps <> [] then
               let trEx = eapply (Reserved ("triggerexists_" + (string_of_id p.pname))) (List.map (fun (x, _) -> EVar x) tmps) in
-              SExists (tmps, [[trEx]], EOp (Bop (BAnd OpBool), [trEx;ens])) :: assigns
+              SExists (tmps, [[trEx]], EOp (Bop (BAnd BpBool), [trEx;ens])) :: assigns
             else
               []
           in
@@ -447,7 +447,7 @@ let rec calls_of_estmt (guards:exp list) (s:estmt):abstract_call_info list =
   | EsStmts ss -> []
   | EsIfElse (e, ss1, ss2, info) ->
       let thnGuards = e :: guards in
-      let elsGuards = EOp (Uop (UNot OpBool), [e]) :: guards in
+      let elsGuards = EOp (Uop (UNot BpBool), [e]) :: guards in
       (calls_of_estmts thnGuards ss1) @ (calls_of_estmts elsGuards ss2) @ [AciIfElse (guards, info)]
   | EsWhile (e, invs, dec, ss) -> calls_of_estmts guards ss
 and calls_of_estmts (guards:exp list) (ss:estmt list):abstract_call_info list = List.collect (calls_of_estmt guards) ss
@@ -983,7 +983,7 @@ let build_abstract (env:env) (benv:build_env) (cenv:connect_env) (estmts:estmt l
         let e = makeSpecForall c.esc_proc.pname (Some c.esc_call_id) c.esc_foralls (eapply (spec_of_call c) args) in
         [(c.esc_loc, require (add_antecedents guards e))]
     | AciIfElse (guards, i) ->
-        let build_ite (e, i, x, y) = EOp (Bop (BEq OpBool), [EVar i; EOp (Cond, [e; EVar x; EVar y])]) in
+        let build_ite (e, i, x, y) = EOp (Bop (BEq BpBool), [EVar i; EOp (Cond, [e; EVar x; EVar y])]) in
         List.map (fun q -> (loc, require (add_antecedents guards (build_ite q)))) i.esi_replacements
     in
   let opaqueReqs = List.collect req_of_call calls in
@@ -1287,7 +1287,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       | [] -> eSpecEns
       | _ ->
           let trEx = makeSpecTriggerExists p.pname (List.map (fun (x, _) -> EVar x) ghostRets) in
-          EBind (Exists, [], ghostRets, [[trEx]], EOp (Bop (BAnd OpBool), [trEx; eSpecEns]))
+          EBind (Exists, [], ghostRets, [[trEx]], EOp (Bop (BAnd BpBool), [trEx; eSpecEns]))
       in
     let eSpec = EOp (Bop BImply, [eSpecReq; eSpecEns]) in
     let specModsInOut = List.collect (specMod env EmitModEns) p.pspecs in
@@ -1408,7 +1408,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
               | (SLoc (loc, s))::posts -> expandInlineIf loc (s::posts) conds prefix
               | (SIfElse (SmInline, e, ss1, ss2))::posts when (List.forall (fun s -> match s with SForall _ -> true | _ -> false) posts) ->
                   let (pr1, ds1) = expandInlineIf loc (ss1 @ posts) (conds @ [e]) (prefix + "if_") in
-                  let (pr2, ds2) = expandInlineIf loc (ss2 @ posts) (conds @ [EOp (Uop (UNot OpBool), [e])]) (prefix + "else_") in
+                  let (pr2, ds2) = expandInlineIf loc (ss2 @ posts) (conds @ [EOp (Uop (UNot BpBool), [e])]) (prefix + "else_") in
                   match (pr1.pbody, pr2.pbody) with
                   | (Some ss1, Some ss2) ->
                     let ss12 = SIfElse (SmPlain, e, ss1, ss2) in

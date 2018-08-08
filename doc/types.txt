@@ -1,13 +1,26 @@
 ABSTRACT SYNTAX
 
-natural literals n = 0 | 1 | 2 | ...
-integer literals i = ... | -2 | -1 | 0 | 1 | 2 | ...
-kinds k = Type(n)
-integer bounds B = i | -inf | inf
-variables x
-monotypes t = x | x(t, ..., t) | int(B1, B2) | tuple(t, ..., t) | fun(t, ..., t) -> t
+natural literal n = 0 | 1 | 2 | ...
+integer literal i = ... | -2 | -1 | 0 | 1 | 2 | ...
+kind k = Type(n)
+integer bound B = i | -inf | inf
+variable x
+monotype t =
+| x
+| x(t, ..., t)
+| int_range(B1, B2)
+| tuple(t, ..., t)
+| collection(t)
+| fun(t, ..., t) -> t
+| bool
+| prop
+| string
+| state
 
-polytypes T =
+For Vale/Dafny, collection = seq | set
+For Vale/F*, collection = list
+
+polytype T =
 | forall a1:Type(0) ... an:Type(0). t
 | forall a1:Type(0) ... an:Type(0). (x:t, ..., x:t) -> t (requires e) (ensures e)
 
@@ -18,17 +31,16 @@ Bop = /\ | \/ | ==> | <== | <==>
 trigger = {e, ..., e}
 triggers = trigger ... trigger
 
-expressions e =
+expression e =
 | e:t
 | x
 | x(e, ..., e)
 | i | true | false | "...string-literal..."
-| const(e)
 | this
 | old(e)
 | old[e](e)
-| list(e, ..., e)
 | tuple(e, ..., e)
+| collection(e, ..., e)
 | (-e)
 | e * e | e / e | e % e | e + e | e - e
 | e icmp e | e = e | e <> e | e == e | e != e
@@ -37,27 +49,42 @@ expressions e =
 | let x:t = e1 in e2
 | bind x:t, ..., x:t triggers :: e
 
+destination dst =
+| x
+| let x:t
+
+statement s =
+| dst, ..., dst := x(e, ..., e)
+| ...
+
 Note: the following expressions may be desugared into x(e, ..., e) expressions for type checking:
 | e[e] | e[e := e] | e.x | e.(x := e) | e is x
 
-inout = in | out | inout
-param = ghost | inline | inout operand
+IO = in | out | inout
+param = ghost | inline | IO operand
+local = const ghost | mutable ghost | inline | IO operand
 ret = ghost
+opr_type = const | x | IO x
 procedure types P = (param x:t, ..., param x:t) -> (ret x:t, ..., ret x:t) (reads x ... x) (modifies x ... x) (requires e) (ensures e)
 
 environment members g =
-| x:k | x:(k, ..., k) -> k | x:k = t | x(x1:k1, ..., xn:kn):k = t  (global type declarations)
-| x:T | x:P  (global value declarations)
-| x:t  (local value declarations)
+| x:k | x:(k, ..., k) -> k | x:k = t | x(x:k, ..., x:k):k = t  (global type declarations)
+| x:T | x:P | operand x:P  (global value declarations)
+| operand x:t = opr_type, ..., opr_type  (global operand type declarations)
+| state x:t  (global state member)
+| local x:t  (local value declarations)
+| inline_only  (only allow inline expressions -- no ghost variables, no SMT queries)
 environment G = g ... g
 
-The type checker expects G to contain the following standard x:k and x:(k, ..., k) -> k declarations:
-  prop : Type(1)
-  bool : Type(0)
-  int : Type(0)
-  string : Type(0)
-  list : (Type(0)) -> Type(0)
-  state : Type(0)
+Notes on variable scope:
+- Global declarations have fully qualified names consisting of a module name plus a name within the module.
+- No two modules can have the same name.
+- Within a module, no two declarations can have the same name.
+- In a scope that already has a local name x, it is illegal to declare another local with the same name x.
+Local declarations (local x:t) are not qualified with a module name, and so do not conflict with global declarations.
+However, references to global declarations can be unqualified (omitting the module name),
+and in this case it's possible for a name x to match both a local name and a global name.
+In this case, the local name takes precedence.
 
 
 KINDING:  G |- t : k
@@ -94,8 +121,22 @@ G |- tn : Type(0)
 -------------------------------------
 G |- fun(t1, ..., tn) -> t0 : Type(0)
 
+G |- t : Type(0)
+----------------------------
+G |- collection(t) : Type(0)
+
+G |- bool : Type(0)
+
+G |- prop : Type(1)
+
+G |- string : Type(0)
+
+G |- state : Type(0)
+
 
 TYPE EQUALITY:  G |- t = t'
+
+G |- t = t
 
 G = ... x:k = t' ...
 --------------------
@@ -121,6 +162,17 @@ G |- tn = tn'
 ----------------------------------------------
 G |- tuple(t1, ..., tn) = tuple(t1', ..., tn')
 
+G |- t0 = t0'
+G |- t1 = t1'
+...
+G |- tn = tn'
+--------------------------------------------------------
+G |- fun(t1, ..., tn) -> t0 = tuple(t1', ..., tn') -> t0
+
+G |- t = t'
+-----------------------------------
+G |- collection(t) = collection(t')
+
 
 SUBTYPING:  G |- t <: t'
 
@@ -134,26 +186,43 @@ B2 <= B2'
 G |- int(B1, B2) <: int(B1', B2')
 
 
-TYPING:  G |- e : t
+EXPRESSION TYPING:  G |- e : t
 
 G |- t = t'
 G |- e : t
---------------
+-----------
 G |- e : t'
 
 G |- t <: t'
 G |- e : t
---------------
+------------
 G |- e : t'
 
+inline_only not in G
 G |- t':k'
 G |- t' <: t  OR  G |- t <: t'
 G |- e:t
 ------------------------------ Note: downcasts incur an SMT check; downcasts from prop to bool always fail
 G |- (e:t') : t'
 
-G = ... x:t ...
----------------
+inline_only not in G
+G = ... local x:t ...
+local in {const ghost, mutable ghost}
+----------------------------------------
+G |- x : t
+
+G = ... inline x:t ...
+----------------------------------------
+G |- x : t
+
+inline_only not in G
+G = ... IO operand x:xo ...
+G |- operand xo : t includes ...
+--------------------------------
+G |- x : t
+
+G = ... state x:t ...
+---------------------
 G |- x : t
 
 T = forall a1:Type(0) ... an:Type(0). t
@@ -161,11 +230,12 @@ G = ... x:T ...
 G |- t1 : Type(0)
 ...
 G |- tn : Type(0)
------------------------------------
+---------------------------------------
 G |- x : t[a1 <- t1, ..., an <- tn]
 
 T = forall a1:Type(0) ... an:Type(0). (x1:t1', ..., xm:tm') -> t (requires e_req) (ensures e_ens)
 G = ... x:T ...
+inline_only not in G
 G |- t1 : Type(0)
 ...
 G |- tn : Type(0)
@@ -183,10 +253,8 @@ G |- false : bool
 
 G |- "...string-literal..." : string
 
-G |- e : t
------------------
-G |- const(e) : t
-
+inline_only not in G
+--------------------
 G |- this : state
 
 G |- e : t
@@ -202,8 +270,8 @@ G |- t : Type(0)
 G |- e1 : t
 ...
 G |- en : t
---------------------------------
-G |- list(e1, ..., en) : list(t)
+--------------------------------------------
+G |- collection(e1, ..., en) : collection(t)
 
 G |- tuple(t1, ..., tn) : Type(0)
 G |- e1 : t1
@@ -275,13 +343,13 @@ G |- (if e0 then e1 else e2) : t
 
 x is not a local variable in G
 G |- e1 : t1
-G, x:t1 |- e2 : t2
+G, const ghost x:t1 |- e2 : t2
 -------------------------------
 G |- (let x:t1 = e1 in e2) : t2
 
 bind in {forall, exists}
 x1...xn are distinct and are not local variables in G
-G' = G, x1:t1, ..., xn:tn
+G' = G, const ghost x1:t1, ..., const ghost xn:tn
 triggers = {e11, ..., e1j} ... {em1, ..., emk}
 G' |- e11 : t11 ... G' |- e1j : t1j
 ...
@@ -292,8 +360,102 @@ G |- (bind x1:t1, ..., xn:tn triggers :: e) : prop
 
 G |- fun(t1, ..., tn) -> t : Type(0)
 x1...xn are distinct and are not local variables in G
-G' = G, x1:t1, ..., xn:tn
+G' = G, const ghost x1:t1, ..., const ghost xn:tn
 G' |- e : t
 ------------------------------------------------------------
 G |- (lambda x1:t1, ..., xn:tn :: e) : fun(t1, ..., tn) -> t
+
+
+OPERAND INCLUSION:  G |- operand x : t includes opr_type
+
+G = ... (operand x:t = ...opr_type...) ...
+------------------------------------------
+G |- operand x : t includes opr_type
+
+G = ... (operand x:t = ...) ...
+-------------------------------
+G |- operand x : t includes x
+
+G |- operand x : t includes x'
+G |- operand x' : t' includes opr_type
+--------------------------------------
+G |- operand x : t includes opr_type
+
+
+OPERAND TYPING:  G |- param e : t
+
+G |- e : t
+----------------
+G |- ghost e : t
+
+G, inline_only |- e : t
+-----------------------
+G |- inline e : t
+
+G |- operand xo : t includes const
+G, inline_only |- e : t
+---------------------------------- constants (immediates)
+G |- in operand e : xo
+
+G = ... IO operand x:xo ...
+G |- operand xo' : to includes xo
+If IO = in then IO' = in
+---------------------------------
+G |- IO' operand x : xo'
+
+G = ... state xs:ts ...
+G |- operand xo : to includes IO xs
+If IO = in then IO' = in
+-----------------------------------
+G |- IO' operand xs : xo
+
+Notes:
+- A memory operand can perform a load (for "in"), a store (for "out"), or both (for "inout")
+- An "operand procedure" represents a load operation or store operation
+- An operand procedure's final parameter represents the loaded or stored value
+- An operand procedure for a load has final parameter "out operand x:t",
+  because the loaded value is an output from the load operation
+- An operand procedure for a store has final parameter "in operand x:t",
+  because the stored value is an input to the store operation
+Pl = (paraml1 xpl1:tpl1, ..., paramn xpln:tpln, out operand xl:xlo) ->
+     ()
+     (reads ...xrl...) (modifies ...xml...) (requires erl) (ensures eel)
+Ps = (params1 xps1:tps1, ..., paramsn xpsn:tpsn, in operand xs:xso) ->
+     ()
+     (reads ...xrs...) (modifies ...xms...) (requires ers) (ensures ees)
+If IO' in {in, inout}, then G = ... operand xP_in:Pl ... and:
+  G |- paraml1 e1 : tpl1
+  ...
+  G |- paramln en : tpln
+  G |- operand xo' : to includes xlo
+If IO' in {out, inout}, then G = ... operand xP_out:Ps ... and:
+  G |- params1 e1 : tps1
+  ...
+  G |- paramsn en : tpsn
+  G |- operand xo' : to includes xso
+------------------------------------------------------------------------
+G |- IO' operand xP(e1, ..., en) : xo'
+
+
+STATEMENT TYPING:  G |- s : G'
+
+P = (..., param xp:tp, ...) ->
+    (..., ghost xg:tg, ...)
+    (reads ...xr...) (modifies ...xm...) (requires er) (ensures ee)
+G = ... x:P ...
+For each ea:
+  G |- param ea : tp
+All variables in ...dst... are distinct
+For each dst:
+  If dst = xd:
+    G = ... mutable ghost xd:td ...
+    G |- td <: tg
+  If dst = let xd:td:
+    xd is not a local variable in G
+    G |- td <: tg
+G' = G, const xd1:td1, ... const xdj:tdj for each let xdi:tdi in ...dst...
+--------------------------------------------------------------------------
+G |- ..., dst, ... := x(..., ea, ...) : G'
+
+(There are more statements, but procedure call is the most important.)
 

@@ -35,10 +35,10 @@ let string_of_bop (op:bop):string =
   | BExply -> "<=="
   | BAnd _ -> "&&"
   | BOr _ -> "||"
-  | BEq OpBool -> "="
-  | BEq OpProp -> "=="
-  | BNe OpBool -> "<>"
-  | BNe OpProp -> "!="
+  | BEq BpBool -> "="
+  | BEq BpProp -> "=="
+  | BNe BpBool -> "<>"
+  | BNe BpProp -> "!="
   | BLt -> "<"
   | BGt -> ">"
   | BLe -> "<="
@@ -58,18 +58,20 @@ let rec string_of_typ_prec (prec:int) (t:typ):string =
     match b with
     | Int i when i < bigint.Zero -> "(" + string i + ")"
     | Int i -> string i
-    | NegInf | Inf -> ""
+    | NegInf | Inf -> "_"
     in
   let (s, tPrec) =
     match t with
     | TName x -> (sid x, 20)
+    | TApply (x, ts) -> (sid x + "(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
     | TVar (x, None) -> (sid x, 20)
     | TVar (x, Some k) -> ("(" + sid x + ":" + string_of_kind k + ")", 20)
-    | TApp (t, ts) -> ((r 10 t) + "(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
-    | TArrow (ts, t) -> ("(" + (String.concat ", " (List.map (r 0) ts)) + ") -> " + (r 0 t), 0)
+    | TBool BpBool -> ("bool", 99)
+    | TBool BpProp -> ("prop", 99)
     | TInt (NegInf, Inf) -> ("int", 0)
-    | TInt (b1, b2) -> ("int(" + s_bnd b1 + ", " + s_bnd b2 + ")", 0)
+    | TInt (b1, b2) -> ("int_range(" + s_bnd b1 + ", " + s_bnd b2 + ")", 0)
     | TTuple ts -> ("tuple(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
+    | TFun (ts, t) -> ("fun (" + (String.concat ", " (List.map (r 0) ts)) + ") -> " + (r 0 t), 0)
   in if prec <= tPrec then s else "(" + s + ")"
 let string_of_typ (t:typ):string = string_of_typ_prec 0 t
 
@@ -343,6 +345,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | DProc p -> emit_proc ps loc p
     | DConst _ -> ()
     | DType _ -> ()
+    | DOperandType _ -> ()
     | DUnsupported _ -> ()
   with err -> raise (LocErr (loc, err))
 

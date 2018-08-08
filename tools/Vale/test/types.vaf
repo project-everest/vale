@@ -1,14 +1,25 @@
 module Types
 
-type bool:Type(0) extern;
-type byte:Type(0) := int(0, 0xff);
+type byte:Type(0) := int_range(0, 0xff);
+type nat32:Type(0) := int_range(0, 0xffffffff);
 
 function byte_test(x:byte, y:byte):byte extern;
 function id #[a:Type(0)] (x:a):a extern;
 
 var{:state ok()} ok:bool;
+var{:state reg(EAX)} eax:int;
+var{:state reg(EBX)} ebx:int;
+var{:state reg(ESP)} esp:int;
 
-procedure{:typecheck} Expressions(ghost x:int(10, 20)) returns(ghost y:int(15, 25))
+operand_type reg32:nat32 :=
+| inout eax
+| inout ebx
+;
+
+operand_type mem32:nat32;
+operand_type opr32:nat32 := reg32 | mem32 | in esp | const;
+
+procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
 {
     let a:bool := !true;
     let b:prop := !a;
@@ -16,14 +27,14 @@ procedure{:typecheck} Expressions(ghost x:int(10, 20)) returns(ghost y:int(15, 2
     let d:int := 5;
     let e:tuple(int, byte) := tuple(5, 5);
     let f:tuple(int, byte) := let z := tuple(5, 5) in z;
-    let g:int((-20), (-10)) := (-x);
-    let h:int((-20), (-10)) := let z := x in (-z);
-    let i:int(13, 23) := x + 3;
-    let j:int(7, 17) := x - 3;
-    let k:int(30, 60) := x * 3;
-    let l:int(30, 60) := x + 2 * x;
-    let m:int(3, 6) := x / 3;
-    let n:int(0, 2) := x % 3;
+    let g:int_range((-20), (-10)) := (-x);
+    let h:int_range((-20), (-10)) := let z := x in (-z);
+    let i:int_range(13, 23) := x + 3;
+    let j:int_range(7, 17) := x - 3;
+    let k:int_range(30, 60) := x * 3;
+    let l:int_range(30, 60) := x + 2 * x;
+    let m:int_range(3, 6) := x / 3;
+    let n:int_range(0, 2) := x % 3;
     let o:bool := a && a;
     let p:prop := a && b;
     let q:prop := b && a;
@@ -37,7 +48,67 @@ procedure{:typecheck} Expressions(ghost x:int(10, 20)) returns(ghost y:int(15, 2
     y := 20;
 }
 
+procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    requires x >= 15;
+{
+    y := #int_range(15, 20)(x);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    requires x >= 15;
+{
+    y := #int_range(15, 25)(x);
+}
+
 // TODO: check that return values are assigned
+
+procedure{:typecheck} Ghosts(ghost x:byte, ghost y:bool, inline z:byte)
+{
+}
+
+procedure{:typecheck} Add(inout dst:opr32, src:opr32)
+{
+}
+
+procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
+    reads esp;
+    modifies eax; ebx;
+{
+    Ghosts(100, true, z);
+    Add(eax, esp);
+    Add(eax, id(id(5)));
+    Add(eax, id(id(z)));
+// TODO:    Add(eax, id#[byte](id#[byte](5)) + 1);
+// TODO:    Add(eax, id(id(5)) + 1);
+    Add(eax, 10);
+    Add(eax, ebx);
+    Add(eax, o);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte, o:reg32)
+    reads esp;
+    modifies eax; ebx;
+{
+    Add(o, eax);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte)
+    modifies eax; ebx; esp;
+{
+    Add(eax, id(id(x)));
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+    modifies eax; ebx; esp;
+{
+    Add(esp, eax);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte)
+    modifies eax; ebx;
+{
+    Ghosts(100, true, x);
+}
 
 procedure{:typecheck}{:testShouldFail} Fail()
 {
@@ -49,7 +120,7 @@ procedure{:typecheck}{:testShouldFail} Fail()
     let a:byte := byte_test(200, 500);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:int(10, 20)) returns(ghost y:int(15, 25))
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
 {
     y := x;
 }

@@ -561,7 +561,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     let xEns = Reserved ("ens_" + (string_of_id p.pname)) in
     let eReqs = List.collect (spec true) pLemmaSpecs in
     let eEnss = List.collect (spec false) pLemmaSpecs in
-    let eReqApp = EApply (xReq, List.map (fun (x, _) -> EVar x) reqArgs) in
+    let eReqApp = eapply xReq (List.map (fun (x, _) -> EVar x) reqArgs) in
     let eEnss = eReqApp::eEnss in
     let eReq = and_of_list eReqs in
     let eEns = and_of_list eEnss in
@@ -569,8 +569,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       {
         fname = xReq;
         fghost = Ghost;
+        ftargs = [];
         fargs = reqArgs;
+        fret_name = None;
         fret = tProp;
+        fspecs = [];
         fbody = Some eReq;
         fattrs = [(Id "public", [])];
       }
@@ -579,8 +582,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       {
         fname = xEns;
         fghost = Ghost;
+        ftargs = [];
         fargs = ensArgs;
         fret = tProp;
+        fret_name = None;
+        fspecs = [];
         fbody = Some eEns;
         fattrs = [(Id "public", [])];
       }

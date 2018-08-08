@@ -9,14 +9,16 @@ type id = Id of string | Reserved of string | Operator of string
 type kind =
 | KType of bigint
 
+type bool_or_prop = BpBool | BpProp
 type bnd = Int of bigint | NegInf | Inf
 type typ =
 | TName of id
-| TVar of id * kind option
+| TApply of id * typ list
+| TBool of bool_or_prop
 | TInt of bnd * bnd
 | TTuple of typ list
-| TArrow of typ list * typ
-| TApp of typ * typ list
+| TFun of typ list * typ
+| TVar of id * kind option
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
@@ -24,29 +26,24 @@ type formal = id * typ option
 
 type exp_call = CallGhost | CallLemma | CallInline | CallOutline
 
-type op_type = OpBool | OpProp
-
 type uop = 
-| UNot of op_type | UNeg | UOld | UIs of id
+| UNot of bool_or_prop | UNeg | UOld | UIs of id
 | UConst
 | UReveal | UGhostOnly | UToOperand
 | UCall of exp_call
 | UCustom of string
 
 type bop =
-| BEquiv | BImply | BExply | BAnd of op_type | BOr of op_type
-| BEq of op_type | BNe of op_type | BLt | BGt | BLe | BGe | BIn
+| BEquiv | BImply | BExply | BAnd of bool_or_prop | BOr of bool_or_prop
+| BEq of bool_or_prop | BNe of bool_or_prop | BLt | BGt | BLe | BGe | BIn
 | BAdd | BSub | BMul | BDiv | BMod
 | BOldAt
 | BCustom of string
 
-//type mop =
-//| MTuple | MList | MSet
-
 type op =
 | Uop of uop
 | Bop of bop
-//| MultiOp of mop
+| TupleOp of typ list option
 | Subscript
 | Update
 | Cond
@@ -180,8 +177,14 @@ type prag =
 | ModuleName of string
 | ResetOptions of string
 
+type operand_typ =
+| OT_Const
+| OT_Name of id
+| OT_State of inout * id
+
 type decl =
 | DType of id * tformal list * kind * typ option
+| DOperandType of id * typ * operand_typ list
 | DVar of id * typ * var_storage * attrs
 | DConst of id * typ
 | DFun of fun_decl

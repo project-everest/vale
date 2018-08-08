@@ -143,7 +143,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       (true, eAssertBy)
   | _ -> err ()
 and build_qcode_stmts (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
-  let outTuple = eapply (Id "tuple") (List.map EVar outs) in
+  let outTuple = EOp (TupleOp None, List.map EVar outs) in
   let empty = eapply (Id "QEmpty") [outTuple] in
   let (needsState, e) = List.foldBack (build_qcode_stmt env outs loc) ss (false, empty) in
   e
@@ -164,7 +164,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     let id = Reserved ("qcode_" + info.qsym + "_" + (string_of_id p.pname)) in
     let cid = Reserved ("code_" + info.qsym + "_" + (string_of_id p.pname)) in
     let tArgs = List.map (fun (x, _) -> TName x) fParams in
-    let tCodeApp = TApp (TName cid, tArgs) in
+    let tCodeApp = tapply cid tArgs in
 //    let fBody = build_qcode_block false env [] loc ss in
     let fBody = build_qcode_stmts env [] loc ss in
     let fCode =
@@ -174,8 +174,8 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
         ftargs = [];
         fargs = pParams;
         fret_name = None;
-//        fret = TApp (TName (Reserved "quickCode"), [tUnit; tCodeApp]);
-        fret = TApp (TName (Id "quickCodes"), [tUnit; tCodeApp]);
+//        fret = tapply (Reserved "quickCode") [tUnit; tCodeApp];
+        fret = tapply  (Id "quickCodes") [tUnit; tCodeApp];
         fspecs = [];
         fbody = Some (hide_ifs fBody);
         fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
@@ -196,7 +196,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
     let eqMod x =
       let getM = stateGet {env with state = EVar sM} x in
       let getN = stateGet {env with state = EVar sN} x in
-      EOp (Bop (BEq OpProp), [getM; getN])
+      EOp (Bop (BEq BpProp), [getM; getN])
       in
     let eEq = and_of_list (List.map eqMod info.qmods) in
     let fEq = EBind (Lambda, [], [(sM, Some tState); (sN, Some tState)], [], eEq) in
@@ -230,11 +230,11 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   let qParams = List.map makeParam p.pargs in
   let makeRet (x, t, storage, io, attrs) = match storage with XGhost -> [(x, t)] | _ -> [] in
   let prets = List.collect makeRet p.prets in
-  let tRet = TApp (TName (Id "tuple"), List.map snd prets) in
+  let tRet = TTuple (List.map snd prets) in
   let cid = Reserved ("code_" + (string_of_id p.pname)) in
   let tArgs = List.map (fun (x, _) -> TName x) cParams in
-  let tCodeApp = TApp (TName cid, tArgs) in
-  let tRetQuick = TApp (TName (Id "quickCode"), [tRet; tCodeApp]) in
+  let tCodeApp = tapply cid tArgs in
+  let tRetQuick = tapply (Id "quickCode") [tRet; tCodeApp] in
   let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
   let (_, ss) = let_updates_stmts mutable_scope ss in
   let outs = List.map fst prets in

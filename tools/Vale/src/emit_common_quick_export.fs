@@ -107,7 +107,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let eArgs = List.map (fun x -> EVar x) xArgs in
   let tArgsCode = List.map (fun x -> TName x) xArgsCode in
   let eArgsCode = List.map (fun x -> EVar x) xArgsCode in
-  let eUnit = eapply (Id "tuple") [] in
+  let eUnit = EOp (TupleOp None, []) in
   let eTrue = EVar (Id "True") in
   let tType0 = TName (Id "Type0") in
   let tUnit = TName (Id "unit") in
@@ -117,7 +117,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     match ghostRets with
     | [] -> tUnit
     | [(_, t)] -> t
-    | xts -> TApp (TName (Id "tuple"), List.map snd xts)
+    | xts -> TTuple (List.map snd xts)
     in
   let wp_X = Reserved ("wp_" + (string_of_id p.pname)) in
   let wpMonotone_X = Reserved ("wpMonotone_" + (string_of_id p.pname)) in
@@ -134,9 +134,9 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let k1 = Reserved "k1" in
   let k2 = Reserved "k2" in
   let k_true = Id "k_true" in
-  let tContinue = TApp (TName (Id "fun"), [tState; tA; tType0]) in
+  let tContinue = TFun ([tState; tA], tType0) in
   let argContinue = (k, Some tContinue) in
-  let tCode = TApp (TName (Reserved ("code_" + (string_of_id p.pname))), tArgsCode) in
+  let tCode = tapply (Reserved ("code_" + (string_of_id p.pname))) tArgsCode in
   let eCode = eapply (Reserved ("code_" + (string_of_id p.pname))) eArgsCode in
 
   let reqIsExps =
@@ -145,7 +145,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     in
 
   // wp_X
-  let ghostRetTuple = eapply (Id "tuple") (List.map (fun (x, _) -> EVar x) ghostRets) in
+  let ghostRetTuple = EOp (TupleOp None, List.map (fun (x, _) -> EVar x) ghostRets) in
   let ghostRetFormals = List.map (fun (x, t) -> (x, Some t)) ghostRets in
   let (pspecs, pmods) = List.unzip (List.map (Emit_common_lemmas.build_lemma_spec env s0 (EVar sM)) p.pspecs) in
   let (updatesX, wpFormals) = makeFrame env p s0 sM in
@@ -155,7 +155,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let ensContinue = EOp (Bop BImply, [wpEns; continueM]) in
   let letEnsContinue = EBind (BindLet, [updatesX], [(sM, None)], [], ensContinue) in
   let wpForall = EBind (Forall, [], wpFormals @ ghostRetFormals, [], letEnsContinue) in
-  let wpBody = EOp (Bop (BAnd OpProp), [wpReq; wpForall]) in
+  let wpBody = EOp (Bop (BAnd BpProp), [wpReq; wpForall]) in
   let fWp =
     {
       fname = wp_X;
@@ -246,7 +246,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   // quick_X
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpProof_X ARGS)
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
-  let tRetQuick = TApp (TName (Reserved "quickCode"), [tA; tCode]) in
+  let tRetQuick = tapply (Reserved "quickCode") [tA; tCode] in
   let eQuick = eapply (Reserved "QProc") [eCode; appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; appArgs wpProof_X] in
   let fQuick =
     {

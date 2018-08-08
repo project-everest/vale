@@ -74,7 +74,6 @@ let rec create_type (built_ins:BuiltIns) (t:typ):Type = // ignoring function typ
   match t with
   | TName id ->
       match (sid id) with
-      | "bool" -> new BoolType() :> Type
       | "char" -> new CharType() :> Type
       | "nat" ->
           let tok = create_dummy_token "nat" in
@@ -91,7 +90,7 @@ let rec create_type (built_ins:BuiltIns) (t:typ):Type = // ignoring function typ
             let tok = create_dummy_token s in
             let e = new NameSegment(tok, s, null) in
             new UserDefinedType(tok, e) :> Type
-  | TApp (TName (Id "tuple"), l) ->
+  | TTuple l ->
       match l with
       | [] ->
           let tok = create_dummy_token "tuple_token" in
@@ -104,54 +103,52 @@ let rec create_type (built_ins:BuiltIns) (t:typ):Type = // ignoring function typ
           let dims = args.Count in
           let tmp = built_ins.TupleType(tok, dims, true) in
           new UserDefinedType(tok, BuiltIns.TupleTypeName(dims), args) :> Type
-  | TApp (t, tlist) ->
-      match t with
-      | TName id ->
-          match (sid id) with
-          | "set" ->
-              match tlist with
-              | [] -> new SetType (true, null) :> Type
-              | t::[] -> new SetType(true, create_type built_ins t) :> Type
-              | _ -> internalErr "set type expects only one type argument"
-          | "iset" ->
-              match tlist with
-              | [] -> new SetType(false, null) :> Type
-              | t::[] -> new SetType(false, create_type built_ins t) :> Type
-              | _ -> internalErr "iset type expects only one type argument"
-          | "multiset" ->
-              match tlist with
-              | [] -> new MultiSetType(null):> Type
-              | t::[] -> new MultiSetType(create_type built_ins t):> Type
-              | _ -> internalErr "multiset type expects only one type argument"
-          | "seq" ->
-              match tlist with
-              | [] -> new SeqType(null):> Type
-              | t::[] -> new SeqType(create_type built_ins t):> Type
-              | _ -> internalErr "seq type expects only one type argument"
-          | "map" ->
-              match tlist with
-              | [] -> new MapType(true, null, null) :> Type
-              | t1::t2::[] -> new MapType(true, create_type built_ins t1, create_type built_ins t2) :> Type
-              | _ -> internalErr "map type expects two type arguments"
-          | "imap" ->
-              match tlist with
-              | [] -> new MapType(false, null, null) :> Type
-              | t1::t2::[] -> new MapType(false, create_type built_ins t1, create_type built_ins t2) :> Type
-              | _ -> internalErr "imap type expects two type arguments"
-          | "array" -> // do not currently handle Dafny's higher dimensioned arrays
-              let tok = create_dummy_token "array" in
-              let args = List.fold (fun (acc:ResizeArray<Type>) (elem:typ) -> acc.Add(create_type built_ins elem); acc) (new ResizeArray<Type>()) tlist in
-              let t = built_ins.ArrayType(tok, 1, args, true) in
-              t :> Type
-          | s ->
-              if s.Contains "."
-              then notImplemented "type creation for types with dots"
-              else
-                let tok = create_dummy_token s in
-                let args = List.fold (fun (acc:ResizeArray<Type>) (elem:typ) -> acc.Add(create_type built_ins elem); acc) (new ResizeArray<Type>()) tlist in
-                let e = new NameSegment(tok, s, args) in
-                new UserDefinedType(e.tok, e) :> Type
-      | _ -> internalErr "TAPP: expected TName"
+  | TApply (id, tlist) ->
+      match (sid id) with
+      | "set" ->
+          match tlist with
+          | [] -> new SetType (true, null) :> Type
+          | t::[] -> new SetType(true, create_type built_ins t) :> Type
+          | _ -> internalErr "set type expects only one type argument"
+      | "iset" ->
+          match tlist with
+          | [] -> new SetType(false, null) :> Type
+          | t::[] -> new SetType(false, create_type built_ins t) :> Type
+          | _ -> internalErr "iset type expects only one type argument"
+      | "multiset" ->
+          match tlist with
+          | [] -> new MultiSetType(null):> Type
+          | t::[] -> new MultiSetType(create_type built_ins t):> Type
+          | _ -> internalErr "multiset type expects only one type argument"
+      | "seq" ->
+          match tlist with
+          | [] -> new SeqType(null):> Type
+          | t::[] -> new SeqType(create_type built_ins t):> Type
+          | _ -> internalErr "seq type expects only one type argument"
+      | "map" ->
+          match tlist with
+          | [] -> new MapType(true, null, null) :> Type
+          | t1::t2::[] -> new MapType(true, create_type built_ins t1, create_type built_ins t2) :> Type
+          | _ -> internalErr "map type expects two type arguments"
+      | "imap" ->
+          match tlist with
+          | [] -> new MapType(false, null, null) :> Type
+          | t1::t2::[] -> new MapType(false, create_type built_ins t1, create_type built_ins t2) :> Type
+          | _ -> internalErr "imap type expects two type arguments"
+      | "array" -> // do not currently handle Dafny's higher dimensioned arrays
+          let tok = create_dummy_token "array" in
+          let args = List.fold (fun (acc:ResizeArray<Type>) (elem:typ) -> acc.Add(create_type built_ins elem); acc) (new ResizeArray<Type>()) tlist in
+          let t = built_ins.ArrayType(tok, 1, args, true) in
+          t :> Type
+      | s ->
+          if s.Contains "."
+          then notImplemented "type creation for types with dots"
+          else
+            let tok = create_dummy_token s in
+            let args = List.fold (fun (acc:ResizeArray<Type>) (elem:typ) -> acc.Add(create_type built_ins elem); acc) (new ResizeArray<Type>()) tlist in
+            let e = new NameSegment(tok, s, args) in
+            new UserDefinedType(e.tok, e) :> Type
+  | TBool _ -> new BoolType() :> Type
   | TInt _ -> new IntType() :> Type
   | _ -> internalErr (sprintf "not implemented create_type for %A" t)
 
@@ -285,7 +282,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
               | BExply -> new BinaryExpr(tok, opcode, e2, e1) :> Expression
               | _ -> new BinaryExpr(tok, opcode, e1, e2) :> Expression
       | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr "binary operator"
-      | EApply (Id "tuple", _, es) ->
+      | EOp (TupleOp _, es) ->
           let tok = create_token loc "(" in
           let args = new ResizeArray<Expression>() in
           List.iter (fun x -> args.Add(create_expression built_ins loc x)) es
@@ -689,6 +686,7 @@ let create_dafny_decl (mdl:LiteralModuleDecl) (built_ins:BuiltIns) (loc:loc, d:d
     | DVar _ -> ()
     | DConst _ -> ()
     | DType _ -> ()
+    | DOperandType _ -> ()
     | DUnsupported _ -> ()
     | DFun f -> default_class.Members.Add(build_fun built_ins loc f)
     | DProc p ->

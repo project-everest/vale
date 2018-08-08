@@ -50,12 +50,12 @@ let string_of_var_storage (g:var_storage) = match g with XGhost -> "ghost " | _ 
 let rec string_of_typ (t:typ):string =
   match t with
   | TName x -> sid x
-  | TApp (TName (Id "tuple"), ts) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
-  | TApp (t, ts) -> (string_of_typ t) + "<" + (String.concat ", " (List.map string_of_typ ts)) + ">"
-  | TArrow (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
+  | TApply (x, ts) -> (sid x) + "<" + (String.concat ", " (List.map string_of_typ ts)) + ">"
+  | TBool _ -> "bool"
   | TInt (b1, b2) -> "int"
+  | TFun (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
   | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
-  | _ -> internalErr (sprintf "unexpected string_of_typ %A" t)
+  | TVar _ -> internalErr "string_of_typ: TVar"
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -80,7 +80,7 @@ let rec string_of_exp_prec prec e =
         let (pe, p1, p2) = prec_of_bop op in
         ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
     | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr ("binary operator " + (sprintf "%A" e))
-    | EApply (Id "tuple", _, es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EOp (TupleOp _, es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EApply (Id "seq", _, es) -> ("[" + (String.concat ", " (List.map (r 5) es)) + "]", 90)
     | EApply (Id "set", _, es) -> ("{" + (String.concat ", " (List.map (r 5) es)) + "}", 90)
     | EOp (Subscript, [e1; e2]) -> ((r 90 e1) + "[" + (r 90 e2) + "]", 90)
@@ -239,6 +239,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
     | DProc p -> emit_proc ps loc p
     | DConst _ -> ()
     | DType _ -> ()
+    | DOperandType _ -> ()
     | DUnsupported _ -> ()
   with err -> raise (LocErr (loc, err))
 

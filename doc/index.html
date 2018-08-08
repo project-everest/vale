@@ -166,12 +166,13 @@
       <li><i>[</i>A<i>]</i> indicates that A is optional.</li>
       <li>A...A indicates that A is repeated zero or more times.</li>
       <li>A<i>[</i>...A<i>]</i> indicates that A is repeated one or more times.</li>
-      <li>Variable/attribute/function/procedure/constructor/field/type names are written as "x", "f", "p", "c", "fd", "t",
+      <li>Variable/attribute/function/procedure/constructor/field/type/operator-type names are written as "x", "f", "p", "c", "fd", "t", "ot",
           where "f" is used to emphasize a function name,
           "p" is used to emphasize a procedure name,
           "c" is used to emphasize a datatype constructor name,
           "fd" is used to emphasize a field name,
-          and "t" is used to emphasize a type name.</li>
+          "t" is used to emphasize a type name,
+          and "ot" is used to emphasize an operator type name.</li>
     </ul>
 
   <p>
@@ -192,10 +193,11 @@ INCLUDE ::= include "STRING"
 DECL ::=
   | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND extern ;
   | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND := TYPE ;
+  | operand_type ot : TYPE <i>[</i> := <i>[</i> | <i>]</i> OTYP | ... | OTYP <i>]</i>
   | <a href="#state">var</a> x : TYPE ;
   | const x : TYPE extern ;
-  | function f ( FORMALS ) : TYPE <i>[</i>:= f<i>]</i> ;
   | function f <i>[</i> #[ TFORMALS ] <i>]</i> ( FORMALS ) : FRET SPECS extern ;
+  | function f ( FORMALS ) : TYPE := f ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
@@ -215,9 +217,9 @@ PFORMALS ::= PFORMAL , ... , PFORMAL
 <a href="#parameters">PFORMAL</a> ::=
   | ghost x : TYPE
   | inline x : TYPE
-  | TYPE x : TYPE
-  | out TYPE x : TYPE
-  | inout TYPE x : TYPE
+  | x : ot
+  | out x : ot
+  | inout x : ot
 
 PRETS ::= PRET , ... , PRET
 <a href="#parameters">PRET</a> ::=
@@ -249,14 +251,15 @@ STMT ::=
   | calc <i>[</i>CALC_OP<i>]</i> { CALC ... CALC EXP ; }
   | reveal f ;
   | p ( EXP , ... , EXP) ;
-  | ASSIGN ;
-  | <i>[</i>ghost<i>]</i> var x <i>[</i>: TYPE<i>]</i> <i>[</i>:= EXP<i>]</i> ;
+  | DESTINATIONS := p ( EXP , ..., EXP ) ;
+  | x := EXP ;
+  | this := EXP ;
+  | ghost var x <i>[</i>: TYPE<i>]</i> <i>[</i>:= EXP<i>]</i> ;
   | let x <i>[</i>: TYPE<i>]</i> := e ;
   | let x1 @= x2 ;
   | forall FORMALS TRIGGERS <i>[</i>:| EXP<i>]</i> :: EXP { STMTS }
   | exists FORMALS TRIGGERS :: EXP ;
   | while ( EXP ) INVARIANTS DECREASE { STMTS }
-  | for ( ASSIGNS ; EXP ; ASSIGNS ) INVARIANTS DECREASE { STMTS }
   | <i>[</i>ghost<i>]</i> <i>[</i>inline<i>]</i> if ( EXP ) { STMTS }
       <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
       <i>[</i> else { ... } <i>]</i>
@@ -266,17 +269,10 @@ CALC_HINTS ::= CALC_HINT ... CALC_HINT
 CALC_HINT ::= { STMTS }
 CALC_OP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
 
-ASSIGNS ::= ASSIGN , ... , ASSIGN
-ASSIGN ::= 
-  | x <a href="#overloading">POSTFIX_OP</a>
-  | x := EXP
-  | this := EXP
-  | DESTINATIONS := p ( EXP , ..., EXP )
-
 DESTINATIONS := DESTINATION <i>[</i> , ... , DESTINATION <i>]</i>
 DESTINATION ::=
   | x
-  | ( <i>[</i>ghost<i>]</i> var x <i>[</i>: TYPE<i>]</i> )
+  | ( ghost var x <i>[</i>: TYPE<i>]</i> )
 
 INVARIANTS ::= INVARIANT ... INVARIANT
 INVARIANT ::= invariant EXP ; ... EXP ;
@@ -301,7 +297,6 @@ EXP ::=
   | ( - EXP )
   | this
   | @x
-  | const(EXP)
   | f ( EXP , ... , EXP )
   | f #[ TYPE , ... , TYPE ] ( EXP , ... , EXP )
   | # TYPE ( EXP )
@@ -332,30 +327,38 @@ EXP ::=
   | lambda FORMALS TRIGGERS :: EXP
   | ( EXP )
 
+OTYP ::=
+  | const
+  | ot
+  | in x
+  | out x
+  | inout x
+
 TYPE ::=
   | t
   | TYPE ( TYPE , ... , TYPE )
   | tuple ( TYPE , ... , TYPE )
   | fun ( TYPE , ... , TYPE ) -> TYPE
-  | int | int ( , INT ) | int ( INT , ) | int ( INT , INT )
+  | int | int_range ( _ , INT ) | int_range ( INT , _ ) | int_range ( INT , INT )
   | ( TYPE )
 
 KIND ::= Type ( 0 ) | Type ( 1 ) | ...
     </pre>
     </td>
     <td>
-    <pre>
+      <pre>
 ---
 
 
 
 
 
+type bool:Type(0) extern;
+
+operand_type opr32:nat32 := inout eax | inout ebx | mem32 | const;
 
 
-
-
-function f(x:int, y:int):bool;
+function f(x:int, y:int):bool extern;
 
       
 
@@ -410,14 +413,15 @@ assert x &lt;= 10 by { myLemma(x); }
 calc { x; x * 1; { myLemma(x); } 1 * x; }
 reveal myOpaqueFunction;
 Increment(x);
+eax, (ghost var x:int), y := myProc(ebx, edx, z);
 x := 5;
+
 ghost var x:uint32 := 33 + 44; // mutable x
 let x := eax; // copy eax's current value into immutable x
 let x @= eax; // let x be an alias for register eax
 forall x:int, y:int :| x &lt; y :: x &lt;= y { ... }
 exists x:int :| 0 &lt;= x;
 while (eax != 0) invariant true; decreases *; { ... }
-for (eax := 0; eax < 10; eax++) decreases eax; { ... }
 if (eax != 5) { Increment(edx) } else { eax := 0; }
 
 
@@ -425,14 +429,6 @@ if (eax != 5) { Increment(edx) } else { eax := 0; }
 
 
 
-
-
-
-
-x++;
-
-
-eax, (ghost var x:int), y := myProc(ebx, edx, z);
 
 
 
@@ -494,11 +490,18 @@ forall x, y {foo(x, y)} :: foo(x, y) || x == y
 
 
 
+
+
+
+
+
+
+
 uint32
 map(int, set(uint32))
 tuple(int, int, bool)
 fun(int, int) -> bool
-type byte : Type(0) := int(0, 0xff);
+type byte : Type(0) := int_range(0, 0xff);
 
 
 ---
@@ -722,7 +725,7 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
         Add(eax, ebx); // instantiate Add with destination eax and source ebx
         Add(ebx, eax); // instantiate Add with destination ebx and source eax
         Add(eax, 7);   // instantiate Add with destination eax and source 7
-        Add(eax, const(2 + 2));   // instantiate Add with destination eax and source 4
+        Add(eax, 2 + 2);   // instantiate Add with destination eax and source 4
         assert eax == old(eax + ebx) + 11;
       }
     </code></pre>
@@ -730,8 +733,6 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
   <p>
     Operand parameters may be instantiated with constants, state variables, operands, or operand constructor applications.
     Operand return values may be instantiated with state variables, operands, or operand constructor applications.
-    Constants passed as operand parameters may either be simple integer literals,
-    or more complex expressions inside a "const(...)" expression.
 
   <h2 id="interface">Interface between Vale and verification languages</h2>
 

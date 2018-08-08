@@ -56,17 +56,17 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * string> LITREAL
 %token <loc * bool> LITBOOL
 %token <loc * int> BV
-%token <loc> INT
+%token <loc> INT INT_RANGE BOOL PROP TUPLE
 %token <loc> QLBRACKET HASHLBRACKET LBRACKET RBRACKET LBRACE RBRACE LPAREN RPAREN LBRACECOLON
 %token <loc> AT COMMA DOT HASH MINUSGT
-%token <loc * (bool * string)> BANG
+%token <loc * (bool * string)> BANG BAR
 %token <loc * (bool * string)> LT GT EQ LE GE EQEQ NE
 %token <loc * (bool * string)> PLUS MINUS STAR SLASH PERCENT
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
 %token <loc * (bool * string)> ATEQ COLONEQ
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
-%token <loc> TTYPE TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
+%token <loc> TTYPE TYPE OPERAND_TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
 %token <loc> UNSUPPORTED
 %token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
@@ -109,30 +109,27 @@ Kind
 
 Type
   : Type1 { $1 }
-  | IntType { $1 }
-  | FUN LPAREN TypeArgsOpt RPAREN MINUSGT Type { TArrow ($3, $6) }
+  | FUN LPAREN TypeArgsOpt RPAREN MINUSGT Type { TFun ($3, $6) }
 Type1
   : Type2 { $1 }
-  | Type1 LPAREN TypeArgsOpt RPAREN
-    {
-      match $1 with
-      | TName (Id "tuple") -> TTuple $3
-      | _ -> TApp ($1, $3)
-    }
+  | AnyQualifiedId LPAREN TypeArgsOpt RPAREN { TApply ($1, $3) }
 Type2
   : LPAREN Type RPAREN { $2 }
   | AnyQualifiedId { TName $1 }
-	
+  | INT { TInt (NegInf, Inf) }
+  | INT_RANGE LPAREN Underscore COMMA Int RPAREN { TInt (NegInf, Int (snd $5))}
+  | INT_RANGE LPAREN Int COMMA Underscore RPAREN { TInt (Int (snd $3), Inf)}
+  | INT_RANGE LPAREN Int COMMA Int RPAREN { TInt (Int (snd $3), Int(snd $5))}
+  | TUPLE LPAREN TypeArgsOpt RPAREN { TTuple $3 }
+  | BOOL { TBool BpBool }
+  | PROP { TBool BpProp }
+
+Underscore
+  : AnyId { if $1 = Id "_" then () else parse_err "expected _ or integer literal" }
+
 Int
   : LITINT { $1 }
   | LPAREN MINUS LITINT RPAREN { ($1, bigint.Negate(snd $3)) }
-
-/* REVIEW: INT vs. INT LPAREN forces IntType to have low precedence -- might want different syntax */
-IntType
-  : INT { TInt (NegInf, Inf) }
-  | INT LPAREN COMMA Int RPAREN { TInt (NegInf, Int(snd $4))}
-  | INT LPAREN Int COMMA RPAREN { TInt (Int (snd $3), Inf)}
-  | INT LPAREN Int COMMA Int RPAREN { TInt (Int (snd $3), Int(snd $5))}
 
 TypeArgs
   : Type { [$1] }
@@ -159,11 +156,11 @@ Exp1
   | Exp1 LTEQEQGT Exp1 { makeBop BEquiv $2 $1 $3 }
   | Exp1 EQEQGT Exp1 { makeBop BImply $2 $1 $3 }
   | Exp1 LTEQEQ Exp1 { makeBop BExply $2 $1 $3 }
-  | Exp1 AMPAMP Exp1 { makeBop (BAnd OpBool) $2 $1 $3 }
-  | Exp1 BARBAR Exp1 { makeBop (BOr OpBool) $2 $1 $3 }
-  | Exp1 EQEQ Exp1 { makeBop (BEq OpProp) $2 $1 $3 }
-  | Exp1 EQ Exp1 { makeBop (BEq OpBool) $2 $1 $3 }
-  | Exp1 NE Exp1 { makeBop (BNe OpProp) $2 $1 $3 }
+  | Exp1 AMPAMP Exp1 { makeBop (BAnd BpBool) $2 $1 $3 }
+  | Exp1 BARBAR Exp1 { makeBop (BOr BpBool) $2 $1 $3 }
+  | Exp1 EQEQ Exp1 { makeBop (BEq BpProp) $2 $1 $3 }
+  | Exp1 EQ Exp1 { makeBop (BEq BpBool) $2 $1 $3 }
+  | Exp1 NE Exp1 { makeBop (BNe BpProp) $2 $1 $3 }
   | Exp1 LT Exp1 { makeBop BLt $2 $1 $3 }
   | Exp1 GT Exp1 { makeBop BGt $2 $1 $3 }
   | Exp1 LE Exp1 { makeBop BLe $2 $1 $3 }
@@ -175,7 +172,7 @@ Exp1
   | Exp1 SLASH Exp1 { makeBop BDiv $2 $1 $3 }
   | Exp1 PERCENT Exp1 { makeBop BMod $2 $1 $3 }
   | LPAREN MINUS Exp1 RPAREN { makeUop UNeg $2 $3 }
-  | BANG Exp1 { makeUop (UNot OpProp) $1 $2 }
+  | BANG Exp1 { makeUop (UNot BpProp) $1 $2 }
   | Exp1 QLBRACKET Exp RBRACKET { expAt $2 (EOp (Bop BIn, [$3; $1])) }
   | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3])) }
   | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5])) }
@@ -194,6 +191,7 @@ Exp1
   | HASH Type2 LPAREN Exp RPAREN { expAt $1 (ECast ($4, $2))  }
   | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, Some $3, $6)) }
   | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, None, $3)) }
+  | TUPLE LPAREN Exps RPAREN { expAt $1 (EOp (TupleOp None, $3)) }
   | ID { expAt (fst $1) (EVar (Id (snd $1))) }
   | AT ID { expAt $1 (EOp (Uop UToOperand, [expAt (fst $2) (EVar (Id (snd $2)))])) }
 Exps1
@@ -241,10 +239,10 @@ CalcOp
   : LTEQEQGT { BEquiv }
   | EQEQGT { BImply }
   | LTEQEQ { BExply }
-  | AMPAMP { BAnd OpBool }
-  | BARBAR { BOr OpBool }
-  | EQEQ { BEq OpProp }
-  | EQ { BEq OpBool }
+  | AMPAMP { BAnd BpBool }
+  | BARBAR { BOr BpBool }
+  | EQEQ { BEq BpProp }
+  | EQ { BEq BpBool }
   | LT { BLt }
   | GT { BGt }
   | LE { BLe }
@@ -284,7 +282,7 @@ Lhs
 // TODO:  : Exp1 { ($1, None) }
   : AnyId { ($1, None) }
   | THIS { (Reserved "this", None) }
-  | LPAREN Var AnyId VarType RPAREN { let (_, g) = $2 in ($3, Some ($4, g)) }
+  | LPAREN Var AnyId VarType RPAREN { let (_, g) = $2 in ($3, Some ($4, g)) } // REVIEW: what about "let" here?
 Lhss1
   : Lhs { [$1] }
   | Lhs COMMA Lhss1 { $1::$3 }
@@ -299,12 +297,14 @@ ExpAssign
       let (loc, (_, s)) = $2 in
       stmtAt loc (SAssign ($1, $3 $4))
     }
+/*
 ExpAssigns1
   : ExpAssign { $1 }
   | ExpAssign COMMA ExpAssigns1 { $1 @ $3 }
 ExpAssigns
   : { [] }
   | ExpAssigns1 { $1 }
+*/
 Stmt
   : ID COLON { stmtAt (fst $1) (SLabel (Id (snd $1))) }
   | GOTO AnyId SEMI { stmtAt $1 (SGoto $2) }
@@ -314,10 +314,12 @@ Stmt
     {
       stmtAt $1 (SWhile ($3, exps_of_spec_exps $5, $6, $8))
     }
+/* We haven't used this; removing it removes the need for ExpAssigns, simplifying the grammar
   | FOR LPAREN ExpAssigns SEMI Exp SEMI ExpAssigns RPAREN Invariants Decreases LBRACE Block RBRACE
     {
       $3 @ (stmtAt $1 (SWhile ($5, exps_of_spec_exps $9, $10, $12 @ $7)))
     }
+*/
   | FORALL Formals Triggers COLONCOLON Exp LBRACE Block RBRACE
     {
       stmtAt $1 (SForall ($2, $3, EBool true, $5, $7))
@@ -459,6 +461,19 @@ Invariants
   : { [] }
   | INVARIANT SemiExps Invariants { $2 @ $3 }
 
+OperandTypeInclude
+  : CONST { OT_Const }
+  | AnyId { OT_Name $1 }
+  | IN AnyId { OT_State (In, $2) }
+  | OUT AnyId { OT_State (Out, $2) }
+  | INOUT AnyId { OT_State (InOut, $2) }
+OperandTypeIncludes1
+  : OperandTypeInclude { [$1] }
+  | OperandTypeInclude BAR OperandTypeIncludes1 { $1::$3 }
+OperandTypeIncludes
+  : OperandTypeIncludes1 { $1 }
+  | BAR OperandTypeIncludes1 { $2 }
+
 Proc
   : GhostOpt PROCEDURE { ($2, $1) }
 FunRet
@@ -476,6 +491,8 @@ Decl
   | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
   | TYPE AnyQualifiedId TFormalsParen COLON Kind EXTERN SEMI { ($1, DType ($2, $3, $5, None)) }
   | TYPE AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($2, $3, $5, Some $7)) }
+  | OPERAND_TYPE AnyQualifiedId COLON Type SEMI { ($1, DOperandType ($2, $4, [])) }
+  | OPERAND_TYPE AnyQualifiedId COLON Type COLONEQ OperandTypeIncludes SEMI { ($1, DOperandType ($2, $4, $6)) }
 	| UNSUPPORTED COLON AnyQualifiedId { ($1, DUnsupported ($3)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | CONST AnyQualifiedId COLON Type EXTERN SEMI { ($1, DConst ($2, $4)) }

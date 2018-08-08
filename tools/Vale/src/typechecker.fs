@@ -10,9 +10,6 @@ open System
 open Microsoft.FSharp.Text.Lexing
 
 let string_of_typ = Emit_vale_text.string_of_typ
-let t_int = TInt (NegInf, Inf)
-let t_bool = TName (Id "bool")
-let t_prop = TName (Id "prop")
 
 let tvar_count = ref 0
 let reset_type_vars () =
@@ -45,24 +42,28 @@ type decl_type =
   }
 type fun_decl_type = unit -> decl_type
 
-type id_info = StateInfo of string | OperandLocal of typ | InlineLocal
+type id_info = StateInfo of typ | OperandLocal of inout * typ | InlineLocal | ConstGlobal
 
 type name_info =
 | Info of typ * id_info option
-| Func_decl of (unit -> decl_type)
-| Proc_decl of decl_type // second proc_decl is for raw_proc
+| Func_decl of fun_decl_type
+| Proc_decl of proc_decl
 | Type_info of tformal list * kind * typ option
-| Name of id
-
-type scope_mod =
-| Include_module of string * bool
+| OperandType_info of typ * operand_typ list
+| UnsupportedName of id
+//| Include_module of string * bool
 | Module_abbrev of string * string
-| Variable of id * typ * id_info option
-| Func of id * fun_decl_type
-| Proc of id * decl_type
-| Type of id * tformal list * kind * typ option
-| Const of id * typ
-| Unsupported of id
+
+type include_module = string * bool
+
+//type scope_mod =
+//| Variable of id * typ * id_info option
+//| Func of id * fun_decl_type
+//| Proc of id * decl_type
+//| Type of id * tformal list * kind * typ option
+//| Const of id * typ
+//| Unsupported of id
+//| No_scope
 
 type transform_kind =
 | EvalOp
@@ -76,11 +77,14 @@ type transform_kind =
 type env =
   {
     declsmap:Map<id, name_info>; // map id to the decl info
-    scope_mods:list<scope_mod>; // a STACK of scope modifiers
-    ghost:bool; // HACK: used for transform parameter types. Won't need it if transform is done before typechecker.
+    include_modules:list<include_module>;
+    inline_only:bool;
+//    scope_mods:list<scope_mod>; // a STACK of scope modifiers
+//    ghost:bool; // HACK: used for transform parameter types. Won't need it if transform is done before typechecker.
   }
 
-let empty_env:env = {declsmap = Map.empty; scope_mods = []; ghost = false}
+//let empty_env:env = {declsmap = Map.empty; scope_mods = []; ghost = false}
+let empty_env:env = {declsmap = Map.empty; include_modules = []; inline_only = false;}
 
 // type annotated expression
 // annotated with the inferred type and expected type
@@ -109,13 +113,58 @@ let name_of_id x =
   | Operator _ -> (mn, Operator sn)
 
 let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
+  match Map.tryFind x env.declsmap with
+  | Some info -> (Some info, x)
+  | None ->
+    (
+      let rec f includes =
+        match includes with
+        | [] -> (None, x)
+        | (s, false)::includes -> f includes
+        | (s, true)::includes ->
+          (
+            let qx = Id (s + "." + (string_of_id x)) in
+            match Map.tryFind qx env.declsmap with
+            | Some info -> (Some info, qx)
+            | None -> f includes
+          )
+        in
+      f env.include_modules
+    )
+(*
+  match Map.tryFind x env.declsmap with
+  | None -> (None, x)
+  | Some ((Info _ | Func_decl _ | Proc_decl _ | Type_info _ | UnsupportedName _) as info) -> (Some info, x)
+  | Some info ->
+    (
+      match info with
+//      | Variable (s, t, info) when s = x -> (Some (Info (t, info)), x)
+//      | Func (s, decl) when s = x -> (Some (Func_decl decl), x)
+//      | Proc (s, decl) when s = x -> (Some (Proc_decl decl), x)
+//      | Type (s, ts, kind, t) when s = x -> (Some (Type_info (ts, kind, t)), x)
+//      | Const (s, t) when s = x -> (Some (Info (t, None)), x)
+//      | Unsupported (s) when s = x -> (Some (UnsupportedName s), x)
+      | Include_module (s, opened) when include_import ->
+        match Some info with
+        | Some r -> (Some r, x)
+        | _ ->
+        // TODO:
+          // for non-qualified reference, the module has to be opened
+          let qx = Id (s + "." + (string_of_id x)) in
+          match Map.tryFind qx env.declsmap with
+          | Some r -> if opened then (Some r, qx) else err (sprintf "module %s needs to be opened to reference %A" s x)
+          | _ -> (None, x)
+      | _ -> (None, x)
+    )
+*)
+(*
   let find = function
   | Variable (s, t, info) when s = x -> (Some (Info (t, info)), x)
   | Func (s, decl) when s = x -> (Some (Func_decl decl), x)
   | Proc (s, decl) when s = x -> (Some (Proc_decl decl), x)
   | Type (s, ts, kind, t) when s = x -> (Some (Type_info (ts, kind, t)), x)
   | Const (s, t) when s = x -> (Some (Info (t, None)), x)
-  | Unsupported (s) when s = x -> (Some (Name s), x)
+  | Unsupported (s) when s = x -> (Some (UnsupportedName s), x)
   | Include_module (s, opened) when include_import ->
     let r = Map.tryFind x env.declsmap in
     match r with
@@ -135,14 +184,15 @@ let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
   | [] ->
     (None, x)
   aux env.scope_mods
+*)
 
-let push_scope_mod env scope_mod =
- {env with scope_mods = scope_mod :: env.scope_mods}
+//let push_scope_mod env x scope_mod =
+// {env with declsmap = Map.add x (No_info, scope_mod) env.declsmap}
 
 let try_lookup_id (env:env) (x:id):(typ * id_info option) option =
   match lookup_name env x true with
   | (Some (Info (t, info)), _) -> Some (t, info)
-  | (Some (Name x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
+  | (Some (UnsupportedName x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
   | _ -> None
 
 let lookup_id (env:env) (x:id):(typ * id_info option) =
@@ -154,7 +204,7 @@ let try_lookup_type (env:env) (x:id):((typ option * kind) option * id) =
   let (t, qx) = lookup_name env x true in
   match t with
   | Some (Type_info (ts, k, t)) -> (Some (t, k), qx)
-  | Some (Name x) -> unsupported ("unsupported '" + (err_id x) + "'")
+  | Some (UnsupportedName x) -> unsupported ("unsupported '" + (err_id x) + "'")
   | _ -> (None, x)
 
 let lookup_type (env:env) (x:id):(typ option * kind) =
@@ -162,18 +212,30 @@ let lookup_type (env:env) (x:id):(typ option * kind) =
   | (Some info, x) -> info
   | _ -> err ("cannot find type '" + (err_id x) + "'")
 
-let try_lookup_proc (env:env) (x:id):(decl_type option * bool) =
-  match lookup_name env x true with
-  | (Some (Proc_decl t), _) -> (Some t, false)
-  | (Some (Func_decl t), _) -> (Some (t ()), true)
-  | (Some (Name x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
-  | _ -> (None, false)
+type fun_or_proc = FoundFun of decl_type | FoundProc of proc_decl
 
-let lookup_proc (env:env) (x:id):(decl_type * bool) =
-  let x = if x = Id "not" then Id "Prims.l_not" else x in
-  match try_lookup_proc env x with
-  | (Some t, b) -> (t, b)
-  | _ -> err ("cannot find fun/proc '" + (err_id x) + "'")
+let try_lookup_fun_or_proc (env:env) (x:id):fun_or_proc option =
+  match lookup_name env x true with
+  | (Some (Proc_decl p), _) -> Some (FoundProc p)
+  | (Some (Func_decl f), _) -> Some (FoundFun (f ()))
+  | (Some (UnsupportedName x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
+  | _ -> None
+
+let lookup_fun_or_proc (env:env) (x:id):fun_or_proc =
+//  let x = if x = Id "not" then Id "Prims.l_not" else x in
+  match try_lookup_fun_or_proc env x with
+  | Some t -> t
+  | _ -> err ("cannot find function/procedure '" + (err_id x) + "'")
+
+let lookup_fun (env:env) (x:id):decl_type =
+  match try_lookup_fun_or_proc env x with
+  | Some (FoundFun t) -> t
+  | _ -> err ("cannot find function '" + (err_id x) + "'")
+
+let lookup_operand_type (env:env) (x:id):(typ * operand_typ list) =
+  match lookup_name env x true with
+  | (Some (OperandType_info (t, os)), _) -> (t, os)
+  | _ -> err ("cannot find operand type '" + (err_id x) + "'")
 
 let rec normalize_type_rec (env:env) (t:typ):typ =
   let r = normalize_type_rec env in
@@ -185,17 +247,20 @@ let rec normalize_type_rec (env:env) (t:typ):typ =
     | _ ->
       err ("cannot find type '" + (err_id id) + "'")
   | TVar _ -> t
+  | TBool _ -> t
   | TInt _ -> t
   | TTuple ts -> TTuple (List.map r ts)
-  | TArrow (ts, t) -> TArrow (List.map r ts, r t)
-  | TApp (t, ts) -> TApp (r t, List.map r ts)
+  | TFun (ts, t) -> TFun (List.map r ts, r t)
+  | TApply (x, ts) -> TApply (x, List.map r ts) // TODO
 let normalize_type (env:env) (t:typ):norm_typ =
   {norm_typ = normalize_type_rec env t}
 
 // HACK: mangle the parameter types. This will not be needed if transform is performed before typechecker.
 let rec normalize_type_with_transform (env:env) (t:typ) (tr:transform_kind option):norm_typ =
+  normalize_type env t
+(*
   let get_type env x t =
-    match try_lookup_proc env x with
+    match try_lookup_fun_or_proc env x with
     | (Some p, _) ->
       match p.trets with
       | [t] -> normalize_type env t
@@ -239,50 +304,58 @@ let rec normalize_type_with_transform (env:env) (t:typ) (tr:transform_kind optio
     | (Some (typ, k), x)  ->
       match typ with | Some t -> normalize_type env t | None -> {norm_typ = TName x}
     | _ -> err ("cannot find type '" + (err_id id) + "'")
-  | (TApp (t, ts), _) ->
-    let t = normalize_type env t in
+  | (TApply (x, ts), _) ->
     let ts = List.map (fun t -> (normalize_type env t).norm_typ) ts in
-    {norm_typ = TApp (t.norm_typ, ts)}
+    {norm_typ = TApply (x, ts)}
   | _ -> normalize_type env t
+*)
 
 let push_unsupported (env:env) (id:id):env =
-  let env = push_scope_mod env (Unsupported id)
-  {env with declsmap = Map.add id (Name id) env.declsmap}
+//  let env = push_scope_mod env (Unsupported id)
+  {env with declsmap = Map.add id (UnsupportedName id) env.declsmap}
+
+let push_name_info (env:env) (id:id) (info:name_info):env =
+//  let env = push_scope_mod env (Unsupported id)
+  {env with declsmap = Map.add id info env.declsmap}
 
 let push_include_module (env:env) (m:string) (b:bool):env =
-  push_scope_mod env (Include_module (m, b))
+//  push_scope_mod env (Include_module (m, b))
+//  push_name_info env (Id m) (Include_module (m, b))
+  {env with include_modules = (m, b)::env.include_modules}
 
 let push_id (env:env) (id:id) (t:typ):env =
-  push_scope_mod env (Variable (id, t, None))
+//  push_scope_mod env id (Variable (id, t, None))
+  push_name_info env id (Info (t, None))
 
 let push_id_with_info (env:env) (id:id) (t:typ) (info:id_info option):env =
-  push_scope_mod env (Variable (id, t, info))
+//  push_scope_mod env id (Variable (id, t, info))
+  push_name_info env id (Info (t, info))
 
 let push_func (env:env) (id:id) (t:fun_decl_type):env =
-  let env = push_scope_mod env (Func (id, t));
+//  let env = push_scope_mod env (Func (id, t));
   {env with declsmap = Map.add id (Func_decl t) env.declsmap}
 
-let push_proc (env:env) (id:id) (t:decl_type):env =
-  push_scope_mod env (Proc (id, t))
+let push_proc (env:env) (id:id) (t:proc_decl):env =
+  push_name_info env id (Proc_decl t)
 
 let push_typ (env:env) (id:id) (ts:tformal list) (k:kind) (t:typ option):env =
-  let env = push_scope_mod env (Type (id, ts, k, t))
+//  let env = push_scope_mod env (Type (id, ts, k, t))
   {env with declsmap = Map.add id (Type_info (ts, k, t)) env.declsmap}
 
 let push_const (env:env) (id:id) (t:typ):env =
   let t = normalize_type env t in
-  let env = push_scope_mod env (Const (id, t.norm_typ)) in
-  {env with declsmap = Map.add id (Info (t.norm_typ, None)) env.declsmap}
+//  let env = push_scope_mod env (Const (id, t.norm_typ)) in
+  {env with declsmap = Map.add id (Info (t.norm_typ, Some ConstGlobal)) env.declsmap}
 
 let push_rets (env:env) (rets:pformal list):env =
   let f s (x, t, g, io, a) =
     let info =
       match g with
-      | XOperand -> Some (OperandLocal t)
+      | XOperand -> Some (OperandLocal (io, t))
       | XInline -> Some InlineLocal
       | _ -> None in
-    Variable (x, (normalize_type env t).norm_typ, info)::s in
-  {env with scope_mods = List.fold f env.scope_mods rets}
+    Map.add x (Info ((normalize_type env t).norm_typ, info)) s in
+  {env with declsmap = List.fold f env.declsmap rets}
 
 let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):env =
   let arg_in_rets arg l = List.exists (fun elem -> elem = arg) l in
@@ -290,29 +363,31 @@ let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):e
     match l with
     | [] -> s
     | a::q ->
-    let (x, t, g, _, _) = a in
+    let (x, t, g, io, _) = a in
     let info =
       match g with
-      | XOperand -> Some (OperandLocal t)
+      | XOperand -> Some (OperandLocal (io, t))
       | XInline -> Some InlineLocal
       | _ -> None
-    let s = if arg_in_rets a rets then s else Variable (x, t, info)::s in
+    let s = if arg_in_rets a rets then s else Map.add x (Info (t, info)) s in
     aux s q in
-  {env with scope_mods = aux env.scope_mods args}
+  {env with declsmap = aux env.declsmap args}
 
 let push_lhss (env:env) (lhss:lhs list):env =
   let push_lhs s (x,dOpt) =
     match dOpt with
     | Some (tOpt, _) ->
       let t = match tOpt with Some t -> t | None -> next_type_var () in
-      Variable (x, t, None)::s
+      Map.add x (Info (t, None)) s
     | None -> s
-  {env with scope_mods = List.fold push_lhs env.scope_mods lhss }
+  {env with declsmap = List.fold push_lhs env.declsmap lhss }
 
 let push_formals (env:env) (formals:formal list):env =
-  {env with scope_mods = List.fold (fun s (x, t) -> let t = match t with Some t-> t | _->next_type_var () in Variable (x, t, None)::s) env.scope_mods formals}
+  {env with declsmap = List.fold (fun s (x, t) -> let t = match t with Some t-> t | _-> next_type_var () in Map.add x (Info (t, None)) s) env.declsmap formals}
 
-let compute_proc_typ (env:env) (p:proc_decl):decl_type =
+let compute_proc_typ (env:env) (p:proc_decl):proc_decl =
+  p
+(*
   let args = List.map (fun (_, t, _, _, _) -> (normalize_type_with_transform env t (Some OperandTyp)).norm_typ) p.pargs in
   let outs =
     List.fold
@@ -323,6 +398,7 @@ let compute_proc_typ (env:env) (p:proc_decl):decl_type =
       in
   let rets = List.map (fun (_, t, _, _, _) -> (normalize_type_with_transform env t (Some OperandTyp)).norm_typ) p.prets in
   {tformals = p.pargs; targs = args; trets = outs @ rets; ret_name = None; specs = p.pspecs; attrs = p.pattrs}
+*)
 
 let compute_func_typ (env:env) (f:fun_decl):decl_type =
   let targs = List.map (fun (id, kind, _) -> (id, next_type_var_id id (Some kind))) f.ftargs in
@@ -332,11 +408,12 @@ let compute_func_typ (env:env) (f:fun_decl):decl_type =
       match List.tryFind (fun (x, tv) -> id = x) targs with
       | Some (_, tv) -> tv
       | None -> t
-    | TApp (t, ts) -> TApp (replace_typ_arg t, List.map replace_typ_arg ts)
-    | TVar (_, _) -> err ("unexpected type variable in function type")
-    | TInt (_, _) -> t
+    | TApply (x, ts) -> TApply (x, List.map replace_typ_arg ts)
+    | TVar _ -> err ("unexpected type variable in function type")
+    | TBool _ -> t
+    | TInt _ -> t
     | TTuple ts -> TTuple (List.map replace_typ_arg ts)
-    | TArrow (ts, t) -> TArrow (List.map replace_typ_arg ts, replace_typ_arg t)
+    | TFun (ts, t) -> TFun (List.map replace_typ_arg ts, replace_typ_arg t)
   let arg_typ l t =
     match t with
     | TName (Id "Prims.unit") -> l
@@ -427,7 +504,7 @@ let rec typ_equal env (t1:typ) (t2:typ):bool =
 // Check t1 <: t2
 let is_subtype (env:env) (t1:norm_typ) (t2:norm_typ):bool =
   match (t1.norm_typ, t2.norm_typ) with
-  | (TName (Id "bool"), TName (Id "prop")) -> true
+  | (TBool BpBool, TBool BpProp) -> true
   | (TInt (l1, h1), TInt (l2, h2)) -> bnd_le l2 l1 && bnd_le h1 h2
   | _ -> t1 = t2
 
@@ -435,15 +512,19 @@ let isArithmeticOp op = match op with | BAdd | BSub | BMul | BDiv | BMod -> true
 let isLogicOp op = match op with | BEquiv | BImply | BExply | BAnd _ | BOr _ -> true | _ -> false
 let isIcmpOp op = match op with | BLt | BGt | BLe | BGe -> true | _ -> false
 
-let lookup_evar env x =
+let lookup_evar (env:env) (x:id):(typ * id_info option) =
   match x with
   | Id "False" -> lookup_id env (Id "Prims.l_False")
   | Id "True" -> lookup_id env (Id "Prims.l_True")
   | _ -> lookup_id env x
 
 let compute_transform_info env (formal:pformal) (e:exp) =
+  None
+(*
   // if env.ghost=true, then it is always Ghost None
   let (g, opr, io) =
+    (Ghost, None, In)
+(*
     if env.ghost then (Ghost, None, In) else
     match formal with
     | (_, (TName (Id x)), XOperand, io, _) -> (NotGhost, Some x,  io)
@@ -452,6 +533,7 @@ let compute_transform_info env (formal:pformal) (e:exp) =
     | (_, t, XGhost, In, []) -> (Ghost, None, In)
     | (_, t, XGhost, _, []) -> err ("out/inout ghost parameters are not supported")
     | (x, _, _, _, _) -> err ("unexpected argument for parameter " + (err_id x)) in
+*)
   match (g, skip_loc e) with
   | (_, EVar x) ->
     let (t, info) = lookup_evar env x in
@@ -480,9 +562,10 @@ let compute_transform_info env (formal:pformal) (e:exp) =
       match io with
       | In | InOut -> Id (xa + "_in")
       | Out -> Id (xa + "_out")
-    let (proc, _) = try_lookup_proc env (operandProc x io) in
+    let (proc, _) = try_lookup_fun_or_proc env (operandProc x io) in
     if (opr <> None && Option.isSome proc) then Some (EApplyCode) else None
   | _ -> None
+*)
 
 let check_not_local env x =
   match lookup_name env x false with
@@ -517,11 +600,13 @@ let constrain_subtype_opt (src_typ:typ) (expected_typ:typ option) (cl:typ_constr
 let rec infer_arg_typ (env:env) (args:(exp * pformal option * typ option) list):(norm_typ list * aexp list * typ_constraints) =
   let infer_arg_typ_fold env (ts, ae, s) ((e:exp), (formal:pformal option), (et:typ option)):(norm_typ list * aexp list * typ_constraints) =
     let (t, ae1, s1) =
+(*
       let tr =
         match formal with
         | Some f ->
           compute_transform_info env f (e:exp)
         | _ -> if env.ghost then Some EvalOp else None
+*)
       match skip_loc e with
 (*
       | EVar x when (x <> Reserved "this") ->
@@ -578,7 +663,7 @@ and infer_exp_multi (env:env) (e:exp) (*expected_typ:typ option list*):(typ list
     let (t, ae, s) =
       match e with
       | EVar x ->
-        lookup_proc env x |> ignore
+        lookup_fun_or_proc env x |> ignore
         ([], AEVar(x, TName (Id "unit"), TName (Id "unit")), [])
       | EApply _ -> infer_exp_multi env e [None];
       | _ -> err (sprintf "unexpected UReveal %A" e)
@@ -586,14 +671,15 @@ and infer_exp_multi (env:env) (e:exp) (*expected_typ:typ option list*):(typ list
     ([], ae, [])
 *)
   | EApply (x, ts_opt, es) -> // TODO: Some ts case
-    let (p, isExtern) = lookup_proc env x in
-    if List.length p.targs <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length p.targs) (List.length es));
-    let param_typs = p.targs in
-    let ret_typs = p.trets in
+    let f = lookup_fun env x in
+    if env.inline_only && List.length f.specs > 0 then err ("inline expressions cannot call functions with requires/ensures") else
+    if List.length f.targs <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.targs) (List.length es));
+    let param_typs = f.targs in
+    let ret_typs = f.trets in
     let param_arg_typs =
-      if p.tformals <> [] then List.map2 (fun t1 t2 -> (Some t1, t2)) p.tformals param_typs
+      if f.tformals <> [] then List.map2 (fun t1 t2 -> (Some t1, t2)) f.tformals param_typs
       else List.map (fun t -> (None, t)) param_typs in
-    let env = if isExtern then {env with ghost = true} else env in
+//    let env = if isExtern then {env with ghost = true} else env in
     let (arg_typs, aes, s) = infer_arg_typ env (List.map2 (fun e (tf, t) -> (e, tf, Some t)) es param_arg_typs) in
     let s =
       match ts_opt with
@@ -619,17 +705,22 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     in
   match e with
   | ELoc (loc, e) ->
-    let (t, ae, s) = infer_exp env e expected_typ in
-    (t, (AE_Loc (loc, ae), None), s)
-  | EVar (Reserved "this") -> norm_ret (TName (Id "state")) (AE_Exp e) []
+    try
+      let (t, ae, s) = infer_exp env e expected_typ in
+      (t, (AE_Loc (loc, ae), None), s)
+    with err -> raise (LocErr (loc, err))
+  | EVar (Reserved "this") ->
+    if env.inline_only then err "'this' is not allowed for inline expressions" else
+    norm_ret (TName (Id "state")) (AE_Exp e) []
   | EVar x ->
-    let (t, _) = lookup_evar env x in
+    let (t, info) = lookup_evar env x in
+    (match (env.inline_only, info) with (false, _) | (_, Some InlineLocal) -> () | _ -> err "only inline variables are allowed in inline expressions");
     let t = normalize_type_with_transform env t (Some EvalOp) in
     ret t (AE_Exp e) []
   | EInt i -> norm_ret (TInt (Int i, Int i)) (AE_Exp e) []
   | EReal r -> norm_ret (TName (Id "real")) (AE_Exp e) []
 //    | EBitVector (n, i) -> TODO
-  | EBool b -> norm_ret t_bool (AE_Exp e) []
+  | EBool b -> norm_ret tBool (AE_Exp e) []
   | EString s -> norm_ret (TName (Id "string")) (AE_Exp e) []
   | EOp (Uop (UConst | UOld) as op, [e]) ->
     let (t, ae, s) = infer_exp env e expected_typ in
@@ -642,7 +733,7 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     let tv = next_type_var () in
     let et = match expected_typ with | None -> tv | Some t -> t in
     let (_, ae, s) = infer_exp env e (Some et) in
-    let s = constrain_subtype tv t_prop s in
+    let s = constrain_subtype tv tProp s in
     let s = constrain_subtype tv et s in
     ({norm_typ = tv}, (AE_Op (op, [ae]), Some (tv, et)), s) // Some (tv, et) used to resolve overload
 (* TODO
@@ -656,7 +747,7 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
       | _ -> err ("'UIs' should be converted to 'EApply' first before typechecking") in
     (t, ae, s)
   | EOp (Uop (UCustom op), l) ->
-    let (p, _) = lookup_proc env (Operator op) in
+    let (p, _) = lookup_fun_or_proc env (Operator op) in
     let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
     let (t, ae, s) = infer_exp env e expected_typ in
     let ae =
@@ -681,31 +772,31 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     let (_, ae1, s1) = infer_exp env e1 (Some et) in
     let (_, ae2, s2) = infer_exp env e2 (Some et) in
     let s = s1 @ s2 in
-    let s = constrain_subtype tv t_prop s in
+    let s = constrain_subtype tv tProp s in
     let s = constrain_subtype tv et s in
     ({norm_typ = tv}, (AE_Op (op, [ae1; ae2]), Some (tv, et)), s) // Some (tv, et) used to resolve overload
   | EOp (Bop (BEquiv | BImply | BExply) as op, [e1; e2]) ->
-    let (_, ae1, s1) = infer_exp env e1 (Some t_prop) in
-    let (_, ae2, s2) = infer_exp env e2 (Some t_prop) in
-    norm_ret t_prop (AE_Op (op, [ae1; ae2])) (s1 @ s2)
+    let (_, ae1, s1) = infer_exp env e1 (Some tProp) in
+    let (_, ae2, s2) = infer_exp env e2 (Some tProp) in
+    norm_ret tProp (AE_Op (op, [ae1; ae2])) (s1 @ s2)
   | EOp (Bop op, [e1; e2]) when isIcmpOp op ->
     // op in {<, > , <=, >=} and it can be chained
     match (op, skip_loc e1) with
     | (op, EOp (Bop op1, [e11; e12])) when isIcmpOp op1 ->
         // Convert (a <= b) < c into (a <= b) && (b < c)
         let e2 = EOp (Bop op, [e12; e2]) in
-        let e = EOp (Bop (BAnd OpBool), [e1; e2]) in
+        let e = EOp (Bop (BAnd BpBool), [e1; e2]) in
         infer_exp env e expected_typ
     | _ ->
-      let (_, ae1, s1) = infer_exp env e1 (Some t_int) in
-      let (_, ae2, s2) = infer_exp env e2 (Some t_int) in
-      norm_ret t_bool (AE_Op (Bop op, [ae1; ae2])) (s1 @ s2)
+      let (_, ae1, s1) = infer_exp env e1 (Some tInt) in
+      let (_, ae2, s2) = infer_exp env e2 (Some tInt) in
+      norm_ret tBool (AE_Op (Bop op, [ae1; ae2])) (s1 @ s2)
   | EOp (Bop (BEq opt | BNe opt) as op, [e1; e2]) ->
     let (t1, ae1, s1) = infer_exp env e1 None in
     let (t2, ae2, s2) = infer_exp env e2 None in
     let s = s1 @ s2 in
     let s = constrain_equal t1.norm_typ t2.norm_typ s in
-    let t = match opt with OpBool -> t_bool | OpProp -> t_prop in
+    let t = match opt with BpBool -> tBool | BpProp -> tProp in
     norm_ret t (AE_Op (op, [ae1; ae2])) s
 (*
   | EOp (Bop BIn, [e1; e2]) ->
@@ -718,7 +809,7 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     let ae = AE_Op (Bop BOldAt, [ae1;ae2], tv, et) in
     (tv, ae, s1 @ s2 @ [(t1, TName(Id "state"));(t2, tv)])
   | EOp (Bop (BCustom op), l) ->
-    let (p, _) = lookup_proc env (Operator op) in
+    let (p, _) = lookup_fun_or_proc env (Operator op) in
     let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
     let (t, ae, s) = infer_exp env e expected_typ in
     let ae =
@@ -746,7 +837,7 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
   | EOp (Cond, [e1; e2; e3]) ->
     let tv = next_type_var () in
     let et = match expected_typ with | None -> tv | Some t -> t in
-    let (t1, ae1, s1) = infer_exp env e1 (Some t_bool) in
+    let (t1, ae1, s1) = infer_exp env e1 (Some tBool) in
     let (t2, ae2, s2) = infer_exp env e2 (Some et) in
     let (t3, ae3, s3) = infer_exp env e3 (Some et) in
     let s = s1 @ s2 @ s3 in
@@ -758,7 +849,7 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     let (t1, _, _) = infer_exp env e None in
     let (t, ae, s) =
       match (t1,x) with
-      | (TApp(TName x,_), (Id f)) ->
+      | (TApply (x, _), (Id f)) ->
         let (mn, t) = name_of_id x in
         let s = if mn = "" then "" else mn + "." in
         let s = s + "__proj__" + "Mk" + string_of_id t + "__item__" + f in
@@ -791,12 +882,12 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     let tv = next_type_var () in
     let arg_typ = next_type_var () in
     let (arg_typs, aes, s) = infer_arg_typ env (List.map (fun e -> (e, None, Some arg_typ)) es) in
-    let et = TApp (TName (Id "list"), [arg_typ]) in
+    let et = tapply (Id "list") [arg_typ] in
     let ae = AEApply (Id "list", aes, [tv], [et]) in
     let s = List.fold (fun l t -> l @ [(t, arg_typ)]) s arg_typs in
     (tv, ae, [(tv, et)] @ s)
 *)
-  | EApply (Id "tuple", _, es) ->
+  | EOp (TupleOp _, es) ->
     let ts =
       match expected_typ with
       | Some (TTuple ts) -> ts
@@ -819,20 +910,21 @@ and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ
     // e: prop
     let env = List.fold (fun env (x, t) -> let t = match t with Some t -> t | None -> next_type_var () in push_id env x t) env fs in
     let (t, ae, s) = infer_exp env e expected_typ in
-    ret t (AE_Bind (b, [], fs, ts, ae)) (constrain_subtype t.norm_typ t_prop s)
+    ret t (AE_Bind (b, [], fs, ts, ae)) (constrain_subtype t.norm_typ tProp s)
   | EBind (Lambda, [], xs, ts, e) ->
     let xs = List.map (fun (x, t) -> match t with Some t -> (x, t) | None -> (x, next_type_var ())) xs in
     let env = List.fold (fun env (x, t) -> push_id env x t) env xs in
     let (t, ae, s) = infer_exp env e None in
     let ae = AE_Bind (Lambda, [], List.map (fun (x, t) -> (x, Some t)) xs, ts, ae) in
-    norm_ret (TArrow (List.map snd xs, t.norm_typ)) ae s
+    norm_ret (TFun (List.map snd xs, t.norm_typ)) ae s
   | ECast (e, tc) ->
+    if env.inline_only then err "casts are not allowed for inline expressions" else
     let (t, ae, s) = infer_exp env e None in
     let ae = AE_Cast (ae, tc) in
     let tc_norm = normalize_type env tc in
     // TODO: move this check to after inference:
     if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae s
-    else err (sprintf "cannot cast between types %A and %A that do not have subtype relationship" t tc)
+    else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
   | _ ->
     let (t, ae, s) = infer_exp_one env e expected_typ in
     ret t ae s
@@ -854,12 +946,14 @@ let kind_equal k1 k2 =
 
 let rec resolve_type (env:env) (t:typ):kind =
   match t with
-  | TName id -> let (t, k) = lookup_type env id in k
+  | TName x -> let (t, k) = lookup_type env x in k
   | TVar (_, Some k) -> k
+  | TBool BpBool -> KType bigint.Zero
+  | TBool BpProp -> KType bigint.One
   | TInt (_, _) -> KType bigint.Zero
   | TTuple ts -> KType bigint.Zero // TODO: check ts
-  | TArrow (ts, t) -> KType bigint.Zero // TODO: check ts, t
-  | TApp (t, ts) -> resolve_type env t
+  | TFun (ts, t) -> KType bigint.Zero // TODO: check ts, t
+  | TApply (x, ts) -> notImplemented "resolve_type" // TODO
   | _ -> err (sprintf "cannot find the kind of the type '%A'" t)
 and resolve_types env ts = List.map (resolve_type env) ts;
 
@@ -882,14 +976,13 @@ let rec subst env (x:id) (s:typ) (t:typ):(typ * bool) =
        (s, b)
       else err (sprintf "kind of type '%A' and type '%A' does not match" s t)
     else (t,  false)
-  | TApp (t, ts) ->
-    let (t1, b1) = subst env x s t in
-    let (ts, b2) = subst_typs env x s ts in
-    (TApp (t1, ts), b1 || b2)
-  | TArrow (ts, t) ->
+  | TApply (xapp, ts) ->
+    let (ts, b) = subst_typs env x s ts in
+    (TApply (xapp, ts), b)
+  | TFun (ts, t) ->
     let (ts, b1) = subst_typs env x s ts in
     let (t2, b2) = subst env x s t in
-    (TArrow (ts, t2), b1 || b2)
+    (TFun (ts, t2), b1 || b2)
   | TTuple ts -> let (ts, b) = subst_typs env x s ts in ((TTuple ts), b)
   | _ -> (t, false)
 and subst_typs env (x:id) (s:typ) (ts:typ list):(typ list * bool) =
@@ -919,8 +1012,9 @@ let rec occurs (x:id) (t:typ):bool =
     | _ -> acc in
   match t with
   | TVar (y, _) -> x = y
-  | TApp (u, l) ->   occurs x u || aux false l
-  | TArrow (l, u) -> aux false l || occurs x u
+  | TApply (_, l) -> aux false l
+  | TTuple l -> aux false l
+  | TFun (l, u) -> aux false l || occurs x u
   | _ -> false
 
 let bind (m:substitutions) (x:id) (t:typ):substitutions =
@@ -949,21 +1043,16 @@ let rec unify_one (env:env) (exact:bool) (m:substitutions) (s:typ) (t:typ):subst
   | (TVar (x, _), _) -> bind m x t2.norm_typ
   | (_, TVar (x, _)) -> bind m x t1.norm_typ
   | (TInt _, TInt _) when not exact && is_subtype env t1 t2 -> m
-  | (TName (Id "bool"), TName (Id "prop")) when not exact -> m
+  | (TBool BpBool, TBool BpProp) when not exact -> m
   | (TTuple ts, TTuple us) when List.length ts = List.length us ->
     let tc = List.fold2 (fun l t1 t2 -> constrain_equal t1 t2 l) [] ts us in
     unify env m tc
-  | (TArrow (xs, y), TArrow (us, v)) when List.length xs = List.length us ->
+  | (TFun (xs, y), TFun (us, v)) when List.length xs = List.length us ->
     let tc = List.fold2 (fun l t1 t2 -> constrain_equal t1 t2 l) [] xs us in
     unify env m (constrain_equal y v tc)
-  | (TApp (x, ys), TApp (u, vs)) when List.length ys = List.length vs ->
-    if x = u then
-      let tc = List.fold2 (fun (l:typ_constraints) t1 t2 -> constrain_equal t1 t2 l) [] ys vs in
-      unify env m tc
-    else
-      let t1 = normalize_type env x in
-      let t2 = normalize_type env u in
-      if t1 = t2 then m else typ_err ()
+  | (TApply (x, ys), TApply (u, vs)) when x = u && List.length ys = List.length vs ->
+    let tc = List.fold2 (fun (l:typ_constraints) t1 t2 -> constrain_equal t1 t2 l) [] ys vs in
+    unify env m tc
   | _ when t1 = t2 -> m
   | _ -> typ_err ()
 
@@ -991,8 +1080,8 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
       let es = List.map (subst_exp env s) aes in
       let bool_prop f =
         match coerce with
-        | Some (TName (Id "bool"), _) -> EOp (f OpBool, es)
-        | Some (TName (Id "prop"), _) -> EOp (f OpProp, es)
+        | Some (TBool BpBool, _) -> EOp (f BpBool, es)
+        | Some (TBool BpProp, _) -> EOp (f BpProp, es)
         | _ -> internalErr "subst_exp UNot"
       match op with
 (* TODO
@@ -1021,7 +1110,7 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
       let et = (List.map (fun t -> substitute env s t) ets).Head in
       let e = EApply (Id "list", Some ts, es) in
       match (t, et) with
-      | (TApp (TName (Id "list"), [x]), TApp (TName (Id "list"), [y])) ->
+      | (TList [x], TList [y]) ->
         if typ_equal env x y then
           if (kind_equal (resolve_type env x) (KType bigint.Zero)) then e
           else err ("Only 'Type0' is allowed in list")
@@ -1032,7 +1121,7 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
       let es = List.map (fun ae -> subst_exp env s ae) aes  in
       let t = (List.map (fun t -> substitute env s t) ts).Head in
       let et = (List.map (fun t -> substitute env s t) ets).Head in
-      let e = EApply (Id "tuple", Some ts, es) in
+      let e = EOp (TupleOp (Some ts), es) in
       match (t, et) with
       | (TTuple xs, TTuple ys) ->
         List.iter2 (fun t1 t2 -> if (not (typ_equal env t1 t2)) then err (sprintf "inferred tuple type %s does not match expected tuple type %s" (string_of_typ et) (string_of_typ t))) xs ys;
@@ -1112,6 +1201,7 @@ let rec update_env_stmt (env:env) (s:stmt):env =
     List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> next_type_var () in push_id env x t) env xs
 
 
+(*
 let resolve_id env id:unit =
   match id with
   | Reserved _ -> ()
@@ -1119,13 +1209,106 @@ let resolve_id env id:unit =
     match lookup_name env id true with
     | (None, _) -> err ("Identifier not found " + (err_id id))
     | (Some r, _) -> ()
+*)
+
+// TODO: move this to emit_vale_text
+let string_of_inout (io:inout):string =
+  match io with
+  | In -> "in"
+  | Out -> "out"
+  | InOut -> "inout"
+
+let string_of_operand_typ (ot:operand_typ):string =
+  match ot with
+  | OT_Const -> "const"
+  | OT_Name x -> string_of_id x
+  | OT_State (io, x) -> string_of_inout io + " " + string_of_id x
+
+let operand_type_includes (env:env) (xo:id) (src_ot:operand_typ):typ =
+  let rec match1 (dst_ot:operand_typ):bool =
+    match (src_ot, dst_ot) with
+    | (OT_Const, OT_Const) -> true
+    | (OT_State ((Out | InOut), xs), OT_State (In, xd)) when xs = xd -> false // somewhat confusingly, In refers to the source here
+    | (OT_State (_, xs), OT_State (_, xd)) when xs = xd -> true
+    | (OT_Name xs, OT_Name xd) when xs = xd -> true
+    | (_, OT_Name xd) ->
+        let (_, dst_ots) = lookup_operand_type env xd in
+        match_many dst_ots
+    | _ -> false
+  and match_many (dst_ots:operand_typ list):bool =
+    List.exists match1 dst_ots
+    in
+  let (t, dst_ots) = lookup_operand_type env xo in
+  if match_many dst_ots then t else
+    err (sprintf "operand '%s' does not have operand type '%s'" (string_of_operand_typ src_ot) (err_id xo))
+
+let tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
+  let locs = locs_of_exp e in
+  try
+    let (x, txo, storage, io, attrs) = pf in
+    let check_const_operand (xo:id):exp =
+      match io with
+      | In ->
+        let tparam = operand_type_includes env xo OT_Const in
+        let (_, e) = tc_exp {env with inline_only = true} e (Some tparam) in
+        EOp (Uop UConst, [e])
+      | Out | InOut -> err "cannot pass constant as 'out' or 'inout' operand"
+      in
+    match (storage, txo) with
+    | (XGhost, tparam) ->
+      let (_, e) = tc_exp env e (Some tparam) in
+      e
+    | (XInline, tparam) ->
+      let (_, e) = tc_exp {env with inline_only = true} e (Some tparam) in
+      e
+    | (XOperand, TName xo) ->
+      (
+        match skip_loc e with
+        | EVar x ->
+          (
+            let (t, info) = lookup_id env x in
+            match (io, info) with
+            | (_, None) -> err "expression is not an operand"
+            | (_, Some (InlineLocal | ConstGlobal)) -> check_const_operand xo
+            | (_, Some (StateInfo ts)) ->
+              let _ = operand_type_includes env xo (OT_State (io, x)) in
+              e
+            | ((Out | InOut), Some (OperandLocal (In, _))) ->
+              err "cannot pass 'in' operand as 'out' or 'inout' operand"
+            | (_, Some (OperandLocal (_, TName xo_local))) ->
+              let _ = operand_type_includes env xo (OT_Name xo_local) in
+              e
+            | (_, Some (OperandLocal (_, _))) -> internalErr "tc_proc_operand: OperandLocal"
+          )
+        | EApply (x, _, _) ->
+          (
+            match lookup_fun_or_proc env x with
+            | FoundFun _ -> check_const_operand xo
+            | FoundProc _ -> notImplemented (sprintf "tc_proc_operand: operand procedures")
+          )
+        | _ -> check_const_operand xo
+      )
+    | (XOperand, _) -> internalErr "tc_proc_operand: XOperand"
+    | _ -> notImplemented (sprintf "tc_proc_operand %A" pf)
+  with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
+
+let tc_proc_call (env:env) (p:proc_decl) (xs:lhs list) (es:exp list):stmt =
+  let nxs = List.length xs in
+  let nes = List.length es in
+  let nparams = List.length p.pargs in
+  let nrets = List.length p.prets in
+  if nes <> nparams then err (sprintf "procedure expects %i arguments(s), found %i arguments(s)" nparams nes) else
+  if nxs > 0 && nxs <> nrets then err (sprintf "procedure returns %i value(s), found %i return variable(s)" nrets nxs) else
+  let es = List.map2 (tc_proc_operand env) p.pargs es in
+  // TODO: return values
+  SAssign (xs, EApply (p.pname, None, es))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
   match s with
-  | SLoc (loc, s) -> SLoc (loc, tc_stmt env s)
-  | SLabel x -> resolve_id env x; s
-  | SGoto x -> resolve_id env x; s
+  | SLoc (loc, s) -> try SLoc (loc, tc_stmt env s) with err -> raise (LocErr (loc, err))
+  | SLabel x -> err "labels are not supported"
+  | SGoto x -> err "goto statements are not supported"
   | SReturn -> s
   | SAssume e -> let (t, e) = tc_exp env e None in SAssume e
   | SAssert (attrs, e) -> let (t, e) = tc_exp env e None in SAssert (attrs, e)
@@ -1134,19 +1317,28 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
     let kind = match t with | Some t -> Some (resolve_type env t) | None -> None
     let eOpt = match eOpt with | Some e -> let (t, e) = tc_exp env e t in Some e | _ -> None in
     SVar (x, t, m, g, a, eOpt)
-  | SAlias (x, y) -> resolve_id env y; s
+  | SAlias (x, y) -> s // TODO resolve_id env y; s
   | SAssign (xs, e) ->
-    let et =
-      match xs with
-      | [(x, Some (Some t, _))] -> Some t
-      | [(x, _)] -> let r = try_lookup_id env x in match r with | Some (t, _) -> Some t | _ -> None
-      | _ -> None in
-    let (t, e) = tc_exp env e et in SAssign (xs, e)
+    let assign_exp () =
+      let et =
+        match xs with
+        | [(x, Some (Some t, _))] -> Some t
+        | [(x, _)] -> let r = try_lookup_id env x in match r with | Some (t, _) -> Some t | _ -> None
+        | _ -> None in
+      let (t, e) = tc_exp env e et in
+      SAssign (xs, e)
+    match skip_loc e with
+    | EApply (x, _, es) ->
+      match (xs, lookup_fun_or_proc env x) with
+      | (([] | [_]), FoundFun f) -> assign_exp ()
+      | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
+      | (_, FoundProc p) -> tc_proc_call env p xs es
+    | _ -> assign_exp ()
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> let (env, b) = tc_stmts env b in SBlock b
   | SQuickBlock (x, b) -> let (env, b) = tc_stmts env b in SQuickBlock (x, b)
   | SIfElse (g, e, b1, b2) ->
-    let et = t_bool in
+    let et = tBool in
     let (t, e) = tc_exp env e (Some et) in
     let (env, b1) = tc_stmts env b1 in
     let (env, b2) = tc_stmts env b2 in
@@ -1227,18 +1419,18 @@ let tc_proc (env:env) (p:proc_decl):(env * proc_decl) =
     let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
     let ptyp = compute_proc_typ env p in
     let env = if isRecursive then push_proc env p.pname ptyp else env in
-    let globals = ref env.scope_mods in
+    let globals = env in
     let env = push_params_without_rets env p.pargs p.prets in
     let env = push_rets env p.prets in
-    let env = {env with ghost = true}
+//    let env = {env with ghost = true}
     let (env, pspecs) = tc_specs env p.pspecs in
-    let env = {env with ghost = false}
+//    let env = {env with ghost = false}
     let (env, body) =
       match p.pbody with
       | None -> (env, None)
       | Some ss -> let (env, ss) = tc_stmts env ss in (env, Some ss)
     let pNew = {p with pbody = body; pspecs = pspecs} in
-    let env = {env with scope_mods = !globals } in
+    let env = globals in
     let env = if isRecursive then env else push_proc env p.pname ptyp in
     (env, pNew)
   with
@@ -1254,6 +1446,9 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
     | DType (x, ts, k, t) ->
       let env = push_typ env x ts k t
       (env, [decl])
+    | DOperandType (x, t, ots) ->
+      let env = push_name_info env x (OperandType_info (t, ots)) in
+      (env, [decl])
     | DVar (x, t, XAlias (AliasThread, e), _) ->
       // TODO: type check t and e
       let env = push_id env x t in
@@ -1261,9 +1456,9 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
     | DVar (x, tt, XState e, _) ->
       (
         match skip_loc e with
-        | EApply (Id id, _, es) ->
+        | EApply _ ->
           let t = normalize_type_with_transform env tt (Some StateGet) in
-          let env = push_id_with_info env x t.norm_typ (Some (StateInfo id))  in
+          let env = push_id_with_info env x t.norm_typ (Some (StateInfo t.norm_typ))  in
           (env, [decl])
         | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
       )
@@ -1307,20 +1502,22 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
 let tc_include env (inc:string * bool * (((loc * decl) * bool) list)):env =
   let (s, b, ds) = inc in
   let env = push_include_module env s b in
-  let globals = ref env.scope_mods in
+  let globals = env in
   let env =
     List.fold (fun env d ->
       let (env, ds) = tc_decl env d in env)
       env
       ds
     in
-  let env = {env with scope_mods = !globals} in
+  let env = globals in
   env
 
 let tc_decls (include_modules:(string * bool * (((loc * decl) * bool) list)) list) (ds:((loc * decl) * bool) list):((loc * decl) * bool) list =
   // Prims is included and prop is defined by default
-  let env = push_include_module empty_env "Prims" true in
-  let env = {env with declsmap = Map.add (Id "prop") (Type_info ([], (KType bigint.One), None)) env.declsmap} in
+  let env = empty_env in
+  let env = push_include_module env "Prims" true in
+//  let env = push_include_module env "Vale.Primitives" true in
+//  let env = {env with declsmap = Map.add (Id "prop") (Type_info ([], (KType bigint.One), None)) env.declsmap} in
   let env = List.fold (fun env inc -> tc_include env inc) env include_modules in
   let (env, dss_rev) =
     List.fold (fun (env:env, l:((loc * decl) * bool) list) d ->
