@@ -1,7 +1,7 @@
 module Types
 
 type byte:Type(0) := int_range(0, 0xff);
-type nat32:Type(0) := int_range(0, 0xffffffff);
+type nat32:Type(0) := int_range(0, 0xffff_ffff);
 
 function byte_test(x:byte, y:byte):byte extern;
 function id #[a:Type(0)] (x:a):a extern;
@@ -18,6 +18,14 @@ operand_type reg32:nat32 :=
 
 operand_type mem32:nat32;
 operand_type opr32:nat32 := reg32 | mem32 | in esp | const;
+
+/* TODO
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+{
+    let t := 10;
+    y := t;
+}
+*/
 
 procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
 {
@@ -40,7 +48,7 @@ procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:in
     let q:prop := b && a;
     let r:prop := b && b;
     let s:byte := if a then 10 else 20;
-    // TODO: let t := if a then 10 else 20;
+    let t := if a then 10 else 20;
     let u:byte := byte_test(x, byte_test(x, x));
     let v:byte := id(u);
     let w:tuple(byte, bool) := id(tuple(id(10), id(true)));
@@ -51,6 +59,9 @@ procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:in
 procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
     requires x >= 15;
 {
+    let k:nat32 := id(5);
+    let j:nat32 := (let m:byte := id#[byte](5) in m);
+    let l:nat32 := id#[byte](5);
     y := #int_range(15, 20)(x);
 }
 
@@ -78,8 +89,8 @@ procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
     Add(eax, esp);
     Add(eax, id(id(5)));
     Add(eax, id(id(z)));
-// TODO:    Add(eax, id#[byte](id#[byte](5)) + 1);
-// TODO:    Add(eax, id(id(5)) + 1);
+    Add(eax, id#[byte](id#[byte](5)) + 1);
+    Add(eax, id(id(5)) + 1);
     Add(eax, 10);
     Add(eax, ebx);
     Add(eax, o);

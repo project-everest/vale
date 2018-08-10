@@ -28,7 +28,7 @@ type norm_typ = {norm_typ:typ}
 type typ_constraint =
 | TcEqual of typ * typ // t1 = t2
 | TcSubtype of typ * typ // t1 <: t2
-type typ_constraints = typ_constraint list
+//type typ_constraints = typ_constraint list
 type substitutions = Map<id, typ>
 
 type decl_type =
@@ -584,6 +584,7 @@ let check_no_duplicates xs =
     in
   f ss
 
+(*
 let constrain_equal (src_typ:typ) (expected_typ:typ) (cl:typ_constraints) : typ_constraints =
   if src_typ = expected_typ then cl
   else TcEqual (src_typ, expected_typ) :: cl
@@ -596,353 +597,11 @@ let constrain_subtype_opt (src_typ:typ) (expected_typ:typ option) (cl:typ_constr
   match expected_typ with
   | None -> cl
   | Some et -> constrain_subtype src_typ et cl
-
-let rec infer_arg_typ (env:env) (args:(exp * pformal option * typ option) list):(norm_typ list * aexp list * typ_constraints) =
-  let infer_arg_typ_fold env (ts, ae, s) ((e:exp), (formal:pformal option), (et:typ option)):(norm_typ list * aexp list * typ_constraints) =
-    let (t, ae1, s1) =
-(*
-      let tr =
-        match formal with
-        | Some f ->
-          compute_transform_info env f (e:exp)
-        | _ -> if env.ghost then Some EvalOp else None
 *)
-      match skip_loc e with
-(*
-      | EVar x when (x <> Reserved "this") ->
-        let (t, info) = lookup_evar env x in
-        let t = normalize_type_with_transform env t tr in
-        let et = match et with | None -> t | Some t -> t in
-        (t, AEVar (x, t, et), [])
-      | EInt i ->
-        let t = TInt (Int i, Int i) in
-        let t = normalize_type_with_transform env t tr in
-        let et = match et with | None -> t | Some t -> t
-        (t, AEInt (i, t, et), [])
-      | EOp (Uop UConst, [e]) ->
-        match tr with
-        | Some (ConstOp s) ->
-          let tv = next_type_var () in
-          let et = match et with | None -> tv | Some t -> t in
-          let t = normalize_type_with_transform env tv tr in
-          let (_, ae, s) = infer_exp env e (Some et) in
-          let ae = AE_Op (Uop UConst, [ae], t, et) in
-          (t, ae, s)
-        | _ -> infer_exp env e et
-      | EApply (x, ts, es) ->
-        match tr with
-        | Some EApplyCode ->
-          let vx = Id (qprefix ("va_opr_code_") (string_of_id x)) in
-          let ecs = List.collect (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> [] | _ -> [e]) es in
-          let ea = EApply (vx, ts, ecs) in
-          let (t, ae, s) = infer_exp env ea et in
-          let ae =
-            match ae with
-            | AEApply (_, es, t, et) -> AEApply (x, es, t, et)
-            | _ -> internalErr ("EApply expected") in
-          (t, ae, s)
-        | _ -> infer_exp env e et
-*)
-      | _ -> infer_exp env e et in
-    (t::ts, ae1::ae, (List.rev s1) @ s)
-  in
-  let (ts_rev, aes_rev, s_rev) = List.fold (infer_arg_typ_fold env) ([], [], []) args in
-  (List.rev ts_rev, List.rev aes_rev, List.rev s_rev)
-
-and infer_exps (env:env) (args:(exp * typ option) list):(norm_typ list * aexp list * typ_constraints) =
-  let infer_exps_fold env (ts, ae, s) ((e:exp), (et:typ option)):(norm_typ list * aexp list * typ_constraints) =
-    let (t, ae1, s1) = infer_exp env e et in
-    (t::ts, ae1::ae, (List.rev s1) @ s)
-  in
-  let (ts_rev, aes_rev, s_rev) = List.fold (infer_exps_fold env) ([], [], []) args in
-  (List.rev ts_rev, List.rev aes_rev, List.rev s_rev)
-and infer_exp_multi (env:env) (e:exp) (*expected_typ:typ option list*):(typ list * aexp_t * typ_constraints) =
-  match e with
-(* TODO
-  | EOp (Uop UReveal, [e]) ->
-    let (t, ae, s) =
-      match e with
-      | EVar x ->
-        lookup_fun_or_proc env x |> ignore
-        ([], AEVar(x, TName (Id "unit"), TName (Id "unit")), [])
-      | EApply _ -> infer_exp_multi env e [None];
-      | _ -> err (sprintf "unexpected UReveal %A" e)
-    let ae = AE_Op (Uop UReveal, [ae], TName (Id "unit"), TName (Id "unit")) in
-    ([], ae, [])
-*)
-  | EApply (x, ts_opt, es) -> // TODO: Some ts case
-    let f = lookup_fun env x in
-    if env.inline_only && List.length f.specs > 0 then err ("inline expressions cannot call functions with requires/ensures") else
-    if List.length f.targs <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.targs) (List.length es));
-    let param_typs = f.targs in
-    let ret_typs = f.trets in
-    let param_arg_typs =
-      if f.tformals <> [] then List.map2 (fun t1 t2 -> (Some t1, t2)) f.tformals param_typs
-      else List.map (fun t -> (None, t)) param_typs in
-//    let env = if isExtern then {env with ghost = true} else env in
-    let (arg_typs, aes, s) = infer_arg_typ env (List.map2 (fun e (tf, t) -> (e, tf, Some t)) es param_arg_typs) in
-    let s =
-      match ts_opt with
-      | None -> s
-      | Some ts ->
-        if List.length ts <> List.length param_typs then err (sprintf "expected %A type argument(s), found %A type argument(s)" (List.length param_typs) (List.length ts))
-        else
-          List.fold2 (fun s t pt -> constrain_equal t pt s) s ts param_typs
-      in
-    (ret_typs, AE_Apply (x, param_typs, aes), s)
-  | _ -> err (sprintf "missing typechecker for exp %A" e)
-and infer_exp (env:env) (e:exp) (expected_typ:typ option):(norm_typ * aexp * typ_constraints) =
-  let ret (t:norm_typ) (ae:aexp_t) (s:typ_constraints) =
-    let coerce =
-      match expected_typ with
-      | None -> None
-      | Some et -> if t = normalize_type env et then None else Some (t.norm_typ, et)
-      in
-    (t, (ae, coerce), constrain_subtype_opt t.norm_typ expected_typ s)
-    in
-  let norm_ret (t:typ) (ae:aexp_t) (s:typ_constraints) =
-    ret (normalize_type env t) ae s
-    in
-  match e with
-  | ELoc (loc, e) ->
-    try
-      let (t, ae, s) = infer_exp env e expected_typ in
-      (t, (AE_Loc (loc, ae), None), s)
-    with err -> raise (LocErr (loc, err))
-  | EVar (Reserved "this") ->
-    if env.inline_only then err "'this' is not allowed for inline expressions" else
-    norm_ret (TName (Id "state")) (AE_Exp e) []
-  | EVar x ->
-    let (t, info) = lookup_evar env x in
-    (match (env.inline_only, info) with (false, _) | (_, Some InlineLocal) -> () | _ -> err "only inline variables are allowed in inline expressions");
-    let t = normalize_type_with_transform env t (Some EvalOp) in
-    ret t (AE_Exp e) []
-  | EInt i -> norm_ret (TInt (Int i, Int i)) (AE_Exp e) []
-  | EReal r -> norm_ret (TName (Id "real")) (AE_Exp e) []
-//    | EBitVector (n, i) -> TODO
-  | EBool b -> norm_ret tBool (AE_Exp e) []
-  | EString s -> norm_ret (TName (Id "string")) (AE_Exp e) []
-  | EOp (Uop (UConst | UOld) as op, [e]) ->
-    let (t, ae, s) = infer_exp env e expected_typ in
-    ret t (AE_Op (op, [ae])) s
-  | EOp (Uop UNeg, [e]) ->
-    let (t, ae, s) = infer_exp env e None in
-    let t = neg_int_bound t.norm_typ in
-    norm_ret t (AE_Op (Uop UNeg, [ae])) s
-  | EOp (Uop (UNot _) as op, [e]) ->
-    let tv = next_type_var () in
-    let et = match expected_typ with | None -> tv | Some t -> t in
-    let (_, ae, s) = infer_exp env e (Some et) in
-    let s = constrain_subtype tv tProp s in
-    let s = constrain_subtype tv et s in
-    ({norm_typ = tv}, (AE_Op (op, [ae]), Some (tv, et)), s) // Some (tv, et) used to resolve overload
-(* TODO
-  | EOp (Uop (UIs x), [e]) ->
-    let ix = Id ("uu___is_"+ (string_of_id x)) in
-    let e = EApply (ix, [e]) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
-      match ae with
-      | AEApply (_, es, [t], [et]) -> AE_Op (Uop (UIs x), es, t, et)
-      | _ -> err ("'UIs' should be converted to 'EApply' first before typechecking") in
-    (t, ae, s)
-  | EOp (Uop (UCustom op), l) ->
-    let (p, _) = lookup_fun_or_proc env (Operator op) in
-    let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
-      match ae with
-      | AEApply (x, es, [t], [et]) -> AE_Op (Uop (UCustom op), es, t, et)
-      | _ -> err ("'UCustom' should be converted to 'EApply' first before typechecking") in
-    (t, ae, s)
-  | EOp (Uop UToOperand, _) ->
-    err (sprintf "missing typing rule for Uop UToOperand")
-  | EOp (Uop op, _) ->
-    err (sprintf  "unsupported Uop '%A' in typechecker" op)
-*)
-  | EOp (Bop op, [e1; e2]) when isArithmeticOp op ->
-    // op in {+, -, *, /, %}
-    let (t1, ae1, s1) = infer_exp env e1 None in
-    let (t2, ae2, s2) = infer_exp env e2 None in
-    let t = unify_int_bound t1.norm_typ t2.norm_typ op in
-    norm_ret t (AE_Op (Bop op, [ae1; ae2])) (s1 @ s2)
-  | EOp (Bop (BAnd _ | BOr _) as op, [e1; e2]) ->
-    let tv = next_type_var () in
-    let et = match expected_typ with | None -> tv | Some t -> t in
-    let (_, ae1, s1) = infer_exp env e1 (Some et) in
-    let (_, ae2, s2) = infer_exp env e2 (Some et) in
-    let s = s1 @ s2 in
-    let s = constrain_subtype tv tProp s in
-    let s = constrain_subtype tv et s in
-    ({norm_typ = tv}, (AE_Op (op, [ae1; ae2]), Some (tv, et)), s) // Some (tv, et) used to resolve overload
-  | EOp (Bop (BEquiv | BImply | BExply) as op, [e1; e2]) ->
-    let (_, ae1, s1) = infer_exp env e1 (Some tProp) in
-    let (_, ae2, s2) = infer_exp env e2 (Some tProp) in
-    norm_ret tProp (AE_Op (op, [ae1; ae2])) (s1 @ s2)
-  | EOp (Bop op, [e1; e2]) when isIcmpOp op ->
-    // op in {<, > , <=, >=} and it can be chained
-    match (op, skip_loc e1) with
-    | (op, EOp (Bop op1, [e11; e12])) when isIcmpOp op1 ->
-        // Convert (a <= b) < c into (a <= b) && (b < c)
-        let e2 = EOp (Bop op, [e12; e2]) in
-        let e = EOp (Bop (BAnd BpBool), [e1; e2]) in
-        infer_exp env e expected_typ
-    | _ ->
-      let (_, ae1, s1) = infer_exp env e1 (Some tInt) in
-      let (_, ae2, s2) = infer_exp env e2 (Some tInt) in
-      norm_ret tBool (AE_Op (Bop op, [ae1; ae2])) (s1 @ s2)
-  | EOp (Bop (BEq opt | BNe opt) as op, [e1; e2]) ->
-    let (t1, ae1, s1) = infer_exp env e1 None in
-    let (t2, ae2, s2) = infer_exp env e2 None in
-    let s = s1 @ s2 in
-    let s = constrain_equal t1.norm_typ t2.norm_typ s in
-    let t = match opt with BpBool -> tBool | BpProp -> tProp in
-    norm_ret t (AE_Op (op, [ae1; ae2])) s
-(*
-  | EOp (Bop BIn, [e1; e2]) ->
-    err ("BIn not supported in TypeChecker")
-  | EOp (Bop BOldAt, [e1; e2]) ->
-    let tv = next_type_var () in
-    let et = match expected_typ with | None -> tv | Some t -> t in
-    let (t1, ae1, s1) = infer_exp env e1 None in
-    let (t2, ae2, s2) = infer_exp env e2 None in
-    let ae = AE_Op (Bop BOldAt, [ae1;ae2], tv, et) in
-    (tv, ae, s1 @ s2 @ [(t1, TName(Id "state"));(t2, tv)])
-  | EOp (Bop (BCustom op), l) ->
-    let (p, _) = lookup_fun_or_proc env (Operator op) in
-    let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
-      match ae with
-      | AEApply (x, es, [t], [et]) -> AE_Op (Bop (BCustom op), es, t, et)
-      | _ -> err ("'BCustom' should be converted to 'EApply' first before typechecking") in
-    (t, ae, s)
-  | EOp (Subscript, [e1; e2]) ->
-    let e = EApply ((Id "subscript"), [e1; e2]) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
-      match ae with
-      | AEApply (x, es, [t], [et]) -> AE_Op (Subscript, es, t, et)
-      | _ -> err ("'Subscript' should be converted to 'EApply' first before typechecking") in
-    (t, ae, s)
-  | EOp (Update, [e1; e2; e3]) ->
-    let e = EApply ((Id "update"), [e1; e2; e3]) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
-      match ae with
-      | AEApply (x, es, [t], [et]) -> AE_Op (Update, es, t, et)
-      | _ -> err ("'Update' should be converted to 'EApply' first before typecheckings") in
-    (t, ae, s)
-*)
-  | EOp (Cond, [e1; e2; e3]) ->
-    let tv = next_type_var () in
-    let et = match expected_typ with | None -> tv | Some t -> t in
-    let (t1, ae1, s1) = infer_exp env e1 (Some tBool) in
-    let (t2, ae2, s2) = infer_exp env e2 (Some et) in
-    let (t3, ae3, s3) = infer_exp env e3 (Some et) in
-    let s = s1 @ s2 @ s3 in
-    let s = constrain_subtype t2.norm_typ tv s in
-    let s = constrain_subtype t3.norm_typ tv s in
-    norm_ret tv (AE_Op (Cond, [ae1; ae2; ae3])) s
-(*TODO
-  | EOp (FieldOp x, [e]) ->
-    let (t1, _, _) = infer_exp env e None in
-    let (t, ae, s) =
-      match (t1,x) with
-      | (TApply (x, _), (Id f)) ->
-        let (mn, t) = name_of_id x in
-        let s = if mn = "" then "" else mn + "." in
-        let s = s + "__proj__" + "Mk" + string_of_id t + "__item__" + f in
-        let e = EApply (Id s, [e]) in
-        infer_exp env e expected_typ
-      | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
-    let ae =
-      match ae with
-      | AEApply (_, es, [t], [et]) -> AE_Op (FieldOp x, es, t, et)
-      | _ -> err ("'FieldOp' should be converted to 'EApply' before typechecking") in
-    (t, ae, s)
-  | EOp (FieldUpdate x, [e1; e2]) ->
-    let (t1, _, _) = infer_exp env e1 None in
-    let (t2, ae2, s2) = infer_exp env e2 None in
-    let (t, ae, s) =
-      match (t1,x) with
-      | (TName (Id t), (Id f)) ->
-        let s = "__proj" + t + "__item__" + f in
-        let e = EApply (Id s, [e1]) in
-        infer_exp env e expected_typ
-      | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
-    let ae =
-      match ae with
-      | AEApply (_, es, [t], [et]) -> AE_Op (FieldUpdate x, es @ [ae2], t, et)
-      | _ -> err ("'FieldUpdate' should be converted to 'EApply' before typechecking") in
-    (t, ae, s @ s2 @ [(t2, t)])
-  | EOp (op, es) ->
-    err (sprintf "unsupported Eop %A in typechecking" op)
-  | EApply (Id "list", _, es) ->
-    let tv = next_type_var () in
-    let arg_typ = next_type_var () in
-    let (arg_typs, aes, s) = infer_arg_typ env (List.map (fun e -> (e, None, Some arg_typ)) es) in
-    let et = tapply (Id "list") [arg_typ] in
-    let ae = AEApply (Id "list", aes, [tv], [et]) in
-    let s = List.fold (fun l t -> l @ [(t, arg_typ)]) s arg_typs in
-    (tv, ae, [(tv, et)] @ s)
-*)
-  | EOp (TupleOp _, es) ->
-    let ts =
-      match expected_typ with
-      | Some (TTuple ts) -> ts
-      | _ -> List.map (fun _ -> next_type_var ()) es
-      in
-    let t = TTuple ts in
-    let (_, aes, s) = infer_exps env (List.map2 (fun e t -> (e, Some t)) es ts) in
-    norm_ret t (AE_Apply (Id "tuple", ts, aes)) s
-  | EBind (BindLet, [ex], [(x, t)], [], e) ->
-    // let x:t := ex in e
-    check_not_local env x;
-    let (t1, ae1, s1) = infer_exp env ex t in
-    let xt = match t with | Some t -> t | _ -> t1.norm_typ in
-    let env = push_id env x xt in
-    let (t2, ae2, s2) = infer_exp env e expected_typ in
-    ret t2 (AE_Bind (BindLet, [ae1], [(x, t)], [], ae2)) (constrain_subtype t1.norm_typ xt (s1 @ s2))
-  | EBind (((Forall | Exists) as b), [], fs, ts, e) ->
-    // fs list of formals, that are distinct and are not local variables
-    // ts: triggers
-    // e: prop
-    let env = List.fold (fun env (x, t) -> let t = match t with Some t -> t | None -> next_type_var () in push_id env x t) env fs in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    ret t (AE_Bind (b, [], fs, ts, ae)) (constrain_subtype t.norm_typ tProp s)
-  | EBind (Lambda, [], xs, ts, e) ->
-    let xs = List.map (fun (x, t) -> match t with Some t -> (x, t) | None -> (x, next_type_var ())) xs in
-    let env = List.fold (fun env (x, t) -> push_id env x t) env xs in
-    let (t, ae, s) = infer_exp env e None in
-    let ae = AE_Bind (Lambda, [], List.map (fun (x, t) -> (x, Some t)) xs, ts, ae) in
-    norm_ret (TFun (List.map snd xs, t.norm_typ)) ae s
-  | ECast (e, tc) ->
-    if env.inline_only then err "casts are not allowed for inline expressions" else
-    let (t, ae, s) = infer_exp env e None in
-    let ae = AE_Cast (ae, tc) in
-    let tc_norm = normalize_type env tc in
-    // TODO: move this check to after inference:
-    if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae s
-    else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
-  | _ ->
-    let (t, ae, s) = infer_exp_one env e expected_typ in
-    ret t ae s
-and infer_exp_one (env:env) (e:exp) (et:typ option):(norm_typ * aexp_t * typ_constraints) =
-  match infer_exp_multi env e (*[et]*) with
-  | ([t], ae, s) -> (normalize_type env t, ae, s)
-  | (ts, _, _) -> err (sprintf "%A can have only one inferred type, got %i" e (List.length ts))
-and infer_exp_many (env:env) (e:exp) (et:(typ option) list):(norm_typ list * aexp_t * typ_constraints) =
-  match et with
-  | [et] ->
-    let (t, ae, s) = infer_exp env e et in ([t], fst ae, s)
-  | _ ->
-    let (ts, ae, s) = infer_exp_multi env e (*et*) in
-    (List.map (normalize_type env) ts, ae, s)
 
 let kind_equal k1 k2 =
   match (k1, k2) with
-  | (KType i1, KType i2) -> i1=i2
+  | (KType i1, KType i2) -> i1 = i2
 
 let rec resolve_type (env:env) (t:typ):kind =
   match t with
@@ -967,7 +626,7 @@ let match_kind env (t:typ) (k:kind option) =
   | None -> true
 
 // substitute all occurrences of x in t with s
-let rec subst env (x:id) (s:typ) (t:typ):(typ * bool) =
+let rec subst (env:env) (x:id) (s:typ) (t:typ):(typ * bool) =
   match t with
   | TVar (y, k) ->
     if x = y then
@@ -991,12 +650,12 @@ and subst_typs env (x:id) (s:typ) (ts:typ list):(typ list * bool) =
     in
   (List.rev ts_rev, b)
 
-let substitute env (m:substitutions) (t:typ):typ =
+let substitute (env:env) (m:substitutions) (t:typ):typ =
   let s = Map.toList m in
   let changed = true in
   let rec aux t b =
     if b = true then
-      let (t, b) = List.foldBack (fun (x, s) (t, b) -> let (t, b1) = subst env x s t in (t, b||b1)) s (t, false) in
+      let (t, b) = List.foldBack (fun (x, s) (t, b) -> let (t, b1) = subst env x s t in (t, b || b1)) s (t, false) in
       aux t b
     else t in
   aux t true
@@ -1017,6 +676,7 @@ let rec occurs (x:id) (t:typ):bool =
   | TFun (l, u) -> aux false l || occurs x u
   | _ -> false
 
+(*
 let bind (m:substitutions) (x:id) (t:typ):substitutions =
   match t with
   | TVar (y, k) -> if (x = y) then m else Map.add x t m
@@ -1026,7 +686,247 @@ let bind_typ (m:substitutions) (s:typ) (t:typ):substitutions =
   match s with
   | TVar (x, _) -> bind m x t
   | _ -> m
+*)
 
+let join2 (t1:typ) (t2:typ):typ option =
+  match (t1, t2) with
+  | (TBool BpBool, TBool BpBool) -> Some (TBool BpBool)
+  | (TBool BpProp, TBool BpBool) | (TBool BpBool, TBool BpProp) | (TBool BpProp, TBool BpProp) -> Some (TBool BpProp)
+  | (TInt (b1l, b1h), TInt (b2l, b2h)) -> Some (TInt (bnd_min b1l b2l, bnd_max b1h b2h))
+  | _ -> None
+
+let meet2 (t1:typ) (t2:typ):typ option =
+  match (t1, t2) with
+  | (TBool BpBool, TBool BpBool) | (TBool BpProp, TBool BpBool) | (TBool BpBool, TBool BpProp) -> Some (TBool BpBool)
+  | (TBool BpProp, TBool BpProp) -> Some (TBool BpProp)
+  | (TInt (b1l, b1h), TInt (b2l, b2h)) -> Some (TInt (bnd_max b1l b2l, bnd_min b1h b2h))
+  | _ -> None
+
+let rec join (ts:typ list):typ option =
+ match ts with
+ | [] -> internalErr "join"
+ | [t1] -> Some t1
+ | t1::t2::ts -> match join2 t1 t2 with None -> None | Some t -> join (t::ts)
+
+let rec meet (ts:typ list):typ option =
+ match ts with
+ | [] -> internalErr "meet"
+ | [t1] -> Some t1
+ | t1::t2::ts -> match meet2 t1 t2 with None -> None | Some t -> meet (t::ts)
+
+// If join fails, pick an arbitrary element of ts
+let join_fallback (ts:typ list):typ option =
+  match ts with
+  | [] -> None
+  | t::_ -> match join ts with None -> Some t | Some t -> Some t
+
+// If meet fails, pick an arbitrary element of ts
+let meet_fallback (ts:typ list):typ option =
+  match ts with
+  | [] -> None
+  | t::_ -> match meet ts with None -> Some t | Some t -> Some t
+
+type unifier =
+  {
+    u_env:env;
+    mutable u_substs:substitutions;
+    mutable u_equalities:(typ * typ) list; // t1 = t2
+    // Invariant: The maps below never contain an empty list or set
+    // Note: any subtype constraint t1 <: t2 that doesn't fit into the maps below is turned into an equality t1 = t2
+    mutable ut_lowers:Map<id, typ list>; // t1 <: x ... tn <: x where t1...tn are integral or bool or prop
+    mutable ut_uppers:Map<id, typ list>; // x <: t1 ... x <: tn where t1...tn are integral or bool or prop
+    mutable ux_lowers:Map<id, Set<id>>; // x1 <: x ... xn <: x
+    mutable ux_uppers:Map<id, Set<id>>; // x <: x1 ... x <: xn
+  }
+
+let map_list_get (x:'a) (m:Map<'a, 'b list>):'b list =
+  match Map.tryFind x m with
+  | None -> []
+  | Some l -> l
+
+let map_set_get (x:'a) (m:Map<'a, Set<'b>>):Set<'b> =
+  match Map.tryFind x m with
+  | None -> Set.empty
+  | Some s -> s
+
+let map_list_add (x:'a) (y:'b) (m:Map<'a, 'b list>):Map<'a, 'b list> =
+  Map.add x (y::(map_list_get x m)) m
+
+let map_set_add (x:'a) (y:'b) (m:Map<'a, Set<'b>>):Map<'a, Set<'b>> =
+  Map.add x (Set.add y (map_set_get x m)) m
+
+let map_set_remove (x:'a) (y:'b) (m:Map<'a, Set<'b>>):Map<'a, Set<'b>> =
+  if Map.containsKey x m then
+    let s = Set.remove y (map_set_get x m) in
+    if Set.isEmpty s then Map.remove x m else Map.add x s m
+  else m
+
+let rec collect_sub_or_super_types (u:unifier) (super:bool) (reached:Set<id>) (x:id):typ list * Set<id> =
+  if Set.contains x reached then ([], reached) else
+  let reached = Set.add x reached in
+  let (tMap, succMap) = if super then (u.ut_uppers, u.ux_uppers) else (u.ut_lowers, u.ux_lowers) in
+  let ts = map_list_get x tMap in
+  let succs = map_set_get x succMap in
+  Set.fold (fun (ts, reached) x -> collect_sub_or_super_types u super reached x) (ts, reached) succs
+
+(*
+Algorithm and heuristics to resolve type constraints:
+
+Phase 1: Process u_equalities until u_equalities = []:
+  - Move any x = t or t = x in u_equalities into u_substs and substitute t for x in all fields of unifier
+    - Note that substitution may move constraints among fields of unifier
+  - Reduce any other t1 = t2 in u_equalities based on the structure of t1 and t2
+Phase 2: Resolve any remaining variables in the subtype graph
+  - For any variable x, let:
+    - Sub(x) be the set of all non-variable subtypes of x in the graph
+    - Super(x) be the set of all non-variable supertypes of x in the graph
+    (Both Sub and Super are computed recursively walking through the graph)
+  - For any x that we want to resolve:
+    - If Sub(x) is non-empty, substitute meet(Sub(x)) for x
+    - Otherwise, if Super(x) is non-empty, substitute meet(Super(x)) for x
+    - Otherwise, x is underconstrained, and we consider this a type error
+Note that we need not resolve all variables at once.  Because of overloading,
+we sometimes need to resolve some variables early to disambiguate the overloading,
+but we delay resolving other variables.
+*)
+
+// t1 = t2
+let u_constrain_equal (u:unifier) (t1:typ) (t2:typ):unit =
+  if t1 = t2 then () else
+  //printfn "constrain %A = %A" t1 t2;
+  u.u_equalities <- (t1, t2)::u.u_equalities
+
+// t1 <: t2
+let u_constrain_subtype (u:unifier) (t1:typ) (t2:typ):unit =
+  if t1 = t2 then () else
+  let env = u.u_env in
+  let t1 = substitute env u.u_substs t1 in
+  let t2 = substitute env u.u_substs t2 in
+  if t1 = t2 then () else
+  //printfn "constrain %A <: %A" t1 t2;
+  let t1_norm = normalize_type env t1 in
+  let t2_norm = normalize_type env t2 in
+  match (t1_norm.norm_typ, t2_norm.norm_typ) with
+  | (TVar (x1, _), TVar (x2, _)) ->
+    u.ux_uppers <- map_set_add x1 x2 u.ux_uppers;
+    u.ux_lowers <- map_set_add x2 x1 u.ux_lowers
+  | (TVar (x1, _), (TInt _ | TBool _)) ->
+    u.ut_uppers <- map_list_add x1 t2 u.ut_uppers
+  | ((TInt _ | TBool _), TVar (x2, _)) ->
+    u.ut_lowers <- map_list_add x2 t1 u.ut_lowers
+  | (TInt _, TInt _) when is_subtype env t1_norm t2_norm -> ()
+  | (TBool BpBool, TBool BpProp) -> ()
+  | _ -> u_constrain_equal u t1 t2
+
+let u_constrain_subtype_opt (u:unifier) (src_typ:typ) (expected_typ:typ option):unit =
+  match expected_typ with
+  | None -> ()
+  | Some et -> u_constrain_subtype u src_typ et
+
+let u_add_subst (u:unifier) (x:id) (t:typ):unit =
+  //printfn "begin add_subst %A %A" x t;
+  let cs = ref [] in
+  u.u_substs <- Map.add x t u.u_substs;
+  let ft m f_apply =
+    match Map.tryFind x m with
+    | None -> m
+    | Some ts -> List.iter f_apply ts; Map.remove x m
+    in
+  u.ut_lowers <- ft u.ut_lowers (fun t2 -> cs := (t2, t)::!cs); // t2 <: x --> t2 <: t
+  u.ut_uppers <- ft u.ut_uppers (fun t2 -> cs := (t, t2)::!cs); // x <: t2 --> t <: t2
+  let fx m1 m2 f_apply =
+    match Map.tryFind x m1 with
+    | None -> (m1, m2)
+    | Some xs ->
+      Set.iter f_apply xs;
+      (Map.remove x m1, Set.fold (fun m2 x2 -> map_set_remove x2 x m2) m2 xs)
+    in
+  let (ml, mu) = (u.ux_lowers, u.ux_uppers) in
+  let (ml, mu) = fx ml mu (fun x2 -> cs := (TVar (x2, None), t)::!cs) in // x2 <: x --> x2 <: t
+  let (mu, ml) = fx mu ml (fun x2 -> cs := (t, TVar (x2, None))::!cs) in // x <: x2 --> t <: x2
+  u.ux_lowers <- ml;
+  u.ux_uppers <- mu;
+  //printfn "end add_subst %A %A %A %A" x t !cs u;
+  List.iter (fun (t1, t2) -> u_constrain_subtype u t1 t2) !cs
+
+let u_apply_subst (u:unifier):unit =
+  let subs (t:typ):typ = substitute u.u_env u.u_substs t in
+  u.u_substs <- Map.map (fun _ t -> subs t) u.u_substs;
+  u.u_equalities <- List.map (fun (t1, t2) -> (subs t1, subs t2)) u.u_equalities
+  // Note that the types in ut_* cannot have type variables, so we don't substitute in them
+
+let u_bind (u:unifier) (x:id) (t:typ):unit =
+  match t with
+  | TVar (y, _) when x = y -> ()
+  | TVar (y, _) -> u_add_subst u x t
+  | _ ->
+    if occurs x t then
+      err ("circular type constraint" + err_id x + " " + string_of_typ t)
+    else u_add_subst u x t
+
+let u_unify_one (u:unifier) (t1:typ) (t2:typ):unit =
+  if t1 = t2 then () else
+  let env = u.u_env in
+  let t1 = substitute env u.u_substs t1 in
+  let t2 = substitute env u.u_substs t2 in
+  if t1 = t2 then () else
+  let typ_err () = err ("cannot coerce type '" + string_of_typ t1 + "' to type '" + string_of_typ t2 + "'") in
+  let t1 = normalize_type env t1 in
+  let t2 = normalize_type env t2 in
+  match (t1.norm_typ, t2.norm_typ) with
+  | (TVar (x, _), _) -> u_bind u x t2.norm_typ
+  | (_, TVar (x, _)) -> u_bind u x t1.norm_typ
+  | (TTuple ts1, TTuple ts2) when List.length ts1 = List.length ts2 ->
+    List.iter2 (fun t1 t2 -> u_constrain_equal u t1 t2) ts1 ts2
+  | (TFun (ts1, t1), TFun (ts2, t2)) when List.length ts1 = List.length ts2 ->
+    List.iter2 (fun t1 t2 -> u_constrain_equal u t1 t2) ts1 ts2;
+    u_constrain_equal u t1 t2
+  | (TApply (x1, ts1), TApply (x2, ts2)) when x1 = x2 && List.length ts1 = List.length ts2 ->
+    List.iter2 (fun t1 t2 -> u_constrain_equal u t1 t2) ts1 ts2
+  | _ when t1 = t2 -> ()
+  | _ -> typ_err ()
+
+let rec u_unify_equalities (u:unifier):unit =
+  match u.u_equalities with
+  | [] -> ()
+  | _ ->
+    List.iter (fun (t1, t2) -> u_unify_one u t1 t2) u.u_equalities;
+    u.u_equalities <- [];
+    u_apply_subst u;
+    u_unify_equalities u
+
+let u_unify (u:unifier) (xs_opt:Set<id> option):unit =
+  // phase 1
+  u_unify_equalities u;
+  // phase 2
+  let xs =
+    match xs_opt with
+    | None -> Set.unionMany [map_domain_set u.ut_lowers; map_domain_set u.ut_uppers; map_domain_set u.ux_lowers; map_domain_set u.ux_uppers]
+    | Some xs -> xs
+    in
+  let subs = ref [] in
+  Set.iter (fun x ->
+      //printfn "processing %A" x;
+      if Map.containsKey x u.u_substs then () else
+      let (sub_ts, _) = collect_sub_or_super_types u false Set.empty x in
+      let (super_ts, _) = collect_sub_or_super_types u true Set.empty x in
+      match meet_fallback super_ts with
+      | Some t -> subs := (x, t)::!subs
+      | None ->
+        (
+          match join_fallback sub_ts with
+          | Some t -> subs := (x, t)::!subs
+          | None -> err (sprintf "cannot infer type for type variable '%s' (you may need to add more type annotations to variables or type arguments to functions)" (err_id x))
+        )
+    )
+    xs;
+  List.iter (fun (x, t) -> u_add_subst u x t) !subs;
+  // Handle any remaining bool/prop/int constraints:
+  u_unify_equalities u
+
+(*
+// exact = true ==> s = t
+// exact = false ==> s <: t
 let rec unify_one (env:env) (exact:bool) (m:substitutions) (s:typ) (t:typ):substitutions =
   if s = t then m else
   let s = substitute env m s in
@@ -1065,6 +965,7 @@ and unify env (m:substitutions) (tc:typ_constraints):substitutions =
   | (TcSubtype (x, y)) :: t ->
     let m = unify_one env false m x y in
     unify env m t
+*)
 
 let insert_cast (e:exp) (t:typ) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
@@ -1153,13 +1054,381 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
   | None -> e
   | Some (t, et) -> if typ_equal env t et then e else insert_cast e t et
 
+let rec infer_arg_typ (env:env) (u:unifier) (args:(exp * pformal option * typ option) list):(norm_typ list * aexp list) =
+  let infer_arg_typ_fold (ts, ae) ((e:exp), (formal:pformal option), (et:typ option)):(norm_typ list * aexp list) =
+    let (t, ae1) =
+(*
+      let tr =
+        match formal with
+        | Some f ->
+          compute_transform_info env f (e:exp)
+        | _ -> if env.ghost then Some EvalOp else None
+*)
+      match skip_loc e with
+(*
+      | EVar x when (x <> Reserved "this") ->
+        let (t, info) = lookup_evar env x in
+        let t = normalize_type_with_transform env t tr in
+        let et = match et with | None -> t | Some t -> t in
+        (t, AEVar (x, t, et), [])
+      | EInt i ->
+        let t = TInt (Int i, Int i) in
+        let t = normalize_type_with_transform env t tr in
+        let et = match et with | None -> t | Some t -> t
+        (t, AEInt (i, t, et), [])
+      | EOp (Uop UConst, [e]) ->
+        match tr with
+        | Some (ConstOp s) ->
+          let tv = next_type_var () in
+          let et = match et with | None -> tv | Some t -> t in
+          let t = normalize_type_with_transform env tv tr in
+          let (_, ae, s) = infer_exp env e (Some et) in
+          let ae = AE_Op (Uop UConst, [ae], t, et) in
+          (t, ae, s)
+        | _ -> infer_exp env e et
+      | EApply (x, ts, es) ->
+        match tr with
+        | Some EApplyCode ->
+          let vx = Id (qprefix ("va_opr_code_") (string_of_id x)) in
+          let ecs = List.collect (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> [] | _ -> [e]) es in
+          let ea = EApply (vx, ts, ecs) in
+          let (t, ae, s) = infer_exp env ea et in
+          let ae =
+            match ae with
+            | AEApply (_, es, t, et) -> AEApply (x, es, t, et)
+            | _ -> internalErr ("EApply expected") in
+          (t, ae, s)
+        | _ -> infer_exp env e et
+*)
+      | _ -> infer_exp env u e et in
+    (t::ts, ae1::ae)
+  in
+  let (ts_rev, aes_rev) = List.fold infer_arg_typ_fold ([], []) args in
+  (List.rev ts_rev, List.rev aes_rev)
+
+and infer_exps (env:env) (u:unifier) (args:(exp * typ option) list):(norm_typ list * aexp list) =
+  let infer_exps_fold (ts, ae) ((e:exp), (et:typ option)):(norm_typ list * aexp list) =
+    let (t, ae1) = infer_exp env u e et in
+    (t::ts, ae1::ae)
+  in
+  let (ts_rev, aes_rev) = List.fold infer_exps_fold ([], []) args in
+  (List.rev ts_rev, List.rev aes_rev)
+and infer_exp_multi (env:env) (u:unifier) (e:exp) (*expected_typ:typ option list*):(typ list * aexp_t) =
+  match e with
+(* TODO
+  | EOp (Uop UReveal, [e]) ->
+    let (t, ae, s) =
+      match e with
+      | EVar x ->
+        lookup_fun_or_proc env x |> ignore
+        ([], AEVar(x, TName (Id "unit"), TName (Id "unit")), [])
+      | EApply _ -> infer_exp_multi env e [None];
+      | _ -> err (sprintf "unexpected UReveal %A" e)
+    let ae = AE_Op (Uop UReveal, [ae], TName (Id "unit"), TName (Id "unit")) in
+    ([], ae, [])
+*)
+  | EApply (x, ts_opt, es) -> // TODO: Some ts case
+    let f = lookup_fun env x in
+    if env.inline_only && List.length f.specs > 0 then err ("inline expressions cannot call functions with requires/ensures") else
+    if List.length f.targs <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.targs) (List.length es));
+    let param_typs = f.targs in
+    let ret_typs = f.trets in
+    let param_arg_typs =
+      if f.tformals <> [] then List.map2 (fun t1 t2 -> (Some t1, t2)) f.tformals param_typs
+      else List.map (fun t -> (None, t)) param_typs in
+//    let env = if isExtern then {env with ghost = true} else env in
+    let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e (tf, t) -> (e, tf, Some t)) es param_arg_typs) in
+    (
+      match ts_opt with
+      | None -> ()
+      | Some ts ->
+        if List.length ts <> List.length param_typs then err (sprintf "expected %A type argument(s), found %A type argument(s)" (List.length param_typs) (List.length ts))
+        else
+          List.iter2 (fun t pt -> u_constrain_equal u t pt) ts param_typs
+    );
+    (ret_typs, AE_Apply (x, param_typs, aes))
+  | _ -> err (sprintf "missing typechecker for exp %A" e)
+and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ * aexp) =
+  let ret (t:norm_typ) (ae:aexp_t) =
+    let coerce =
+      match expected_typ with
+      | None -> None
+      | Some et -> if t = normalize_type env et then None else Some (t.norm_typ, et)
+      in
+    u_constrain_subtype_opt u t.norm_typ expected_typ;
+    (t, (ae, coerce))
+    in
+  let norm_ret (t:typ) (ae:aexp_t) =
+    ret (normalize_type env t) ae
+    in
+  match e with
+  | ELoc (loc, e) ->
+    try
+      let (t, ae) = infer_exp env u e expected_typ in
+      (t, (AE_Loc (loc, ae), None))
+    with err -> raise (LocErr (loc, err))
+  | EVar (Reserved "this") ->
+    if env.inline_only then err "'this' is not allowed for inline expressions" else
+    norm_ret (TName (Id "state")) (AE_Exp e)
+  | EVar x ->
+    let (t, info) = lookup_evar env x in
+    (match (env.inline_only, info) with (false, _) | (_, Some InlineLocal) -> () | _ -> err "only inline variables are allowed in inline expressions");
+    let t = normalize_type_with_transform env t (Some EvalOp) in
+    ret t (AE_Exp e)
+  | EInt i -> norm_ret (TInt (Int i, Int i)) (AE_Exp e)
+  | EReal r -> norm_ret (TName (Id "real")) (AE_Exp e)
+//    | EBitVector (n, i) -> TODO
+  | EBool b -> norm_ret tBool (AE_Exp e)
+  | EString s -> norm_ret (TName (Id "string")) (AE_Exp e)
+  | EOp (Uop (UConst | UOld) as op, [e]) ->
+    let (t, ae) = infer_exp env u e expected_typ in
+    ret t (AE_Op (op, [ae]))
+  | EOp (Uop UNeg, [e]) ->
+    let (t, ae) = infer_exp env u e None in
+    let t = neg_int_bound t.norm_typ in
+    norm_ret t (AE_Op (Uop UNeg, [ae]))
+  | EOp (Uop (UNot _) as op, [e]) ->
+    let tv = next_type_var () in
+    let et = match expected_typ with | None -> tv | Some t -> t in
+    let (_, ae) = infer_exp env u e (Some et) in
+    u_constrain_subtype u tv tProp;
+    u_constrain_subtype u tv et;
+    ({norm_typ = tv}, (AE_Op (op, [ae]), Some (tv, et))) // Some (tv, et) used to resolve overload
+(* TODO
+  | EOp (Uop (UIs x), [e]) ->
+    let ix = Id ("uu___is_"+ (string_of_id x)) in
+    let e = EApply (ix, [e]) in
+    let (t, ae, s) = infer_exp env e expected_typ in
+    let ae =
+      match ae with
+      | AEApply (_, es, [t], [et]) -> AE_Op (Uop (UIs x), es, t, et)
+      | _ -> err ("'UIs' should be converted to 'EApply' first before typechecking") in
+    (t, ae, s)
+  | EOp (Uop (UCustom op), l) ->
+    let (p, _) = lookup_fun_or_proc env (Operator op) in
+    let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
+    let (t, ae, s) = infer_exp env e expected_typ in
+    let ae =
+      match ae with
+      | AEApply (x, es, [t], [et]) -> AE_Op (Uop (UCustom op), es, t, et)
+      | _ -> err ("'UCustom' should be converted to 'EApply' first before typechecking") in
+    (t, ae, s)
+  | EOp (Uop UToOperand, _) ->
+    err (sprintf "missing typing rule for Uop UToOperand")
+  | EOp (Uop op, _) ->
+    err (sprintf  "unsupported Uop '%A' in typechecker" op)
+*)
+  | EOp (Bop op, [e1; e2]) when isArithmeticOp op ->
+    // op in {+, -, *, /, %}
+    let (t1, ae1) = infer_exp_force_subst env u e1 None in
+    let (t2, ae2) = infer_exp_force_subst env u e2 None in
+    let t = unify_int_bound t1 t2 op in
+    norm_ret t (AE_Op (Bop op, [ae1; ae2]))
+  | EOp (Bop (BAnd _ | BOr _) as op, [e1; e2]) ->
+    let tv = next_type_var () in
+    let et = match expected_typ with | None -> tv | Some t -> t in
+    let (_, ae1) = infer_exp env u e1 (Some et) in
+    let (_, ae2) = infer_exp env u e2 (Some et) in
+    u_constrain_subtype u tv tProp;
+    u_constrain_subtype u tv et;
+    ({norm_typ = tv}, (AE_Op (op, [ae1; ae2]), Some (tv, et))) // Some (tv, et) used to resolve overload
+  | EOp (Bop (BEquiv | BImply | BExply) as op, [e1; e2]) ->
+    let (_, ae1) = infer_exp env u e1 (Some tProp) in
+    let (_, ae2) = infer_exp env u e2 (Some tProp) in
+    norm_ret tProp (AE_Op (op, [ae1; ae2]))
+  | EOp (Bop op, [e1; e2]) when isIcmpOp op ->
+    // op in {<, > , <=, >=} and it can be chained
+    match (op, skip_loc e1) with
+    | (op, EOp (Bop op1, [e11; e12])) when isIcmpOp op1 ->
+        // Convert (a <= b) < c into (a <= b) && (b < c)
+        let e2 = EOp (Bop op, [e12; e2]) in
+        let e = EOp (Bop (BAnd BpBool), [e1; e2]) in
+        infer_exp env u e expected_typ
+    | _ ->
+      let (_, ae1) = infer_exp env u e1 (Some tInt) in
+      let (_, ae2) = infer_exp env u e2 (Some tInt) in
+      norm_ret tBool (AE_Op (Bop op, [ae1; ae2]))
+  | EOp (Bop (BEq opt | BNe opt) as op, [e1; e2]) ->
+    let (t1, ae1) = infer_exp env u e1 None in
+    let (t2, ae2) = infer_exp env u e2 None in
+    u_constrain_equal u t1.norm_typ t2.norm_typ;
+    let t = match opt with BpBool -> tBool | BpProp -> tProp in
+    norm_ret t (AE_Op (op, [ae1; ae2]))
+(*
+  | EOp (Bop BIn, [e1; e2]) ->
+    err ("BIn not supported in TypeChecker")
+  | EOp (Bop BOldAt, [e1; e2]) ->
+    let tv = next_type_var () in
+    let et = match expected_typ with | None -> tv | Some t -> t in
+    let (t1, ae1, s1) = infer_exp env e1 None in
+    let (t2, ae2, s2) = infer_exp env e2 None in
+    let ae = AE_Op (Bop BOldAt, [ae1;ae2], tv, et) in
+    (tv, ae, s1 @ s2 @ [(t1, TName(Id "state"));(t2, tv)])
+  | EOp (Bop (BCustom op), l) ->
+    let (p, _) = lookup_fun_or_proc env (Operator op) in
+    let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
+    let (t, ae, s) = infer_exp env e expected_typ in
+    let ae =
+      match ae with
+      | AEApply (x, es, [t], [et]) -> AE_Op (Bop (BCustom op), es, t, et)
+      | _ -> err ("'BCustom' should be converted to 'EApply' first before typechecking") in
+    (t, ae, s)
+  | EOp (Subscript, [e1; e2]) ->
+    let e = EApply ((Id "subscript"), [e1; e2]) in
+    let (t, ae, s) = infer_exp env e expected_typ in
+    let ae =
+      match ae with
+      | AEApply (x, es, [t], [et]) -> AE_Op (Subscript, es, t, et)
+      | _ -> err ("'Subscript' should be converted to 'EApply' first before typechecking") in
+    (t, ae, s)
+  | EOp (Update, [e1; e2; e3]) ->
+    let e = EApply ((Id "update"), [e1; e2; e3]) in
+    let (t, ae, s) = infer_exp env e expected_typ in
+    let ae =
+      match ae with
+      | AEApply (x, es, [t], [et]) -> AE_Op (Update, es, t, et)
+      | _ -> err ("'Update' should be converted to 'EApply' first before typecheckings") in
+    (t, ae, s)
+*)
+  | EOp (Cond, [e1; e2; e3]) ->
+    let tv = next_type_var () in
+    let et = match expected_typ with | None -> tv | Some t -> t in
+    let (t1, ae1) = infer_exp env u e1 (Some tBool) in
+    let (t2, ae2) = infer_exp env u e2 (Some et) in
+    let (t3, ae3) = infer_exp env u e3 (Some et) in
+    u_constrain_subtype u t2.norm_typ tv;
+    u_constrain_subtype u t3.norm_typ tv;
+    norm_ret tv (AE_Op (Cond, [ae1; ae2; ae3]))
+(*TODO
+  | EOp (FieldOp x, [e]) ->
+    let (t1, _, _) = infer_exp env e None in
+    let (t, ae, s) =
+      match (t1,x) with
+      | (TApply (x, _), (Id f)) ->
+        let (mn, t) = name_of_id x in
+        let s = if mn = "" then "" else mn + "." in
+        let s = s + "__proj__" + "Mk" + string_of_id t + "__item__" + f in
+        let e = EApply (Id s, [e]) in
+        infer_exp env e expected_typ
+      | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
+    let ae =
+      match ae with
+      | AEApply (_, es, [t], [et]) -> AE_Op (FieldOp x, es, t, et)
+      | _ -> err ("'FieldOp' should be converted to 'EApply' before typechecking") in
+    (t, ae, s)
+  | EOp (FieldUpdate x, [e1; e2]) ->
+    let (t1, _, _) = infer_exp env e1 None in
+    let (t2, ae2, s2) = infer_exp env e2 None in
+    let (t, ae, s) =
+      match (t1,x) with
+      | (TName (Id t), (Id f)) ->
+        let s = "__proj" + t + "__item__" + f in
+        let e = EApply (Id s, [e1]) in
+        infer_exp env e expected_typ
+      | _ -> err (sprintf "unknown field type %A for field %s" t1 (err_id x)) in
+    let ae =
+      match ae with
+      | AEApply (_, es, [t], [et]) -> AE_Op (FieldUpdate x, es @ [ae2], t, et)
+      | _ -> err ("'FieldUpdate' should be converted to 'EApply' before typechecking") in
+    (t, ae, s @ s2 @ [(t2, t)])
+  | EOp (op, es) ->
+    err (sprintf "unsupported Eop %A in typechecking" op)
+  | EApply (Id "list", _, es) ->
+    let tv = next_type_var () in
+    let arg_typ = next_type_var () in
+    let (arg_typs, aes, s) = infer_arg_typ env (List.map (fun e -> (e, None, Some arg_typ)) es) in
+    let et = tapply (Id "list") [arg_typ] in
+    let ae = AEApply (Id "list", aes, [tv], [et]) in
+    let s = List.fold (fun l t -> l @ [(t, arg_typ)]) s arg_typs in
+    (tv, ae, [(tv, et)] @ s)
+*)
+  | EOp (TupleOp _, es) ->
+    let ts =
+      match expected_typ with
+      | Some (TTuple ts) -> ts
+      | _ -> List.map (fun _ -> next_type_var ()) es
+      in
+    let t = TTuple ts in
+    let (_, aes) = infer_exps env u (List.map2 (fun e t -> (e, Some t)) es ts) in
+    norm_ret t (AE_Apply (Id "tuple", ts, aes))
+  | EBind (BindLet, [ex], [(x, t)], [], e) ->
+    // let x:t := ex in e
+    check_not_local env x;
+    let (t1, ae1) = infer_exp env u ex t in
+    let xt = match t with | Some t -> t | _ -> t1.norm_typ in
+    let env = push_id env x xt in
+    let (t2, ae2) = infer_exp env u e expected_typ in
+    u_constrain_subtype u t1.norm_typ xt;
+    ret t2 (AE_Bind (BindLet, [ae1], [(x, t)], [], ae2))
+  | EBind (((Forall | Exists) as b), [], fs, ts, e) ->
+    // fs list of formals, that are distinct and are not local variables
+    // ts: triggers
+    // e: prop
+    let env = List.fold (fun env (x, t) -> let t = match t with Some t -> t | None -> next_type_var () in push_id env x t) env fs in
+    let (t, ae) = infer_exp env u e expected_typ in
+    u_constrain_subtype u t.norm_typ tProp;
+    ret t (AE_Bind (b, [], fs, ts, ae))
+  | EBind (Lambda, [], xs, ts, e) ->
+    let xs = List.map (fun (x, t) -> match t with Some t -> (x, t) | None -> (x, next_type_var ())) xs in
+    let env = List.fold (fun env (x, t) -> push_id env x t) env xs in
+    let (t, ae) = infer_exp env u e None in
+    let ae = AE_Bind (Lambda, [], List.map (fun (x, t) -> (x, Some t)) xs, ts, ae) in
+    norm_ret (TFun (List.map snd xs, t.norm_typ)) ae
+  | ECast (e, tc) ->
+    if env.inline_only then err "casts are not allowed for inline expressions" else
+    let (t, ae) = infer_exp env u e None in
+    let ae = AE_Cast (ae, tc) in
+    let tc_norm = normalize_type env tc in
+    // TODO: move this check to after inference:
+    if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae
+    else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
+  | _ ->
+    let (t, ae) = infer_exp_one env u e expected_typ in
+    ret t ae
+and infer_exp_force_subst (env:env) (u:unifier) (e:exp) (et:typ option):(typ * aexp) =
+  try
+    let (t, ae) = infer_exp env u e None in
+    let t =
+      match t.norm_typ with
+      | TVar (x, _) ->
+        u_unify u (Some (Set.singleton x));
+        substitute env (u.u_substs) t.norm_typ
+      | t -> t
+      in
+    (t, ae)
+  with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> raise (LocErr (loc, err)))
+and infer_exp_one (env:env) (u:unifier) (e:exp) (et:typ option):(norm_typ * aexp_t) =
+  match infer_exp_multi env u e (*[et]*) with
+  | ([t], ae) -> (normalize_type env t, ae)
+  | (ts, _) -> err (sprintf "%A can have only one inferred type, got %i" e (List.length ts))
+and infer_exp_many (env:env) (u:unifier) (e:exp) (et:(typ option) list):(norm_typ list * aexp_t) =
+  match et with
+  | [et] ->
+    let (t, ae) = infer_exp env u e et in ([t], fst ae)
+  | _ ->
+    let (ts, ae) = infer_exp_multi env u e (*et*) in
+    (List.map (normalize_type env) ts, ae)
+
+let new_unifier (env:env):unifier =
+  {
+    u_env = env;
+    u_substs = Map.empty;
+    u_equalities = [];
+    ut_lowers = Map.empty;
+    ut_uppers = Map.empty;
+    ux_lowers = Map.empty;
+    ux_uppers = Map.empty;
+  }
+
 let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
   try
-    let (t, ae, cl) = infer_exp env e et in
-//    printfn "t = %A  ae = %A  cl = %A" t ae cl;
-    let s = unify env Map.empty cl in
-    let t = substitute env s t.norm_typ in
-    let es = subst_exp env s ae in
+    let u = new_unifier env in
+    let (t, ae) = infer_exp env u e et in
+    //printfn "t = %A  ae = %A  u = %A" t ae u;
+    u_unify u None;
+    // TODO: check that no type variables remain
+    let t = substitute env u.u_substs t.norm_typ in
+    let es = subst_exp env u.u_substs ae in
 //    printfn "e = %A  es = %A" (Emit_vale_text.string_of_exp e) (Emit_vale_text.string_of_exp es);
 //    printfn "e = %A\n  ae = %A\n  t = %A\n  es = %A" e ae t es;
     (t, es)
@@ -1243,7 +1512,6 @@ let operand_type_includes (env:env) (xo:id) (src_ot:operand_typ):typ =
     err (sprintf "operand '%s' does not have operand type '%s'" (string_of_operand_typ src_ot) (err_id xo))
 
 let tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
-  let locs = locs_of_exp e in
   try
     let (x, txo, storage, io, attrs) = pf in
     let check_const_operand (xo:id):exp =

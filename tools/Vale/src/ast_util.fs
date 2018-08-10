@@ -39,6 +39,9 @@ let List_mapSnd (f:'b -> 'c) (l:('a * 'b) list):('a * 'c) list = List.map (mapSn
 
 let list_of_opt (opt:'a option):'a list = match opt with None -> [] | Some a -> [a]
 
+let map_domain_set (m:Map<'a, 'b>):Set<'a> =
+  Set.ofList (List.map fst (Map.toList m))
+
 exception Err of string
 exception InternalErr of string
 exception LocErr of loc * exn
