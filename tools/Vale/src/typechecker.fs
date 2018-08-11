@@ -30,7 +30,12 @@ type fun_instance =
     attrs:attrs;
   }
 
-type id_info = StateInfo of typ | OperandLocal of inout * typ | InlineLocal | ConstGlobal
+type id_info =
+| StateInfo of typ
+| OperandLocal of inout * typ
+| InlineLocal
+| MutableGhostLocal
+| ConstGlobal
 
 type name_info =
 | Info of typ * id_info option
@@ -339,26 +344,27 @@ let push_rets (env:env) (rets:pformal list):env =
   let f s (x, t, g, io, a) =
     let info =
       match g with
-      | XOperand -> Some (OperandLocal (io, t))
-      | XInline -> Some InlineLocal
-      | _ -> None in
+      | XGhost -> Some MutableGhostLocal
+      | _ -> err (sprintf "return variable '%s' must be ghost" (err_id x))
     Map.add x (Info ((normalize_type env t).norm_typ, info)) s in
   {env with declsmap = List.fold f env.declsmap rets}
 
 let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):env =
-  let arg_in_rets arg l = List.exists (fun elem -> elem = arg) l in
   let rec aux s l =
     match l with
     | [] -> s
     | a::q ->
-    let (x, t, g, io, _) = a in
-    let info =
-      match g with
-      | XOperand -> Some (OperandLocal (io, t))
-      | XInline -> Some InlineLocal
-      | _ -> None
-    let s = if arg_in_rets a rets then s else Map.add x (Info (t, info)) s in
-    aux s q in
+      (
+        let (x, t, g, io, _) = a in
+        let info =
+          match g with
+          | XOperand -> Some (OperandLocal (io, t))
+          | XInline -> Some InlineLocal
+          | _ -> None
+        let s = Map.add x (Info (t, info)) s in
+        aux s q
+      )
+    in
   {env with declsmap = aux env.declsmap args}
 
 let push_lhss (env:env) (lhss:lhs list):env =
@@ -454,15 +460,18 @@ let is_subtype (env:env) (t1:norm_typ) (t2:norm_typ):bool =
   | (TInt (l1, h1), TInt (l2, h2)) -> bnd_le l2 l1 && bnd_le h1 h2
   | _ -> t1 = t2
 
+let is_subtype_norm (env:env) (t1:typ) (t2:typ):bool =
+  is_subtype env (normalize_type env t1) (normalize_type env t2)
+
 let isArithmeticOp op = match op with | BAdd | BSub | BMul | BDiv | BMod -> true | _ -> false
 let isLogicOp op = match op with | BEquiv | BImply | BExply | BAnd _ | BOr _ -> true | _ -> false
 let isIcmpOp op = match op with | BLt | BGt | BLe | BGe -> true | _ -> false
 
-let lookup_evar (env:env) (x:id):(typ * id_info option) =
-  match x with
-  | Id "False" -> lookup_id env (Id "Prims.l_False")
-  | Id "True" -> lookup_id env (Id "Prims.l_True")
-  | _ -> lookup_id env x
+//let lookup_evar (env:env) (x:id):(typ * id_info option) =
+//  match x with
+//  | Id "False" -> lookup_id env (Id "Prims.l_False")
+//  | Id "True" -> lookup_id env (Id "Prims.l_True")
+//  | _ -> lookup_id env x
 
 let compute_transform_info env (formal:pformal) (e:exp) =
   None
@@ -1203,7 +1212,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
     if env.inline_only then err "'this' is not allowed for inline expressions" else
     norm_ret (TName (Id "state")) (AE_Exp e)
   | EVar x ->
-    let (t, info) = lookup_evar env x in
+    let (t, info) = lookup_id env x in
     (match (env.inline_only, info) with (false, _) | (_, Some InlineLocal) -> () | _ -> err "only inline variables are allowed in inline expressions");
     let t = normalize_type_with_transform env t (Some EvalOp) in
     ret t (AE_Exp e)
@@ -1491,7 +1500,8 @@ let rec update_env_stmt (env:env) (s:stmt):env =
   | SVar (x, t, m, g, a, eOpt) ->
     (
       let t = match t with Some t -> t | None -> internalErr "update_env_stmt" in
-      push_id env x t
+      let info = match (m, g) with (Mutable, XGhost) -> Some MutableGhostLocal | _ -> None in
+      push_id_with_info env x t info
     )
   | SAlias (x, y) ->
     let (t, _) = lookup_id env y in
@@ -1571,7 +1581,7 @@ let tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
           (
             let (t, info) = lookup_id env x in
             match (io, info) with
-            | (_, None) -> err "expression is not an operand"
+            | (_, (None | Some MutableGhostLocal)) -> err "expression is not an operand"
             | (_, Some (InlineLocal | ConstGlobal)) -> check_const_operand xo
             | (_, Some (StateInfo ts)) ->
               let _ = operand_type_includes env xo (OT_State (io, x)) in
@@ -1595,6 +1605,15 @@ let tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
     | _ -> notImplemented (sprintf "tc_proc_operand %A" pf)
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
 
+let assign_local (env:env) (x:id):typ =
+  let (t, info) = lookup_id env x in
+  match info with
+  | Some MutableGhostLocal -> t
+  | _ -> err (sprintf "variable '%s' must be mutable ghost to allow assignment" (err_id x))
+
+// TODO: check that global variable names are distinct
+// TODO: check that local variable names are distinct
+
 let tc_proc_call (env:env) (p:proc_decl) (xs:lhs list) (es:exp list):stmt =
   let nxs = List.length xs in
   let nes = List.length es in
@@ -1603,7 +1622,17 @@ let tc_proc_call (env:env) (p:proc_decl) (xs:lhs list) (es:exp list):stmt =
   if nes <> nparams then err (sprintf "procedure expects %i arguments(s), found %i arguments(s)" nparams nes) else
   if nxs > 0 && nxs <> nrets then err (sprintf "procedure returns %i value(s), found %i return variable(s)" nrets nxs) else
   let es = List.map2 (tc_proc_operand env) p.pargs es in
-  // TODO: return values
+  let proc_ret (lhs:lhs) (ret:pformal):lhs =
+    let (_, tr, _, _, _) = ret in
+    let check_subtype (x:id) (tx:typ):unit =
+      if not (is_subtype_norm env tr tx) then err (sprintf "cannot assign return type '%s' to variable '%s' of type '%s'" (string_of_typ tr) (err_id x) (string_of_typ tx))
+      in
+    match lhs with
+    | (x, None) -> check_subtype x (assign_local env x); lhs
+    | (x, Some (None, Ghost)) -> (x, Some (Some tr, Ghost))
+    | (x, Some (Some tx, Ghost)) -> check_subtype x tx; lhs
+    | (x, Some (_, NotGhost)) -> err (sprintf "variable '%s' must be ghost" (err_id x))
+  let xs = List.map2 proc_ret xs p.prets in
   SAssign (xs, EApply (p.pname, None, es))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
@@ -1613,62 +1642,74 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
   | SLabel x -> err "labels are not supported"
   | SGoto x -> err "goto statements are not supported"
   | SReturn -> s
-  | SAssume e -> let (t, e) = tc_exp env e None in SAssume e
-  | SAssert (attrs, e) -> let (t, e) = tc_exp env e None in SAssert (attrs, e)
+  | SAssume e -> let (_, e) = tc_exp env e (Some tProp) in SAssume e
+  | SAssert (attrs, e) -> let (_, e) = tc_exp env e (Some tProp) in SAssert (attrs, e)
   | SCalc (oop, contents) -> SCalc (oop, tc_calc_contents env contents)
   | SVar (x, tOpt, m, g, a, eOpt) ->
-    (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());
-    let (t, eOpt) =
-      let etOpt = match eOpt with | Some e -> Some (tc_exp env e tOpt) | _ -> None in
-      match (tOpt, etOpt) with
-      | (None, None) -> err "variable declaration must have a type or an initial expression"
-      | (None, Some (t, e)) -> (t, Some e)
-      | (Some t, None) -> (t, None)
-      | (Some t, Some (_, e)) -> (t, Some e)
-      in
-    SVar (x, Some t, m, g, a, eOpt)
+    (
+      (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());
+      let (t, eOpt) =
+        let etOpt = match eOpt with | Some e -> Some (tc_exp env e tOpt) | _ -> None in
+        match (tOpt, etOpt) with
+        | (None, None) -> err "variable declaration must have a type or an initial expression"
+        | (None, Some (t, e)) -> (t, Some e)
+        | (Some t, None) -> (t, None)
+        | (Some t, Some (_, e)) -> (t, Some e)
+        in
+      SVar (x, Some t, m, g, a, eOpt)
+    )
   | SAlias (x, y) -> s // TODO resolve_id env y; s
   | SAssign (xs, e) ->
-    let assign_exp () =
-      let et =
-        match xs with
-        | [(x, Some (Some t, _))] -> Some t
-        | [(x, _)] -> let r = try_lookup_id env x in match r with | Some (t, _) -> Some t | _ -> None
-        | _ -> None in
-      let (t, e) = tc_exp env e et in
-      SAssign (xs, e)
-    match skip_loc e with
-    | EApply (x, _, es) ->
-      match (xs, lookup_fun_or_proc env x) with
-      | (([] | [_]), FoundFun _) -> assign_exp ()
-      | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
-      | (_, FoundProc p) -> tc_proc_call env p xs es
-    | _ -> assign_exp ()
+    (
+      let assign_exp () =
+        let (et, ft) =
+          match xs with
+          | [(x, None)] -> (Some (assign_local env x), fun _ -> xs)
+          | [(x, Some (None, Ghost))] -> (None, fun t -> [(x, Some (Some t, Ghost))])
+          | [(x, Some (Some t, Ghost))] -> (Some t, fun _ -> xs)
+          | [(x, Some (_, NotGhost))] -> err (sprintf "variable '%s' must be ghost" (err_id x))
+          | [] -> (None, fun _ -> xs)
+          | _::_::_ -> internalErr "assign_exp"
+          in
+        let (t, e) = tc_exp env e et in
+        SAssign (ft t, e)
+        in
+      match skip_loc e with
+      | EApply (x, _, es) ->
+        match (xs, lookup_fun_or_proc env x) with
+        | (([] | [_]), FoundFun _) -> assign_exp ()
+        | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
+        | (_, FoundProc p) -> tc_proc_call env p xs es
+      | _ -> assign_exp ()
+    )
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> let (env, b) = tc_stmts env b in SBlock b
   | SQuickBlock (x, b) -> let (env, b) = tc_stmts env b in SQuickBlock (x, b)
   | SIfElse (g, e, b1, b2) ->
-    let et = tBool in
-    let (t, e) = tc_exp env e (Some et) in
-    let (env, b1) = tc_stmts env b1 in
-    let (env, b2) = tc_stmts env b2 in
-    SIfElse(g, e, b1, b2)
+      let (t, e) = tc_exp env e (Some tBool) in
+      let (_, b1) = tc_stmts env b1 in
+      let (_, b2) = tc_stmts env b2 in
+      SIfElse (g, e, b1, b2)
   | SWhile (e, invs, ed, b) ->
-    let (t, e) = tc_exp env e None in
-    let invs = List_mapSnd (fun e -> let (t,e) = tc_exp env e None in e) invs in
-    let ed = mapSnd (List.map (fun e -> let (t,e) = tc_exp env e None in e)) ed in
-    let (env, b) = tc_stmts env b in
-    SWhile (e, invs, ed, b)
+      let (t, e) = tc_exp env e (Some tBool) in
+      let invs = List_mapSnd (fun e -> let (_, e) = tc_exp env e (Some tProp) in e) invs in
+      let ed = mapSnd (List.map (fun e -> let (_, e) = tc_exp env e None in e)) ed in
+      let (_, b) = tc_stmts env b in
+      SWhile (e, invs, ed, b)
   | SForall (xs, ts, ex, e, b) ->
-    let env1 = update_env_stmt env s in
-    let (t, ex) = tc_exp env1 ex None in
-    let (t, e) = tc_exp env1 e None in
-    let (env, b) = tc_stmts env1 b in
-    SForall (xs, ts, ex, e, b)
+      // TODO: xs
+      // TODO: ts
+      let env1 = update_env_stmt env s in
+      let (t, ex) = tc_exp env1 ex (Some tProp) in
+      let (_, e) = tc_exp env1 e (Some tProp) in
+      let (env, b) = tc_stmts env1 b in
+      SForall (xs, ts, ex, e, b)
   | SExists (xs, ts, e) ->
-    let env1 = update_env_stmt env s in
-    let (t, e) = tc_exp env1 e None in
-    SExists (xs, ts, e)
+      // TODO: xs
+      // TODO: ts
+      let env1 = update_env_stmt env s in
+      let (_, e) = tc_exp env1 e (Some tProp) in
+      SExists (xs, ts, e)
 and tc_stmts (env:env) (ss:stmt list):(env * stmt list) =
   let (env, ss_rev) =
     List.fold

@@ -94,7 +94,7 @@ type var_storage =
 
 type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool; is_quicktype:bool}
 type quick_info = {qsym:string; qmods:id list}
-type lhs = id * (typ option * ghost) option
+type lhs = id * (typ option * ghost) option // TODO: we only allow Ghost here, so no need to mention possibility of NotGhost
 type stmt =
 | SLoc of loc * stmt
 | SLabel of id

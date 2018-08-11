@@ -64,6 +64,14 @@ procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:in
     let j:nat32 := (let m:byte := id#[byte](5) in m);
     let l:nat32 := id#[byte](5);
     y := #int_range(15, 20)(x);
+    assert 7 < 8;
+    if (3 < 3) {}
+}
+
+procedure{:typecheck}{:testShouldFail} Fail()
+{
+    let a:int := 0;
+    a := 1; // not mutable
 }
 
 procedure{:typecheck}{:testShouldFail} Fail()
