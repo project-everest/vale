@@ -164,7 +164,6 @@ method printIns(ins:ins)
         case SUB(dest, src1, src2) => printIns3Op("SUB", dest, src1, src2);
         case AND(dest, src1, src2) => printIns3Op("AND", dest, src1, src2);
         case EOR(dest, src1, src2) => printIns3Op("EOR", dest, src1, src2);
-        case REV(dest, src) => printIns2Op("REV", dest, src);
         case LDR(rd, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_global(rd, global, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_reloc(rd, sym) => printIns2Op("LDR", rd, sym);

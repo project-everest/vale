@@ -249,21 +249,6 @@ rAND(out dst:opr32, src1:opr32, src2:opr32)
     } 
 }
 
-
-procedure {:refined} {:instruction Ins(REV(dst, src))}
-rREV(out dst:opr32, src:opr_reg)
-    ensures
-        dst == old(bswap32(src));
-{
-    reveal eval_code;
-    reveal ValidRegState;
-    reveal ValidMemState;
-
-    ghost if (!(old(this).ok && this.ok)) {
-        this := old(this).(ok := false);
-    } 
-}
-
 #verbatim
 } // end module ARMdecls
 #endverbatim

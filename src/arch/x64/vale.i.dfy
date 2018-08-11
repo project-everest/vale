@@ -1,12 +1,10 @@
 // Untrusted Dafny-Vale interface
 
 include "def.s.dfy"
-include "../../lib/util/words_and_bytes.i.dfy"
 
 module x64_vale_i {
 
 import opened x64_def_s
-import opened words_and_bytes_i_temp = words_and_bytes_i
 
 type opr = operand
 

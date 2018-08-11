@@ -1,12 +1,10 @@
 // Trusted specification for x86 semantics
 
 include "../../lib/util/operations.s.dfy"
-include "../../lib/util/words_and_bytes.s.dfy"
 
 module x64_def_s {
 
 import opened operations_s
-import opened words_and_bytes_s
 
 datatype x86reg =
   X86Eax | X86Ebx | X86Ecx | X86Edx | X86Esi | X86Edi | X86Ebp
@@ -31,7 +29,6 @@ datatype ins =
 | IMul64(dstIMul64:operand, srcIMul64:operand)
 | AddCarry(dstAddCarry:operand, srcAddCarry:operand)
 | AddCarry64(dstAddCarry64:operand, srcAddCarry64:operand)
-| BSwap32(dstBSwap:operand)
 | Xor32(dstXor:operand, srcXor:operand)
 | Xor64(dstXorq:operand, srcXorq:operand)
 | And32(dstAnd:operand, srcAnd:operand)
@@ -350,11 +347,6 @@ function clear_low_byte(n:uint32) : uint32
     (n / 256) * 256
 }
 
-function bswap32(x:uint32) : uint32 { 
-    var bytes := WordToBytes(x);
-    BytesToWord(bytes[3], bytes[2], bytes[1], bytes[0])
-}
-
 function xor32(x:uint32, y:uint32) : uint32  { BitwiseXor(x, y) }
 
 function xor64(x:uint64, y:uint64) : uint64  { BitwiseXor64(x, y) }
@@ -398,7 +390,6 @@ predicate ValidInstruction(s:state, ins:ins)
         case IMul64(dst, src) => Valid64BitDestinationOperand(s, dst) && Valid64BitSourceOperand(s, src) && Valid64BitSourceOperand(s, dst)
         case AddCarry(dstAddCarry, srcAddCarry) => Valid32BitDestinationOperand(s, dstAddCarry) && Valid32BitSourceOperand(s, srcAddCarry) && Valid32BitSourceOperand(s, dstAddCarry)
         case AddCarry64(dstAddCarry, srcAddCarry) => Valid64BitDestinationOperand(s, dstAddCarry) && Valid64BitSourceOperand(s, srcAddCarry) && Valid64BitSourceOperand(s, dstAddCarry)
-        case BSwap32(dstBSwap) => Valid32BitDestinationOperand(s, dstBSwap) && dstBSwap.OReg?
         case Xor32(dstXor, srcXor) => Valid32BitDestinationOperand(s, dstXor) && Valid32BitSourceOperand(s, srcXor) && Valid32BitSourceOperand(s, dstXor)
         case Xor64(dstXor, srcXor) => Valid64BitDestinationOperand(s, dstXor) && Valid64BitSourceOperand(s, srcXor) && Valid64BitSourceOperand(s, dstXor)
         case And32(dstAnd, srcAnd) => Valid32BitDestinationOperand(s, dstAnd) && Valid32BitSourceOperand(s, srcAnd) && Valid32BitSourceOperand(s, dstAnd)
@@ -456,7 +447,6 @@ predicate evalIns(ins:ins, s:state, r:state)
                                        var sum := eval_op64(s, dst) + eval_op64(s, src) + old_carry;
                                        evalUpdateAndHavocFlags64(s, dst, sum % 0x1_0000_0000_0000_0000, r)
                                     && Cf(r.flags) == (sum >= 0x1_0000_0000_0000_0000)
-            case BSwap32(dst)    => evalUpdateAndMaintainFlags(s, dst, bswap32(eval_op32(s, dst)), r)
             case Xor32(dst, src) => evalUpdateAndHavocFlags(s, dst, xor32(eval_op32(s, dst), eval_op32(s, src)), r)
             case Xor64(dst, src) => evalUpdateAndHavocFlags64(s, dst, xor64(eval_op64(s, dst), eval_op64(s, src)), r)
             case And32(dst, src) => evalUpdateAndHavocFlags(s, dst, and32(eval_op32(s, dst), eval_op32(s, src)), r)

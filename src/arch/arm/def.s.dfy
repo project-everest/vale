@@ -1,9 +1,7 @@
-include "../../lib/util/words_and_bytes.s.dfy"
 include "../../lib/util/operations.s.dfy"
 
 module ARM_def_s {
 
-import opened words_and_bytes_s 
 import opened operations_s
 
 //-----------------------------------------------------------------------------
@@ -12,6 +10,11 @@ import opened operations_s
 predicate WordAligned(i:int) { i % 4 == 0 }
 function  WordsToBytes(w:int) : int { 4 * w }
 function  BytesToWords(b:int) : int requires WordAligned(b) { b / 4 }
+
+predicate isUInt32(n:int)
+{
+    0 <= n < 0x1_0000_0000
+}
 
 type addr = x | isUInt32(x) && WordAligned(x)
 type shift_amount = s | 0 <= s < 32 // Some shifts allow s=32, but we'll be conservative for simplicity
@@ -49,7 +52,6 @@ datatype ins =
     | SUB(dstSUB:operand, src1SUB:operand, src2SUB:operand)
     | AND(dstAND:operand, src1AND:operand, src2AND:operand)
     | EOR(dstEOR:operand, src1EOR:operand, src2EOR:operand) // Also known as XOR
-    | REV(dstREV:operand, srcREV:operand)
     | MOV(dstMOV:operand, srcMOV:operand)
     | LDR(rdLDR:operand,  baseLDR:operand, ofsLDR:operand)
     | LDR_global(rdLDR_global:operand, globalLDR:operand,
@@ -175,15 +177,6 @@ function SizeOfGlobal(g:operand): uint32
 // global declarations are the responsibility of the program, as long as they're valid
 function {:axiom} TheGlobalDecls(): globaldecls
     ensures ValidGlobalDecls(TheGlobalDecls());
-
-//-----------------------------------------------------------------------------
-// Functions for uint8wise operations
-//-----------------------------------------------------------------------------
-
-function bswap32(x:uint32) : uint32 { 
-    var uint8s := WordToBytes(x);
-    BytesToWord(uint8s[3], uint8s[2], uint8s[1], uint8s[0])
-}
 
 //-----------------------------------------------------------------------------
 // Evaluation
@@ -337,8 +330,6 @@ predicate ValidInstruction(s:state, ins:ins)
             ValidOperand(src2) && ValidRegOperand(dest)
         case EOR(dest, src1, src2) => ValidOperand(src1) &&
             ValidSecondOperand(src2) && ValidRegOperand(dest)
-        case REV(dest, src) => ValidRegOperand(src) &&
-            ValidRegOperand(dest)
         case LDR(rd, base, ofs) => 
             ValidRegOperand(rd) &&
             ValidOperand(base) && ValidOperand(ofs) &&
@@ -382,7 +373,6 @@ predicate evalIns(ins:ins, s:state, r:state)
         case EOR(dst, src1, src2) => evalUpdate(s, dst,
             BitwiseXor(OperandContents(s, src1), OperandContents(s, src2)),
             r)
-        case REV(dst, src) => evalUpdate(s, dst, bswap32(OperandContents(s, src)), r)
         case LDR(rd, base, ofs) => 
             evalLoad(s, rd, OperandContents(s, base), OperandContents(s, ofs), r)
         case LDR_global(rd, global, base, ofs) => 

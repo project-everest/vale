@@ -1,6 +1,5 @@
 include{:verbatim} "vale.i.dfy"
 include{:verbatim}{:from BASE} "lib/util/dafny_wrappers.i.dfy"
-include{:verbatim}{:from BASE} "lib/util/words_and_bytes.i.dfy"
 include{:verbatim}{:from BASE} "lib/util/operations.i.dfy"
 
 #verbatim
@@ -8,7 +7,6 @@ module x64_decls_i {
 
 import opened x64_vale_i
 import opened dafny_wrappers_i
-import opened words_and_bytes_i
 import opened operations_i
 #endverbatim
 
@@ -292,18 +290,6 @@ procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, src))} Mov64(out dst:op
     {
         this := this.(regs := this.regs[@dst.r := 0]);
     }
-}
-
-procedure {:refined} {:instruction Ins(BSwap32(dst))} BSwap32(inout dst:opr32)
-  requires{:refined false} op32(this, @dst);
-  ensures {:refined false} op32(this, @dst);
-  ensures
-    dst == bswap32(old(dst));
-{
-    reveal evalCodeOpaque;
-    reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
