@@ -12,6 +12,8 @@ let tState = TName (Reserved "state")
 let tCode = TName (Reserved "code")
 let tCodes = TName (Reserved "codes")
 let tFuel = TName (Reserved "fuel")
+let ktype0 = KType bigint.Zero
+let ktype1 = KType bigint.One
 
 let tapply (x:id) (ts:typ list):typ = TApply (x, ts)
 let eapply (x:id) (es:exp list):exp = EApply (x, None, es)
@@ -50,6 +52,8 @@ let err (s:string):'a = raise (Err s)
 let internalErr (s:string):'a = raise (InternalErr s)
 let notImplemented (s:string):'a = raise (InternalErr ("not implemented: " + s))
 let unsupported (s:string):'a = raise (UnsupportedErr s)
+let locErr (loc:loc) (err:exn):'a = raise (LocErr (loc, err))
+let locErrOpt (loc:loc option) (err:exn):'a = match loc with None -> raise err | Some loc -> locErr loc err
 
 let string_of_loc (loc:loc):string =
   "line " + (string loc.loc_line) + " column " + (string loc.loc_col) + " of file " + loc.loc_file
@@ -125,7 +129,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
   map_apply_modify (f e) (fun () ->
     let r = map_exp f in
     match e with
-    | ELoc (loc, e) -> try ELoc (loc, r e) with err -> raise (LocErr (loc, err))
+    | ELoc (loc, e) -> try ELoc (loc, r e) with err -> locErr loc err
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
     | EBind (b, es, fs, ts, e) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e)
     | EOp (op, es) -> EOp (op, List.map r es)
@@ -137,7 +141,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
   let r = gather_exp f in
   let children:'a list =
     match e with
-    | ELoc (loc, e) -> try [r e] with err -> raise (LocErr (loc, err))
+    | ELoc (loc, e) -> try [r e] with err -> locErr loc err
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> []
     | EBind (b, es, fs, ts, e) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
     | EOp (op, es) -> List.map r es
@@ -175,7 +179,7 @@ let rec skip_locs (e:exp):exp = map_exp (fun e -> match e with ELoc (_, e) -> Re
 
 let rec skip_loc_apply (e:exp) (f:exp->'a):'a =
   match e with
-  | ELoc (loc, e) -> try skip_loc_apply e f with err -> raise (LocErr (loc, err))
+  | ELoc (loc, e) -> try skip_loc_apply e f with err -> locErr loc err
   | _ -> f e
 
 let rec loc_apply (loc:loc) (e:exp) (f:exp -> 'a):'a =
@@ -183,7 +187,7 @@ let rec loc_apply (loc:loc) (e:exp) (f:exp -> 'a):'a =
     match e with
     | ELoc (loc, e) -> loc_apply loc e f
     | _ -> f e
-  with err -> raise (LocErr (loc, err))
+  with err -> locErr loc err
 
 let locs_of_exp (e:exp):loc list =
   let f e locs =
@@ -200,7 +204,7 @@ let skip_locs_attrs (a:attrs):attrs = List.map (fun (x, es) -> (x, List.map skip
 let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt list =
   map_apply_modify (fs s) (fun () ->
     match s with
-    | SLoc (loc, s) -> try List.map (fun s -> SLoc (loc, s)) (map_stmt fe fs s) with err -> raise (LocErr (loc, err))
+    | SLoc (loc, s) -> try List.map (fun s -> SLoc (loc, s)) (map_stmt fe fs s) with err -> locErr loc err
     | SLabel x -> [s]
     | SGoto x -> [s]
     | SReturn -> [s]
@@ -236,7 +240,7 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
   let rs = gather_stmts fs fe in
   let children:'a list =
     match s with
-    | SLoc (loc, s) -> try [r s] with err -> raise (LocErr (loc, err))
+    | SLoc (loc, s) -> try [r s] with err -> locErr loc err
     | SLabel _ | SGoto _ | SReturn -> []
     | SAssume e | SAssert (_, e) | SAssign (_, e) -> [re e]
     | SCalc (oop, contents) -> List.collect (gather_calc_contents fs fe) contents

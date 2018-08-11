@@ -399,8 +399,8 @@ TFormalsBracket
   : { [] }
   | HASHLBRACKET TFormals RBRACKET { $2 }
 TFormalsParen
-  : { [] }
-  | LPAREN TFormals RPAREN { $2 }
+  : { None }
+  | LPAREN TFormals RPAREN { Some $2 }
 
 InOut
   : { In }
