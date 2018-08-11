@@ -1,9 +1,7 @@
 include "def.s.dfy"
-include "leakage.i.dfy"
 
 module ARM_print_s {
 import opened ARM_def_s
-import opened ARM_leakage_i
 
 function method user_continue_label(): string
 {
@@ -310,34 +308,4 @@ method printFooter()
 {
 }
 
-// runs constant time analysis
-method checkConstantTime(proc_name:seq<char>, code:code, ts:taintState) returns (b:bool)
-    decreases * 
-{
-    var constTime, ts' := checkIfCodeConsumesFixedTime(code, ts);
-    b := constTime;
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (constTime == false) {
-        print(proc_name + ": Constant time check failed\n");
-    } else {
-        //printProc(proc_name, code, n, ret_count);
-        //var n' := printCode(code, n);
-    }
-}
-
-// runs both leakage analysis and constant time analysis
-method checkLeakage(proc_name:seq<char>, code:code, ts:taintState, tsExpected:taintState) returns (b:bool)
-    decreases * 
-{
-    b := checkIfCodeisLeakageFree(code, ts, tsExpected);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (b == false) {
-        print(proc_name + ": Leakage analysis failed\n");
-    } else {
-        // printProc(proc_name, code, n, ret_count);
-        //var n' := printCode(code, n);
-    }
-}
 }

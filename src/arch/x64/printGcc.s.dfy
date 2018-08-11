@@ -1,12 +1,10 @@
 // Trusted printer for producing MASM code
 
 include "def.s.dfy"
-//"const-time.i.dfy"
 
 module x64_printGcc_s {
 
 import opened x64_def_s
-//import opened x86_const_time_i
 
 method printReg(r:x86reg)
 {
@@ -337,35 +335,5 @@ method printFooter()
 {
     print("\n");
 }
-
-/*
-// runs constant time analysis
-method checkConstantTimeAndPrintProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, ts:taintState)
-    decreases * 
-{
-    var constTime, ts' := checkIfCodeConsumesFixedTime(code, ts);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (constTime == false) {
-        print(proc_name + ": Constant time check failed\n");
-    } else {
-        printProc(proc_name, code, n, ret_count);
-    }
-}
-
-// runs both leakage analysis and constant time analysis
-method checkConstantTimeAndLeakageBeforePrintProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, ts:taintState, tsExpected:taintState)
-    decreases * 
-{
-    var b := checkIfCodeisLeakageFree(code, ts, tsExpected);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (b == false) {
-        print(proc_name + ": Constant time check or leakage analysis failed\n");
-    } else {
-        printProc(proc_name, code, n, ret_count);
-    }
-}
-*/
 
 }
