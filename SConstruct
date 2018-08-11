@@ -35,20 +35,22 @@ envDict = {'TARGET_ARCH':target_arch,
 
 env = Environment(**envDict)
 if sys.platform == 'win32':
-  import win32job
-  import win32api
   env.Replace(CCPDBFLAGS='/Zi /Fd${TARGET.base}.pdb')
   # Use kremlib.h without primitive support for uint128_t.
   env.Append(CCFLAGS=['/Ox', '/Gz', '/DKRML_NOUINT128'])
   env.Append(LINKFLAGS=['/DEBUG'])
   env['NUGET'] = 'nuget.exe'
-  hdl = win32job.CreateJobObject(None, "")
-  win32job.AssignProcessToJobObject(hdl, win32api.GetCurrentProcess())
-  extended_info = win32job.QueryInformationJobObject(None, win32job.JobObjectExtendedLimitInformation)
-  extended_info['BasicLimitInformation']['LimitFlags'] = win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-  win32job.SetInformationJobObject(hdl, win32job.JobObjectExtendedLimitInformation, extended_info)
   if os.getenv('PLATFORM')=='X64':
     env['AS'] = 'ml64'
+  if 'SHELL' in os.environ and importlib.util.find_spec('win32job') != None and importlib.util.find_spec('win32api'):
+    # Special job handling for cygwin so that child processes exit when the parent process exits
+    import win32job
+    import win32api
+    hdl = win32job.CreateJobObject(None, "")
+    win32job.AssignProcessToJobObject(hdl, win32api.GetCurrentProcess())
+    extended_info = win32job.QueryInformationJobObject(None, win32job.JobObjectExtendedLimitInformation)
+    extended_info['BasicLimitInformation']['LimitFlags'] = win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    win32job.SetInformationJobObject(hdl, win32job.JobObjectExtendedLimitInformation, extended_info)
 else:
   env.Append(CCFLAGS=['-O3', '-flto', '-g', '-DKRML_NOUINT128', '-std=c++11'])
   env['MONO'] = 'mono'

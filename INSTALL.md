@@ -1,8 +1,8 @@
 Vale relies on the following tools, which must be installed before building Vale:
 
-* Python (version 2.x), used by SCons
+* Python (version >= 3.6), used by SCons
   * See https://www.python.org/
-* SCons, the Python-based build system used by Vale
+* SCons (version >= 3.00), the Python-based build system used by Vale
   * See http://scons.org/
 * F\# (version >= 4.0), including [FsLexYacc](http://fsprojects.github.io/FsLexYacc/).  Vale is written in F\#.
   * See http://fsharp.org/ for complete information, including free versions for Windows, Mac, and Linux.
