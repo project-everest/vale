@@ -165,10 +165,10 @@ method printIns(ins:ins)
         case AND(dest, src1, src2) => printIns3Op("AND", dest, src1, src2);
         case EOR(dest, src1, src2) => printIns3Op("EOR", dest, src1, src2);
         case REV(dest, src) => printIns2Op("REV", dest, src);
-        case LDR(rd, base, ofs, taint) => printInsLdStr("LDR", rd, base, ofs);
+        case LDR(rd, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_global(rd, global, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_reloc(rd, sym) => printIns2Op("LDR", rd, sym);
-        case STR(rd, base, ofs, taint) => printInsLdStr("STR", rd, base, ofs);
+        case STR(rd, base, ofs) => printInsLdStr("STR", rd, base, ofs);
         case STR_global(rd, global, base, ofs) => printInsLdStr("STR", rd, base, ofs);
         case MOV(dst, src) => printIns2Op("MOV", dst, src);
     }

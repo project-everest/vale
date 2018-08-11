@@ -228,11 +228,10 @@ predicate ValidAddr(m:memmap, addr:int)
  && addr in m
 }
 
-predicate ValidSrcAddr(m:memmap, addr:int, t:taint)
+predicate ValidSrcAddr(m:memmap, addr:int)
 {
     ValidMem(addr)
  && addr in m
- && m[addr].t == t
 }
 
 predicate ValidAddrs(mem:memmap, base:int, num_uint32s:int)
@@ -243,13 +242,13 @@ predicate ValidAddrs(mem:memmap, base:int, num_uint32s:int)
         base <= addr < base + num_uint32s*4 && (addr - base) % 4 == 0 ==> ValidAddr(mem, addr)
 }
 
-predicate ValidSrcAddrs(mem:memmap, base:int, num_uint32s:int, taint:taint)
+predicate ValidSrcAddrs(mem:memmap, base:int, num_uint32s:int)
 {
-    forall addr {:trigger ValidAddr(mem, addr)} {:trigger ValidSrcAddr(mem, addr, taint)} 
+    forall addr {:trigger ValidAddr(mem, addr)} {:trigger ValidSrcAddr(mem, addr)} 
                 {:trigger addr in mem } :: 
-        base <= addr < base + num_uint32s*4 && (addr - base) % 4 == 0 ==> ValidSrcAddr(mem, addr, taint)
-    //forall j {:trigger ValidAddr(mem, base+j*4)} {:trigger ValidSrcAddr(mem, base+j*4, taint)} {:trigger  base+j*4 in mem } :: 
-//        0 <= j < num_uint32s ==> ValidSrcAddr(mem, base + j*4, taint)
+        base <= addr < base + num_uint32s*4 && (addr - base) % 4 == 0 ==> ValidSrcAddr(mem, addr)
+    //forall j {:trigger ValidAddr(mem, base+j*4)} {:trigger ValidSrcAddr(mem, base+j*4)} {:trigger  base+j*4 in mem } :: 
+//        0 <= j < num_uint32s ==> ValidSrcAddr(mem, base + j*4)
 }
 
 //-----------------------------------------------------------------------------

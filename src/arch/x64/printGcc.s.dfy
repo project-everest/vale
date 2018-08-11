@@ -100,7 +100,7 @@ method printOprnd(o:operand)
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
         case OStack(i) => print(8+4*i); print("(%rsp)"); 
-        case OHeap(addr, taint) => printMAddr(addr);
+        case OHeap(addr) => printMAddr(addr);
 }
 method printOprnd64(o:operand)
 {
@@ -110,7 +110,7 @@ method printOprnd64(o:operand)
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
         case OStack(i) => print(8+4*i); print("(%rsp)"); 
-        case OHeap(addr, taint) => printMAddr(addr);
+        case OHeap(addr) => printMAddr(addr);
 }
 
 method printSmallOprnd(o:operand)
@@ -266,7 +266,6 @@ method printIns(ins:ins)
         case Shr32(dst, src)    => printName1("  shr", dst); printShiftOprnd(src, 32); print ", "; printOprnd(dst); print("\n");
 
         case Pxor(dst, src)                => print ("  pxor ");    printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case MOVDQU(dst, src)              => print ("  movdqu ");  printOprnd(src); print(", "); printOprnd(dst); print("\n");
 }
 
 method printBlock(b:codes, n:int) returns(n':int)

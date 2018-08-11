@@ -13,7 +13,7 @@ import opened x64_decls_i
 import opened operations_i
 #endverbatim
 
-procedure{:operand} Mem_in(base:opr, inline offset:int, inline taint:taint, ghost id:heaplet_id) returns(o:mem)
+procedure{:operand} Mem_in(base:opr, inline offset:int) returns(o:mem)
     reads
         mem;
     extern;
@@ -28,7 +28,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64Wrap(inout 
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     reveal BitwiseAdd64;
-    this := this.(heaplets := old(this).heaplets);
+
     this := MaybeUpdateOk(old(this), this);
     ghost if (!this.ok)
     {
@@ -36,26 +36,24 @@ procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64Wrap(inout 
     }
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset, taint)))} Load64(
+procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset)))} Load64(
     out dst:opr64,
         src:opr64,
-        inline offset:int,
-        inline taint:taint,
-        ghost id:heaplet_id)
+        inline offset:int)
     reads
         mem;
     requires{:refined false}
         @dst is OReg;
         @src is OReg;
     requires
-        ValidSrcAddr(mem, id, src + offset, 64, taint);
+        ValidSrcAddr(mem, src + offset, 64);
     ensures
-        ValidSrcAddr(mem, id, old(src) + offset, 64, taint);
-        dst == mem[id].mem64[old(src) + offset].v;
+        ValidSrcAddr(mem, old(src) + offset, 64);
+        dst == mem[old(src) + offset].v64;
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := this.(heaplets := old(this).heaplets);
+
     this := MaybeUpdateOk(old(this), this);
     ghost if (!this.ok)
     {
@@ -63,37 +61,23 @@ procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset,
     }
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Mov64(MakeHeapOp(dst, offset, taint), src))} Store64(
+procedure{:refined}{:bridge}{:instruction Ins(Mov64(MakeHeapOp(dst, offset), src))} Store64(
     dst:opr64,
     src:opr64,
-    inline offset:int,
-    inline taint:taint,
-    ghost id:heaplet_id)
+    inline offset:int)
     modifies
         mem;
     requires{:refined false}
         @dst is OReg;
         @src is OReg;
     requires/ensures
-        ValidDstAddr(mem, id, dst + offset, 64);
+        ValidDstAddr(mem, dst + offset, 64);
     ensures
-        mem == old(mem)[id := old(mem)[id].(mem64 := old(mem)[id].mem64[dst + offset := Heaplet64Entry(src, taint)])];
+        mem == old(mem)[dst + offset := Mem64(src)];
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     ghost var v := old(src);
-
-    ghost if (old(this).ok) { 
-        ghost if (exists id :: ValidDstAddr(old(this).heaplets, id, old(dst) + offset, 64)) {
-            exists id :: ValidDstAddr(old(this).heaplets, id, old(dst) + offset, 64);
-            this := this.(heaplets := UpdateHeaplets64(old(this), dst + offset, id, taint, v));
-            lemma_HeapletsUpdatedCorrectly64(old(this), this, dst + offset, id, taint, v);
-        } else {
-            this := old(this).(ok := false);
-        }
-    } else {
-      this := old(this);
-    }
     this := MaybeUpdateOk(old(this), this);
 }
 
@@ -106,7 +90,6 @@ procedure{:refined}{:bridge}{:instruction Ins(AddLea64(dst, src1, src2))} AddLea
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:opr64, src:opr64)
@@ -120,7 +103,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:opr64, src:opr64)
@@ -133,7 +116,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout 
     reveal x86_ValidState;
     reveal BitwiseSub64;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:opr64, src:mem64)
@@ -147,7 +130,7 @@ procedure{:refined}{:bridge}{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(i
     reveal x86_ValidState;
     reveal BitwiseAdd64;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
     lemma_BitwiseAdd64EquivalentToAddMod2To64(old(dst), old(src));
 }
 
@@ -162,7 +145,7 @@ procedure{:refined}{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:opr
     reveal BitwiseMul64;
     reveal BitwiseMul64hi;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 procedure{:refined}{:instruction Ins(Mul64(src))} Mul64Wrap(src:opr64)
@@ -179,7 +162,7 @@ procedure{:refined}{:instruction Ins(Mul64(src))} Mul64Wrap(src:opr64)
     reveal BitwiseMul64;
     reveal BitwiseMul64hi;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout dst:opr64, src:opr64)
@@ -191,7 +174,7 @@ procedure{:refined}{:bridge}{:instruction Ins(And64(dst, src))} And64(inout dst:
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:opr64, src:opr64)
@@ -207,7 +190,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 procedure{:refined}{:bridge}{:instruction Ins(Shr64(dst, src))} Shr64(inout dst:opr64, src:opr64)
@@ -223,7 +206,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Shr64(dst, src))} Shr64(inout dst:
     reveal evalCodeOpaque;
     reveal x86_ValidState;
     this := MaybeUpdateOk(old(this), this);
-    this := this.(heaplets := old(this).heaplets);
+
 }
 
 #verbatim

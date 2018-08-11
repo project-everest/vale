@@ -99,7 +99,7 @@ method printGenericOprnd(o:operand, ptr_type:string)
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
         case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(8+4*i); print("]");
-        case OHeap(addr, taint) => printMAddr(addr, ptr_type);
+        case OHeap(addr) => printMAddr(addr, ptr_type);
 }
 method printGenericOprnd64(o:operand, ptr_type:string)
 {
@@ -109,7 +109,7 @@ method printGenericOprnd64(o:operand, ptr_type:string)
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
         case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(8+4*i); print("]");
-        case OHeap(addr, taint) => printMAddr(addr, ptr_type);
+        case OHeap(addr) => printMAddr(addr, ptr_type);
 }
 method printOprnd(o:operand)
 {
@@ -225,7 +225,6 @@ method printIns(ins:ins)
         case Shr32(dst, src) => print ("  shr "); printOprnd(dst); print ", "; printShiftOprnd(src, 32); print("\n");
 
         case Pxor(dst, src) => print ("  pxor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case MOVDQU(dst, src) => print ("  movdqu "); printXmmOprnd(dst); print(", "); printXmmOprnd(src); print("\n");
 }
 
 method printBlock(b:codes, n:int) returns(n':int)

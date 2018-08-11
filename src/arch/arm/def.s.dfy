@@ -20,7 +20,6 @@ type shift_amount = s | 0 <= s < 32 // Some shifts allow s=32, but we'll be cons
 // Microarchitectural State
 //-----------------------------------------------------------------------------
 datatype ARMReg = R0|R1|R2|R3|R4|R5|R6|R7|R8|R9|R10|R11|R12|SP|LR
-datatype taint = Public | Secret
 
 datatype Shift = LSLShift(amount_lsl:shift_amount)
                | LSRShift(amount_lsr:shift_amount)
@@ -33,19 +32,14 @@ datatype operand = OConst(n:uint32)
     | OSP
     | OLR
 
-datatype mementry = mementry(v:uint32, t:taint)
+datatype mementry = mementry(v:uint32)
 type memmap = map<addr, mementry>
 datatype memstate = MemState(addresses:memmap,
                              globals:map<operand, seq<uint32>>)
 
-datatype observation =
-    BranchPredicate(pred:bool)
-  | MemAccessOffset(base:int, offset:int)
-
 datatype state = State(regs:map<ARMReg, uint32>,
                        m:memstate,
-                       ok:bool,
-                       trace:seq<observation>)
+                       ok:bool)
 
 //-----------------------------------------------------------------------------
 // Instructions
@@ -57,11 +51,11 @@ datatype ins =
     | EOR(dstEOR:operand, src1EOR:operand, src2EOR:operand) // Also known as XOR
     | REV(dstREV:operand, srcREV:operand)
     | MOV(dstMOV:operand, srcMOV:operand)
-    | LDR(rdLDR:operand,  baseLDR:operand, ofsLDR:operand, taintLDR:taint)
+    | LDR(rdLDR:operand,  baseLDR:operand, ofsLDR:operand)
     | LDR_global(rdLDR_global:operand, globalLDR:operand,
                  baseLDR_global:operand, ofsLDR_global:operand)
     | LDR_reloc(rdLDR_reloc:operand, symLDR_reloc:operand)
-    | STR(rdSTR:operand,  baseSTR:operand, ofsSTR:operand, taintSTR:taint)
+    | STR(rdSTR:operand,  baseSTR:operand, ofsSTR:operand)
     | STR_global(rdSTR_global:operand, globalSTR:operand,
                  baseSTR_global:operand, ofsSTR_global:operand)
 
@@ -140,11 +134,6 @@ predicate ValidShiftOperand(s:state, o:operand)
 
 predicate ValidRegOperand(o:operand)
     { !o.OConst? && !o.OShift? && ValidOperand(o) }
-
-predicate ValidAddressTaint(s:state, addr:int, t:taint)
-{
-    addr in s.m.addresses && s.m.addresses[addr].t == t
-}
 
 //-----------------------------------------------------------------------------
 // Globals
@@ -267,12 +256,11 @@ predicate evalLoad(s:state, o:operand, base:int, ofs:int, r:state)
     ensures  evalLoad(s, o, base, ofs, r) ==> ValidState(r)
 {
     var v := MemContents(s.m, base + ofs);
-    var obs := MemAccessOffset(base, ofs);
     reveal_ValidRegState();
     match o
-        case OReg(reg) => r == s.(regs := s.regs[o.r := v], trace := s.trace + [obs])
-        case OLR => r == s.(regs := s.regs[LR := v], trace := s.trace + [obs])
-        case OSP => r == s.(regs := s.regs[SP := v], trace := s.trace + [obs])
+        case OReg(reg) => r == s.(regs := s.regs[o.r := v])
+        case OLR => r == s.(regs := s.regs[LR := v])
+        case OSP => r == s.(regs := s.regs[SP := v])
 }
 
 predicate evalLoadGlobal(s:state, o:operand, g:operand, base:int, ofs:int, r:state)
@@ -283,21 +271,20 @@ predicate evalLoadGlobal(s:state, o:operand, g:operand, base:int, ofs:int, r:sta
     ensures  evalLoadGlobal(s, o, g, base, ofs, r) ==> ValidState(r)
 {
     var v := GlobalWord(s.m, g, base + ofs - AddressOfGlobal(g));
-    var obs := MemAccessOffset(base, ofs);
     reveal_ValidRegState();
     match o
-        case OReg(reg) => r == s.(regs := s.regs[o.r := v], trace := s.trace + [obs])
-        case OLR => r == s.(regs := s.regs[LR := v], trace := s.trace + [obs])
-        case OSP => r == s.(regs := s.regs[SP := v], trace := s.trace + [obs])
+        case OReg(reg) => r == s.(regs := s.regs[o.r := v])
+        case OLR => r == s.(regs := s.regs[LR := v])
+        case OSP => r == s.(regs := s.regs[SP := v])
 }
 
-predicate evalStore(s:state, base:int, ofs:int, v:uint32, r:state, t:taint)
+predicate evalStore(s:state, base:int, ofs:int, v:uint32, r:state)
     requires ValidState(s)
     requires ValidMem(base + ofs)
-    ensures  evalStore(s, base, ofs, v, r, t) ==> ValidState(r)
+    ensures  evalStore(s, base, ofs, v, r) ==> ValidState(r)
 {
     reveal_ValidMemState();
-    r == s.(m := s.m.(addresses := s.m.addresses[base + ofs := mementry(v, t)]), trace := s.trace + [MemAccessOffset(base, ofs)])
+    r == s.(m := s.m.(addresses := s.m.addresses[base + ofs := mementry(v)]))
 }
 
 predicate evalStoreGlobal(s:state, g:operand, base:int, ofs:int, v:uint32, r:state)
@@ -311,7 +298,7 @@ predicate evalStoreGlobal(s:state, g:operand, base:int, ofs:int, v:uint32, r:sta
     var addr := base + ofs - AddressOfGlobal(g);
     var newval := oldval[BytesToWords(addr) := v];
     assert |newval| == |oldval|;
-    r == s.(m := s.m.(globals := s.m.globals[g := newval]), trace := s.trace + [MemAccessOffset(base, ofs)])
+    r == s.(m := s.m.(globals := s.m.globals[g := newval]))
 }
 
 function evalCmp(c:ocmp, i1:uint32, i2:uint32):bool
@@ -335,7 +322,7 @@ function evalOBool(s:state, o:obool):bool
 
 predicate branchRelation(s:state, s':state, cond:bool)
 {
-    s' == s.(trace := s.trace + [BranchPredicate(cond)])
+    s' == s
 }
 
 predicate ValidInstruction(s:state, ins:ins)
@@ -352,13 +339,12 @@ predicate ValidInstruction(s:state, ins:ins)
             ValidSecondOperand(src2) && ValidRegOperand(dest)
         case REV(dest, src) => ValidRegOperand(src) &&
             ValidRegOperand(dest)
-        case LDR(rd, base, ofs, taint) => 
+        case LDR(rd, base, ofs) => 
             ValidRegOperand(rd) &&
             ValidOperand(base) && ValidOperand(ofs) &&
             var addr := OperandContents(s, base) + OperandContents(s, ofs);
             WordAligned(addr) &&
-            ValidMem(addr) &&
-            ValidAddressTaint(s, addr, taint)
+            ValidMem(addr)
         case LDR_global(rd, global, base, ofs) => 
             ValidRegOperand(rd) &&
             ValidOperand(base) && ValidOperand(ofs) &&
@@ -366,7 +352,7 @@ predicate ValidInstruction(s:state, ins:ins)
             ValidGlobalAddr(global, OperandContents(s, base) + OperandContents(s, ofs))
         case LDR_reloc(rd, global) => 
             ValidRegOperand(rd) && ValidGlobal(global)
-        case STR(rd, base, ofs, taint) =>
+        case STR(rd, base, ofs) =>
             ValidRegOperand(rd) &&
             ValidOperand(ofs) && ValidOperand(base) &&
             WordAligned(OperandContents(s, base) + OperandContents(s, ofs)) &&
@@ -397,14 +383,14 @@ predicate evalIns(ins:ins, s:state, r:state)
             BitwiseXor(OperandContents(s, src1), OperandContents(s, src2)),
             r)
         case REV(dst, src) => evalUpdate(s, dst, bswap32(OperandContents(s, src)), r)
-        case LDR(rd, base, ofs, taint) => 
+        case LDR(rd, base, ofs) => 
             evalLoad(s, rd, OperandContents(s, base), OperandContents(s, ofs), r)
         case LDR_global(rd, global, base, ofs) => 
             evalLoadGlobal(s, rd, global, OperandContents(s, base), OperandContents(s, ofs), r)
         case LDR_reloc(rd, name) =>
             evalUpdate(s, rd, AddressOfGlobal(name), r)
-        case STR(rd, base, ofs, taint) => 
-            evalStore(s, OperandContents(s, base), OperandContents(s, ofs), OperandContents(s, rd), r, taint)
+        case STR(rd, base, ofs) => 
+            evalStore(s, OperandContents(s, base), OperandContents(s, ofs), OperandContents(s, rd), r)
         case STR_global(rd, global, base, ofs) => 
             evalStoreGlobal(s, global, OperandContents(s, base), OperandContents(s, ofs), OperandContents(s, rd), r)
         case MOV(dst, src) => evalUpdate(s, dst,

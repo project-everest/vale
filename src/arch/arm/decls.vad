@@ -26,10 +26,10 @@ var{:state reg(R11)} r11:uint32;
 var{:state reg(R12)} r12:uint32;
 
 
-procedure {:refined} {:instruction Ins(LDR(rd, base, ofs, t))}
-rLDR(out rd:opr32, base:opr32, ofs:opr32, inline t:taint)
+procedure {:refined} {:instruction Ins(LDR(rd, base, ofs))}
+rLDR(out rd:opr32, base:opr32, ofs:opr32)
     requires
-        ValidSrcAddr(mem, base + ofs, t);
+        ValidSrcAddr(mem, base + ofs);
     reads mem;
     ensures
         rd == mem[old(base) + old(ofs)].v;
@@ -94,17 +94,17 @@ rLDRglobal(out rd:opr32, inline g:global,
     } 
 }
 
-procedure {:refined} {:instruction Ins(STR(rd, base, ofs, t))}
-rSTR(rd:opr_reg, base:opr32, ofs:opr32, inline t:taint)
+procedure {:refined} {:instruction Ins(STR(rd, base, ofs))}
+rSTR(rd:opr_reg, base:opr32, ofs:opr32)
     requires
         ValidAddr(mem, base + ofs);
     ensures
-        ValidSrcAddr(mem, base + ofs, t);
+        ValidSrcAddr(mem, base + ofs);
         forall addr {ValidAddr(mem, addr)} :: ValidAddr(old(mem), addr) ==> ValidAddr(mem, addr);
     modifies
         mem;
     ensures
-        mem == old(mem)[old(base+ofs) := mementry(rd, t)];
+        mem == old(mem)[old(base+ofs) := mementry(rd)];
 {
     reveal eval_code;
     reveal ValidRegState;
