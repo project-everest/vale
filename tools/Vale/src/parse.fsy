@@ -306,10 +306,6 @@ Stmt
         in
       stmtAt $1 (SAssert (attrs, $5))
     }
-  | ASSERT LBRACECOLON AnyId RBRACE LBRACECOLON AnyId RBRACE LITBOOL SEMI
-    {
-      stmtAt $1 (if $3 = Id "split_here" && $6 = Id "refined" && snd $8 then SAssert ({assert_attrs_default with is_split = true; is_refined = true}, EBool true) else parse_err "Must use: assert {:split_here}{:refined} true;" )
-    }
   | CALC CalcOpOpt LBRACE CalcContents RBRACE { stmtAt $1 (SCalc ($2, $4)) }
   | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp(Uop UReveal, [EVar $2]))) }
   | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
@@ -385,16 +381,6 @@ SpecRaw
   | REQUIRES SemiExps { ($1, RawSpec (RRequires Refined, $2)) }
   | ENSURES SemiExps { ($1, RawSpec (REnsures Refined, $2)) }
   | REQUIRES SLASH ENSURES SemiExps { ($1, RawSpec (RRequiresEnsures, $4)) }
-  | REQUIRES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
-    {
-      (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
-      ($1, RawSpec (RRequires Unrefined, $6))
-    }
-  | ENSURES LBRACECOLON AnyId LITBOOL RBRACE SemiExps
-    {
-      (match ($3, snd $4) with (Id "refined", false) -> () | _ -> parse_err "expected requires{:refined false}");
-      ($1, RawSpec (REnsures Unrefined, $6))
-    }
   | READS SemiExps { ($1, RawSpec (RModifies Read, $2)) }
   | MODIFIES SemiExps { ($1, RawSpec (RModifies Modify, $2)) }
   | PRESERVES SemiExps { ($1, RawSpec (RModifies Preserve, $2)) }

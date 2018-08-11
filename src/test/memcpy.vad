@@ -8,7 +8,7 @@ import opened x64decls_temp = x64_decls_i
 import opened x64decls64_temp = x64_decls64_i
 #endverbatim
 
-procedure{:refined}{:timeLimitMultiplier 2} Copy64()
+procedure{:timeLimitMultiplier 2} Copy64()
     requires/ensures
         rsi % 8 == 0;
         rdi % 8 == 0;

@@ -26,13 +26,14 @@ var{:state reg(R11)} r11:uint32;
 var{:state reg(R12)} r12:uint32;
 
 
-procedure {:refined} {:instruction Ins(LDR(rd, base, ofs))}
+procedure{:instruction Ins(LDR(rd, base, ofs))}
 rLDR(out rd:opr32, base:opr32, ofs:opr32)
     requires
         ValidSrcAddr(mem, base + ofs);
     reads mem;
     ensures
-        rd == mem[old(base) + old(ofs)].v;
+        ValidSrcAddr(mem, old(base + ofs));
+        rd == mem[old(base + ofs)].v;
 {
     reveal eval_code;
     reveal ValidRegState;
@@ -43,7 +44,7 @@ rLDR(out rd:opr32, base:opr32, ofs:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(LDR_reloc(rd, OSymbol(g)))}
+procedure{:instruction Ins(LDR_reloc(rd, OSymbol(g)))}
 rLDRglobaladdr(out rd:opr32, inline g:global)
     requires ValidGlobal(OSymbol(g));
     ensures
@@ -74,7 +75,7 @@ predicate ValidGlobalsAddr(globals:map<operand, seq<uint32>>, g:global, addr:int
 }
 #endverbatim
 
-procedure {:refined} {:instruction Ins(LDR_global(rd, OSymbol(g), base, ofs))}
+procedure{:instruction Ins(LDR_global(rd, OSymbol(g), base, ofs))}
 rLDRglobal(out rd:opr32, inline g:global,
           base:opr32, ofs:opr32)
     requires
@@ -82,7 +83,8 @@ rLDRglobal(out rd:opr32, inline g:global,
     reads
         globals;
     ensures
-        rd == globals[OSymbol(g)][BytesToWords(base + ofs - AddressOfGlobal(OSymbol(g)))];
+        ValidGlobalsAddr(globals, g, old(base + ofs));
+        rd == globals[OSymbol(g)][BytesToWords(old(base + ofs) - AddressOfGlobal(OSymbol(g)))];
         //GlobalWord(this.m, g, base + ofs - g);
 {
     reveal eval_code;
@@ -94,7 +96,7 @@ rLDRglobal(out rd:opr32, inline g:global,
     } 
 }
 
-procedure {:refined} {:instruction Ins(STR(rd, base, ofs))}
+procedure{:instruction Ins(STR(rd, base, ofs))}
 rSTR(rd:opr_reg, base:opr32, ofs:opr32)
     requires
         ValidAddr(mem, base + ofs);
@@ -115,7 +117,7 @@ rSTR(rd:opr_reg, base:opr32, ofs:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(MOV(dst, src))}
+procedure{:instruction Ins(MOV(dst, src))}
 rMOV(out dst:opr32, src:opr32)
     ensures
         dst == old(src);
@@ -129,7 +131,7 @@ rMOV(out dst:opr32, src:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
+procedure{:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
 rMOVShift(out dst:opr32, src:opr_snd, inline shift:Shift)
     ensures
         dst == old(EvalShift(old(src), shift));
@@ -143,7 +145,7 @@ rMOVShift(out dst:opr32, src:opr_snd, inline shift:Shift)
     } 
 }
 
-procedure {:refined} {:instruction Ins(EOR(dst, src1, src2))}
+procedure{:instruction Ins(EOR(dst, src1, src2))}
 rEOR(out dst:opr32, src1:opr32, src2:opr32)
     ensures
         dst == BitwiseXor(old(src1), old(src2));
@@ -157,7 +159,7 @@ rEOR(out dst:opr32, src1:opr32, src2:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))}
+procedure{:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))}
 rEORShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
     ensures
         dst == BitwiseXor(old(src1), EvalShift(old(src2), shift));
@@ -171,7 +173,7 @@ rEORShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
     } 
 }
 
-procedure {:refined} {:instruction Ins(ADD(dst, src1, src2))}
+procedure{:instruction Ins(ADD(dst, src1, src2))}
 rADD(out dst:opr32, src1:opr32, src2:opr32)
     requires
         src1 + src2 < 0x1_0000_0000;
@@ -187,7 +189,7 @@ rADD(out dst:opr32, src1:opr32, src2:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(SUB(dst, src1, src2))}
+procedure{:instruction Ins(SUB(dst, src1, src2))}
 rSUB(out dst:opr32, src1:opr32, src2:opr32)
     requires
         src1 - src2 >= 0;
@@ -203,7 +205,7 @@ rSUB(out dst:opr32, src1:opr32, src2:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(ADD(dst, src1, src2))}
+procedure{:instruction Ins(ADD(dst, src1, src2))}
 rADDWrap(out dst:opr32, src1:opr32, src2:opr32)
     ensures
         dst == BitwiseAdd32(old(src1), old(src2));
@@ -219,7 +221,7 @@ rADDWrap(out dst:opr32, src1:opr32, src2:opr32)
     } 
 }
 
-procedure {:refined} {:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
+procedure{:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
 rADDWrapShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
     ensures
         dst == BitwiseAdd32(old(src1), EvalShift(old(src2), shift));
@@ -235,7 +237,7 @@ rADDWrapShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
     } 
 }
 
-procedure {:refined} {:instruction Ins(AND(dst, src1, src2))}
+procedure{:instruction Ins(AND(dst, src1, src2))}
 rAND(out dst:opr32, src1:opr32, src2:opr32)
     ensures
         dst == old(BitwiseAnd(src1, src2));

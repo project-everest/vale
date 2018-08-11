@@ -38,19 +38,19 @@ function va_get_flags(s:va_state):uint32 { s.flags }
 function va_get_mem(s:va_state):heap { s.heap }
 function va_get_stack(s:va_state):Stack { s.stack }
 
-function va_modify_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
 function va_modify_reg32(r:x86reg, sM:va_state, sK:va_state):va_state 
     requires r in sM.regs 
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_modify_reg64(r:x86reg, sM:va_state, sK:va_state):va_state 
+function va_update_reg64(r:x86reg, sM:va_state, sK:va_state):va_state 
     requires r in sM.regs 
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
 function va_modify_Quadword(r:int, sM:va_state, sK:va_state):va_state 
     requires r in sM.xmms
 { sK.(xmms := sK.xmms[r := sM.xmms[r]]) }
-function va_modify_mem(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap) }
-function va_modify_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
-function va_modify_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
+function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap) }
+function va_update_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
+function va_update_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
 
 predicate va_is_src_opr_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
 
@@ -96,7 +96,7 @@ function va_eval_opr_quad(s:va_state, o:opr):Quadword
     s.xmms[o.r.xmm]
 }
 
-function va_update_opr32(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_operand_opr32(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?;
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
@@ -104,7 +104,7 @@ function va_update_opr32(o:opr, sM:va_state, sK:va_state):va_state
     va_update_operand(o, sM, sK)
 }
 
-function va_update_opr64(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_operand_opr64(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?;
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
@@ -112,7 +112,7 @@ function va_update_opr64(o:opr, sM:va_state, sK:va_state):va_state
     va_update_operand(o, sM, sK)
 }
 
-function va_update_opr_quad(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_operand_opr_quad(o:opr, sM:va_state, sK:va_state):va_state
     requires o.OReg?;
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
@@ -125,7 +125,7 @@ function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
 {
-    if o.r.X86Xmm? then va_modify_Quadword(o.r.xmm, sM, sK) else va_modify_reg64(o.r, sM, sK)
+    if o.r.X86Xmm? then va_modify_Quadword(o.r.xmm, sM, sK) else va_update_reg64(o.r, sM, sK)
 }
 
 predicate va_state_eq(s0:va_state, s1:va_state)

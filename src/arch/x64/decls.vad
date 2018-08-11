@@ -86,15 +86,16 @@ lemma lemma_lowerUpper64(i:uint64)
 }
 #endverbatim
 
-procedure {:refined} {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) } 
+procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) } 
           Load(out dst:opr32, src:opr64, inline offset:int)
-    ensures {:refined false} op32(this, @dst);
-    requires/ensures
+    ensures  op32(this, @dst);
+    requires
         ValidSrcAddr(mem, src + offset, 32);
     reads
         mem;
     ensures
-        dst == mem[src + offset].v32;
+        ValidSrcAddr(mem, old(src) + offset, 32);
+        dst == mem[old(src) + offset].v32;
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
@@ -106,9 +107,9 @@ procedure {:refined} {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
     }
 }
 
-procedure {:refined} {:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) } 
+procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) } 
           Store(dst:opr64, src:opr32, inline offset:int)
-    requires{:refined false} op32(this, @src);
+    requires op32(this, @src);
     requires/ensures
         ValidDstAddr(mem, dst + offset, 32);
     modifies
@@ -122,9 +123,9 @@ procedure {:refined} {:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure {:refined} {:instruction Ins(Mov32(dst, stack(slot))) } 
+procedure{:instruction Ins(Mov32(dst, stack(slot))) } 
           LoadStack(out dst:opr32, inline slot:int)
-    ensures {:refined false} op32(this, @dst);
+    ensures  op32(this, @dst);
     requires/ensures
         HasStackSlot(stack, slot);
     reads
@@ -142,9 +143,9 @@ procedure {:refined} {:instruction Ins(Mov32(dst, stack(slot))) }
     }
 }
 
-procedure {:refined} {:instruction Ins(Mov32(stack(slot), src)) } 
+procedure{:instruction Ins(Mov32(stack(slot), src)) } 
           StoreStack(inline slot:int, src:opr32)
-    requires{:refined false} op32(this, @src);
+    requires op32(this, @src);
     requires/ensures
         HasStackSlot(stack, slot);
     modifies
@@ -159,7 +160,7 @@ procedure {:refined} {:instruction Ins(Mov32(stack(slot), src)) }
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure {:refined}{:bridge} {:instruction Ins(Mov64(dst, stack(slot))) } 
+procedure{:instruction Ins(Mov64(dst, stack(slot))) } 
           LoadStack64(out dst:opr64, inline slot:int)
     requires/ensures
         HasStackSlot(stack, slot);
@@ -179,7 +180,7 @@ procedure {:refined}{:bridge} {:instruction Ins(Mov64(dst, stack(slot))) }
     }
 }
 
-procedure {:refined}{:bridge} {:instruction Ins(Mov64(stack(slot), src)) } 
+procedure{:instruction Ins(Mov64(stack(slot), src)) } 
           StoreStack64(inline slot:int, src:opr64)
     requires/ensures
         HasStackSlot(stack, slot);
@@ -198,9 +199,9 @@ procedure {:refined}{:bridge} {:instruction Ins(Mov64(stack(slot), src)) }
     lemma_lowerUpper64(src);
 }
 
-procedure{:refined}{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
-  requires{:refined false} op32(this, @dst);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
+  requires op32(this, @dst);
+  ensures  op32(this, @dst);
   requires
     0 <= dst <= 1000;
   modifies 
@@ -214,9 +215,9 @@ procedure{:refined}{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr3
 
 }
 
-procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
-  requires{:refined false} op32(this, @dst); op32(this, @src);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
+  requires op32(this, @dst); op32(this, @src);
+  ensures  op32(this, @dst);
   requires
     src + dst < 0x1_0000_0000;
   modifies 
@@ -231,9 +232,9 @@ procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, sr
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
-procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr32)
-  requires{:refined false} op32(this, @dst); op32(this, @src);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr32)
+  requires op32(this, @dst); op32(this, @src);
+  ensures  op32(this, @dst);
   modifies 
     efl;
   ensures
@@ -247,7 +248,7 @@ procedure{:refined}{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64(inout dst:opr64, src:opr64)
+procedure{:instruction Ins(Add64(dst, src))} Add64(inout dst:opr64, src:opr64)
   requires
     src + dst < 0x1_0000_0000_0000_0000;
   modifies 
@@ -262,9 +263,9 @@ procedure{:refined}{:bridge}{:instruction Ins(Add64(dst, src))} Add64(inout dst:
     lemma_BitwiseAdd64EquivalentToAddMod2To64(old(dst), old(src));
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Mov32(dst, src))} Mov32(out dst:opr32, src:opr32)
-  requires{:refined false} op32(this, @src);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Mov32(dst, src))} Mov32(out dst:opr32, src:opr32)
+  requires op32(this, @src);
+  ensures  op32(this, @dst);
   ensures
     dst == old(src);
 {
@@ -278,7 +279,7 @@ procedure{:refined}{:bridge}{:instruction Ins(Mov32(dst, src))} Mov32(out dst:op
     }
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, src))} Mov64(out dst:opr64, src:opr64)
+procedure{:instruction Ins(Mov64(dst, src))} Mov64(out dst:opr64, src:opr64)
   ensures
     dst == old(src);
 {
@@ -292,9 +293,9 @@ procedure{:refined}{:bridge}{:instruction Ins(Mov64(dst, src))} Mov64(out dst:op
     }
 }
 
-procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
-  requires{:refined false} op32(this, @dst); op32(this, @src);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
+  requires op32(this, @dst); op32(this, @src);
+  ensures  op32(this, @dst);
   modifies efl;
   ensures
     dst == xor32(old(dst), old(src));
@@ -305,9 +306,9 @@ procedure {:refined} {:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, 
 
 }
 
-procedure {:refined} {:instruction Ins(Xor64(dst, src))} Xor64(inout dst:opr64, src:opr64)
-  requires{:refined false} op64(this, @dst); op64(this, @src);
-  ensures {:refined false} op64(this, @dst);
+procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:opr64, src:opr64)
+  requires op64(this, @dst); op64(this, @src);
+  ensures  op64(this, @dst);
   modifies efl;
   ensures
     dst == xor64(old(dst), old(src));
@@ -318,9 +319,9 @@ procedure {:refined} {:instruction Ins(Xor64(dst, src))} Xor64(inout dst:opr64, 
 
 }
 
-procedure {:refined} {:instruction Ins(And32(dst, src))} And32(inout dst:opr32, src:opr32)
-  requires{:refined false} op32(this, @dst); op32(this, @src);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(And32(dst, src))} And32(inout dst:opr32, src:opr32)
+  requires op32(this, @dst); op32(this, @src);
+  ensures  op32(this, @dst);
   modifies efl;
   ensures
     dst == and32(old(dst), old(src));
@@ -331,9 +332,9 @@ procedure {:refined} {:instruction Ins(And32(dst, src))} And32(inout dst:opr32, 
 
 }
 
-procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
-  requires{:refined false} op32(this, @dst);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
+  requires op32(this, @dst);
+  ensures  op32(this, @dst);
   modifies efl;
   ensures
     dst == not32(old(dst));
@@ -344,9 +345,9 @@ procedure {:refined} {:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
 
 }
 
-procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); IsUInt32(amount);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, inline amount:uint32)
+  requires op32(this, @dst); IsUInt32(amount);
+  ensures  op32(this, @dst);
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -359,9 +360,9 @@ procedure {:refined} {:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout 
 
 }
 
-procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); IsUInt32(amount);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, inline amount:uint32)
+  requires op32(this, @dst); IsUInt32(amount);
+  ensures  op32(this, @dst);
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -374,9 +375,9 @@ procedure {:refined} {:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout 
 
 }
 
-procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); IsUInt32(amount);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, inline amount:uint32)
+  requires op32(this, @dst); IsUInt32(amount);
+  ensures  op32(this, @dst);
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -389,9 +390,9 @@ procedure {:refined} {:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout 
 
 }
 
-procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, inline amount:uint32)
-  requires{:refined false} op32(this, @dst); IsUInt32(amount);
-  ensures {:refined false} op32(this, @dst);
+procedure{:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, inline amount:uint32)
+  requires op32(this, @dst); IsUInt32(amount);
+  ensures  op32(this, @dst);
   requires 
     0 <= amount < 32;
   modifies efl;
@@ -404,7 +405,7 @@ procedure {:refined} {:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout 
 
 }
 
-procedure {:refined} {:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad, src:opr_quad)
+procedure{:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad, src:opr_quad)
   modifies efl;
   ensures
     dst == old(QuadwordXor(dst, src));

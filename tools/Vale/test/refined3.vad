@@ -99,13 +99,13 @@ type va_state = state
 function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:reg, s:va_state):int { getReg(s, r) }
 
-function va_modify_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
-function va_modify_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
+function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state requires r in sM.regs { sK.(regs := sK.regs[r := sM.regs[r]]) }
 
-function va_update_opr(o:opr, sM:va_state, sK:va_state):va_state
+function va_update_operand_opr(o:opr, sM:va_state, sK:va_state):va_state
     requires o in sM.regs
 {
-    va_modify_reg(o, sM, sK)
+    va_update_reg(o, sM, sK)
 }
 
 predicate va_state_eq(s0:va_state, s1:va_state)
@@ -142,7 +142,7 @@ predicate{:opaque} evalCodeOpaque(c:code, s0:state, sN:state) { evalCode(c, s0, 
 // Ultimately, we still prove precisely what we want: if s.ok and evalCode(c, s0, sN),
 // then sN.ok and postcondition(sN).
 // It may seem strange to allow zombie steps and then prove that there are no
-// zombie steps, but this allows us to factor the proof for {:refined} procedures
+// zombie steps, but this allows us to factor the proof for  procedures
 // so that the proof of non-zombieness comes after other parts of the proof.
 // Specifically, the "refined" lemmas will allow zombie steps, and only at the
 // end of each refined lemma will we call the "abstract" lemma that
@@ -272,7 +272,7 @@ function MaybeUpdateOk(s0:state, s1:state):state
 
 #endverbatim
 
-procedure{:refined}{:bridge}{:instruction Ins(InsImm(dst, imm))} Imm(out dst:opr, inline imm:int)
+procedure{:instruction Ins(InsImm(dst, imm))} Imm(out dst:opr, inline imm:int)
     ensures
         dst == imm;
 {
@@ -280,7 +280,7 @@ procedure{:refined}{:bridge}{:instruction Ins(InsImm(dst, imm))} Imm(out dst:opr
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:refined}{:bridge}{:instruction Ins(InsAdd(dst, src))} Add(inout dst:opr, src:opr)
+procedure{:instruction Ins(InsAdd(dst, src))} Add(inout dst:opr, src:opr)
     ensures
         dst == old(dst) + old(src);
 {
@@ -288,7 +288,7 @@ procedure{:refined}{:bridge}{:instruction Ins(InsAdd(dst, src))} Add(inout dst:o
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:refined} test1()
+procedure test1()
     requires
         x >= 0;
     ensures
@@ -312,7 +312,7 @@ predicate Easy(a:int, b:int, c:int, d:int) { true }
 
 // --------------------------------------------------------------
 
-procedure{:refined} LoopBody(ghost g:int, ghost i:int, ghost h1:int) returns(ghost h2:int)
+procedure LoopBody(ghost g:int, ghost i:int, ghost h1:int) returns(ghost h2:int)
     requires
         g <= x;
         0 <= h1;
@@ -332,7 +332,7 @@ procedure{:refined} LoopBody(ghost g:int, ghost i:int, ghost h1:int) returns(gho
     h2 := h1 + 1;
 }
 
-procedure{:refined} Loop(ghost g:int, ghost h1:int) returns(ghost h2:int)
+procedure Loop(ghost g:int, ghost h1:int) returns(ghost h2:int)
     requires/ensures
         g <= x;
     requires
@@ -424,7 +424,7 @@ function RotateReg(i:int):reg
 }
 #endverbatim
 
-procedure{:refined} RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
+procedure RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
     requires
         n > 0;
         RotateInv(n, a, b, c, d);
@@ -434,8 +434,8 @@ procedure{:refined} RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:o
     reveal RotateInv;
 }
 
-procedure{:refined}{:recursive} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
-    requires{:refined false}
+procedure{:recursive} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
+    requires
         @a == RotateReg(16 - n);
         @b == RotateReg(17 - n);
         @c == RotateReg(18 - n);
@@ -452,7 +452,7 @@ procedure{:refined}{:recursive} RotateLoop(inline n:nat, inout a:opr, inout b:op
     }
 }
 
-procedure{:refined} RotateProc()
+procedure RotateProc()
     modifies
         w; x; y; z;
     requires
@@ -465,7 +465,7 @@ procedure{:refined} RotateProc()
 
 // --------------------------------------------------------------
 
-procedure{:refined} InlineIfElse(inline n:nat)
+procedure InlineIfElse(inline n:nat)
     requires
         n < 3;
     requires/ensures
@@ -494,7 +494,7 @@ procedure{:refined} InlineIfElse(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure{:refined} InlineIfInTheMiddle(inline n:nat)
+procedure InlineIfInTheMiddle(inline n:nat)
     requires
         n < 2;
     requires/ensures
@@ -529,7 +529,7 @@ procedure{:refined} InlineIfInTheMiddle(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure{:refined}{:recursive} Unroll(inline n:nat)
+procedure{:recursive} Unroll(inline n:nat)
     requires/ensures
         x >= 0;
     ensures
@@ -547,7 +547,7 @@ procedure{:refined}{:recursive} Unroll(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure{:refined} GhostReturn(ghost g:int, inline n:bool, src:opr, ghost i:int) returns (ghost h:int)
+procedure GhostReturn(ghost g:int, inline n:bool, src:opr, ghost i:int) returns (ghost h:int)
     requires
         g <= x;
         Inv(x, y, g, i);
@@ -568,7 +568,7 @@ procedure{:refined} GhostReturn(ghost g:int, inline n:bool, src:opr, ghost i:int
     h := g + 1;
 }
 
-procedure{:refined} GhostReturnCaller(ghost kg:int, source:opr)
+procedure GhostReturnCaller(ghost kg:int, source:opr)
     requires/ensures
         kg <= x;
     requires
@@ -591,7 +591,7 @@ procedure{:refined} GhostReturnCaller(ghost kg:int, source:opr)
 
 // --------------------------------------------------------------
 
-procedure{:refined} GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
+procedure GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
       returns (ghost h:int)
     requires
         true;
@@ -606,9 +606,9 @@ procedure{:refined} GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:in
     Add(x, z);
 }
 
-procedure{:refined} GhostReturnCallerY(ghost kg:int, source:opr)
+procedure GhostReturnCallerY(ghost kg:int, source:opr)
     requires
-        {:refined false} @source != X && @source != Z;
+         @source != X && @source != Z;
     requires
         Easy(x, y, kg, 0);
     ensures
@@ -652,13 +652,13 @@ procedure UGhostReturnCallerY(ghost kg:int, source:opr)
 
 // --------------------------------------------------------------
 
-procedure{:refined} ProcA(src:opr)
+procedure ProcA(src:opr)
     modifies x;
 {
 }
 
-procedure{:refined} ProcB(source:opr)
-    requires {:refined false} @source != X;
+procedure ProcB(source:opr)
+    requires  @source != X;
     modifies x;
 {
     ProcA(source);
