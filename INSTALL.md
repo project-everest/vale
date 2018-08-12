@@ -19,10 +19,17 @@ On Mac OS X (tested with El Capitan, 10.11.6), you can install the dependencies 
     ```brew install scons nuget mono```
 Note that the mono package includes F\#.
 
-Once these tools are installed, running SCons in the top-level directory will build the Vale tool
-and build and verify all sources in the [src](./src) directory:
+Once these tools are installed, running SCons in the top-level directory will build the Vale tool:
 
 python.exe scons.py
+
+To verify all Dafny sources in the [src](./src) directory, run:
+
+python.exe scons.py --DAFNY
+
+To verify all F* sources in the [src](./src) directory, run:
+
+python.exe scons.py --FSTAR
 
 NOTE: You can override tools/Kremlin by setting the KREMLIN_HOME
 environment variable to point to the directory where KreMLin is

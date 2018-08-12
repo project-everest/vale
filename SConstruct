@@ -122,15 +122,15 @@ else:
   fstar_default_path = 'tools/FStar'
 
 # Retrieve tool-specific command overrides passed in by the user
-AddOption('--DAFNY', dest='do_dafny', default=True, action='store_true',
+AddOption('--DAFNY', dest = 'do_dafny', default = False, action = 'store_true',
   help='Verify Dafny files')
-AddOption('--NO-DAFNY', dest='do_dafny', default=True, action='store_false',
+AddOption('--NO-DAFNY', dest = 'do_dafny', default = False, action = 'store_false',
   help='Do not verify Dafny files')
-AddOption('--FSTAR', dest='do_fstar', default=False, action='store_true',
+AddOption('--FSTAR', dest = 'do_fstar', default = False, action = 'store_true',
   help='Verify F* files')
-AddOption('--NO-FSTAR', dest='do_fstar', default=False, action='store_false',
+AddOption('--NO-FSTAR', dest = 'do_fstar', default = False, action = 'store_false',
   help='Do not verify F* files')
-AddOption('--DAFNY-PATH', dest='dafny_path', type='string', default='tools/Dafny', action='store',
+AddOption('--DAFNY-PATH', dest = 'dafny_path', type = 'string', default = 'tools/Dafny', action = 'store',
   help='Specify the path to Dafny tool binaries')
 AddOption('--Z3-PATH', dest = 'z3_path', type = 'string', default = z3_default_path, action = 'store',
   help = 'Specify the path to directory containing Z3 executable')
@@ -144,7 +144,7 @@ AddOption('--Z3-MY-VERSION', dest = 'z3_my_version', default = False, action = '
   help = 'Use version of Z3 that does not necessarily match .z3_version')
 AddOption('--USE-HINTS', dest = 'use_hints', default = False, action = 'store_true',
   help = 'Use F* .hints files from the hints directory')
-AddOption('--DARGS', dest='dafny_user_args', type='string', default=[], action='append',
+AddOption('--DARGS', dest = 'dafny_user_args', type = 'string', default=[], action = 'append',
   help='Supply temporary additional arguments to the Dafny compiler')
 AddOption('--FARGS', dest = 'fstar_user_args', type = 'string', default = [], action = 'append',
   help = 'Supply temporary additional arguments to the F* compiler')
@@ -156,7 +156,7 @@ AddOption('--CACHE-DIR', dest = 'cache_dir', type = 'string', default = None, ac
   help = 'Specify the SCons Shared Cache Directory')
 AddOption('--ONE', dest = 'single_vaf', type = 'string', default = None, action = 'store',
   help = 'Only verify one specified .vaf file, and in that file, only verify procedures or verbatim blocks marked as {:verify}.')
-AddOption('--NO-COLOR', dest='no_color', default=False, action='store_true',
+AddOption('--NO-COLOR', dest = 'no_color', default=False, action = 'store_true',
   help="Don't add color to build output")
 AddOption('--DUMP-ARGS', dest = 'dump_args', default = False, action = 'store_true',
   help = "Print arguments that will be passed to the verification tools")
