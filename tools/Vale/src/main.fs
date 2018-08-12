@@ -71,6 +71,10 @@ let main (argv) =
             then failwith "Cannot include include both -dafnyDirect and -fstarText"
             else dafnyDirect := true; match_args l
         | "-h" :: [] -> failwith "TODO: Implement command line help"
+        | "-dafnyText" :: l ->
+            if !dafnyDirect
+            then failwith "Cannot include include both -dafnyDirect and -dafnyText"
+            else match_args l
         | "-fstarText" :: l ->
             if !dafnyDirect
             then failwith "Cannot include include both -dafnyDirect and -fstarText"

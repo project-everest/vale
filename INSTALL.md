@@ -11,7 +11,6 @@ Vale relies on the following tools, which must be installed before building Vale
     * This will create a directory tools/FsLexYacc that contains the FsLexYacc binaries; the build will expect to find these binaries in tools/FsLexYacc
 * C\#, used by [Dafny](https://github.com/Microsoft/dafny/blob/master/INSTALL)
   * See https://www.visualstudio.com/vs/community/ or http://www.mono-project.com/
-* An installed C compiler, used by SCons to compile C files
 
 On an Ubuntu system, including Windows Subsystem for Linux, you can install the dependencies with:
      ```sudo apt install scons fsharp nuget mono-devel```
