@@ -110,7 +110,7 @@ procedure{:instruction Ins(S.Adox64(dst, src))}{:quick exportOnly} Adox64Wrap(in
 procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64(inout dst: dst_opr64, src: opr64)
     requires
         0 <= dst - src;
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(dst) - old(src);
@@ -146,7 +146,7 @@ procedure{:instruction Ins(S.Mul64(src))}{:quick exportOnly} Mul64Wrap(src: opr6
 procedure{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:quick exportOnly} Mulx64(out dst_hi: dst_opr64, out dst_lo: dst_opr64, src: opr64)
     requires @dst_hi != @dst_lo;
     reads
-        rdx; 
+        rdx;
     ensures
         pow2_64 * dst_hi + dst_lo == old(rdx * src);
 {
@@ -166,18 +166,18 @@ procedure{:instruction Ins(S.IMul64(dst, src))}{:quick exportOnly} IMul64(inout 
 }
 
 procedure{:instruction Ins(S.Xor64(dst, src))}{:quick exportOnly} Xor64(inout dst: dst_opr64, src: opr64)
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(ixor(dst,src));
         !overflow(efl);
         !cf(efl);
-        
+
 {
 }
 
 procedure{:instruction Ins(S.And64(dst, src))}{:quick exportOnly} And64(inout dst: dst_opr64, src: opr64)
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(iand(dst,src));

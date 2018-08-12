@@ -86,7 +86,7 @@ lemma lemma_lowerUpper64(i:uint64)
 }
 #endverbatim
 
-procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) } 
+procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
           Load(out dst:opr32, src:opr64, inline offset:int)
     ensures  op32(this, @dst);
     requires
@@ -107,7 +107,7 @@ procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
     }
 }
 
-procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) } 
+procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
           Store(dst:opr64, src:opr32, inline offset:int)
     requires op32(this, @src);
     requires/ensures
@@ -123,7 +123,7 @@ procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Mov32(dst, stack(slot))) } 
+procedure{:instruction Ins(Mov32(dst, stack(slot))) }
           LoadStack(out dst:opr32, inline slot:int)
     ensures  op32(this, @dst);
     requires/ensures
@@ -143,7 +143,7 @@ procedure{:instruction Ins(Mov32(dst, stack(slot))) }
     }
 }
 
-procedure{:instruction Ins(Mov32(stack(slot), src)) } 
+procedure{:instruction Ins(Mov32(stack(slot), src)) }
           StoreStack(inline slot:int, src:opr32)
     requires op32(this, @src);
     requires/ensures
@@ -160,7 +160,7 @@ procedure{:instruction Ins(Mov32(stack(slot), src)) }
     this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Mov64(dst, stack(slot))) } 
+procedure{:instruction Ins(Mov64(dst, stack(slot))) }
           LoadStack64(out dst:opr64, inline slot:int)
     requires/ensures
         HasStackSlot(stack, slot);
@@ -180,7 +180,7 @@ procedure{:instruction Ins(Mov64(dst, stack(slot))) }
     }
 }
 
-procedure{:instruction Ins(Mov64(stack(slot), src)) } 
+procedure{:instruction Ins(Mov64(stack(slot), src)) }
           StoreStack64(inline slot:int, src:opr64)
     requires/ensures
         HasStackSlot(stack, slot);
@@ -204,7 +204,7 @@ procedure{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
   ensures  op32(this, @dst);
   requires
     0 <= dst <= 1000;
-  modifies 
+  modifies
     efl;
   ensures
     dst == old(dst) + 1;
@@ -220,7 +220,7 @@ procedure{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
   ensures  op32(this, @dst);
   requires
     src + dst < 0x1_0000_0000;
-  modifies 
+  modifies
     efl;
   ensures
     dst == old(dst) + old(src);
@@ -235,7 +235,7 @@ procedure{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
 procedure{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr32)
   requires op32(this, @dst); op32(this, @src);
   ensures  op32(this, @dst);
-  modifies 
+  modifies
     efl;
   ensures
     dst == (old(dst) + old(src)) % 0x1_0000_0000;
@@ -251,7 +251,7 @@ procedure{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr3
 procedure{:instruction Ins(Add64(dst, src))} Add64(inout dst:opr64, src:opr64)
   requires
     src + dst < 0x1_0000_0000_0000_0000;
-  modifies 
+  modifies
     efl;
   ensures
     dst == old(dst) + old(src);
@@ -348,7 +348,7 @@ procedure{:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
 procedure{:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, inline amount:uint32)
   requires op32(this, @dst); IsUInt32(amount);
   ensures  op32(this, @dst);
-  requires 
+  requires
     0 <= amount < 32;
   modifies efl;
   ensures
@@ -363,7 +363,7 @@ procedure{:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, i
 procedure{:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, inline amount:uint32)
   requires op32(this, @dst); IsUInt32(amount);
   ensures  op32(this, @dst);
-  requires 
+  requires
     0 <= amount < 32;
   modifies efl;
   ensures
@@ -378,7 +378,7 @@ procedure{:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, i
 procedure{:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, inline amount:uint32)
   requires op32(this, @dst); IsUInt32(amount);
   ensures  op32(this, @dst);
-  requires 
+  requires
     0 <= amount < 32;
   modifies efl;
   ensures
@@ -393,7 +393,7 @@ procedure{:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, i
 procedure{:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, inline amount:uint32)
   requires op32(this, @dst); IsUInt32(amount);
   ensures  op32(this, @dst);
-  requires 
+  requires
     0 <= amount < 32;
   modifies efl;
   ensures

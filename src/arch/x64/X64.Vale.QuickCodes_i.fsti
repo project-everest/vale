@@ -82,7 +82,7 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
         label r msg (pre p))
   | QLemma r msg pre post l qcs ->
       label r msg pre /\ (post ==> wp cs qcs k s0)
-// Hoist lambdas out of main definition to avoid issues with function equality 
+// Hoist lambdas out of main definition to avoid issues with function equality
 and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b -> Type0) :
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
   =

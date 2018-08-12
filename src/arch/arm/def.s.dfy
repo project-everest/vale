@@ -88,7 +88,7 @@ predicate {:opaque} ValidRegState(regs:map<ARMReg, uint32>)
     forall r:ARMReg :: r in regs
 }
 
-// All valid states have the same memory address domain, but we don't care what 
+// All valid states have the same memory address domain, but we don't care what
 // it is (at this level).
 function {:axiom} TheValidAddresses(): set<addr>
 
@@ -115,7 +115,7 @@ predicate ValidOperand(o:operand)
 
 predicate ValidSecondOperand(o:operand)
 {
-    ValidOperand(o) 
+    ValidOperand(o)
  || (o.OShift? && !(o.reg.SP? || o.reg.LR?))
 }
 
@@ -154,13 +154,13 @@ predicate ValidGlobalDecls(decls:globaldecls)
 
 predicate ValidGlobalAddr(g:operand, addr:int)
 {
-    ValidGlobal(g) && WordAligned(addr) 
+    ValidGlobal(g) && WordAligned(addr)
  && AddressOfGlobal(g) <= addr < AddressOfGlobal(g) + SizeOfGlobal(g)
 }
 
 predicate ValidGlobalOffset(g:operand, offset:int)
 {
-    ValidGlobal(g) && WordAligned(offset) 
+    ValidGlobal(g) && WordAligned(offset)
  && 0 <= offset < SizeOfGlobal(g)
 }
 
@@ -319,7 +319,7 @@ predicate branchRelation(s:state, s':state, cond:bool)
 }
 
 predicate ValidInstruction(s:state, ins:ins)
-{ 
+{
     ValidState(s) && match ins
         case ADD(dest, src1, src2) => ValidOperand(src1) &&
             ValidSecondOperand(src2) && ValidRegOperand(dest)
@@ -330,25 +330,25 @@ predicate ValidInstruction(s:state, ins:ins)
             ValidOperand(src2) && ValidRegOperand(dest)
         case EOR(dest, src1, src2) => ValidOperand(src1) &&
             ValidSecondOperand(src2) && ValidRegOperand(dest)
-        case LDR(rd, base, ofs) => 
+        case LDR(rd, base, ofs) =>
             ValidRegOperand(rd) &&
             ValidOperand(base) && ValidOperand(ofs) &&
             var addr := OperandContents(s, base) + OperandContents(s, ofs);
             WordAligned(addr) &&
             ValidMem(addr)
-        case LDR_global(rd, global, base, ofs) => 
+        case LDR_global(rd, global, base, ofs) =>
             ValidRegOperand(rd) &&
             ValidOperand(base) && ValidOperand(ofs) &&
             ValidGlobalOffset(global, OperandContents(s, base) + OperandContents(s, ofs) - AddressOfGlobal(global)) &&
             ValidGlobalAddr(global, OperandContents(s, base) + OperandContents(s, ofs))
-        case LDR_reloc(rd, global) => 
+        case LDR_reloc(rd, global) =>
             ValidRegOperand(rd) && ValidGlobal(global)
         case STR(rd, base, ofs) =>
             ValidRegOperand(rd) &&
             ValidOperand(ofs) && ValidOperand(base) &&
             WordAligned(OperandContents(s, base) + OperandContents(s, ofs)) &&
             ValidMem(OperandContents(s, base) + OperandContents(s, ofs))
-        case STR_global(rd, global, base, ofs) => 
+        case STR_global(rd, global, base, ofs) =>
             ValidRegOperand(rd) &&
             ValidOperand(base) && ValidOperand(ofs) &&
             ValidGlobalOffset(global, OperandContents(s, base) + OperandContents(s, ofs) - AddressOfGlobal(global)) &&
@@ -373,15 +373,15 @@ predicate evalIns(ins:ins, s:state, r:state)
         case EOR(dst, src1, src2) => evalUpdate(s, dst,
             BitwiseXor(OperandContents(s, src1), OperandContents(s, src2)),
             r)
-        case LDR(rd, base, ofs) => 
+        case LDR(rd, base, ofs) =>
             evalLoad(s, rd, OperandContents(s, base), OperandContents(s, ofs), r)
-        case LDR_global(rd, global, base, ofs) => 
+        case LDR_global(rd, global, base, ofs) =>
             evalLoadGlobal(s, rd, global, OperandContents(s, base), OperandContents(s, ofs), r)
         case LDR_reloc(rd, name) =>
             evalUpdate(s, rd, AddressOfGlobal(name), r)
-        case STR(rd, base, ofs) => 
+        case STR(rd, base, ofs) =>
             evalStore(s, OperandContents(s, base), OperandContents(s, ofs), OperandContents(s, rd), r)
-        case STR_global(rd, global, base, ofs) => 
+        case STR_global(rd, global, base, ofs) =>
             evalStoreGlobal(s, global, OperandContents(s, base), OperandContents(s, ofs), OperandContents(s, rd), r)
         case MOV(dst, src) => evalUpdate(s, dst,
             OperandContents(s, src),

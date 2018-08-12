@@ -90,7 +90,7 @@ function EvalMemAddr(regs:map<x86reg, uint64>, addr:maddr) : int
     match addr
         case MConst(n) => n
         case MReg(r, offset) => eval_reg(regs, r) + offset
-        case MIndex(base, scale, index, offset) => 
+        case MIndex(base, scale, index, offset) =>
              eval_reg(regs, base) + scale * eval_reg(regs, index) + offset
 }
 
@@ -126,14 +126,14 @@ predicate ValidOperand(s:state, size:int, o:operand)
                 r.X86Xmm? && ValidXmm(s.xmms, r)
             else
                 false
-        case OStack(slot) => 
+        case OStack(slot) =>
             if size == 32 then
                 |s.stack| > 0 && slot in s.stack[0]
             else if size == 64 then
                 |s.stack| > 0 && slot in s.stack[0] && slot + 1 in s.stack[0]
             else
                 false
-        case OHeap(addr) => 
+        case OHeap(addr) =>
             if size == 32 then
                 ValidHeapAddr(s, addr)
             else if size == 64 then
@@ -355,19 +355,19 @@ function and32(x:uint32, y:uint32) : uint32  { BitwiseAnd(x, y) }
 
 function not32(x:uint32) : uint32 { BitwiseNot(x) }
 
-function rol32(x:uint32, amount:uint32) : uint32 
+function rol32(x:uint32, amount:uint32) : uint32
     requires 0 <= amount < 32;
     { RotateLeft(x, amount) }
 
-function ror32(x:uint32, amount:uint32) : uint32 
+function ror32(x:uint32, amount:uint32) : uint32
     requires 0 <= amount < 32;
     { RotateRight(x, amount) }
 
-function shl32(x:uint32, amount:uint32) : uint32 
+function shl32(x:uint32, amount:uint32) : uint32
     requires 0 <= amount < 32;
     { LeftShift(x, amount) }
 
-function shr32(x:uint32, amount:uint32) : uint32 
+function shr32(x:uint32, amount:uint32) : uint32
     requires 0 <= amount < 32;
     { RightShift(x, amount) }
 

@@ -95,7 +95,7 @@ procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:opr64, s
 procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:opr64, src:opr64)
     requires
         0 <= dst - src;
-    modifies 
+    modifies
         efl;
     ensures
         dst == old(dst) - old(src);

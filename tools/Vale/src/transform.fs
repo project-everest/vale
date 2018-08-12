@@ -874,7 +874,7 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
           Replace (env, mods m)
     )
   | SpecRaw (Lets _) -> PostProcess (fun (env, _) -> (env, []))
-  
+
 let rewrite_vars_spec (envIn:env) (envOut:env) (s:spec):spec =
   match s with
   | Requires (r, e) -> Requires (r, rewrite_vars_exp None envIn e)

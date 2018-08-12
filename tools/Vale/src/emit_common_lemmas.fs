@@ -90,7 +90,7 @@ and build_code_stmts (env:env) (benv:build_env) (stmts:stmt list):exp =
 and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
 
-// compute parameters/returns for procedures (abstract/concrete/lemma) 
+// compute parameters/returns for procedures (abstract/concrete/lemma)
 // pfIsRet == false ==> pf is input parameter
 // pfIsRet == true ==> pf is output return value
 // ret == false ==> generate parameters

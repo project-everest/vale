@@ -125,7 +125,7 @@ procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
 {
 }
 
-procedure {:quick exportOnly} 
+procedure {:quick exportOnly}
           PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, out tmp:reg_opr64)
     requires
         index < 4;

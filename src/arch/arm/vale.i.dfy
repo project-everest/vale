@@ -60,9 +60,9 @@ predicate va_require(b0:codes, c1:code, s0:va_state, sN:va_state)
 }
 
 //// Weaker form of eval_code that we can actually ensure generically in instructions
-//predicate eval_weak(c:code, s:va_state, r:va_state) 
-//{ 
-//    s.ok && r.ok ==> evalCodeOpaque(c, s, r) 
+//predicate eval_weak(c:code, s:va_state, r:va_state)
+//{
+//    s.ok && r.ok ==> evalCodeOpaque(c, s, r)
 //}
 
 predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
@@ -115,12 +115,12 @@ function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:ARMReg, s:va_state):uint32 requires r in s.regs { s.regs[r] }
 function va_get_mem(s:va_state):memmap { s.m.addresses }
 function va_get_globals(s:va_state):map<operand, seq<uint32>> { s.m.globals }
-function va_get_osp(s:va_state):uint32 
+function va_get_osp(s:va_state):uint32
     requires SP in s.regs
 {
     s.regs[SP]
 }
-function va_get_olr(s:va_state):uint32 
+function va_get_olr(s:va_state):uint32
     requires LR in s.regs
 {
     s.regs[LR]
@@ -148,19 +148,19 @@ function va_update_operand_opr32(o:operand, sM:va_state, sK:va_state):va_state
     requires ValidRegOperand(o);
     requires match o
                 case OReg(r) => r in sM.regs
-                case OLR => LR in sM.regs 
-                case OSP => SP in sM.regs 
-{ 
+                case OLR => LR in sM.regs
+                case OSP => SP in sM.regs
+{
     va_update_operand(o, sM, sK)
 }
-	
+
 function va_update_operand(o:operand, sM:va_state, sK:va_state):va_state
     requires ValidRegOperand(o);
     requires match o
                 case OReg(r) => r in sM.regs
-                case OLR => LR in sM.regs 
-                case OSP => SP in sM.regs 
-{ 
+                case OLR => LR in sM.regs
+                case OSP => SP in sM.regs
+{
     match o
         case OReg(r) => va_update_reg(o.r, sM, sK)
         case OLR => va_update_reg(LR, sM, sK)
@@ -234,17 +234,17 @@ predicate ValidSrcAddr(m:memmap, addr:int)
 predicate ValidAddrs(mem:memmap, base:int, num_uint32s:int)
 {
     //forall j {:trigger ValidAddr(mem, base+j*4)} {:trigger  base+j*4 in mem } :: 0 <= j < num_uint32s ==> ValidAddr(mem, base + j*4)
-    forall addr {:trigger ValidAddr(mem, addr)} 
-                {:trigger addr in mem } :: 
+    forall addr {:trigger ValidAddr(mem, addr)}
+                {:trigger addr in mem } ::
         base <= addr < base + num_uint32s*4 && (addr - base) % 4 == 0 ==> ValidAddr(mem, addr)
 }
 
 predicate ValidSrcAddrs(mem:memmap, base:int, num_uint32s:int)
 {
-    forall addr {:trigger ValidAddr(mem, addr)} {:trigger ValidSrcAddr(mem, addr)} 
-                {:trigger addr in mem } :: 
+    forall addr {:trigger ValidAddr(mem, addr)} {:trigger ValidSrcAddr(mem, addr)}
+                {:trigger addr in mem } ::
         base <= addr < base + num_uint32s*4 && (addr - base) % 4 == 0 ==> ValidSrcAddr(mem, addr)
-    //forall j {:trigger ValidAddr(mem, base+j*4)} {:trigger ValidSrcAddr(mem, base+j*4)} {:trigger  base+j*4 in mem } :: 
+    //forall j {:trigger ValidAddr(mem, base+j*4)} {:trigger ValidSrcAddr(mem, base+j*4)} {:trigger  base+j*4 in mem } ::
 //        0 <= j < num_uint32s ==> ValidSrcAddr(mem, base + j*4)
 }
 
@@ -523,7 +523,7 @@ lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va
                      && !evalOBool(s, b)
                      && r.ok
                      && r' == r
-                     else 
+                     else
                         true)
                  && r' == r
             else

@@ -21,11 +21,11 @@ type va_code = code
 type va_codes = codes
 type va_state = state
 
-type imm8 = uint8 
+type imm8 = uint8
 
 ////////////////////////////////////////////////////////////////////////
 //
-//  Connecting Vale functions to Dafny functions 
+//  Connecting Vale functions to Dafny functions
 //
 ////////////////////////////////////////////////////////////////////////
 
@@ -39,13 +39,13 @@ function va_get_mem(s:va_state):heap { s.heap }
 function va_get_stack(s:va_state):Stack { s.stack }
 
 function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
-function va_modify_reg32(r:x86reg, sM:va_state, sK:va_state):va_state 
-    requires r in sM.regs 
+function va_modify_reg32(r:x86reg, sM:va_state, sK:va_state):va_state
+    requires r in sM.regs
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_update_reg64(r:x86reg, sM:va_state, sK:va_state):va_state 
-    requires r in sM.regs 
+function va_update_reg64(r:x86reg, sM:va_state, sK:va_state):va_state
+    requires r in sM.regs
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_modify_Quadword(r:int, sM:va_state, sK:va_state):va_state 
+function va_modify_Quadword(r:int, sM:va_state, sK:va_state):va_state
     requires r in sM.xmms
 { sK.(xmms := sK.xmms[r := sM.xmms[r]]) }
 function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap) }
@@ -143,9 +143,9 @@ predicate{:opaque} evalCodeOpaque(c:code, s0:state, sN:state)
     evalCode(c, s0, sN)
 }
 
-predicate eval_code(c:code, s:state, r:state) 
-{ 
-    s.ok ==> evalCodeOpaque(c, s, r) 
+predicate eval_code(c:code, s:state, r:state)
+{
+    s.ok ==> evalCodeOpaque(c, s, r)
 }
 
 function method va_CNil():codes { CNil }
@@ -161,9 +161,9 @@ predicate va_require(b0:codes, c1:code, s0:va_state, sN:va_state)
 }
 
 // Weaker form of eval_code that we can actually ensure generically in instructions
-predicate eval_weak(c:code, s:state, r:state) 
-{ 
-    s.ok && r.ok ==> evalCodeOpaque(c, s, r) 
+predicate eval_weak(c:code, s:state, r:state)
+{
+    s.ok && r.ok ==> evalCodeOpaque(c, s, r)
 }
 
 predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
@@ -239,7 +239,7 @@ predicate {:opaque} x86_ValidState(s:state)
 //
 ////////////////////////////////////////////////////////////////////////
 
-predicate ValidDstAddr(h:heap, addr:int, size:int) 
+predicate ValidDstAddr(h:heap, addr:int, size:int)
 {
     addr in h
  && match h[addr]
@@ -255,13 +255,13 @@ predicate ValidSrcAddr(h:heap, addr:int, size:int)
 }
 
 predicate HasStackSlot(s:Stack, slot:int)
-{ 
+{
     |s| > 0
  && slot in s[0]
 }
 
 predicate HasStackSlots(s:Stack, count:int)
-{ 
+{
     |s| > 0
  && (forall slot :: 0 <= slot < count ==> slot in s[0])
 }
@@ -299,7 +299,7 @@ lemma evalWhile_validity(b:obool, c:code, n:nat, s:state, r:state)
     ensures  valid_state(s) && r.ok ==> valid_state(r);
 {
     if valid_state(s) && r.ok && ValidOperand(s, 64, b.o1) && ValidOperand(s, 64, b.o2) && n > 0 {
-        var s', r' :| evalOBool(s, b) && branchRelation(s, s', true) && evalCode(c, s', r') && evalWhile(b, c, n - 1, r', r); 
+        var s', r' :| evalOBool(s, b) && branchRelation(s, s', true) && evalCode(c, s', r') && evalWhile(b, c, n - 1, r', r);
         code_state_validity(c, s', r');
         evalWhile_validity(b, c, n - 1, r', r);
         assert valid_state(r);
@@ -417,7 +417,7 @@ lemma va_lemma_block(b:codes, s0:va_state, r:va_state) returns(r1:va_state, c0:c
             code_state_validity(c0, s0, r1);
         }
         assert eval_code(c0, s0, r1);
-    } else { 
+    } else {
         // If s0 isn't okay, we can do whatever we want,
         // so we ensure r1.ok is false, and hence eval_code(*, r1, *) is trivially true
         r1 := s0;
@@ -448,7 +448,7 @@ lemma va_lemma_ifElse(ifb:obool, ct:code, cf:code, s:va_state, r:va_state) retur
         var t:state :| branchRelation(s, t, cond)
                     && (if cond then evalCode(ct, t, r) else evalCode(cf, t, r));
         s' := state(t.regs, t.xmms, t.flags, t.stack, t.heap, t.ok);
-    } 
+    }
 }
 
 predicate{:opaque} evalWhileOpaque(b:obool, c:code, n:nat, s:state, r:state) { evalWhile(b, c, n, s, r) }
@@ -530,7 +530,7 @@ lemma va_lemma_whileFalse(b:obool, c:code, s:va_state, r:va_state) returns(r':va
                  && x86_branchRelation(s, r', false)
                  && !evalOBool(s, b)
                  && r.ok
-                 else 
+                 else
                     true)
                   && r' == r
             else

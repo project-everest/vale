@@ -58,9 +58,9 @@ method printSmallReg(r:x86reg)
         case X86Ebx => print("bl");
         case X86Ecx => print("cl");
         case X86Edx => print("dl");
-        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
         case X86R8 => print("!!!invalid!!!");
         case X86R9 => print("!!!invalid!!!");
         case X86R10 => print("!!!invalid!!!");
@@ -69,7 +69,7 @@ method printSmallReg(r:x86reg)
         case X86R13 => print("!!!invalid!!!");
         case X86R14 => print("!!!invalid!!!");
         case X86R15 => print("!!!invalid!!!");
-        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
 }
 
 method printMAddr(addr:maddr)
@@ -99,7 +99,7 @@ method printOprnd(o:operand)
             if 0 <= n as int < 0x1_0000_0000 { print("$"); print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
-        case OStack(i) => print(8+4*i); print("(%rsp)"); 
+        case OStack(i) => print(8+4*i); print("(%rsp)");
         case OHeap(addr) => printMAddr(addr);
 }
 method printOprnd64(o:operand)
@@ -109,17 +109,17 @@ method printOprnd64(o:operand)
             if 0 <= n as int < 0x1_0000_0000_0000_0000 { print("$"); print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
-        case OStack(i) => print(8+4*i); print("(%rsp)"); 
+        case OStack(i) => print(8+4*i); print("(%rsp)");
         case OHeap(addr) => printMAddr(addr);
 }
 
 method printSmallOprnd(o:operand)
 {
-    if o.OConst? { 
+    if o.OConst? {
       if 0 <= o.n as int < 32 {
-        print("$"); print(o.n); 
-      } else { 
-        print(o.n, " is too large for a small operand"); 
+        print("$"); print(o.n);
+      } else {
+        print(o.n, " is too large for a small operand");
       }
     } else if o.OReg? { printSmallReg(o.r); }
     else { print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); }
@@ -171,7 +171,7 @@ method printName1(name:string, o:operand)
 method printName2(name:string, o1:operand, o2:operand)
 {
     print(name);
-    if o1.OStack? || o1.OHeap? 
+    if o1.OStack? || o1.OHeap?
     || o2.OStack? || o2.OHeap? {
         print("l");
     }
@@ -190,7 +190,7 @@ method printName64_1(name:string, o1:operand)
 method printName64(name:string, o1:operand, o2:operand)
 {
     print(name);
-    if o1.OStack? || o1.OHeap? 
+    if o1.OStack? || o1.OHeap?
     || o2.OStack? || o2.OHeap? {
         print("q");
     }
@@ -317,7 +317,7 @@ method printHeader()
 method printProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32)
 {
   print(".global "); print(proc_name); print("\n");
-  print(proc_name); print(":\n"); 
+  print(proc_name); print(":\n");
 
   var _ := printCode(code, n);
 

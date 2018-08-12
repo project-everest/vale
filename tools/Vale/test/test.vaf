@@ -25,7 +25,7 @@ let double (x:int):int = x + x
 #endverbatim
 
 procedure Calls()
-    requires 
+    requires
         rax < 7;
     modifies
         rax; rbx; efl;

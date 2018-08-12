@@ -30,7 +30,7 @@ procedure{:operand} Mem_in(base:reg, inline offset:int) returns(o:mem)
     extern;
 
 procedure{:operand} Mem_out(base:reg, inline offset:int, o:mem)
-    modifies 
+    modifies
         mem;
 /* not yet needed (currently handled by va_is_dst_mem_operand_int, etc.):
     requires

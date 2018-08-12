@@ -38,7 +38,7 @@ let print_reg_name (r:reg) =
   | R13 -> "r13"
   | R14 -> "r14"
   | R15 -> "r15"
-  
+
 let print_reg (r:reg) (p:printer) =
   p.reg_prefix() ^ print_reg_name r
 
@@ -134,7 +134,7 @@ let print_ins (ins:ins) (p:printer) =
   let print_pair (dst src:string) =
     let first, second = p.op_order dst src in
       first ^ ", " ^ second
-  in    
+  in
   let print_op_pair (dst:operand) (src:operand) (print_dst:operand->printer->string) (print_src:operand->printer-> string) =
     print_pair (print_dst dst p) (print_src src p)
   in
@@ -147,7 +147,7 @@ let print_ins (ins:ins) (p:printer) =
   let print_xmm_op (dst:xmm) (src:operand) =
     let first, second = p.op_order (print_xmm dst p) (print_operand src p) in
       first ^ ", " ^ second
-  in 
+  in
   let print_xmm_op32 (dst:xmm) (src:operand) =
     let first, second = p.op_order (print_xmm dst p) (print_operand32 src p) in
       first ^ ", " ^ second
@@ -155,11 +155,11 @@ let print_ins (ins:ins) (p:printer) =
   let print_op_xmm (dst:operand) (src:xmm) =
     let first, second = p.op_order (print_operand dst p) (print_xmm src p) in
       first ^ ", " ^ second
-  in 
+  in
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst p) (print_xmm src p) in
       first ^ ", " ^ second
-  in  
+  in
   match ins with
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
@@ -176,7 +176,7 @@ let print_ins (ins:ins) (p:printer) =
   | Adox64 dst src -> p.ins_name "  adox" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
   | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
-  | Mulx64 dst_hi dst_lo src -> 
+  | Mulx64 dst_hi dst_lo src ->
     let dst_s = print_ops dst_hi dst_lo in
     p.ins_name "  mulx" [dst_hi; dst_lo; src] ^ print_pair dst_s (print_operand src p)
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
@@ -194,7 +194,7 @@ let print_ins (ins:ins) (p:printer) =
   | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op32 dst src) (print_imm8 index p)
   | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index p)
   | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count p)
- 
+
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =
     let first, second = p.op_order (print_operand o1 p) (print_operand o2 p) in

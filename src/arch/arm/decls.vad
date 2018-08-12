@@ -41,7 +41,7 @@ rLDR(out rd:opr32, base:opr32, ofs:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(LDR_reloc(rd, OSymbol(g)))}
@@ -56,7 +56,7 @@ rLDRglobaladdr(out rd:opr32, inline g:global)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 #verbatim
@@ -70,7 +70,7 @@ predicate ValidGlobals(globals:map<operand, seq<uint32>>)
 predicate ValidGlobalsAddr(globals:map<operand, seq<uint32>>, g:global, addr:int)
 {
     ValidGlobals(globals)
- && ValidGlobal(OSymbol(g)) && WordAligned(addr) 
+ && ValidGlobal(OSymbol(g)) && WordAligned(addr)
  && AddressOfGlobal(OSymbol(g)) <= addr < AddressOfGlobal(OSymbol(g)) + SizeOfGlobal(OSymbol(g))
 }
 #endverbatim
@@ -93,7 +93,7 @@ rLDRglobal(out rd:opr32, inline g:global,
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(STR(rd, base, ofs))}
@@ -114,7 +114,7 @@ rSTR(rd:opr_reg, base:opr32, ofs:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(MOV(dst, src))}
@@ -128,7 +128,7 @@ rMOV(out dst:opr32, src:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
@@ -142,7 +142,7 @@ rMOVShift(out dst:opr32, src:opr_snd, inline shift:Shift)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(EOR(dst, src1, src2))}
@@ -156,7 +156,7 @@ rEOR(out dst:opr32, src1:opr32, src2:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))}
@@ -170,7 +170,7 @@ rEORShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(ADD(dst, src1, src2))}
@@ -178,7 +178,7 @@ rADD(out dst:opr32, src1:opr32, src2:opr32)
     requires
         src1 + src2 < 0x1_0000_0000;
     ensures
-        dst == old(src1 + src2); 
+        dst == old(src1 + src2);
 {
     reveal eval_code;
     reveal ValidRegState;
@@ -186,7 +186,7 @@ rADD(out dst:opr32, src1:opr32, src2:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(SUB(dst, src1, src2))}
@@ -194,7 +194,7 @@ rSUB(out dst:opr32, src1:opr32, src2:opr32)
     requires
         src1 - src2 >= 0;
     ensures
-        dst == old(src1 - src2); 
+        dst == old(src1 - src2);
 {
     reveal eval_code;
     reveal ValidRegState;
@@ -202,7 +202,7 @@ rSUB(out dst:opr32, src1:opr32, src2:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(ADD(dst, src1, src2))}
@@ -218,7 +218,7 @@ rADDWrap(out dst:opr32, src1:opr32, src2:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
@@ -234,7 +234,7 @@ rADDWrapShift(out dst:opr32, src1:opr32, src2:opr_snd, inline shift:Shift)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 procedure{:instruction Ins(AND(dst, src1, src2))}
@@ -248,7 +248,7 @@ rAND(out dst:opr32, src1:opr32, src2:opr32)
 
     ghost if (!(old(this).ok && this.ok)) {
         this := old(this).(ok := false);
-    } 
+    }
 }
 
 #verbatim

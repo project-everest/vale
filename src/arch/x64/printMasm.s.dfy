@@ -55,9 +55,9 @@ method printSmallReg(r:x86reg)
         case X86Ebx => print("bl");
         case X86Ecx => print("cl");
         case X86Edx => print("dl");
-        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
         case X86R8 => print("!!!invalid!!!");
         case X86R9 => print("!!!invalid!!!");
         case X86R10 => print("!!!invalid!!!");
@@ -66,7 +66,7 @@ method printSmallReg(r:x86reg)
         case X86R13 => print("!!!invalid!!!");
         case X86R14 => print("!!!invalid!!!");
         case X86R15 => print("!!!invalid!!!");
-        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
 }
 
 method printMAddr(addr:maddr, ptr_type:string)
@@ -127,11 +127,11 @@ method printXmmOprnd(o:operand)
 
 method printSmallOprnd(o:operand)
 {
-    if o.OConst? { 
+    if o.OConst? {
       if 0 <= o.n as int < 32 {
-        print(o.n); 
-      } else { 
-        print(o.n, " is too large for a small operand"); 
+        print(o.n);
+      } else {
+        print(o.n, " is too large for a small operand");
       }
     } else if o.OReg? { printSmallReg(o.r); }
     else { print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); }

@@ -58,23 +58,23 @@ method printReg(r:ARMReg)
 method printShift(s:Shift)
 {
     match s
-        case LSLShift(amount) => if amount == 0 { 
-                                     print("Shifts cannot be 0!"); 
-                                 } else { 
-                                     print("lsl#"); 
-                                     print(amount); 
+        case LSLShift(amount) => if amount == 0 {
+                                     print("Shifts cannot be 0!");
+                                 } else {
+                                     print("lsl#");
+                                     print(amount);
                                  }
-        case LSRShift(amount) => if amount == 0 { 
-                                     print("Shifts cannot be 0!"); 
-                                 } else { 
-                                     print("lsr#"); 
-                                     print(amount); 
+        case LSRShift(amount) => if amount == 0 {
+                                     print("Shifts cannot be 0!");
+                                 } else {
+                                     print("lsr#");
+                                     print(amount);
                                  }
-        case RORShift(amount) => if amount == 0 { 
-                                     print("Shifts cannot be 0!"); 
-                                 } else { 
-                                     print("ror#"); 
-                                     print(amount); 
+        case RORShift(amount) => if amount == 0 {
+                                     print("Shifts cannot be 0!");
+                                 } else {
+                                     print("ror#");
+                                     print(amount);
                                  }
 }
 
@@ -212,7 +212,7 @@ method printCode(c:code, n:int) returns(n':int)
             n' := printCode(iff, n');
             // Label end of block
             printLabel(end_of_block); print(":"); nl();
-        } 
+        }
         case While(b, loop) =>
         {
           var n1 := n;

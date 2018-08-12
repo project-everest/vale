@@ -96,12 +96,12 @@ unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
 let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) : Lemma
   (requires
     OReg? base /\
-    valid_mem64 (eval_operand base s + offset ) s.mem 
+    valid_mem64 (eval_operand base s + offset ) s.mem
   )
   (ensures valid_operand (va_opr_code_Mem base offset) s)
   =
   ()
-  
+
 
 (* Evaluation *)
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand o s
@@ -151,11 +151,11 @@ let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
   match o with
   | OConst n -> sK
   | OReg r -> va_update_reg r sM sK
-  | OMem m -> va_update_mem sM sK 
+  | OMem m -> va_update_mem sM sK
 
 [@va_qattr] unfold
 let va_update_dst_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
-  va_update_operand o sM sK   
+  va_update_operand o sM sK
 
 [@va_qattr] unfold
 let va_update_operand_dst_opr64 (o:operand) (sM:va_state) (sK:va_state) : va_state =
@@ -198,8 +198,8 @@ let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) =
   match o with
   | OConst n -> s
   | OReg r -> update_reg r v s
-  | OMem m -> s 
-  
+  | OMem m -> s
+
 let va_lemma_upd_update (sM:state) : Lemma
   (
     (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
@@ -232,7 +232,7 @@ unfold let va_get_whileCond (c:va_code{While? c}) : ocmp = While?.whileCond c
 unfold let va_get_whileBody (c:va_code{While? c}) : va_code = While?.whileBody c
 
 (** Map syntax **)
-// syntax for map accesses, m.[key] and m.[key] <- value 
+// syntax for map accesses, m.[key] and m.[key] <- value
 type map (key:eqtype) (value:Type) = Map.t key value
 let op_String_Access     = Map.sel
 let op_String_Assignment = Map.upd
