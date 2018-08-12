@@ -30,8 +30,6 @@ type ins =
   | Pxor       : dst:xmm -> src:xmm -> ins
   | Pslld      : dst:xmm -> amt:int -> ins
   | Psrld      : dst:xmm -> amt:int -> ins
-  | Psrldq     : dst:xmm -> amt:int -> ins
-  | Pshufb     : dst:xmm -> src:xmm -> ins  
   | Pshufd     : dst:xmm -> src:xmm -> permutation:imm8 -> ins  
   | Pcmpeqd    : dst:xmm -> src:xmm -> ins
   | Pextrq     : dst:operand -> src:xmm -> index:imm8 -> ins
@@ -341,26 +339,6 @@ let eval_ins (ins:ins) : st unit =
     check_imm (0 <= amt && amt < 32);;
     update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
  
-  | Psrldq dst amt ->
-    check_imm (0 <= amt && amt < 16);;
-    let src_q = eval_xmm dst s in
-    let src_bytes = le_quad32_to_bytes src_q in
-    let abs_amt = if 0 <= amt && amt <= (length src_bytes) then amt else 0 in // F* can't use the check_imm above
-    let zero_pad = Seq.create abs_amt 0 in
-    let remaining_bytes = slice src_bytes abs_amt (length src_bytes) in
-    let dst_q = le_bytes_to_quad32 (append zero_pad remaining_bytes) in
-    update_xmm_preserve_flags dst dst_q
-
-  | Pshufb dst src -> 
-    let src_q = eval_xmm src s in
-    let dst_q = eval_xmm dst s in
-    // We only spec a restricted version sufficient for doing a byte reversal
-    check_imm (src_q.lo0 = 0x0C0D0E0F &&
-	       src_q.lo1 = 0x08090A0B &&
-	       src_q.hi2 = 0x04050607 &&
-	       src_q.hi3 = 0x00010203);;
-    update_xmm dst ins (reverse_bytes_quad32 dst_q)
-    
   | Pshufd dst src permutation ->  
     let bits:bits_of_byte = byte_to_twobits permutation in
     let src_val = eval_xmm src s in
