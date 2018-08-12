@@ -98,14 +98,14 @@ function opaque_double (x:int) : int extern;
 
 procedure Calls0()
 {
-    
+
     assert 1 + 2 == 3 by { assert 1 + 2 == 2 + 1; }
-    
+
 }
 
 procedure Calls1()
 {
-    
+
     forall x:int {x + x} :| x >= 0 :: x + x >= x
     {
         assert x + x >= 0;
@@ -114,7 +114,7 @@ procedure Calls1()
 
 procedure Calls2()
 {
-    
+
     forall x:int, y:int {x + y} {y + x}:| x >= 0 && y >= 0 :: x + y == y + x
     {
         assert x + y >= 0;
@@ -123,7 +123,7 @@ procedure Calls2()
 
 procedure Calls3()
 {
-    
+
     forall x:int, y:int, z: int {x + y + z, y + x + z} :| x >= 0 && y >= 0 && z >= 0 :: x + y + z == y + x + z
     {
         assert x + y + z >= x;
@@ -132,7 +132,7 @@ procedure Calls3()
 
 procedure Calls4()
 {
-    
+
     forall a:int, x:int, y:int, z: int {a + x + y + z} {y + x + z + a}:| a >= 0 && x >= 0 && y >= 0 && z >= 0 :: a + x + y + z == y + x + z + a
     {
         assert a + x + y + z >= a;
@@ -141,7 +141,7 @@ procedure Calls4()
 
 procedure Calls5()
 {
-    
+
     forall a:int, b:int, x:int, y:int, z: int {a + b + x + y + z, y + x + z + a + b}:| a >= 0 && x >= 0 && y >= 0 && z >= 0 :: a + b + x + y + z == y + x + z + a + b
     {
         assert a + x + y + z >= a;
@@ -150,7 +150,7 @@ procedure Calls5()
 
 procedure Calls6()
 {
-    
+
     forall a:int, b:int, c: int, x:int, y:int, z: int :| a >= 0 && x >= 0 && y >= 0 && z >= 0 :: a + b + c + x + y + z == y + x + z + a + b + c
     {
         assert a + x + y + z >= a;

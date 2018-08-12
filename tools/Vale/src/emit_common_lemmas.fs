@@ -93,7 +93,7 @@ and build_code_stmts (env:env) (benv:build_env) (stmts:stmt list):exp =
 and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
 
-// compute parameters/returns for procedures (abstract/concrete/lemma) 
+// compute parameters/returns for procedures (abstract/concrete/lemma)
 // pfIsRet == false ==> pf is input parameter
 // pfIsRet == true ==> pf is output return value
 // ret == false ==> generate parameters
@@ -425,6 +425,7 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand)
 let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
   let fParams = make_fun_params p.prets p.pargs in
+  let attrs = List.filter filter_fun_attr p.pattrs in
   let f =
     {
       fname = benv.code_name "";
@@ -439,9 +440,9 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
         else Some (build_code_block env benv stmts);
       fattrs =
         if benv.is_quick then
-          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ p.pattrs @ attr_no_verify "admit" benv.proc.pattrs
+          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
         else
-          [(Id "opaque", [])] @ p.pattrs @ attr_no_verify "admit" benv.proc.pattrs;
+          [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
     }
     in
   List.map (fun f -> (loc, DFun f)) (List.rev (f::!(benv.quick_code_funs)))
@@ -646,7 +647,7 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
             is_quick = isQuick;
             is_operand = isOperand;
             is_framed = attrs_get_bool (Id "frame") true p.pattrs;
-            is_terminating = attrs_get_bool (Id "terminates") true p.pattrs;
+            is_terminating = attrs_get_bool (Id "terminates") !fstar p.pattrs;
             code_name = codeName;
             frame_exp = makeFrame env p s0;
             gen_quick_block = gen_quick_block;

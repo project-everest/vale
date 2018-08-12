@@ -11,76 +11,45 @@ import SCons.Util
 
 # Imported identifiers defined in the SConstruct file
 Import('env')
+Import('win32')
+Import('do_build')
+Import('mono')
+Import('dafny_path')
 
 ####################################################################
 #
-#   Code to drive F#, FSLEX, and FSYACC tools
+#   Code to drive F#, fslex_exe, and fsyacc_exe tools
 #
 ####################################################################
 
-BUILD = '#tools/FsLexYacc/FsLexYacc.6.1.0/build'    # the '#' character makes this relative to the SConstruct file in the root of the repo
-FSLEX = BUILD+'/fslex.exe'
-FSYACC = BUILD+'/fsyacc.exe'
-BIN = '#bin'
+bin_dir = Dir('#bin')
+build_dir = Dir('#tools/FsLexYacc/FsLexYacc.6.1.0/build')    # the '#' character makes this relative to the SConstruct file in the root of the repo
+fslex_exe = File(f'{build_dir}/fslex.exe')
+fsyacc_exe = File(f'{build_dir}/fsyacc.exe')
 
-def fsyaccEmitter(target, source, env):
-  # assume the initial target is a .fs file.  Add the .fsi target
-  targetBase, targetExt = os.path.splitext(SCons.Util.to_String(target[0]))
-  target.append(targetBase+'.fsi')
-  return (target, source)
+def abspaths(files):
+  return ' '.join([x.abspath for x in files])
 
-def add_fslexyacc(env):
-  # probe for fslexyacc to ensure it is installed ahead of trying to use it to build
-  fslexfile = File(FSLEX)
-  if not os.path.isfile(str(fslexfile)) and not GetOption('clean'):
-    packages_config = File('#tools/Vale/src/packages.config')
-    packages_dir = Dir('#tools/FsLexYacc')
-    if Execute('%s restore %s -PackagesDirectory %s' % (env['NUGET'], packages_config, packages_dir)):
-      print("Unable to run nuget in order to restore FsLexYacc.  See INSTALL.md for more details.")
-      Exit(1)
-    #raise EnvironmentError('FsLexYacc missing.  Please install to: "%s"'%str(fslexfile))
-    
-  env['FSLEX'] = fslexfile
-  fslex = Builder(action='$MONO $FSLEX $SOURCE -o $TARGET',
-                           suffix = '.fs',
-                           src_suffix = '.fsl')
-  env.Append(BUILDERS = {'FSLex' : fslex})
- 
-  env['FSYACC'] = File(FSYACC)
-  fsyacc = Builder(action='$MONO $FSYACC --module "Parse" $SOURCE -o $TARGET',
-                           suffix = '.fs',
-                           src_suffix = '.fsy',
-                           emitter = fsyaccEmitter)
-  env.Append(BUILDERS = {'FSYacc' : fsyacc})
-
-def build_vale(sources, dafny_refs):
+def build_tool(sources, refs):
   senv = env.Clone()
-  # Wrap all paths in File() so they are appropriately adjusted to be relative to the SConstruct file
-  senv['DAFNY_REFS']=[]
-  for r in dafny_refs:
-    senv.Append(DAFNY_REFS = '-r')
-    senv.Append(DAFNY_REFS = File(r))
-  if sys.platform != 'win32':
-    senv['FSC']='fsharpc'
-  else:
+  r_refs = " ".join([f'-r {x}' for x in refs])
+  if win32:
     # probe for the F# compiler on the PATH
-    fsc = FindFile('fsc.exe', os.environ['PATH'].split(';'))
-    if fsc == None:
+    fsc_exe = FindFile('fsc.exe', os.environ['PATH'].split(';'))
+    if fsc_exe == None:
       installdir = os.environ.get('FSHARPINSTALLDIR')
       if installdir == None:
-        raise EnvironmentError('fsc,exe missing from path and FSHARPINSTALLDIR.')
-      senv['FSC']=File(os.path.join(installdir, 'fsc.exe'))
-    else:
-      senv['FSC']=fsc
-  vale_tool = senv.Command(BIN+'/vale.exe', sources,
-    '$FSC -g --platform:anycpu --standalone --mlcompatibility -O $SOURCES -o $TARGET $DAFNY_REFS')
-
-  # add dependencies to vale.exe
-  for r in dafny_refs:
-    Depends(vale_tool, r)
-  return vale_tool
-
-add_fslexyacc(env)
+        raise EnvironmentError('fsc.exe missing from path and FSHARPINSTALLDIR.')
+      fsc_exe = File(os.path.join(installdir, 'fsc.exe'))
+    fsc_exe = f'"{fsc_exe}"'
+  else:
+    fsc_exe = 'fsharpc'
+  tool_exe = File(f'{bin_dir}/vale.exe')
+  tool_exe = senv.Command(tool_exe, sources,
+    f'{fsc_exe} -g --platform:anycpu --standalone --mlcompatibility -O {abspaths(sources)} -o {tool_exe} {r_refs}')
+  for r in refs:
+    Depends(tool_exe, r)
+  return tool_exe
 
 ####################################################################
 #
@@ -106,7 +75,7 @@ DAFNY_BIN = [
     'Dafny.exe'
   ]
 
-SRC = [
+TOOL_SOURCES = [
   'src/ast.fs',
   'src/ast_util.fs',
   'src/parse_util.fs',
@@ -119,7 +88,6 @@ SRC = [
   'src/emit_common_quick_code.fs',
   'src/emit_common_lemmas.fs',
   'src/emit_common_quick_export.fs',
-  'src/emit_common_refine.fs',
   'src/emit_common_top.fs',
   'src/emit_dafny_text.fs',
   'src/emit_dafny_direct.fs',
@@ -138,7 +106,7 @@ VALE_BIN = DAFNY_BIN + [
 DafnyInterface_dir = Dir('DafnyInterface/Source/DafnyInterface')
 DafnyInterface_src = [DafnyInterface_dir.File(f)
                       for f in ['DafnyDriver.cs', 'Properties/AssemblyInfo.cs']]
-DafnyInterface_refs = [Dir(env['DAFNY_PATH']).File(f).abspath for f in [
+DafnyInterface_refs = [Dir(dafny_path).File(f).abspath for f in [
     'BoogieAbsInt.dll',
     'BoogieConcurrency.dll',
     'BoogieCore.dll',
@@ -150,57 +118,44 @@ DafnyInterface_refs = [Dir(env['DAFNY_PATH']).File(f).abspath for f in [
     'Provers.SMTLib.dll',
 ]]
 
-if sys.platform == 'win32':
+if win32:
   # The default search path for env.Detect() is just windows\system32.
   # Search along the OS PATH, then quote the name to avoid spaces-in-path issues.
   csc = env.WhereIs('csc.exe', path=os.environ['PATH'])
   if csc == None:
     raise EnvironmentError('csc.exe missing from path.')
-  env['CSC'] = '\"' + csc + '\"'
+  csc_exe = '\"' + csc + '\"'
 else: # mono
-  env['CSC'] = env.Detect('dmcs')
+  csc_exe = env.Detect('dmcs')
 
-DafnyInterface_dll = env.Command(
-  '#bin/DafnyInterface.dll',
+DafnyInterface_dll = File('#bin/DafnyInterface.dll')
+env.Command(
+  DafnyInterface_dll,
   DafnyInterface_src,
-  '$CSC -t:library -out:$TARGET $SOURCES '
-    + ' '.join(['-r:'+r for r in DafnyInterface_refs]))
+  f'{csc_exe} -t:library -out:{DafnyInterface_dll} {abspaths(DafnyInterface_src)} '
+    + ' '.join(['-r:' + r for r in DafnyInterface_refs]))
 Depends(DafnyInterface_dll, DafnyInterface_refs)
 
-DAFNY_REFS = [Dir(env['DAFNY_PATH']).File(f).abspath for f in DAFNY_BIN] + [
-  DafnyInterface_dll,
+DAFNY_REFS = [Dir(dafny_path).File(f).abspath for f in DAFNY_BIN] + [
+  str(DafnyInterface_dll),
   '../Dafny/Newtonsoft.Json.dll',
   '../../tools/FsLexYacc/FsLexYacc.Runtime.6.1.0/lib/net40/FsLexYacc.Runtime.dll'
   ]
 
 # build vale.exe
-env.FSLex(target='../../obj/Vale/lex.fs', source='src/lex.fsl')
-env.FSYacc(target='../../obj/Vale/parse.fs', source='src/parse.fsy')
-vale_tool = build_vale(SRC, DAFNY_REFS)
+lex_fsl = File('src/lex.fsl')
+parse_fsy = File('src/parse.fsy')
+lex_fs = File('#obj/Vale/lex.fs')
+parse_fs = File('#obj/Vale/parse.fs')
+env.Command(lex_fs, lex_fsl, f'{mono} {fslex_exe} {lex_fsl.abspath} -o {lex_fs}')
+env.Command(parse_fs, parse_fsy, f'{mono} {fsyacc_exe} --module "Parse" {parse_fsy.abspath} -o {parse_fs}')
+tool_exe = build_tool([File(x) for x in TOOL_SOURCES], [File(x) for x in DAFNY_REFS])
 
-# copy the dependencies to the BIN directory, too
-dependencies = vale_tool
+# copy the dependencies to the bin_dir directory, too
 for s in VALE_BIN:
-  b = env.CopyAs(Dir(BIN).File(s), Dir(env['DAFNY_PATH']).File(s))
-  Depends(vale_tool, b)
-  dependencies.append(b)
-if sys.platform == 'win32' or (
-    sys.platform.startswith('linux')
-        and os.path.exists('/proc/sys/fs/binfmt_misc/WSLInterop')):
+  b = env.CopyAs(Dir(bin_dir).File(s), Dir(dafny_path).File(s))
+  Depends(tool_exe, b)
+if win32:
   # we can use our win32 z3 binary, either natively or via WSL interop
-  b = env.CopyAs(Dir(BIN).File('z3.exe'), Dir(env['DAFNY_PATH']).File('z3.exe'))
-  Depends(vale_tool, b)
-  dependencies.append(b)
-  z3 = File(b[0])
-else:
-  z3 = FindFile('z3', os.environ['PATH'].split(':'))
-  if z3 == None:
-    raise EnvironmentError('z3 missing from path.')
-  Depends(vale_tool, z3)
-  dependencies.append(z3)
-  
-# Return a list containing the vale.exe tool and its dependent DLLs, for
-# other scripts to use as additional dependencies.
-# Also return the path to z3 relative to the root Sconstruct file.
-vale_tool_results = collections.namedtuple('ValeToolResults', 'dependencies z3')(dependencies, z3)
-Return('vale_tool_results')
+  z3 = env.CopyAs(Dir(bin_dir).File('z3.exe'), Dir(dafny_path).File('z3.exe'))
+  Depends(tool_exe, z3)

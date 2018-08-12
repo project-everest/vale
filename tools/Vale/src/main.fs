@@ -37,7 +37,7 @@ let main (argv) =
     | Some loc -> printfn "\nerror at %s:" (string_of_loc loc)
     in
   let print_error_prefix locOpt =
-    match !lexbufOpt with 
+    match !lexbufOpt with
     | None -> printfn "\nerror processing file %s" !cur_file; print_error_loc locOpt
     | Some lexbuf -> printfn "\nerror at line %i column %i of file %s" (line lexbuf) (col lexbuf) (file lexbuf)
     in
@@ -73,6 +73,10 @@ let main (argv) =
             then failwith "Cannot include include both -dafnyDirect and -fstarText"
             else dafnyDirect := true; match_args l
         | "-h" :: [] -> failwith "TODO: Implement command line help"
+        | "-dafnyText" :: l ->
+            if !dafnyDirect
+            then failwith "Cannot include include both -dafnyDirect and -dafnyText"
+            else match_args l
         | "-fstarText" :: l ->
             if !dafnyDirect
             then failwith "Cannot include include both -dafnyDirect and -fstarText"

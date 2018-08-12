@@ -151,8 +151,8 @@ and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | So
 and string_of_pformal (x:id, t:typ, _, _, _) = string_of_formal (x, Some t)
 and string_of_pformals (xs:pformal list):string = String.concat " " (List.map string_of_pformal xs)
 and string_of_trigger (es:exp list):string = String.concat "; " (List.map string_of_exp es)
-and string_of_triggers (ts:exp list list):string = 
-    match ts with 
+and string_of_triggers (ts:exp list list):string =
+    match ts with
     | [] -> ""
     | [t] -> "{:pattern" + string_of_trigger t + "}"
     | _::_::_ -> "{:pattern " + String.concat "\/ " (List.map string_of_trigger ts) + "}"
@@ -180,7 +180,7 @@ let string_of_decrease (es:exp list) n =
   match es with
   | [] -> ""
   | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map string_of_exp es)) n
-  
+
 let string_of_outs_exp (outs:(bool * formal list) option):string =
   match outs with
   | None -> "()"
@@ -267,13 +267,13 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
         ps.PrintLine (" = fun " + (let_string_of_formals false xs) + "->" + intro);
         let p = [ for i in 1 .. n -> "t"+(string i)] in
         let string_of_p = String.concat " " p in
-        ps.PrintLine (" (fun " + string_of_p + " -> FStar.Classical.move_requires " + "(" + f + " " + (let_string_of_formals false xs) + " " + string_of_p + ")" + ")");       
+        ps.PrintLine (" (fun " + string_of_p + " -> FStar.Classical.move_requires " + "(" + f + " " + (let_string_of_formals false xs) + " " + string_of_p + ")" + ")");
         ps.Unindent ();
       in
-      let forall_intro_name l n = 
-        if n >3 then l + "_forall_intro_" + (string n) else "FStar.Classical.forall_intro_3" 
+      let forall_intro_name l n =
+        if n >3 then l + "_forall_intro_" + (string n) else "FStar.Classical.forall_intro_3"
       in
-      let rec gen_forall_intro l n = 
+      let rec gen_forall_intro l n =
         match n with
         | 0 | 1 | 2 | 3 -> ()
         | _ ->
@@ -294,13 +294,13 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
             ps.Unindent ();
           )
       in
-      let rec gen_forall l f (xs: formal list) = 
-        match xs.Length with 
+      let rec gen_forall l f (xs: formal list) =
+        match xs.Length with
         | 0 -> ps.PrintLine(l)
         | 1 -> ps.PrintLine("FStar.Classical.forall_intro " + "(FStar.Classical.move_requires " + f + ")")
         | 2 -> ps.PrintLine("FStar.Classical.forall_intro_2 " + "(fun x -> FStar.Classical.move_requires " + "(" + f + " x)" + ")")
         | 3 -> ps.PrintLine("FStar.Classical.forall_intro_3 " + "(fun x y -> FStar.Classical.move_requires " + "(" + f + " x y)" + ")")
-        | _ -> 
+        | _ ->
          (
             let aux_name = f + "_1" in
             let n = xs.Length - 1 in
@@ -310,7 +310,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
             ps.PrintLine("FStar.Classical.forall_intro " + "(FStar.Classical.move_requires " + aux_name + ")");
           )
       in
-      let gen_lemma l xs ts ex e ss = 
+      let gen_lemma l xs ts ex e ss =
         let f = l + "_f" in
         ps.PrintLine ("let " + f + " " + (let_string_of_formals true xs) + " : Lemma ");
         ps.Indent ();
@@ -319,7 +319,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
         ps.PrintLine "=";
         emit_block ps " in " None ss;
         ps.Unindent ();
-        gen_forall l f xs; 
+        gen_forall l f xs;
       in
       ps.PrintLine ("let " + l + " () : Lemma ");
       match (xs, ts) with
@@ -330,7 +330,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
           emit_block ps (" in " + l + " ();") None ss;
       | ([], _::_) -> err "trigger only allowed with one or more variables"
       | (_, _) ->
-        ( 
+        (
           ps.Indent();
           ps.PrintLine ("(forall " + (string_of_formals xs) + ". " + (string_of_triggers ts) + "(" + (string_of_exp ex) + "==>" + (string_of_exp e) + ")" + ")");
           ps.Unindent();
@@ -338,7 +338,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
           ps.Indent ();
           gen_lemma l xs ts ex e ss;
           ps.Unindent ()
-          ps.PrintLine "in";      
+          ps.PrintLine "in";
         )
         ps.PrintLine(l + "();");
     )

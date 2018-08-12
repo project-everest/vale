@@ -47,6 +47,13 @@ let eliminate_assign_lhss (s:stmt):stmt list =
 
 let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 
+let filter_fun_attr (x, es) =
+  match x with
+  | Id "recursive" -> !fstar
+  | Id ("tactic" | "quick" | "decrease") -> true
+  | _ -> false
+  in
+
 let filter_proc_attr (x, es) =
   match x with
   | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick" | "recursive" | "decrease") -> true
@@ -176,4 +183,4 @@ let rec hide_ifs (e:exp):exp =
     in
   map_exp f e
 
-  
+

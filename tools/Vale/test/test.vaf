@@ -27,7 +27,7 @@ let double (x:int):int = x + x
 function double (x:int):int extern;
 
 procedure Calls()
-    requires 
+    requires
         rax < 7;
     modifies
         rax; rbx; efl;

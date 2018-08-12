@@ -11,7 +11,7 @@ module dafny_wrappers_i {
         requires 0 <= start <= end <= |s|;
         { s[start..end] }
     function SeqTail<T>(s:seq<T>, tail:nat) : seq<T> requires tail <= |s| { s[tail..] }
-    function SeqDrop<T>(s:seq<T>, tail:int) : seq<T> 
+    function SeqDrop<T>(s:seq<T>, tail:int) : seq<T>
         requires 0 <= tail <= |s|
         { s[..tail] }
     function SeqAppendElt<T>(s:seq<T>, elt:T) : seq<T> { s + [elt] }

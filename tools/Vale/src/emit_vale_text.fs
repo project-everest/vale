@@ -160,8 +160,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssert (attrs, e) ->
       let sAssert = if attrs.is_inv then "invariant" else "assert" in
       let sSplit = if attrs.is_split then "{:split_here}" else "" in
-      let sRefined = if attrs.is_refined then "{:refined}" else "" in
-      ps.PrintLine (sAssert + sSplit + sRefined + " " + (string_of_exp e) + ";")
+      ps.PrintLine (sAssert + sSplit + " " + (string_of_exp e) + ";")
   | SCalc (oop, contents) ->
       ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
       ps.Indent();
@@ -223,15 +222,10 @@ and emit_block (ps:print_state) (stmts:stmt list) =
   ps.Unindent ();
   ps.PrintLine "}"
 
-let string_of_is_refined (r:is_refined) =
-  match r with
-  | Refined -> ""
-  | Unrefined -> "{:refined false}"
-
 let string_of_raw_spec_kind (r:raw_spec_kind) =
   match r with
-  | RRequires r -> "requires" + (string_of_is_refined r)
-  | REnsures r -> "ensures" + (string_of_is_refined r)
+  | RRequires r -> "requires"
+  | REnsures r -> "ensures"
   | RRequiresEnsures -> "requires/ensures"
   | RModifies Read -> "reads"
   | RModifies Modify -> "modifies"
@@ -263,9 +257,9 @@ let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
   try
     match s with
     | Requires (r, e) ->
-        ps.PrintLine ("requires" + (string_of_is_refined r) + " " + (string_of_exp e) + ";")
+        ps.PrintLine ("requires" + " " + (string_of_exp e) + ";")
     | Ensures (r, e) ->
-        ps.PrintLine ("ensures" + (string_of_is_refined r) + "  " + (string_of_exp e) + ";")
+        ps.PrintLine ("ensures" + "  " + (string_of_exp e) + ";")
     | Modifies (Read, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
     | Modifies (Modify, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
     | Modifies (Preserve, e) -> ps.PrintLine ("preserves " + (string_of_exp e) + ";")

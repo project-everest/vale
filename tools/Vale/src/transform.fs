@@ -2,7 +2,6 @@
 //   - resolve overloading
 //   - turn operands into appropriate ghost variables
 //   - turn references to operands into appropriate ghost variables
-//   - insert some diagnostic assertions for {:refined true}
 // Mostly, this is about changing expressions and arguments
 
 module Transform
@@ -870,7 +869,7 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
           Replace (env, mods m)
     )
   | SpecRaw (Lets _) -> PostProcess (fun (env, _) -> (env, []))
-  
+
 let rewrite_vars_spec (envIn:env) (envOut:env) (s:spec):spec =
   match s with
   | Requires (r, e) -> Requires (r, rewrite_vars_exp None envIn e)
@@ -898,93 +897,6 @@ let check_no_duplicates (es:(loc * exp) list):unit =
     | _::t -> f t
     in
   f ss
-
-///////////////////////////////////////////////////////////////////////////////
-// Add extra asserts for p's ensures clauses and for called procedures' requires clauses,
-// to produce better error messages.
-
-let rec is_while_proc (ss:stmt list):bool =
-  match ss with
-  | [s] ->
-    (
-      match skip_loc_stmt s with
-      | SWhile (e, invs, ed, _) -> true
-      | _ -> false
-    )
-  | s::ss when (match skip_locs_stmt s with [SVar (_, _, _, XGhost, _, _)] | [SAssign ([(_, None)], EVar _)] -> true | _ -> false) -> is_while_proc ss
-  | _ -> false
-
-let add_req_ens_asserts (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):stmt list =
-  if is_while_proc ss then ss else
-  let hideResults ss = // wrap assertions in "forall ensures true" for better performance
-    SForall ([], [], EBool true, EBool true, ss)
-    in
-  let rec fs (loc:loc) (s:stmt):stmt list map_modify =
-    let reqAssert (f:exp -> exp) (loc, spec) =
-      match spec with
-      | Requires (Unrefined, _) -> []
-      | Requires (Refined, e) -> [SLoc (loc, SAssert (assert_attrs_default, f e))]
-      | _ -> []
-      in
-    let rec assign e =
-      match e with
-      | ELoc (loc, e) -> try assign e with err -> raise (LocErr (loc, err))
-      | EApply (x, _, es) when Map.containsKey x env.raw_procs ->
-        let pCall = Map.find x env.raw_procs in
-        if List.length es = List.length pCall.pargs then
-          (* Generate one assertion for each precondition of the procedure pCall that we're calling.
-             Also generate "assert true" to mark the location of the call itself.
-             Wrap the whole thing in "forall ensures true" to improve verification performance.
-          forall 
-            ensures true
-          {
-            ghost var va_tmp_dst := va_x90_eax;
-            ghost var va_tmp_ptr := va_old_esi;
-            ghost var va_tmp_offset := 60;
-            assert true;
-            assert inMem(va_tmp_ptr + va_tmp_offset, va_x99_mem);
-          }
-          *)
-          let es = List.map (map_exp (fun e -> match e with EOp (Uop UConst, [e]) -> Replace e | _ -> Unchanged)) es in
-          let xs = List.map (fun (x, _, _, _, _) -> x) pCall.pargs in
-          let rename x = Reserved ("tmp_" + string_of_id x) in
-          let xSubst = Map.ofList (List.map (fun x -> (x, EVar (rename x))) xs) in
-          let xDecl x e = SVar (rename x, None, Immutable, XGhost, [], Some e) in
-          let xDecls = List.map2 xDecl xs es in
-          let f e =
-//            let f2 e x ex = EBind (BindLet, [ex], [(rename x, None)], [], e) in
-//            List.fold2 f2 (subst_reserved_exp xSubst e) xs es
-            let e = map_exp (fun e -> match e with EOp (Uop UOld, [e]) -> Replace e | _ -> Unchanged) e in
-            subst_reserved_exp xSubst e
-            in
-          let reqAsserts = (List.collect (reqAssert f) pCall.pspecs) in
-          let reqMarker = SLoc (loc, SAssert (assert_attrs_default, EBool true)) in
-          Replace ([hideResults (xDecls @ (reqMarker::reqAsserts)); s])
-        else Unchanged
-      | _ -> Unchanged
-      in
-    match s with
-    | SLoc (loc, s) -> fs loc s
-    | SAssign (_, e) -> assign e
-    | _ -> Unchanged
-    in
-  let ss = map_stmts (fun e -> e) (fs loc) ss in
-  let ensStmt (loc, s) =
-    (* Generate one assertion for each postcondition of the current procedure p.
-       Wrap each assertion in a "forall ensures true" to improve verification performance.
-    forall 
-      ensures true
-    {
-      assert va_old_esi + 64 <= va_old_edi || va_old_edi + 64 <= va_old_esi;
-    }
-    *)
-    match s with
-    | Ensures (Unrefined, _) -> []
-    | Ensures (Refined, e) -> [hideResults [SLoc (loc, SAssert (assert_attrs_default, e))]]
-    | _ -> []
-    in
-  let ensStmts = List.collect ensStmt p.pspecs in
-  ss @ ensStmts
 
 ///////////////////////////////////////////////////////////////////////////////
 // Add quick blocks for assert{:quick_start}...assert{:quick_end}
@@ -1263,7 +1175,6 @@ type transformed =
 
 // Either transform p, or return a list of decls that then must be transformed
 let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
-  let isRefined = attrs_get_bool (Id "refined") false p.pattrs in
   let isFrame = attrs_get_bool (Id "frame") true p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
@@ -1284,7 +1195,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let okMod = SpecRaw (RawSpec (RModifies Preserve, [(loc, SpecExp ok)])) in
   let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
   let okSpecs = (if isAlreadyModOk then [] else [(loc, okMod)]) @ [(loc, okReqEns)] in
-  let pspecs = if isRefined || isFrame then okSpecs @ p.pspecs else p.pspecs in
+  let pspecs = if isFrame then okSpecs @ p.pspecs else p.pspecs in
   let pspecs = match preserveSpecs with [] -> pspecs | _ -> pspecs @ [(loc, SpecRaw (RawSpec (REnsures Unrefined, preserveSpecs)))] in
   let addParam isRet ids (x, t, g, io, a) =
     match g with
@@ -1348,7 +1259,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let envpIn = {envpIn with abstractOld = true} in
   let envp = envpIn in
   let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
-  let envp = {envp with checkMods = isRefined || isFrame} in
+  let envp = {envp with checkMods = isFrame} in
   let envp = {envp with abstractOld = false} in
   let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
   let specs = List_mapSnd (resolve_overload_spec envpIn envp) specs in
@@ -1371,7 +1282,6 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
           | _ -> Unchanged
           in
         let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
-        let ss = if isRefined && not isInstruction then add_req_ens_asserts env loc p ss else ss in
         let ss = resolve_overload_stmts envp ss in
         //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
         let ss = add_quick_type_stmts ss in

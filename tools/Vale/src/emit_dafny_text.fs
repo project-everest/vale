@@ -194,7 +194,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let sAttr (x, es) =
     match (x, es) with
     | (Id "opaque", ([] | [EBool true])) -> "{:opaque}"
-    | _ -> err ("unknown function attribute " + (sid x))
+    | _ -> err ("unknown function attribute " + (sid x) + " on function " + (sid f.fname))
     in
   let sAttrs = List.map sAttr f.fattrs in
   ps.PrintLine (sFun + (String.concat "" sAttrs) + " " + (sid f.fname) + "(" + (string_of_formals f.fargs) + "):" + (string_of_typ f.fret));

@@ -1,12 +1,10 @@
 // Trusted printer for producing MASM code
 
 include "def.s.dfy"
-//"const-time.i.dfy"
 
 module x64_printGcc_s {
 
 import opened x64_def_s
-//import opened x86_const_time_i
 
 method printReg(r:x86reg)
 {
@@ -60,9 +58,9 @@ method printSmallReg(r:x86reg)
         case X86Ebx => print("bl");
         case X86Ecx => print("cl");
         case X86Edx => print("dl");
-        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
         case X86R8 => print("!!!invalid!!!");
         case X86R9 => print("!!!invalid!!!");
         case X86R10 => print("!!!invalid!!!");
@@ -71,7 +69,7 @@ method printSmallReg(r:x86reg)
         case X86R13 => print("!!!invalid!!!");
         case X86R14 => print("!!!invalid!!!");
         case X86R15 => print("!!!invalid!!!");
-        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
 }
 
 method printMAddr(addr:maddr)
@@ -101,8 +99,8 @@ method printOprnd(o:operand)
             if 0 <= n as int < 0x1_0000_0000 { print("$"); print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
-        case OStack(i) => print(8+4*i); print("(%rsp)"); 
-        case OHeap(addr, taint) => printMAddr(addr);
+        case OStack(i) => print(8+4*i); print("(%rsp)");
+        case OHeap(addr) => printMAddr(addr);
 }
 method printOprnd64(o:operand)
 {
@@ -111,17 +109,17 @@ method printOprnd64(o:operand)
             if 0 <= n as int < 0x1_0000_0000_0000_0000 { print("$"); print(n); }
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
-        case OStack(i) => print(8+4*i); print("(%rsp)"); 
-        case OHeap(addr, taint) => printMAddr(addr);
+        case OStack(i) => print(8+4*i); print("(%rsp)");
+        case OHeap(addr) => printMAddr(addr);
 }
 
 method printSmallOprnd(o:operand)
 {
-    if o.OConst? { 
+    if o.OConst? {
       if 0 <= o.n as int < 32 {
-        print("$"); print(o.n); 
-      } else { 
-        print(o.n, " is too large for a small operand"); 
+        print("$"); print(o.n);
+      } else {
+        print(o.n, " is too large for a small operand");
       }
     } else if o.OReg? { printSmallReg(o.r); }
     else { print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); }
@@ -173,7 +171,7 @@ method printName1(name:string, o:operand)
 method printName2(name:string, o1:operand, o2:operand)
 {
     print(name);
-    if o1.OStack? || o1.OHeap? 
+    if o1.OStack? || o1.OHeap?
     || o2.OStack? || o2.OHeap? {
         print("l");
     }
@@ -192,7 +190,7 @@ method printName64_1(name:string, o1:operand)
 method printName64(name:string, o1:operand, o2:operand)
 {
     print(name);
-    if o1.OStack? || o1.OHeap? 
+    if o1.OStack? || o1.OHeap?
     || o2.OStack? || o2.OHeap? {
         print("q");
     }
@@ -217,7 +215,6 @@ method printIns(ins:ins)
         case Sub32(dst, src)    => printName2("  sub", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Mul32(src)         => printName1("  mul", src);      printOprnd(src); print("\n");
         case AddCarry(dst, src) => printName2("  add", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case BSwap32(dst)       => printName1("  bswap", dst);    printOprnd(dst); print("\n");
         case Xor32(dst, src)    => printName2("  xor", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case Xor64(dst, src)    => printName2("  xor", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
         case And32(dst, src)    => printName2("  and", dst, src); printOprnd(src); print(", "); printOprnd(dst); print("\n");
@@ -268,7 +265,6 @@ method printIns(ins:ins)
         case Shr32(dst, src)    => printName1("  shr", dst); printShiftOprnd(src, 32); print ", "; printOprnd(dst); print("\n");
 
         case Pxor(dst, src)                => print ("  pxor ");    printOprnd(src); print(", "); printOprnd(dst); print("\n");
-        case MOVDQU(dst, src)              => print ("  movdqu ");  printOprnd(src); print(", "); printOprnd(dst); print("\n");
 }
 
 method printBlock(b:codes, n:int) returns(n':int)
@@ -321,7 +317,7 @@ method printHeader()
 method printProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32)
 {
   print(".global "); print(proc_name); print("\n");
-  print(proc_name); print(":\n"); 
+  print(proc_name); print(":\n");
 
   var _ := printCode(code, n);
 
@@ -337,35 +333,5 @@ method printFooter()
 {
     print("\n");
 }
-
-/*
-// runs constant time analysis
-method checkConstantTimeAndPrintProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, ts:taintState)
-    decreases * 
-{
-    var constTime, ts' := checkIfCodeConsumesFixedTime(code, ts);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (constTime == false) {
-        print(proc_name + ": Constant time check failed\n");
-    } else {
-        printProc(proc_name, code, n, ret_count);
-    }
-}
-
-// runs both leakage analysis and constant time analysis
-method checkConstantTimeAndLeakageBeforePrintProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, ts:taintState, tsExpected:taintState)
-    decreases * 
-{
-    var b := checkIfCodeisLeakageFree(code, ts, tsExpected);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (b == false) {
-        print(proc_name + ": Constant time check or leakage analysis failed\n");
-    } else {
-        printProc(proc_name, code, n, ret_count);
-    }
-}
-*/
 
 }

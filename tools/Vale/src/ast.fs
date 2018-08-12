@@ -26,7 +26,7 @@ type formal = id * typ option
 
 type exp_call = CallGhost | CallLemma | CallInline | CallOutline
 
-type uop = 
+type uop =
 | UNot of bool_or_prop | UNeg | UOld | UIs of id
 | UConst
 | UReveal | UGhostOnly | UToOperand

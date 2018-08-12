@@ -1,9 +1,7 @@
 include "def.s.dfy"
-include "leakage.i.dfy"
 
 module ARM_print_s {
 import opened ARM_def_s
-import opened ARM_leakage_i
 
 function method user_continue_label(): string
 {
@@ -60,23 +58,23 @@ method printReg(r:ARMReg)
 method printShift(s:Shift)
 {
     match s
-        case LSLShift(amount) => if amount == 0 { 
-                                     print("Shifts cannot be 0!"); 
-                                 } else { 
-                                     print("lsl#"); 
-                                     print(amount); 
+        case LSLShift(amount) => if amount == 0 {
+                                     print("Shifts cannot be 0!");
+                                 } else {
+                                     print("lsl#");
+                                     print(amount);
                                  }
-        case LSRShift(amount) => if amount == 0 { 
-                                     print("Shifts cannot be 0!"); 
-                                 } else { 
-                                     print("lsr#"); 
-                                     print(amount); 
+        case LSRShift(amount) => if amount == 0 {
+                                     print("Shifts cannot be 0!");
+                                 } else {
+                                     print("lsr#");
+                                     print(amount);
                                  }
-        case RORShift(amount) => if amount == 0 { 
-                                     print("Shifts cannot be 0!"); 
-                                 } else { 
-                                     print("ror#"); 
-                                     print(amount); 
+        case RORShift(amount) => if amount == 0 {
+                                     print("Shifts cannot be 0!");
+                                 } else {
+                                     print("ror#");
+                                     print(amount);
                                  }
 }
 
@@ -166,11 +164,10 @@ method printIns(ins:ins)
         case SUB(dest, src1, src2) => printIns3Op("SUB", dest, src1, src2);
         case AND(dest, src1, src2) => printIns3Op("AND", dest, src1, src2);
         case EOR(dest, src1, src2) => printIns3Op("EOR", dest, src1, src2);
-        case REV(dest, src) => printIns2Op("REV", dest, src);
-        case LDR(rd, base, ofs, taint) => printInsLdStr("LDR", rd, base, ofs);
+        case LDR(rd, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_global(rd, global, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_reloc(rd, sym) => printIns2Op("LDR", rd, sym);
-        case STR(rd, base, ofs, taint) => printInsLdStr("STR", rd, base, ofs);
+        case STR(rd, base, ofs) => printInsLdStr("STR", rd, base, ofs);
         case STR_global(rd, global, base, ofs) => printInsLdStr("STR", rd, base, ofs);
         case MOV(dst, src) => printIns2Op("MOV", dst, src);
     }
@@ -215,7 +212,7 @@ method printCode(c:code, n:int) returns(n':int)
             n' := printCode(iff, n');
             // Label end of block
             printLabel(end_of_block); print(":"); nl();
-        } 
+        }
         case While(b, loop) =>
         {
           var n1 := n;
@@ -310,34 +307,4 @@ method printFooter()
 {
 }
 
-// runs constant time analysis
-method checkConstantTime(proc_name:seq<char>, code:code, ts:taintState) returns (b:bool)
-    decreases * 
-{
-    var constTime, ts' := checkIfCodeConsumesFixedTime(code, ts);
-    b := constTime;
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (constTime == false) {
-        print(proc_name + ": Constant time check failed\n");
-    } else {
-        //printProc(proc_name, code, n, ret_count);
-        //var n' := printCode(code, n);
-    }
-}
-
-// runs both leakage analysis and constant time analysis
-method checkLeakage(proc_name:seq<char>, code:code, ts:taintState, tsExpected:taintState) returns (b:bool)
-    decreases * 
-{
-    b := checkIfCodeisLeakageFree(code, ts, tsExpected);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (b == false) {
-        print(proc_name + ": Leakage analysis failed\n");
-    } else {
-        // printProc(proc_name, code, n, ret_count);
-        //var n' := printCode(code, n);
-    }
-}
 }

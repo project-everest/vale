@@ -7,7 +7,7 @@ module x64_print_s {
 
 import opened x64_def_s
 
-import Masm = x64_printMasm_s 
+import Masm = x64_printMasm_s
 import Gcc = x64_printGcc_s
 
 datatype AsmTarget = MASM | GCC
