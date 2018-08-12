@@ -2,7 +2,6 @@
 
 module X64.Vale.QuickCodes_i
 open X64.Machine_s
-open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -350,13 +349,12 @@ val wp_run_code (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (update:state 
 
 unfold let normal_steps : list string =
   [
-    "X64.Vale.State_i.__proj__Mkstate__item__ok";
-    "X64.Vale.State_i.__proj__Mkstate__item__regs";
-    "X64.Vale.State_i.__proj__Mkstate__item__xmms";
-    "X64.Vale.State_i.__proj__Mkstate__item__flags";
-    "X64.Vale.State_i.__proj__Mkstate__item__mem";
-
-    "X64.Vale.QuickCode_i.__proj__QProc__item__wp";
+    `%Mkstate?.ok;
+    `%Mkstate?.regs;
+    `%Mkstate?.xmms;
+    `%Mkstate?.flags;
+    `%Mkstate?.mem;
+    `%QProc?.wp;
   ]
 
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr [`%va_qattr]; delta_only normal_steps] x

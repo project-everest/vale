@@ -2,7 +2,6 @@ module X64.Vale.Lemmas_i
 open X64.Machine_s
 open X64.Vale.State_i
 module S = X64.Semantics_s
-module BS = X64.Bytes_Semantics_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
@@ -28,10 +27,9 @@ let rec increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
       if not (eval_ocmp s0 b) then ()
       else
       (
-        match S.eval_code c (f0 - 1) (state_to_S s0) with
+        match S.eval_code c (f0 - 1) s0 with
         | None -> ()
         | Some s1 ->
-            let s1 = state_of_S s1 in
             increase_fuel c s0 (f0 - 1) s1 (fN - 1);
             if s1.ok then increase_fuel (While b c) s1 (f0 - 1) sN (fN - 1)
             else ()
@@ -41,8 +39,7 @@ and increase_fuels (c:codes) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
   | [] -> ()
   | h::t ->
     (
-      let Some s1 = S.eval_code h f0 (state_to_S s0) in
-      let s1 = state_of_S s1 in
+      let Some s1 = S.eval_code h f0 s0 in
       increase_fuel h s0 f0 s1 fN;
       increase_fuels t s1 f0 sN fN
     )
@@ -82,9 +79,9 @@ let lemma_ifElseFalse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) 
   ()
 
 let eval_while_inv_temp (c:code) (s0:state) (fW:fuel) (sW:state) : Type0 =
-  forall (f:nat).{:pattern S.eval_code c f (state_to_S sW)}
-    Some? (S.eval_code c f (state_to_S sW)) ==>
-    S.eval_code c (f + fW) (state_to_S s0) == S.eval_code c f (state_to_S sW)
+  forall (f:nat).{:pattern S.eval_code c f sW}
+    Some? (S.eval_code c f sW) ==>
+    S.eval_code c (f + fW) s0 == S.eval_code c f sW
 
 let eval_while_inv (c:code) (s0:state) (fW:fuel) (sW:state) : Type0 =
   eval_while_inv_temp c s0 fW sW
@@ -97,7 +94,7 @@ let lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
 
 let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
   let f1 = fW + 1 in
-  assert (S.eval_code (While b c) f1 (state_to_S s0) == S.eval_code (While b c) 1 (state_to_S sW));
+  assert (S.eval_code (While b c) f1 s0 == S.eval_code (While b c) 1 sW);
   assert (eval_code (While b c) s0 f1 sW);
   (sW, f1)
   
@@ -105,17 +102,17 @@ let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
 let lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) =
   let fN:nat = f0 + fM + 1 in
   let fForall (f:nat) : Lemma
-    (requires Some? (S.eval_code c f (state_to_S sN)))
-    (ensures S.eval_code c (f + fN) (state_to_S s0) == S.eval_code c f (state_to_S sN)) =
-    let Some sZ = S.eval_code c f (state_to_S sN) in
+    (requires Some? (S.eval_code c f sN))
+    (ensures S.eval_code c (f + fN) s0 == S.eval_code c f sN) =
+    let Some sZ = S.eval_code c f sN in
     let fZ = if f > fM then f else fM in
     increase_fuel (While?.whileBody c) sM fM sN fZ;
-    increase_fuel c sN f (state_of_S sZ) fZ;
-    assert (S.eval_code c (fZ + 1) (state_to_S sM) == Some sZ);
-    assert (S.eval_code c (fZ + 1) (state_to_S sM) == S.eval_code c (fZ + 1 + f0) (state_to_S s0));
-    assert (S.eval_code c (fZ + 1 + f0) (state_to_S s0) == Some sZ);
-    increase_fuel c s0 (fZ + 1 + f0) (state_of_S sZ) (f + fN);
-    assert (S.eval_code c (f + fN) (state_to_S s0) == Some sZ);
+    increase_fuel c sN f sZ fZ;
+    assert (S.eval_code c (fZ + 1) sM == Some sZ);
+    assert (S.eval_code c (fZ + 1) sM == S.eval_code c (fZ + 1 + f0) s0);
+    assert (S.eval_code c (fZ + 1 + f0) s0 == Some sZ);
+    increase_fuel c s0 (fZ + 1 + f0) sZ (f + fN);
+    assert (S.eval_code c (f + fN) s0 == Some sZ);
     ()
     in
   Classical.ghost_lemma fForall;

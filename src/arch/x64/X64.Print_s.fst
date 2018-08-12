@@ -4,7 +4,6 @@ module X64.Print_s
 
 open X64.Machine_s
 open X64.Semantics_s
-open X64.Bytes_Semantics_s
 open FStar.IO
 
 noeq type printer = {
@@ -109,11 +108,6 @@ let print_imm8 (i:int) (p:printer) =
 let print_xmm (x:xmm) (p:printer) =
   p.reg_prefix() ^ "xmm" ^ string_of_int x
 
-let print_mov128_op (o:mov128_op) (p:printer) =
-  match o with
-  | Mov128Xmm x -> print_xmm x p
-  | Mov128Mem m -> print_maddr m "xmmword" print_reg p
-
 assume val print_any: 'a -> string
 
 let print_shift_operand (o:operand) (p:printer) =
@@ -190,8 +184,6 @@ let print_ins (ins:ins) (p:printer) =
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
-  | Push src      -> p.ins_name "  push" [src] ^ print_operand src p
-  | Pop dst       -> p.ins_name "  pop"  [dst] ^ print_operand dst p
   | Paddd dst src          -> "  paddd "      ^ print_xmms dst src
   | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
   | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
@@ -204,7 +196,6 @@ let print_ins (ins:ins) (p:printer) =
   | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op32 dst src) (print_imm8 index p)
   | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index p)
   | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count p)
-  | MOVDQU dst src         -> "  movdqu "     ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
  
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =

@@ -5,7 +5,6 @@ module Quick
 #verbatim{:interface}{:implementation}
 open Words_s
 open X64.Machine_s
-open X64.Memory_i_s
 open X64.Vale
 open X64.Vale.State_i
 open X64.Vale.Decls_i
@@ -123,11 +122,20 @@ let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
 let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
 #endverbatim
 
+procedure{:quick} Incr3Quick()
+    modifies
+        efl;
+        rax;
+    requires
+        rax < 100;
+{
+    Add64(rax, 1);
+}
+
 procedure{:quick exportOnly} Add64Ghosts(
         inout dst:dst_opr64,
         src:opr64,
         inline i:int,
-        ghost b:buffer64,
         ghost g1:int,
         ghost g2:int)
     returns(
