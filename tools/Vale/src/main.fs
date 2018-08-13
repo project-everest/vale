@@ -257,7 +257,7 @@ let main (argv) =
             let rec resuffix map s =
               match map with
               | [] -> err ("could not find matching suffix for path \"" + s + "; use 'include{:suffix false} to suppress this feature")
-              | (s1, s2)::t when s.EndsWith(s1) -> s.Substring(0, s.Length - s1.Length) + s2
+              | (s1, s2)::t when (let s1: string = s1 in s.EndsWith(s1)) -> s.Substring(0, s.Length - s1.Length) + s2
               | _::t -> resuffix t s
               in
             (if useSuffix then processSuffixInclude (Option.isSome from_opt) incBaseRaw (resuffix suffixMap incPath));
