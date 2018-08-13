@@ -10,7 +10,6 @@ import collections
 import SCons.Util
 
 # Imported identifiers defined in the SConstruct file
-# Imported identifiers defined in the SConstruct file
 Import('env')
 Import('win32')
 Import('do_build')

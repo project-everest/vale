@@ -52,6 +52,7 @@ type exp =
 | EId of id
 | EInt of bigint
 | EUnitValue
+| EBool
 | EProp
 | EType of univ
 | EComp of exp * exp * exp list

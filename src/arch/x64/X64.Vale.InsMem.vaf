@@ -1,9 +1,8 @@
 include "X64.Vale.InsBasic.vaf"
-include{:fstar} {:open} "X64.Machine_s"
-include{:fstar} {:open} "X64.Memory_i_s"
-include{:fstar} {:open} "X64.Vale.State_i"
-include{:fstar} {:open} "X64.Vale.Decls_i"
-include{:fstar} {:open} "X64.Vale.QuickCode_i"
+include{:fstar}{:open} "X64.Machine_s"
+include{:fstar}{:open} "X64.Vale.State_i"
+include{:fstar}{:open} "X64.Vale.Decls_i"
+include{:fstar}{:open} "X64.Vale.QuickCode_i"
 
 module X64.Vale.InsMem
 

@@ -1,5 +1,4 @@
 include "../../../src/arch/x64/X64.Vale.InsBasic.vaf"
-include{:fstar} {:open} "X64.Memory_i_s"
 
 module Quick
 

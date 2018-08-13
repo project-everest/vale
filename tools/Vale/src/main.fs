@@ -227,21 +227,25 @@ let main (argv) =
         (if debugIncludes then printfn "adding include from %A: %A --> %A --> %A" sourceDir x xabs path);
         includes_rev := path::!includes_rev
       in
-    let rec processFStarInclude (x:string) (opened:bool): unit =
-        if !all_fstar_type_files = [] then 
-          all_fstar_type_files := Directory.EnumerateFiles(".", "*.fst.types.vaf", SearchOption.AllDirectories) |> List.ofSeq
-        let filename = x + ".fst.types.vaf" in
-        let f = List.tryFind (fun f -> (Path.GetFileName f) = filename) !all_fstar_type_files in
-        let ds = 
-          match f with
-          | Some f -> 
-            if not (Set.contains f !processedFiles) then
-              processedFiles := Set.add f !processedFiles;
-              processFile (f, false)
-            else []
-          | _ -> if !do_typecheck then err (sprintf "cannot find exported fstar type file %s" filename) else []
-        in
-        include_modules_rev := (x, opened, ds)::!include_modules_rev;
+    let rec processFStarInclude (x:string) (opened:bool):unit =
+(*
+      if !all_fstar_type_files = [] then 
+        all_fstar_type_files := Directory.EnumerateFiles(".", "*.fst.types.vaf", SearchOption.AllDirectories) |> List.ofSeq
+      let filename = x + ".fst.types.vaf" in
+      let f = List.tryFind (fun f -> (Path.GetFileName f) = filename) !all_fstar_type_files in
+      let ds = 
+        match f with
+        | Some f -> 
+          if not (Set.contains f !processedFiles) then
+            processedFiles := Set.add f !processedFiles;
+            processFile (f, false)
+          else []
+        | _ -> if !do_typecheck then err (sprintf "cannot find exported fstar type file %s" filename) else []
+      in
+      include_modules_rev := (x, opened, ds)::!include_modules_rev;
+*)
+      include_modules_rev := (x, opened, [])::!include_modules_rev;
+      ()
     and processFile (xRaw:string, isInputFile:bool):((loc * decl) * bool) list =
       let x = if isInputFile then Path.Combine (!sourceDir, xRaw) else xRaw in
       (if debugIncludes then printfn "processing file %A" x);

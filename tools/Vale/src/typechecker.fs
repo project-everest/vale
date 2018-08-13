@@ -196,7 +196,7 @@ let lookup_id (env:env) (x:id):(typ * id_info option) =
 let try_lookup_type (env:env) (x:id):((tformal list option * kind * typ option) option * id) =
   let (t, qx) = lookup_name env x true in
   match t with
-  | Some (Type_info (ts, k, t)) -> (Some (ts, k, t), qx)
+  | Some (Type_info (tfs, k, t)) -> (Some (tfs, k, t), qx)
   | Some (UnsupportedName x) -> unsupported ("unsupported '" + (err_id x) + "'")
   | _ -> (None, x)
 
@@ -230,21 +230,71 @@ let lookup_operand_type (env:env) (x:id):(typ * operand_typ list) =
   | (Some (OperandType_info (t, os)), _) -> (t, os)
   | _ -> err ("cannot find operand type '" + (err_id x) + "'")
 
+// Substitute for TName x in t
+let rec subst_typ_name (m:substitutions) (t:typ):typ =
+  match t with
+  | TName x ->
+    (
+      match Map.tryFind x m with
+      | None -> t
+      | Some t2 -> t2
+    )
+  | TBool _ | TInt _ -> t
+  | TApply (xapp, ts) -> TApply (xapp, subst_typs_name m ts)
+  | TFun (ts, t) -> TFun (subst_typs_name m ts, subst_typ_name m t)
+  | TTuple ts -> TTuple (subst_typs_name m ts)
+  | TVar (x, _) -> internalErr "subst_typ_name: TVar"
+and subst_typs_name (m:substitutions) (ts:typ list):typ list =
+  List.map (subst_typ_name m) ts
+
+// Substitute for TVar x in t
+let rec subst_typ (m:substitutions) (t:typ):typ =
+  match t with
+  | TName _ | TBool _ | TInt _ -> t
+  | TApply (xapp, ts) -> TApply (xapp, subst_typs m ts)
+  | TFun (ts, t) -> TFun (subst_typs m ts, subst_typ m t)
+  | TTuple ts -> TTuple (subst_typs m ts)
+  | TVar (x, _) ->
+    (
+      match Map.tryFind x m with
+      | None -> t
+      | Some t2 -> t2
+    )
+and subst_typs (m:substitutions) (ts:typ list):typ list =
+  List.map (subst_typ m) ts
+
 let rec normalize_type_rec (env:env) (t:typ):typ =
   let r = normalize_type_rec env in
   match t with
-  | TName id ->
-    match try_lookup_type env id with
-    | (Some (_, _, tOpt), x)  ->
-      match tOpt with | Some t -> r t | None -> TName x
-    | _ ->
-      err ("cannot find type '" + (err_id id) + "'")
+  | TName x ->
+    (
+      match try_lookup_type env x with
+      | (Some (_, _, tOpt), x)  ->
+        (
+          match tOpt with | Some t -> r t | None -> TName x
+        )
+      | _ -> err ("cannot find type '" + (err_id x) + "'")
+    )
   | TVar _ -> t
   | TBool _ -> t
   | TInt _ -> t
   | TTuple ts -> TTuple (List.map r ts)
   | TFun (ts, t) -> TFun (List.map r ts, r t)
-  | TApply (x, ts) -> TApply (x, List.map r ts) // TODO
+  | TApply (x, ts) ->
+    (
+      match try_lookup_type env x with
+      | (Some (Some _, _, None), xt)  ->
+        (
+          TApply (xt, List.map r ts)
+        )
+      | (Some (Some tfs, _, Some t), x)  ->
+        (
+          let m = Map.ofList (List.map2 (fun (xf, _, _) tf -> (xf, tf)) tfs ts) in
+          let t = subst_typ_name m t in
+          r t
+        )
+      | _ -> err ("cannot find type '" + (err_id x) + "'")
+    )
 let normalize_type (env:env) (t:typ):norm_typ =
   {norm_typ = normalize_type_rec env t}
 
@@ -522,11 +572,13 @@ let compute_transform_info env (formal:pformal) (e:exp) =
   | _ -> None
 *)
 
+// TODO: more checking of variable name distinctness
 let check_not_local env x =
   match lookup_name env x false with
   | (Some (Info (t, info)), _) -> err ("formal: " + (err_id x) + " is a local variable")
   | _ -> ()
 
+// TODO: more checking of variable name distinctness
 let check_no_duplicates xs =
   let ls = List.map fst xs in
   let ss = List.sort ls in
@@ -598,41 +650,6 @@ let match_kind env (t:typ) (k:kind option) =
     | _ ->
       kind_equal (check_type env t) k
   | None -> true
-
-// substitute all occurrences of x in t with s
-let rec subst (env:env) (x:id) (s:typ) (t:typ):(typ * bool) =
-  match t with
-  | TVar (y, k) ->
-    if x = y then
-      if match_kind env s k then
-       let b = if typ_equal env s t then false else true in
-       (s, b)
-      else err (sprintf "kind of type '%A' and type '%A' does not match" s t)
-    else (t,  false)
-  | TApply (xapp, ts) ->
-    let (ts, b) = subst_typs env x s ts in
-    (TApply (xapp, ts), b)
-  | TFun (ts, t) ->
-    let (ts, b1) = subst_typs env x s ts in
-    let (t2, b2) = subst env x s t in
-    (TFun (ts, t2), b1 || b2)
-  | TTuple ts -> let (ts, b) = subst_typs env x s ts in ((TTuple ts), b)
-  | _ -> (t, false)
-and subst_typs env (x:id) (s:typ) (ts:typ list):(typ list * bool) =
-  let (ts_rev, b) =
-    List.fold (fun (rs, b) t -> let (t, b1) = subst env x s t in (t::rs, b1 || b)) ([], false) ts
-    in
-  (List.rev ts_rev, b)
-
-let substitute (env:env) (m:substitutions) (t:typ):typ =
-  let s = Map.toList m in
-  let changed = true in
-  let rec aux t b =
-    if b = true then
-      let (t, b) = List.foldBack (fun (x, s) (t, b) -> let (t, b1) = subst env x s t in (t, b || b1)) s (t, false) in
-      aux t b
-    else t in
-  aux t true
 
 let rec occurs (x:id) (t:typ):bool =
   let rec aux (acc:bool) l =
@@ -790,8 +807,8 @@ let u_constrain_equal (u:unifier) (t1:typ) (t2:typ):unit =
 let u_constrain_subtype_loc (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
   if t1 = t2 then () else
   let env = u.u_env in
-  let t1 = substitute env u.u_substs t1 in
-  let t2 = substitute env u.u_substs t2 in
+  let t1 = subst_typ u.u_substs t1 in
+  let t2 = subst_typ u.u_substs t2 in
   if t1 = t2 then () else
   //printfn "constrain %A <: %A" t1 t2;
   let t1_norm = normalize_type env t1 in
@@ -845,7 +862,7 @@ let u_add_subst (u:unifier) (x:id) (t:typ):unit =
   List.iter (fun (t1, t2, loc) -> u_constrain_subtype_loc u loc t1 t2) !cs
 
 let u_apply_subst (u:unifier):unit =
-  let subs (t:typ):typ = substitute u.u_env u.u_substs t in
+  let subs (t:typ):typ = subst_typ u.u_substs t in
   u.u_substs <- Map.map (fun _ t -> subs t) u.u_substs;
   u.u_equalities <- List.map (fun (t1, t2, loc) -> (subs t1, subs t2, loc)) u.u_equalities
   // Note that the types in ut_* cannot have type variables, so we don't substitute in them
@@ -862,8 +879,8 @@ let u_bind (u:unifier) (x:id) (t:typ):unit =
 let u_unify_one (u:unifier) (t1:typ) (t2:typ):unit =
   if t1 = t2 then () else
   let env = u.u_env in
-  let t1 = substitute env u.u_substs t1 in
-  let t2 = substitute env u.u_substs t2 in
+  let t1 = subst_typ u.u_substs t1 in
+  let t2 = subst_typ u.u_substs t2 in
   if t1 = t2 then () else
   let typ_err () = err ("cannot coerce type '" + string_of_typ t1 + "' to type '" + string_of_typ t2 + "'") in
   let t1 = normalize_type env t1 in
@@ -934,8 +951,8 @@ let u_unify (u:unifier) (xs_opt:Set<id> option):unit =
 // exact = false ==> s <: t
 let rec unify_one (env:env) (exact:bool) (m:substitutions) (s:typ) (t:typ):substitutions =
   if s = t then m else
-  let s = substitute env m s in
-  let t = substitute env m t in
+  let s = subst_typ m s in
+  let t = subst_typ m t in
   if s = t then m else
   let typ_err () =
     if exact then err ("type '" + string_of_typ s + "' is not equal to type '" + string_of_typ t + "'")
@@ -982,21 +999,8 @@ let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (targOpts:typ option
     | None -> (x, u_next_type_var_id u x (Some k))
     | Some t -> (x, t)
     in
-  let targs = List.map2 ft targOpts f.ftargs in
-  let rec replace_typ_arg (t:typ):typ =
-    match t with
-    | TName id ->
-      (
-        match List.tryFind (fun (x, tv) -> id = x) targs with
-        | Some (_, tv) -> tv
-        | None -> t
-      )
-    | TApply (x, ts) -> TApply (x, List.map replace_typ_arg ts)
-    | TVar _ -> err ("unexpected type variable in function type")
-    | TBool _ -> t
-    | TInt _ -> t
-    | TTuple ts -> TTuple (List.map replace_typ_arg ts)
-    | TFun (ts, t) -> TFun (List.map replace_typ_arg ts, replace_typ_arg t)
+  let targMap = Map.ofList (List.map2 ft targOpts f.ftargs) in
+  let replace_typ_arg (t:typ):typ = subst_typ_name targMap t in
   let arg_typ l t =
     match t with
     | TName (Id "Prims.unit") -> l
@@ -1015,7 +1019,7 @@ let insert_cast (e:exp) (t:typ) (et:typ):exp =
   ECast (e, et)
 
 let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
-  let coerce = Option.map (fun (t, et) -> (substitute env s t, substitute env s et)) coerce in
+  let coerce = Option.map (fun (t, et) -> (subst_typ s t, subst_typ s et)) coerce in
   let e =
     match e with
     | AE_Loc (loc, ae) -> ELoc (loc, subst_exp env s ae)
@@ -1050,8 +1054,8 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
 (*
     | AEApply (Id "list", aes, ts, ets) ->
       let es = List.map (fun ae -> subst_exp env s ae) aes  in
-      let t = (List.map (fun t -> substitute env s t) ts).Head in
-      let et = (List.map (fun t -> substitute env s t) ets).Head in
+      let t = (List.map (fun t -> subst_typ s t) ts).Head in
+      let et = (List.map (fun t -> subst_typ s t) ets).Head in
       let e = EApply (Id "list", Some ts, es) in
       match (t, et) with
       | (TList [x], TList [y]) ->
@@ -1063,8 +1067,8 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
       | _ -> err (sprintf "list type %A expected but got %A" (string_of_typ et) (string_of_typ t))
     | AEApply (Id "tuple", aes, ts, ets) ->
       let es = List.map (fun ae -> subst_exp env s ae) aes  in
-      let t = (List.map (fun t -> substitute env s t) ts).Head in
-      let et = (List.map (fun t -> substitute env s t) ets).Head in
+      let t = (List.map (fun t -> subst_typ s t) ts).Head in
+      let et = (List.map (fun t -> subst_typ s t) ets).Head in
       let e = EOp (TupleOp (Some ts), es) in
       match (t, et) with
       | (TTuple xs, TTuple ys) ->
@@ -1074,8 +1078,8 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
       | _ -> err (sprintf "tuple type %s expected but got %s" (string_of_typ et) (string_of_typ t))734
     | AEApply (x, aes, ts, ets) ->
       let es = List.map (fun ae -> subst_exp env s ae) aes  in
-      let t = List.map (fun t -> substitute env s t) ts in
-      let et = List.map (fun t -> substitute env s t) ets in
+      let t = List.map (fun t -> subst_typ s t) ts in
+      let et = List.map (fun t -> subst_typ s t) ets in
       let e = EApply (x, Some ts, es) in
       let equal = List.fold2 (fun b t1 t2 -> b&&typ_equal env t1 t2) true t et
       if equal then e else
@@ -1084,7 +1088,7 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
 *)
     | AE_Apply (x, ts, aes) ->
       let es = List.map (subst_exp env s) aes in
-      let ts = List.map (substitute env s) ts in
+      let ts = List.map (subst_typ s) ts in
       EApply (x, Some ts, es)
     | AE_Bind (bOp, aes, xs, ts, ae) ->
       let es = List.map (subst_exp env s) aes in
@@ -1433,7 +1437,7 @@ and infer_exp_force_subst (env:env) (u:unifier) (e:exp) (et:typ option):(typ * a
       match t.norm_typ with
       | TVar (x, _) ->
         u_unify u (Some (Set.singleton x));
-        substitute env (u.u_substs) t.norm_typ
+        subst_typ (u.u_substs) t.norm_typ
       | t -> t
       in
     (t, ae)
@@ -1471,7 +1475,7 @@ let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
     let (t, ae) = infer_exp env u e et in
     //printfn "t = %A  ae = %A  u = %A" t ae u;
     u_unify u None;
-    let t = substitute env u.u_substs t.norm_typ in
+    let t = subst_typ u.u_substs t.norm_typ in
     let es = subst_exp env u.u_substs ae in
 //    printfn "e = %A  es = %A" (Emit_vale_text.string_of_exp e) (Emit_vale_text.string_of_exp es);
 //    printfn "e = %A\n  ae = %A\n  t = %A\n  es = %A" e ae t es;
@@ -1485,7 +1489,7 @@ let tc_exp_many (env:env) (e:exp) (et:typ option list):(typ list * exp) =
   try
     let (ts, ae, cl) = infer_exp_many env e et in
     let s = unify env Map.empty cl in
-    let ts = List.map (fun t -> substitute env s t.norm_typ) ts in
+    let ts = List.map (fun t -> subst_typ s t.norm_typ) ts in
     let es = subst_exp env s ae in
     (ts, es)
   with

@@ -131,6 +131,7 @@ let rec tree_of_exp (e:exp):string_tree =
   | EId x -> tree_of_id x
   | EInt i -> st_leaf (i.ToString())
   | EUnitValue -> st_leaf "UNIT_VALUE"
+  | EBool -> st_leaf "BOOL"
   | EProp -> st_leaf "PROP"
   | EType u -> st_paren [st_leaf "Type"; tree_of_univ u]
   | EComp (e1, e2, es) -> st_paren (st_list [st_leaf "!!"; r e1] :: List.map r (e2::es))
@@ -347,6 +348,7 @@ let rec unsupported (e:exp):string option =
   | EId x -> None
   | EInt i -> None
   | EUnitValue -> None
+  | EBool -> None
   | EProp -> None
   | EType u -> None
   | EComp (e1, e2, es) -> exps_unsupported (e1::e2::es)
@@ -414,7 +416,7 @@ let rec index_to_var_exp (xs:string list) (e:exp):exp =
   | ERefine ({index = Some _}, _, _) ->
       err ("index_to_var_exp: " + string_of_exp e)
   | EId x -> EId (index_to_var_id xs x)
-  | EInt _ | EUnitValue | EProp -> e
+  | EInt _ | EUnitValue | EBool | EProp -> e
   | EType u -> EType (index_to_var_univ xs u)
   | EComp (e1, e2, es) -> EComp (r e1, r e2, List.map r es)
   | EApp (e, aes) -> EApp (r e, List.map (fun (a, e) -> (a, r e)) aes)
@@ -476,8 +478,9 @@ let universe0_univ (u:univ):univ =
 let rec universe0_exp (e:exp):exp =
   let r = universe0_exp in
   match e with
-  | EId {name = Some ("Prop_s.prop0" | "Prims.logical")} -> EProp
-  | EId _ | EInt _ | EUnitValue | EProp | EUnsupported _ -> e
+  | EId {name = Some "Prims.bool"} -> EBool
+  | EId {name = Some ("Prop_s.prop0" | "Prims.prop" | "Prims.logical")} -> EProp
+  | EId _ | EInt _ | EUnitValue | EBool | EProp | EUnsupported _ -> e
   | EType u -> EType (universe0_univ u)
   | EComp (e1, e2, es) -> EComp (r e1, r e2, List.map r es)
   | EApp (e, aes) -> EApp (r e, List.map (fun (a, e) -> (a, r e)) aes)
@@ -540,6 +543,7 @@ let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:exp):bool =
     in
   match e with
   | EId _ -> is_vale_type_id env e
+  | EBool -> true
   | EProp -> true
   | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, e1, [er; EFun ([(_, {name = Some xe}, _)], ee)]) when outer ->
       let dxe = { d_name = xe; d_qualifiers = []; d_category = "val"; d_udecls = []; d_binders = []; d_typ = e1; d_body = None} in
@@ -684,7 +688,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * decl) list)) (d:decl):(env * (e
     | [] -> e
     | (a, x, t_opt)::bs -> EArrow (a, x, Option.get t_opt, add_binders bs e)
     in
-  let envs_ds = 
+  let envs_ds =
     match (bs, d.d_typ) with
     | (_, EType _) ->
         let body =
@@ -734,12 +738,13 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * decl) list)) (d:decl):(env * (e
           in
         let range_to_int_type (r:range):exp =
           let eInt = EId {name = Some "int"; index = None} in
-          let eNone = EId {name = Some ""; index = None} in
+          let eIntRange = EId {name = Some "int_range"; index = None} in
+          let eNone = EId {name = Some "_"; index = None} in
           match r with
           | (None, None) -> eInt
-          | (Some b1, None) -> EApp (eInt, [(Explicit, EInt b1); (Explicit, eNone)])
-          | (None, Some b2) -> EApp (eInt, [(Explicit, eNone); (Explicit, EInt b2)])
-          | (Some b1, Some b2) -> EApp (eInt, [(Explicit, EInt b1); (Explicit, EInt b2)])
+          | (Some b1, None) -> EApp (eIntRange, [(Explicit, EInt b1); (Explicit, eNone)])
+          | (None, Some b2) -> EApp (eIntRange, [(Explicit, eNone); (Explicit, EInt b2)])
+          | (Some b1, Some b2) -> EApp (eIntRange, [(Explicit, EInt b1); (Explicit, EInt b2)])
           in
         let int_refine = match int_refine with Some (Some r, z) -> Some (r, z) | _ -> None in
         match (bs, bs_are_Type, int_refine) with
@@ -794,7 +799,7 @@ let rec trees_of_comma_list (es:string_tree list):string_tree list =
 let rec tree_of_vale_name (x:string):string_tree =
   let r = tree_of_vale_name in
   match x with
-  | ("Prop_s.prop0" | "Prims.prop" | "Prims.logical") -> st_leaf "prop"
+//  | ("Prop_s.prop0" | "Prims.prop" | "Prims.logical") -> st_leaf "prop"
   | _ when x.EndsWith(".decreases") -> r (x.Replace(".decreases", "._decreases"))
   | _ when x.EndsWith(".modifies") -> r (x.Replace(".modifies", "._modifies"))
   | _ ->
@@ -816,6 +821,7 @@ let rec tree_of_vale_type (e:exp):string_tree =
   match e with
   | EId id -> tree_of_vale_id id
   | EInt i -> st_leaf (i.ToString())
+  | EBool -> st_leaf "bool"
   | EProp -> st_leaf "prop"
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)]) -> r e

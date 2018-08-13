@@ -1,8 +1,8 @@
-include{:fstar} {:open} "Types_s"
-include{:fstar} {:open} "X64.Machine_s"
-include{:fstar} {:open} "X64.Vale.State_i"
-include{:fstar} {:open} "X64.Vale.Decls_i"
-include{:fstar} {:open} "X64.Vale.QuickCode_i"
+include{:fstar}{:open} "Types_s"
+include{:fstar}{:open} "X64.Machine_s"
+include{:fstar}{:open} "X64.Vale.State_i"
+include{:fstar}{:open} "X64.Vale.Decls_i"
+include{:fstar}{:open} "X64.Vale.QuickCode_i"
 
 module X64.Vale.InsBasic
 
