@@ -11,6 +11,7 @@ module HS = FStar.Monotonic.HyperStack
 module HH = FStar.Monotonic.HyperHeap
 module B = LowStar.Buffer
 module M = LowStar.Modifies
+module S8 = SecretByte
 
 open Opaque_s
 open X64.Machine_s
@@ -26,6 +27,23 @@ let sub l i = l - i
 
 inline_for_extraction
 let b8 = B.buffer UInt8.t
+let s8 = B.buffer S8.t
+
+let rec loc_locs_disjoint_rec (l:s8) (ls:list s8) : Type0 =
+  match ls with
+  | [] -> True
+  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
+
+let rec locs_disjoint_rec (ls:list s8) : Type0 =
+  match ls with
+  | [] -> True
+  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
+
+unfold
+let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
+
+unfold
+let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
 
 unfold
 let disjoint ptr1 ptr2 = M.loc_disjoint (M.loc_buffer ptr1) (M.loc_buffer ptr2)

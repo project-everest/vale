@@ -17,27 +17,6 @@ open X64.Memory_i_s
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 
-
-let b8 = B.buffer UInt8.t
-let s8 = B.buffer S8.t
-
-let rec loc_locs_disjoint_rec (l:s8) (ls:list s8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> M.loc_disjoint (M.loc_buffer l) (M.loc_buffer h) /\ loc_locs_disjoint_rec l t
-
-let rec locs_disjoint_rec (ls:list s8) : Type0 =
-  match ls with
-  | [] -> True
-  | h::t -> loc_locs_disjoint_rec h t /\ locs_disjoint_rec t
-
-unfold
-let bufs_disjoint (ls:list s8) : Type0 = normalize (locs_disjoint_rec ls)
-
-unfold
-let buf_disjoint_from (b:s8) (ls:list s8) : Type0 = normalize (loc_locs_disjoint_rec b ls)
-
-// TODO: Complete with your pre- and post-conditions
 let pre_cond (h:HS.mem) (dst:s8) (src:s8) = live h dst /\ live h src /\ bufs_disjoint [dst;src] /\ length dst % 8 == 0 /\ length src % 8 == 0 /\ length dst == 16 /\ length src == 16
 let post_cond (h0:HS.mem) (h1:HS.mem) (dst:s8) (src:s8) = live h0 dst /\ live h0 src /\ live h1 dst /\ live h1 src /\ length dst % 8 == 0 /\ length src % 8 == 0 /\
   (let dst_b = BV.mk_buffer_view dst Views.view64 in
