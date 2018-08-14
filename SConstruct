@@ -310,10 +310,11 @@ if verify and do_build:
 else:
   fstar_z3_path = ''
 
-if sys.platform == 'win32':
-  dafny_z3_path = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
-else:
-  dafny_z3_path = f'/z3exe:{z3_exe}'
+if verify and do_dafny:
+  if sys.platform == 'win32':
+    dafny_z3_path = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
+  else:
+    dafny_z3_path = f'/z3exe:{z3_exe}'
 
 vale_exe = File('bin/vale.exe')
 dafny_exe = File(f'{dafny_path}/Dafny.exe')
