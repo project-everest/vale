@@ -363,7 +363,7 @@ let translate_core_lowstar target (func:func_ty) (stack_needed:bool) (length_sta
   (if stack_needed then " stack_b " else " ") ^
   print_args_names_reveal args ^ " in\n" ^
   "  implies_post is_win (state_of_S s0) s_v f_v " ^ print_args_names args ^ "stack_b;\n" ^
-  "  Some?.v (TS.taint_eval_code (va_code_memcpy is_win) f_v s0), f_v, s_v.mem.hs\n\n"
+  "  Some?.v (TS.taint_eval_code (va_code_" ^ name ^ " is_win) f_v s0), f_v, s_v.mem.hs\n\n"
 
 let translate_lowstar target (func:func_ty) =
   let name, args, Stk slots = func in
@@ -426,6 +426,7 @@ let translate_lowstar target (func:func_ty) =
   "#set-options \"--initial_fuel " ^ fuel_value ^ " --max_fuel " ^ fuel_value ^ " --initial_ifuel 2 --max_ifuel 2\"\n" ^
   
   translate_core_lowstar target func stack_needed length_stack slots additional ^
+  "#set-options \"--max_fuel 0 --max_ifuel 0\"\n\n" ^
   "let " ^ name ^ " " ^ (print_args_names args) ^ " =\n" ^
   (if stack_needed then "  push_frame();\n" ^
     "  let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t " ^ string_of_int length_stack ^ ") in\n"  else "") ^

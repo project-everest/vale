@@ -152,6 +152,8 @@ let lemma_ghost_memcpy is_win dst src stack_b h0 =
   implies_post is_win (state_of_S s0) s_v f_v dst src stack_b;
   Some?.v (TS.taint_eval_code (va_code_memcpy is_win) f_v s0), f_v, s_v.mem.hs
 
+#set-options "--max_fuel 0 --max_ifuel 0"
+
 let memcpy dst src  =
   push_frame();
   let (stack_b:b8) = B.alloca (UInt8.uint_to_t 0) (UInt32.uint_to_t 24) in
