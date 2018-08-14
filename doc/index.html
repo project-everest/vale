@@ -198,9 +198,8 @@ DECL ::=
   | const x : TYPE extern ;
   | function f <i>[</i> #[ TFORMALS ] <i>]</i> ( FORMALS ) : FRET SPECS extern ;
   | function f ( FORMALS ) : TYPE := f ;
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
-  | <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> <a href="#overloading">:= p ;</a>
+  | <i>[</i>ghost<i>]</i> <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
+  | <i>[</i>ghost<i>]</i> <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
 FORMALS ::= FORMAL , ... , FORMAL
@@ -360,8 +359,6 @@ operand_type opr32:nat32 := inout eax | inout ebx | mem32 | const;
 
 function f(x:int, y:int):bool extern;
 
-      
-
 procedures p(ghost x:int) returns(ghost y:int)
   requires
     0 &lt;= x;
@@ -369,6 +366,7 @@ procedures p(ghost x:int) returns(ghost y:int)
   ensures 
     x &lt;= y;
 { ... }
+
 
 
 

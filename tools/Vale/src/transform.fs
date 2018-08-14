@@ -9,11 +9,10 @@ module Transform
 open Ast
 open Ast_util
 open Parse
+open TypeChecker
 open Microsoft.FSharp.Math
 
-let fstar = ref false;
 let assumeUpdates = ref 0
-let do_typecheck = ref true;
 
 type id_local = {local_in_param:bool; local_exp:exp; local_typ:typ option} // In parameters are read-only and refer to old(state)
 type id_info =

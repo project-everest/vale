@@ -183,7 +183,7 @@ type operand_typ =
 | OT_State of inout * id
 
 type decl =
-| DType of id * tformal list option * kind * typ option
+| DType of id * tformal list option * kind * typ option * attrs
 | DOperandType of id * typ * operand_typ list
 | DVar of id * typ * var_storage * attrs
 | DConst of id * typ

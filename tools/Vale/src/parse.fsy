@@ -232,6 +232,11 @@ OpToken
   | LTEQEQ { $1 }
   | EQEQGT { $1 }
   | LTEQEQGT { $1 }
+  | LBRACKET RBRACKET { ($1, (false, "[]")) }
+  | LBRACKET COLONEQ RBRACKET { ($1, (false, "[:=]")) }
+  | QLBRACKET RBRACKET { ($1, (false, "?[]")) }
+  | DOT ID { ($1, (false, "." + snd $2 )) }
+  | DOT ID COLONEQ { ($1, (false, "." + snd $2 + ":=")) }
 AnyIdOrOp
   : AnyQualifiedId { $1 }
   | OPERATOR LPAREN OpToken RPAREN { let (_, (_, s)) = $3 in Operator s }
@@ -346,7 +351,7 @@ Stmt
       stmtAt $1 (SAssert (attrs, $5))
     }
   | CALC CalcOpOpt LBRACE CalcContents RBRACE { stmtAt $1 (SCalc ($2, $4)) }
-  | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp(Uop UReveal, [EVar $2]))) }
+  | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp (Uop UReveal, [EVar $2]))) }
   | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
   | LET Formal COLONEQ Exp SEMI { let (x, t) = $2 in stmtAt $1 (SVar (x, t, Immutable, XGhost, [], Some $4)) }
   | LET AnyId ATEQ AnyId SEMI { stmtAt $1 (SAlias ($2, $4)) }
@@ -475,8 +480,8 @@ Decl
     }
   | MODULE AnyQualifiedId { ($1, DPragma (ModuleName (string_of_id $2))) }
   | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
-  | TYPE AnyQualifiedId TFormalsParen COLON Kind EXTERN SEMI { ($1, DType ($2, $3, $5, None)) }
-  | TYPE AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($2, $3, $5, Some $7)) }
+  | TYPE Attrs AnyQualifiedId TFormalsParen COLON Kind EXTERN SEMI { ($1, DType ($3, $4, $6, None, $2)) }
+  | TYPE Attrs AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($3, $4, $6, Some $8, $2)) }
   | OPERAND_TYPE AnyQualifiedId COLON Type SEMI { ($1, DOperandType ($2, $4, [])) }
   | OPERAND_TYPE AnyQualifiedId COLON Type COLONEQ OperandTypeIncludes SEMI { ($1, DOperandType ($2, $4, $6)) }
 	| UNSUPPORTED COLON AnyQualifiedId { ($1, DUnsupported ($3)) }

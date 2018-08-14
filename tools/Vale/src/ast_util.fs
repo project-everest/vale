@@ -51,7 +51,7 @@ exception UnsupportedErr of string
 let err (s:string):'a = raise (Err s)
 let internalErr (s:string):'a = raise (InternalErr s)
 let notImplemented (s:string):'a = raise (InternalErr ("not implemented: " + s))
-let unsupported (s:string):'a = raise (UnsupportedErr s)
+let unsupported (s:string):'a = printfn "%s" s; raise (UnsupportedErr s)
 let locErr (loc:loc) (err:exn):'a = raise (LocErr (loc, err))
 let locErrOpt (loc:loc option) (err:exn):'a = match loc with None -> raise err | Some loc -> locErr loc err
 

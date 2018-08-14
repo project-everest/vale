@@ -114,7 +114,7 @@ function method va_coerce_opr32_to_opr_snd(o:opr):opr { o }
 function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:ARMReg, s:va_state):uint32 requires r in s.regs { s.regs[r] }
 function va_get_mem(s:va_state):memmap { s.m.addresses }
-function va_get_globals(s:va_state):map<operand, seq<uint32>> { s.m.globals }
+function va_get_globals(s:va_state):map<global, seq<uint32>> { s.m.globals }
 function va_get_osp(s:va_state):uint32
     requires SP in s.regs
 {
@@ -184,7 +184,7 @@ type va_value_opr_snd = snd
 type va_operand_opr_snd = va_operand
 predicate va_is_src_opr_snd(o:operand, s:va_state) { ValidOperand(o) && o.OReg? }
 
-predicate va_is_src_operandglobal(o:operand, s:va_state) { ValidGlobal(o) }
+//predicate va_is_src_operandglobal(g:global, s:va_state) { ValidGlobal(g) }
 
 function va_eval_opr32(s:va_state, o:operand):uint32
     requires va_is_src_opr32(o, s);
@@ -205,12 +205,11 @@ function va_eval_opr_snd(s:va_state, o:operand):snd
     OperandContents(s,o)
 }
 
-type global = string
-function va_eval_operandglobal(s:va_state, o:operand):global
-    requires va_is_src_operandglobal(o, s);
-{
-    o.sym
-}
+//function va_eval_operandglobal(s:va_state, o:operand):global
+//    requires va_is_src_operandglobal(o, s);
+//{
+//    o.sym
+//}
 
 predicate va_state_eq(s0:va_state, s1:va_state)
 {

@@ -9,14 +9,14 @@ import opened operations_s
 //-----------------------------------------------------------------------------
 predicate WordAligned(i:int) { i % 4 == 0 }
 function  WordsToBytes(w:int) : int { 4 * w }
-function  BytesToWords(b:int) : int requires WordAligned(b) { b / 4 }
+function  BytesToWords(b:int) : int { b / 4 }
 
 predicate isUInt32(n:int)
 {
     0 <= n < 0x1_0000_0000
 }
 
-type addr = x | isUInt32(x) && WordAligned(x)
+type addr = int
 type shift_amount = s | 0 <= s < 32 // Some shifts allow s=32, but we'll be conservative for simplicity
 
 //-----------------------------------------------------------------------------
@@ -24,42 +24,45 @@ type shift_amount = s | 0 <= s < 32 // Some shifts allow s=32, but we'll be cons
 //-----------------------------------------------------------------------------
 datatype ARMReg = R0|R1|R2|R3|R4|R5|R6|R7|R8|R9|R10|R11|R12|SP|LR
 
-datatype Shift = LSLShift(amount_lsl:shift_amount)
-               | LSRShift(amount_lsr:shift_amount)
-               | RORShift(amount_ror:shift_amount)
+datatype Shift =
+| LSLShift(amount_lsl:shift_amount)
+| LSRShift(amount_lsr:shift_amount)
+| RORShift(amount_ror:shift_amount)
+
+type global = string
 
 datatype operand = OConst(n:uint32)
-    | OReg(r:ARMReg)
-    | OShift(reg:ARMReg, s:Shift)
-    | OSymbol(sym:string)
-    | OSP
-    | OLR
+| OReg(r:ARMReg)
+| OShift(reg:ARMReg, s:Shift)
+| OSymbol(sym:global)
+| OSP
+| OLR
 
-datatype mementry = mementry(v:uint32)
+datatype mementry = MemEntry(v:uint32)
 type memmap = map<addr, mementry>
-datatype memstate = MemState(addresses:memmap,
-                             globals:map<operand, seq<uint32>>)
+datatype memstate = MemState(
+    addresses:memmap,
+    globals:map<global, seq<uint32>>)
 
-datatype state = State(regs:map<ARMReg, uint32>,
-                       m:memstate,
-                       ok:bool)
+datatype state = State(
+    regs:map<ARMReg, uint32>,
+    m:memstate,
+    ok:bool)
 
 //-----------------------------------------------------------------------------
 // Instructions
 //-----------------------------------------------------------------------------
 datatype ins =
-      ADD(dstADD:operand, src1ADD:operand, src2ADD:operand)
-    | SUB(dstSUB:operand, src1SUB:operand, src2SUB:operand)
-    | AND(dstAND:operand, src1AND:operand, src2AND:operand)
-    | EOR(dstEOR:operand, src1EOR:operand, src2EOR:operand) // Also known as XOR
-    | MOV(dstMOV:operand, srcMOV:operand)
-    | LDR(rdLDR:operand,  baseLDR:operand, ofsLDR:operand)
-    | LDR_global(rdLDR_global:operand, globalLDR:operand,
-                 baseLDR_global:operand, ofsLDR_global:operand)
-    | LDR_reloc(rdLDR_reloc:operand, symLDR_reloc:operand)
-    | STR(rdSTR:operand,  baseSTR:operand, ofsSTR:operand)
-    | STR_global(rdSTR_global:operand, globalSTR:operand,
-                 baseSTR_global:operand, ofsSTR_global:operand)
+| ADD(dstADD:operand, src1ADD:operand, src2ADD:operand)
+| SUB(dstSUB:operand, src1SUB:operand, src2SUB:operand)
+| AND(dstAND:operand, src1AND:operand, src2AND:operand)
+| EOR(dstEOR:operand, src1EOR:operand, src2EOR:operand) // Also known as XOR
+| MOV(dstMOV:operand, srcMOV:operand)
+| LDR(rdLDR:operand,  baseLDR:operand, ofsLDR:operand)
+| LDR_global(rdLDR_global:operand, globalLDR:global, baseLDR_global:operand, ofsLDR_global:operand)
+| LDR_reloc(rdLDR_reloc:operand, symLDR_reloc:global)
+| STR(rdSTR:operand,  baseSTR:operand, ofsSTR:operand)
+| STR_global(rdSTR_global:operand, globalSTR:global, baseSTR_global:operand, ofsSTR_global:operand)
 
 //-----------------------------------------------------------------------------
 // Code Representation
@@ -70,7 +73,7 @@ datatype obool = OCmp(cmp:ocmp, o1:operand, o2:operand)
 datatype codes = CNil | va_CCons(hd:code, tl:codes)
 
 datatype code =
-  Ins(ins:ins)
+| Ins(ins:ins)
 | Block(block:codes)
 | IfElse(ifCond:obool, ifTrue:code, ifFalse:code)
 | While(whileCond:obool, whileBody:code)
@@ -83,16 +86,16 @@ predicate ValidState(s:state)
     ValidRegState(s.regs) && ValidMemState(s.m)
 }
 
-predicate {:opaque} ValidRegState(regs:map<ARMReg, uint32>)
+predicate{:opaque} ValidRegState(regs:map<ARMReg, uint32>)
 {
     forall r:ARMReg :: r in regs
 }
 
 // All valid states have the same memory address domain, but we don't care what
 // it is (at this level).
-function {:axiom} TheValidAddresses(): set<addr>
+function{:axiom} TheValidAddresses(): set<addr>
 
-predicate {:opaque} ValidMemState(s:memstate)
+predicate{:opaque} ValidMemState(s:memstate)
 {
     // regular mem
     (forall m:addr :: m in TheValidAddresses() <==> m in s.addresses)
@@ -140,34 +143,35 @@ predicate ValidRegOperand(o:operand)
 //-----------------------------------------------------------------------------
 // Globals
 //-----------------------------------------------------------------------------
-type globaldecls = map<operand, addr>
+type global_addr = u:uint32 | WordAligned(u)
+type globaldecls = map<global, global_addr>
 
-predicate ValidGlobal(o:operand)
+predicate ValidGlobal(g:global)
 {
-    o.OSymbol? && o in TheGlobalDecls()
+    g in TheGlobalDecls()
 }
 
 predicate ValidGlobalDecls(decls:globaldecls)
 {
-    forall d :: d in decls ==> d.OSymbol? && decls[d] != 0
+    forall d :: d in decls ==> decls[d] != 0
 }
 
-predicate ValidGlobalAddr(g:operand, addr:int)
+predicate ValidGlobalAddr(g:global, addr:int)
 {
     ValidGlobal(g) && WordAligned(addr)
  && AddressOfGlobal(g) <= addr < AddressOfGlobal(g) + SizeOfGlobal(g)
 }
 
-predicate ValidGlobalOffset(g:operand, offset:int)
+predicate ValidGlobalOffset(g:global, offset:int)
 {
     ValidGlobal(g) && WordAligned(offset)
  && 0 <= offset < SizeOfGlobal(g)
 }
 
 // globals have an unknown (uint32) address, only establised by LDR-reloc
-function {:axiom} AddressOfGlobal(g:operand): addr
+function{:axiom} AddressOfGlobal(g:global):global_addr
 
-function SizeOfGlobal(g:operand): uint32
+function SizeOfGlobal(g:global): uint32
     requires ValidGlobal(g)
     ensures WordAligned(SizeOfGlobal(g))
 {
@@ -175,7 +179,7 @@ function SizeOfGlobal(g:operand): uint32
 }
 
 // global declarations are the responsibility of the program, as long as they're valid
-function {:axiom} TheGlobalDecls(): globaldecls
+function{:axiom} TheGlobalDecls(): globaldecls
     ensures ValidGlobalDecls(TheGlobalDecls());
 
 //-----------------------------------------------------------------------------
@@ -212,7 +216,7 @@ function MemContents(s:memstate, m:addr): uint32
     s.addresses[m].v
 }
 
-function GlobalFullContents(s:memstate, g:operand): seq<uint32>
+function GlobalFullContents(s:memstate, g:global): seq<uint32>
     requires ValidMemState(s)
     requires ValidGlobal(g)
     ensures WordsToBytes(|GlobalFullContents(s, g)|) == SizeOfGlobal(g)
@@ -221,7 +225,7 @@ function GlobalFullContents(s:memstate, g:operand): seq<uint32>
     s.globals[g]
 }
 
-function GlobalWord(s:memstate, g:operand, offset:uint32): uint32
+function GlobalWord(s:memstate, g:global, offset:uint32): uint32
     requires ValidGlobalOffset(g, offset)
     requires ValidMemState(s)
 {
@@ -256,7 +260,7 @@ predicate evalLoad(s:state, o:operand, base:int, ofs:int, r:state)
         case OSP => r == s.(regs := s.regs[SP := v])
 }
 
-predicate evalLoadGlobal(s:state, o:operand, g:operand, base:int, ofs:int, r:state)
+predicate evalLoadGlobal(s:state, o:operand, g:global, base:int, ofs:int, r:state)
     requires ValidState(s)
     requires ValidRegOperand(o)
     requires ValidGlobalOffset(g, base + ofs - AddressOfGlobal(g))
@@ -277,10 +281,10 @@ predicate evalStore(s:state, base:int, ofs:int, v:uint32, r:state)
     ensures  evalStore(s, base, ofs, v, r) ==> ValidState(r)
 {
     reveal_ValidMemState();
-    r == s.(m := s.m.(addresses := s.m.addresses[base + ofs := mementry(v)]))
+    r == s.(m := s.m.(addresses := s.m.addresses[base + ofs := MemEntry(v)]))
 }
 
-predicate evalStoreGlobal(s:state, g:operand, base:int, ofs:int, v:uint32, r:state)
+predicate evalStoreGlobal(s:state, g:global, base:int, ofs:int, v:uint32, r:state)
     requires ValidState(s)
     requires ValidGlobalOffset(g, base + ofs - AddressOfGlobal(g))
     requires ValidGlobalAddr(g, base + ofs)
@@ -412,10 +416,11 @@ predicate evalWhile(b:obool, c:code, n:nat, s:state, r:state)
         if n == 0 then
             !evalOBool(s, b) && branchRelation(s, r, false)
         else
-            exists loop_start:state, loop_end:state ::    evalOBool(s, b)
-                                                 && branchRelation(s, loop_start, true)
-                                                 && evalCode(c, loop_start, loop_end)
-                                                 && evalWhile(b, c, n - 1, loop_end, r)
+            exists loop_start:state, loop_end:state ::
+                evalOBool(s, b)
+             && branchRelation(s, loop_start, true)
+             && evalCode(c, loop_start, loop_end)
+             && evalWhile(b, c, n - 1, loop_end, r)
     else
         !r.ok
 }

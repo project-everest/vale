@@ -10,6 +10,56 @@ import opened dafny_wrappers_i
 import opened operations_i
 #endverbatim
 
+type{:primitive} state:Type(0) extern;
+type nat:Type(0) := int_range(0, _);
+type uint32:Type(0) := int_range(0, 0xffff_ffff);
+type uint64:Type(0) := int_range(0, 0xffff_ffff_ffff_ffff);
+type seq(a:Type(0)):Type(0) extern;
+type map(a:Type(0), b:Type(0)):Type(0) extern;
+type Quadword:Type(0) extern;
+type memEntry:Type(0) extern;
+type heap:Type(0) := map(int, memEntry);
+type Frame:Type(0) := map(int, uint32);
+type Stack:Type(0) := seq(Frame);
+function operator([]) #[a:Type(0)](s:seq(a), i:int):a extern; // TODO: requires clause
+function operator([ := ]) #[a:Type(0)](s:seq(a), i:int, v:a):seq(a) extern; // TODO: requires clause
+function operator([]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):b extern; // TODO: requires clause
+function operator([ := ]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a, v:b):map(a, b) extern;
+function Mem32(v32:uint32):memEntry extern;
+function Mem64(v64:uint64):memEntry extern;
+function operator(.v32) (m:memEntry):uint32 extern;
+function operator(.v64) (m:memEntry):uint64 extern;
+function operator(.ok) (s:state):bool extern;
+function operator(.ok :=) (s:state, b:bool):state extern;
+function ValidDstAddr(h:heap, addr:int, size:int):bool extern;
+function ValidSrcAddr(h:heap, addr:int, size:int):bool extern;
+function HasStackSlot(s:Stack, slot:int):bool extern;
+function SeqTail #[a:Type(0)](s:seq(a), tail:nat):seq(a) extern; // TODO: requires clause
+function IsUInt32(i:int):bool extern;
+function lower64(i:uint64):uint32 extern;
+function upper64(i:uint64):uint32 extern;
+function lowerUpper64(l:uint32, u:uint32):uint64 extern;
+function BitwiseAnd(x:uint32, y:uint32):uint32 extern;
+function BitwiseXor(x:uint32, y:uint32):uint32 extern;
+function BitwiseAdd32(x:uint32, y:uint32):uint32 extern;
+function BitwiseAdd64(x:uint64, y:uint64):uint64 extern;
+function BitwiseSub64(x:uint64, y:uint64):uint64 extern;
+function BitwiseMul64(x:uint64, y:uint64):uint64 extern;
+function BitwiseMul64hi(x:uint64, y:uint64):uint64 extern;
+function BitwiseAnd64(x:uint64, y:uint64):uint64 extern;
+function BitwiseShl64(x:uint64, y:uint64):uint64 extern; // TODO: requires clause
+function BitwiseShr64(x:uint64, y:uint64):uint64 extern; // TODO: requires clause
+function xor32(x:uint32, y:uint32):uint32 extern;
+function xor64(x:uint64, y:uint64):uint64 extern;
+function and32(x:uint32, y:uint32):uint32 extern;
+function not32(x:uint32):uint32 extern;
+function rol32(x:uint32, amount:uint32):uint32 extern; // TODO: requires clause
+function ror32(x:uint32, amount:uint32):uint32 extern; // TODO: requires clause
+function shl32(x:uint32, amount:uint32):uint32 extern; // TODO: requires clause
+function shr32(x:uint32, amount:uint32):uint32 extern; // TODO: requires clause
+function QuadwordXor(a:Quadword, b:Quadword):Quadword extern;
+function Cf(flags:uint32):bool extern;
+
 var{:state ok()} ok:bool;
 
 var{:state reg32(X86Eax)} eax:uint32;
@@ -55,28 +105,30 @@ var{:state flags()} efl:uint32;
 var{:state mem()}   mem:heap;
 var{:state stack()} stack:Stack;
 
+operand_type reg32:uint32 :=
+| inout eax | inout ebx | inout ecx | inout edx
+| inout esi | inout edi | inout ebp | inout r8d
+| inout r9d | inout r10d | inout r11d | inout r12d
+| inout r13d | inout r14d | inout r15d
+;
+operand_type reg64:uint64 :=
+| inout rax | inout rbx | inout rcx | inout rdx
+| inout rsi | inout rdi | inout rbp | inout r8
+| inout r9 | inout r10 | inout r11 | inout r12
+| inout r13 | inout r14 | inout r15
+;
+operand_type opr_quad:Quadword :=
+| inout xmm0 | inout xmm1 | inout xmm2 | inout xmm3
+| inout xmm4 | inout xmm5
+;
+operand_type mem32:uint32;
+operand_type mem64:uint64;
+operand_type shift32:uint32 := in ecx | const;
+operand_type opr32:uint32 := reg32 | const;
+operand_type shift64:uint32 := in rcx | const;
+operand_type opr64:uint64 := reg64 | const;
+
 #verbatim
-function MaybeUpdateOk(s:state, r:state) : state
-{
-    if !(s.ok && r.ok) then s.(ok := false) else r
-}
-
-predicate op32(s:state, o:operand)
-{
-    o.OReg? ==> o.r in s.regs && IsUInt32(s.regs[o.r])
-}
-
-predicate op64(s:state, o:operand)
-{
-    // Only 64-bit registers are supported as op64() currently.
-    o.OReg? ==> o.r in s.regs// && IsUInt64(s.regs[o.r])
-}
-
-predicate reg32(s:state, r:x86reg)
-{
-    r in s.regs && IsUInt32(s.regs[r])
-}
-
 lemma lemma_lowerUpper64(i:uint64)
     ensures lowerUpper64(lower64(i), upper64(i)) == i
 {
@@ -86,9 +138,12 @@ lemma lemma_lowerUpper64(i:uint64)
 }
 #endverbatim
 
+ghost procedure lemma_lowerUpper64(ghost i:uint64) extern;
+ghost procedure lemma_BitwiseAdd32EquivalentToAddMod2To32(ghost x:uint32, ghost y:uint32) extern;
+ghost procedure lemma_BitwiseAdd64EquivalentToAddMod2To64(ghost x:uint64, ghost y:uint64) extern;
+
 procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
           Load(out dst:opr32, src:opr64, inline offset:int)
-    ensures  op32(this, @dst);
     requires
         ValidSrcAddr(mem, src + offset, 32);
     reads
@@ -99,17 +154,10 @@ procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-
-    this := MaybeUpdateOk(old(this), this);
-    ghost if (!this.ok)
-    {
-        this := this.(regs := this.regs[@dst.r := 0]);
-    }
 }
 
 procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
           Store(dst:opr64, src:opr32, inline offset:int)
-    requires op32(this, @src);
     requires/ensures
         ValidDstAddr(mem, dst + offset, 32);
     modifies
@@ -119,13 +167,10 @@ procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    ghost var v := old(src);
-    this := MaybeUpdateOk(old(this), this);
 }
 
 procedure{:instruction Ins(Mov32(dst, stack(slot))) }
           LoadStack(out dst:opr32, inline slot:int)
-    ensures  op32(this, @dst);
     requires/ensures
         HasStackSlot(stack, slot);
     reads
@@ -135,17 +180,10 @@ procedure{:instruction Ins(Mov32(dst, stack(slot))) }
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-
-    this := MaybeUpdateOk(old(this), this);
-    ghost if (!this.ok)
-    {
-        this := this.(regs := this.regs[@dst.r := 0]);
-    }
 }
 
 procedure{:instruction Ins(Mov32(stack(slot), src)) }
           StoreStack(inline slot:int, src:opr32)
-    requires op32(this, @src);
     requires/ensures
         HasStackSlot(stack, slot);
     modifies
@@ -156,8 +194,6 @@ procedure{:instruction Ins(Mov32(stack(slot), src)) }
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-
-    this := MaybeUpdateOk(old(this), this);
 }
 
 procedure{:instruction Ins(Mov64(dst, stack(slot))) }
@@ -172,12 +208,6 @@ procedure{:instruction Ins(Mov64(dst, stack(slot))) }
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-
-    this := MaybeUpdateOk(old(this), this);
-    ghost if (!this.ok)
-    {
-        this := this.(regs := this.regs[@dst.r := 0]);
-    }
 }
 
 procedure{:instruction Ins(Mov64(stack(slot), src)) }
@@ -194,226 +224,162 @@ procedure{:instruction Ins(Mov64(stack(slot), src)) }
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-
-    this := MaybeUpdateOk(old(this), this);
     lemma_lowerUpper64(src);
 }
 
 procedure{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
-  requires op32(this, @dst);
-  ensures  op32(this, @dst);
-  requires
-    0 <= dst <= 1000;
-  modifies
-    efl;
-  ensures
-    dst == old(dst) + 1;
+    requires
+        0 <= dst <= 1000;
+    modifies
+        efl;
+    ensures
+        dst == old(dst) + 1;
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
-  requires op32(this, @dst); op32(this, @src);
-  ensures  op32(this, @dst);
-  requires
-    src + dst < 0x1_0000_0000;
-  modifies
-    efl;
-  ensures
-    dst == old(dst) + old(src);
+    requires
+        src + dst < 0x1_0000_0000;
+    modifies
+        efl;
+    ensures
+        dst == old(dst) + old(src);
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
 procedure{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr32)
-  requires op32(this, @dst); op32(this, @src);
-  ensures  op32(this, @dst);
-  modifies
-    efl;
-  ensures
-    dst == (old(dst) + old(src)) % 0x1_0000_0000;
-    dst == old(BitwiseAdd32(dst, src));
+    modifies
+        efl;
+    ensures
+        dst == (old(dst) + old(src)) % 0x1_0000_0000;
+        dst == old(BitwiseAdd32(dst, src));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
 procedure{:instruction Ins(Add64(dst, src))} Add64(inout dst:opr64, src:opr64)
-  requires
-    src + dst < 0x1_0000_0000_0000_0000;
-  modifies
-    efl;
-  ensures
-    dst == old(dst) + old(src);
+    requires
+        src + dst < 0x1_0000_0000_0000_0000;
+    modifies
+        efl;
+    ensures
+        dst == old(dst) + old(src);
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
     lemma_BitwiseAdd64EquivalentToAddMod2To64(old(dst), old(src));
 }
 
 procedure{:instruction Ins(Mov32(dst, src))} Mov32(out dst:opr32, src:opr32)
-  requires op32(this, @src);
-  ensures  op32(this, @dst);
-  ensures
-    dst == old(src);
+    ensures
+        dst == old(src);
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
-    ghost if (!this.ok)
-    {
-        this := this.(regs := this.regs[@dst.r := 0]);
-    }
 }
 
 procedure{:instruction Ins(Mov64(dst, src))} Mov64(out dst:opr64, src:opr64)
-  ensures
-    dst == old(src);
+    ensures
+        dst == old(src);
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
-    ghost if (!this.ok)
-    {
-        this := this.(regs := this.regs[@dst.r := 0]);
-    }
 }
 
 procedure{:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
-  requires op32(this, @dst); op32(this, @src);
-  ensures  op32(this, @dst);
-  modifies efl;
-  ensures
-    dst == xor32(old(dst), old(src));
+    modifies efl;
+    ensures
+        dst == xor32(old(dst), old(src));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:opr64, src:opr64)
-  requires op64(this, @dst); op64(this, @src);
-  ensures  op64(this, @dst);
-  modifies efl;
-  ensures
-    dst == xor64(old(dst), old(src));
+    modifies efl;
+    ensures
+        dst == xor64(old(dst), old(src));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(And32(dst, src))} And32(inout dst:opr32, src:opr32)
-  requires op32(this, @dst); op32(this, @src);
-  ensures  op32(this, @dst);
-  modifies efl;
-  ensures
-    dst == and32(old(dst), old(src));
+    modifies efl;
+    ensures
+        dst == and32(old(dst), old(src));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
-  requires op32(this, @dst);
-  ensures  op32(this, @dst);
-  modifies efl;
-  ensures
-    dst == not32(old(dst));
+    modifies efl;
+    ensures
+        dst == not32(old(dst));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, inline amount:uint32)
-  requires op32(this, @dst); IsUInt32(amount);
-  ensures  op32(this, @dst);
-  requires
-    0 <= amount < 32;
-  modifies efl;
-  ensures
-    dst == rol32(old(dst), old(amount));
+    requires
+        0 <= amount < 32;
+    modifies efl;
+    ensures
+        dst == rol32(old(dst), old(amount));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, inline amount:uint32)
-  requires op32(this, @dst); IsUInt32(amount);
-  ensures  op32(this, @dst);
-  requires
-    0 <= amount < 32;
-  modifies efl;
-  ensures
-    dst == ror32(old(dst), old(amount));
+    requires
+        0 <= amount < 32;
+    modifies efl;
+    ensures
+        dst == ror32(old(dst), old(amount));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, inline amount:uint32)
-  requires op32(this, @dst); IsUInt32(amount);
-  ensures  op32(this, @dst);
-  requires
-    0 <= amount < 32;
-  modifies efl;
-  ensures
-    dst == shl32(old(dst), old(amount));
+    requires
+        0 <= amount < 32;
+    modifies efl;
+    ensures
+        dst == shl32(old(dst), old(amount));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, inline amount:uint32)
-  requires op32(this, @dst); IsUInt32(amount);
-  ensures  op32(this, @dst);
-  requires
-    0 <= amount < 32;
-  modifies efl;
-  ensures
-    dst == shr32(old(dst), old(amount));
+    requires
+        0 <= amount < 32;
+    modifies efl;
+    ensures
+        dst == shr32(old(dst), old(amount));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 procedure{:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad, src:opr_quad)
-  modifies efl;
-  ensures
-    dst == old(QuadwordXor(dst, src));
+    modifies efl;
+    ensures
+        dst == old(QuadwordXor(dst, src));
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-    this := MaybeUpdateOk(old(this), this);
-
 }
 
 #verbatim

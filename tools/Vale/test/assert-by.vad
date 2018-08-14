@@ -13,6 +13,10 @@ predicate{:opaque} OpaqueTruth(x:int)
     true
 }
 #endverbatim
+function F(i:int):bool extern;
+function G(i:int):bool extern;
+ghost procedure L(ghost i:int) extern;
+function OpaqueTruth(x:int):bool extern;
 
 procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
     ensures
@@ -20,9 +24,9 @@ procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
 {
 }
 
-procedure P(inout o:reg, inline k:int, ghost g:int)
+procedure{:notypecheck} P(inout o:reg, inline k:int, ghost g:int)
     requires
-        @o != EAX;
+        @o != EAX; // TODO: typecheck
         g >= 1;
     ensures
         eax == old(eax) + 1;

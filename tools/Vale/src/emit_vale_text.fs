@@ -64,8 +64,7 @@ let rec string_of_typ_prec (prec:int) (t:typ):string =
     match t with
     | TName x -> (sid x, 20)
     | TApply (x, ts) -> (sid x + "(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
-    | TVar (x, None) -> (sid x, 20)
-    | TVar (x, Some k) -> ("(" + sid x + ":" + string_of_kind k + ")", 20)
+    | TVar (x, _) -> (sid x, 20)
     | TBool BpBool -> ("bool", 99)
     | TBool BpProp -> ("prop", 99)
     | TInt (NegInf, Inf) -> ("int", 0)

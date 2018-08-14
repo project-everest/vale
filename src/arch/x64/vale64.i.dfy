@@ -18,7 +18,8 @@ function method va_coerce_operand_to_cmp(o:opr):opr { o }
 
 type va_mem_operand = operand
 type va_value_mem64 = uint64
-type va_operand_mem64 = va_mem_operand
+type va_operand_mem64 = operand
+type va_operand_shift64 = operand
 
 predicate va_is_src_mem64(o:opr, s:va_state)
 {
@@ -27,6 +28,14 @@ predicate va_is_src_mem64(o:opr, s:va_state)
 
 function va_eval_mem64(s:va_state, o:opr):uint64
     requires va_is_src_mem64(o, s)
+{
+    eval_op64(s, o)
+}
+
+predicate va_is_src_shift64(o:opr, s:va_state) { o.OConst? || o == OReg(X86Ecx) }
+
+function va_eval_shift64(s:va_state, o:opr):uint64
+    requires va_is_src_shift64(o, s)
 {
     eval_op64(s, o)
 }

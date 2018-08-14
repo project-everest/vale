@@ -590,12 +590,11 @@ def include_vaf_file(env, file):
 # Verify a .dfy file
 def verify_dafny_file(options, targetfile, sourcefile):
   env = options.env
-  stderrfile = File(f'{targetfile}.stderr')
   temptargetfile = File(f'{targetfile}.tmp')
   env.Command(temptargetfile, sourcefile,
     f'{mono} {dafny_exe} {options.verifier_flags} {dafny_z3_path}' +
     f' {sourcefile} {" ".join(dafny_user_args)}' +
-    f' 1> {temptargetfile} 2> {stderrfile}')
+    f' 1> {temptargetfile} 2>&1')
   CopyFile(targetfile, temptargetfile)
 
 # Verify a .fst or .fsti file

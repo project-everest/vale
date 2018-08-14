@@ -56,8 +56,9 @@ predicate va_is_src_opr_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
 
 type va_value_opr32 = uint32
 type va_operand_opr32 = va_operand
-predicate va_is_src_opr32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm?) }
-predicate va_is_dst_opr32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
+predicate is_src_opr32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm?) }
+predicate va_is_src_opr32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm? && o.r in s.regs && IsUInt32(s.regs[o.r])) }
+predicate va_is_dst_opr32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? && o.r in s.regs && IsUInt32(s.regs[o.r]) }
 
 type va_value_opr64 = uint64
 type va_operand_opr64 = va_operand
@@ -78,7 +79,7 @@ function va_eval_opr_imm8(s:va_state, o:opr):uint32
 }
 
 function va_eval_opr32(s:va_state, o:opr):uint32
-    requires va_is_src_opr32(o, s);
+    requires is_src_opr32(o, s);
 {
     eval_op32(s, o)
 }

@@ -4,6 +4,8 @@ include "common.vad"
 function F(x:int):int { x + 25 }
 function G(x:int, y:int):int { x + y }
 #endverbatim
+function F(x:int):int extern;
+function G(x:int, y:int):int extern;
 
 procedure Q()
 {

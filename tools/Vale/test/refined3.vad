@@ -4,6 +4,16 @@ var{:state reg(Y)} y:int;
 var{:state reg(Z)} z:int;
 var{:state reg(W)} w:int;
 
+type nat:Type(0) := int_range(0, _);
+type seq(a:Type(0)):Type(0) extern;
+type map(a:Type(0), b:Type(0)):Type(0) extern;
+function operator([]) #[a:Type(0)](s:seq(a), i:int):a extern; // TODO: requires clause
+function operator([ := ]) #[a:Type(0)](s:seq(a), i:int, v:a):seq(a) extern; // TODO: requires clause
+function operator([]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):b extern; // TODO: requires clause
+function operator([ := ]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a, v:b):map(a, b) extern;
+
+operand_type opr:int := inout x | inout y | inout z | inout w;
+
 #verbatim
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -265,11 +275,6 @@ lemma va_lemma_whileFalse(b:obool, c:code, s0:va_state, sN:va_state) returns(s1:
     s1 := if s0.ok then sN else s0;
 }
 
-function MaybeUpdateOk(s0:state, s1:state):state
-{
-    if !(s0.ok && s1.ok) then s0.(ok := false) else s1
-}
-
 #endverbatim
 
 procedure{:instruction Ins(InsImm(dst, imm))} Imm(out dst:opr, inline imm:int)
@@ -277,7 +282,6 @@ procedure{:instruction Ins(InsImm(dst, imm))} Imm(out dst:opr, inline imm:int)
         dst == imm;
 {
     reveal evalCodeOpaque;
-    this := MaybeUpdateOk(old(this), this);
 }
 
 procedure{:instruction Ins(InsAdd(dst, src))} Add(inout dst:opr, src:opr)
@@ -285,7 +289,6 @@ procedure{:instruction Ins(InsAdd(dst, src))} Add(inout dst:opr, src:opr)
         dst == old(dst) + old(src);
 {
     reveal evalCodeOpaque;
-    this := MaybeUpdateOk(old(this), this);
 }
 
 procedure test1()
@@ -303,12 +306,15 @@ procedure test1()
 
 #verbatim
 predicate{:opaque} Post(x:int, y:int, g:int) { true }
-
 predicate Inv(x:int, y:int, g:int, i:int) { Post(x, y, g) && i >= 0 }
 predicate R(h:int, g:int) { h == g + 1 }
 predicate Easy(a:int, b:int, c:int, d:int) { true }
-
 #endverbatim
+
+function Post(x:int, y:int, g:int):bool extern;
+function Inv(x:int, y:int, g:int, i:int):bool extern;
+function R(h:int, g:int):bool extern;
+function Easy(a:int, b:int, c:int, d:int):bool extern;
 
 // --------------------------------------------------------------
 
@@ -347,7 +353,7 @@ procedure Loop(ghost g:int, ghost h1:int) returns(ghost h2:int)
     modifies
         x; z;
 {
-    ghost var i := 0;
+    ghost var i:nat := 0;
     h2 := h1;
     while (x <= y)
         invariant
@@ -398,7 +404,7 @@ procedure ULoop(ghost g:int, ghost h1:int) returns(ghost h2:int)
     modifies
         x; z;
 {
-    ghost var i := 0;
+    ghost var i:nat := 0;
     h2 := h1;
     while (x <= y)
         invariant
@@ -423,20 +429,21 @@ function RotateReg(i:int):reg
     if n == 0 then W else if n == 1 then X else if n == 2 then Y else Z
 }
 #endverbatim
+function RotateInv(n:nat, a:int, b:int, c:int, d:int):bool extern;
 
 procedure RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
     requires
         n > 0;
         RotateInv(n, a, b, c, d);
     ensures
-        RotateInv(n - 1, b, c, d, a);
+        RotateInv(#nat(n - 1), b, c, d, a); // note: we could have given n type pos instead of nat to avoid the cast
 {
     reveal RotateInv;
 }
 
-procedure{:recursive} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
+procedure{:recursive}{:notypecheck} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
     requires
-        @a == RotateReg(16 - n);
+        @a == RotateReg(16 - n); // TODO: typecheck
         @b == RotateReg(17 - n);
         @c == RotateReg(18 - n);
         @d == RotateReg(19 - n);
@@ -529,7 +536,7 @@ procedure InlineIfInTheMiddle(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure{:recursive} Unroll(inline n:nat)
+procedure{:recursive}{:notypecheck} Unroll(inline n:nat)
     requires/ensures
         x >= 0;
     ensures
@@ -541,7 +548,7 @@ procedure{:recursive} Unroll(inline n:nat)
     {
         Imm(z, n);
         Add(x, z);
-        Unroll(n - 1);
+        Unroll(n - 1); // TODO: typecheck
     }
 }
 
@@ -581,8 +588,8 @@ procedure GhostReturnCaller(ghost kg:int, source:opr)
     modifies
         x; z; w;
 {
-    ghost var ki := 0;
-    ghost var kh := 0;
+    ghost var ki:int := 0;
+    ghost var kh:int := 0;
     ghost var n:int := 17;
     kh := GhostReturn(kg, true, source, ki);
     assert R(kh, kg);
@@ -606,9 +613,9 @@ procedure GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
     Add(x, z);
 }
 
-procedure GhostReturnCallerY(ghost kg:int, source:opr)
+procedure{:notypecheck} GhostReturnCallerY(ghost kg:int, source:opr)
     requires
-         @source != X && @source != Z;
+         @source != X && @source != Z; // TODO: typechecker
     requires
         Easy(x, y, kg, 0);
     ensures
@@ -635,9 +642,9 @@ procedure UGhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
     Add(x, z);
 }
 
-procedure UGhostReturnCallerY(ghost kg:int, source:opr)
+procedure{:notypecheck} UGhostReturnCallerY(ghost kg:int, source:opr)
     requires
-        @source != X && @source != Z;
+        @source != X && @source != Z; // TODO: typecheck
         Easy(x, y, kg, 0);
     reads
         y;
@@ -657,8 +664,8 @@ procedure ProcA(src:opr)
 {
 }
 
-procedure ProcB(source:opr)
-    requires  @source != X;
+procedure{:notypecheck} ProcB(source:opr)
+    requires  @source != X; // TODO: typecheck
     modifies x;
 {
     ProcA(source);

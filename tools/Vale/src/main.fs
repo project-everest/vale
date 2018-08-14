@@ -2,6 +2,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Emit_common_base
 open Emit_common_top

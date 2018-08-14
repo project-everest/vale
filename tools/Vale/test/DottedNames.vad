@@ -11,8 +11,8 @@ lemma L(i:int)
 module MyModule {
     type MyType = int
 
-    ghost method MyMethod(b:bool) returns (y:int) { }
-    function method MyFunction(x:int): int { x + x }
+    ghost method MyMethod(b:bool) returns(y:int) { }
+    function method MyFunction(x:int):int { x + x }
     type ParamType<G> = seq<G>
 }
 type va_operand_reg_MyModule__MyType = va_register
@@ -29,18 +29,32 @@ predicate va_is_src_opr_MyRecord(dt:va_operand, s:va_state)
 function va_eval_opr_MyRecord(s:state, o:va_operand):MyRecord
 #endverbatim
 
+type MyRecord:Type(0) extern;
+type MyModule.MyType:Type(0) := int;
+type MyModule.ParamType(G:Type(0)):Type(0) := seq(G);
+function operator(.a)(r:MyRecord):int extern;
+function operator(.b)(r:MyRecord):bool extern;
+function F(i:int):bool extern;
+function G(i:int):bool extern;
+function MyModule.MyFunction(x:int):int extern;
+ghost procedure L(ghost i:int) extern;
+//TODO: ghost procedure MyModule.MyMethod(ghost b:bool) returns(y:int) extern;
+function MyModule.MyMethod(b:bool):int extern;
+operand_type reg_MyModule.MyType:int := reg;
+operand_type opr_MyRecord:MyRecord;
+
 procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
     ensures
         x == old(x) + 1;
 {
 }
 
-procedure P(
+procedure{:notypecheck} P(
     inout o:reg_MyModule.MyType, inline k:int, ghost g:int,
     ghost eleven:MyModule.ParamType(int),
     ghost twelve:MyModule.ParamType(MyModule.MyType))
     requires
-        @o != EAX;
+        @o != EAX; // TODO: typecheck
         g >= 1;
         MyModule.MyFunction(5) == 10;
     ensures

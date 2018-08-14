@@ -97,6 +97,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr ("EBind " + (sprintf "%A" e))
+    | ECast (e, _) -> (r prec e, 0)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_formal (x:id, t:typ option) = (sid x) + (match t with None -> "" | Some t -> ":" + (string_of_typ t))
@@ -165,7 +166,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ("forall " + (string_of_formals xs));
       ps.Indent ();
       List.iter (fun es -> ps.PrintLine (string_of_trigger es)) ts;
-      (match skip_loc ex with EBool true -> () | _ -> ps.PrintLine ("| " + (string_of_exp ex)));
+      (match skip_loc ex with EBool true | ECast (EBool true, _) -> () | _ -> ps.PrintLine ("| " + (string_of_exp ex)));
       ps.PrintLine ("ensures " + (string_of_exp e));
       ps.Unindent ();
       emit_block ps ss;

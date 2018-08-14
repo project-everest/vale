@@ -166,7 +166,7 @@ method printIns(ins:ins)
         case EOR(dest, src1, src2) => printIns3Op("EOR", dest, src1, src2);
         case LDR(rd, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
         case LDR_global(rd, global, base, ofs) => printInsLdStr("LDR", rd, base, ofs);
-        case LDR_reloc(rd, sym) => printIns2Op("LDR", rd, sym);
+        case LDR_reloc(rd, sym) => printIns2Op("LDR", rd, OSymbol(sym));
         case STR(rd, base, ofs) => printInsLdStr("STR", rd, base, ofs);
         case STR_global(rd, global, base, ofs) => printInsLdStr("STR", rd, base, ofs);
         case MOV(dst, src) => printIns2Op("MOV", dst, src);
@@ -281,12 +281,6 @@ method printGlobal(symname: string, bytes: int)
     }
 }
 
-function method SymbolName(o:operand): string
-    requires o.OSymbol?
-{
-    match o case OSymbol(name) => name
-}
-
 method printBss(gdecls: globaldecls)
     requires ValidGlobalDecls(gdecls)
 {
@@ -298,7 +292,7 @@ method printBss(gdecls: globaldecls)
         invariant forall s :: s in syms ==> s in gdecls;
     {
         var s :| s in syms;
-        printGlobal(SymbolName(s), gdecls[s]);
+        printGlobal(s, gdecls[s]);
         syms := syms - {s};
     }
 }

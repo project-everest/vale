@@ -4,6 +4,7 @@ open Ast
 open Ast_util
 open Parse
 open Parse_util
+open TypeChecker
 open Transform
 open Microsoft.FSharp.Math
 open System.Numerics

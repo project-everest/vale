@@ -36,7 +36,6 @@ expression e =
 | x
 | x(e, ..., e)
 | i | true | false | "...string-literal..."
-| this
 | old(e)
 | old[e](e)
 | tuple(e, ..., e)
@@ -81,6 +80,7 @@ Notes on variable scope:
 - No two modules can have the same name.
 - Within a module, no two declarations can have the same name.
 - In a scope that already has a local name x, it is illegal to declare another local with the same name x.
+- In procedures, the environment contains a mutable ghost variable named "this" of type state
 Local declarations (local x:t) are not qualified with a module name, and so do not conflict with global declarations.
 However, references to global declarations can be unqualified (omitting the module name),
 and in this case it's possible for a name x to match both a local name and a global name.
@@ -252,10 +252,6 @@ G |- true : bool
 G |- false : bool
 
 G |- "...string-literal..." : string
-
-inline_only not in G
---------------------
-G |- this : state
 
 G |- e : t
 ---------------
