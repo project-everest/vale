@@ -69,10 +69,11 @@ procedure types P = (param x:t, ..., param x:t) -> (ret x:t, ..., ret x:t) (read
 environment members g =
 | x:k | x:(k, ..., k) -> k | x:k = t | x(x:k, ..., x:k):k = t  (global type declarations)
 | x:T | x:P | operand x:P  (global value declarations)
-| operand x:t = opr_type, ..., opr_type  (global operand type declarations)
+| operand x:t = opr_type, ..., opr_type   (global operand type declarations)
+| operand x(param x:t, ..., param x:t):t  (global operand procedure type declarations)
 | state x:t  (global state member)
 | local x:t  (local value declarations)
-| inline_only  (only allow inline expressions -- no ghost variables, no SMT queries)
+| inline_only  (only allow inline expressions -- no ghost variables)
 environment G = g ... g
 
 Notes on variable scope:
@@ -198,7 +199,6 @@ G |- e : t
 ------------
 G |- e : t'
 
-inline_only not in G
 G |- t':k'
 G |- t' <: t  OR  G |- t <: t'
 G |- e:t
@@ -235,7 +235,6 @@ G |- x : t[a1 <- t1, ..., an <- tn]
 
 T = forall a1:Type(0) ... an:Type(0). (x1:t1', ..., xm:tm') -> t (requires e_req) (ensures e_ens)
 G = ... x:T ...
-inline_only not in G
 G |- t1 : Type(0)
 ...
 G |- tn : Type(0)
@@ -405,32 +404,12 @@ If IO = in then IO' = in
 -----------------------------------
 G |- IO' operand xs : xo
 
-Notes:
-- A memory operand can perform a load (for "in"), a store (for "out"), or both (for "inout")
-- An "operand procedure" represents a load operation or store operation
-- An operand procedure's final parameter represents the loaded or stored value
-- An operand procedure for a load has final parameter "out operand x:t",
-  because the loaded value is an output from the load operation
-- An operand procedure for a store has final parameter "in operand x:t",
-  because the stored value is an input to the store operation
-Pl = (paraml1 xpl1:tpl1, ..., paramn xpln:tpln, out operand xl:xlo) ->
-     ()
-     (reads ...xrl...) (modifies ...xml...) (requires erl) (ensures eel)
-Ps = (params1 xps1:tps1, ..., paramsn xpsn:tpsn, in operand xs:xso) ->
-     ()
-     (reads ...xrs...) (modifies ...xms...) (requires ers) (ensures ees)
-If IO' in {in, inout}, then G = ... operand xP_in:Pl ... and:
-  G |- paraml1 e1 : tpl1
-  ...
-  G |- paramln en : tpln
-  G |- operand xo' : to includes xlo
-If IO' in {out, inout}, then G = ... operand xP_out:Ps ... and:
-  G |- params1 e1 : tps1
-  ...
-  G |- paramsn en : tpsn
-  G |- operand xo' : to includes xso
-------------------------------------------------------------------------
-G |- IO' operand xP(e1, ..., en) : xo'
+G = ... operand xP(..., param xp:tp, ...):to ...
+For each ea:
+  G |- param ea : tp
+G |- operand xo : to includes xP
+------------------------------------------------
+G |- IO operand xP(..., ea, ...) : xo
 
 
 STATEMENT TYPING:  G |- s : G'

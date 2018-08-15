@@ -5,14 +5,17 @@ var{:state reg(Z)} z:int;
 var{:state reg(W)} w:int;
 
 type nat:Type(0) := int_range(0, _);
-type seq(a:Type(0)):Type(0) extern;
+type{:primitive} seq(a:Type(0)):Type(0) extern;
 type map(a:Type(0), b:Type(0)):Type(0) extern;
+type reg:Type(0) extern;
+const X:reg extern;
+const Z:reg extern;
 function operator([]) #[a:Type(0)](s:seq(a), i:int):a extern; // TODO: requires clause
 function operator([ := ]) #[a:Type(0)](s:seq(a), i:int, v:a):seq(a) extern; // TODO: requires clause
 function operator([]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):b extern; // TODO: requires clause
 function operator([ := ]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a, v:b):map(a, b) extern;
 
-operand_type opr:int := inout x | inout y | inout z | inout w;
+operand_type opr:int @ reg := inout x | inout y | inout z | inout w;
 
 #verbatim
 
@@ -430,6 +433,7 @@ function RotateReg(i:int):reg
 }
 #endverbatim
 function RotateInv(n:nat, a:int, b:int, c:int, d:int):bool extern;
+function RotateReg(i:int):reg extern;
 
 procedure RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
     requires
@@ -441,9 +445,9 @@ procedure RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout 
     reveal RotateInv;
 }
 
-procedure{:recursive}{:notypecheck} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
+procedure{:recursive} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
     requires
-        @a == RotateReg(16 - n); // TODO: typecheck
+        @a == RotateReg(16 - n);
         @b == RotateReg(17 - n);
         @c == RotateReg(18 - n);
         @d == RotateReg(19 - n);
@@ -455,7 +459,7 @@ procedure{:recursive}{:notypecheck} RotateLoop(inline n:nat, inout a:opr, inout 
     inline if (n > 0)
     {
         RotateBody(n, a, b, c, d);
-        RotateLoop(n - 1, b, c, d, a);
+        RotateLoop(#nat(n - 1), b, c, d, a);
     }
 }
 
@@ -536,7 +540,7 @@ procedure InlineIfInTheMiddle(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure{:recursive}{:notypecheck} Unroll(inline n:nat)
+procedure{:recursive} Unroll(inline n:nat)
     requires/ensures
         x >= 0;
     ensures
@@ -548,7 +552,7 @@ procedure{:recursive}{:notypecheck} Unroll(inline n:nat)
     {
         Imm(z, n);
         Add(x, z);
-        Unroll(n - 1); // TODO: typecheck
+        Unroll(#nat(n - 1));
     }
 }
 
@@ -613,9 +617,9 @@ procedure GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
     Add(x, z);
 }
 
-procedure{:notypecheck} GhostReturnCallerY(ghost kg:int, source:opr)
+procedure GhostReturnCallerY(ghost kg:int, source:opr)
     requires
-         @source != X && @source != Z; // TODO: typechecker
+         @source != X && @source != Z;
     requires
         Easy(x, y, kg, 0);
     ensures
@@ -626,7 +630,7 @@ procedure{:notypecheck} GhostReturnCallerY(ghost kg:int, source:opr)
         x; z; w;
 {
     ghost var ki := 0;
-    ghost var kh := 0;
+    ghost var kh:int := 0;
     kh := GhostReturnY(kg, true, source, ki);
     kh := GhostReturnY(kg, true, source, ki);
 }
@@ -642,9 +646,9 @@ procedure UGhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
     Add(x, z);
 }
 
-procedure{:notypecheck} UGhostReturnCallerY(ghost kg:int, source:opr)
+procedure UGhostReturnCallerY(ghost kg:int, source:opr)
     requires
-        @source != X && @source != Z; // TODO: typecheck
+        @source != X && @source != Z;
         Easy(x, y, kg, 0);
     reads
         y;
@@ -652,7 +656,7 @@ procedure{:notypecheck} UGhostReturnCallerY(ghost kg:int, source:opr)
         x; z; w;
 {
     ghost var ki := 0;
-    ghost var kh := 0;
+    ghost var kh:int := 0;
     kh := UGhostReturnY(kg, true, source, ki);
     kh := UGhostReturnY(kg, true, source, ki);
 }
@@ -664,8 +668,8 @@ procedure ProcA(src:opr)
 {
 }
 
-procedure{:notypecheck} ProcB(source:opr)
-    requires  @source != X; // TODO: typecheck
+procedure ProcB(source:opr)
+    requires  @source != X;
     modifies x;
 {
     ProcA(source);

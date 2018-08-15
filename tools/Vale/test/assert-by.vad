@@ -24,7 +24,7 @@ procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
 {
 }
 
-procedure{:notypecheck} P(inout o:reg, inline k:int, ghost g:int)
+procedure P(inout o:reg, inline k:int, ghost g:int)
     requires
         @o != EAX; // TODO: typecheck
         g >= 1;

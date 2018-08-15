@@ -465,6 +465,13 @@ OperandTypeIncludes
   : OperandTypeIncludes1 { $1 }
   | BAR OperandTypeIncludes1 { $2 }
 
+OperandTypeAt
+  : { None }
+  | AT Type { Some $2 }
+ProcFormalsOpt
+  : { None }
+  | LPAREN ProcFormals RPAREN { Some $2 }
+
 Proc
   : GhostOpt PROCEDURE { ($2, $1) }
 FunRet
@@ -482,8 +489,8 @@ Decl
   | RESET_OPTIONS { let (l, s) = $1 in (l, DPragma (ResetOptions s)) }
   | TYPE Attrs AnyQualifiedId TFormalsParen COLON Kind EXTERN SEMI { ($1, DType ($3, $4, $6, None, $2)) }
   | TYPE Attrs AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($3, $4, $6, Some $8, $2)) }
-  | OPERAND_TYPE AnyQualifiedId COLON Type SEMI { ($1, DOperandType ($2, $4, [])) }
-  | OPERAND_TYPE AnyQualifiedId COLON Type COLONEQ OperandTypeIncludes SEMI { ($1, DOperandType ($2, $4, $6)) }
+  | OPERAND_TYPE AnyQualifiedId ProcFormalsOpt COLON Type OperandTypeAt SEMI { ($1, DOperandType ($2, $3, $5, $6, [])) }
+  | OPERAND_TYPE AnyQualifiedId ProcFormalsOpt COLON Type OperandTypeAt COLONEQ OperandTypeIncludes SEMI { ($1, DOperandType ($2, $3, $5, $6, $8)) }
 	| UNSUPPORTED COLON AnyQualifiedId { ($1, DUnsupported ($3)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
   | CONST AnyQualifiedId COLON Type EXTERN SEMI { ($1, DConst ($2, $4)) }

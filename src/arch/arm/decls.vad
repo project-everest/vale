@@ -7,7 +7,7 @@ import opened ARM_decls_i_ARM_vale_i = ARM_vale_i
 
 type{:primitive} state:Type(0) extern;
 type uint32:Type(0) := int_range(0, 0xffff_ffff);
-type seq(a:Type(0)):Type(0) extern;
+type{:primitive} seq(a:Type(0)):Type(0) extern;
 type map(a:Type(0), b:Type(0)):Type(0) extern;
 type global:Type(0) extern;
 type mementry:Type(0) extern;

@@ -184,7 +184,7 @@ type operand_typ =
 
 type decl =
 | DType of id * tformal list option * kind * typ option * attrs
-| DOperandType of id * typ * operand_typ list
+| DOperandType of id * pformal list option * typ * typ option * operand_typ list
 | DVar of id * typ * var_storage * attrs
 | DConst of id * typ
 | DFun of fun_decl

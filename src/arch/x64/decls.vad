@@ -14,7 +14,7 @@ type{:primitive} state:Type(0) extern;
 type nat:Type(0) := int_range(0, _);
 type uint32:Type(0) := int_range(0, 0xffff_ffff);
 type uint64:Type(0) := int_range(0, 0xffff_ffff_ffff_ffff);
-type seq(a:Type(0)):Type(0) extern;
+type{:primitive} seq(a:Type(0)):Type(0) extern;
 type map(a:Type(0), b:Type(0)):Type(0) extern;
 type Quadword:Type(0) extern;
 type memEntry:Type(0) extern;

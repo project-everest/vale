@@ -193,7 +193,7 @@ INCLUDE ::= include "STRING"
 DECL ::=
   | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND extern ;
   | type t <i>[</i> ( TFORMALS ) <i>]</i> : KIND := TYPE ;
-  | operand_type ot : TYPE <i>[</i> := <i>[</i> | <i>]</i> OTYP | ... | OTYP <i>]</i>
+  | operand_type ot <i>[</i> ( PFORMALS ) <i>]</i> : TYPE <i>[</i> @ TYPE <i>]</i> <i>[</i> := OTYPS <i>]</i>
   | <a href="#state">var</a> x : TYPE ;
   | const x : TYPE extern ;
   | function f <i>[</i> #[ TFORMALS ] <i>]</i> ( FORMALS ) : FRET SPECS extern ;
@@ -326,6 +326,7 @@ EXP ::=
   | lambda FORMALS TRIGGERS :: EXP
   | ( EXP )
 
+OTYPS ::= <i>[</i> | <i>]</i> OTYP | ... | OTYP
 OTYP ::=
   | const
   | ot
@@ -483,6 +484,7 @@ tuple(5, 15, true) // Dafny, F*
 
 let x := 3 in x + 1
 forall x, y {foo(x, y)} :: foo(x, y) || x == y
+
 
 
 

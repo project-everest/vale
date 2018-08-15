@@ -20,8 +20,8 @@ predicate va_is_src_reg_MyModule__MyType(x:va_register, s:va_state) { true }
 predicate va_is_dst_reg_MyModule__MyType(x:va_register, s:va_state) { true }
 function va_eval_reg_MyModule__MyType(s:va_state, o:va_register):int { eval_reg(o, s) }
 function method va_coerce_reg_MyModule__MyType_to_reg(r:va_register):va_register { r }
-function va_update_operand_reg_MyModule__MyType(r:reg, sM:va_state, sK:va_state):va_state { va_update_reg(r, sM, sK) }
-function method va_op_reg_MyModule__MyType_reg(r:reg):va_register { r }
+function va_update_operand_reg_MyModule__MyType(r:register, sM:va_state, sK:va_state):va_state { va_update_reg(r, sM, sK) }
+function method va_op_reg_MyModule__MyType_reg(r:register):va_register { r }
 
 datatype MyRecord = MakeRecord(a:int, b:bool)
 type va_operand_opr_MyRecord = va_operand
@@ -40,7 +40,7 @@ function MyModule.MyFunction(x:int):int extern;
 ghost procedure L(ghost i:int) extern;
 //TODO: ghost procedure MyModule.MyMethod(ghost b:bool) returns(y:int) extern;
 function MyModule.MyMethod(b:bool):int extern;
-operand_type reg_MyModule.MyType:int := reg;
+operand_type reg_MyModule.MyType:int @ register := reg;
 operand_type opr_MyRecord:MyRecord;
 
 procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
@@ -49,12 +49,15 @@ procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
 {
 }
 
-procedure{:notypecheck} P(
-    inout o:reg_MyModule.MyType, inline k:int, ghost g:int,
+procedure P(
+    // inout o:reg_MyModule.MyType, // REVIEW: this isn't supported (reg <: reg_MyModule.MyType, not the other way around), but we could loosen the rules to allow it
+    inout o:reg,
+    inline k:int,
+    ghost g:int,
     ghost eleven:MyModule.ParamType(int),
     ghost twelve:MyModule.ParamType(MyModule.MyType))
     requires
-        @o != EAX; // TODO: typecheck
+        @o != EAX;
         g >= 1;
         MyModule.MyFunction(5) == 10;
     ensures
