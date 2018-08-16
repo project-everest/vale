@@ -1,12 +1,10 @@
 // Trusted printer for producing MASM code
 
 include "def.s.dfy"
-//"const-time.i.dfy"
 
 module x64_printMasm_s {
 
 import opened x64_def_s
-//import opened x86_const_time_i
 
 method printReg(r:x86reg)
 {
@@ -57,9 +55,9 @@ method printSmallReg(r:x86reg)
         case X86Ebx => print("bl");
         case X86Ecx => print("cl");
         case X86Edx => print("dl");
-        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
-        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Esi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Edi => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
+        case X86Ebp => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
         case X86R8 => print("!!!invalid!!!");
         case X86R9 => print("!!!invalid!!!");
         case X86R10 => print("!!!invalid!!!");
@@ -68,7 +66,7 @@ method printSmallReg(r:x86reg)
         case X86R13 => print("!!!invalid!!!");
         case X86R14 => print("!!!invalid!!!");
         case X86R15 => print("!!!invalid!!!");
-        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); 
+        case X86Xmm(_) => print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl.");
 }
 
 method printMAddr(addr:maddr, ptr_type:string)
@@ -101,7 +99,7 @@ method printGenericOprnd(o:operand, ptr_type:string)
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg(r);
         case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(8+4*i); print("]");
-        case OHeap(addr, taint) => printMAddr(addr, ptr_type);
+        case OHeap(addr) => printMAddr(addr, ptr_type);
 }
 method printGenericOprnd64(o:operand, ptr_type:string)
 {
@@ -111,7 +109,7 @@ method printGenericOprnd64(o:operand, ptr_type:string)
             else { print(" !!!NOT IMPLEMENTED!!!"); }
         case OReg(r) => printReg64(r);
         case OStack(i) => print(ptr_type); print(" ptr [rsp + "); print(8+4*i); print("]");
-        case OHeap(addr, taint) => printMAddr(addr, ptr_type);
+        case OHeap(addr) => printMAddr(addr, ptr_type);
 }
 method printOprnd(o:operand)
 {
@@ -129,11 +127,11 @@ method printXmmOprnd(o:operand)
 
 method printSmallOprnd(o:operand)
 {
-    if o.OConst? { 
+    if o.OConst? {
       if 0 <= o.n as int < 32 {
-        print(o.n); 
-      } else { 
-        print(o.n, " is too large for a small operand"); 
+        print(o.n);
+      } else {
+        print(o.n, " is too large for a small operand");
       }
     } else if o.OReg? { printSmallReg(o.r); }
     else { print(" !!!INVALID small operand!!!  Expected al, bl, cl, or dl."); }
@@ -192,7 +190,6 @@ method printIns(ins:ins)
         case Sub32(dst, src) => print ("  sub "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case Mul32(src)      => print ("  mul "); printOprnd(src); print("\n");
         case AddCarry(dst, src) => print ("  add "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case BSwap32(dst)    => print ("  bswap "); printOprnd(dst); print("\n");
         case Xor32(dst, src) => print ("  xor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case Xor64(dst, src) => print ("  xor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
         case And32(dst, src) => print ("  and "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
@@ -227,7 +224,6 @@ method printIns(ins:ins)
         case Shr32(dst, src) => print ("  shr "); printOprnd(dst); print ", "; printShiftOprnd(src, 32); print("\n");
 
         case Pxor(dst, src) => print ("  pxor "); printOprnd(dst); print(", "); printOprnd(src); print("\n");
-        case MOVDQU(dst, src) => print ("  movdqu "); printXmmOprnd(dst); print(", "); printXmmOprnd(src); print("\n");
 }
 
 method printBlock(b:codes, n:int) returns(n':int)
@@ -299,35 +295,5 @@ method printFooter()
 {
     print("end\n");
 }
-
-/*
-// runs constant time analysis
-method checkConstantTimeAndPrintProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, ts:taintState)
-    decreases * 
-{
-    var constTime, ts' := checkIfCodeConsumesFixedTime(code, ts);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (constTime == false) {
-        print(proc_name + ": Constant time check failed\n");
-    } else {
-        printProc(proc_name, code, n, ret_count);
-    }
-}
-
-// runs both leakage analysis and constant time analysis
-method checkConstantTimeAndLeakageBeforePrintProc(proc_name:seq<char>, code:code, n:int, ret_count:uint32, ts:taintState, tsExpected:taintState)
-    decreases * 
-{
-    var b := checkIfCodeisLeakageFree(code, ts, tsExpected);
-
-    // print code only if the code is constant time and leakage free according to the checker
-    if (b == false) {
-        print(proc_name + ": Constant time check or leakage analysis failed\n");
-    } else {
-        printProc(proc_name, code, n, ret_count);
-    }
-}
-*/
 
 }

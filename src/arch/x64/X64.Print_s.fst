@@ -4,7 +4,6 @@ module X64.Print_s
 
 open X64.Machine_s
 open X64.Semantics_s
-open X64.Bytes_Semantics_s
 open FStar.IO
 
 noeq type printer = {
@@ -39,7 +38,7 @@ let print_reg_name (r:reg) =
   | R13 -> "r13"
   | R14 -> "r14"
   | R15 -> "r15"
-  
+
 let print_reg (r:reg) (p:printer) =
   p.reg_prefix() ^ print_reg_name r
 
@@ -109,11 +108,6 @@ let print_imm8 (i:int) (p:printer) =
 let print_xmm (x:xmm) (p:printer) =
   p.reg_prefix() ^ "xmm" ^ string_of_int x
 
-let print_mov128_op (o:mov128_op) (p:printer) =
-  match o with
-  | Mov128Xmm x -> print_xmm x p
-  | Mov128Mem m -> print_maddr m "xmmword" print_reg p
-
 assume val print_any: 'a -> string
 
 let print_shift_operand (o:operand) (p:printer) =
@@ -140,7 +134,7 @@ let print_ins (ins:ins) (p:printer) =
   let print_pair (dst src:string) =
     let first, second = p.op_order dst src in
       first ^ ", " ^ second
-  in    
+  in
   let print_op_pair (dst:operand) (src:operand) (print_dst:operand->printer->string) (print_src:operand->printer-> string) =
     print_pair (print_dst dst p) (print_src src p)
   in
@@ -153,7 +147,7 @@ let print_ins (ins:ins) (p:printer) =
   let print_xmm_op (dst:xmm) (src:operand) =
     let first, second = p.op_order (print_xmm dst p) (print_operand src p) in
       first ^ ", " ^ second
-  in 
+  in
   let print_xmm_op32 (dst:xmm) (src:operand) =
     let first, second = p.op_order (print_xmm dst p) (print_operand32 src p) in
       first ^ ", " ^ second
@@ -161,11 +155,11 @@ let print_ins (ins:ins) (p:printer) =
   let print_op_xmm (dst:operand) (src:xmm) =
     let first, second = p.op_order (print_operand dst p) (print_xmm src p) in
       first ^ ", " ^ second
-  in 
+  in
   let print_xmms (dst:xmm) (src:xmm) =
     let first, second = p.op_order (print_xmm dst p) (print_xmm src p) in
       first ^ ", " ^ second
-  in  
+  in
   match ins with
   | Mov64 dst src -> p.ins_name "  mov" [dst; src] ^ print_ops dst src
   | Add64 dst src -> p.ins_name "  add" [dst; src] ^ print_ops dst src
@@ -182,7 +176,7 @@ let print_ins (ins:ins) (p:printer) =
   | Adox64 dst src -> p.ins_name "  adox" [dst; src] ^ print_ops dst src
   | Sub64 dst src -> p.ins_name "  sub" [dst; src] ^ print_ops dst src
   | Mul64 src -> p.ins_name "  mul" [src] ^ (print_operand src p)
-  | Mulx64 dst_hi dst_lo src -> 
+  | Mulx64 dst_hi dst_lo src ->
     let dst_s = print_ops dst_hi dst_lo in
     p.ins_name "  mulx" [dst_hi; dst_lo; src] ^ print_pair dst_s (print_operand src p)
   | IMul64 dst src -> p.ins_name "  imul" [dst; src] ^ print_ops dst src
@@ -190,22 +184,17 @@ let print_ins (ins:ins) (p:printer) =
   | And64 dst src -> p.ins_name "  and" [dst; src] ^ print_ops dst src
   | Shr64 dst amt -> p.ins_name "  shr" [dst; amt] ^ print_shift dst amt
   | Shl64 dst amt -> p.ins_name "  shl" [dst; amt] ^ print_shift dst amt
-  | Push src      -> p.ins_name "  push" [src] ^ print_operand src p
-  | Pop dst       -> p.ins_name "  pop"  [dst] ^ print_operand dst p
   | Paddd dst src          -> "  paddd "      ^ print_xmms dst src
   | Pxor dst src           -> "  pxor "       ^ print_xmms dst src
   | Pslld dst amt          -> "  pslld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
   | Psrld dst amt          -> "  psrld "      ^ print_pair (print_xmm dst p) (print_imm8 amt p)
-  | Psrldq dst amt         -> "  psrldq "     ^ print_pair (print_xmm dst p) (print_imm8 amt p)
-  | Pshufb dst src         -> "  pshufb "     ^ print_xmms dst src
   | Pshufd dst src count   -> "  pshufd "     ^ print_pair (print_xmms dst src) (print_imm8 count p)
   | Pcmpeqd dst src        -> "  pcmpeqd "    ^ print_xmms dst src
   | Pextrq dst src index   -> "  pextrq "     ^ print_pair (print_op_xmm dst src) (print_imm8 index p)
   | Pinsrd dst src index   -> "  pinsrd "     ^ print_pair (print_xmm_op32 dst src) (print_imm8 index p)
   | Pinsrq dst src index   -> "  pinsrq "     ^ print_pair (print_xmm_op dst src) (print_imm8 index p)
   | VPSLLDQ dst src count  -> "  vpslldq "    ^ print_pair (print_xmms dst src) (print_imm8 count p)
-  | MOVDQU dst src         -> "  movdqu "     ^ print_pair (print_mov128_op dst p) (print_mov128_op src p)
- 
+
 let print_cmp (c:ocmp) (counter:int) (p:printer) : string =
   let print_ops (o1:operand) (o2:operand) : string =
     let first, second = p.op_order (print_operand o1 p) (print_operand o2 p) in

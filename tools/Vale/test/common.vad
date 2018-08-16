@@ -139,9 +139,9 @@ type va_state = state
 function va_get_ok(s:va_state):bool { s.ok }
 function va_get_reg(r:reg, s:va_state):int { eval_reg(r, s) }
 function va_get_mem(s:va_state):map<int, int> { s.mem }
-function va_modify_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
-function va_modify_reg(r:reg, sM:va_state, sK:va_state):va_state { sK.(regs := sK.regs[r := va_get_reg(r, sM)]) }
-function va_modify_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
+function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
+function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state { sK.(regs := sK.regs[r := va_get_reg(r, sM)]) }
+function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
 
 // register
 type va_register = reg
@@ -152,7 +152,7 @@ type va_value_reg = int
 function method va_op_reg_reg(r:reg):va_register { r }
 predicate va_is_src_reg(r:reg, s:va_state) { true }
 predicate va_is_dst_reg(r:reg, s:va_state) { true }
-function va_update_reg(r:reg, sM:va_state, sK:va_state):va_state { va_modify_reg(r, sM, sK) }
+function va_update_operand_reg(r:reg, sM:va_state, sK:va_state):va_state { va_update_reg(r, sM, sK) }
 function va_eval_reg(s:va_state, r:va_register):int { eval_reg(r, s) }
 
 // operand
@@ -165,7 +165,7 @@ function method va_op_opr_reg(r:reg):va_operand { OReg(r) }
 predicate va_is_src_opr(o:opr, s:va_state) { true }
 predicate va_is_dst_opr(o:opr, s:va_state) { o.OReg? }
 function method va_const_opr(x:int):va_operand { OConst(x) }
-function va_update_opr(o:opr, sM:va_state, sK:va_state):va_state requires o.OReg? { va_modify_reg(o.r, sM, sK) }
+function va_update_opr(o:opr, sM:va_state, sK:va_state):va_state requires o.OReg? { va_update_reg(o.r, sM, sK) }
 function va_eval_opr(s:va_state, r:va_operand):int { eval_opr(r, s) }
 
 // mem_operand
@@ -179,11 +179,11 @@ function method va_op_mem_operand(o:opr):va_mem_operand { OOpr(o) }
 predicate va_is_src_mem(o:mem_opr, s:va_state) { mem_opr_ok(o, s) }
 predicate va_is_dst_mem(o:mem_opr, s:va_state) { mem_opr_ok(o, s) && (o.OOpr? ==> o.o.OReg?) }
 function method va_mem_const_opr(x:int):va_mem_operand { OOpr(OConst(x)) }
-function va_update_mem(o:mem_opr, sM:va_state, sK:va_state):va_state requires o.OOpr? ==> o.o.OReg?
+function va_update_operand_mem(o:mem_opr, sM:va_state, sK:va_state):va_state requires o.OOpr? ==> o.o.OReg?
 {
   match o
     case OMem(base, offset) => sK.(mem := sK.mem[eval_reg(base, sK) + offset := eval_mem_opr(o, sM)])
-    case OOpr(o) => va_modify_reg(o.r, sM, sK)
+    case OOpr(o) => va_update_reg(o.r, sM, sK)
 }
 function va_eval_mem(s:va_state, o:va_mem_operand):int { eval_mem_opr(o, s) }
 

@@ -30,8 +30,8 @@ datatype Quadword = Quadword(lo:uint32, mid_lo:uint32, mid_hi:uint32, hi:uint32)
 
 newtype twobits = i:int | 0 <= i < 4
 datatype BitsOfByte = BitsOfByte(lo:twobits,
-                                 mid_lo:twobits, 
-                                 mid_hi:twobits, 
+                                 mid_lo:twobits,
+                                 mid_hi:twobits,
                                  hi:twobits)
 
 function bits_to_byte(bits:BitsOfByte) : uint8

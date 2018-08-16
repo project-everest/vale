@@ -2,7 +2,6 @@
 
 module X64.Vale.QuickCodes_i
 open X64.Machine_s
-open X64.Memory_i
 open X64.Vale.State_i
 open X64.Vale.Decls_i
 open X64.Vale.QuickCode_i
@@ -83,7 +82,7 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (k:state -> a -> Type0) (
         label r msg (pre p))
   | QLemma r msg pre post l qcs ->
       label r msg pre /\ (post ==> wp cs qcs k s0)
-// Hoist lambdas out of main definition to avoid issues with function equality 
+// Hoist lambdas out of main definition to avoid issues with function equality
 and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (k:state -> b -> Type0) :
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
   =
@@ -350,13 +349,12 @@ val wp_run_code (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (update:state 
 
 unfold let normal_steps : list string =
   [
-    "X64.Vale.State_i.__proj__Mkstate__item__ok";
-    "X64.Vale.State_i.__proj__Mkstate__item__regs";
-    "X64.Vale.State_i.__proj__Mkstate__item__xmms";
-    "X64.Vale.State_i.__proj__Mkstate__item__flags";
-    "X64.Vale.State_i.__proj__Mkstate__item__mem";
-
-    "X64.Vale.QuickCode_i.__proj__QProc__item__wp";
+    `%Mkstate?.ok;
+    `%Mkstate?.regs;
+    `%Mkstate?.xmms;
+    `%Mkstate?.flags;
+    `%Mkstate?.mem;
+    `%QProc?.wp;
   ]
 
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr [`%va_qattr]; delta_only normal_steps] x
