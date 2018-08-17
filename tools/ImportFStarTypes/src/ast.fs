@@ -48,33 +48,65 @@ type univ =
 
 type aqual = Explicit | Implicit | Equality
 
-type exp =
+// F* expressions
+type f_exp =
 | EId of id
 | EInt of bigint
 | EUnitValue
 | EBool
 | EProp
 | EType of univ
-| EComp of exp * exp * exp list
-| EApp of exp * (aqual * exp) list
-| EAppUnivs of exp * univ list
-| EArrow of aqual * id * exp * exp
-| ERefine of id * exp * exp
-| ETyped of exp * exp
-| EAscribed of exp * exp
-| EPattern of exp list list * exp
-| ELet of binder * exp * exp
-| EFun of binder list * exp
+| EComp of f_exp * f_exp * f_exp list
+| EApp of f_exp * (aqual * f_exp) list
+| EAppUnivs of f_exp * univ list
+| EArrow of aqual * id * f_exp * f_exp
+| ERefine of id * f_exp * f_exp
+| ETyped of f_exp * f_exp
+| EAscribed of f_exp * f_exp
+| EPattern of f_exp list list * f_exp
+| ELet of f_binder * f_exp * f_exp
+| EFun of f_binder list * f_exp
 | EUnsupported of string
-and binder = aqual * id * exp option
+and f_binder = aqual * id * f_exp option
 
-type decl =
-  {
-    d_name:string;
-    d_qualifiers:string list;
-    d_category:string;
-    d_udecls:id list;
-    d_binders:binder list;
-    d_typ:exp;
-    d_body:exp option;
-  }
+type f_decl = {
+  f_name:string;
+  f_qualifiers:string list;
+  f_category:string;
+  f_udecls:id list;
+  f_binders:f_binder list;
+  f_typ:f_exp;
+  f_body:f_exp option;
+}
+
+// Vale kinds, types, and expressions
+type v_kind =
+| KType of bigint
+
+type bool_or_prop = BpBool | BpProp
+type v_type =
+| TName of string
+| TInt of bigint // used by int_range
+| TApply of string * v_type list
+| TFun of v_type list * v_type
+
+type v_exp =
+| VId of string
+| VInt of bigint
+| VApp of string * v_type list option * v_exp list
+| VLet of string * v_type * v_exp * v_exp
+//| VFun of v_binder list * v_exp
+//| VUnsupported of string
+//and v_binder = aqual * id * v_exp option
+
+(*
+type v_decl = {
+  v_name:string;
+  v_qualifiers:string list;
+  v_category:string;
+  v_udecls:id list;
+  v_binders:v_binder list;
+  v_type:v_type;
+  v_body:v_exp option;
+}
+*)

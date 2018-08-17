@@ -188,14 +188,14 @@ let va_upd_operand_xmm (x:xmm) (v:quad32) (s:state) : state =
   update_xmm x v s
 
 [@va_qattr]
-let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) =
+let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) : state =
   match o with
   | OConst n -> s
   | OReg r -> update_reg r v s
   | OMem m -> s // TODO: support destination memory operands
 
 [@va_qattr]
-let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) =
+let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) : state =
   match o with
   | OConst n -> s
   | OReg r -> update_reg r v s

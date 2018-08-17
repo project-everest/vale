@@ -301,7 +301,7 @@ let eval_ins (ins:ins) : st unit =
 
   | IMul64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins (FStar.UInt.mul_mod #64 (eval_operand dst s) (eval_operand src s))
+    update_operand dst ins ((eval_operand dst s `op_Multiply` eval_operand src s) % 0x10000000000000000)
 
   | Xor64 dst src ->
     check (valid_operand src);;

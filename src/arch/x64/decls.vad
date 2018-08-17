@@ -125,7 +125,7 @@ operand_type mem32:uint32;
 operand_type mem64:uint64;
 operand_type shift32:uint32 := in ecx | const;
 operand_type opr32:uint32 := reg32 | const;
-operand_type shift64:uint32 := in rcx | const;
+operand_type shift64:uint64 := in rcx | const;
 operand_type opr64:uint64 := reg64 | const;
 
 #verbatim

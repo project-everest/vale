@@ -511,15 +511,15 @@ let compute_bound (l1:bnd) (h1:bnd) (l2:bnd) (h2:bnd) (op:bop):(bnd * bnd) =
     | BMul -> all_pairs (fun x y -> [bnd_mul x y])
     | BDiv when (bnd_gt l2 bnd_zero) (* TODO || (bnd_lt h2 bnd_zero) *) -> all_pairs bnd_div
     | BMod when (bnd_gt l2 bnd_zero) || (bnd_lt h2 bnd_zero) ->
-      [bnd_zero] @ bnd_sub (bnd_abs l2) bnd_one @ bnd_sub (bnd_abs h2) bnd_one
+        [bnd_zero] @ bnd_sub (bnd_abs l2) bnd_one @ bnd_sub (bnd_abs h2) bnd_one
     | _ -> err (sprintf "cannot find new bound for '(%A, %A) %A (%A, %A)'" l1 h1 op l2 h2) in
   (List.fold bnd_min Inf s, List.fold bnd_max NegInf s)
 
 let unify_int_bound (t1:typ) (t2:typ) (op:bop):typ =
   match (t1, t2) with
   | (TInt (l1, h1), TInt (l2, h2)) ->
-    let (l, h) = compute_bound l1 h1 l2 h2 op in
-    TInt (l, h)
+      let (l, h) = compute_bound l1 h1 l2 h2 op in
+      TInt (l, h)
   | _ -> err (sprintf "expected two integer types, found '%A' and '%A'" (string_of_typ t1) (string_of_typ t2))
 
 let neg_int_bound (t:typ):typ =
@@ -1924,7 +1924,7 @@ let tc_proc (env:env) (p:proc_decl):(env * proc_decl) =
       (env, p)
 
 let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) list) =
-  let ((loc, d), b) = decl in
+  let ((loc, d), verify) = decl in
   try
     match d with
     | DType (x, ts, k, t, attrs) ->
@@ -1951,7 +1951,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         (env, [decl])
     | DFun ({fbody = None} as f) -> // TODO: fbody = Some e
       (
-        let isTypeChecked = (attrs_get_bool (Id "typecheck") (not !fstar) f.fattrs) && not (attrs_get_bool (Id "notypecheck") false f.fattrs) in
+        let isTypeChecked = verify && (attrs_get_bool (Id "typecheck") true f.fattrs) && not (attrs_get_bool (Id "notypecheck") false f.fattrs) in
         let name =
           // Generate distinct names for overloaded operators
           // TODO: more overloaded operators
@@ -1967,7 +1967,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         (env, [decl])
       )
     | DProc p ->
-        let isTypeChecked = (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") (not !fstar) p.pattrs) && not (attrs_get_bool (Id "notypecheck") false p.pattrs) in
+        let isTypeChecked = verify && (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") true p.pattrs) && not (attrs_get_bool (Id "notypecheck") false p.pattrs) in
         let isTestShouldFail = attrs_get_bool (Id "testShouldFail") false p.pattrs in
         let (env, ps) =
           if isTypeChecked then
@@ -1981,7 +1981,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
           else
             let env = push_proc env p.pname p in (env, [p])
           in
-        (env, List.map (fun p -> ((loc, DProc p), b)) ps)
+        (env, List.map (fun p -> ((loc, DProc p), verify)) ps)
     | DUnsupported x ->
         let env = push_unsupported env x in
         (env, [decl])

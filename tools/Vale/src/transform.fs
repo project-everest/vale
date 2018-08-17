@@ -702,7 +702,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
 *)
     | (NotGhost, ECast(e, t)) -> Unchanged  // TODO: need to rewrite e
     | (NotGhost, _) ->
-        err "unsupported expression (if the expression is intended as a const operand, try wrapping it in 'const(...)'; if the expression is intended as a non-const operand, try declaring operand procedures)"
+        err "unsupported expression (if the expression is intended as a load/store operand, try declaring 'operand_type x(...):...')"
         // Replace (codeLemma e)
     | (Ghost, EOp (Uop UToOperand, [e])) -> Replace (rewrite_vars_arg rctx NotGhost None io env e)
 // TODO: this is a real error message, it should be uncommented

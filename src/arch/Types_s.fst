@@ -13,12 +13,12 @@ unfold let nat64 = Words_s.nat64
 let add_wrap (#n:nat) (x:natN n) (y:natN n) : natN n = if x + y < n then x + y else x + y - n
 
 // abstract bitwise operations on integers:
-assume val iand : #n:nat -> a:natN n -> b:natN n -> natN n
-assume val ixor : #n:nat -> a:natN n -> b:natN n -> natN n
-assume val ior : #n:nat -> a:natN n -> b:natN n -> natN n
-assume val inot : #n:nat -> a:natN n  -> natN n
-assume val ishl : #n:nat -> a:natN n -> s:int -> natN n
-assume val ishr : #n:nat -> a:natN n -> s:int -> natN n
+assume val iand (#n:nat) (a:natN n) (b:natN n) : natN n
+assume val ixor (#n:nat) (a:natN n) (b:natN n) : natN n
+assume val ior (#n:nat) (a:natN n) (b:natN n) : natN n
+assume val inot (#n:nat) (a:natN n) : natN n
+assume val ishl (#n:nat) (a:natN n) (s:int) : natN n
+assume val ishr (#n:nat) (a:natN n) (s:int) : natN n
 
 unfold let nat32_xor (x y:nat32) : nat32 = ixor x y
 
