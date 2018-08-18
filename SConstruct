@@ -93,7 +93,7 @@ import SCons.Util
 import atexit
 import platform
 import fnmatch
-import distutils.dir_util
+import pathlib
 import shutil
 
 if sys.version_info < (3, 6):
@@ -543,7 +543,7 @@ def add_include_dir_for_file(include_paths, file):
   d = str(file.dir)
   if not (d in include_paths):
     include_paths.append(d)
-    distutils.dir_util.mkpath(str(to_obj_dir(file).dir))
+    pathlib.Path(str(to_obj_dir(file).dir)).mkdir(parents = True, exist_ok = True)
 
 def include_fstar_file(env, file):
   options = get_build_options(file)
@@ -557,7 +557,7 @@ def include_vaf_file(env, file):
   options = get_build_options(file)
   add_include_dir_for_file(obj_include_paths, file)
   dummy_dir = File(f'obj/dummies/{file_drop_extension(file)}').dir
-  distutils.dir_util.mkpath(str(dummy_dir))
+  pathlib.Path(str(dummy_dir)).mkdir(parents = True, exist_ok = True)
   if options != None:
     add_module_for_file(file)
     module_name = file_module_name(file)
@@ -566,7 +566,7 @@ def include_vaf_file(env, file):
       # The F* dependency analysis runs before .vaf files are converted to .fst/.fsti files,
       # so generate a dummy .fst/.fsti file pair for each .vaf file for the F* dependency analysis.
       dummy_file = File(f'obj/dummies/{file_drop_extension(file)}{extension}')
-      distutils.dir_util.mkpath(str(dummy_file.dir))
+      pathlib.Path(str(dummy_file.dir)).mkdir(parents = True, exist_ok = True)
       with open(str(dummy_file), 'w') as myfile:
         myfile.write(f'module {module_name}' + '\n')
 
@@ -858,9 +858,9 @@ if do_build:
 
 # Create obj directory and any subdirectories needed during dependency analysis
   # (SCons will create other subdirectories during build)
-  distutils.dir_util.mkpath('bin')
-  distutils.dir_util.mkpath('obj')
-  distutils.dir_util.mkpath('obj/cache_checked')
+  pathlib.Path('bin').mkdir(parents = True, exist_ok = True)
+  pathlib.Path('obj').mkdir(parents = True, exist_ok = True)
+  pathlib.Path('obj/cache_checked').mkdir(parents = True, exist_ok = True)
 
   Export('env')
   Export('win32')
