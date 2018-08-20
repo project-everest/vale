@@ -93,7 +93,7 @@ import SCons.Util
 import atexit
 import platform
 import fnmatch
-import distutils.dir_util
+import pathlib
 import shutil
 
 if sys.version_info < (3, 6):
@@ -256,10 +256,6 @@ verify_paths = [
 ]
 
 manual_dependencies = {
-  'obj/src/arch/x64/X64.Vale.InsLemmas.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
-  'obj/src/arch/x64/X64.Vale.InsBasic.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
-  'obj/src/arch/x64/X64.Vale.InsMem.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
-  'obj/src/arch/x64/X64.Vale.InsVector.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
 }
 
 #
@@ -267,11 +263,6 @@ manual_dependencies = {
 #
 verify_options = [
   ('src/lib/util/operator.vaf', BuildOptions(fstar_default_args, vale_includes = '')),
-
-  # Any use of expose_interfaces requires adding to manual_dependencies
-  ('obj/src/arch/x64/X64.Vale.InsBasic.fst', BuildOptions(fstar_default_args + ' --expose_interfaces X64.Vale.Decls_i.fst')),
-  ('obj/src/arch/x64/X64.Vale.InsMem.fst', BuildOptions(fstar_default_args + ' --expose_interfaces X64.Vale.Decls_i.fst')),
-  ('obj/src/arch/x64/X64.Vale.InsVector.fst', BuildOptions(fstar_default_args + ' --expose_interfaces X64.Vale.Decls_i.fst')),
 
   ('src/*/*.fst', BuildOptions(fstar_default_args)),
   ('src/*/*.fsti', BuildOptions(fstar_default_args)),
@@ -310,10 +301,11 @@ if verify and do_build:
 else:
   fstar_z3_path = ''
 
-if sys.platform == 'win32':
-  dafny_z3_path = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
-else:
-  dafny_z3_path = f'/z3exe:{z3_exe}'
+if verify and do_dafny:
+  if sys.platform == 'win32':
+    dafny_z3_path = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
+  else:
+    dafny_z3_path = f'/z3exe:{z3_exe}'
 
 vale_exe = File('bin/vale.exe')
 import_fstar_types_exe = File('bin/importFStarTypes.exe')
@@ -560,7 +552,7 @@ def add_include_dir_for_file(include_paths, file):
   d = str(file.dir)
   if not (d in include_paths):
     include_paths.append(d)
-    distutils.dir_util.mkpath(str(to_obj_dir(file).dir))
+    pathlib.Path(str(to_obj_dir(file).dir)).mkdir(parents = True, exist_ok = True)
 
 def include_fstar_file(env, file):
   options = get_build_options(file)
@@ -574,7 +566,7 @@ def include_vaf_file(env, file):
   options = get_build_options(file)
   add_include_dir_for_file(obj_include_paths, file)
   dummy_dir = File(f'obj/dummies/{file_drop_extension(file)}').dir
-  distutils.dir_util.mkpath(str(dummy_dir))
+  pathlib.Path(str(dummy_dir)).mkdir(parents = True, exist_ok = True)
   if options != None:
     add_module_for_file(file)
     module_name = file_module_name(file)
@@ -583,7 +575,7 @@ def include_vaf_file(env, file):
       # The F* dependency analysis runs before .vaf files are converted to .fst/.fsti files,
       # so generate a dummy .fst/.fsti file pair for each .vaf file for the F* dependency analysis.
       dummy_file = File(f'obj/dummies/{file_drop_extension(file)}{extension}')
-      distutils.dir_util.mkpath(str(dummy_file.dir))
+      pathlib.Path(str(dummy_file.dir)).mkdir(parents = True, exist_ok = True)
       with open(str(dummy_file), 'w') as myfile:
         myfile.write(f'module {module_name}' + '\n')
 
@@ -947,9 +939,9 @@ if do_build:
 
 # Create obj directory and any subdirectories needed during dependency analysis
   # (SCons will create other subdirectories during build)
-  distutils.dir_util.mkpath('bin')
-  distutils.dir_util.mkpath('obj')
-  distutils.dir_util.mkpath('obj/cache_checked')
+  pathlib.Path('bin').mkdir(parents = True, exist_ok = True)
+  pathlib.Path('obj').mkdir(parents = True, exist_ok = True)
+  pathlib.Path('obj/cache_checked').mkdir(parents = True, exist_ok = True)
 
   Export('env')
   Export('win32')

@@ -30,6 +30,22 @@ fsyacc_exe = File(f'{build_dir}/fsyacc.exe')
 def abspaths(files):
   return ' '.join([x.abspath for x in files])
 
+def fsyaccEmitter(target, source, env):
+  # assume the initial target is a .fs file.  Add the .fsi target
+  targetBase, targetExt = os.path.splitext(SCons.Util.to_String(target[0]))
+  target.append(targetBase + '.fsi')
+  return (target, source)
+
+def add_fslexyacc(env):
+  # probe for fslexyacc to ensure it is installed ahead of trying to use it to build
+  if not os.path.isfile(str(fslex_exe)):
+    packages_config = File('#tools/Vale/src/packages.config')
+    packages_dir = Dir('#tools/FsLexYacc')
+    nuget_env = Environment(ENV = {'PATH' : os.environ['PATH']})
+    if nuget_env.Execute(f'nuget restore {packages_config} -PackagesDirectory {packages_dir}'):
+      print("Unable to run nuget in order to restore FsLexYacc.  See INSTALL.md for more details.")
+      Exit(1)
+
 def build_tool(sources, refs):
   senv = env.Clone()
   r_refs = " ".join([f'-r {x}' for x in refs])
