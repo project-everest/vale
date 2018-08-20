@@ -256,10 +256,6 @@ verify_paths = [
 ]
 
 manual_dependencies = {
-  'obj/src/arch/x64/X64.Vale.InsLemmas.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
-  'obj/src/arch/x64/X64.Vale.InsBasic.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
-  'obj/src/arch/x64/X64.Vale.InsMem.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
-  'obj/src/arch/x64/X64.Vale.InsVector.fst.verified.tmp': 'obj/src/arch/x64/X64.Vale.Decls_i.fst',
 }
 
 #
@@ -267,11 +263,6 @@ manual_dependencies = {
 #
 verify_options = [
   ('src/lib/util/operator.vaf', BuildOptions(fstar_default_args, vale_includes = '')),
-
-  # Any use of expose_interfaces requires adding to manual_dependencies
-  ('obj/src/arch/x64/X64.Vale.InsBasic.fst', BuildOptions(fstar_default_args + ' --expose_interfaces X64.Vale.Decls_i.fst')),
-  ('obj/src/arch/x64/X64.Vale.InsMem.fst', BuildOptions(fstar_default_args + ' --expose_interfaces X64.Vale.Decls_i.fst')),
-  ('obj/src/arch/x64/X64.Vale.InsVector.fst', BuildOptions(fstar_default_args + ' --expose_interfaces X64.Vale.Decls_i.fst')),
 
   ('src/*/*.fst', BuildOptions(fstar_default_args)),
   ('src/*/*.fsti', BuildOptions(fstar_default_args)),
