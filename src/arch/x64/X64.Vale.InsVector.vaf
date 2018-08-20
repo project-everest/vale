@@ -74,10 +74,10 @@ procedure{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly} Paddd(inout ds
     modifies efl;
     ensures
         dst == old(Mkfour(
-            add_wrap64(dst.lo0, src.lo0),
-            add_wrap64(dst.lo1, src.lo1),
-            add_wrap64(dst.hi2, src.hi2),
-            add_wrap64(dst.hi3, src.hi3)));
+            add_wrap32(dst.lo0, src.lo0),
+            add_wrap32(dst.lo1, src.lo1),
+            add_wrap32(dst.hi2, src.hi2),
+            add_wrap32(dst.hi3, src.hi3)));
 {
 }
 
@@ -91,7 +91,7 @@ procedure{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout ds
     requires
         0 <= amt < 32;
     ensures
-        dst == four_map((lambda i:nat32 :: ishl(i, amt)), old(dst));
+        dst == four_map((lambda i:nat32 :: ishl32(i, amt)), old(dst));
 {
 }
 
@@ -99,7 +99,7 @@ procedure{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout ds
     requires
         0 <= amt < 32;
     ensures
-        dst == four_map((lambda i:nat32 :: ishr(i, amt)), old(dst));
+        dst == four_map((lambda i:nat32 :: ishr32(i, amt)), old(dst));
 {
 }
 
@@ -140,7 +140,7 @@ procedure{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
         src < pow2_32;
         index < 4;
     ensures
-        dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), index);
+        dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), #nat2(index));
 {
 }
 
@@ -149,7 +149,7 @@ procedure{:quick exportOnly}
     requires
         index < 4;
     ensures
-        dst == insert_nat32(old(dst), immediate, index);
+        dst == insert_nat32(old(dst), immediate, #nat2(index));
 {
     Mov64(tmp, immediate);
     Pinsrd(dst, tmp, index);
@@ -160,7 +160,7 @@ procedure{:instruction Ins(S.Pinsrq(dst, src, index))}{:quick exportOnly}
     requires
         index < 2;
     ensures
-        dst == insert_nat64(old(dst), src, index);
+        dst == insert_nat64(old(dst), src, #nat1(index));
 {
 }
 
@@ -169,7 +169,7 @@ procedure{:quick exportOnly}
     requires
         index < 2;
     ensures
-        dst == insert_nat64(old(dst), immediate, index);
+        dst == insert_nat64(old(dst), immediate, #nat1(index));
 {
     Mov64(tmp, immediate);
     Pinsrq(dst, tmp, index);

@@ -770,13 +770,13 @@ def compute_module_types(env, source_vaf):
   def collect_dumps_in_order(x):
     if not (x in done):
       done.add(x)
-      for y in dump_deps[x]:
+      for y in sorted(dump_deps[x]):
         # if x depends on y, y must appear first
         collect_dumps_in_order(y)
       x_vaf = re.sub('\.dump$', '.types.vaf', x)
       Depends(types_vaf, x)
       dumps.append(x)
-  for x in vaf_dump_deps[source_vaf]:
+  for x in sorted(vaf_dump_deps[source_vaf]):
     collect_dumps_in_order(x)
   dumps_string = " ".join(['-in ' + str(x) for x in dumps])
   Depends(types_vaf, import_fstar_types_exe)

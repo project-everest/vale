@@ -58,6 +58,9 @@ procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:in
     let aa:list_list(byte) := nil();
     let b := nil#[byte]();
     let c := cons(100, Cons(200, b));
+    let d := Mkmyrec(100, true);
+    let e:int := d.r1;
+    let f:bool := d.r2;
     let k:nat32 := id(5);
     let j:nat32 := (let m:byte := id#[byte](5) in m);
     let l:nat32 := id#[byte](5);

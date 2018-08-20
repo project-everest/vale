@@ -1343,7 +1343,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let x =
         match t1 with
         | TName (Id x) | TApply (Id x, _) -> x
-        | _ -> err (sprintf "cannot find overloaded [] function for collection of type %s" (string_of_typ t1))
+        | _ -> err (sprintf "cannot find overloaded operator([]) function for collection of type %s" (string_of_typ t1))
         in
       let e = eapply (Operator (x + "[]")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
@@ -1357,7 +1357,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let x =
         match t1 with
         | TName (Id x) | TApply (Id x, _) -> x
-        | _ -> err (sprintf "cannot find overloaded [:=] function for collection of type %s" (string_of_typ t1))
+        | _ -> err (sprintf "cannot find overloaded operator([:=]) function for collection of type %s" (string_of_typ t1))
         in
       let e = eapply (Operator (x + "[:=]")) [e1; e2; e3] in
       let (t, ae) = infer_exp env u e expected_typ in
@@ -1371,7 +1371,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let x =
         match t2 with
         | TName (Id x) | TApply (Id x, _) -> x
-        | _ -> err (sprintf "cannot find overloaded ?[] function for collection of type %s" (string_of_typ t2))
+        | _ -> err (sprintf "cannot find overloaded operator(?[]) function for collection of type %s" (string_of_typ t2))
         in
       let e = eapply (Operator (x + "?[]")) [e2; e1] in
       let (t, ae) = infer_exp env u e expected_typ in
@@ -1389,23 +1389,33 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       | _ -> err ("'Update' should be converted to 'EApply' first before typecheckings") in
     (t, ae, s)
 *)
-  | EOp (FieldOp (Id x), [e]) ->
+  | EOp (FieldOp (Id xf), [e1]) ->
     (
-      // REVIEW: we might want to overload .x
-      let e = eapply (Operator ("." + x)) [e] in
-      let (t, ae) = infer_exp_force env u e expected_typ in // force in case we later implement overloading
+      let (t1, ae1) = infer_exp_force env u e1 expected_typ in
+      let x1 =
+        match t1 with
+        | TName (Id x1) | TApply (Id x1, _) -> x1
+        | _ -> err (sprintf "cannot find overloaded operator(.%s) function for type %s" xf (string_of_typ t1))
+        in
+      let e = eapply (Operator (x1 + " ." + xf)) [e1] in
+      let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> norm_ret t (AE_Op (FieldOp (Id x), es))
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (FieldOp (Id xf), es)) // TODO: save x1 or t1
       | _ -> internalErr ("EOp FieldOp")
     )
-  | EOp (FieldUpdate (Id x), [e1; e2]) ->
+  | EOp (FieldUpdate (Id xf), [e1; e2]) ->
     (
-      // REVIEW: we might want to overload .x :=
-      let e = eapply (Operator ("." + x + ":=")) [e1; e2] in
-      let (t, ae) = infer_exp_force env u e expected_typ in // force in case we later implement overloading
+      let (t1, ae1) = infer_exp_force env u e1 expected_typ in
+      let x1 =
+        match t1 with
+        | TName (Id x1) | TApply (Id x1, _) -> x1
+        | _ -> err (sprintf "cannot find overloaded operator(.%s :=) function for type %s" xf (string_of_typ t1))
+        in
+      let e = eapply (Operator (x1 + " ." + xf + ":=")) [e1; e2] in
+      let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> norm_ret t (AE_Op (FieldUpdate (Id x), es))
-      | _ -> internalErr ("EOp FieldUpdate")
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (FieldUpdate (Id xf), es)) // TODO: save x1 or t1
+      | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (Cond, [e1; e2; e3]) ->
       let tv = u_next_type_var u in
@@ -1962,6 +1972,13 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
           | (Operator "[:=]", _) -> err "operator([:=]) expects three arguments (the first argument must be a named type)"
           | (Operator "?[]", [(_, Some (TName (Id x) | (TApply (Id x, _)))); _]) -> Operator (x + "?[]")
           | (Operator "?[]", _) -> err "operator(?[]) expects two arguments (the first argument must be a named type)"
+          | (Operator xf, [(_, Some (TName (Id xt) | (TApply (Id xt, _)))); _])
+              when xf.StartsWith(".") && xf.EndsWith(":=") -> Operator (xt + " " + xf)
+          | (Operator xf, _) when xf.StartsWith(".") && xf.EndsWith(":=") ->
+              err (sprintf "operator(%s :=) expects expects two arguments (the first argument must be a named type)" xf)
+          | (Operator xf, [(_, Some (TName (Id xt) | (TApply (Id xt, _))))]) when xf.StartsWith(".") -> Operator (xt + " " + xf)
+          | (Operator xf, _) when xf.StartsWith(".") ->
+              err (sprintf "operator(%s) expects one argument, which must be a named type" xf)
           | _ -> f.fname
         let env = push_func env name f in
         (env, [decl])

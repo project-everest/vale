@@ -9,6 +9,8 @@ function byte_test(x:byte, y:byte):byte extern;
 function id #[a:Type(0)](x:a):a extern;
 function nil #[a:Type(0)]():list(a) extern;
 function cons #[a:Type(0)](hd:a, tl:list(a)):list(a) extern;
+function operator(.field1) #[a:Type(0)](l:list(a)):bool extern;
+function operator(.field1) #[a:Type(0)](l:fake_list(a)):int extern;
 
 var{:state ok()} ok:bool;
 var{:state reg(EAX)} eax:int;
@@ -54,12 +56,14 @@ procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:in
 
 function ff(x1:byte, x2:byte, x3:byte, x4:byte):byte extern;
 
-procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+procedure{:typecheck} Expressions2(ghost x:int_range(10, 20), ghost fl:fake_list(int)) returns(ghost y:int_range(15, 25))
     requires x >= 15;
 {
     let a:list(byte) := nil();
     let b := nil#[byte]();
     let c := cons(100, cons(200, b));
+    let d:bool := c.field1;
+    let e:int := fl.field1;
     let k:nat32 := id(5);
     let j:nat32 := (let m:byte := id#[byte](5) in m);
     let l:nat32 := id#[byte](5);

@@ -56,8 +56,14 @@ statement s =
 | dst, ..., dst := x(e, ..., e)
 | ...
 
-Note: the following expressions may be desugared into x(e, ..., e) expressions for type checking:
+Note: the following expressions are resolved into x(e1, ..., en) expressions for type checking:
 | e[e] | e[e := e] | e.x | e.(x := e) | e is x
+In the x(e1, ..., en) expression, the function x is an overloaded operator name,
+written in Vale syntax as "operator([])", "operator([:=])", "operator(.x)", or "operator(.x:=)".
+Inside the type checker, the overloaded operator name also contains the type name of the first
+argument e1; this type name distinguishes different declarations of the same overloaded operator.
+The type of e1 must be a named type x:k or x:(k, ..., k) -> k or a primitive type like "int",
+not a type abbreviation x:k = t or x(...):k = t.
 
 IO = in | out | inout
 param = ghost | inline | IO operand

@@ -15,3 +15,5 @@ assume val ff2 (z:int) : Pure int (requires True) (ensures fun _ -> xeq2 10 20 /
 
 let natN (n:nat) = x:nat{x < n}
 let nat8 = natN 256
+
+type myrec = {r1:int; r2:bool}

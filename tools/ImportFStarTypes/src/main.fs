@@ -795,7 +795,17 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
           | ([], Some i) -> (Some (EInt i), EApp (eIntRange, [(Explicit, EInt i); (Explicit, EInt i)]))
           | _ -> (None, d.f_typ)
           in
-        [(env, {d with f_category = "val"; f_body = body; f_typ = t})]
+        // For names of the form FTypeFStar.__proj__Mkmyrec__item__r1, produce a second function named operator(.r1).
+        // For now, we only handle records ("Mk..."); datatype projectors like FStar.Pervasives.__proj__Inl__item__v
+        // and FStar.Pervasives.__proj__Inr__item__v would create ambiguous operators.
+        let x = d.f_name in
+        let dv = {d with f_category = "val"; f_body = body; f_typ = t} in
+        if x.Contains("__proj__Mk") && x.Contains("__item__") then
+          let i = x.IndexOf("__item__") + "__item__".Length in
+          let xf = x.Substring(i) in
+          let xo = "operator(." + xf + ")" in
+          [(env, dv); (env, {dv with f_name = xo})]
+        else [(env, dv)]
     | _ ->
         let t = match !reason with None -> d.f_typ | Some s -> EUnsupported s in
         [(env, {d with f_category = "unsupported"; f_typ = t})]
