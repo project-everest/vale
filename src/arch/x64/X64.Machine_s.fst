@@ -40,24 +40,24 @@ type mem_entry =
 | Mem32: v:nat32 -> mem_entry
 | Mem64: v:nat64 -> mem_entry
 
-type mem = Map.t int mem_entry
+type memory = Map.t int mem_entry
 
 noeq type state = {
   ok: bool;
   regs: reg -> nat64;
   xmms: xmm -> quad32;
   flags: nat64;
-  mem: mem;
+  mem: memory;
 }
 
-let valid_mem64 (addr:int) (m:mem) : bool =
+let valid_mem64 (addr:int) (m:memory) : bool =
   match Map.sel m addr with Mem64 v -> true | _ -> false
 
-assume val load_mem64 (addr:int) (m:mem) : Pure nat64
+assume val load_mem64 (addr:int) (m:memory) : Pure nat64
   (requires True)
   (ensures fun n -> match Map.sel m addr with Mem64 v -> v == n | _ -> True)
 
-let store_mem64 (addr:int) (v:nat64) (m:mem) : mem =
+let store_mem64 (addr:int) (v:nat64) (m:memory) : memory =
   Map.upd m addr (Mem64 v)
 
 type maddr =

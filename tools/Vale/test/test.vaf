@@ -35,8 +35,8 @@ procedure Calls()
         rax == old(rax) + 7;
 {
     Add64Wrap(rax, 1);
-    ghost var z := rax;
-    Mov64(rbx, const(double(1)));
+    ghost var z:int := rax;
+    Mov64(rbx, #nat64(double(1)));
     assert rbx == 2;
     assert z == rax;
     if (rbx == 2)

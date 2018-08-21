@@ -1257,15 +1257,17 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       | AEApply (_, es, [t], [et]) -> AE_Op (Uop (UIs x), es, t, et)
       | _ -> err ("'UIs' should be converted to 'EApply' first before typechecking") in
     (t, ae, s)
-  | EOp (Uop (UCustom op), l) ->
-    let (p, _) = lookup_fun_or_proc env (Operator op) in
-    let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
+*)
+  | EOp (Uop (UCustom op), es) ->
+    (
+      let f = lookup_fun env (Operator op) in
+      let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
+      let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | AEApply (x, es, [t], [et]) -> AE_Op (Uop (UCustom op), es, t, et)
-      | _ -> err ("'UCustom' should be converted to 'EApply' first before typechecking") in
-    (t, ae, s)
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (Uop (UCustom op), es))
+      | _ -> internalErr "UCustom"
+    )
+(*
   | EOp (Uop UToOperand, _) ->
     err (sprintf "missing typing rule for Uop UToOperand")
   | EOp (Uop op, _) ->
@@ -1311,10 +1313,11 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       u_constrain_subtype u t2.norm_typ tv;
       let t =
         // REVIEW: do we want different treatment of == between Dafny and F*?
-        match (!fstar, opt) with
-        | (false, _) -> tBool
-        | (true, BpBool) -> tBool
-        | (true, BpProp) -> tProp
+        match (!fstar, opt, expected_typ) with
+        | (false, _, _) -> tBool
+        | (true, BpBool, _) -> tBool
+        | (true, BpProp, Some (TBool BpBool)) -> tBool
+        | (true, BpProp, _) -> tProp
         in
       norm_ret t (AE_Op (op, [ae1; ae2]))
 (*
@@ -1327,16 +1330,16 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
     let (t2, ae2, s2) = infer_exp env e2 None in
     let ae = AE_Op (Bop BOldAt, [ae1;ae2], tv, et) in
     (tv, ae, s1 @ s2 @ [(t1, TName(Id "state"));(t2, tv)])
-  | EOp (Bop (BCustom op), l) ->
-    let (p, _) = lookup_fun_or_proc env (Operator op) in
-    let e = EApply (attrs_get_id (Reserved "alias") p.attrs, l) in
-    let (t, ae, s) = infer_exp env e expected_typ in
-    let ae =
-      match ae with
-      | AEApply (x, es, [t], [et]) -> AE_Op (Bop (BCustom op), es, t, et)
-      | _ -> err ("'BCustom' should be converted to 'EApply' first before typechecking") in
-    (t, ae, s)
 *)
+  | EOp (Bop (BCustom op), es) ->
+    (
+      let f = lookup_fun env (Operator op) in
+      let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
+      let (t, ae) = infer_exp env u e expected_typ in
+      match ae with
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (Bop (BCustom op), es))
+      | _ -> internalErr "BCustom"
+    )
   | EOp (Subscript, [e1; e2]) ->
     (
       let (t1, ae1) = infer_exp_force env u e1 expected_typ in
@@ -1705,7 +1708,7 @@ let rec tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
           )
         | _ -> check_const_operand xo
       )
-    | (XOperand, _) -> internalErr "tc_proc_operand: XOperand"
+    | (XOperand, _) -> err "expected operand as procedure argument, found expression"
     | _ -> notImplemented (sprintf "tc_proc_operand %A" pf)
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
 
@@ -1947,13 +1950,13 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         // TODO: type check t and e
         let env = push_id env x t in
         (env, [decl])
-    | DVar (x, tt, XState e, _) ->
+    | DVar (x, t, XState e, _) ->
       (
         match skip_loc e with
         | EApply _ ->
-          let t = normalize_type_with_transform env tt (Some StateGet) in
-          let env = push_id_with_info env x t.norm_typ (Some (StateInfo t.norm_typ))  in
-          (env, [decl])
+            //let t = normalize_type_with_transform env t (Some StateGet) in
+            let env = push_id_with_info env x t(*.norm_typ*) (Some (StateInfo t(*.norm_typ*)))  in
+            (env, [decl])
         | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
       )
     | DConst (x, t) ->

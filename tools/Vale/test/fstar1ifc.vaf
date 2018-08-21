@@ -1,12 +1,14 @@
 include{:fstar}{:open} "Types_s"
 
+module Fstar1ifc
+
 var{:state ok()} ok:bool;
 var{:state reg(EAX)} eax:int;
 var{:state reg(EBX)} ebx:int;
 var{:state flags()} efl:int;
 var{:state mem()} mem:int;
 
-module Fstar1ifc
+operand_type reg:int := inout eax | inout ebx;
 
 #verbatim{:interface}
 module Map=FStar.Map
@@ -15,12 +17,12 @@ let op_String_Access = Map.sel
 let op_String_Assignment = Map.upd
 let contains = Map.contains
 
-type reg = | EAX | EBX
+type register = | EAX | EBX
 
 type va_bool = bool
 type va_int = int
 type ins = | IPlaceholder : int -> ins
-type ocmp = | OLe: o1:reg -> o2:reg -> ocmp
+type ocmp = | OLe: o1:register -> o2:register -> ocmp
 type va_code =
   | Ins : ins:ins -> va_code
   | Block : block:va_codes -> va_code
@@ -40,22 +42,22 @@ let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
 let va_get_whileCond (c:va_code{While? c}) : GTot ocmp = While?.whileCond c
 let va_get_whileBody (c:va_code{While? c}) : GTot va_code = While?.whileBody c
 
-type va_state = map reg int
+type va_state = map register int
 let va_get_ok (s:va_state) : GTot Type = True
-let va_get_reg (r:reg) (s:va_state) : GTot int = s.[r]
+let va_get_reg (r:register) (s:va_state) : GTot int = s.[r]
 let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
-let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
+let va_update_reg (r:register) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
 
-type va_register = reg
-type va_operand_reg = reg
-let va_op_reg_reg (r:reg) : Tot va_register = r
-let va_is_src_reg (r:reg) (s:va_state) = True
-let va_is_dst_reg (r:reg) (s:va_state) = True
-let va_update_register (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
-let va_update_operand_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+type va_register = register
+type va_operand_reg = register
+let va_op_reg_reg (r:register) : Tot va_register = r
+let va_is_src_reg (r:register) (s:va_state) = True
+let va_is_dst_reg (r:register) (s:va_state) = True
+let va_update_register (r:register) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_update_operand_reg (r:register) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
 let va_eval_reg (s:va_state) (r:va_register) : GTot int = s.[r]
 
-type va_cmp = reg
+type va_cmp = register
 let va_op_cmp_reg (r:va_register) : va_cmp = r
 let va_cmp_le (a:va_register) (b:va_register) : ocmp = OLe a b
 
@@ -173,12 +175,6 @@ let opaque_double = make_opaque double
 
 function double (x:int) : int extern;
 function opaque_double (x:int) : int extern;
-type va_state : Type(0) extern;
-type reg : Type(0) extern;
-type va_register : Type(0) := reg;
-type va_operand_reg : Type(0) := reg ;
-function va_eval_reg(s_5048 : va_state , r_5049 : va_register) : int extern;
-function va_op_reg_reg (r_4773 : reg) : va_register extern;
 
 procedure{:terminates} Imm(out x:reg, inline y:int)
     ensures

@@ -124,7 +124,7 @@ let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
 let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
 #endverbatim
 
-procedure lemma_self_int(i:int) extern;
+ghost procedure lemma_self_int(ghost i:int) extern;
 
 procedure{:quick} Incr3Quick()
     modifies
@@ -296,5 +296,5 @@ procedure{:quick} TestAssertTyping(ghost i:int) returns(ghost j:nat)
 {
     assert{:quick_type} i >= 0;
     assert{:quick_type} i >= 0;
-    j := i;
+    j := #nat(i);
 }

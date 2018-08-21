@@ -28,7 +28,9 @@ Note that <, >, <=, >= may be chained together: 0 <= i < n turns into 0 <= i && 
 #token /\ precedence &&
 #token \/ precedence ||
 
+// REVIEW: these may be obsolete now that Vale overloads ! && || == != across bool and prop
+function disequality #[a:Type(0)](x:a, y:a):bool extern;
 function operator(~) (x:prop):prop := l_not;
-function operator(<>) (x:prop, y:prop):prop := op_disEquality;
+function operator(<>) #[a:Type(0)](x:a, y:a):bool := disequality;
 function operator(/\) (x:prop, y:prop):prop := l_and;
 function operator(\/) (x:prop, y:prop):prop := l_or;

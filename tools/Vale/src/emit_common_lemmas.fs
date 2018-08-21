@@ -35,12 +35,9 @@ function method{:opaque} va_code_Q(...):va_code
 let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   let rs = build_code_block env benv in
   let rec assign e =
-    let is_proc (x:id) (g:ghost):bool =
-      match Map.tryFind x env.procs with Some {pghost = pg} -> pg = g | _ -> false
-      in
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (Id x, _, es) when is_proc (Id x) NotGhost ->
+    | EApply (Id x, _, es) when is_proc env (Id x) NotGhost ->
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in
@@ -181,12 +178,9 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
   let total = benv.is_terminating in
   let rec assign lhss e =
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
-    let is_proc (x:id) (g:ghost):bool =
-      match Map.tryFind x env.procs with Some {pghost = pg} -> pg = g | _ -> false
-      in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, _, es) when is_proc x NotGhost ->
+    | EApply (x, _, es) when is_proc env x NotGhost ->
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
@@ -200,7 +194,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
         let blockLhss = List.map varLhsOfId (if total then [sM; senv.fM] else [senv.bM; sM]) in
         let sLem = SAssign (blockLhss @ lhss, lem) in
         (NotGhost, false, [sLem])
-    | EApply (x, ts, es) when is_proc x Ghost ->
+    | EApply (x, ts, es) when is_proc env x Ghost ->
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e]) -> sub_s0 e | _ -> sub_s0 e) es in
         let e = EApply (x, ts, es)
         (Ghost, false, [SAssign (lhss, e)])

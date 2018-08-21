@@ -774,7 +774,7 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
   | (_, EApply(x, ts, es)) ->
     (
       match Map.tryFind x env.procs with
-      | None -> (lhss, rewrite_vars_exp rctx env e)
+      | None | Some {pghost = Ghost} -> (lhss, rewrite_vars_exp rctx env e)
       | Some p ->
           check_mods env p;
           let (lhss, args) = rewrite_vars_args rctx env p lhss es in

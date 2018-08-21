@@ -184,4 +184,6 @@ let rec hide_ifs (e:exp):exp =
     in
   map_exp f e
 
+let is_proc (env:env) (x:id) (g:ghost):bool =
+  match Map.tryFind x env.procs with Some {pghost = pg} -> pg = g | _ -> false
 

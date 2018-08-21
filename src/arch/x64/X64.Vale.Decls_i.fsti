@@ -130,11 +130,11 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) : Lemma
 [@va_qattr] unfold let va_get_flags (s:va_state) : int = s.flags
 [@va_qattr] unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
 [@va_qattr] unfold let va_get_xmm (x:xmm) (s:va_state) : quad32 = eval_xmm x s
-[@va_qattr] unfold let va_get_mem (s:va_state) : mem = s.mem
+[@va_qattr] unfold let va_get_mem (s:va_state) : memory = s.mem
 
 [@va_qattr] let va_upd_ok (ok:bool) (s:state) : state = { s with ok = ok }
 [@va_qattr] let va_upd_flags (flags:nat64) (s:state) : state = { s with flags = flags }
-[@va_qattr] let va_upd_mem (mem:mem) (s:state) : state = { s with mem = mem }
+[@va_qattr] let va_upd_mem (mem:memory) (s:state) : state = { s with mem = mem }
 [@va_qattr] let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
 [@va_qattr] let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
 

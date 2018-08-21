@@ -58,7 +58,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with
-    | EApply (Id xp, _, es) when Map.containsKey (Id xp) env.procs ->
+    | EApply (Id xp, _, es) when is_proc env (Id xp) NotGhost ->
         inline_call xp [(x, tOpt)] es
 //    | EApply (xp, _, es) when allowLemma ->
 //        lemma_call xp [(x, tOpt)] es
@@ -86,13 +86,13 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         in
       let xs = List.map formal_of_lhs xs in
       match skip_loc e with
-      | EApply (Id x, _, es) when Map.containsKey (Id x) env.procs ->
+      | EApply (Id x, _, es) when is_proc env (Id x) NotGhost ->
           inline_call x xs es
       | EApply (x, _, es) ->
           lemma_call x xs es
       | EOp (Uop UReveal, es) ->
           let x = "reveal_opaque" in
-          if Map.containsKey (Id x) env.procs then
+          if is_proc env (Id x) NotGhost then
              inline_call x xs es
           else
              lemma_call (Id x) xs es
@@ -135,7 +135,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let eIf = eapply (Id sq) [eCmp; eqc1; eqc2] in
       let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); (Reserved "g", None)], [], eTail) in
       (true, eapply (Id "QBind") [range; msg; eIf; fTail])
-  | SForall ([], [], EBool true, ep, ss) ->
+  | SForall ([], [], (EBool true | ECast (EBool true, _)), ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
       let s = Reserved "s" in

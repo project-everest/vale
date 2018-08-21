@@ -47,7 +47,7 @@ var{:state reg(R13)} r13:nat64;
 var{:state reg(R14)} r14:nat64;
 var{:state reg(R15)} r15:nat64;
 var{:state flags()} efl:nat64;
-var{:state mem()} mem:mem;
+var{:state mem()} mem:memory;
 
 operand_type reg64:nat64 :=
 | inout rax | inout rbx | inout rcx | inout rdx

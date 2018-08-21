@@ -263,6 +263,8 @@ manual_dependencies = {
 #
 verify_options = [
   ('src/lib/util/operator.vaf', BuildOptions(fstar_default_args, vale_includes = '')),
+  ('tools/Vale/test/types.vaf', BuildOptions(None)), # type-check only, no verification
+  ('tools/Vale/test/FTypeVale.vaf', BuildOptions(None)), # type-check only, no verification
 
   ('src/*/*.fst', BuildOptions(fstar_default_args)),
   ('src/*/*.fsti', BuildOptions(fstar_default_args)),
@@ -324,6 +326,7 @@ obj_include_paths = []  # string paths in obj/, but omitting the 'obj/' prefix
 fsti_map = {}  # map module names to .fsti File nodes (or .fst File nodes if no .fsti exists)
 dump_deps = {}  # map F* type .dump file names x.dump to sets of .dump file names that x.dump depends on
 vaf_dump_deps = {} # map .vaf file names x.vaf to sets of .dump file names that x.vaf depends on
+vaf_vaf_deps = {} # map .vaf file names x.vaf to sets of y.vaf file names that x.vaf depends on
 
 dafny_include_re = re.compile(r'^\s*include\s+"(\S+)"', re.M)
 # match 'include {:attr1} ... {:attrn} "filename"'
@@ -666,6 +669,7 @@ def vaf_dependency_scan(env, file):
   #dumptargetfile = f'{obj_file_base}.fsti.dump'
   #dump_deps[dumptargetfile] = set()
   vaf_dump_deps[str(file)] = set()
+  vaf_vaf_deps[str(file)] = set()
   fst_fsti = [f'{obj_file_base}.fst', f'{obj_file_base}.fsti']
   obj_tmps = [f'{obj_file_base}.fst.verified.tmp', f'{obj_file_base}.fsti.verified.tmp']
   typesfile = File(f'{obj_file_base}.types.vaf')
@@ -682,10 +686,11 @@ def vaf_dependency_scan(env, file):
       # if A.vaf includes B.vaf, then manually establish these dependencies:
       #   A.fst.verified  depends on B.fsti
       #   A.fsti.verified depends on B.fsti
+      vaf_vaf_deps[str(file)].add(str(File(f)))
       f_base = file_drop_extension(to_obj_dir(File(f)))
       f_fsti = File(f_base + '.fsti.verified')
       Depends(obj_tmps, f_fsti)
-  if len(vaf_dump_deps[str(file)]) > 0:
+  if len(vaf_dump_deps[str(file)]) + len(vaf_vaf_deps[str(file)]) > 0:
     Depends(fst_fsti, typesfile)
   for inc in fst_includes:
     if inc in fsti_map:
@@ -716,7 +721,7 @@ def translate_vaf_file(options, source_vaf):
   targets = [target_fst, target_fsti]
   opt_vale_includes = vale_includes if options.vale_includes == None else options.vale_includes
   types_include = ''
-  if len(vaf_dump_deps[str(source_vaf)]) > 0:
+  if len(vaf_dump_deps[str(source_vaf)]) + len(vaf_vaf_deps[str(source_vaf)]) > 0:
     types_include = f'-include {target}.types.vaf'
   env.Command(targets, [source_vaf, vale_exe],
     f'{mono} {vale_exe} -fstarText {types_include} {opt_vale_includes}' +
@@ -744,7 +749,7 @@ def process_vaf_file(env, file, fstar_includes):
     fsts = translate_vaf_file(options, file)
     fst = fsts[0]
     fsti = fsts[1]
-    if verify:
+    if verify and options.verifier_flags != None:
       fst_options = get_build_options(fst)
       fsti_options = get_build_options(fsti)
       target = file_drop_extension(to_obj_dir(file))
@@ -768,8 +773,9 @@ def compute_module_types(env, source_vaf):
       x_vaf = re.sub('\.dump$', '.types.vaf', x)
       Depends(types_vaf, x)
       dumps.append(x)
-  for x in sorted(vaf_dump_deps[source_vaf]):
-    collect_dumps_in_order(x)
+  for vaf in sorted(vaf_vaf_deps[source_vaf] | {source_vaf}):
+    for x in sorted(vaf_dump_deps[vaf]):
+      collect_dumps_in_order(x)
   dumps_string = " ".join(['-in ' + str(x) for x in dumps])
   Depends(types_vaf, import_fstar_types_exe)
   Command(types_vaf, dumps, f'{mono} {import_fstar_types_exe} {dumps_string} > {types_vaf}')
@@ -965,7 +971,7 @@ if do_build:
   if do_fstar:
     compute_fstar_deps(env, verify_paths, compute_include_paths(src_include_paths, obj_include_paths, 'obj/dummies'))
     for x in vaf_dump_deps:
-      if len(vaf_dump_deps[x]) > 0:
+      if len(vaf_dump_deps[x]) + len(vaf_vaf_deps[x]) > 0:
         compute_module_types(env, x)
 
   if dump_args:
