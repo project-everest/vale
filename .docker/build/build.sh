@@ -34,7 +34,7 @@ function exec_build () {
 
     if [[ $target == "vale-ci" ]]; then
         echo "target -> vale-ci"
-        python3.6 $(which scons) -j $threads --DAFNY && echo -n true > $status_file;
+        python3.6 $(which scons) -j $threads --DAFNY --FSTAR --FSTAR-MY-VERSION && echo -n true > $status_file;
     elif [[ $target == "vale-nightly" ]]; then
         echo "target -> vale-nightly"
         python3.6 $(which scons) -j $threads --DAFNY --FSTAR --FSTAR-MY-VERSION && echo -n true > $status_file;
