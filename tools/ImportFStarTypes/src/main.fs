@@ -769,7 +769,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
             [(env, {d with f_category = "type"; f_body = Some (range_to_int_type r)})]
         | ([], _, Some (r, Some (local_env_bounds_opt, xr, bounds))) ->
           (
-            let local_env_bounds = Option.defaultValue Map.empty local_env_bounds_opt in
+            let local_env_bounds = match local_env_bounds_opt with None -> Map.empty | Some x -> x in  // Option.defaultValue Map.empty local_env_bounds_opt in
             match as_range_constant local_env_bounds xr bounds with
             | None ->
                 [(env, {d with f_category = "unsupported"; f_typ = EUnsupported "unsupported integer bounds"})]
