@@ -329,6 +329,7 @@ vale_include_re = re.compile(r'include((?:\s*\{\:(?:\w|[ ])*\})*)\s*"(\S+)"', re
 vale_verbatim_re = re.compile(r'\{\:\s*verbatim\s*\}')
 vale_from_base_re = re.compile(r'\{\:\s*from\s*BASE\s*\}')
 vale_open_re = re.compile(r'open\s+([a-zA-Z0-9_.]+)')
+vale_friend_re = re.compile(r'friend\s+([a-zA-Z0-9_.]+)')
 vale_import_re = re.compile(r'module\s+[a-zA-Z0-9_]+\s*[=]\s*([a-zA-Z0-9_.]+)')
 
 if (not sys.stdout.isatty()) or no_color:
@@ -636,19 +637,24 @@ def vaf_dependency_scan(env, file):
   dirname = os.path.dirname(str(file))
   vaf_includes = vale_include_re.findall(contents)
   fst_includes = vale_open_re.findall(contents) + vale_import_re.findall(contents)
+  fst_friends = vale_friend_re.findall(contents)
   obj_file_base = file_drop_extension(to_obj_dir(file))
+  obj_tmp = [f'{obj_file_base}.fst.verified.tmp']
   obj_tmps = [f'{obj_file_base}.fst.verified.tmp', f'{obj_file_base}.fsti.verified.tmp']
   for (attrs, inc) in vaf_includes:
     f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
     # if A.vaf includes B.vaf, then manually establish these dependencies:
-    #   A.fst.verified  depends on B.fsti
-    #   A.fsti.verified depends on B.fsti
+    #   A.fst.verified.tmp  depends on B.fsti.verified
+    #   A.fsti.verified.tmp depends on B.fsti.verified
     f_base = file_drop_extension(to_obj_dir(File(f)))
     f_fsti = File(f_base + '.fsti.verified')
     Depends(obj_tmps, f_fsti)
   for inc in fst_includes:
     if inc in fsti_map:
-      Depends(obj_tmps, [fsti_map[inc]])
+      Depends(obj_tmps, f'{to_obj_dir(fsti_map[inc])}.verified')
+  for inc in fst_friends:
+    if inc in fsti_map:
+      Depends(obj_tmp, re.sub('\.fsti$', '.fst.verified', str(to_obj_dir(fsti_map[inc]))))
 
 # Translate Vale .vad to .dfy file
 # Takes a source .vad File node
@@ -763,6 +769,8 @@ def process_files_in(env, directories):
         process_fstar_file(env, file, fstar_includes)
       for file in vafs:
         process_vaf_file(env, file, fstar_includes)
+      for target in manual_dependencies:
+        Depends(target, manual_dependencies[target])
 
 ##################################################################################################
 #
