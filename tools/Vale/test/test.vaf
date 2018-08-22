@@ -26,7 +26,7 @@ let double (x:int):int = x + x
 
 function double (x:int):int extern;
 
-procedure Calls()
+procedure{:typecheck} Calls()
     requires
         rax < 7;
     modifies

@@ -10,7 +10,7 @@ open System
 open Microsoft.FSharp.Text.Lexing
 
 let fstar = ref false;
-let do_typecheck = ref true;
+let do_typecheck = ref false;
 
 let string_of_kind = Emit_vale_text.string_of_kind
 let string_of_typ = Emit_vale_text.string_of_typ
@@ -1964,7 +1964,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         (env, [decl])
     | DFun ({fbody = None} as f) -> // TODO: fbody = Some e
       (
-        let isTypeChecked = verify && (attrs_get_bool (Id "typecheck") true f.fattrs) && not (attrs_get_bool (Id "notypecheck") false f.fattrs) in
+        let isTypeChecked = verify && (attrs_get_bool (Id "typecheck") !do_typecheck f.fattrs) in
         let name =
           // Generate distinct names for overloaded operators
           // TODO: more overloaded operators
@@ -1987,7 +1987,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         (env, [decl])
       )
     | DProc p ->
-        let isTypeChecked = verify && (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") true p.pattrs) && not (attrs_get_bool (Id "notypecheck") false p.pattrs) in
+        let isTypeChecked = verify && (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") !do_typecheck p.pattrs) in
         let isTestShouldFail = attrs_get_bool (Id "testShouldFail") false p.pattrs in
         let (env, ps) =
           if isTypeChecked then
@@ -1998,6 +1998,8 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
             else
               let (env, p) = tc_proc env p in
               (env, [p])
+          else if isTestShouldFail then
+            (env, [])
           else
             let env = push_proc env p.pname p in (env, [p])
           in

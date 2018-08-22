@@ -86,7 +86,7 @@ type pos = i:nat | i > 0 witness 1
 function Double(x:int):int extern;
 function le(x:int, y:int):bool extern;
 
-procedure Calls()
+procedure{:typecheck} Calls()
     modifies
         eax; ebx;
     ensures

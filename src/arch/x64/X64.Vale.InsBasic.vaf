@@ -60,8 +60,8 @@ operand_type reg_opr64:nat64 := reg64;
 operand_type dst_opr64:nat64 @ operand := reg_opr64;
 operand_type opr64:nat64 := dst_opr64 | const;
 
-// add {:notypecheck} attr because Type0 is not defined.
-procedure{:quick exportOnly}{:notypecheck} AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
+// add {:typecheck false} attr because Type0 is not defined. (TODO: get rid of this)
+procedure{:quick exportOnly}{:typecheck false} AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
     requires
         p;
 {
