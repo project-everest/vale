@@ -225,6 +225,7 @@ let get_aqual (e:raw_exp):aqual * raw_exp =
 
 let rec parse_exp (e:raw_exp):f_exp =
   match e with
+  | RId (_, "Prims.eqtype") -> EType (UInt bigint.Zero)
   | RId (_, x) -> EId (parse_id x)
   | RInt (_, i) -> EInt i
   | RUnitValue _ -> EUnitValue
@@ -314,7 +315,7 @@ let filter_decls (ds:f_decl list):f_decl list =
     | (Some d, Some _) -> [d]
     in
   let filter_decl (d:f_decl):bool =
-    List.forall (fun x -> x <> "private") d.f_qualifiers
+    List.forall (fun x -> x <> "private") d.f_qualifiers && d.f_name <> "Prims.eqtype"
     in
   let abstract_decl (d:f_decl):f_decl =
     if List.forall (fun x -> x <> "abstract") d.f_qualifiers then d else
@@ -691,7 +692,7 @@ let rec as_range_constant (local_env:Map<string, bigint>) (range_var:string) (e:
 let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env * (env * f_decl) list) =
   let d = universe0_decl d in
   let bs = d.f_binders in
-  let bs_are_Type = List.forall (fun (_, _, e) -> match e with (Some (EType _)) -> true | _ -> false) bs in
+  let bs_are_Type = List.collect (fun (_, x, e) -> match e with (Some (EType _)) -> [] | _ -> [x]) bs in
   // printfn "// examining %s" d.f_name;
   reason := None;
   let typed_binders = List.forall (fun (_, _, t) -> Option.isSome t) in
@@ -761,10 +762,10 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
           in
         let int_refine = match int_refine with Some (Some r, z) -> Some (r, z) | _ -> None in
         match (bs, bs_are_Type, int_refine) with
-        | (_, true, None) ->
+        | (_, [], None) ->
             [(env, {d with f_category = "type"; f_body = body})]
-        | (_, false, None) ->
-            [(env, {d with f_category = "unsupported"; f_typ = EUnsupported "dependent type"})]
+        | (_, x::_, None) ->
+            [(env, {d with f_category = "unsupported"; f_typ = EUnsupported (sprintf "tried to interpret as type, but %s does not have kind Type(0) (if this is supposed to be a function, not a type, consider returning 'Prop_s.prop0')" (string_of_id x))})]
         | ([], _, Some (r, None)) ->
             [(env, {d with f_category = "type"; f_body = Some (range_to_int_type r)})]
         | ([], _, Some (r, Some (local_env_bounds_opt, xr, bounds))) ->
@@ -776,7 +777,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
             | Some r_bounds ->
                 [(env, {d with f_category = "type"; f_body = Some (range_to_int_type (range_intersect r r_bounds))})]
           )
-        | (_, false, Some (r, Some (None, xr, bounds))) ->
+        | (_, _::_, Some (r, Some (None, xr, bounds))) ->
             let rec resolve_bounds (e:f_exp):f_exp =
               match (as_int_constant env e, e) with
               | (Some i, _) -> EInt i
@@ -826,6 +827,7 @@ let rec string_of_vale_name (x:string):string =
 //  | ("Prop_s.prop0" | "Prims.prop" | "Prims.logical") -> st_leaf "prop"
   | _ when x.EndsWith(".decreases") -> r (x.Replace(".decreases", "._decreases"))
   | _ when x.EndsWith(".modifies") -> r (x.Replace(".modifies", "._modifies"))
+  | _ when x.EndsWith(".reveal") -> r (x.Replace(".reveal", "._reveal"))
   | _ ->
       let x = if x.StartsWith("'") then "_" + x else x in
       x.Replace("#", "_")
@@ -1022,7 +1024,7 @@ let main (argv:string array) =
           | f :: l -> outfile := Some f; match_args l
         | f :: l ->
             failwith ("Unrecognized argument: " + f + "\n")
-        | [] -> if List.length !in_files_rev = 0 then failwith "Use -in to specify input file"
+        | [] -> if List.length !in_files_rev = 0 then printfn "// Use -in to specify input file"
         in
         match_args args
       in
@@ -1103,9 +1105,9 @@ let main (argv:string array) =
           // REVIEW: why are there duplicates?
           duplicates := Set.add d.f_name (!duplicates);
           match (d.f_category, d.f_typ) with
-          | (_, EUnsupported s) -> printfn "unsupported: %s //(reason: %s)" d.f_name s; printfn ""
-          | ("unsupported", _) -> printfn "unsupported: %s" d.f_name; printfn ""
-          | ("int_type_generator", _) -> printfn "unsupported (int type generator): %s" d.f_name; printfn ""
+          | (_, EUnsupported s) -> printfn "unsupported: %s //(reason: %s)" (string_of_vale_name d.f_name) s; printfn ""
+          | ("unsupported", _) -> printfn "unsupported: %s" (string_of_vale_name d.f_name); printfn ""
+          | ("int_type_generator", _) -> printfn "unsupported (int type generator): %s" (string_of_vale_name d.f_name); printfn ""
           | _ -> print_tree "" (tree_of_vale_decl env d); printfn ""
          )
       )

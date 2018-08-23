@@ -209,7 +209,7 @@ let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
 let try_lookup_id (env:env) (x:id):(typ * id_info option) option =
   match lookup_name env x true with
   | (Some (Info (t, info)), _) -> Some (t, info)
-  | (Some (UnsupportedName x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
+  | (Some (UnsupportedName x), _) -> unsupported ("identifier '" + (err_id x) + "' is declared 'unsupported' (see declarations of identifier for more details)")
   | _ -> None
 
 let lookup_id (env:env) (x:id):(typ * id_info option) =
@@ -237,7 +237,7 @@ let try_lookup_type (env:env) (x:id):((tformal list option * kind * typ option) 
   let (t, qx) = lookup_name env x true in
   match t with
   | Some (Type_info (tfs, k, t)) -> (Some (tfs, k, t), qx)
-  | Some (UnsupportedName x) -> unsupported ("unsupported '" + (err_id x) + "'")
+  | Some (UnsupportedName x) -> unsupported ("type '" + (err_id x) + "' is declared 'unsupported' (see declaration of type for more details)")
   | _ -> (None, x)
 
 let lookup_type (env:env) (x:id):(tformal list option * kind * typ option) =
@@ -251,7 +251,7 @@ let try_lookup_fun_or_proc (env:env) (x:id):fun_or_proc option =
   match lookup_name env x true with
   | (Some (Proc_decl p), _) -> Some (FoundProc p)
   | (Some (Func_decl f), _) -> Some (FoundFun f)
-  | (Some (UnsupportedName x), _) -> unsupported ("unsupported '" + (err_id x) + "'")
+  | (Some (UnsupportedName x), _) -> unsupported ("function or procedure '" + (err_id x) + "' is declared 'unsupported' (see declaration of function or procedure for more details)")
   | _ -> None
 
 let lookup_fun_or_proc (env:env) (x:id):fun_or_proc =

@@ -47,7 +47,7 @@ let main (argv) =
     | (LocErr (loc, e)) as x ->
         if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; print_error_loc locOpt; printfn "%s" (x.ToString ())
         print_error (Some loc) e
-    | (Err s) as x ->
+    | (Err s | UnsupportedErr s) as x ->
         print_error_loc locOpt
         printfn "%s" s
         if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; printfn "%s" (x.ToString ());

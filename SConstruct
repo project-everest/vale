@@ -693,8 +693,7 @@ def vaf_dependency_scan(env, file):
       f_base = file_drop_extension(to_obj_dir(File(f)))
       f_fsti = File(f_base + '.fsti.verified')
       Depends(obj_tmps, f_fsti)
-  if len(vaf_dump_deps[str(file)]) + len(vaf_vaf_deps[str(file)]) > 0:
-    Depends(fst_fsti, typesfile)
+  Depends(fst_fsti, typesfile)
   for inc in fst_includes:
     if inc in fsti_map:
       Depends(obj_tmps, to_obj_dir(File(f'{fsti_map[inc]}.verified')))
@@ -727,8 +726,7 @@ def translate_vaf_file(options, source_vaf):
   targets = [target_fst, target_fsti]
   opt_vale_includes = vale_includes if options.vale_includes == None else options.vale_includes
   types_include = ''
-  if len(vaf_dump_deps[str(source_vaf)]) + len(vaf_vaf_deps[str(source_vaf)]) > 0:
-    types_include = f'-include {target}.types.vaf'
+  types_include = f'-include {target}.types.vaf'
   env.Command(targets, [source_vaf, vale_exe],
     f'{mono} {vale_exe} -fstarText -typecheck {types_include} {opt_vale_includes}' +
     f' -in {source_vaf} -out {target_fst} -outi {target_fsti}' +
@@ -979,8 +977,7 @@ if do_build:
   if do_fstar:
     compute_fstar_deps(env, verify_paths, compute_include_paths(src_include_paths, obj_include_paths, 'obj/dummies'))
     for x in vaf_dump_deps:
-      if len(vaf_dump_deps[x]) + len(vaf_vaf_deps[x]) > 0:
-        compute_module_types(env, x)
+      compute_module_types(env, x)
 
   if dump_args:
     print_dump_args()
