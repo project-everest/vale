@@ -8,6 +8,7 @@ type id = Id of string | Reserved of string | Operator of string
 
 type kind =
 | KType of bigint
+| KDependent of id
 
 type bool_or_prop = BpBool | BpProp
 type bnd = Int of bigint | NegInf | Inf
@@ -18,6 +19,7 @@ type typ =
 | TInt of bnd * bnd
 | TTuple of typ list
 | TFun of typ list * typ
+| TDependent of id // the id is an expression-level variable, not a type-level variable
 | TVar of id * kind option
 
 type ghost = Ghost | NotGhost

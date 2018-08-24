@@ -280,6 +280,7 @@ let rec subst_typ_name (m:substitutions) (t:typ):typ =
       | Some t2 -> t2
     )
   | TBool _ | TInt _ -> t
+  | TDependent x -> t // Since x is an expression name, not a type name, we never attempt substitution for it
   | TApply (xapp, ts) -> TApply (xapp, subst_typs_name m ts)
   | TFun (ts, t) -> TFun (subst_typs_name m ts, subst_typ_name m t)
   | TTuple ts -> TTuple (subst_typs_name m ts)
@@ -291,6 +292,7 @@ and subst_typs_name (m:substitutions) (ts:typ list):typ list =
 let rec subst_typ (m:substitutions) (t:typ):typ =
   match t with
   | TName _ | TBool _ | TInt _ -> t
+  | TDependent x -> t // Since x is an expression name, not a type name, we never attempt substitution for it
   | TApply (xapp, ts) -> TApply (xapp, subst_typs m ts)
   | TFun (ts, t) -> TFun (subst_typs m ts, subst_typ m t)
   | TTuple ts -> TTuple (subst_typs m ts)
@@ -305,6 +307,7 @@ and subst_typs (m:substitutions) (ts:typ list):typ list =
 
 let rec normalize_type_rec (env:env) (t:typ):typ =
   let r = normalize_type_rec env in
+  // REVIEW: do local variables interfere with name lookups here?
   match t with
   | TName x ->
     (
@@ -320,6 +323,9 @@ let rec normalize_type_rec (env:env) (t:typ):typ =
   | TInt _ -> t
   | TTuple ts -> TTuple (List.map r ts)
   | TFun (ts, t) -> TFun (List.map r ts, r t)
+  | TDependent x ->
+      let (_, x) = lookup_name env x true in
+      TDependent x
   | TApply (x, ts) ->
     (
       match try_lookup_type env x with
@@ -634,8 +640,8 @@ let constrain_subtype_opt (src_typ:typ) (expected_typ:typ option) (cl:typ_constr
 *)
 
 let kind_equal k1 k2 =
-  match (k1, k2) with
-  | (KType i1, KType i2) -> i1 = i2
+  // TODO: for KDependent, we have to resolve names to fully-qualified names
+  k1 = k2
 
 let rec check_type (env:env) (t:typ):kind =
   match t with
@@ -663,6 +669,12 @@ let rec check_type (env:env) (t:typ):kind =
   | TInt (_, _) -> ktype0
   | TTuple ts -> check_types_as env ts ktype0; ktype0
   | TFun (ts, t) -> check_types_as env ts ktype0; check_type_as env t ktype0; ktype0
+  | TDependent x ->
+    (
+      match lookup_id env x with
+      | (TName xt, Some ConstGlobal) -> KDependent xt
+      | _ -> err (sprintf "variable '%s' must be a global constant whose type is a simple named type" (err_id x))
+    )
 and check_type_as (env:env) (t:typ) (k:kind):unit =
   let kt = check_type env t in
   if kt <> k then err (sprintf "expected type of kind %s, found type '%s' of kind %s" (string_of_kind k) (string_of_typ t) (string_of_kind kt))
@@ -827,7 +839,7 @@ but we delay resolving other variables.
 // t1 = t2
 let u_constrain_equal_loc (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
   if t1 = t2 then () else
-  //printfn "constrain %A = %A" t1 t2;
+  // printfn "constrain %A = %A at %A" t1 t2 (match loc with None -> "None" | Some loc -> string_of_loc loc);
   u.u_equalities <- (t1, t2, loc)::u.u_equalities
 
 let u_constrain_equal (u:unifier) (t1:typ) (t2:typ):unit =
@@ -840,7 +852,7 @@ let u_constrain_subtype_loc (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit 
   let t1 = subst_typ u.u_substs t1 in
   let t2 = subst_typ u.u_substs t2 in
   if t1 = t2 then () else
-  //printfn "constrain %A <: %A" t1 t2;
+  // printfn "constrain %A <: %A at %A" t1 t2 (match loc with None -> "None" | Some loc -> string_of_loc loc);
   let t1_norm = normalize_type env t1 in
   let t2_norm = normalize_type env t2 in
   match (t1_norm.norm_typ, t2_norm.norm_typ) with
@@ -879,8 +891,8 @@ let u_add_subst (u:unifier) (x:id) (t:typ):unit =
     match Map.tryFind x m1 with
     | None -> (m1, m2)
     | Some xs ->
-      Set.iter f_apply xs;
-      (Map.remove x m1, Set.fold (fun m2 x2 -> map_set_remove x2 x m2) m2 xs)
+        Set.iter f_apply xs;
+        (Map.remove x m1, Set.fold (fun m2 x2 -> map_set_remove x2 x m2) m2 xs)
     in
   let find_loc (x1:id) (x2:id):loc option = Option.bind (fun x -> x) (Map.tryFind (x1, x2) u.ux_locs) in
   let (ml, mu) = (u.ux_lowers, u.ux_uppers) in
@@ -906,7 +918,7 @@ let u_bind (u:unifier) (x:id) (t:typ):unit =
       err ("circular type constraint" + err_id x + " " + string_of_typ t)
     else u_add_subst u x t
 
-let u_unify_one (u:unifier) (t1:typ) (t2:typ):unit =
+let u_unify_one (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
   if t1 = t2 then () else
   let env = u.u_env in
   let t1 = subst_typ u.u_substs t1 in
@@ -919,12 +931,12 @@ let u_unify_one (u:unifier) (t1:typ) (t2:typ):unit =
   | (TVar (x, _), _) -> u_bind u x t2.norm_typ
   | (_, TVar (x, _)) -> u_bind u x t1.norm_typ
   | (TTuple ts1, TTuple ts2) when List.length ts1 = List.length ts2 ->
-    List.iter2 (fun t1 t2 -> u_constrain_equal u t1 t2) ts1 ts2
+      List.iter2 (fun t1 t2 -> u_constrain_equal_loc u loc t1 t2) ts1 ts2
   | (TFun (ts1, t1), TFun (ts2, t2)) when List.length ts1 = List.length ts2 ->
-    List.iter2 (fun t1 t2 -> u_constrain_equal u t1 t2) ts1 ts2;
-    u_constrain_equal u t1 t2
+      List.iter2 (fun t1 t2 -> u_constrain_equal_loc u loc t1 t2) ts1 ts2;
+      u_constrain_equal_loc u loc t1 t2
   | (TApply (x1, ts1), TApply (x2, ts2)) when x1 = x2 && List.length ts1 = List.length ts2 ->
-    List.iter2 (fun t1 t2 -> u_constrain_equal u t1 t2) ts1 ts2
+      List.iter2 (fun t1 t2 -> u_constrain_equal_loc u loc t1 t2) ts1 ts2
   | _ when t1 = t2 -> ()
   | _ -> typ_err ()
 
@@ -932,11 +944,11 @@ let rec u_unify_equalities (u:unifier):unit =
   match u.u_equalities with
   | [] -> ()
   | _ ->
-    let eqs = u.u_equalities in
-    u.u_equalities <- [];
-    List.iter (fun (t1, t2, loc) -> try u_unify_one u t1 t2 with err -> locErrOpt loc err) eqs;
-    u_apply_subst u;
-    u_unify_equalities u
+      let eqs = u.u_equalities in
+      u.u_equalities <- [];
+      List.iter (fun (t1, t2, loc) -> try u_unify_one u loc t1 t2 with err -> locErrOpt loc err) eqs;
+      u_apply_subst u;
+      u_unify_equalities u
 
 let u_unify (u:unifier) (xs_opt:Set<id> option):unit =
   // phase 1
@@ -1190,6 +1202,7 @@ and infer_exps (env:env) (u:unifier) (args:(exp * typ option) list):(norm_typ li
   let (ts_rev, aes_rev) = List.fold infer_exps_fold ([], []) args in
   (List.rev ts_rev, List.rev aes_rev)
 and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ * aexp) =
+  // printfn "infer_exp %A at %A" e (match u.u_loc with None -> "None" | Some loc -> string_of_loc loc);
   let ret (t:norm_typ) (ae:aexp_t) =
     let coerce =
       match expected_typ with
@@ -1525,9 +1538,11 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let (t, ae) = infer_exp env u e None in
       let ae = AE_Cast (ae, tc) in
       let tc_norm = normalize_type env tc in
-      // TODO: move this check to after inference:
-      if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae
-      else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
+      norm_ret tc ae
+      //REVIEW: casts across arbitrary types seem to be useful (e.g. for module friends)
+      //// TODO: move this check to after inference:
+      //if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae
+      //else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
   | EApply ((Id "list") as x, ts_opt, es) when !fstar -> check_collection_literal x PT_List ts_opt es
   | EApply ((Id "seq") as x, ts_opt, es) when not !fstar -> check_collection_literal x PT_Seq ts_opt es
   | EApply ((Id "set") as x, ts_opt, es) when not !fstar -> check_collection_literal x PT_Set ts_opt es

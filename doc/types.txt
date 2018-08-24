@@ -2,7 +2,7 @@ ABSTRACT SYNTAX
 
 natural literal n = 0 | 1 | 2 | ...
 integer literal i = ... | -2 | -1 | 0 | 1 | 2 | ...
-kind k = Type(n)
+kind k = Type(n) | Dependent(x)
 integer bound B = i | -inf | inf
 variable x
 monotype t =
@@ -12,6 +12,7 @@ monotype t =
 | tuple(t, ..., t)
 | collection(t)
 | fun(t, ..., t) -> t
+| dependent(x)
 | bool
 | prop
 | string
@@ -32,7 +33,7 @@ trigger = {e, ..., e}
 triggers = trigger ... trigger
 
 expression e =
-| e:t
+| #t(e)
 | x
 | x(e, ..., e)
 | i | true | false | "...string-literal..."
@@ -140,6 +141,11 @@ G |- string : Type(0)
 
 G |- state : Type(0)
 
+T = forall. xk
+G = ... x:T ...
+---------------------------------
+G |- dependent(x) : Dependent(xk)
+
 
 TYPE EQUALITY:  G |- t = t'
 
@@ -206,10 +212,9 @@ G |- e : t
 G |- e : t'
 
 G |- t':k'
-G |- t' <: t  OR  G |- t <: t'
 G |- e:t
 ------------------------------ Note: downcasts incur an SMT check; downcasts from prop to bool always fail
-G |- (e:t') : t'
+G |- #t'(e) : t'
 
 inline_only not in G
 G = ... local x:t ...
@@ -249,6 +254,11 @@ G |- e1 : t1'[a1 <- t1, ..., an <- tn]
 G |- em : tm'[a1 <- t1, ..., an <- tn]
 ------------------------------------------------ Note: if e_req isn't True, then it is checked by the SMT solver
 G |- x(e1, ..., en) : t[a1 <- t1, ..., an <- tn]
+
+//TODO: this is not yet implemented:
+//G = ... x:Dependent(xk) ...
+//---------------------------
+//G |- x : xk
 
 G |- i : int(i, i)
 

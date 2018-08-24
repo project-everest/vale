@@ -20,6 +20,16 @@ operand_type reg32:nat32 :=
 operand_type mem32:nat32;
 operand_type opr32:nat32 := reg32 | mem32 | in esp | const;
 
+/*
+type buf_typ:Type(0) extern;
+const bt32:buf_typ extern;
+const bt64:buf_typ extern;
+type buf(bt:Dependent(buf_typ)):Type(0) extern;
+type buf32:Type(0) := buf(dependent(bt32));
+type buf64:Type(0) := buf(dependent(bt64));
+function buf_len #[bt:Dependent(buf_typ)](b:buf(bt)):int extern;
+*/
+
 procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
 {
     let a:bool := !true;
@@ -69,6 +79,17 @@ procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:in
     if (3 < 3) {}
 }
 
+procedure{:typecheck} Dependents(ghost b:buf32, ghost bt:buf_typ)
+{
+    let c:buf(dependent(bt32)) := b;
+    let d:int := buf_len(c);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost b:buf32, ghost bt:buf_typ)
+{
+    ghost var x:buf(dependent(bt)); // bt is not a global constant
+}
+
 procedure{:typecheck}{:testShouldFail} Fail()
 {
     let a:list(byte) := nil();
@@ -95,12 +116,6 @@ procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(g
 {
     let t := 10;
     y := t;
-}
-
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
-    requires x >= 15;
-{
-    y := #int_range(15, 25)(x);
 }
 
 // TODO: check that return values are assigned

@@ -81,6 +81,7 @@ let rec string_of_typ (t:typ):string =
   | TTuple [] -> "unit"
   | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
+  | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
 
 let rec string_of_exp_prec prec e =

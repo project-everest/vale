@@ -50,7 +50,10 @@ let string_of_bop (op:bop):string =
   | BMod -> "%"
   | BIn | BOldAt | BCustom _ -> internalErr "binary operator"
 
-let string_of_kind ((KType i):kind):string = "Type(" + string i + ")"
+let string_of_kind (k:kind):string =
+  match k with
+  | KType i -> "Type(" + string i + ")"
+  | KDependent i -> "Dependent(" + string i + ")"
 
 let rec string_of_typ_prec (prec:int) (t:typ):string =
   let r = string_of_typ_prec in
@@ -64,13 +67,14 @@ let rec string_of_typ_prec (prec:int) (t:typ):string =
     match t with
     | TName x -> (sid x, 20)
     | TApply (x, ts) -> (sid x + "(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
-    | TVar (x, _) -> (sid x, 20)
     | TBool BpBool -> ("bool", 99)
     | TBool BpProp -> ("prop", 99)
     | TInt (NegInf, Inf) -> ("int", 0)
     | TInt (b1, b2) -> ("int_range(" + s_bnd b1 + ", " + s_bnd b2 + ")", 0)
     | TTuple ts -> ("tuple(" + (String.concat ", " (List.map (r 0) ts)) + ")", 10)
-    | TFun (ts, t) -> ("fun (" + (String.concat ", " (List.map (r 0) ts)) + ") -> " + (r 0 t), 0)
+    | TFun (ts, t) -> ("fun(" + (String.concat ", " (List.map (r 0) ts)) + ") -> " + (r 0 t), 0)
+    | TDependent x -> ("dependent(" + sid x + ")", 10)
+    | TVar (x, _) -> (sid x, 20)
   in if prec <= tPrec then s else "(" + s + ")"
 let string_of_typ (t:typ):string = string_of_typ_prec 0 t
 

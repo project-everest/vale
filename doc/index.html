@@ -340,9 +340,10 @@ TYPE ::=
   | tuple ( TYPE , ... , TYPE )
   | fun ( TYPE , ... , TYPE ) -> TYPE
   | int | int_range ( _ , INT ) | int_range ( INT , _ ) | int_range ( INT , INT )
+  | dependent ( x )
   | ( TYPE )
 
-KIND ::= Type ( 0 ) | Type ( 1 ) | ...
+KIND ::= Type ( 0 ) | Type ( 1 ) | ... | Dependent ( t )
     </pre>
     </td>
     <td>
@@ -502,6 +503,7 @@ map(int, set(uint32))
 tuple(int, int, bool)
 fun(int, int) -> bool
 type byte : Type(0) := int_range(0, 0xff);
+
 
 
 ---

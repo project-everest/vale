@@ -55,6 +55,7 @@ let rec string_of_typ (t:typ):string =
   | TInt (b1, b2) -> "int"
   | TFun (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
   | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
+  | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
 
 let rec string_of_exp_prec prec e =

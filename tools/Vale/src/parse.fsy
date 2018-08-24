@@ -67,7 +67,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TTYPE TYPE OPERAND_TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
-%token <loc> UNSUPPORTED
+%token <loc> DDEPENDENT DEPENDENT UNSUPPORTED
 %token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS LAMBDA FUN
@@ -105,7 +105,9 @@ Includes
   | Include Includes { $1::$2 }
 
 Kind
-  : TTYPE LPAREN LITINT RPAREN { KType (snd $3) }
+  : LPAREN Kind RPAREN { $2 }
+  | TTYPE LPAREN LITINT RPAREN { KType (snd $3) }
+  | DDEPENDENT LPAREN AnyQualifiedId RPAREN { KDependent $3 }
 
 Type
   : Type1 { $1 }
@@ -120,6 +122,7 @@ Type2
   | INT_RANGE LPAREN Underscore COMMA Int RPAREN { TInt (NegInf, Int (snd $5))}
   | INT_RANGE LPAREN Int COMMA Underscore RPAREN { TInt (Int (snd $3), Inf)}
   | INT_RANGE LPAREN Int COMMA Int RPAREN { TInt (Int (snd $3), Int(snd $5))}
+  | DEPENDENT LPAREN AnyQualifiedId RPAREN { TDependent $3 }
   | TUPLE LPAREN TypeArgsOpt RPAREN { TTuple $3 }
   | BOOL { TBool BpBool }
   | PROP { TBool BpProp }

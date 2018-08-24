@@ -17,3 +17,11 @@ let natN (n:nat) = x:nat{x < n}
 let nat8 = natN 256
 
 type myrec = {r1:int; r2:bool}
+
+assume val buf_typ : Type0
+assume val bt32 : buf_typ
+assume val bt64 : buf_typ
+assume val buf (bt:buf_typ) : Type0
+let buf32 : Type0 = buf bt32
+let buf64 : Type0 = buf bt64
+assume val buf_len (#bt:buf_typ) (b:buf bt):int

@@ -566,7 +566,21 @@ let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:f_exp):bool =
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)]) ->
       may_be_refine e
-  | EApp (e, aes) -> is_vale_type_id env e && List.forall r (List.map snd aes)
+  | EApp (e, aes) ->
+    (
+      match as_vale_type_id env e with
+      | Some bs when List.length bs = List.length aes ->
+          let es = List.map snd aes in
+          List.forall2 (fun b e -> if b then r e else is_vale_exp_id env e || r e) bs es
+      | _ -> false
+    )
+  | EArrow ((Implicit | Equality), {name = Some x}, _, _) when not leftmost ->
+      set_reason ("implicit parameters must be in outermost position: " + x); false
+  | EArrow ((Implicit | Equality), {name = Some x}, t, e2) when is_vale_type_id env t ->
+      let k = EApp (EId {name = Some "Dependent"; index = None}, [(Explicit, t)]) in
+      let dx = { f_name = x; f_qualifiers = []; f_category = "type"; f_udecls = []; f_binders = []; f_typ = k; f_body = None} in
+      let env = Map.add x dx env in
+      is_vale_type outer true env e2
   | EArrow (_, {name = Some x}, ((EType (UInt i)) as t), e2) when leftmost && i.Equals(bigint.Zero) ->
       let dx = { f_name = x; f_qualifiers = []; f_category = "type"; f_udecls = []; f_binders = []; f_typ = t; f_body = None} in
       let env = Map.add x dx env in
@@ -583,17 +597,20 @@ let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:f_exp):bool =
   // TODO: more cases
   | EUnsupported s -> set_reason s; false
   | _ -> set_reason ("not vale type: " + string_of_exp e); false
-and is_vale_type_id (env:env) (e:f_exp):bool =
+and as_vale_type_id (env:env) (e:f_exp):bool list option =
   match e with
-  | EId {name = Some "Prims.logical"} -> true
+  | EId {name = Some "Prims.logical"} -> Some []
   | EId {name = Some x} ->
     (
       match Map.tryFind x env with
       // REVIEW: is any "type" ok?
-      | Some { f_category = "type" } -> true
-      | _ -> set_reason x; false
+      | Some { f_category = "type"; f_binders = bs } ->
+          Some (List.map (fun (_, _, e) -> match e with Some (EType _) -> true | _ -> false) bs)
+      | _ -> set_reason (sprintf "expected a type name, found %s" x); None
     )
-  | _ -> false
+  | _ -> None
+and is_vale_type_id (env:env) (e:f_exp):bool =
+  match as_vale_type_id env e with Some _ -> true | None -> false
 and is_vale_exp (env:env) (e:f_exp):bool =
   //printfn "is_vale_exp? %s" (string_of_exp e);
   let r = is_vale_exp env in
@@ -611,6 +628,7 @@ and is_vale_exp (env:env) (e:f_exp):bool =
           let f (t:f_exp) (e:f_exp):bool =
             match t with
             | EType _ -> is_vale_type false false env e
+            | EApp (EId {name = Some "Dependent"}, _) -> is_vale_type false false env e || is_vale_exp env e
             | _ -> is_vale_exp env e
             in
           List.forall (fun b -> b) (List.map2 f ts (List.map snd aes))
@@ -624,9 +642,11 @@ and get_vale_exp_id (env:env) (e:f_exp):f_decl option =
     (
       match Map.tryFind x env with
       | Some ({ f_category = "val" } as d) -> Some d
-      | _ -> set_reason x; None
+      | _ -> set_reason (sprintf "expected an expression variable name, found %s" x); None
     )
   | _ -> None
+and is_vale_exp_id (env:env) (e:f_exp):bool =
+  match get_vale_exp_id env e with Some _ -> true | None -> false
 
 let as_int_constant (env:env) (e:f_exp):bigint option =
   match e with
@@ -692,7 +712,19 @@ let rec as_range_constant (local_env:Map<string, bigint>) (range_var:string) (e:
 let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env * (env * f_decl) list) =
   let d = universe0_decl d in
   let bs = d.f_binders in
+  let promote_binder (a, x, e) =
+    let e =
+      match e with
+      | Some (EId x) when is_vale_type false false env (EId x) ->
+          Some (EApp (EId {name = Some "Dependent"; index = None}, [(Explicit, EId x)]))
+      | Some (EType _) -> e
+      | _ -> None
+      in
+    (a, x, e)
+    in
+  let bs_promote = List.map promote_binder bs in
   let bs_are_Type = List.collect (fun (_, x, e) -> match e with (Some (EType _)) -> [] | _ -> [x]) bs in
+  let bs_promote_are_Type = List.collect (fun (_, x, e) -> match e with (Some _) -> [] | _ -> [x]) bs_promote in
   // printfn "// examining %s" d.f_name;
   reason := None;
   let typed_binders = List.forall (fun (_, _, t) -> Option.isSome t) in
@@ -761,10 +793,10 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
           | (Some b1, Some b2) -> EApp (eIntRange, [(Explicit, EInt b1); (Explicit, EInt b2)])
           in
         let int_refine = match int_refine with Some (Some r, z) -> Some (r, z) | _ -> None in
-        match (bs, bs_are_Type, int_refine) with
-        | (_, [], None) ->
-            [(env, {d with f_category = "type"; f_body = body})]
-        | (_, x::_, None) ->
+        match (bs, (bs_are_Type, bs_promote_are_Type), int_refine) with
+        | (_, (_, []), None) ->
+            [(env, {d with f_category = "type"; f_binders = bs_promote; f_body = body})]
+        | (_, (_, x::_), None) ->
             [(env, {d with f_category = "unsupported"; f_typ = EUnsupported (sprintf "tried to interpret as type, but %s does not have kind Type(0) (if this is supposed to be a function, not a type, consider returning 'Prop_s.prop0')" (string_of_id x))})]
         | ([], _, Some (r, None)) ->
             [(env, {d with f_category = "type"; f_body = Some (range_to_int_type r)})]
@@ -777,7 +809,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
             | Some r_bounds ->
                 [(env, {d with f_category = "type"; f_body = Some (range_to_int_type (range_intersect r r_bounds))})]
           )
-        | (_, _::_, Some (r, Some (None, xr, bounds))) ->
+        | (_, (_::_, _), Some (r, Some (None, xr, bounds))) ->
             let rec resolve_bounds (e:f_exp):f_exp =
               match (as_int_constant env e, e) with
               | (Some i, _) -> EInt i
@@ -840,10 +872,11 @@ let vale_string_of_id (id:id):string =
 let vale_kind_of_exp (e:f_exp):v_kind =
   match e with
   | EType (UInt i) -> KType i
+  | EApp (EId {name = Some "Dependent"}, [(_, EId {name = Some x})]) -> KDependent x
   | _ -> err ("internal error: vale_kind_of_f_exp: " + string_of_exp e)
 
-let rec vale_type_of_exp (e:f_exp):v_type =
-  let r = vale_type_of_exp in
+let rec vale_type_of_exp (env:env) (e:f_exp):v_type =
+  let r = vale_type_of_exp env in
   match e with
   | EId id -> TName (vale_string_of_id id)
   | EInt i -> TInt i
@@ -851,9 +884,23 @@ let rec vale_type_of_exp (e:f_exp):v_type =
   | EProp -> TName "prop"
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, []) -> r e
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)]) -> r e
-  | EApp (EId {name = Some x}, aes) ->
+  | EApp (EId {name = Some x} as ex, aes) ->
+      let es:v_type list =
+        match as_vale_type_id env ex with
+        | Some bs when List.length bs = List.length aes ->
+            let es = List.map snd aes in
+            let arg (b:bool) (e:f_exp):v_type =
+              if b then r e
+              else
+                match get_vale_exp_id env e with
+                | Some {f_name = x} -> TApply ("dependent", [TName x])
+                | _ -> r e
+            in
+            List.map2 arg bs es
+        | _ -> List.map (snd >> r) aes
+        in
       // TODO: tuples are special case
-      TApply (string_of_vale_name x, List.map (snd >> r) aes)
+      TApply (string_of_vale_name x, es)
   | EArrow _ ->
       let (es, e) = take_arrows e in
       TFun (List.map r es, r e)
@@ -873,11 +920,11 @@ let rec vale_exp_of_exp (env:env) (e:f_exp):v_exp =
         in
       let es_ts = List.map2 (fun t (_, e) -> (t, e)) ts aes in
       let (ts, es) = List.partition (fun (t, _) -> match t with EType _ -> true | _ -> false) es_ts in
-      let ts = List.map (snd >> vale_type_of_exp) ts in
+      let ts = List.map (snd >> vale_type_of_exp env) ts in
       let es = List.map (snd >> (vale_exp_of_exp env)) es in
       VApp (vale_string_of_id x, (match ts with [] -> None | _ -> Some ts), es)
   | ELet ((_, x, Some t), e1, e2) ->
-      VLet (vale_string_of_id x, vale_type_of_exp t, r e1, r e2)
+      VLet (vale_string_of_id x, vale_type_of_exp env t, r e1, r e2)
   | _ -> err ("internal error: vale_exp_of_exp: " + string_of_exp e)
 
 let tree_of_vale_name (x:string):string_tree =
@@ -886,8 +933,10 @@ let tree_of_vale_name (x:string):string_tree =
 let tree_of_vale_id (id:id):string_tree =
   st_leaf (vale_string_of_id id)
 
-let tree_of_vale_kind ((KType i):v_kind):string_tree =
-  st_leaf ("Type(" + i.ToString() + ")")
+let tree_of_vale_kind (k:v_kind):string_tree =
+  match k with
+  | KType i -> st_leaf ("Type(" + i.ToString() + ")")
+  | KDependent x -> st_leaf ("Dependent(" + x + ")")
 
 let rec tree_of_vale_type (t:v_type):string_tree =
   let r = tree_of_vale_type in
@@ -899,10 +948,10 @@ let rec tree_of_vale_type (t:v_type):string_tree =
   | TFun (ts, t) ->
       st_paren [st_leaf "fun"; st_paren (trees_of_comma_list (List.map r ts)); st_leaf "->"; r t]
 
-let tree_of_vale_type_kind (e:f_exp):string_tree =
+let tree_of_vale_type_kind (env:env) (e:f_exp):string_tree =
   match e with
   | EType _ -> tree_of_vale_kind (vale_kind_of_exp e)
-  | _ -> tree_of_vale_type (vale_type_of_exp e)
+  | _ -> tree_of_vale_type (vale_type_of_exp env e)
 
 let rec tree_of_vale_exp (e:v_exp):string_tree =
   let r = tree_of_vale_exp in
@@ -962,7 +1011,7 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
       let body =
         match d.f_body with
         | None -> [st_leaf "extern"; st_leaf ";"]
-        | Some t -> [st_leaf ":="; tree_of_vale_type (vale_type_of_exp t); st_leaf ";"]
+        | Some t -> [st_leaf ":="; tree_of_vale_type (vale_type_of_exp env t); st_leaf ";"]
         in
       st_list ([st_leaf "type"; tree_of_vale_name d.f_name] @ ps @ typing @ body)
     )
@@ -974,16 +1023,32 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
         match bs with
         | [] -> ("const", [])
         | _ ->
-            let (bst, bsv) = List.partition (fun (_, _, t) -> match t with Some (EType _) -> true | _ -> false) bs in
+            let is_tparam (a, _, t) =
+              match (a, t) with
+              | ((Implicit | Equality), _) -> true
+              | (_, Some (EType _)) -> true
+              | _ -> false
+              in
+            let (bst, bsv) = List.partition is_tparam bs in
+            let promote_binder (a, x, e) =
+              let e =
+                match e with
+                | Some (EType _) -> e
+                | Some e -> Some (EApp (EId {name = Some "Dependent"; index = None}, [(Explicit, e)]))
+                | _ -> e
+                in
+              (a, x, e)
+              in
+            let bst = List.map promote_binder bst in
             let f (a, x, t) =
               let tree_a = match a with Explicit -> [] | _ -> [st_leaf "#"] in
-              st_list (tree_a @ [tree_of_vale_id x; st_leaf ":"; tree_of_vale_type_kind (Option.get t)])
+              st_list (tree_a @ [tree_of_vale_id x; st_leaf ":"; tree_of_vale_type_kind env (Option.get t)])
               in
             let tparams = match bst with [] -> [] | _ -> [make_st_list "#[" "]" (trees_of_comma_list (List.map f bst))] in
             ("function", tparams @ [st_paren (trees_of_comma_list (List.map f bsv))])
         in
       let tree_req = List.map (fun e -> st_list [st_leaf "requires"; tree_of_vale_exp (vale_exp_of_exp env e); st_leaf ";"]) reqs in
-      let tree_t = tree_of_vale_type (vale_type_of_exp t) in
+      let tree_t = tree_of_vale_type (vale_type_of_exp env t) in
       let (tree_t, tree_ens) =
         match enss with
         | None -> (tree_t, [])

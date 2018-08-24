@@ -82,6 +82,7 @@ type f_decl = {
 // Vale kinds, types, and expressions
 type v_kind =
 | KType of bigint
+| KDependent of string
 
 type bool_or_prop = BpBool | BpProp
 type v_type =

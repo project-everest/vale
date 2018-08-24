@@ -94,11 +94,12 @@ procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(g
     y := t;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
-    requires x >= 15;
-{
-    y := #int_range(15, 25)(x);
-}
+//This is now allowed:
+//procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+//    requires x >= 15;
+//{
+//    y := #int_range(15, 25)(x);
+//}
 
 // TODO: check that return values are assigned
 

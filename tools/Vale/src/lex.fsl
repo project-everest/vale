@@ -177,6 +177,8 @@ and lextoken = parse
 | "unsupported (int type generator)" { UNSUPPORTED (curLoc lexbuf) }
 | "Type" { TTYPE (curLoc lexbuf) }
 | "type" { TYPE (curLoc lexbuf) }
+| "Dependent" { DDEPENDENT (curLoc lexbuf) }
+| "dependent" { DEPENDENT (curLoc lexbuf) }
 | "const" { CONST (curLoc lexbuf) }
 | "readonly" { READONLY (curLoc lexbuf) }
 | "function" { FUNCTION (curLoc lexbuf) }
