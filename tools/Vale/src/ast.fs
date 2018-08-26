@@ -168,6 +168,7 @@ type proc_decl =
     pname:id;
     pghost:ghost;
     pinline:inline_kind;
+    ptargs:tformal list;
     pargs:pformal list;
     prets:pformal list;
     pspecs:(loc * spec) list;

@@ -1131,6 +1131,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             pname = xp_body;
             pghost = NotGhost;
             pinline = Inline;
+            ptargs = p.ptargs;
             pargs = pf_state::p_ins_in;
             prets = p_outs;
             pspecs = specs @ [spec_enter_body; spec_precedes];
@@ -1143,6 +1144,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             pname = xp_while;
             pghost = NotGhost;
             pinline = Inline;
+            ptargs = p.ptargs;
             pargs = pf_state::p_ins_in;
             prets = p_outs;
             pspecs = specs @ [spec_exit];
@@ -1315,7 +1317,7 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
     )
   | DFun ({fbody = None} as f) ->
       ([], {env with funs = Map.add f.fname f env.funs})
-  | DProc p ->
+  | DProc ({pghost = NotGhost} as p)->
     (
       match transform_proc env loc p with
       | TransformedDone ((envRec, envBody, pNew), envProc) -> ([envRec, envBody, DProc pNew], envProc)

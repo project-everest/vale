@@ -120,7 +120,7 @@ procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(g
 
 // TODO: check that return values are assigned
 
-procedure{:typecheck} Ghosts(ghost x:byte, ghost y:bool, inline z:byte)
+procedure{:typecheck} Ghosts#[a:Type(0)](ghost x:byte, ghost y:bool, inline z:byte, ghost g1:a, ghost g2:a)
 {
 }
 
@@ -132,7 +132,7 @@ procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
     reads esp;
     modifies eax; ebx;
 {
-    Ghosts(100, true, z);
+    Ghosts(100, true, z, 50, 60);
     Add(eax, esp);
     Add(eax, id(id(5)));
     Add(eax, id(id(z)));
@@ -141,6 +141,13 @@ procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
     Add(eax, 10);
     Add(eax, ebx);
     Add(eax, o);
+}
+
+procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte, o:reg32)
+    reads esp;
+    modifies eax; ebx;
+{
+    Ghosts(100, true, z, true, 100);
 }
 
 procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte, o:reg32)

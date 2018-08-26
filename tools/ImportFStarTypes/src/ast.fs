@@ -100,6 +100,8 @@ type v_exp =
 //| VUnsupported of string
 //and v_binder = aqual * id * v_exp option
 
+type effect = EffectLemma | EffectGhost | EffectOther
+
 (*
 type v_decl = {
   v_name:string;

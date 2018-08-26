@@ -198,8 +198,8 @@ DECL ::=
   | const x : TYPE extern ;
   | function f <i>[</i> #[ TFORMALS ] <i>]</i> ( FORMALS ) : FRET SPECS extern ;
   | function f ( FORMALS ) : TYPE := f ;
-  | <i>[</i>ghost<i>]</i> <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
-  | <i>[</i>ghost<i>]</i> <a href="#procedures">procedure</a> p ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
+  | <i>[</i>ghost<i>]</i> <a href="#procedures">procedure</a> p <i>[</i> #[ TFORMALS ] <i>]</i> ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS { STMTS }
+  | <i>[</i>ghost<i>]</i> <a href="#procedures">procedure</a> p <i>[</i> #[ TFORMALS ] <i>]</i> ( PFORMALS ) <i>[</i>returns ( PRETS )<i>]</i> SPECS extern ;
   | <a href="#verbatim">VERBATIM_DECL_BLOCK</a>
 
 FORMALS ::= FORMAL , ... , FORMAL

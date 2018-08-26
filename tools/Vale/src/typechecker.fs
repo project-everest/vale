@@ -25,11 +25,18 @@ type substitutions = Map<id, typ>
 
 // fun_decl instantiated with type arguments
 type fun_instance = {
-  targs:typ list;
-  tret:typ;
-  ret_name:id option;
-  specs:(loc * spec) list;
-  attrs:attrs;
+  f_args:typ list;
+  f_ret:typ;
+//  f_ret_name:id option;
+//  f_specs:(loc * spec) list;
+//  f_attrs:attrs;
+}
+
+type proc_instance = {
+  p_args:pformal list;
+  p_rets:pformal list;
+//  p_specs:(loc * spec) list;
+//  p_attrs:attrs;
 }
 
 type id_info =
@@ -836,6 +843,21 @@ we sometimes need to resolve some variables early to disambiguate the overloadin
 but we delay resolving other variables.
 *)
 
+let new_unifier (env:env) (loc:loc option):unifier =
+  {
+    u_env = env;
+    u_loc = loc;
+    u_tvar_count = 0;
+    u_tvars = Map.empty;
+    u_substs = Map.empty;
+    u_equalities = [];
+    ut_lowers = Map.empty;
+    ut_uppers = Map.empty;
+    ux_lowers = Map.empty;
+    ux_uppers = Map.empty;
+    ux_locs = Map.empty;
+  }
+
 // t1 = t2
 let u_constrain_equal_loc (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
   if t1 = t2 then () else
@@ -1031,19 +1053,28 @@ and unify env (m:substitutions) (tc:typ_constraints):substitutions =
     unify env m t
 *)
 
-let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (targOpts:typ option list):fun_instance =
+let compute_instance (env:env) (u:unifier) (tparams:tformal list) (ts_opt:typ list option):(typ -> typ) =
+  let targOpts =
+    match ts_opt with
+    | None -> List.map (fun _ -> None) tparams
+    | Some ts -> List.map Some ts
+    in
   let nts = List.length targOpts in
-  let nks = List.length f.ftargs in
+  let nks = List.length tparams in
   if nts <> nks then err (sprintf "expected %A type argument(s), found %A type argument(s)" nks nts) else
-  List.iter2 (fun tOpt (_, k, _) -> match tOpt with Some t -> check_type_as env t k | None -> ()) targOpts f.ftargs;
+  List.iter2 (fun tOpt (_, k, _) -> match tOpt with Some t -> check_type_as env t k | None -> ()) targOpts tparams;
   let ft tOpt (x, k, _) =
     match tOpt with
     | None -> (x, u_next_type_var_id u x (Some k))
     | Some t -> (x, t)
     in
-  let targMap = Map.ofList (List.map2 ft targOpts f.ftargs) in
+  let targMap = Map.ofList (List.map2 ft targOpts tparams) in
   let replace_typ_arg (t:typ):typ = subst_typ_name targMap t in
   let arg_typ t = (normalize_type_with_transform env (replace_typ_arg t) (Some OperandTyp)).norm_typ in
+  arg_typ
+
+let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (ts_opt:typ list option):fun_instance =
+  let arg_typ = compute_instance env u f.ftargs ts_opt in
   let args =
     List.fold
       (fun l (id, t) -> let t = match t with | Some t -> t | None -> u_next_type_var_id u id None in l @ [arg_typ t])
@@ -1051,7 +1082,19 @@ let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (targOpts:typ option
       f.fargs
       in
   let ret = arg_typ f.fret in
-  {targs = args; tret = ret; ret_name = f.fret_name; specs = f.fspecs; attrs = f.fattrs}
+  {f_args = args; f_ret = ret (*; f_ret_name = f.fret_name; f_specs = f.fspecs; f_attrs = f.fattrs*)}
+
+let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:typ list option):proc_instance =
+  let arg_typ = compute_instance env u p.ptargs ts_opt in
+  let fformal (x, t, storage, io, attrs):pformal =
+    let t =
+      match storage with
+      | XGhost | XInline -> arg_typ t
+      | XOperand -> t
+      | _ -> notImplemented (sprintf "compute_proc_instance: %A" storage)
+      in
+    (x, t, storage, io, attrs) in
+  {p_args = List.map fformal p.pargs; p_rets = List.map fformal p.prets}
 
 let insert_cast (e:exp) (t:typ) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
@@ -1548,15 +1591,10 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
   | EApply ((Id "set") as x, ts_opt, es) when not !fstar -> check_collection_literal x PT_Set ts_opt es
   | EApply (x, ts_opt, es) ->
       let f = lookup_fun env x in
-      let ts_args =
-        match ts_opt with
-        | None -> List.map (fun _ -> None) f.ftargs
-        | Some ts -> List.map Some ts
-        in
-      let f = compute_fun_instance env u f ts_args in
-      if List.length f.targs <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.targs) (List.length es));
-      let param_typs = f.targs in
-      let ret_typ = f.tret in
+      let f = compute_fun_instance env u f ts_opt in
+      if List.length f.f_args <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.f_args) (List.length es));
+      let param_typs = f.f_args in
+      let ret_typ = f.f_ret in
   //    let env = if isExtern then {env with ghost = true} else env in
       let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e t -> (e, Some t)) es param_typs) in
       norm_ret ret_typ (AE_Apply (x, param_typs, aes))
@@ -1577,24 +1615,9 @@ and infer_exp_force (env:env) (u:unifier) (e:exp) (et:typ option):(typ * aexp) =
     (t, ae)
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
 
-let new_unifier (env:env) (loc:loc option):unifier =
-  {
-    u_env = env;
-    u_loc = loc;
-    u_tvar_count = 0;
-    u_tvars = Map.empty;
-    u_substs = Map.empty;
-    u_equalities = [];
-    ut_lowers = Map.empty;
-    ut_uppers = Map.empty;
-    ux_lowers = Map.empty;
-    ux_uppers = Map.empty;
-    ux_locs = Map.empty;
-  }
-
 let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
   try
-    let u = new_unifier env (match locs_of_exp e with [] -> None | l::_ -> Some l) in
+    let u = new_unifier env (loc_of_exp_opt e) in
     let (t, ae) = infer_exp env u e et in
     //printfn "t = %A  ae = %A  u = %A" t ae u;
     u_unify u None;
@@ -1670,24 +1693,24 @@ let operand_type_includes (env:env) (xo:id) (src_ot:operand_typ):typ =
   if src_ot = OT_Name xo || match_many dst_ots then t else
     err (sprintf "operand '%s' does not have operand type '%s'" (string_of_operand_typ src_ot) (err_id xo))
 
-let rec tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
+let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
   try
     let (x, txo, storage, io, attrs) = pf in
-    let check_const_operand (xo:id):exp =
+    let check_const_operand (xo:id):aexp =
       match io with
       | In ->
           let tparam = operand_type_includes env xo OT_Const in
-          let (_, e) = tc_exp {env with inline_only = true} e (Some tparam) in
-          EOp (Uop UConst, [e])
+          let (_, ae) = infer_exp {env with inline_only = true} u e (Some tparam) in
+          (AE_Op (Uop UConst, [ae]), None)
       | Out | InOut -> err "cannot pass constant as 'out' or 'inout' operand"
       in
     match (storage, txo) with
     | (XGhost, tparam) ->
-        let (_, e) = tc_exp env e (Some tparam) in
-        e
+        let (_, ae) = infer_exp env u e (Some tparam) in
+        ae
     | (XInline, tparam) ->
-        let (_, e) = tc_exp {env with inline_only = true} e (Some tparam) in
-        e
+        let (_, ae) = infer_exp {env with inline_only = true} u e (Some tparam) in
+        ae
     | (XOperand, TName xo) ->
       (
         match skip_loc e with
@@ -1699,12 +1722,12 @@ let rec tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
             | (_, Some (InlineLocal | ConstGlobal)) -> check_const_operand xo
             | (_, Some (StateInfo ts)) ->
                 let _ = operand_type_includes env xo (OT_State (io, x)) in
-                e
+                (AE_Exp e, None)
             | ((Out | InOut), Some (OperandLocal (In, _))) ->
                 err "cannot pass 'in' operand as 'out' or 'inout' operand"
             | (_, Some (OperandLocal (_, TName xo_local))) ->
                 let _ = operand_type_includes env xo (OT_Name xo_local) in
-                e
+                (AE_Exp e, None)
             | (_, Some (OperandLocal (_, _))) -> internalErr (sprintf "tc_proc_operand: OperandLocal: %A %A" io info)
           )
         | EApply (x, None, es) ->
@@ -1717,8 +1740,8 @@ let rec tc_proc_operand (env:env) (pf:pformal) (e:exp):exp =
                 let nes = List.length es in
                 let nparams = List.length pformals in
                 if nes <> nparams then err (sprintf "operand type '%s' expects %i arguments(s), found %i arguments(s)" (err_id x) nparams nes) else
-                let es = List.map2 (tc_proc_operand env) pformals es in
-                EApply (x, None, es)
+                let aes = List.map2 (tc_proc_operand env u) pformals es in
+                (AE_Apply (x, [], aes), None)
             | _ -> err (sprintf "cannot find function named '%s' or procedure operand_type named '%s'" (err_id x) (err_id x))
           )
         | _ -> check_const_operand xo
@@ -1736,15 +1759,18 @@ let assign_local (env:env) (x:id):typ =
 // TODO: check that global variable names are distinct
 // TODO: check that local variable names are distinct
 
-let tc_proc_call (env:env) (p:proc_decl) (xs:lhs list) (es:exp list):stmt =
+let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:typ list option) (es:exp list):stmt =
+  let u = new_unifier env loc in
+  let pi = compute_proc_instance env u p ts_opt in
   let nxs = List.length xs in
   let nes = List.length es in
   let nparams = List.length p.pargs in
   let nrets = List.length p.prets in
   if nes <> nparams then err (sprintf "procedure expects %i arguments(s), found %i arguments(s)" nparams nes) else
   if nxs > 0 && nxs <> nrets then err (sprintf "procedure returns %i value(s), found %i return variable(s)" nrets nxs) else
-  let es = List.map2 (tc_proc_operand env) p.pargs es in
+  let aes = List.map2 (tc_proc_operand env u) pi.p_args es in
   let proc_ret (lhs:lhs) (ret:pformal):lhs =
+    // TODO: type inference here
     let (_, tr, _, _, _) = ret in
     let check_subtype (x:id) (tx:typ):unit =
       if not (is_subtype_norm env tr tx) then err (sprintf "cannot assign return type '%s' to variable '%s' of type '%s'" (string_of_typ tr) (err_id x) (string_of_typ tx))
@@ -1754,8 +1780,10 @@ let tc_proc_call (env:env) (p:proc_decl) (xs:lhs list) (es:exp list):stmt =
     | (x, Some (None, Ghost)) -> (x, Some (Some tr, Ghost))
     | (x, Some (Some tx, Ghost)) -> check_subtype x tx; lhs
     | (x, Some (_, NotGhost)) -> err (sprintf "variable '%s' must be ghost" (err_id x))
-  let xs = List.map2 proc_ret xs p.prets in
-  SAssign (xs, EApply (p.pname, None, es))
+  let xs = List.map2 proc_ret xs pi.p_rets in
+  u_unify u None;
+  let es = List.map (subst_exp env u.u_substs) aes in
+  SAssign (xs, EApply (p.pname, None, es)) // TODO: replace None with type arguments
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
@@ -1800,11 +1828,13 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
         SAssign (ft t, e)
         in
       match skip_loc e with
-      | EApply (x, _, es) ->
-        match (xs, lookup_fun_or_proc env x) with
-        | (([] | [_]), FoundFun _) -> assign_exp ()
-        | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
-        | (_, FoundProc p) -> tc_proc_call env p xs es
+      | EApply (x, ts_opt, es) ->
+        (
+          match (xs, lookup_fun_or_proc env x) with
+          | (([] | [_]), FoundFun _) -> assign_exp ()
+          | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
+          | (_, FoundProc p) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
+        )
       | _ -> assign_exp ()
     )
   | SLetUpdates _ -> internalErr "SLetUpdates"
@@ -2002,6 +2032,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         (env, [decl])
       )
     | DProc p ->
+        // TODO: add ptargs to env
         let isTypeChecked = verify && (Option.isSome p.pbody) && (attrs_get_bool (Id "typecheck") !do_typecheck p.pattrs) in
         let isTestShouldFail = attrs_get_bool (Id "testShouldFail") false p.pattrs in
         let (env, ps) =

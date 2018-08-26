@@ -12,6 +12,9 @@ let cons = Cons
 assume val xeq2 (#a:Type) (x:a) (y:a) : prop
 assume val ff1 (z:int) : Lemma (xeq2 10 20 /\ (match z with 3 -> True | _ -> False))
 assume val ff2 (z:int) : Pure int (requires True) (ensures fun _ -> xeq2 10 20 /\ (match z with 3 -> True | _ -> False))
+assume val ff3 (z:int) : Ghost int (requires True) (ensures fun y -> xeq2 10 20 /\ (match z with 3 -> True | _ -> False))
+assume val ff4 (_:unit) : Lemma True
+// TODO: Ghost returning tuple should be converted to multiple return values
 
 let natN (n:nat) = x:nat{x < n}
 let nat8 = natN 256

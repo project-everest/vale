@@ -604,6 +604,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       pname = Reserved ("lemma_" + (string_of_id p.pname));
       pghost = Ghost;
       pinline = Outline;
+      ptargs = p.ptargs;
       pargs = pargs;
       prets = prets;
       pspecs = pLemmaSpecs;

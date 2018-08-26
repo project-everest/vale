@@ -523,13 +523,13 @@ Decl
         fattrs = $2}
       )
     }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
+  | Proc Attrs AnyIdOrOp TFormalsBracket LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
     {
-      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = None; pattrs = $2})
+      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; ptargs = $4; pargs = $6; prets = $8; pspecs = $9; pbody = None; pattrs = $2})
     }
-  | Proc Attrs AnyIdOrOp LPAREN ProcFormals RPAREN ProcRet Specs LBRACE Block RBRACE
+  | Proc Attrs AnyIdOrOp TFormalsBracket LPAREN ProcFormals RPAREN ProcRet Specs LBRACE Block RBRACE
     {
-      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; pargs = $5; prets = $7; pspecs = $8; pbody = Some $10; pattrs = $2})
+      (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; ptargs = $4; pargs = $6; prets = $8; pspecs = $9; pbody = Some $11; pattrs = $2})
     }
 
 Decls

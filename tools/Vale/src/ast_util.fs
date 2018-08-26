@@ -196,6 +196,9 @@ let locs_of_exp (e:exp):loc list =
     | _ -> List.concat locs
   in gather_exp f e
 
+let loc_of_exp_opt (e:exp):loc option =
+  match locs_of_exp e with [] -> None | h::t -> Some h
+
 let one_loc_of_exp (defaultLoc:loc) (e:exp):loc =
   match locs_of_exp e with [] -> defaultLoc | h::t -> h
 

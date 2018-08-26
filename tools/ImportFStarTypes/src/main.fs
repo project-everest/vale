@@ -948,10 +948,10 @@ let rec tree_of_vale_type (t:v_type):string_tree =
   | TFun (ts, t) ->
       st_paren [st_leaf "fun"; st_paren (trees_of_comma_list (List.map r ts)); st_leaf "->"; r t]
 
-let tree_of_vale_type_kind (env:env) (e:f_exp):string_tree =
-  match e with
-  | EType _ -> tree_of_vale_kind (vale_kind_of_exp e)
-  | _ -> tree_of_vale_type (vale_type_of_exp env e)
+//let tree_of_vale_type_kind (env:env) (e:f_exp):string_tree =
+//  match e with
+//  | EType _ -> tree_of_vale_kind (vale_kind_of_exp e)
+//  | _ -> tree_of_vale_type (vale_type_of_exp env e)
 
 let rec tree_of_vale_exp (e:v_exp):string_tree =
   let r = tree_of_vale_exp in
@@ -966,7 +966,7 @@ let rec tree_of_vale_exp (e:v_exp):string_tree =
       st_paren [st_list [st_leaf "let"; st_leaf x; st_leaf ":"; tree_of_vale_type t; st_leaf ":="; r e1; st_leaf "in"]; r e2]
 
 // returns parameters, requires, ensures, return type
-let rec take_params (e:f_exp):(f_binder list * f_exp list * (id * f_exp) option * f_exp) =
+let rec take_params (e:f_exp):(effect * f_binder list * f_exp list * (id * f_exp) option * f_exp) =
   let may_be_refine_req (x:id) (e:f_exp):(f_exp list * f_exp) =
     match e with
     | ERefine (x1, e1, e2) ->
@@ -983,18 +983,19 @@ let rec take_params (e:f_exp):(f_binder list * f_exp list * (id * f_exp) option 
   | EArrow (a, x, t, e2) ->
       let (req, t) = may_be_refine_req x t in
       let b = (a, x, Some t) in
-      let (bs, reqs, enss, e) = take_params e2 in
-      (b::bs, req @ reqs, enss, e)
-  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, e1, [req; EFun ([(_, xens, _)], ens)]) ->
+      let (effect, bs, reqs, enss, e) = take_params e2 in
+      (effect, b::bs, req @ reqs, enss, e)
+  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma" as g)}, e1, [req; EFun ([(_, xens, _)], ens)]) ->
+      let effect = match g with "Prims.Ghost" -> EffectGhost | "Prims.Lemma" -> EffectLemma | _ -> EffectOther in
       if keep_req_ens then
-        ([], [req], Some (xens, ens), e1)
+        (effect, [], [req], Some (xens, ens), e1)
       else
-        ([], [], None, e1)
+        (effect, [], [], None, e1)
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)])
   | e ->
       let (ens, e) = may_be_refine_ens e in
-      ([], [], ens, e)
+      (EffectOther, [], [], ens, e)
 
 let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
   match d.f_category with
@@ -1017,7 +1018,8 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
     )
   | "val" ->
     (
-      let (bs, reqs, enss, t) = take_params d.f_typ in
+      let (effect, bs, reqs, enss, t) = take_params d.f_typ in
+      let is_proc = match effect with EffectGhost | EffectLemma -> true | EffectOther -> false in
       let bs = d.f_binders @ bs in
       let (prefix, ps) =
         match bs with
@@ -1040,22 +1042,51 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
               (a, x, e)
               in
             let bst = List.map promote_binder bst in
-            let f (a, x, t) =
+            let ft (a, x, k) =
               let tree_a = match a with Explicit -> [] | _ -> [st_leaf "#"] in
-              st_list (tree_a @ [tree_of_vale_id x; st_leaf ":"; tree_of_vale_type_kind env (Option.get t)])
+              st_list (tree_a @ [tree_of_vale_id x; st_leaf ":"; tree_of_vale_kind (vale_kind_of_exp (Option.get k))])
               in
-            let tparams = match bst with [] -> [] | _ -> [make_st_list "#[" "]" (trees_of_comma_list (List.map f bst))] in
-            ("function", tparams @ [st_paren (trees_of_comma_list (List.map f bsv))])
+            let fv (a, x, t) =
+              let tree_g = if is_proc then [st_leaf "ghost"] else [] in
+              let tree_a = match a with Explicit -> [] | _ -> [st_leaf "#"] in
+              st_list (tree_g @ tree_a @ [tree_of_vale_id x; st_leaf ":"; tree_of_vale_type (vale_type_of_exp env (Option.get t))])
+              in
+            let tparams = match bst with [] -> [] | _ -> [make_st_list "#[" "]" (trees_of_comma_list (List.map ft bst))] in
+            let bsv =
+              match (is_proc, bsv) with
+              | (true, [(_, _, Some (EId {name = Some "Prims.unit"}))]) -> []
+              | _ -> bsv
+              in
+            ((if is_proc then "ghost procedure" else "function"),
+              tparams @ [st_paren (trees_of_comma_list (List.map fv bsv))])
         in
       let tree_req = List.map (fun e -> st_list [st_leaf "requires"; tree_of_vale_exp (vale_exp_of_exp env e); st_leaf ";"]) reqs in
-      let tree_t = tree_of_vale_type (vale_type_of_exp env t) in
-      let (tree_t, tree_ens) =
+      let vale_t = vale_type_of_exp env t in
+      let tree_t = tree_of_vale_type vale_t in
+      let tree_ens =
         match enss with
-        | None -> (tree_t, [])
+        | None -> []
         | Some (x, e) ->
-            (st_paren [tree_of_vale_id x; st_leaf ":"; tree_t], [st_list [st_leaf "ensures"; tree_of_vale_exp (vale_exp_of_exp env e); st_leaf ";"]])
+            [st_list [st_leaf "ensures"; tree_of_vale_exp (vale_exp_of_exp env e); st_leaf ";"]]
         in
-      let typing = [st_leaf ":"; tree_t] @ tree_req @ tree_ens @ [st_leaf "extern"; st_leaf ";"] in
+      let ens_x =
+        match (effect, enss) with
+        | (_, Some (x, e)) -> Some (tree_of_vale_id x)
+        | (EffectGhost, None) -> Some (st_leaf "_")
+        | (_, None) -> None
+        in
+      let tree_t =
+        match ens_x with
+        | None -> tree_t
+        | Some x -> st_paren [x; st_leaf ":"; tree_t]
+        in
+      let ret =
+        match effect with
+        | EffectLemma -> []
+        | EffectGhost -> [st_leaf "returns"; tree_t]
+        | EffectOther -> [st_leaf ":"; tree_t]
+        in
+      let typing = ret @ tree_req @ tree_ens @ [st_leaf "extern"; st_leaf ";"] in
       st_list ([st_leaf prefix; tree_of_vale_name d.f_name] @ ps @ typing)
     )
   | _ -> err ("internal error: tree_of_vale_decl: " + d.f_category)
