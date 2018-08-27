@@ -47,11 +47,11 @@ let map_domain_set (m:Map<'a, 'b>):Set<'a> =
 exception Err of string
 exception InternalErr of string
 exception LocErr of loc * exn
-exception UnsupportedErr of string
+exception UnsupportedErr of string * loc * string option
 let err (s:string):'a = raise (Err s)
 let internalErr (s:string):'a = raise (InternalErr s)
 let notImplemented (s:string):'a = raise (InternalErr ("not implemented: " + s))
-let unsupported (s:string):'a = printfn "%s" s; raise (UnsupportedErr s)
+let unsupported (loc:loc) (msg:string option) (s:string):'a = raise (UnsupportedErr (s, loc, msg))
 let locErr (loc:loc) (err:exn):'a = raise (LocErr (loc, err))
 let locErrOpt (loc:loc option) (err:exn):'a = match loc with None -> raise err | Some loc -> locErr loc err
 

@@ -100,6 +100,7 @@ let exp_refined (e:exp):exp =
 let stmts_abstract (useOld:bool) (ss:stmt list):stmt list =
   map_stmts (exp_abstract useOld) (fun _ -> Unchanged) ss
 
+// TODO: get rid of "refined"
 let stmts_refined (ss:stmt list):stmt list =
   map_stmts exp_refined (fun _ -> Unchanged) ss
 
@@ -1176,7 +1177,7 @@ type transformed =
 
 // Either transform p, or return a list of decls that then must be transformed
 let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
-  let isFrame = attrs_get_bool (Id "frame") true p.pattrs in
+  let isFrame = attrs_get_bool (Id "frame") (p.pghost = NotGhost) p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isAlreadyModOk = List_mem_assoc (Id "already_has_mod_ok") p.pattrs in
@@ -1317,7 +1318,7 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
     )
   | DFun ({fbody = None} as f) ->
       ([], {env with funs = Map.add f.fname f env.funs})
-  | DProc ({pghost = NotGhost} as p)->
+  | DProc p ->
     (
       match transform_proc env loc p with
       | TransformedDone ((envRec, envBody, pNew), envProc) -> ([envRec, envBody, DProc pNew], envProc)

@@ -67,7 +67,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc> HAVOC OLD THIS COLONCOLON
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TTYPE TYPE OPERAND_TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
-%token <loc> DDEPENDENT DEPENDENT UNSUPPORTED
+%token <loc> DDEPENDENT DEPENDENT
 %token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS LAMBDA FUN
@@ -494,9 +494,14 @@ Decl
   | TYPE Attrs AnyQualifiedId TFormalsParen COLON Kind COLONEQ Type SEMI { ($1, DType ($3, $4, $6, Some $8, $2)) }
   | OPERAND_TYPE AnyQualifiedId ProcFormalsOpt COLON Type OperandTypeAt SEMI { ($1, DOperandType ($2, $3, $5, $6, [])) }
   | OPERAND_TYPE AnyQualifiedId ProcFormalsOpt COLON Type OperandTypeAt COLONEQ OperandTypeIncludes SEMI { ($1, DOperandType ($2, $3, $5, $6, $8)) }
-	| UNSUPPORTED COLON AnyQualifiedId { ($1, DUnsupported ($3)) }
   | VAR Attrs AnyId COLON Type SEMI { let (s, a) = storageAttrs $2 in ($1, DVar ($3, $5, s, a)) }
-  | CONST AnyQualifiedId COLON Type EXTERN SEMI { ($1, DConst ($2, $4)) }
+	| CONST Attrs AnyQualifiedId COLON Type EXTERN SEMI
+    {
+      match $2 with
+      | [(Id "unsupported", [EString s | ELoc (_, EString s)])] -> ($1, DUnsupported ($3, Some s))
+      | [(Id "unsupported", _)] -> ($1, DUnsupported ($3, None))
+      | _ -> ($1, DConst ($3, $5))
+    }
   | FUNCTION Attrs AnyIdOrOp TFormalsBracket LPAREN Formals RPAREN COLON FunRet COLONEQ AnyId SEMI
     { ($1, DFun {
         fname = $3;

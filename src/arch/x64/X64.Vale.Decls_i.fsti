@@ -34,6 +34,9 @@ let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
 unfold let va_bool = bool
 unfold let va_prop = Type0
 unfold let va_int = int
+let va_int_at_least (k:int) = i:int{i >= k}
+let va_int_at_most (k:int) = i:int{i <= k}
+let va_int_range (k1 k2:int) = i:int{k1 <= i /\ i <= k2}
 val ins : Type0
 val ocmp : Type0
 unfold let va_code = precode ins ocmp

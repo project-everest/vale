@@ -173,8 +173,6 @@ and lextoken = parse
       let s = s.Substring(0, s.Length - 2) in skip_line lexbuf; op_tok s
     | _ -> op_tok s
   }
-| "unsupported" { UNSUPPORTED (curLoc lexbuf) }
-| "unsupported (int type generator)" { UNSUPPORTED (curLoc lexbuf) }
 | "Type" { TTYPE (curLoc lexbuf) }
 | "type" { TYPE (curLoc lexbuf) }
 | "Dependent" { DDEPENDENT (curLoc lexbuf) }

@@ -40,7 +40,7 @@ type proc_instance = {
 }
 
 type id_info =
-| StateInfo of typ
+| StateInfo of id * typ
 | OperandLocal of inout * typ
 | InlineLocal
 | MutableGhostLocal
@@ -52,11 +52,11 @@ type name_info =
 | Proc_decl of proc_decl
 | Type_info of tformal list option * kind * typ option
 | OperandType_info of pformal list option * typ * typ option * operand_typ list
-| UnsupportedName of id
+| UnsupportedName of id * loc * string option
 //| Include_module of string * bool
 | Module_abbrev of string * string
 
-type include_module = string * bool
+type include_module = string * string option option
 
 //type scope_mod =
 //| Variable of id * typ * id_info option
@@ -133,21 +133,27 @@ let name_of_id x =
   | Operator _ -> (mn, Operator sn)
 
 let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
-  match Map.tryFind x env.decls_map with
-  | Some info -> (Some info, x)
-  | None ->
+  match (x, Map.tryFind x env.decls_map) with
+  | (_, Some info) -> (Some info, x)
+  | (Id x, None) ->
     (
       let rec f includes =
         match includes with
-        | [] -> (None, x)
-        | (s, false)::includes -> f includes
-        | (s, true)::includes ->
+        | [] -> (None, Id x)
+        | (s, None)::includes -> f includes
+        | (s, Some (Some m))::includes ->
           (
-            let qx =
-              match x with
-              | Id x -> Id (s + "." + x)
-              | _ -> x
-              in
+            if x.StartsWith(m + ".") then
+              let x = x.Substring(m.Length) in
+              let qx = Id (s + x) in
+              match Map.tryFind qx env.decls_map with
+              | Some info -> (Some info, qx)
+              | None -> (None, qx)
+            else f includes
+          )
+        | (s, Some None)::includes ->
+          (
+            let qx = Id (s + "." + x) in
             match Map.tryFind qx env.decls_map with
             | Some info -> (Some info, qx)
             | None -> f includes
@@ -155,6 +161,7 @@ let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
         in
       f env.include_modules
     )
+  | (_, None) -> (None, x)
 (*
   match Map.tryFind x env.decls_map with
   | None -> (None, x)
@@ -216,7 +223,7 @@ let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
 let try_lookup_id (env:env) (x:id):(typ * id_info option) option =
   match lookup_name env x true with
   | (Some (Info (t, info)), _) -> Some (t, info)
-  | (Some (UnsupportedName x), _) -> unsupported ("identifier '" + (err_id x) + "' is declared 'unsupported' (see declarations of identifier for more details)")
+  | (Some (UnsupportedName (x, loc, msg)), _) -> unsupported loc msg ("identifier '" + (err_id x) + "' is declared 'unsupported')")
   | _ -> None
 
 let lookup_id (env:env) (x:id):(typ * id_info option) =
@@ -244,7 +251,7 @@ let try_lookup_type (env:env) (x:id):((tformal list option * kind * typ option) 
   let (t, qx) = lookup_name env x true in
   match t with
   | Some (Type_info (tfs, k, t)) -> (Some (tfs, k, t), qx)
-  | Some (UnsupportedName x) -> unsupported ("type '" + (err_id x) + "' is declared 'unsupported' (see declaration of type for more details)")
+  | Some (UnsupportedName (x, loc, msg)) -> unsupported loc msg ("type '" + (err_id x) + "' is declared 'unsupported'")
   | _ -> (None, x)
 
 let lookup_type (env:env) (x:id):(tformal list option * kind * typ option) =
@@ -258,7 +265,7 @@ let try_lookup_fun_or_proc (env:env) (x:id):fun_or_proc option =
   match lookup_name env x true with
   | (Some (Proc_decl p), _) -> Some (FoundProc p)
   | (Some (Func_decl f), _) -> Some (FoundFun f)
-  | (Some (UnsupportedName x), _) -> unsupported ("function or procedure '" + (err_id x) + "' is declared 'unsupported' (see declaration of function or procedure for more details)")
+  | (Some (UnsupportedName (x, loc, msg)), _) -> unsupported loc msg ("function or procedure '" + (err_id x) + "' is declared 'unsupported'")
   | _ -> None
 
 let lookup_fun_or_proc (env:env) (x:id):fun_or_proc =
@@ -406,15 +413,15 @@ let rec normalize_type_with_transform (env:env) (t:typ) (tr:transform_kind optio
   | _ -> normalize_type env t
 *)
 
-let push_unsupported (env:env) (id:id):env =
+let push_unsupported (env:env) (id:id) (loc:loc) (msg:string option):env =
 //  let env = push_scope_mod env (Unsupported id)
-  {env with decls_map = Map.add id (UnsupportedName id) env.decls_map}
+  {env with decls_map = Map.add id (UnsupportedName (id, loc, msg)) env.decls_map}
 
 let push_name_info (env:env) (id:id) (info:name_info):env =
 //  let env = push_scope_mod env (Unsupported id)
   {env with decls_map = Map.add id info env.decls_map}
 
-let push_include_module (env:env) (m:string) (b:bool):env =
+let push_include_module (env:env) (m:string) (b:string option option):env =
 //  push_scope_mod env (Include_module (m, b))
 //  push_name_info env (Id m) (Include_module (m, b))
   {env with include_modules = (m, b)::env.include_modules}
@@ -1281,7 +1288,12 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       with err -> locErr loc err
   | EVar x ->
       let (t, info) = lookup_id env x in
-      (match (env.inline_only, info) with (false, _) | (_, Some InlineLocal) -> () | _ -> err "only inline variables are allowed in inline expressions");
+      let () =
+        match (env.inline_only, info) with
+        | (false, _) -> ()
+        | (_, Some (InlineLocal | ConstGlobal)) -> ()
+        | _ -> err "only inline variables and global const variables are allowed in inline expressions"
+        in
       let t = normalize_type_with_transform env t (Some EvalOp) in
       ret t (AE_Exp e)
   | EInt i -> norm_ret (TInt (Int i, Int i)) (AE_Exp e)
@@ -1454,12 +1466,15 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let x1 =
         match t1 with
         | TName (Id x1) | TApply (Id x1, _) -> x1
+        | TTuple ts -> "tuple " + string (List.length ts)
         | _ -> err (sprintf "cannot find overloaded operator(.%s) function for type %s" xf (string_of_typ t1))
         in
       let e = eapply (Operator (x1 + " ." + xf)) [e1] in
       let (t, ae) = infer_exp env u e expected_typ in
-      match ae with
-      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (FieldOp (Id xf), es)) // TODO: save x1 or t1
+      match (t1, ae) with
+      | (TTuple ts, (AE_Apply (_, _, es), _)) ->
+          ret t (AE_Apply (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), ts, es))
+      | (_, (AE_Apply (_, _, es), _)) -> ret t (AE_Op (FieldOp (Id xf), es)) // TODO: save x1 or t1
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (FieldUpdate (Id xf), [e1; e2]) ->
@@ -1627,8 +1642,8 @@ let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
 //    printfn "e = %A\n  ae = %A\n  t = %A\n  es = %A" e ae t es;
     (t, es)
   with
-    | UnsupportedErr s -> printfn "%s" s; (TTuple [], e)
-    | err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
+  //| UnsupportedErr s -> printfn "%s" s; (TTuple [], e)
+  | err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
 
 let rec update_env_stmt (env:env) (s:stmt):env =
   match s with
@@ -1720,8 +1735,8 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
             match (io, info) with
             | (_, (None | Some MutableGhostLocal)) -> err "expression is not an operand"
             | (_, Some (InlineLocal | ConstGlobal)) -> check_const_operand xo
-            | (_, Some (StateInfo ts)) ->
-                let _ = operand_type_includes env xo (OT_State (io, x)) in
+            | (_, Some (StateInfo (xx, ts))) ->
+                let _ = operand_type_includes env xo (OT_State (io, xx)) in
                 (AE_Exp e, None)
             | ((Out | InOut), Some (OperandLocal (In, _))) ->
                 err "cannot pass 'in' operand as 'out' or 'inout' operand"
@@ -1888,35 +1903,35 @@ let tc_spec (env:env) (loc:loc, s:spec):(env * (loc * spec) list) =
   | Ensures (r, e) -> let (t, e) = tc_exp env e None in (env, [(loc, Ensures (r, e))])
   | Modifies (m, e) -> let (t, e) = tc_exp env e None in (env, [(loc, Modifies (m, e))])
   | SpecRaw (RawSpec (r, es)) ->
-    let rec tc_spec_exp (env:env) (es:(loc * spec_exp) list):(env * (loc * spec_exp) list) =
-      match es with
-      | [] -> (env, [])
-      | (loc, SpecExp e)::es ->
-        let (t, e) = tc_exp env e None in
-        let (env, es) = tc_spec_exp env es in
-        (env, (loc, SpecExp e) :: es)
-      | (loc, SpecLet (x, t, e))::es ->
-        let (tc, e) = tc_exp env e t in
-        let typ = match t with Some t -> t | None -> tc in
-        let env = push_id env x typ in
-        let (env, es) = tc_spec_exp env es in
-        (env, (loc, SpecLet (x, t, e)) :: es)
-    let (env, es) = tc_spec_exp env es in
-    (env, [(loc, SpecRaw (RawSpec (r, es)))])
+      let rec tc_spec_exp (env:env) (es:(loc * spec_exp) list):(env * (loc * spec_exp) list) =
+        match es with
+        | [] -> (env, [])
+        | (loc, SpecExp e)::es ->
+            let (t, e) = tc_exp env e None in
+            let (env, es) = tc_spec_exp env es in
+            (env, (loc, SpecExp e) :: es)
+        | (loc, SpecLet (x, t, e))::es ->
+            let (tc, e) = tc_exp env e t in
+            let typ = match t with Some t -> t | None -> tc in
+            let env = push_id env x typ in
+            let (env, es) = tc_spec_exp env es in
+            (env, (loc, SpecLet (x, t, e)) :: es)
+      let (env, es) = tc_spec_exp env es in
+      (env, [(loc, SpecRaw (RawSpec (r, es)))])
   | SpecRaw (Lets ls) ->
-    let tc_spec_let (env:env) (loc:loc, l:lets):(env * (loc * lets)) =
-      match l with
-      | LetsVar (x, t, e) ->
-        let (tc, e) = tc_exp env e t in
-        let typ = match t with Some t -> t | None -> tc in
-        let env = push_id env x typ in
-        (env, (loc,  LetsVar (x, t, e)))
-      | LetsAlias (x, y) ->
-        let (t, info) = lookup_id env y in
-        let env = push_id_with_info env x t info in
-        (env, (loc, LetsAlias (x, y))) in
-    let (env, ls) = List.fold (fun (env, lets) l -> let (env, l) = tc_spec_let env l in (env, lets @ [l])) (env,[]) ls in
-    (env, [(loc, SpecRaw (Lets ls))])
+      let tc_spec_let (env:env) (loc:loc, l:lets):(env * (loc * lets)) =
+        match l with
+        | LetsVar (x, t, e) ->
+            let (tc, e) = tc_exp env e t in
+            let typ = match t with Some t -> t | None -> tc in
+            let env = push_id env x typ in
+            (env, (loc, LetsVar (x, Some typ, e)))
+        | LetsAlias (x, y) ->
+            let (t, info) = lookup_id env y in
+            let env = push_id_with_info env x t info in
+            (env, (loc, LetsAlias (x, y))) in
+      let (env, ls) = List.fold (fun (env, lets) l -> let (env, l) = tc_spec_let env l in (env, lets @ [l])) (env,[]) ls in
+      (env, [(loc, SpecRaw (Lets ls))])
 
 let tc_specs (env:env) (specs:(loc * spec) list):(env * (loc * spec) list) =
   let (env, specs) = List_mapFoldFlip tc_spec env specs in
@@ -1957,7 +1972,7 @@ let push_params_without_rets (env:env) (args:pformal list) (rets:pformal list):e
   {env with decls_map = aux env.decls_map args}
 
 let tc_proc (env:env) (p:proc_decl):(env * proc_decl) =
-  try
+//  try
     let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
     let env = if isRecursive then push_proc env p.pname p else env in
     let globals = env in
@@ -1975,11 +1990,11 @@ let tc_proc (env:env) (p:proc_decl):(env * proc_decl) =
     let env = globals in
     let env = if isRecursive then env else push_proc env p.pname p in
     (env, pNew)
-  with
-    | UnsupportedErr s ->
-      printfn "%s" s;
-      let env = push_unsupported env p.pname in
-      (env, p)
+//  with
+//  | UnsupportedErr s ->
+//      //printfn "%s" s;
+//      let env = push_unsupported env p.pname s in
+//      (env, p)
 
 let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) list) =
   let ((loc, d), verify) = decl in
@@ -2000,7 +2015,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
         match skip_loc e with
         | EApply _ ->
             //let t = normalize_type_with_transform env t (Some StateGet) in
-            let env = push_id_with_info env x t(*.norm_typ*) (Some (StateInfo t(*.norm_typ*)))  in
+            let env = push_id_with_info env x t(*.norm_typ*) (Some (StateInfo (x, t(*.norm_typ*)))) in
             (env, [decl])
         | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
       )
@@ -2025,6 +2040,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
           | (Operator xf, _) when xf.StartsWith(".") && xf.EndsWith(":=") ->
               err (sprintf "operator(%s :=) expects expects two arguments (the first argument must be a named type)" xf)
           | (Operator xf, [(_, Some (TName (Id xt) | (TApply (Id xt, _))))]) when xf.StartsWith(".") -> Operator (xt + " " + xf)
+          | (Operator xf, [(_, Some (TTuple ts))]) when xf.StartsWith(".") -> Operator ("tuple " + string (List.length ts) + " " + xf)
           | (Operator xf, _) when xf.StartsWith(".") ->
               err (sprintf "operator(%s) expects one argument, which must be a named type" xf)
           | _ -> f.fname
@@ -2050,18 +2066,18 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
             let env = push_proc env p.pname p in (env, [p])
           in
         (env, List.map (fun p -> ((loc, DProc p), verify)) ps)
-    | DUnsupported x ->
-        let env = push_unsupported env x in
+    | DUnsupported (x, msg) ->
+        let env = push_unsupported env x loc msg in
         (env, [decl])
     | DPragma (ModuleName s) ->
-        let env = push_include_module env s true in
+        let env = push_include_module env s (Some None) in
         (env, [decl])
     | _ -> (env, [decl])
   with
-    | UnsupportedErr s -> printfn "%s" s; (env, [decl])
-    | err -> locErr loc err
+  //| UnsupportedErr s -> printfn "%s" s; (env, [decl])
+  | err -> locErr loc err
 
-let tc_include env (inc:string * bool * (((loc * decl) * bool) list)):env =
+let tc_include env (inc:string * string option option * (((loc * decl) * bool) list)):env =
   let (s, b, ds) = inc in
   let env = push_include_module env s b in
   let globals = env in
@@ -2074,10 +2090,10 @@ let tc_include env (inc:string * bool * (((loc * decl) * bool) list)):env =
   let env = globals in
   env
 
-let tc_decls (include_modules:(string * bool * (((loc * decl) * bool) list)) list) (ds:((loc * decl) * bool) list):((loc * decl) * bool) list =
+let tc_decls (include_modules:(string * string option option * (((loc * decl) * bool) list)) list) (ds:((loc * decl) * bool) list):((loc * decl) * bool) list =
   // Prims is included and prop is defined by default
   let env = empty_env in
-  let env = push_include_module env "Prims" true in
+  let env = push_include_module env "Prims" (Some None) in
 //  let env = push_include_module env "Vale.Primitives" true in
 //  let env = {env with decls_map = Map.add (Id "prop") (Type_info ([], (KType bigint.One), None)) env.decls_map} in
   let env = List.fold (fun env inc -> tc_include env inc) env include_modules in

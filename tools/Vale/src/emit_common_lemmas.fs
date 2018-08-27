@@ -429,6 +429,7 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand)
 *)
 let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
+  if p.pghost = Ghost then [] else
   let fParams = make_fun_params p.prets p.pargs in
   let attrs = List.filter filter_fun_attr p.pattrs in
   let f =
@@ -483,7 +484,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let argR = (sN, tState, XPhysical, In, []) in
   let prets = make_proc_params true p.prets p.pargs in
   let pargs = make_proc_params false p.prets p.pargs in
-  let pargs = (if total then [argS] else [argS; argR]) @ pargs in
+  let pargs =
+    match p.pghost with
+    | Ghost -> pargs
+    | NotGhost -> (if total then [argS] else [argS; argR]) @ pargs
+    in
   let xReq = "require" + total_suffix total in
   let xEns = "ensure" + total_suffix total in
   let req = require (vaApp xReq ([EVar b0; eapply codeName fArgs; EVar s0] @ listIfNot total [EVar sN])) in // va_require(va_b0, va_code_Q(iii, va_op(dummy), va_op(dummy2)), va_s0, va_sN)
@@ -522,8 +527,12 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       va_sM := va_lemma_empty(va_s99, va_sM);
     }
   *)
-  let pargs = argB::pargs in
-  let prets = (if total then [retS; retF] else [retB; retS]) @ prets in
+  let pargs = match p.pghost with Ghost -> pargs | NotGhost -> argB::pargs in
+  let prets =
+    match p.pghost with
+    | Ghost -> prets
+    | NotGhost -> (if total then [retS; retF] else [retB; retS]) @ prets
+    in
   let reqs = if benv.is_framed then reqsIs else [] in
   let ensFrame = if benv.is_framed then [(loc, ensure eFrame)] else [] in
   let (pspecs, pmods) = List.unzip (List.map (build_lemma_spec env s0 (EVar sM)) p.pspecs) in
@@ -548,9 +557,12 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     else
       // Body of ordinary lemma
       let ss = stmts_refined bstmts in
-      [sReveal; sOldS] @ sBlock @ [sb1] @ ss
+      match p.pghost with
+      | Ghost -> ss
+      | NotGhost -> [sReveal; sOldS] @ sBlock @ [sb1] @ ss
     in
-  let pLemmaSpecs = (loc, req)::reqs @ (loc, ens)::(List.concat pspecs) @ ensFrame in
+  let (req1, ens1) = match p.pghost with Ghost -> ([], []) | NotGhost -> ([(loc, req)], [(loc, ens)]) in
+  let pLemmaSpecs = req1 @ reqs @ ens1 @ List.concat pspecs @ ensFrame in
   let exportSpecsDecls =
     let isExportSpecs = attrs_get_bool (Id "exportSpecs") false p.pattrs in
     if not isExportSpecs then [] else
@@ -601,7 +613,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     in
   let pLemma =
     {
-      pname = Reserved ("lemma_" + (string_of_id p.pname));
+      pname = match p.pghost with Ghost -> p.pname | NotGhost -> Reserved ("lemma_" + (string_of_id p.pname)); // REVIEW: ghost procedure names
       pghost = Ghost;
       pinline = Outline;
       ptargs = p.ptargs;
@@ -652,7 +664,7 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
             is_instruction = isInstruction;
             is_quick = isQuick;
             is_operand = isOperand;
-            is_framed = attrs_get_bool (Id "frame") true p.pattrs;
+            is_framed = attrs_get_bool (Id "frame") (p.pghost = NotGhost) p.pattrs;
             is_terminating = attrs_get_bool (Id "terminates") !fstar p.pattrs;
             code_name = codeName;
             frame_exp = makeFrame env p s0;
@@ -665,7 +677,11 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
         let fCodes = build_code loc env benv rstmts in
         let dummy = Reserved "dummy" in
         let senv = { env = env; benv = benv; b1 = b1; bM = dummy; code = EVar dummy; s0 = s0; f0 = fM; sM = sM; fM = fM; sN = dummy; loc = loc;} in
-        let bstmts = build_lemma_stmts senv stmts in
+        let bstmts =
+          match p.pghost with
+          | Ghost -> build_lemma_ghost_stmts senv stmts
+          | NotGhost -> build_lemma_stmts senv stmts
+          in
         let pLemma = build_lemma env benv b1 rstmts bstmts in
         let quickDecls =
           if isQuick then

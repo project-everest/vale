@@ -62,6 +62,7 @@ procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:in
 function ff(x1:byte, x2:byte, x3:byte, x4:byte):byte extern;
 
 procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    lets p := 7;
     requires x >= 15;
 {
     let a:list(byte) := Nil();
@@ -76,6 +77,7 @@ procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:in
     let l:nat32 := id#[byte](5);
     y := #int_range(15, 20)(x);
     assert 7 < 8;
+    assert p < 8;
     if (3 < 3) {}
 }
 
@@ -129,6 +131,7 @@ procedure{:typecheck} Add(inout dst:opr32, src:opr32)
 }
 
 procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
+    lets ax @= eax;
     reads esp;
     modifies eax; ebx;
 {
@@ -138,7 +141,7 @@ procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
     Add(eax, id(id(z)));
     Add(eax, id#[byte](id#[byte](5)) + 1);
     Add(eax, id(id(5)) + 1);
-    Add(eax, 10);
+    Add(ax, 10);
     Add(eax, ebx);
     Add(eax, o);
 }

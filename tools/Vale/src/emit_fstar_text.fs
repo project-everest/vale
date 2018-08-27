@@ -77,6 +77,9 @@ let rec string_of_typ (t:typ):string =
   | TApply (x, ts) -> "(" + (sid x) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
   | TBool BpBool -> "bool"
   | TBool BpProp -> "prop"
+  | TInt (Int k1, Int k2) -> "(va_int_range " + string k1 + " " + string k2 + ")"
+  | TInt (Int k1, Inf) -> "(va_int_at_least " + string k1 + ")"
+  | TInt (NegInf, Int k2) -> "(va_int_at_most " + string k2 + ")"
   | TInt (_, _) -> "int"
   | TTuple [] -> "unit"
   | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
@@ -489,7 +492,7 @@ let emit_open (ps:print_state) (s:string):unit =
   ps.PrintLine ("open " + s)
   match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("open " + s)
 
-let emit_decl (ps:print_state) (opens: string list) (loc:loc, d:decl):unit =
+let emit_decl (ps:print_state) (opens:(string * string option option) list) (loc:loc, d:decl):unit =
   try
     match d with
     | DVerbatim (attrs, lines) ->
@@ -519,6 +522,6 @@ let emit_decl (ps:print_state) (opens: string list) (loc:loc, d:decl):unit =
     | _ -> ()
   with err -> raise (LocErr (loc, err))
 
-let emit_decls (ps:print_state) (ds:decls) (opens: string list):unit =
+let emit_decls (ps:print_state) (ds:decls) (opens:(string * string option option) list):unit =
   List.iter (emit_decl ps opens) ds
 

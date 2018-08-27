@@ -899,8 +899,10 @@ let rec vale_type_of_exp (env:env) (e:f_exp):v_type =
             List.map2 arg bs es
         | _ -> List.map (snd >> r) aes
         in
-      // TODO: tuples are special case
-      TApply (string_of_vale_name x, es)
+      if x.StartsWith("FStar.Pervasives.Native.tuple") then
+        TApply ("tuple", es)
+      else
+        TApply (string_of_vale_name x, es)
   | EArrow _ ->
       let (es, e) = take_arrows e in
       TFun (List.map r es, r e)
@@ -1200,10 +1202,14 @@ let main (argv:string array) =
          (
           // REVIEW: why are there duplicates?
           duplicates := Set.add d.f_name (!duplicates);
+          let unsupported msg =
+            printfn "const{:unsupported%s} %s:_ extern;" msg (string_of_vale_name d.f_name);
+            printfn ""
+            in
           match (d.f_category, d.f_typ) with
-          | (_, EUnsupported s) -> printfn "unsupported: %s //(reason: %s)" (string_of_vale_name d.f_name) s; printfn ""
-          | ("unsupported", _) -> printfn "unsupported: %s" (string_of_vale_name d.f_name); printfn ""
-          | ("int_type_generator", _) -> printfn "unsupported (int type generator): %s" (string_of_vale_name d.f_name); printfn ""
+          | (_, EUnsupported s) -> unsupported (" \"" + s + "\"")
+          | ("unsupported", _) -> unsupported ""
+          | ("int_type_generator", _) -> unsupported " \"int type generator\""
           | _ -> print_tree "" (tree_of_vale_decl env d); printfn ""
          )
       )

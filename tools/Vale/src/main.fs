@@ -20,7 +20,7 @@ let main (argv) =
   let in_files_rev = ref ([]:(string * bool) list) in
   let includes_rev = ref ([]:string list) in
   let suffixMap_rev = ref ([]:(string * string) list) in
-  let include_modules_rev = ref ([]:(string * bool * (((loc * decl) * bool) list)) list)
+  let include_modules_rev = ref ([]:(string * string option option * (((loc * decl) * bool) list)) list)
   let all_fstar_type_files = ref ([]:string list) in
   let sourceDir = ref "." in
   let destDir = ref "." in
@@ -47,10 +47,16 @@ let main (argv) =
     | (LocErr (loc, e)) as x ->
         if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; print_error_loc locOpt; printfn "%s" (x.ToString ())
         print_error (Some loc) e
-    | (Err s | UnsupportedErr s) as x ->
-        print_error_loc locOpt
-        printfn "%s" s
+    | (Err s) as x ->
+        print_error_loc locOpt;
+        printfn "%s" s;
         if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; printfn "%s" (x.ToString ());
+        exit 1
+    | (UnsupportedErr (s, loc, msg)) as x ->
+        print_error_loc locOpt;
+        printfn "%s" s;
+        printfn "  (see %s for location of unsupported declaration)" (string_of_loc loc);
+        (match msg with None -> () | Some s-> printfn "  reason for unsupported declaration: %s" s);
         exit 1
     | (InternalErr s) as x ->
         print_error_loc locOpt
@@ -229,7 +235,7 @@ let main (argv) =
         (if debugIncludes then printfn "adding include from %A: %A --> %A --> %A" sourceDir x xabs path);
         includes_rev := path::!includes_rev
       in
-    let rec processFStarInclude (x:string) (opened:bool):unit =
+    let rec processFStarInclude (x:string) (opened:string option option):unit =
 (*
       if !all_fstar_type_files = [] then 
         all_fstar_type_files := Directory.EnumerateFiles(".", "*.fst.types.vaf", SearchOption.AllDirectories) |> List.ofSeq
@@ -272,7 +278,11 @@ let main (argv) =
             (if isInputFile then processVerbatimInclude (incBase false) incPath);
             []
           else if attrs_get_bool (Id "fstar") false attrs then
-            let opened = attrs_get_bool (Id "open") false attrs in
+            let opened =
+              match attrs_get_exps_opt (Id "open") attrs with
+              | None -> None
+              | Some [EVar (Id x) | ELoc (_, EVar (Id x))] -> Some (Some x)
+              | Some _ -> Some None
             processFStarInclude incPath opened;
             []
           else
@@ -339,7 +349,8 @@ let main (argv) =
       if (not !dafnyDirect) then List.iter (fun (s:string) -> ps.PrintLine ("include \"" + s.Replace("\\", "\\\\") + "\"")) (List.rev !includes_rev);
       precise_opaque := !emitFStarText;
       fstar := !emitFStarText;
-      let decls = build_decls empty_env (List.rev (!include_modules_rev)) decls in
+      let include_modules = List.rev (!include_modules_rev) in
+      let decls = build_decls empty_env include_modules decls in
       (match !reprint_file with
         | None -> ()
         | Some filename ->
@@ -355,7 +366,7 @@ let main (argv) =
             rstream.Close ()
         );
       if !emitFStarText then
-        Emit_fstar_text.emit_decls ps decls (List.fold (fun l (x,b,d) -> if b then x::l else l) [] !include_modules_rev)
+        Emit_fstar_text.emit_decls ps decls (List.map (fun (x, b, d) -> (x, b)) include_modules)
       else
         if !dafnyDirect then
           // Initialize Dafny objects
