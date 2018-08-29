@@ -1141,13 +1141,14 @@ let main (argv:string array) =
         List.rev (List.map List.rev (splitWhereRec f l [] []))
         in
       let lines = Array.toList (System.IO.File.ReadAllLines(name)) in
+      let lines = List.filter (fun line -> line <> "]") lines in
       let sModule = "Module after type checking:" in
       let line_is_new_module (x:string):bool = (x = sModule || x.StartsWith("Verified ") || x.StartsWith("All verification")) in
       let modules = splitWhere line_is_new_module lines in
       let modules = List.filter (fun (x:string list) -> match x with s::_ when s = sModule -> true | _ -> false) modules in
       let get_module_blocks (lines:string list):string list list =
         let lines = List.filter (fun (x:string) -> not (x.StartsWith("#") || x.Contains("): (Warning "))) lines in
-        match splitWhere (fun (x:string) -> x = "Exports:") lines with
+        match splitWhere (fun (x:string) -> x.StartsWith("Exports:")) lines with
         | [_; (_::lines)] ->
             splitWhere
               (fun (x:string) ->
