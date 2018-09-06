@@ -16,16 +16,18 @@ ARG TARGET
 ARG BRANCHNAME
 ARG FSTARSOURCEVERSION
 
-WORKDIR ${MYHOME}/FStar
+# ADD SSH KEY
+RUN mkdir -p ${MYHOME}/.ssh
+RUN chown everest ${MYHOME}/.ssh
+RUN chmod 700 ${MYHOME}/.ssh
+COPY --chown=everest id_rsa ${MYHOME}/.ssh/id_rsa
+RUN chmod 600 ${MYHOME}/.ssh/id_rsa
+
+# Copy source files
+RUN mkdir ${MYHOME}/vale
+COPY --chown=everest / ${MYHOME}/vale/
 
 # Do some cleanup
-RUN rm -rf hacl-star
-RUN rm -rf hacl-star-old
-RUN rm -rf kremlin
-RUN rm -rf hacl-star
-RUN rm -rf mitls-fstar
-RUN rm -rf vale
-
 RUN rm -f build.sh
 RUN rm -f build_helper.sh
 RUN rm -f buildlogfile.txt
@@ -36,26 +38,15 @@ RUN rm -f result.txt
 RUN rm -f status.txt
 RUN rm -f commitinfofilename.json
 
-RUN mkdir ${MYHOME}/FStar/vale
-COPY --chown=everest / ${MYHOME}/FStar/vale/
+RUN rm vale/Dockerfile
+RUN rm vale/build.sh
+RUN rm vale/build_helper.sh
+RUN rm vale/id_rsa
+RUN rm vale/commitinfofilename.json
 
-# Remove extra files.
-RUN rm ${MYHOME}/FStar/vale/Dockerfile
-RUN rm ${MYHOME}/FStar/vale/build_helper.sh
-RUN rm ${MYHOME}/FStar/vale/build.sh
-RUN rm ${MYHOME}/FStar/vale/id_rsa
-RUN rm ${MYHOME}/FStar/vale/commitinfofilename.json
-
-# ADD SSH KEY
-RUN mkdir -p ${MYHOME}/.ssh
-RUN chown everest ${MYHOME}/.ssh
-RUN chmod 700 ${MYHOME}/.ssh
-COPY --chown=everest id_rsa ${MYHOME}/.ssh/id_rsa
-RUN chmod 600 ${MYHOME}/.ssh/id_rsa
-
-COPY --chown=everest build.sh ${MYHOME}/FStar/build.sh
+COPY --chown=everest build.sh ${MYHOME}/build.sh
 RUN chmod +x build.sh
-COPY --chown=everest build_helper.sh ${MYHOME}/FStar/build_helper.sh
+COPY --chown=everest build_helper.sh ${MYHOME}/build_helper.sh
 RUN chmod +x build_helper.sh
 
 RUN ./build_helper.sh ${TARGET} ${BUILDLOGFILE} ${MAXTHREADS} ${BRANCHNAME} ${FSTARSOURCEVERSION} || true
