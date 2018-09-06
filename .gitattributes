@@ -1,0 +1,4 @@
+*.fs* eol=lf
+*.ml* eol=lf
+*.sh text eol=lf
+Makefile eol=lf
