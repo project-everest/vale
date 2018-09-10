@@ -1,4 +1,8 @@
-*.fs* eol=lf
+*.fsti eol=lf
+*.fst eol=lf
+*.fs eol=lf
+*.fsl eol=lf
+*.fsy eol=lf
 *.ml* eol=lf
 *.sh text eol=lf
 Makefile eol=lf
