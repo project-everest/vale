@@ -99,7 +99,7 @@ EOF
     "./$SCONS_INVOKE_FILE"
     SCONS_RETCODE=$?
     rm -f "$SCONS_INVOKE_FILE"
-    return $SCONS_RETCODE
+    exit $SCONS_RETCODE
 else
     python$SCONS_PYTHON_MAJOR_MINOR $(which scons) "$@"
 fi
