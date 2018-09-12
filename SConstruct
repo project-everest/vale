@@ -130,6 +130,10 @@ AddOption('--FSTAR', dest = 'do_fstar', default = False, action = 'store_true',
   help='Verify F* files')
 AddOption('--NO-FSTAR', dest = 'do_fstar', default = False, action = 'store_false',
   help='Do not verify F* files')
+AddOption('--DAFNY-USE-MY-Z3', dest = 'dafny_use_my_z3', default = False, action = 'store_true',
+  help='With Dafny on Windows, use the Z3 in the PATH or specified by --Z3-PATH, not the one provided in tools/Dafny')
+AddOption('--DAFNY-USE-DAFNY-Z3', dest = 'dafny_use_my_z3', default = False, action = 'store_false',
+  help='With Dafny on Windows, use the Z3 provided in tools/Dafny')
 AddOption('--DAFNY-PATH', dest = 'dafny_path', type = 'string', default = 'tools/Dafny', action = 'store',
   help='Specify the path to Dafny tool binaries')
 AddOption('--Z3-PATH', dest = 'z3_path', type = 'string', default = z3_default_path, action = 'store',
@@ -166,6 +170,7 @@ do_clean = GetOption('clean')
 do_build = not (do_help or do_clean)
 do_dafny = GetOption('do_dafny')
 do_fstar = GetOption('do_fstar')
+dafny_use_my_z3 = GetOption('dafny_use_my_z3')
 dafny_path = Dir(GetOption('dafny_path')).abspath
 z3_path = Dir(GetOption('z3_path')).abspath
 kremlin_path = Dir(GetOption('kremlin_path')).abspath
@@ -304,7 +309,7 @@ else:
   fstar_z3_path = ''
 
 if verify and do_dafny:
-  if sys.platform == 'win32':
+  if sys.platform == 'win32' and not dafny_use_my_z3:
     dafny_z3_path = '' # use the default Boogie search rule, which uses Z3 from the tools/Dafny directory
   else:
     dafny_z3_path = f'/z3exe:{z3_exe}'
