@@ -17,6 +17,7 @@ windows_scons_python_dir () {
       echo "ERROR: Python $SCONS_PYTHON_MAJOR_MINOR was not installed properly" >&2
       exit 1
     fi
+    PYDIR=$(cygpath -u "$PYDIR")
     echo "$PYDIR"
 }
 
@@ -72,33 +73,46 @@ is_windows () {
 if is_windows ; then
     VS_ENV_CMD=$(windows_setup_environment)
     pydir=$(windows_scons_python_dir)
+    pydir_w=$(cygpath -d "$pydir")
 
     # Instead of invoking cmd.exe /c, which would force us to
     # rely on its flaky semantics for double quotes,
     # we go through a batch file.
+
+    # The problem is that, if we run scons directly from within the
+    # .bat file (or, even worse, call scons.bat), then it will not
+    # capture UNIX signals (CTRL+C, etc.) So we need to go "back to
+    # Cygwin": create a .sh file, and have the .bat file call bash
+    # with the .sh file, and have the .sh file call python with scons.py
+    # instead of calling scons.bat.
+
+    # This detour through a .bat file is necessary because of
+    # vcvarsall.bat, which is called to change the caller's
+    # environment, which only works from a .bat file, and not from a
+    # bash script or python script.
+
     THIS_PID=$$
     # Find an unambiguous file name for our .bat file
     SCONS_EXECS=0
     while
-      SCONS_INVOKE_FILE="vale$THIS_PID""scons$SCONS_EXECS"".bat" &&
-      [[ -e "$SCONS_INVOKE_FILE" ]]
+      SCONS_INVOKE_FILE_BASENAME="vale$THIS_PID""scons$SCONS_EXECS" && {
+      [[ -e "$SCONS_INVOKE_FILE_BASENAME.bat" ]] ||
+      [[ -e "$SCONS_INVOKE_FILE_BASENAME.sh" ]]
+    }
     do
       SCONS_EXECS=$(($SCONS_EXECS + 1))
     done
     # Then create, run and remove the .bat file
-    cat > "$SCONS_INVOKE_FILE" <<EOF
+    cat > "$SCONS_INVOKE_FILE_BASENAME.bat" <<EOF
 call $VS_ENV_CMD
+C:\cygwin64\bin\bash.exe $SCONS_INVOKE_FILE_BASENAME.sh
 EOF
-    if command -v scons.bat > /dev/null 2>&1 ; then
-      echo "call scons.bat $cmd $parallel_opt" >> "$SCONS_INVOKE_FILE"
-    else
-      PYDIR=$(cygpath -d $(windows_scons_python_dir))
-      echo "$PYDIR/python.exe $PYDIR/Scripts/scons.py $*" >> "$SCONS_INVOKE_FILE"
-    fi
-    chmod +x "$SCONS_INVOKE_FILE"
-    "./$SCONS_INVOKE_FILE"
+    # TODO: convert arguments to scons to windows paths.
+    echo "$pydir/python.exe '$pydir_w\\Scripts\\scons.py' $*" > "$SCONS_INVOKE_FILE_BASENAME.sh"
+    chmod +x "$SCONS_INVOKE_FILE_BASENAME.bat"
+    "./$SCONS_INVOKE_FILE_BASENAME.bat"
     SCONS_RETCODE=$?
-    rm -f "$SCONS_INVOKE_FILE"
+    rm -f "$SCONS_INVOKE_FILE_BASENAME.bat" "$SCONS_INVOKE_FILE_BASENAME.sh"
     exit $SCONS_RETCODE
 else
     python$SCONS_PYTHON_MAJOR_MINOR $(which scons) "$@"
