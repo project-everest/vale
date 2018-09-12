@@ -488,8 +488,8 @@ let universe0_univ (u:univ):univ =
 let rec universe0_exp (e:f_exp):f_exp =
   let r = universe0_exp in
   match e with
-  | EId {name = Some "Prims.bool"} -> EBool
-  | EId {name = Some ("Prop_s.prop0" | "Prims.prop" | "Prims.logical")} -> EProp
+  | EId {name = Some "Prims._\"bool\""} -> EBool
+  | EId {name = Some ("Prop_s.prop0" | "Prims._\"prop\"" | "Prims.logical")} -> EProp
   | EId _ | EInt _ | EUnitValue | EBool | EProp | EUnsupported _ -> e
   | EType u -> EType (universe0_univ u)
   | EComp (e1, e2, es) -> EComp (r e1, r e2, List.map r es)
@@ -748,7 +748,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
         let int_refine:(range option * (Map<string, bigint> option * string * f_exp) option) option =
           // t           --> Some (Some range(t), None)
           // x:t{bounds} --> Some (Some range(t), Some (None, x, bounds))
-          if d.f_name = "Prims.int" then Some (Some (None, None), None) else
+          if d.f_name = "Prims._\"int\"" then Some (Some (None, None), None) else
           let int_type_to_range (e:f_exp):range option =
             match e with
             | EId {name = Some "int"} -> Some (None, None)
@@ -854,15 +854,8 @@ let rec trees_of_comma_list (es:string_tree list):string_tree list =
   | e::es -> (st_list [e; st_leaf ","])::(trees_of_comma_list es)
 
 let rec string_of_vale_name (x:string):string =
-  let r = string_of_vale_name in
-  match x with
-//  | ("Prop_s.prop0" | "Prims.prop" | "Prims.logical") -> st_leaf "prop"
-  | _ when x.EndsWith(".decreases") -> r (x.Replace(".decreases", "._decreases"))
-  | _ when x.EndsWith(".modifies") -> r (x.Replace(".modifies", "._modifies"))
-  | _ when x.EndsWith(".reveal") -> r (x.Replace(".reveal", "._reveal"))
-  | _ ->
-      let x = if x.StartsWith("'") then "_" + x else x in
-      x.Replace("#", "_")
+  x.Replace("#", "_") // REVIEW
+//  | ("Prop_s.prop0" | "Prims._\"prop\"" | "Prims.logical") -> st_leaf "prop"
 
 let vale_string_of_id (id:id):string =
   match id with
@@ -1208,7 +1201,7 @@ let main (argv:string array) =
             printfn ""
             in
           match (d.f_category, d.f_typ) with
-          | (_, EUnsupported s) -> unsupported (" \"" + s + "\"")
+          | (_, EUnsupported s) -> unsupported (" \"" + s.Replace("_\"", "'").Replace("\"", "'") + "\"")
           | ("unsupported", _) -> unsupported ""
           | ("int_type_generator", _) -> unsupported " \"int type generator\""
           | _ -> print_tree "" (tree_of_vale_decl env d); printfn ""

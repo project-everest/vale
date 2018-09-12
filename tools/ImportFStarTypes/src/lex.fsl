@@ -10,6 +10,20 @@ open System.Numerics
 let lexeme (lexbuf:LexBuffer<_>):(string) = System.Text.Encoding.ASCII.GetString lexbuf.Lexeme
 let next_line (lexbuf:LexBuffer<_>) = lexbuf.EndPos <- lexbuf.EndPos.NextLine
 
+let vale_keywords =
+  Set.ofList [
+    "Type"; "type"; "Dependent"; "dependent"; "const"; "readonly"; "function"; "returns"; "axiom";
+    "extern"; "procedure"; "lets"; "requires"; "ensures"; "reads"; "modifies"; "preserves";
+    "decreases"; "invariant"; "assert"; "by"; "assume"; "calc"; "havoc"; "goto"; "lemma"; "call";
+    "forall"; "exists"; "fun"; "lambda"; "old"; "this"; "true"; "false"; "is"; "let"; "in"; "out";
+    "inout"; "var"; "if"; "then"; "else"; "while"; "for"; "return"; "reveal"; "static"; "module";
+    "import"; "ghost"; "inline"; "operator"; "include"; "operand_type"; "tuple"; "bool"; "prop";
+    "int"; "int_range";
+  ]
+
+let rec string_of_vale_name_string (x:string):string =
+  if Set.contains x vale_keywords then "_\"" + x + "\"" else x
+
 }
 
 rule lextoken = parse
@@ -112,7 +126,14 @@ rule lextoken = parse
 | ['0'-'9']['0'-'9''_']* { LITINT ((curLoc lexbuf), bigint.Parse((lexeme lexbuf).Replace("_", ""))) }
 | ['0'-'9']+['.']['0'-'9']+ { LITREAL ((curLoc lexbuf), lexeme lexbuf) }
 | ['@']['0'-'9']+ { ID ((curLoc lexbuf), lexeme lexbuf) }
-| ['_''a'-'z''A'-'Z''\'']+['_''a'-'z''A'-'Z''0'-'9''\'''.''#''-''@']* { ID ((curLoc lexbuf), lexeme lexbuf) }
+| ['_''a'-'z''A'-'Z''\'']+['_''a'-'z''A'-'Z''0'-'9''\'''.''#''-''@']*
+  {
+    let x = lexeme lexbuf in
+    let xs = Array.toList (x.Split('.')) in
+    let xs = List.map string_of_vale_name_string xs in
+    let x = String.concat "." xs in
+    ID (curLoc lexbuf, x)
+  }
 | eof { EOF }
 | '\000' { EOF }
 | _ { parse_err ("cannot parse character: \"" ^ (lexeme lexbuf) ^ "\"" ^ "\n(ascii code " ^ (string (int ((lexeme lexbuf).Chars 0))) ^ ")") }

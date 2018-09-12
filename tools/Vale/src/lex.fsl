@@ -196,7 +196,7 @@ and lextoken = parse
 | "by" { BY (curLoc lexbuf) }
 | "assume" { ASSUME (curLoc lexbuf) }
 | "calc" { CALC (curLoc lexbuf) }
-| "havoc" { HAVOC (curLoc lexbuf)}
+| "havoc" { HAVOC (curLoc lexbuf) }
 | "goto" { GOTO (curLoc lexbuf) }
 | "lemma" { LEMMA (curLoc lexbuf) }
 | "call" { CALL (curLoc lexbuf) }
@@ -232,8 +232,9 @@ and lextoken = parse
 | "tuple" { TUPLE (curLoc lexbuf) }
 | "bool" { BOOL (curLoc lexbuf) }
 | "prop" { PROP (curLoc lexbuf) }
+| "int" { INT (curLoc lexbuf) }
 | "int_range" { INT_RANGE (curLoc lexbuf) }
-| "bv"['0'-'9']+ { BV ((curLoc lexbuf), System.Int32.Parse((lexeme lexbuf).Substring(2))) }
+(*| "bv"['0'-'9']+ { BV ((curLoc lexbuf), System.Int32.Parse((lexeme lexbuf).Substring(2))) }*)
 | ['"'][^'"''\n''\r''\t''\\']*['"'] { let s = lexeme lexbuf in STRING (curLoc lexbuf, s.Substring(1, s.Length - 2)) }
 | "0x"['0'-'9''a'-'f''A'-'F']['0'-'9''a'-'f''A'-'F''_']*
   {
@@ -250,18 +251,11 @@ and lextoken = parse
           hex t (bigint.Add (bigint d, bigint.Multiply (bigint 16, n))) in
     LITINT ((curLoc lexbuf), hex digits bigint.Zero)
   }
-| "int" { INT (curLoc lexbuf) }
 | ['0'-'9']['0'-'9''_']* { LITINT ((curLoc lexbuf), bigint.Parse((lexeme lexbuf).Replace("_", ""))) }
 | ['0'-'9']+['.']['0'-'9']+ { LITREAL ((curLoc lexbuf), lexeme lexbuf) }
-| "Prims."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
-| "FStar."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
-| "CanonCommMonoid."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
-| "CanonCommSemiring."['.''_''a'-'z''A'-'Z''0'-'9''\'']+
-| "X64.Bytes_Semantics_s.havoc"
-| "X64.Semantics_s.havoc"
-| "X64.Bytes_Semantics_s.return"
-| "X64.Semantics_s.return"
-| ['_''a'-'z''A'-'Z']+['_''a'-'z''A'-'Z''0'-'9''\'']* { ID ((curLoc lexbuf), lexeme lexbuf) }
+(* TODO: we parse _"..." into ..., which is correct, but the Vale printer (not the Dafny/F* printers) also needs to print ... as _"..." when ... is a Vale keyword *)
+| "_"['"'][^'"''\n''\r''\t''\\']*['"'] { let s = lexeme lexbuf in ID (curLoc lexbuf, s.Substring(2, s.Length - 3)) }
+| ['_''a'-'z''A'-'Z''\'']+['_''a'-'z''A'-'Z''0'-'9''\'']* { ID (curLoc lexbuf, lexeme lexbuf) }
 | eof { EOF }
 | '\000' { EOF }
 | _ { parse_err ("cannot parse character: \"" ^ (lexeme lexbuf) ^ "\"" ^ "\n(ascii code " ^ (string (int ((lexeme lexbuf).Chars 0))) ^ ")") }
