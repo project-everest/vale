@@ -57,6 +57,7 @@ rule lextoken = parse
 | "Meta_labeled" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_labeled(Patterns are incomplete, "[^'(']*'('[^')']*"))" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_labeled(could not prove post-condition, "[^'(']*'('[^')']*"))" { META (curLoc lexbuf, lexeme lexbuf) }
+| "Meta_labeled(Could not prove termination "[^'(']*'('[^')']*"))" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_desugared" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_monadic" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_monadic_lift" { META (curLoc lexbuf, lexeme lexbuf) }
