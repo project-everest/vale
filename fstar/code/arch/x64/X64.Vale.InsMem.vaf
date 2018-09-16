@@ -1,0 +1,58 @@
+include "X64.Vale.InsBasic.vaf"
+include{:fstar}{:open} "X64.Machine_s"
+include{:fstar}{:open} "X64.Vale.State"
+include{:fstar}{:open} "X64.Vale.Decls"
+include{:fstar}{:open} "X64.Vale.QuickCode"
+
+module X64.Vale.InsMem
+
+#verbatim{:interface}
+open X64.Machine_s
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.QuickCode
+#endverbatim
+
+#verbatim
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State
+open X64.Vale.StateLemmas
+open X64.Vale.Decls
+friend X64.Vale.Decls
+module S = X64.Semantics_s
+module P = X64.Print_s
+#endverbatim
+
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+
+procedure{:operand} Mem_in(base:opr, inline offset:int) returns(o:opr)
+    reads
+        mem;
+    extern;
+
+procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:quick exportOnly} Load64(
+    out dst:dst_opr64,
+        src:reg_opr64,
+        inline offset:int)
+    reads
+        mem;
+    requires
+        valid_mem64(src + offset, mem);
+    ensures
+        dst == load_mem64(old(src + offset), mem);
+{
+}
+
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:quick exportOnly} Store64(
+        dst:reg_opr64,
+        src:opr64,
+        inline offset:int)
+    modifies
+        mem;
+    requires
+        valid_mem64(dst + offset, mem);
+    ensures
+        mem == old(store_mem64(dst + offset, src, mem));
+{
+}

@@ -1,0 +1,34 @@
+include{:from BASE} "code/arch/x64/decls.vad"
+include{:from BASE} "code/arch/x64/decls64.vad"
+
+#verbatim
+import opened x64def_s_temp = x64_def
+import opened x64vale_temp = x64_vale
+import opened x64decls_temp = x64_decls
+import opened x64decls64_temp = x64_decls64
+#endverbatim
+
+procedure{:timeLimitMultiplier 2} Copy64()
+    requires/ensures
+        rsi % 8 == 0;
+        rdi % 8 == 0;
+        rsi + 32 <= rdi || rdi + 32 <= rsi;
+        forall i {mem?[i]}{ValidSrcAddr(mem, i, 64)} :: rsi <= i < rsi + 32 && i % 8 == 0 ==> ValidSrcAddr(mem, i, 64);
+        forall i {mem?[i]}{ValidDstAddr(mem, i, 64)} :: rdi <= i < rdi + 32 && i % 8 == 0 ==> ValidDstAddr(mem, i, 64);
+    ensures
+        forall i :: 0 <= i < 32 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
+    reads
+        rsi; rdi;
+    modifies
+        rax; rbx; rcx; rdx;
+        mem;
+{
+    Load64(rax, rsi, 0);
+    Load64(rbx, rsi, 8);
+    Load64(rcx, rsi, 16);
+    Load64(rdx, rsi, 24);
+    Store64(rdi, rax, 0);
+    Store64(rdi, rbx, 8);
+    Store64(rdi, rcx, 16);
+    Store64(rdi, rdx, 24);
+}

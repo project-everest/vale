@@ -1,0 +1,222 @@
+include{:fstar}{:open} "Types_s"
+include{:fstar}{:open} "Arch.Types"
+include{:fstar}{:open} "X64.Machine_s"
+include{:fstar}{:open} "X64.Vale.State"
+include{:fstar}{:open} "X64.Vale.Decls"
+include{:fstar}{:open} "X64.Vale.QuickCode"
+
+module X64.Vale.InsBasic
+
+#verbatim{:interface}
+open Types_s
+open Arch.Types
+open X64.Machine_s
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.QuickCode
+#endverbatim
+
+#verbatim
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State
+open X64.Vale.StateLemmas
+open X64.Vale.Decls
+friend X64.Vale.Decls
+module S = X64.Semantics_s
+module P = X64.Print_s
+#endverbatim
+
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+
+var{:state ok()} ok:bool;
+var{:state reg(Rax)} rax:nat64;
+var{:state reg(Rbx)} rbx:nat64;
+var{:state reg(Rcx)} rcx:nat64;
+var{:state reg(Rdx)} rdx:nat64;
+var{:state reg(Rsi)} rsi:nat64;
+var{:state reg(Rdi)} rdi:nat64;
+var{:state reg(Rbp)} rbp:nat64;
+var{:state reg(Rsp)} rsp:nat64;
+var{:state reg(R8)}  r8:nat64;
+var{:state reg(R9)}  r9:nat64;
+var{:state reg(R10)} r10:nat64;
+var{:state reg(R11)} r11:nat64;
+var{:state reg(R12)} r12:nat64;
+var{:state reg(R13)} r13:nat64;
+var{:state reg(R14)} r14:nat64;
+var{:state reg(R15)} r15:nat64;
+var{:state flags()} efl:nat64;
+var{:state mem()} mem:memory;
+
+operand_type reg64:nat64 :=
+| inout rax | inout rbx | inout rcx | inout rdx
+| inout rsi | inout rdi | inout rbp | inout r8
+| inout r9 | inout r10 | inout r11 | inout r12
+| inout r13 | inout r14 | inout r15
+;
+operand_type shift_amt64:nat64 := in rcx | const;
+operand_type reg_opr64:nat64 := reg64;
+operand_type dst_opr64:nat64 @ operand := reg_opr64;
+operand_type opr64:nat64 := dst_opr64 | const;
+
+// add {:typecheck false} attr because Type0 is not defined. (TODO: get rid of this)
+procedure{:quick exportOnly}{:typecheck false} AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
+    requires
+        p;
+{
+    u := tuple();
+}
+
+procedure{:instruction Ins(S.Mov64(dst,src))}{:quick exportOnly} Mov64(inout dst:dst_opr64, src:opr64)
+    ensures
+        dst == old(src);
+{
+}
+
+procedure{:instruction Ins(S.Add64(dst,src))}{:quick exportOnly} Add64(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    requires
+        src + dst < pow2_64;
+    ensures
+        dst == old(dst + src);
+{
+}
+
+procedure{:instruction Ins(S.Add64(dst,src))}{:quick exportOnly} Add64Wrap(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap64(dst, src));
+        cf(efl) == old(dst + src >= pow2_64);
+{
+}
+
+procedure{:instruction Ins(S.AddLea64(dst, src1, src2))}{:quick exportOnly} AddLea64(out dst:dst_opr64, src1:opr64, src2:opr64)
+    requires
+        src1 + src2 < pow2_64;
+    ensures
+        dst == old(src1) + old(src2);
+{
+}
+
+procedure{:instruction Ins(S.AddCarry64(dst, src))}{:quick exportOnly} Adc64Wrap(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap64(add_wrap64(dst, src), (if cf(efl) then 1 else 0)));
+        cf(efl) == old(dst + src + (if cf(efl) then 1 else 0)) >= pow2_64;
+{
+}
+
+procedure{:instruction Ins(S.Adcx64(dst, src))}{:quick exportOnly} Adcx64Wrap(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap64(add_wrap64(dst, src), (if cf(efl) then 1 else 0)));
+        efl == update_cf(old(efl), old(dst + src + (if cf(efl) then 1 else 0)) >= pow2_64);
+{
+}
+
+procedure{:instruction Ins(S.Adox64(dst, src))}{:quick exportOnly} Adox64Wrap(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(add_wrap64(add_wrap64(dst, src), (if overflow(efl) then 1 else 0)));
+        efl == update_of(old(efl), old(dst + src + (if overflow(efl) then 1 else 0)) >= pow2_64);
+{
+}
+
+procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64(inout dst:dst_opr64, src:opr64)
+    requires
+        0 <= dst - src;
+    modifies
+        efl;
+    ensures
+        dst == old(dst) - old(src);
+{
+}
+
+procedure{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64Wrap(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(dst - src) % pow2_64;
+{
+}
+
+#verbatim
+let lemma_fundamental_div_mod (a b:nat64) :
+  Lemma (pow2_64 `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
+  =
+  ()
+#endverbatim
+
+ghost procedure lemma_fundamental_div_mod(ghost a:nat64, ghost b:nat64) extern;
+
+procedure{:instruction Ins(S.Mul64(src))}{:quick exportOnly} Mul64Wrap(src:opr64)
+    modifies
+        efl;
+        rax;
+        rdx;
+    ensures
+        pow2_64 * rdx + rax == old(rax * src);
+{
+    lemma_fundamental_div_mod(old(rax), old(src));
+}
+
+procedure{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:quick exportOnly} Mulx64(out dst_hi:dst_opr64, out dst_lo:dst_opr64, src:opr64)
+    requires @dst_hi != @dst_lo;
+    reads
+        rdx;
+    ensures
+        pow2_64 * dst_hi + dst_lo == old(rdx * src);
+{
+    lemma_fundamental_div_mod(old(rdx), old(src));
+}
+
+procedure{:instruction Ins(S.IMul64(dst, src))}{:quick exportOnly} IMul64(inout dst:dst_opr64, src:opr64)
+    requires
+        0 <= dst * src < pow2_64;
+    modifies
+        efl;
+    ensures
+        dst == old(dst * src);
+{
+}
+
+procedure{:instruction Ins(S.Xor64(dst, src))}{:quick exportOnly} Xor64(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(ixor64(dst,src));
+        !overflow(efl);
+        !cf(efl);
+{
+}
+
+procedure{:instruction Ins(S.And64(dst, src))}{:quick exportOnly} And64(inout dst:dst_opr64, src:opr64)
+    modifies
+        efl;
+    ensures
+        dst == old(iand64(dst,src));
+{
+}
+
+procedure{:instruction Ins(S.Shl64(dst, amt))}{:quick exportOnly} Shl64(inout dst:dst_opr64, amt:shift_amt64)
+    modifies
+        efl;
+    ensures
+        dst == old(ishl64(dst, amt));
+{
+}
+
+procedure{:instruction Ins(S.Shr64(dst, amt))}{:quick exportOnly} Shr64(inout dst:dst_opr64, amt:shift_amt64)
+    modifies
+        efl;
+    ensures
+        dst == old(ishr64(dst, amt));
+{
+}
+

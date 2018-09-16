@@ -248,10 +248,11 @@ fstar_default_args = (fstar_default_args_nosmtencoding
   )
 
 vale_scons_args = '-disableVerify -omitUnverified' if is_single_vaf else ''
-vale_includes = f'-include {File("src/lib/util/operator.vaf")}'
+vale_includes = f'-include {File("fstar/code/lib/util/operator.vaf")}'
 
 verify_paths = [
-  'src',
+  'dafny',
+  'fstar',
   'tools/Vale/test',
 ]
 
@@ -262,12 +263,12 @@ manual_dependencies = {
 # Table of special-case sources which requires non-default arguments
 #
 verify_options = [
-  ('src/lib/util/operator.vaf', BuildOptions(fstar_default_args, vale_includes = '')),
+  ('fstar/code/lib/util/operator.vaf', BuildOptions(fstar_default_args, vale_includes = '')),
   ('tools/Vale/test/types.vaf', BuildOptions(None)), # type-check only, no verification
   ('tools/Vale/test/FTypeVale.vaf', BuildOptions(None)), # type-check only, no verification
 
-  ('src/*/*.fst', BuildOptions(fstar_default_args)),
-  ('src/*/*.fsti', BuildOptions(fstar_default_args)),
+  ('fstar/*/*.fst', BuildOptions(fstar_default_args)),
+  ('fstar/*/*.fsti', BuildOptions(fstar_default_args)),
   ('tools/Vale/test/*/*.fst', BuildOptions(fstar_default_args)),
   ('tools/Vale/test/*/*.fsti', BuildOptions(fstar_default_args)),
 
@@ -621,7 +622,7 @@ def dafny_dependency_scan(env, file):
   obj_tmp = [f'{to_obj_dir(file)}.verified.tmp']
   for i in includes:
     srcpath = File(os.path.join(dirname, i))
-    # TODO : this should convert the .dfy filename back to a src\...\.vad filename, and look up its options
+    # TODO : this should convert the .dfy filename back to a dafny\code\...\.vad filename, and look up its options
     options = get_build_options(srcpath)
     if options != None:
       f_base = to_obj_dir(File(os.path.join(dirname, i)))
@@ -651,7 +652,7 @@ def vad_dependency_scan(env, file):
   obj_file_base = file_drop_extension(to_obj_dir(file))
   obj_tmps = [f'{obj_file_base}.dfy.verified.tmp']
   for (attrs, inc) in includes:
-    f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+    f = os.path.join('dafny' if vale_from_base_re.search(attrs) else dirname, inc)
     if vale_verbatim_re.search(attrs):
       f_base = file_drop_extension(to_obj_dir(File(f)))
       f_dfy = File(f_base + '.dfy.verified')
@@ -685,7 +686,7 @@ def vaf_dependency_scan(env, file):
       else:
         print_error_exit(f'TODO: not implemented: .vaf includes extern F* file {inc}')
     else:
-      f = os.path.join('src' if vale_from_base_re.search(attrs) else dirname, inc)
+      f = os.path.join('fstar' if vale_from_base_re.search(attrs) else dirname, inc)
       # if A.vaf includes B.vaf, then manually establish these dependencies:
       #   A.fst.verified.tmp  depends on B.fsti.verified
       #   A.fsti.verified.tmp depends on B.fsti.verified
@@ -710,7 +711,7 @@ def translate_vad_file(options, source_vad):
   target_dfy = File(target + '.dfy')
   env.Command(target_dfy, [source_vad, vale_exe],
     f'{mono} {vale_exe} -typecheck -includeSuffix .vad .dfy -dafnyText' +
-    f' -sourceFrom BASE src -destFrom BASE obj/src'
+    f' -sourceFrom BASE dafny -destFrom BASE obj/dafny'
     f' -in {source_vad} -out {target_dfy}' +
     f' {" ".join(vale_user_args)}')
   return target_dfy
