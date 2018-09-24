@@ -980,7 +980,7 @@ if do_build:
 
   print('Processing source files')
   process_files_in(env, verify_paths)
-  if do_fstar:
+  if do_fstar and not is_single_vaf:
     compute_fstar_deps(env, verify_paths, compute_include_paths(src_include_paths, obj_include_paths, 'obj/dummies'))
     for x in vaf_dump_deps:
       compute_module_types(env, x)

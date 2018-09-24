@@ -7,6 +7,8 @@ module Test.Memcpy
 open X64.Machine_s
 open X64.Vale.State
 open X64.Vale.Decls
+open X64.Vale.QuickCode
+open X64.Vale.QuickCodes
 open X64.Vale.InsBasic
 open X64.Vale.InsMem
 #endverbatim
@@ -14,6 +16,27 @@ open X64.Vale.InsMem
 #reset-options "--z3rlimit 20"
 
 procedure Copy16()
+    requires/ensures
+        valid_mem64(rsi, mem);
+        valid_mem64(rsi + 8, mem);
+        valid_mem64(rdi, mem);
+        valid_mem64(rdi + 8, mem);
+        rsi + 16 <= rdi || rdi + 16 <= rsi;
+    ensures
+        forall i :: 0 <= i && i < 16 && i % 8 = 0 ==> load_mem64(rsi + i, mem) == load_mem64(rdi + i, mem);
+    reads
+        rsi; rdi;
+    modifies
+        rax; rbx;
+        mem;
+{
+    Load64(rax, rsi, 0);
+    Load64(rbx, rsi, 8);
+    Store64(rdi, rax, 0);
+    Store64(rdi, rbx, 8);
+}
+
+procedure{:quick} Copy16Q()
     requires/ensures
         valid_mem64(rsi, mem);
         valid_mem64(rsi + 8, mem);
