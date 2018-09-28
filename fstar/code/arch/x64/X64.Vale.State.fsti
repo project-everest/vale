@@ -34,11 +34,11 @@ let eval_operand (o:operand) (s:state) : nat64 =
 
 [@va_qattr]
 let update_reg (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = fun r' -> if r = r' then v else s.regs r' }
+  { s with regs = regs_make (fun (r':reg) -> if r = r' then v else s.regs r') }
 
 [@va_qattr]
 let update_xmm (x:xmm) (v:Types_s.quad32) (s:state) : state =
-  { s with xmms = fun x' -> if x = x' then v else s.xmms x' }
+  { s with xmms = xmms_make (fun (x':xmm) -> if x = x' then v else s.xmms x') }
 
 [@va_qattr]
 let update_mem (ptr:int) (v:nat64) (s:state) : state = { s with mem = store_mem64 ptr v s.mem }

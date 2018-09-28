@@ -42,10 +42,15 @@ type mem_entry =
 
 type memory = Map.t int mem_entry
 
+let regs_t = FStar.FunctionalExtensionality.restricted_t reg (fun _ -> nat64)
+let xmms_t = FStar.FunctionalExtensionality.restricted_t xmm (fun _ -> quad32)
+unfold let regs_make (f:reg -> nat64) : regs_t = FStar.FunctionalExtensionality.on_dom reg f
+unfold let xmms_make (f:xmm -> quad32) : xmms_t = FStar.FunctionalExtensionality.on_dom xmm f
+
 noeq type state = {
   ok: bool;
-  regs: reg -> nat64;
-  xmms: xmm -> quad32;
+  regs: regs_t;
+  xmms: xmms_t;
   flags: nat64;
   mem: memory;
 }

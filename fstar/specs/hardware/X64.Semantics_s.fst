@@ -78,10 +78,10 @@ let eval_ocmp (s:state) (c:ocmp) :bool =
   | OGt o1 o2 -> eval_operand o1 s > eval_operand o2 s
 
 let update_reg' (r:reg) (v:nat64) (s:state) : state =
-  { s with regs = fun r' -> if r' = r then v else s.regs r' }
+  { s with regs = regs_make (fun (r':reg) -> if r' = r then v else s.regs r') }
 
 let update_xmm' (x:xmm) (v:quad32) (s:state) : state =
-  { s with xmms = fun x' -> if x' = x then v else s.xmms x' }
+  { s with xmms = xmms_make (fun (x':xmm) -> if x' = x then v else s.xmms x') }
 
 val mod_8: (n:nat{n < pow2_64}) -> nat8
 let mod_8 n = n % 0x100
