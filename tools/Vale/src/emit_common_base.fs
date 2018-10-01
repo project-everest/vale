@@ -10,6 +10,7 @@ open Microsoft.FSharp.Math
 open System.Numerics
 
 let concise_lemmas = ref true;
+let quick_mods = ref false;
 let precise_opaque = ref false;
 let reprint_decls_rev = ref ([]:decls)
 let disable_verify = ref false
@@ -186,4 +187,26 @@ let rec hide_ifs (e:exp):exp =
 
 let is_proc (env:env) (x:id) (g:ghost):bool =
   match Map.tryFind x env.procs with Some {pghost = pg} -> pg = g | _ -> false
+
+let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id * typ)) list =
+  match s with
+  | Requires _ | Ensures _ -> []
+  | Modifies (m, e) ->
+    (
+      let io =
+        match m with
+        | Modify -> InOut
+        | Preserve -> if preserveModifies then InOut else In
+        | Read -> In
+        in
+      match skip_loc (exp_abstract false e) with
+      | EVar x ->
+        (
+          match Map.tryFind x env.ids with
+          | Some (StateInfo (_, _, t)) -> [(io, (x, t))]
+          | _ -> internalErr ("specMod: could not find variable " + (err_id x))
+        )
+      | _ -> []
+    )
+  | SpecRaw _ -> internalErr "SpecRaw"
 

@@ -11,6 +11,8 @@ open Emit_common_base
 open Microsoft.FSharp.Math
 open System.Numerics
 
+let qmods_opt = Emit_common_quick_code.qmods_opt
+
 (*
 Example: Add64
   X = Add64
@@ -23,6 +25,7 @@ Example: Add64
   ENS = x == (va_eval_dst_opr64 s0 dst) + (va_eval_opr64 s0 src)
   UPDATES = (update_operand dst x ({s0 with flags = flags}))
   UPDATES_SM = (update_operand dst (eval_operand dst sM) ({s0 with flags = sM.flags}))
+  PMODS = [va_mod_dst_opr64 dst; Mod_flags]
 
 // Function
 let wp_X PARAMS (s0:state) (k:state -> A -> Type0) : Type0 =
@@ -37,60 +40,31 @@ let wp_X PARAMS (s0:state) (k:state -> A -> Type0) : Type0 =
 val wpMonotone_X PARAMS (s0:state) (k1:state -> A -> Type0) (k2:state -> A -> Type0) : Lemma
   (requires (forall (s:state) (g:A). k1 s g ==> k2 s g))
   (ensures wp_X ARGS s0 k1 ==> wp_X ARGS s0 k2) =
-let wpMonotone_X s0 k1 k2 = ()
+let wpMonotone_X PARAMS s0 k1 k2 = ()
 
 val wpCompute_X PARAMS (s0:state) : Ghost (state * fuel * A)
   (requires wp_X ARGS s0 k_true)
   (ensures fun _ -> True)
-let wpCompute_X s0 =
+let wpCompute_X PARAMS s0 =
   let (sM, f0, g1, ..., gn) = va_lemma_X (va_code_X ARGS) s0 ARGS in
   let g = (g1, ..., gn) in
   (sM, f0, g)
 
 val wpProof_X PARAMS (s0:state) (k:state -> A -> Type0) : Lemma
   (requires wp_X ARGS s0 k)
-  (ensures t_ensure (va_code_X ARGS) (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
-let wpProof_X s0 k =
+  (ensures t_ensure (va_code_X ARGS) PMODS (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
+let wpProof_X PARAMS s0 k =
   let (sM, f0, g1, ..., gn) = va_lemma_X (va_code_X ARGS) s0 ARGS in
   va_lemma_upd_update sM;
   assert (state_eq sM UPDATES_SM);
+  lemma_norm_mods PMODS sM s0;
   ()
 
 // Function
 [@"opaque_to_smt"]
 let quick_X PARAMS : quickCode A (va_code_X ARGS) =
-  va_QProc (va_code_X ARGS) (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
+  va_QProc (va_code_X ARGS) PMODS (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
 *)
-
-let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):exp * formal list =
-  let id_x (x:id) = Reserved ("x_" + string_of_id x) in
-  let specModsIo = List.collect (Emit_common_lemmas.specModIo env false) p.pspecs in
-  let collectArg (isRet:bool) (x, t, storage, io, _) =
-    match (isRet, storage, io) with
-    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> [(x, id_x x, t)]
-    | _ -> []
-    in
-  let collectMod (io, (x, _)) =
-    match io with
-    | (InOut | Out) ->
-      (
-        match Map.tryFind x env.ids with
-        | Some (StateInfo (prefix, es, t)) -> [(id_x x, t, prefix, es)]
-        | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
-      )
-    | _ -> []
-    in
-  let mods = List.collect collectMod specModsIo in
-  let args = (List.collect (collectArg true) p.prets) @ (List.collect (collectArg false) p.pargs) in
-  let frameArg e (x, xx, t) = vaApp ("upd_" + (vaOperandTyp t)) [EVar x; EVar xx; e] in
-  let frameMod e (x, _, prefix, es) = vaApp ("upd_" + prefix) (es @ [EVar x; e]) in
-  let e = EVar s0 in
-  let e = List.fold frameArg e args in
-  let e = List.fold frameMod e mods in
-  let fs = [] in
-  let fs = List.fold (fun fs (_, xx, t) -> (xx, Some (tOperand (vaValueTyp t)))::fs) fs args in
-  let fs = List.fold (fun fs (x, t, _, _) -> (x, Some t)::fs) fs mods in
-  (e, List.rev fs)
 
 let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let makeParam (x, t, storage, io, attrs) =
@@ -138,6 +112,8 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let argContinue = (k, Some tContinue) in
   let tCode = tapply (Reserved ("code_" + (string_of_id p.pname))) tArgsCode in
   let eCode = eapply (Reserved ("code_" + (string_of_id p.pname))) eArgsCode in
+  let (updatesX, pmods, wpFormals) = Emit_common_quick_code.makeFrame env false p s0 sM in
+  let ePMods = eapply (Id "list") pmods in
 
   let reqIsExps =
     (List.collect (Emit_common_lemmas.reqIsArg s0 true) p.prets) @
@@ -148,7 +124,6 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let ghostRetTuple = EOp (TupleOp None, List.map (fun (x, _) -> EVar x) ghostRets) in
   let ghostRetFormals = List.map (fun (x, t) -> (x, Some t)) ghostRets in
   let (pspecs, pmods) = List.unzip (List.map (Emit_common_lemmas.build_lemma_spec env s0 (EVar sM)) p.pspecs) in
-  let (updatesX, wpFormals) = makeFrame env p s0 sM in
   let (wpReqs, wpEnss) = collect_specs false (List.concat pspecs) in
   let (wpReq, wpEns) = (and_of_list (reqIsExps @ wpReqs), and_of_list wpEnss) in
   let continueM = eapply k [EVar sM; ghostRetTuple] in
@@ -225,13 +200,14 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
 
   // wpProof_X declaration
   let pK = arg k tContinue in
-  let specEnsArgs = [eCode; appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; EVar s0; EVar k] in
+  let specEnsArgs = [eCode] @ qmods_opt ePMods @ [appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; EVar s0; EVar k] in
   let specReq = Requires (Unrefined, eapply wp_X (eArgs @ [EVar s0; EVar k])) in
   let specEns = Ensures (Unrefined, eapply (Id "t_ensure") specEnsArgs) in
   // wpProof_X body
   let sLemmaUpd = SAssign ([], eapply (Reserved "lemma_upd_update") [EVar sM]) in
   let (_, eqUpdates) = Emit_common_lemmas.makeFrame env p s0 sM in
   let sAssertEq = SAssert (assert_attrs_default, eqUpdates) in
+  let sLemmaNormMods = SAssign ([], eapply (Id "lemma_norm_mods") [ePMods; EVar sM; EVar s0]) in
   let pProof =
     {
       pname = wpProof_X;
@@ -241,7 +217,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       pargs = pargs @ [pS0; pK];
       prets = [];
       pspecs = [(loc, specReq); (loc, specEns)];
-      pbody = Some [sCallLemma; sLemmaUpd; sAssertEq];
+      pbody = Some ([sCallLemma; sLemmaUpd; sAssertEq] @ qmods_opt sLemmaNormMods);
       pattrs = attr_no_verify "admit" p.pattrs;
     }
     in
@@ -250,7 +226,7 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpProof_X ARGS)
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
   let tRetQuick = tapply (Reserved "quickCode") [tA; tCode] in
-  let eQuick = eapply (Reserved "QProc") [eCode; appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; appArgs wpProof_X] in
+  let eQuick = eapply (Reserved "QProc") ([eCode] @ qmods_opt ePMods @ [appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; appArgs wpProof_X]) in
   let fQuick =
     {
       fname = Reserved ("quick_" + (string_of_id p.pname));

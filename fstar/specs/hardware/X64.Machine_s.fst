@@ -31,8 +31,8 @@ type reg =
   | R14
   | R15
 
-type imm8 = i:int { 0 <= i && i < 256}
-type xmm = i:int{ 0 <= i /\ i < 16 }
+type imm8 = i:int{0 <= i && i < 256}
+type xmm = i:int{0 <= i /\ i < 16}
 
 type mem_entry =
 | Mem8: v:nat8 -> mem_entry
@@ -83,4 +83,4 @@ type precode (t_ins:Type0) (t_ocmp:Type0) =
   | While: whileCond:t_ocmp -> whileBody:precode t_ins t_ocmp -> precode t_ins t_ocmp
 
 let valid_dst (o:operand) : bool =
-  not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
+  not (OConst? o || (OReg? o && Rsp? (OReg?.r o)))
