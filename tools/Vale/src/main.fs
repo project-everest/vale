@@ -164,7 +164,7 @@ let main (argv) =
     let flagsSuffixMap = List.rev !suffixMap_rev in
     let debugIncludes = Set.contains "includes" !debug_flags in
     let parse_file comment name =
-      printfn "%sparsing %s" comment name
+      //printfn "%sparsing %s" comment name
       cur_file := name
       let stream_in = System.IO.File.OpenRead(name) in
       let parse_in = new System.IO.BinaryReader(stream_in) in

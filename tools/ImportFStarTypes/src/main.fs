@@ -39,24 +39,24 @@ let rec string_of_tree (t:string_tree):string =
   | StLeaf s -> s
   | StList (l, r, ts) -> l + String.concat " " (List.map string_of_tree ts) + r
 
-let rec print_tree (indent:string) (t:string_tree):unit =
+let rec print_tree (printline:string -> unit) (indent:string) (t:string_tree):unit =
   let (len, r) = t in
   match r with
   | StLeaf s ->
-      printfn "%s%s" indent s
+      printline (sprintf "%s%s" indent s)
   | StList _ when len < 100 ->
-      printfn "%s%s" indent (string_of_tree t)
+      printline (sprintf "%s%s" indent (string_of_tree t))
   | StList (l, r, (t1::ts)) when fst t1 < 100 ->
-      printfn "%s%s%s%s" indent l (if l.Length = 1 then " " else "") (string_of_tree t1);
-      List.iter (print_tree (indent + "  ")) ts;
-      (if r.Length > 0 then printfn "%s%s" indent r)
+      printline (sprintf "%s%s%s%s" indent l (if l.Length = 1 then " " else "") (string_of_tree t1));
+      List.iter (print_tree printline (indent + "  ")) ts;
+      (if r.Length > 0 then printline (sprintf "%s%s" indent r))
   | StList (l, r, (t1::ts)) when l.Length = 0 && r.Length = 0 ->
-      print_tree indent t1;
-      List.iter (print_tree (indent + "  ")) ts
+      print_tree printline indent t1;
+      List.iter (print_tree printline (indent + "  ")) ts
   | StList (l, r, ts) ->
-      (if l.Length > 0 then printfn "%s%s" indent l);
-      List.iter (print_tree (indent + "  ")) ts;
-      (if r.Length > 0 then printfn "%s%s" indent r)
+      (if l.Length > 0 then printline (sprintf "%s%s" indent l));
+      List.iter (print_tree printline (indent + "  ")) ts;
+      (if r.Length > 0 then printline (sprintf "%s%s" indent r))
 
 let rec tree_of_raw_exp (e:raw_exp):string_tree =
   match e with
@@ -1091,14 +1091,17 @@ let main (argv:string array) =
   let outfile = ref (None:string option) in
   let lexbufOpt = ref (None:LexBuffer<byte> option)
   let arg_list = argv |> Array.toList in
+  let close_streams = ref (fun () -> ()) in
   let print_err (err:string):unit =
     printfn "Error:";
-    match !lexbufOpt with
-    | None -> printfn "%s" err;
-    | Some lexbuf ->
-        printfn "%s" err;
-        printfn "\nerror at line %i column %i of string\n%s" (line lexbuf) (col lexbuf) (file lexbuf);
-        exit 1
+    let _ =
+      match !lexbufOpt with
+      | None -> printfn "%s" err
+      | Some lexbuf ->
+          printfn "%s" err;
+          printfn "\nerror at line %i column %i of string\n%s" (line lexbuf) (col lexbuf) (file lexbuf)
+      in
+    !close_streams ()
     in
   try
   (
@@ -1120,6 +1123,19 @@ let main (argv:string array) =
         match_args args
       in
     parse_argv (List.tail arg_list);
+    let stream =
+      match !outfile with
+      | None -> System.Console.Out
+      | Some s ->
+          let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
+          let stream =
+            (new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter
+            in
+          let f = !close_streams in
+          close_streams := (fun () -> f (); stream.Close ());
+          stream
+      in
+    let printline (s:string) = stream.WriteLine(s) in
     let in_files = List.rev (!in_files_rev) in
     let read_file (name:string):string list =
       let rec splitWhereRec (f:'a -> bool) (in1:'a list) (out1:'a list) (outn:'a list list):'a list list =
@@ -1197,17 +1213,18 @@ let main (argv:string array) =
           // REVIEW: why are there duplicates?
           duplicates := Set.add d.f_name (!duplicates);
           let unsupported msg =
-            printfn "const{:unsupported%s} %s:_ extern;" msg (string_of_vale_name d.f_name);
-            printfn ""
+            printline (sprintf "const{:unsupported%s} %s:_ extern;" msg (string_of_vale_name d.f_name));
+            printline ""
             in
           match (d.f_category, d.f_typ) with
           | (_, EUnsupported s) -> unsupported (" \"" + s.Replace("_\"", "'").Replace("\"", "'") + "\"")
           | ("unsupported", _) -> unsupported ""
           | ("int_type_generator", _) -> unsupported " \"int type generator\""
-          | _ -> print_tree "" (tree_of_vale_decl env d); printfn ""
+          | _ -> print_tree printline "" (tree_of_vale_decl env d); printline ""
          )
       )
       envs_ds;
+    !close_streams ();
     ()
   )
   with
