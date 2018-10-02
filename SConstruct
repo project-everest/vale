@@ -121,19 +121,17 @@ if 'FSTAR_HOME' in os.environ:
 else:
   fstar_default_path = 'tools/FStar'
 
+def AddOptYesNo(name, dest, default, help):
+  AddOption('--' + name, dest = dest, default = default, action = 'store_true', help = f'{help} (default {default})')
+  AddOption('--NO-' + name, dest = dest, default = default, action = 'store_false')
+
 # Retrieve tool-specific command overrides passed in by the user
-AddOption('--DAFNY', dest = 'do_dafny', default = False, action = 'store_true',
+AddOptYesNo('DAFNY', dest = 'do_dafny', default = False,
   help='Verify Dafny files')
-AddOption('--NO-DAFNY', dest = 'do_dafny', default = False, action = 'store_false',
-  help='Do not verify Dafny files')
-AddOption('--FSTAR', dest = 'do_fstar', default = False, action = 'store_true',
+AddOptYesNo('FSTAR', dest = 'do_fstar', default = False,
   help='Verify F* files')
-AddOption('--NO-FSTAR', dest = 'do_fstar', default = False, action = 'store_false',
-  help='Do not verify F* files')
-AddOption('--DAFNY-USE-MY-Z3', dest = 'dafny_use_my_z3', default = False, action = 'store_true',
+AddOptYesNo('DAFNY-USE-MY-Z3', dest = 'dafny_use_my_z3', default = False,
   help='With Dafny on Windows, use the Z3 in the PATH or specified by --Z3-PATH, not the one provided in tools/Dafny')
-AddOption('--DAFNY-USE-DAFNY-Z3', dest = 'dafny_use_my_z3', default = False, action = 'store_false',
-  help='With Dafny on Windows, use the Z3 provided in tools/Dafny')
 AddOption('--DAFNY-PATH', dest = 'dafny_path', type = 'string', default = 'tools/Dafny', action = 'store',
   help='Specify the path to Dafny tool binaries')
 AddOption('--Z3-PATH', dest = 'z3_path', type = 'string', default = z3_default_path, action = 'store',
@@ -142,12 +140,10 @@ AddOption('--KREMLIN-PATH', dest = 'kremlin_path', type = 'string', default = kr
   help = 'Specify the path to kreMLin')
 AddOption('--FSTAR-PATH', dest = 'fstar_path', type = 'string', default = fstar_default_path, action = 'store',
   help = 'Specify the path to F* tool')
-AddOption('--FSTAR-MY-VERSION', dest = 'fstar_my_version', default = False, action = 'store_true',
+AddOptYesNo('FSTAR-MY-VERSION', dest = 'fstar_my_version', default = False,
   help = 'Use version of F* that does not necessarily match .fstar_version')
-AddOption('--Z3-MY-VERSION', dest = 'z3_my_version', default = False, action = 'store_true',
+AddOptYesNo('Z3-MY-VERSION', dest = 'z3_my_version', default = False,
   help = 'Use version of Z3 that does not necessarily match .z3_version')
-AddOption('--USE-HINTS', dest = 'use_hints', default = False, action = 'store_true',
-  help = 'Use F* .hints files from the hints directory')
 AddOption('--DARGS', dest = 'dafny_user_args', type = 'string', default=[], action = 'append',
   help='Supply temporary additional arguments to the Dafny compiler')
 AddOption('--FARGS', dest = 'fstar_user_args', type = 'string', default = [], action = 'append',
@@ -160,10 +156,12 @@ AddOption('--CACHE-DIR', dest = 'cache_dir', type = 'string', default = None, ac
   help = 'Specify the SCons Shared Cache Directory')
 AddOption('--ONE', dest = 'single_vaf', type = 'string', default = None, action = 'store',
   help = 'Only verify one specified .vaf file, and in that file, only verify procedures or verbatim blocks marked as {:verify}.')
-AddOption('--NO-COLOR', dest = 'no_color', default=False, action = 'store_true',
-  help="Don't add color to build output")
-AddOption('--DUMP-ARGS', dest = 'dump_args', default = False, action = 'store_true',
+AddOptYesNo('COLOR', dest = 'do_color', default = True,
+  help="Add color to build output")
+AddOptYesNo('DUMP-ARGS', dest = 'dump_args', default = False,
   help = "Print arguments that will be passed to the verification tools")
+AddOptYesNo('PROFILE', dest = 'profile', default = False,
+  help = "Turn on profile options to measure verification performance (note: --NO-USE-HINTS is recommended when profiling)")
 
 do_help = GetOption('help')
 do_clean = GetOption('clean')
@@ -181,12 +179,12 @@ vale_user_args = GetOption('vale_user_args')
 kremlin_user_args = GetOption('kremlin_user_args')
 fstar_my_version = GetOption('fstar_my_version')
 z3_my_version = GetOption('z3_my_version')
-use_hints = GetOption('use_hints')
-no_color = GetOption('no_color')
+do_color = GetOption('do_color')
 dump_args = GetOption('dump_args')
 single_vaf = GetOption('single_vaf')
-is_single_vaf = not (single_vaf is None)
+profile = GetOption('profile')
 
+is_single_vaf = not (single_vaf is None)
 verify = do_dafny or do_fstar
 
 ##################################################################################################
@@ -345,7 +343,7 @@ vale_open_re = re.compile(r'open\s+([a-zA-Z0-9_.]+)')
 vale_friend_re = re.compile(r'friend\s+([a-zA-Z0-9_.]+)')
 vale_import_re = re.compile(r'module\s+[a-zA-Z0-9_]+\s*[=]\s*([a-zA-Z0-9_.]+)')
 
-if (not sys.stdout.isatty()) or no_color:
+if (not sys.stdout.isatty()) or not do_color:
   # No color if the output is not a terminal or user opts out
   yellow = ''
   red = ''
@@ -608,6 +606,7 @@ def verify_fstar_file(options, targetfile, sourcefile, fstar_includes):
   env.Command(temptargetfile, sourcefile,
     f'{fstar_exe} {sourcefile} {options.verifier_flags} {fstar_z3_path}' +
     f' {fstar_includes} {" ".join(fstar_user_args)}' +
+    (f' --debug {file_module_name(File(sourcefile))} --debug_level print_normalized_terms' if profile else '') +
     f' 1> {temptargetfile} 2> {stderrfile}')
   CopyFile(targetfile, temptargetfile)
   dump_module_flag = '--dump_module ' + file_module_name(sourcefile)
