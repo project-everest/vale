@@ -404,7 +404,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
-    psi.PrintLine (sVal (sid f.fname) decreases1);
+    if isPublic then
+      psi.PrintLine (sVal (sid f.fname) decreases1);
+    else
+      ps.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid (transparent_id f.fname)) e
@@ -414,7 +417,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     let header = if isRecursive then "and " else "let " in
     printBody header true (sid f.fname) eOpaque
   else if isPublicDecl then
-    psi.PrintLine (sVal (sid f.fname) decreases1);
+    if isPublic then 
+      psi.PrintLine (sVal (sid f.fname) decreases1);
+    else
+      ps.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid f.fname) e
