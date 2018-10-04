@@ -57,7 +57,7 @@ let filter_fun_attr (x, es) =
 
 let filter_proc_attr (x, es) =
   match x with
-  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick" | "recursive" | "decrease") -> true
+  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick" | "recursive" | "decrease" | "public") -> true
   | _ -> false
   in
 
@@ -65,6 +65,10 @@ let attr_no_verify (s:string) (a:attrs):attrs =
   let verify = attrs_get_bool (Id "verify") false a in
   if !disable_verify && not verify then [(Id s, [])]
   else []
+
+let attr_public (a:attrs) : attrs =
+  let isPublic = attrs_get_bool (Id "public") false a in
+  if isPublic then [(Id "public", [])] else []
 
 // convert imperative updates to functional let assignments
 let rec let_updates_stmts (scope:Map<id, typ option>) (ss:stmt list):(Set<id> * stmt list)=

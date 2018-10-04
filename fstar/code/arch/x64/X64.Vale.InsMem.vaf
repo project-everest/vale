@@ -31,7 +31,7 @@ procedure{:operand} Mem_in(base:opr, inline offset:int) returns(o:opr)
         mem;
     extern;
 
-procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:quick exportOnly} Load64(
+procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:quick exportOnly}{:public} Load64(
     out dst:dst_opr64,
         src:reg_opr64,
         inline offset:int)
@@ -44,7 +44,7 @@ procedure{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:qui
 {
 }
 
-procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:quick exportOnly} Store64(
+procedure{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:quick exportOnly}{:public} Store64(
         dst:reg_opr64,
         src:opr64,
         inline offset:int)

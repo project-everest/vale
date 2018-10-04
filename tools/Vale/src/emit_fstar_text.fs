@@ -434,6 +434,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
+  let isPublic = attrs_get_bool (Id "public") false p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let decreaseExps = attrs_get_exps_opt (Id "decrease") p.pattrs in
   let isAdmit = attrs_get_bool (Id "admit") false p.pattrs in
@@ -459,6 +460,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
     | (_, _) ->
+        let psi = if isPublic then psi else ps
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
         printPType psi "-> " decreases0
   );

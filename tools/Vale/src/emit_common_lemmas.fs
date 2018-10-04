@@ -593,7 +593,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
         fret = tProp;
         fspecs = [];
         fbody = Some eReq;
-        fattrs = [(Id "public", [])];
+        fattrs = attr_public p.pattrs;
       }
       in
     let fEns =
@@ -606,7 +606,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
         fret_name = None;
         fspecs = [];
         fbody = Some eEns;
-        fattrs = [(Id "public", [])];
+        fattrs = attr_public p.pattrs;
       }
       in
     [(loc, DFun fReq); (loc, DFun fEns)]
