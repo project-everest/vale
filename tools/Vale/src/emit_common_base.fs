@@ -51,7 +51,7 @@ let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 let filter_fun_attr (x, es) =
   match x with
   | Id "recursive" -> !fstar
-  | Id ("tactic" | "quick" | "decrease") -> true
+  | Id ("tactic" | "quick" | "decrease" | "public") -> true
   | _ -> false
   in
 

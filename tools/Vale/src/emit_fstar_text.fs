@@ -384,7 +384,11 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isOpaque = isOpaque && not isAdmit in
   let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
-  let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
+  // write everything to *.fsti if it is public and not opaque or publicDecl. 
+  // For opaque and publicDecl, only "val" is written into *.fsti if it is public, 
+  // everything else goes into *.fst regardless if it is public or not.
+  let writeToPsi = isPublic && not (isOpaque || isPublicDecl) 
+  let ps = match (writeToPsi, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   emit_laxness ps f.fattrs;
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
