@@ -733,7 +733,7 @@ def translate_vaf_file(options, source_vaf):
   types_include = ''
   types_include = f'-include {target}.types.vaf'
   env.Command(targets, [source_vaf, vale_exe],
-    f'{mono} {vale_exe} -fstarText -quickMods -typecheck {types_include} {opt_vale_includes}' +
+    f'{mono} {vale_exe} -fstarText -typecheck {types_include} {opt_vale_includes}' +
     f' -in {source_vaf} -out {target_fst} -outi {target_fsti}' +
     f' {vale_scons_args} {" ".join(vale_user_args)}')
   return targets
