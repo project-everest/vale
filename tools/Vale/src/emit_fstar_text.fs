@@ -384,7 +384,11 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isOpaque = isOpaque && not isAdmit in
   let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
-  let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
+  // write everything to *.fsti if it is public and not opaque or publicDecl. 
+  // For opaque and publicDecl, only "val" is written into *.fsti if it is public, 
+  // everything else goes into *.fst regardless if it is public or not.
+  let writeToPsi = isPublic && not (isOpaque || isPublicDecl) 
+  let ps = match (writeToPsi, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   emit_laxness ps f.fattrs;
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
@@ -404,7 +408,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
-    psi.PrintLine (sVal (sid f.fname) decreases1);
+    if isPublic then
+      psi.PrintLine (sVal (sid f.fname) decreases1);
+    else
+      ps.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid (transparent_id f.fname)) e
@@ -414,7 +421,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     let header = if isRecursive then "and " else "let " in
     printBody header true (sid f.fname) eOpaque
   else if isPublicDecl then
-    psi.PrintLine (sVal (sid f.fname) decreases1);
+    if isPublic then 
+      psi.PrintLine (sVal (sid f.fname) decreases1);
+    else
+      ps.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid f.fname) e

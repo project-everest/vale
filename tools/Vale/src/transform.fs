@@ -1138,7 +1138,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             pspecs = specs @ [spec_enter_body; spec_precedes];
             pbody = Some (sInits @ b);
             // always non-public, even if they are generated from the body of a public procedure
-            pattrs = [(Id "pubic", [EBool false]); (Id "already_has_mod_ok", [])] @ p.pattrs;
+            pattrs = [(Id "public", [EBool false]); (Id "already_has_mod_ok", [])] @ p.pattrs;
           }
           in
         let p_while =
