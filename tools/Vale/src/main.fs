@@ -142,6 +142,8 @@ let main (argv) =
         | "-reprintLoopInvs=false" :: l -> reprint_loop_invs := false; match_args l
         | "-reprintBlankLines=false" :: l -> reprint_blank_lines := false; match_args l
         | "-conciseLemmas=false" :: l -> concise_lemmas := false; match_args l
+        | "-quickMods" :: l -> quick_mods := true; match_args l
+        | "-quickMods=false" :: l -> quick_mods := false; match_args l
         | "-disableVerify" :: l -> disable_verify := true; match_args l
         | "-omitUnverified" :: l -> omit_unverified := true; match_args l
         | "-noLemmas" :: l -> no_lemmas := true ; match_args l
@@ -163,7 +165,7 @@ let main (argv) =
     let flagsSuffixMap = List.rev !suffixMap_rev in
     let debugIncludes = Set.contains "includes" !debug_flags in
     let parse_file comment name =
-      printfn "%sparsing %s" comment name
+      //printfn "%sparsing %s" comment name
       cur_file := name
       let stream_in = System.IO.File.OpenRead(name) in
       let parse_in = new System.IO.BinaryReader(stream_in) in

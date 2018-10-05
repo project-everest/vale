@@ -119,28 +119,6 @@ let make_proc_params (ret:bool) (prets:pformal list) (pargs:pformal list):pforma
   (List.collect (make_proc_param false false ret) pargs) @
   (List.collect (make_proc_param true false ret) pargs)
 
-let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id * typ)) list =
-  match s with
-  | Requires _ | Ensures _ -> []
-  | Modifies (m, e) ->
-    (
-      let io =
-        match m with
-        | Modify -> InOut
-        | Preserve -> if preserveModifies then InOut else In
-        | Read -> In
-        in
-      match skip_loc (exp_abstract false e) with
-      | EVar x ->
-        (
-          match Map.tryFind x env.ids with
-          | Some (StateInfo (_, _, t)) -> [(io, (x, t))]
-          | _ -> internalErr ("specMod: could not find variable " + (err_id x))
-        )
-      | _ -> []
-    )
-  | SpecRaw _ -> internalErr "SpecRaw"
-
 type stmt_env =
   {
     env:env;
@@ -550,7 +528,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let eFrameX = vaApp "state_match" [EVar sM; eFrameExp] in
       let eFrameL = eapply (Id "label") [range; msg; eFrameX] in
       let (_, enssL) = collect_specs true (List.concat pspecs) in
-      let enssL = enssL @ [eFrameL] in
+      let enssL = enssL @ (if !quick_mods then [] else [eFrameL]) in
       Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
     else if benv.is_operand then
       err "operand procedures must be declared extern"

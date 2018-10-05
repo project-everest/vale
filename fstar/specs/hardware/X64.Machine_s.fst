@@ -31,8 +31,8 @@ type reg =
   | R14
   | R15
 
-type imm8 = i:int { 0 <= i && i < 256}
-type xmm = i:int{ 0 <= i /\ i < 16 }
+type imm8 = i:int{0 <= i && i < 256}
+type xmm = i:int{0 <= i /\ i < 16}
 
 type mem_entry =
 | Mem8: v:nat8 -> mem_entry
@@ -44,8 +44,8 @@ type memory = Map.t int mem_entry
 
 let regs_t = FStar.FunctionalExtensionality.restricted_t reg (fun _ -> nat64)
 let xmms_t = FStar.FunctionalExtensionality.restricted_t xmm (fun _ -> quad32)
-unfold let regs_make (f:reg -> nat64) : regs_t = FStar.FunctionalExtensionality.on_dom reg f
-unfold let xmms_make (f:xmm -> quad32) : xmms_t = FStar.FunctionalExtensionality.on_dom xmm f
+[@va_qattr] unfold let regs_make (f:reg -> nat64) : regs_t = FStar.FunctionalExtensionality.on_dom reg f
+[@va_qattr] unfold let xmms_make (f:xmm -> quad32) : xmms_t = FStar.FunctionalExtensionality.on_dom xmm f
 
 noeq type state = {
   ok: bool;
@@ -83,4 +83,4 @@ type precode (t_ins:Type0) (t_ocmp:Type0) =
   | While: whileCond:t_ocmp -> whileBody:precode t_ins t_ocmp -> precode t_ins t_ocmp
 
 let valid_dst (o:operand) : bool =
-  not(OConst? o || (OReg? o && Rsp? (OReg?.r o)))
+  not (OConst? o || (OReg? o && Rsp? (OReg?.r o)))

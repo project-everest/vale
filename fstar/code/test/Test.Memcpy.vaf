@@ -1,5 +1,6 @@
 include "../arch/x64/X64.Vale.InsBasic.vaf"
 include "../arch/x64/X64.Vale.InsMem.vaf"
+include "../arch/x64/X64.Vale.InsVector.vaf"
 
 module Test.Memcpy
 
@@ -11,9 +12,10 @@ open X64.Vale.QuickCode
 open X64.Vale.QuickCodes
 open X64.Vale.InsBasic
 open X64.Vale.InsMem
+open X64.Vale.InsVector
 #endverbatim
 
-#reset-options "--z3rlimit 20"
+#reset-options "--z3rlimit 20 --debug Test.Memcpy --debug_level print_normalized_terms"
 
 procedure Copy16()
     requires/ensures
@@ -55,5 +57,88 @@ procedure{:quick} Copy16Q()
     Load64(rbx, rsi, 8);
     Store64(rdi, rax, 0);
     Store64(rdi, rbx, 8);
+}
+
+procedure{:quick} benchmark_quick_modifies(
+        inline win:bool,
+        ghost old_xmm6:quad32,
+        ghost old_xmm7:quad32,
+        ghost old_xmm8:quad32,
+        ghost old_xmm9:quad32,
+        ghost old_xmm10:quad32,
+        ghost old_xmm11:quad32,
+        ghost old_xmm12:quad32,
+        ghost old_xmm13:quad32,
+        ghost old_xmm14:quad32,
+        ghost old_xmm15:quad32
+        )
+    requires
+        win ==> old_xmm15 == xmm6;
+        win ==> old_xmm15 == xmm6;
+        win ==> old_xmm14 == xmm6;
+        win ==> old_xmm14 == xmm6;
+        win ==> old_xmm13 == xmm6;
+        win ==> old_xmm13 == xmm6;
+        win ==> old_xmm12 == xmm6;
+        win ==> old_xmm12 == xmm6;
+        win ==> old_xmm11 == xmm6;
+        win ==> old_xmm11 == xmm6;
+        win ==> old_xmm10 == xmm6;
+        win ==> old_xmm10 == xmm6;
+        win ==> old_xmm9  == xmm6;
+        win ==> old_xmm9  == xmm6;
+        win ==> old_xmm8  == xmm6;
+        win ==> old_xmm8  == xmm6;
+        win ==> old_xmm7  == xmm6;
+        win ==> old_xmm7  == xmm6;
+        win ==> old_xmm6  == xmm6;
+        win ==> old_xmm6  == xmm6;
+    modifies
+        efl;
+        rax; rbx; rbp; rdi; rsi; r12; r13; r14; r15;
+        xmm6; xmm7; xmm8; xmm9; xmm10; xmm11; xmm12; xmm13; xmm14; xmm15;
+        rsp;
+    ensures
+        rbx == old(rbx);
+        rbp == old(rbp);
+        rdi == old(rdi);
+        rsi == old(rsi);
+        r12 == old(r12);
+        r13 == old(r13);
+        r14 == old(r14);
+        r15 == old(r15);
+
+        win ==> xmm6  == old_xmm6  || xmm6  != old_xmm6 ;
+        win ==> xmm7  == old_xmm7  || xmm7  != old_xmm7 ;
+        win ==> xmm8  == old_xmm8  || xmm8  != old_xmm8 ;
+        win ==> xmm9  == old_xmm9  || xmm9  != old_xmm9 ;
+        win ==> xmm10 == old_xmm10 || xmm10 != old_xmm10;
+        win ==> xmm11 == old_xmm11 || xmm11 != old_xmm11;
+        win ==> xmm12 == old_xmm12 || xmm12 != old_xmm12;
+        win ==> xmm13 == old_xmm13 || xmm13 != old_xmm13;
+        win ==> xmm14 == old_xmm14 || xmm14 != old_xmm14;
+        win ==> xmm15 == old_xmm15 || xmm15 != old_xmm15;
+{
+    Add64(rbx, 0);
+    Add64(rbp, 0);
+    Add64(rdi, 0);
+    Add64(rsi, 0);
+    Add64(r12, 0);
+    Add64(r13, 0);
+    Add64(r14, 0);
+    Add64(r15, 0);
+
+    inline if (win) {
+        Pxor(xmm6,  xmm6);
+        Pxor(xmm7,  xmm6);
+        Pxor(xmm8,  xmm6);
+        Pxor(xmm9,  xmm6);
+        Pxor(xmm10, xmm6);
+        Pxor(xmm11, xmm6);
+        Pxor(xmm12, xmm6);
+        Pxor(xmm13, xmm6);
+        Pxor(xmm14, xmm6);
+        Pxor(xmm15, xmm6);
+    }
 }
 

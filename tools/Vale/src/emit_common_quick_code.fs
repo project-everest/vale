@@ -11,11 +11,46 @@ open Emit_common_base
 open Microsoft.FSharp.Math
 open System.Numerics
 
+let qmods_opt (x:'a):'a list = if !quick_mods then [x] else []
+
 let qlemma_exp (e:exp):exp =
   let e = get_lemma_exp e in
   let e = map_exp stateToOp e in
   let e = exp_refined e in
   e
+
+let makeFrame (env:env) (preserveModifies:bool) (p:proc_decl) (s0:id) (sM:id):exp * exp list * formal list =
+  let id_x (x:id) = Reserved ("x_" + string_of_id x) in
+  let specModsIo preserveModifies = List.collect (specModIo env preserveModifies) p.pspecs in
+  let collectArg (isRet:bool) (x, t, storage, io, _) =
+    match (isRet, storage, io) with
+    | (true, XOperand, _) | (_, XOperand, (InOut | Out)) -> [(x, id_x x, t)]
+    | _ -> []
+    in
+  let collectMod (io, (x, _)) =
+    match io with
+    | (InOut | Out) ->
+      (
+        match Map.tryFind x env.ids with
+        | Some (StateInfo (prefix, es, t)) -> [(id_x x, t, prefix, es)]
+        | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
+      )
+    | _ -> []
+    in
+  let mods preserveModifies = List.collect collectMod (specModsIo preserveModifies) in
+  let args = (List.collect (collectArg true) p.prets) @ (List.collect (collectArg false) p.pargs) in
+  let frameArg e (x, xx, t) = vaApp ("upd_" + (vaOperandTyp t)) [EVar x; EVar xx; e] in
+  let framePArg (x, _, t) = vaApp ("mod_" + (vaTyp t)) [EVar x] in
+  let frameMod e (x, _, prefix, es) = vaApp ("upd_" + prefix) (es @ [EVar x; e]) in
+  let framePMod (_, _, prefix, es) = eapply_opt (Id ("Mod_" + prefix)) es in
+  let e = EVar s0 in
+  let e = List.fold frameArg e args in
+  let e = List.fold frameMod e (mods false) in
+  let pmods = List.map framePArg args @ List.map framePMod (mods preserveModifies) in
+  let fs = [] in
+  let fs = List.fold (fun fs (_, xx, t) -> (xx, Some (tOperand (vaValueTyp t)))::fs) fs args in
+  let fs = List.fold (fun fs (x, t, _, _) -> (x, Some t)::fs) fs (mods false) in
+  (e, List.rev pmods, List.rev fs)
 
 let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
   let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
@@ -23,6 +58,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
   let env = snd (env_stmt env s) in
   let range = EVar (Id "range1") in
   let msg = EString ("***** PRECONDITION NOT MET AT " + string_of_loc loc + " *****") in
+  let mods = EVar (Reserved "mods") in
   let uses_state (e:exp):bool =
     let f (e:exp) (bs:bool list):bool =
       match e with
@@ -132,14 +168,14 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         | SmInline -> ("qInlineIf", eb)
         | _ -> ("qIf", qlemma_exp (eb_alt ()))
         in
-      let eIf = eapply (Id sq) [eCmp; eqc1; eqc2] in
+      let eIf = eapply (Id sq) (qmods_opt mods @ [eCmp; eqc1; eqc2]) in
       let fTail = EBind (Lambda, [], [(Reserved "s", Some tState); (Reserved "g", None)], [], eTail) in
       (true, eapply (Id "QBind") [range; msg; eIf; fTail])
   | SForall ([], [], (EBool true | ECast (EBool true, _)), ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
       let s = Reserved "s" in
-      let eAssertBy = eapply (Id "qAssertBy") [range; msg; ep; eQcs; EVar s; eTail] in
+      let eAssertBy = eapply (Id "qAssertBy") (qmods_opt mods @ [range; msg; ep; eQcs; EVar s; eTail]) in
       (true, eAssertBy)
   | _ -> err ()
 and build_qcode_stmts (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
@@ -152,7 +188,7 @@ and build_qcode_block (add_old:bool) (env:env) (outs:id list) (loc:loc) (ss:stmt
   let eStmts = build_qcode_stmts env outs loc ss in
   let eLet = if add_old then EBind (BindLet, [EVar s], [(Reserved "old_s", Some tState)], [], eStmts) else eStmts in
   let fApp = EBind (Lambda, [], [(s, Some tState)], [], eLet) in
-  eapply (Id "qblock") [fApp]
+  eapply (Id "qblock") (qmods_opt (EVar (Reserved "mods")) @ [fApp])
 
 let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
   let funs = ref ([]:decls) in
@@ -216,7 +252,7 @@ let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list
 let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   (*
   [@"opaque_to_smt"]
-  let va_qcode_Add3 () : quickCode unit (va_code_Add3 ()) = qblock (
+  let va_qcode_Add3 (va_mods:mods_t) : quickCode unit (va_code_Add3 ()) = qblock (
     fun (va_s:state) -> let va_old_s = va_s in
     QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
     QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
@@ -244,7 +280,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
       fname = Reserved ("qcode_" + (string_of_id p.pname));
       fghost = NotGhost;
       ftargs = [];
-      fargs = qParams;
+      fargs = (qmods_opt (Reserved "mods", Some (TName (Id "mods_t")))) @ qParams;
       fret_name = None;
       fret = tRetQuick;
       fspecs = [];
@@ -263,6 +299,11 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   let fM = Reserved "fM" in
   let sM = Reserved "sM" in
   let g = Reserved "g" in
+  let mods = Reserved "mods" in
+  let qc = Reserved "qc" in
+  let (_, pmods, _) = makeFrame env true p s0 sM in
+  let ePMods = eapply (Id "list") pmods in
+  let sMods = SAssign ([(mods, Some (Some (TName (Id "mods_t")), Ghost))], ePMods) in
 //  let wpSound_X = Reserved ("wpSound_" + (string_of_id p.pname)) in
   let wpSound_X = Id "wp_sound_code_norm" in
   let qCodes_X = Reserved ("qcode_" + (string_of_id p.pname)) in
@@ -270,12 +311,19 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
   let letGs = EBind (BindLet, [EVar g], gAssigns, [], hide_ifs ens) in
   let funCont = EBind (Lambda, [], [(s0, None); (sM, None); (g, None)], [], letGs) in
-  let eWpSound = eapply wpSound_X [code; eapply qCodes_X args; EVar s0; funCont] in
+  let args = qmods_opt (EVar mods) @ args in
+  let sQc = SAssign ([(qc, None)], eapply qCodes_X args) in
+  let eWpSound = eapply wpSound_X [code; EVar qc; EVar s0; funCont] in
   let sWpSound = SAssign ([(sM, None); (fM, None); (g, None)], eWpSound) in
+  // assert_norm (va_qc.mods == va_mods)
+  let eQcMods = EOp (FieldOp (Id "mods"), [EVar qc]) in
+  let sQcNorm = SAssign ([], eapply (Id "assert_norm") [EOp (Bop (BEq BpProp), [eQcMods; EVar mods])]) in
+  // lemma_norm_mods va_mods va_sM va_s0
+  let sLemmaNormMods = SAssign ([], eapply (Id "lemma_norm_mods") [ePMods; EVar sM; EVar s0]) in
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
   let sAssignGs =
     match ghostRets with
     | [] -> []
     | _ -> [SAssign (gAssigns, EVar g)]
     in
-  [sWpSound] @ sAssignGs
+  qmods_opt sMods @ [sQc; sWpSound] @ qmods_opt sQcNorm @ qmods_opt sLemmaNormMods @ sAssignGs
