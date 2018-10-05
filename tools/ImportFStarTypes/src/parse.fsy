@@ -95,7 +95,7 @@ exp
   | exp1 PLUS exp1 { RList [RPlus $2; $1; $3] }
   | exp1 LBRACE exp RBRACE { RList [RRefine $2; $1; $3] }
   | exp1 ASCRIBED exp1s { RList [RAscribed $2; $1; rlist_opt $3] }
-  | exp1 ASCRIBED LBRACKET exp RBRACKET exp1s { RList [RAscribed $2; $1; $4; rlist_opt $6] }
+/*  | exp1 ASCRIBED LBRACKET exp RBRACKET exp1s { RList [RAscribed $2; $1; $4; rlist_opt $6] } */
   | DECREASES exp1 { RList [RDecreases $1; $2] }
 
 exp1
@@ -118,6 +118,7 @@ exp1
 
 exp2
   : LPAREN exp RPAREN { match $2 with RList [] -> RUnitValue $1 | e -> e }
+  | LBRACKET exp RBRACKET { RList [] }
   | LPAREN ATTRIBUTES exp1s RPAREN { RList [RAttributes $2; RList $3] }
   | SCOLON { RSColon $1 } /* used in match and let */
   | MATCH { RMatch $1 } /* used in match */
