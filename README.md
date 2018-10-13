@@ -11,7 +11,7 @@ TODO: Information about docker image
 
 # Organization
 
-[proof.txt] contains a formalization of the interoperation between Low\* and Vale code,
+[proof.txt](proof.txt) contains a formalization of the interoperation between Low\* and Vale code,
 as well as a proof of Theorem 4.2, which demonstrates secret independence for such hybrid programs.
 
 [QuickRegs1.fst](QuickRegs1.fst) and [QuickRegs2.fst](QuickRegs2.fst) contain the simplified examples presented in Section 3 as part of the exposition

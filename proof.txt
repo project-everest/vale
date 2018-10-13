@@ -1,0 +1,1070 @@
+This file contains the proof of side channel resistance theorem for hybrid Low* and Vale programs.
+
+It is originally taken from the supplementary materials from the paper:
+
+Verified Low-Level Programming Embedded in F*, ICFP'17
+
+We have extended it to cover Low* interop with Vale, as mentioned in our submission.
+
+We decorate our extensions in this file with the following markers:
+
+
+*** Begin:added for Low*/Vale interop ***
+...
+
+*** End: added for Low*/Vale interop ***
+
+
+
+---------
+Notations
+---------
+
+
+*** Begin: added for Low*/Vale interop ***
+
+c : extern code
+
+e ::= ... | let _ = extern c in e
+
+z : external trace
+
+tr ::= ... | z
+
+*** End: added for Low/Vale interop ***
+
+
+t ::= int | unit | { f_i : t_i } | buf t | a
+
+v ::= x | n | () | { f_i = v_i } | (b, n) | stuck
+
+P ::= Top level functions    (same as lp)
+
+G ::= x_i:t_i    (type enviroment)
+
+S ::= (b_i, n_i):t_i    (store typing)
+
+G_s = a_i, f_j:t_j -> t'_j    (type variables and signature of functions that
+                               manipulate secrets)
+
+G_f = x_i:a_i    (free variables of secret types)
+
+q ::= a_i |-> t_i    (instantiations of type variables)
+
+p ::= x_i |-> v_i    (substitutions of secret variables)
+
+
+g ::= x_i |-> v_i    (substitution of non-secret variables, required for extern code)
+
+
+-----------
+Judgments:
+-----------
+
+Remark: In the following judgments, we use the program P itself in the typing context,
+rather than just the signatures, as we do in the main paper (G_p). This is equivalent
+since the rule [T-App] below, which looks up the function signature in P, does not
+rely on the function body.
+
+P; S; G_s, G |- e : t    (expression typing)
+
+P; S; G_s |- P'    (program typing)
+
+G_s |- t    (type well-formedness)
+
+G_s |- q    (well-formedness of type variables instantiations)
+
+S; G_s, G |-_q p    (well-typed substitutions)
+
+P; S; G_s, G |- H    (heap typing)
+
+
+
+** Expression typing    P; S; G_s, G |- e : t
+
+
+     G(x) = t    G_s |- t
+    --------------------------- [T-Var]
+     P; S; G_s, G |- x : t
+
+
+    -------------------------- [T-Int]
+     P; S; G_s, G |- n : int
+
+
+    ---------------------------- [T-Unit]
+     P; S; G_s, G |- () : unit
+
+
+    -------------------------------- [T-Buf]
+     P; S; G_s, G |- (b, n) : S(b)
+
+
+     P; S; G_s, G       |- e1 : buf t1
+     P; S; G_s, G       |- e2 : int
+     P; S; G_s, G, x:t1 |- e : t
+    ---------------------------------------------------- [T-Readbuf]
+     P; S; G_s, G |- let x:t1 = readbuf e1 e2 in e : t
+
+
+     P; S; G_s, G |- e1 : buf t1
+     P; S; G_s, G |- e2 : int
+     P; S; G_s, G |- e3 : t1
+     P; S; G_s, G |- e  : t
+    ----------------------------------------------------- [T-Writebuf]
+     P; S; G_s, G |- let _ = writebuf e1 e2 e3 in e : t
+
+     P; S; G_s, G          |- e1 : t
+     P; S; G_s, G, x:buf t |- e2 : t2
+    ----------------------------------------------------- [T-Newbuf]
+     P; S; G_s, G |- let x = newbuf n (e1:t) in e2 : t2
+
+
+     P; S; G_s, G |- e1 : buf t
+     P; S; G_s, G |- e2 : int
+    --------------------------------------- [T-Subbuf]
+     P; S; G_s, G |- subbuf e1 e2 : buf t
+
+
+     P; S; G_s, G |- e : t
+    ---------------------------------- [T-Withframe]
+     P; S; G_s, G |- withframe e : t
+
+
+     P; S; G_s, G |- e : t
+    ---------------------------- [T-Pop]
+     P; S; G_s, G |- pop e : t
+
+
+     P; S; G_s, G |- e   : int
+     P; S; G_s, G |- e_i : t
+    ------------------------------------------- [T-If]
+     P; S; G_s, G |- if e then e1 else e2 : t
+
+
+     P(d) = fun (x:t1) -> _:t \/ G_s(d) = t1 -> t
+     P; S; G_s, G      |- e1 : t1
+     P; S; G_s, G, x:t |- e2 : t2
+    --------------------------------------------- [T-App]
+     P; S; G_s, G |- let x:t = d e1 in e2 : t2
+
+
+     P; S; G_s, G      |- e1 : t
+     P; S; G_s, G, x:t |- e2 : t2
+    ------------------------------------------ [T-Let]
+     P; S; G_s, G |- let x:t = e1 in e2 : t2
+
+
+     P; S; G_s, G |- e_i : t_i
+    ------------------------------------------------ [T-Rec]
+     P; S; G_s, G |- { f_i : e_i } : { f_i : t_i }
+
+
+     P; S: G_s, G|- e : { f_i : t_i }
+    ----------------------------------- [T-Proj]
+     P; S; G_s, G |- e.f_i : t_i
+
+
+*** Begin: added for Low*/Vale interop ***
+
+
+     A_extern (S, G, c) = success    //taint analysis succeeds
+     P; S; G_s, G |- e : t
+    ------------------------------------------- [T-Extern]
+     P; S; G_s, G |- let _ = extern c in e : t
+
+
+*** End: added for Low*/Vale interop ***
+
+
+
+** Program typing   P; S; G_s |- P'
+
+
+    ----------------------- [P-Emp]
+     P; S; G_s |- .
+
+
+     G_s             |- t_i
+     P; S; G_s, y:t1 |- e : t2
+     P; S; G_s       |- P'
+    ---------------------------------------------- [P-Fun]
+     P; S; G_s |- let d = fun(y:t1) -> e:t2, P'
+
+
+*** Begin: added for Low*/Vale interop ***
+
+
+** Dynamic semantics of extern
+
+      H, c ---->z H'  //evaluation for external syntax
+   --------------------------------------------------- [Extern]
+    P |- (H, let _ = extern c in e) -->z (H', e)
+
+
+*** End: added for Low*/Vale interop ***
+
+
+-------------------------------------
+Notion of equivalence-modulo-secrets
+-------------------------------------
+
+Equivalence of values:
+----------------------
+
+A lax relation typing-wise.
+
+V_int           = { (n, n) }
+V_unit          = { ( (), () ) }
+V_{ f_i : t_i } = { ({f_i = v_i}, {f_i = v_i'}) | forall i. (v_i, v_i') \in V_(t_i) }
+V_(buf t)       = { ( (b, n), (b, n) ) }
+V_a             = { (v1, v2) }
+
+
+Equivalence of heaps:
+---------------------
+
+Again, a lax relation typing-wise. Further, S can contain type variables.
+
+S |- H1 =eq= H2 iff
+
+1. dom H1 = dom H2
+
+2. forall (b, n) \in dom H1.
+     let buf t = S (b, n)
+     forall 0 <= i < n. (H1[(b, n)][i], H2[(b, n)][i]) \in V_t
+
+
+Gen function for values:
+-------------------------
+
+Let v1 is closed, v2 is closed, and (v1, v2) \in V_t (t can have type variables)
+
+Gen v1 v2 t = v, p1, p2, G
+
+
+Gen n n int    = (n, ., ., .)
+
+Gen () () unit = ((), ., ., .)
+
+Gen { f_i = v_i } { f_i = v'_i } { f_i : t_i } = ({f_i = v''_i}, p1, p2, G)
+  where forall i. Gen v_i v'_i t_i = (v''_i, p1_i, p2_i, G_i)
+  and   p1 = compose_for_all_i p1_i
+  and   p2 = compose_for_all_i p2_i
+  and   G  = compose_for_all_i G_i
+
+  (compose is a simple append in each case)
+
+Gen (b, n) (b, n) (buf t) = ((b, n), ., ., .)
+
+Gen v1 v2 a = (x, x |-> v1, x |-> v2, x:a)
+
+
+Gen function for heaps:
+------------------------
+
+Let H1 is closed, H2 is closed, and S |- H1 =eq= H2
+
+Gen H1 H2 S = (H, p1, p2, G)
+
+s.t. dom H = dom H1 (= dom H2)
+     H[(b, n)][i] = v,
+     where Gen H1[(b, n)][i] H2[(b, n)][i] t = v, p1_b_n_i, p2_b_n_i, G_b_n_i
+     and p1 = compose of all p1_b_n_i and p2 = compose of all p2_b_n_i
+     and G = compose of all G_b_n_i
+
+--------------------------------------------------------------------------------------
+Remark: Gen does not preserve sharing, but we recover sharing after the substitition.
+Further, substitution is just a proof device.
+--------------------------------------------------------------------------------------
+
+
+Assumption on secrets manipulating functions:
+----------------------------------------------
+
+If
+
+(1) G_s (f) = t1 -> t2, where G_s |- t1 and G_s |- t2  (f has type t1 -> t2
+                                                        in the signature,
+                                                        t1 and t2 can have
+                                                        type variables)
+
+(2) S |- H1 =eq= H2    (H1 and H2 are closed heaps (see 6, 7 below)
+                        and related under S)
+
+(3) P; S[q]; G_s[q] |- v1 : t1[q]    (v1 is a closed value of type t1[q])
+
+(4) P; S[q]; G_s[q] |- v2 : t1[q]    (so is v2)
+
+(5) (v1, v2) \in V_t1    (v1 and v2 are related)
+
+(6) P; S[q]; G_s[q] |- H1    (H1 is well-typed heap, and closed)
+
+(7) P; S[q]; G_s[q] |- H2    (so is H2)
+
+Then
+
+(a) P, P_s |- (H1, (P_s (f)) v1) -m->tr (H1', v1')    (f v1 terminates in m steps)
+
+(b) P, P_s |- (H2, (P_s (f)) v2) -n->tr (H2', v2')    (f v2 terminates in n steps
+                                                       with same trace as f v1)
+
+(c) S' |- H1' =eq= H2'    (output heaps are equivalent modulo secrets)
+
+(d) P; S'[q]; G_s[q] |- v1' : t2[q]
+
+(e) P; S'[q]; G_s[q] |- v2' : t2[q]
+
+(f) (v1', v2') \in V_t2    (v1' and v2' are equivalent modulo secrets)
+
+(g) P; S'[q]; G_s[q] |- H1'
+
+(h) P; S'[q]; G_s[q] |- H2'
+
+
+----------------------------------------
+Remark: a separate lemma can show m = n
+----------------------------------------
+
+
+-------------------------------------
+Lemma: Gen-function-lemma-for-values
+-------------------------------------
+
+If
+
+(1) G_s |- t
+
+(2) G_s |- q
+
+(3) P; S[q]; G_s |- v1 : t[q]
+
+(4) P; S[q]; G_s |- v2 : t[q]
+
+(5) (v1, v2) \in V_t
+
+Then
+
+(a) Gen v1 v2 t = v, p1, p2, G
+
+(b) P; S; G_s, G |- v : t
+
+(c) S; G_s, G |-_q p1
+
+(d) S; G_s, G |-_q p2
+
+
+------------------------------------
+Lemma: Gen-function-lemma-for-heaps
+------------------------------------
+
+If
+
+(1) G_s |- q
+
+(2) P; S[q]; G_s |- H1
+
+(3) P; S[q]; G_s |- H2
+
+(4) S |- H1 =eq= H2
+
+Then
+
+(a) Gen H1 H2 S = (H, p1, p2, G)
+
+(b) P; S; G_s, G |- H
+
+(c) S; G_s, G |-_q p1
+
+(d) S; G_s, G |-_q p2
+
+
+----------------------------
+Substitution-lemma-for-Low*
+----------------------------
+
+If
+
+(1) P; S; G_s, G, x:t |- e : t'
+
+(2) P; S; G_s, G |- v : t
+
+Then
+
+(a) P; S; G_s, G |- e[v/x] : t'
+
+
+-----------------------
+Lemma: Value-inversion
+-----------------------
+
+(a) If P; S; G_s |- v : int,   then v = n.
+
+(b) If P; S; G_s |- v : buf t, then v = (b, n)
+
+
+--------------------------
+Subject reduction of Low*
+--------------------------
+
+If
+
+(1) P; S; G_s |- P    (program is well typed)
+
+(2) P; S; G_s, G |- e : t    (e has type t)
+
+(3) .; S[q]; G_s[q] |-  P_s    (P_s is a well typed implementation
+                                of the interface G_s)
+
+(4) P, P_s |- H, e -->tr H', e'
+
+(5) P; S; G_s |- H
+
+Then, exists S' \superset S s.t.
+
+(a) P; S'; G_s, G |- e': t
+
+(b) P; S'; G_s |- H'
+
+
+Proof: Low* type system is a simply-typed type system, so the proofs go through
+in an unsurprising manner.
+
+Also, the type system ensures subject reduction, but does not ensure progress
+since it does not track the buffer bounds.
+
+
+-----------------------------------------
+Lemma: Equivalence-modulo-secrets-values
+-----------------------------------------
+
+If
+
+(1) P; S; G_s, G_f |- v : t    (v is well-typed against the secrets interface)
+
+(2) S; G_s, G_f |-_q p    (p is a well-typed substitution of secret variables under
+instantiations of type variables q)
+
+(3) S; G_s, G_f |-_q p1    (p1 is also a well-typed substitution)
+
+Then
+
+(a) (v[p], v[p1]) \in V_t    (the substituted values are related)
+
+
+----------------------------------------
+Lemma: Equivalence-modulo-secrets-heaps
+----------------------------------------
+
+(Explanation same as the above lemma)
+
+If
+
+(1) P; S; G_s, G_f |- H
+
+(2) S; G_s, G_f |-_q p    (p is a well-typed substitution of secret variables under
+instantiations of type variables q)
+
+(3) S; G_s, G_f |-_q p1    (p1 is also a well-typed substitution)
+
+Then
+
+(a) S |- H[p] =eq= H[p1]
+
+
+-------------------------------
+Lemma: Substituted-value-typing
+-------------------------------
+
+If
+
+(1) P; S; G_s, G_f |- v : t    (v is well-typed)
+
+(2) S; G_s, G_f |-_q p    (substitution p is well-typed
+                           with type variables instantiations q)
+
+Then
+
+(a) P; S[q]; G_s[q] |- v[p] : t[q]    (substituted value is well-typed and closed)
+
+
+-------------------------------
+Lemma: Substituted-heap-typing
+-------------------------------
+
+If
+
+(1) P; S; G_s, G_f |- H    (H is well-typed)
+
+(2) S; G_s, G_f |-_q p    (substitution p is well-typed
+                           with type variables instantiations q)
+
+Then
+
+(a) P; S[q]; G_s[q] |- H[p]    (substituted heap is well-typed and closed)
+
+
+-------------------------------------
+Lemma: Non-secret-value-substitution
+-------------------------------------
+
+If
+
+(1) S; G_s, G_f |-_q p
+
+(2) P; S; G_s, G_f |- v[p] : t
+
+Then
+
+(a) If t = int, then v = n.
+
+(b) If t = buf t, then v = (b, n)
+
+
+
+*** Begin: added for Low*/Vale interop ***
+
+
+
+----------------------------
+Assumption on external code
+----------------------------
+
+Let
+  G is a type environment
+  G_f \subseteq G s.t. forall x \in dom(G_f). G_f(x) = a  //secret-typed variables in G
+
+
+If
+
+(1) A_extern (S, G, c) = success  //static taint analyzer on c succeeds
+
+(2) S; G_s, G_f |-_q p1  //p1 is a well-typed substitution of secret variables in G
+
+(3) S; G_s, G_f |-_q p2  //p2 is another well-typed substitution of secret variables in G
+
+(3) S; G_s, G \ G_f |-_q g  //g is a substitution of remaining variables in G
+
+(4) P; S; G_s, G |- H  //Heap H is well-typed in G
+
+
+Then exists H1', H2', H' s.t.
+
+
+(a) H[g][p1], c[g][p1] ---->z H1'  //after we apply the substitutions to H, c runs fine to H'
+
+(b) H[g][p2], c[g][p2] ---->z H2'  //even with p2, importantly the trace z remains same
+
+(c) H1' = H'[g][p1]  //both the heaps are substitutions on a template H'
+
+(d) H2' = H'[g][p2]
+
+(e) P; S; G_s, G |- H'  //H' is well-typed in G and the same store typing
+                        //really assuming same, no observable allocations in c code
+
+
+Note that the substitutions don't grow, since the external code does not
+add new variable bindings.
+
+
+
+*** End: added for Low*/Vale interop ***
+
+
+
+-----------------------------------
+Theorem: Secret-independent-traces
+-----------------------------------
+
+(Also assume G_s |- q, G_s and q do not vary with program execution)
+
+If
+
+(1) P; S; G_s, G_f |- (H, e) : t    (only secret type variables are free)
+
+(2) S; G_s, G_f |-_q p    (substitution of secret typed variables is well-typed)
+
+(3) S; G_s, G_f |-_q p1    (p1 is some other substitution that is also well-typed)
+
+(4) .; S[q]; G_s[q] |-  P_s    (P_s is a well typed implementation
+                                of the interface G_s)
+
+Then either e is a value, or
+exists m > 0, n > 0,
+exists S' \superseteq S, G_f' \superseteq G_f, H', e', p' \superseteq p,
+       p1' \superseteq p1 s.t.
+
+(a) P, P_s |- (H, e)[p] -m->tr (H1, e1)    (it takes m steps, emitting the trace tr)
+
+(b) (H', e')[p'] = (H1, e1)    (the resulting H1 and e1 are some template
+                                with some substitution)
+
+(c) P; S'; G_s, G_f' |- (H', e') : t    (H' and e' are well-typed)
+
+(d) S'; G_s, G_f' |-_q p'     (the resulting substitution is well-typed)
+
+(e) P, P_s |- (H, e)[p1] -n->tr (H', e')[p1']    (running on p1 is basically
+                                                  same trace and same template
+                                                  with different substitution
+                                                  for secrets)
+
+(f) S'; G_s, G_f' |-_q p1'     (the second resulting substitution
+                                is also well-typed)
+
+-------------------------
+Proof: by induction on e
+-------------------------
+
+Case e = let x:t1 = e1 in e2
+------------------------------
+
+Subcase 1: e1 is not a value:
+------------------------------
+
+Inverting [E-Let] with (1), we get:
+
+(5) P; S; G_s, G_f |- e1 : t1
+
+Applying I.H. on (5), (2), and (3):
+
+(6) P, P_s |- (H, e1)[p] -m->tr (H1, e11)
+
+(7) (H', e1')[p'] = (H1, e11)
+
+(8) P; S'; G_s, G_f' |- (H', e1') : t1
+
+(9) S; G_s, G_f' |-_q p'
+
+(10) P, P_s |- (H, e1)[p1] -n->tr (H', e1')[p1']
+
+(11) S; G_s, G_f' |-_q p1'
+
+Choose m = m, n = n.
+Choose S' = S', G_f' = G_f', H' = H', e' = let x = e1' in e2, p' = p', p1' = p1'
+
+And, choose the evaluation context LE = let x = <> in e2
+
+Using [Step], the evaluation context stepping rule, we get (a):
+
+(12) P, P_s |- (H, let x = e1 in e2)[p] -m->tr (H1, let x = e11 in e2[p])
+
+Consider (H', let x = e1' in e2)[p'], since p' \supserseteq p, e2[p'] = e2[p],
+hence we get (b).
+
+(c) follows from applying [T-Let] with (8), and weakening lemmas.
+
+(d) follows from (9).
+
+(e) follows similar to deriving (a) above.
+
+(f) follow from (11).
+
+
+Subcase 2: e1 is a value
+-------------------------
+
+(5) e[p] = let x = e1[p] in e2[p]
+
+Using [E-Let]:
+
+(6) P, P_s |- (H[p], let x = e1[p] in e2[p]) --> (H[p], e2[p][e1[p]/x])
+
+Choosing m = 1, H1 = H[p], e1 = e2[p][e1[p]/x], tr = ., we get (a).
+
+Choosing H' = H, e' = e2[e1/x], p' = p, we get (b).
+
+Inverting [T-Let] with (1), we get:
+
+(7) P; S; G_s, G_f |- e1 : t'
+
+(6) P; S; G_s, G_f, x:t' |- e2 : t
+
+Since e1 is a value, Using Lemma [Substitution-lemma-for-Low*], we get:
+
+(8) P; S; G_s, G_f |- e2[e1/x] : t
+
+Since H' = H, we get (c).
+
+Since p' = p, we get (d) from (2).
+
+(e) follows similar to above evaluation for p with n = 1
+(p really did not play any role in the evaluation above).
+
+(f) follows from (3), since p1' = p1.
+
+
+Case e = let x = f e1 in e2
+-----------------------------
+
+Subcase 1: e1 is not a value:
+-----------------------------
+
+Inverting [T-App] with (1):
+
+(5) P; S; G_s, G_f |- e1 : t1
+
+Applying I.H. on (5), (2), and (3):
+
+(6) P, P_s |- (H, e1)[p] -m->tr (H1, e11)
+
+(7) (H', e1')[p'] = (H1, e11)
+
+(8) P; S'; G_s, G_f' |- (H', e1') : t1
+
+(9) S; G_s, G_f' |-_q p'
+
+(10) P, P_s |- (H, e1)[p1] -n->tr (H', e1')[p1']
+
+(11) S; G_s, G_f' |-_q p1'
+
+Choose m = m, n = n.
+Choose S' = S', G_f' = G_f', H' = H', e' = let x = f e1' in e2, p' = p', p1' = p1'
+
+And, choose the evaluation context LE = let x = f <> in e2
+
+Using [Step], the evaluation context stepping rule, we get (a):
+
+(12) P, P_s |- (H, let x = f e1 in e2)[p] -m->tr (H1, let x = f e11 in e2[p])
+
+Consider (H', let x = f e1' in e2)[p'], since p' \supserseteq p, e2[p'] = e2[p],
+hence we get (b).
+
+(c) follows from applying [T-App] with (8), and weakening lemmas.
+
+(d) follows from (9).
+
+(e) follows similar to deriving (a) above.
+
+(f) follow from (11).
+
+
+Subcase 2: e1 is a value
+-------------------------
+
+Subsubcase 1: f \in P:
+----------------------
+
+Inverting [T-App] with (1):
+
+(5) P(f) = fun (x:t1) -> e:t
+
+(6) P; S; G_s, G_f |- e1 : t1
+
+(7) P; S; G_s, G_f, x:t |- e2 : t2
+
+Using [App], we get:
+
+(8) P, P_s |- (H, let x = f e1 in e2)[p] -0->. (H[p], let x = e[e1[p]/x] in e2[p])
+
+which gives us (a).
+
+Since e1 has no free secret variables,
+
+(9) let x = e[e1[p]/x] in e2[p] = (let x = e[e1/x] in e2)[p]
+
+Choose H' = H, e' = let x = e[e1/x] in e2, and p' = p to get (b).
+
+Choose S' = S, G_f' = G_f
+
+Using substitution lemma with weakening:
+
+(10) P; S; G_s, G_f |- e[e1/x] : t (recall e1 is a value)
+
+Applying [E-Let] with (10) and (7):
+
+(11) P; S; G_s, G_f |- let x = e[e1/x] in e2 : t2
+
+And since H' = H, we get (c).
+
+(d) follows since G_f' = G_f and p' = p.
+
+(e) follows since m = n = 0, and tr = . .
+
+(f) follows since p1' = p1.
+
+
+Subsubcase 2: f:t1 -> t2 \in G_f
+----------------------------------
+
+Inverting (1):
+
+(5) P; S; G_s, G_f |- H
+
+(6) P; S; G_s, G_f |- e1 : t1
+
+(7) P; S; G_s, G_f, x:t2 |- e2 : t
+
+Using Lemma [Substituted-value-typing] with (2) and (6):
+
+(8) P; S[q]; G_s[q] |- e1[p] : t1[q]
+
+Using Lemma [Substituted-value-typing] with (3) and (6):
+
+(9) P; S[q]; G_s[q] |- e1[p1] : t1[q]
+
+Using Lemma [Substituted-heap-typing] with (2) and (5):
+
+(10) P; S[q]; G_s[q] |- H[p]
+
+Using Lemma [Substituted-heap-typing] with (3) and (5):
+
+(11) P; S[q]; G_s[q] |- H[p1]
+
+Using Lemma [Equivalence-modulo-secrets-heaps] with (5), (2), and (3):
+
+(12) S |- H[p] =eq= H[p1]
+
+Using Lemma [Equivalence-modulo-secrets-values] with (6), (2), and (3):
+
+(13) (e1[p], e2[p]) \in V_t1
+
+Using assumption about secret manipuating functions with
+H1 = H[p], H2 = H[p1], v1 = e1[p], v2 = e1[p1]
+and (12), (8), (9), (13), (10), and (11):
+
+(14) P, P_s |- (H[p], f e1[p]) -m->tr (H1', v1')
+
+(15) P, P_s |- (H[p1], f e1[p1]) -n->tr (H2', v2')
+
+(16) S' |- H1' =eq= H2'
+
+(17) P; S'[q]; G_s |- v1' : t2[q]
+
+(18) P; S'[q]; G_s |- v2' : t2[q]
+
+(19) (v1', v2') \in V_t2
+
+(20) P; S'[q]; G_s |- H1'
+
+(21) P; S'[q]; G_s |- H2'
+
+Using Lemma [Gen-function-lemma-for-values] with (assume), (17), (18), (19):
+
+(22) Gen v1' v2' t2 = v, p', p1', G
+
+(22a) P; S; G_s, G |- v : t2
+
+(23) S; G_s, G |-_q p'
+
+(24) S; G_s, G |-_q p1'
+
+Using Lemma [Gen-function-lemma-for-heaps] with (assume), (20), (21), (16):
+
+(25) Gen H1 H2 S' = H', p_h, p_h1, G_h
+
+(25a) P; S; G_s, G_h |- H'
+
+(26) S; G_s, G_h |-_q p_h
+
+(27) S; G_s, G_h |-_q p_h1
+
+
+For theorem consequences, choose:
+
+m = m, n = n, S' = S', G_f' = G_f \union G \union G_h, H' = H',
+e' = let x = v in e2, p' = p \union p' \union p_h, p1' = p1 \union p1' \union p_h1
+
+(a), (b), and (e) follow from [Context] rule of semantics and (22) and (25) above.
+
+(d) and (f) follow from (23), (24), (26), and (27).
+
+(c) follows from (22a) and (7) with [T-Let] and heap typing from (25a).
+
+
+Case e = let _ = writebuf e1 e2 e3 in e
+----------------------------------------
+
+Subcase 1: One of e1, e2, e3 is not a value: These are context cases proven similar
+to the context cases of let and application above.
+
+Subcase 2: e1, e2, e3 are values
+---------------------------------
+
+Inverting (1):
+
+(4) P; S; G_s, G_f |- H
+
+(5) P; S; G_s, G_f |- e1 : buf t1
+
+(6) P; S; G_s, G_f |- e2 : int
+
+(7) P; S; G_s, G_f |- e3 : t1
+
+Using Lemma [Substituted-value-typing] with (5) and (2):
+
+(8) P; S[q]; G_s[q] |- e1[p] : buf t1[q]
+
+Using Lemma [Substituted-value-typing] with (6) and (2):
+
+(9) P; S[q]; G_s[q] |- e2[p] : int
+
+Using Lemma [Substituted-value-typing] with (7) and (2):
+
+(10) P; S[q]; G_s[q] |- e3[p] : t1[q]
+
+Using Lemma [Value-inversion], we get:
+
+(11) e1[p] = (b, n), actually e1 = (b, n)
+
+(12) e2[p] = n', actually e2 = n'    (Lemma [Non-secret-value-substitution])
+
+Using [E-Write]:
+
+(13) P, P_s |- (H, let _ = write e1 e2 e3 in e)[p] ->write(b, n + n')
+               (H[p][(b, n + n') |-> e3[p]], e[p])
+
+(the step can get stuck if the index is out of bound or the frame has been popped,
+in which case we just step to stuck value)
+
+For (a) and (b) choose m = 1, tr = write(b, n + n'), H' = H[(b, n + n') |-> e3],
+e' = e, p' = p, S' = S, G_f' = G_f
+
+(c) simply follows from the inversion of typing judgment (1),
+and new heap is also well-typed.
+
+(d) follows from (2).
+
+We can do similar analysis with p1 as above and get that:
+
+(13) P, P_s |- (H, let _ = write e1 e2 e3 in e)[p1] ->write(b, n + n')
+               (H[p1][(b, n + n') |-> e3[p1]], e[p1])
+
+Note that e1 and e2 are independent of p or p1, as noted in (11) and (12) above.
+
+So, choose n = 1 after which (e) follows. (f) follows from (3).
+
+
+Case e = let x = newbuf n e1 in e2
+-----------------------------------
+
+Subcase 1: Either e1 or e2 is not a value: These are context cases proven
+similar to the let and application cases above.
+
+Subcase 2: Both e1 and e2 are values
+-------------------------------------
+
+Inverting (1):
+
+(4) P; S; G_s, G_f |- H
+
+(5) P; S; G_s, G_f |- e1 : t1
+
+(6) P; S; G_s, G_f, x:buf t |- e2 : t
+
+Using [E-NewBuf]:
+
+(7) P, P_s |- (H[p], let x = n e1[p] in e2[p]) ->write (b, 0) ... (b, n - 1)
+              (H[p][b |-> e1[p]^n], e2[p][(b, 0)/x])
+
+Choose m = 1, n = 1, S' = S[b |-> buf t1], G_f' = G_f, H' = H[b |-> e1^n],
+e' = e2[(b, 0)/x], p' = p, p1' = p1, tr = write (b, 0) ... (b, n - 1)
+
+(a) and (b) follow from (7).
+
+(c) follows since H' is well-typed in S', and e' is well-typed after applying
+Lemma [Substitution-lemma-for-Low*].
+
+(d) follows from (2).
+
+(e) follows with p1' = p1, and the trace is independent of the substitution p and p'
+
+(f) follows from (3).
+
+
+Case e = let x = readbuf e1 e2 in e
+------------------------------------
+
+Subcase 1: One of e1 or e2 is not a value: These are context cases proven
+similar to the let and application cases above.
+
+Subcase 2: Both e1 and e2 are values
+-------------------------------------
+
+Inverting (1):
+
+(4) P; S; G_s, G_f |- e1 : buf t1
+
+(5) P; S; G_s, G_f |- e2 : int
+
+(6) P; S; G_s, G_f, x:t1 |- e : t
+
+Using Lemma [Substituted-value-typing] with (4) and (2), (5) and (2), and
+Lemma [Substituted-heap-typing] with (6) and (2):
+
+(7) P; S[q]; G_s[q] |- e1[p] : buf t1[q]
+
+(8) P; S[q]; G_s[q] |- e2[p] : int
+
+(9) P; S[q]; G_s[q] |- H[p]
+
+Using Lemma [Non-secret-value-substitution] with (7) and (8):
+
+(10) e1 = (b, n)
+
+(11) e2 = n'
+
+Using [E-Read]:
+
+(12) P, P_s |- (H, let x = readbuf e1 e2 in e)[p] ->read (b, n + n')
+               (H[p], e[p][H[p](b, n + n')/x])
+
+(the step can get stuck if the index is out of bound or the frame has been popped,
+in which case we just step to stuck value)
+
+Choose m = 1, n = 1.
+Choose S' = S, G_f' = G_f, H' = H, e' = e[H(b, n + n')/x], p' = p, p1' = p1
+
+(a) and (b) follow from (12).
+
+(c) follows since H' = H, and e' is well-typed
+    after applying Lemma [Substitution-lemma-for-Low*].
+
+(d) follows from (2).
+
+(e) follows similar to (12).
+
+(f) follows from (3).
+
+
+*** Begin: added for Low*/Vale interop ***
+
+
+
+Case e = let _ = extern c in e
+-------------------------------
+
+Inverting (1):
+
+(5) A_extern (S, G_f, c) = success
+
+(6) P; S; G_s, G_f |- e : t
+
+We apply the assumption about extern code evaluation, using G = G_f, g = empty to get:
+
+(7) H[p], c[p] ---->z H1'
+
+(8) H[p1], c[p1] ---->z H2'
+
+(9) H1' = H'[p]
+
+(10) H2' = H'[p1]
+
+(11) P; S; G_s, G_f |- H'
+
+Choose m = n = 1, S' = S, G_f' = G_f, H' = H', e' = e, p' = p, p1' = p1. Then:
+
+(a) follows with m = 1, tr = z, H1 = H1', e1 = e[p] using [Extern] with (7)
+
+(b) follows with (9) and (a) since e1 = e[p]
+
+(c) follows with (11) and (6)
+
+(d) follows from the premise (the substitution remains same)
+
+(e) follows with n = 1, tr = z, H' = H', e' = e using [Extern] with (10)
+
+(f) follows from the premise (the subtitution remains same)
+
+
+
+*** End: added for Low*/Vale interop ***
