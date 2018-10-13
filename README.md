@@ -4,7 +4,7 @@ Artifact for *A Verified, Efficient Embedding of A Verifiable Assembly Language*
 This [repository](https://github.com/project-everest/vale/tree/popl_artifact_submit) contains 
 the version of Vale presented in the POPL 2019 submission *A Verified, Efficient Embedding of A Verifiable Assembly Language*.
 
-For most recent work on Vale, please look at the [Vale repository](https://github.com/project-everest/vale) for the Vale tool, and at the [HACL\* repository](https://github.com/project-everest/hacl-star/tree/fstar-master/vale/) for the Vale cryptographic libraries.
+For most recent work on Vale, please look [here](https://github.com/project-everest/vale) for the Vale tool, and [here](https://github.com/project-everest/hacl-star/tree/fstar-master/vale/) for the Vale cryptographic libraries.
 
 # Running the code
 TODO: Information about docker image
@@ -14,7 +14,7 @@ TODO: Information about docker image
 [proof.txt] contains a formalization of the interoperation between Low\* and Vale code,
 as well as a proof of Theorem 4.2, which demonstrates secret independence for such hybrid programs.
 
-[QuickRegs1.fst] and [QuickRegs2.fst] contain the simplified examples presented in Section 3 as part of the exposition
+[QuickRegs1.fst](QuickRegs1.fst) and [QuickRegs2.fst](QuickRegs2.fst) contain the simplified examples presented in Section 3 as part of the exposition
 of our optimized verification technique.
 
 
@@ -90,4 +90,4 @@ Once these tools are installed, running SCons in the top-level directory will bu
 * To see additional generic and Vale-specific options,
   including options to configure where to find Vale, KreMLin, F* and Z3:
   * ```python.exe scons.py --FSTAR-MY-VERSION -h```
-* All the files built and verify will be available in the [obj](./obj) directory. To clean the build and reverify everything from scratch, delete the [obj](.obj) directory (rm -r obj) before running SCons again.
+* All the files built and verify will be available in the `obj` directory. To clean the build and reverify everything from scratch, delete the `obj` directory (```rm -r obj```) before running SCons again.
