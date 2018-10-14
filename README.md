@@ -4,7 +4,8 @@ Artifact for *A Verified, Efficient Embedding of A Verifiable Assembly Language*
 This [repository](https://github.com/project-everest/vale/tree/popl_artifact_submit) contains 
 the version of Vale presented in the POPL 2019 submission *A Verified, Efficient Embedding of A Verifiable Assembly Language*.
 
-For most recent work on Vale, please look [here](https://github.com/project-everest/vale) for the Vale tool, and [here](https://github.com/project-everest/hacl-star/tree/fstar-master/vale/) for the Vale cryptographic libraries.
+For the most recent work on Vale, please look [here](https://github.com/project-everest/vale) for the Vale tool,
+and [here](https://github.com/project-everest/hacl-star/tree/fstar-master/vale/) for the Vale cryptographic libraries.
 
 # Running the code
 TODO: Information about docker image
@@ -33,7 +34,7 @@ distinguish trusted F\* files by appending `_s` (for specification) to the name.
 * [src/arch/x64](./src/arch/x64): definitions and proofs related to our assembly language semantics for x64
     - `X64.Machine_s.fst`: basic components of our machine model
     - `X64.Bytes_Semantics_s.fst`: defines our trusted bytes-level semantics
-    - `X64.Vale.Ins*`: implements Vale procedures the provide verified Hoare-style reasoning on top of our semantics
+    - `X64.Vale.Ins*`: implements Vale procedures that provide verified Hoare-style reasoning on top of our semantics
     - `X64.Vale.QuickCode*`: implements our efficient verified verification-condition generator
     - `X64.Taint_Semantics_s.fst`: wraps the basic semantics in a trace-based model of information leakage
     - `X64.Leakage_s.fst`: defines what it means for assembly code to be leakage free
@@ -84,10 +85,10 @@ Once these tools are installed, running SCons in the top-level directory will bu
   Any warnings about needing `pywin32` can be ignored.
 * To see additional generic and Vale-specific options,
   including options to configure where to find Vale, KreMLin, F* and Z3:
-  * ```python.exe scons.py --FSTAR-MY-VERSION -h``estAesGcm.exe```
+  * ```python.exe scons.py --FSTAR-MY-VERSION -h```
 * To build in parallel, add the `-j` option (e.g. `-j 4` for 4-way parallelism).
   Any warnings about needing `pywin32` can be ignored.
 * To see additional generic and Vale-specific options,
   including options to configure where to find Vale, KreMLin, F* and Z3:
   * ```python.exe scons.py --FSTAR-MY-VERSION -h```
-* All the files built and verify will be available in the `obj` directory. To clean the build and reverify everything from scratch, delete the `obj` directory (```rm -r obj```) before running SCons again.
+* All the files built and verified will be available in the `obj` directory. To clean the build and reverify everything from scratch, delete the `obj` directory (```rm -r obj```) before running SCons again.
