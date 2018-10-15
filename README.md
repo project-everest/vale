@@ -8,10 +8,14 @@ For the most recent work on Vale, please look [here](https://github.com/project-
 and [here](https://github.com/project-everest/hacl-star/tree/fstar-master/vale/) for the Vale cryptographic libraries.
 
 # Running the code
-We provide a Linux Docker image to use our tool.
+We provide a Linux Docker image to use Vale.  If you prefer to install and run
+everything from scratch, please see the [Installation section](#installation) below.
+
 * To download the image, run `docker pull afromherz/popl19_vale`
 * To start the image, run `docker run -t -d --name vale afromherz/popl19_vale`
 * To enter the image, run `docker exec -it vale /bin/bash`
+
+Once Docker is running, follow the instructions in the [Verifying and Running Code section](#verifying-and-running-code) below.
 
 # Organization
 
@@ -77,8 +81,12 @@ On Mac OS X (tested with El Capitan, 10.11.6), you can install the dependencies 
     ```brew install scons nuget mono```
 Note that the mono package includes F\#.
 
-Once these tools are installed, running SCons in the top-level directory will build the Vale tool and build and verify all the sources in the [src](./src) directory:
-* To build all sources in the [src](./src) directory:
+Once these tools are installed, follow the instructions below to verify and build the artifacts.
+
+# Verifying and Running Code
+
+Running SCons in the top-level `vale` directory will build the Vale tool and build and verify all the sources in the [src](./src) directory:
+* To verify all sources in the [src](./src) directory:
   * ```scons --FSTAR-MY-VERSION```
 * To build the AES-GCM assembly language and test executable:
   * On Windows, set the `PLATFORM` environment variable to `X64`
