@@ -7,6 +7,12 @@ the version of Vale presented in the POPL 2019 submission *A Verified, Efficient
 For the most recent work on Vale, please look [here](https://github.com/project-everest/vale) for the Vale tool,
 and [here](https://github.com/project-everest/hacl-star/tree/fstar-master/vale/) for the Vale cryptographic libraries.
 
+# Running the code
+We provide a Linux Docker image to use our tool.
+* To download the image, run `docker pull afromherz/popl19_vale`
+* To start the image, run `docker run -t -d --name vale afromherz/popl19_vale`
+* To enter the image, run `docker exec -it vale /bin/bash`
+
 # Organization
 
 [proof.txt](proof.txt) contains a formalization of the interoperation between Low\* and Vale code,
