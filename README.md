@@ -73,19 +73,15 @@ Note that the mono package includes F\#.
 
 Once these tools are installed, running SCons in the top-level directory will build the Vale tool and build and verify all the sources in the [src](./src) directory:
 * To build all sources in the [src](./src) directory:
-  * ```python.exe scons.py --FSTAR-MY-VERSION```
+  * ```scons --FSTAR-MY-VERSION```
 * To build the AES-GCM assembly language and test executable:
   * On Windows, set the `PLATFORM` environment variable to `X64`
-  * ```python.exe scons.py --FSTAR-MY-VERSION --FSTAR-EXTRACT obj/aesgcm.asn obj/aesgcm-gcc.S obj/aesgcm-linux.S obj/aesgcm-macos.S```
-  * ```python.exe scons.py --FSTAR-MY-VERSION --FSTAR-EXTRACT obj/TestAesGcm.exe```
+  * ```scons --FSTAR-MY-VERSION --FSTAR-EXTRACT obj/aesgcm.asm obj/aesgcm-gcc.S obj/aesgcm-linux.S obj/aesgcm-macos.S```
+  * ```scons --FSTAR-MY-VERSION --FSTAR-EXTRACT obj/TestAesGcm.exe```
 * To build in parallel, add the `-j` option (e.g. `-j 4` for 4-way parallelism).
   Any warnings about needing `pywin32` can be ignored.
 * To see additional generic and Vale-specific options,
   including options to configure where to find Vale, KreMLin, F* and Z3:
-  * ```python.exe scons.py --FSTAR-MY-VERSION -h```
-* To build in parallel, add the `-j` option (e.g. `-j 4` for 4-way parallelism).
-  Any warnings about needing `pywin32` can be ignored.
-* To see additional generic and Vale-specific options,
-  including options to configure where to find Vale, KreMLin, F* and Z3:
-  * ```python.exe scons.py --FSTAR-MY-VERSION -h```
+  * ```scons.py --FSTAR-MY-VERSION -h```
 * All the files built and verified will be available in the `obj` directory. To clean the build and reverify everything from scratch, delete the `obj` directory (```rm -r obj```) before running SCons again.
+* If errors occur, make sure that the `FSTAR_HOME` environment variable is correctly set to the `FStar` folder
