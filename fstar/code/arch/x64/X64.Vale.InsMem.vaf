@@ -7,6 +7,7 @@ include{:fstar}{:open} "X64.Vale.QuickCode"
 module X64.Vale.InsMem
 
 #verbatim{:interface}
+open Defs_s
 open X64.Machine_s
 open X64.Vale.State
 open X64.Vale.Decls

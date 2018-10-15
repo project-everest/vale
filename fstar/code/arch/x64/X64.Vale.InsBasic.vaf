@@ -8,6 +8,7 @@ include{:fstar}{:open} "X64.Vale.QuickCode"
 module X64.Vale.InsBasic
 
 #verbatim{:interface}
+open Defs_s
 open Types_s
 open Arch.Types
 open X64.Machine_s

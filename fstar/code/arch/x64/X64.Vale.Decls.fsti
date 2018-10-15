@@ -6,6 +6,7 @@ module X64.Vale.Decls
 // because they refer to Semantics_s.
 // Regs_i and State_i are ok, because they do not refer to Semantics_s.
 
+open Defs_s
 open Prop_s
 open X64.Machine_s
 open X64.Vale.State
@@ -56,13 +57,15 @@ unfold let va_cmp = operand
 unfold let va_register = reg
 unfold let va_operand_xmm = xmm
 
+[@va_qattr] unfold let va_expand_state (s:state) : state = s
+
 (* Abbreviations *)
 unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
 
 (* Constructors *)
 val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
-[@va_qattr] unfold let va_op_xmm_xmm(x:xmm) : va_operand_xmm = x
+[@va_qattr] unfold let va_op_xmm_xmm (x:xmm) : va_operand_xmm = x
 [@va_qattr] unfold let va_op_opr_reg (r:reg) : va_operand = OReg r
 [@va_qattr] unfold let va_op_opr64_reg (r:reg) : va_operand = OReg r
 [@va_qattr] unfold let va_const_operand (n:int) = OConst n

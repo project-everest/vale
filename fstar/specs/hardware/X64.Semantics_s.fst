@@ -1,5 +1,6 @@
 module X64.Semantics_s
 
+open Defs_s
 open Opaque_s
 open X64.Machine_s
 open Words_s

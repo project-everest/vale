@@ -13,6 +13,7 @@ include{:fstar}{:open} "X64.Vale.QuickCode"
 module X64.Vale.InsVector
 
 #verbatim{:interface}
+open Defs_s
 open Words_s
 open Words.Two_s
 open Words.Four_s
