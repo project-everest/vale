@@ -15,8 +15,6 @@ let do_typecheck = ref false;
 let string_of_kind = Emit_vale_text.string_of_kind
 let string_of_typ = Emit_vale_text.string_of_typ
 
-type norm_typ = {norm_typ:typ}
-
 type typ_constraint =
 | TcEqual of typ * typ // t1 = t2
 | TcSubtype of typ * typ // t1 <: t2
@@ -355,11 +353,11 @@ let rec normalize_type_rec (env:env) (t:typ):typ =
         )
       | _ -> err ("cannot find type '" + (err_id x) + "'")
     )
-let normalize_type (env:env) (t:typ):norm_typ =
-  {norm_typ = normalize_type_rec env t}
+let normalize_type (env:env) (t:typ):typ =
+  normalize_type_rec env t
 
 // HACK: mangle the parameter types. This will not be needed if transform is performed before typechecker.
-let rec normalize_type_with_transform (env:env) (t:typ) (tr:transform_kind option):norm_typ =
+let rec normalize_type_with_transform (env:env) (t:typ) (tr:transform_kind option):typ =
   normalize_type env t
 (*
   let get_type env x t =
@@ -537,11 +535,11 @@ let compute_bound (l1:bnd) (h1:bnd) (l2:bnd) (h2:bnd) (op:bop):(bnd * bnd) =
 let unify_int_bound (env:env) (t1:typ) (t2:typ) (op:bop):typ =
   let t1 = normalize_type env t1 in
   let t2 = normalize_type env t2 in 
-  match (t1.norm_typ, t2.norm_typ) with
+  match (t1, t2) with
   | (TInt (l1, h1), TInt (l2, h2)) ->
       let (l, h) = compute_bound l1 h1 l2 h2 op in
       TInt (l, h)
-  | _ -> err (sprintf "expected two integer types, found '%A' and '%A'" (string_of_typ t1.norm_typ) (string_of_typ t2.norm_typ))
+  | _ -> err (sprintf "expected two integer types, found '%A' and '%A'" (string_of_typ t1) (string_of_typ t2))
 
 let neg_int_bound (t:typ):typ =
   match t with
@@ -552,8 +550,8 @@ let rec typ_equal env (t1:typ) (t2:typ):bool =
   normalize_type env t1 = normalize_type env t2
 
 // Check t1 <: t2
-let is_subtype (env:env) (t1:norm_typ) (t2:norm_typ):bool =
-  match (t1.norm_typ, t2.norm_typ) with
+let is_subtype (env:env) (t1:typ) (t2:typ):bool =
+  match (t1, t2) with
   | (TBool BpBool, TBool BpProp) -> true
   | (TInt (l1, h1), TInt (l2, h2)) -> bnd_le l2 l1 && bnd_le h1 h2
   | _ -> t1 = t2
@@ -736,8 +734,6 @@ let bind_typ (m:substitutions) (s:typ) (t:typ):substitutions =
 let join2 (env:env) (t1:typ) (t2:typ):typ option =
   let t1 = normalize_type env t1 in
   let t2 = normalize_type env t2 in
-  let t1 = t1.norm_typ in
-  let t2 = t2.norm_typ in
   match (t1, t2) with
   | (TBool BpBool, TBool BpBool) -> Some (TBool BpBool)
   | (TBool BpProp, TBool BpBool) | (TBool BpBool, TBool BpProp) | (TBool BpProp, TBool BpProp) -> Some (TBool BpProp)
@@ -747,8 +743,6 @@ let join2 (env:env) (t1:typ) (t2:typ):typ option =
 let meet2 (env:env) (t1:typ) (t2:typ):typ option =
   let t1 = normalize_type env t1 in
   let t2 = normalize_type env t2 in
-  let t1 = t1.norm_typ in
-  let t2 = t2.norm_typ in
   match (t1, t2) with
   | (TBool BpBool, TBool BpBool) | (TBool BpProp, TBool BpBool) | (TBool BpBool, TBool BpProp) -> Some (TBool BpBool)
   | (TBool BpProp, TBool BpProp) -> Some (TBool BpProp)
@@ -880,8 +874,6 @@ let u_constrain_equal_loc (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
   let env = u.u_env in
   let norm1 = normalize_type env t1 in
   let norm2 = normalize_type env t2 in
-  let norm1 = norm1.norm_typ in
-  let norm2 = norm2.norm_typ in
   if norm1 = norm2 then () else
   // printfn "constrain %A = %A at %A" t1 t2 (match loc with None -> "None" | Some loc -> string_of_loc loc);
   u.u_equalities <- (t1, t2, loc)::u.u_equalities
@@ -899,7 +891,7 @@ let u_constrain_subtype_loc (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit 
   // printfn "constrain %A <: %A at %A" t1 t2 (match loc with None -> "None" | Some loc -> string_of_loc loc);
   let t1_norm = normalize_type env t1 in
   let t2_norm = normalize_type env t2 in
-  match (t1_norm.norm_typ, t2_norm.norm_typ) with
+  match (t1_norm, t2_norm) with
   | (TVar (x1, _), TVar (x2, _)) ->
     u.ux_uppers <- map_set_add x1 x2 u.ux_uppers;
     u.ux_lowers <- map_set_add x2 x1 u.ux_lowers;
@@ -984,7 +976,7 @@ let rec u_unify_one (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
       else
         let t1 = normalize_type env t1 in
         let t2 = normalize_type env t2 in
-        match (t1.norm_typ, t2.norm_typ) with
+        match (t1, t2) with
         | (TApply (x1, ts1), TApply (x2, ts2)) when x1 = x2 && List.length ts1 = List.length ts2 ->
           List.iter2 (fun t1 t2 -> u_constrain_equal_loc u loc t1 t2) ts1 ts2
         | _ -> typ_err() 
@@ -992,8 +984,8 @@ let rec u_unify_one (u:unifier) (loc:loc option) (t1:typ) (t2:typ):unit =
   | _ -> 
     let norm1 = normalize_type env t1 in
     let norm2 = normalize_type env t2 in
-    if norm1.norm_typ = t1 && norm2.norm_typ = t2 then typ_err() else
-    r norm1.norm_typ norm2.norm_typ
+    if norm1 = t1 && norm2 = t2 then typ_err() else
+    r norm1 norm2
 
 let rec u_unify_equalities (u:unifier):unit =
   match u.u_equalities with
@@ -1218,8 +1210,8 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
   | None -> e
   | Some (t, et) -> if typ_equal env t et then e else insert_cast e t et
 
-let rec infer_arg_typ (env:env) (u:unifier) (args:(exp * typ option) list):(norm_typ list * aexp list) =
-  let infer_arg_typ_fold (ts, ae) ((e:exp), (et:typ option)):(norm_typ list * aexp list) =
+let rec infer_arg_typ (env:env) (u:unifier) (args:(exp * typ option) list):(typ list * aexp list) =
+  let infer_arg_typ_fold (ts, ae) ((e:exp), (et:typ option)):(typ list * aexp list) =
     let (t, ae1) =
 (*
       let tr =
@@ -1270,14 +1262,14 @@ let rec infer_arg_typ (env:env) (u:unifier) (args:(exp * typ option) list):(norm
   let (ts_rev, aes_rev) = List.fold infer_arg_typ_fold ([], []) args in
   (List.rev ts_rev, List.rev aes_rev)
 
-and infer_exps (env:env) (u:unifier) (args:(exp * typ option) list):(norm_typ list * aexp list) =
-  let infer_exps_fold (ts, ae) ((e:exp), (et:typ option)):(norm_typ list * aexp list) =
+and infer_exps (env:env) (u:unifier) (args:(exp * typ option) list):(typ list * aexp list) =
+  let infer_exps_fold (ts, ae) ((e:exp), (et:typ option)):(typ list * aexp list) =
     let (t, ae1) = infer_exp env u e et in
     (t::ts, ae1::ae)
   in
   let (ts_rev, aes_rev) = List.fold infer_exps_fold ([], []) args in
   (List.rev ts_rev, List.rev aes_rev)
-and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ * aexp) =
+and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aexp) =
   // printfn "infer_exp %A at %A" e (match u.u_loc with None -> "None" | Some loc -> string_of_loc loc);
   let ret (t:typ) (ae:aexp_t) =
     let coerce =
@@ -1286,7 +1278,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       | Some et -> if normalize_type env t = normalize_type env et then None else Some (t, et)
       in
     u_constrain_subtype_opt u t expected_typ;
-    ({norm_typ = t}, (ae, coerce))
+    (t, (ae, coerce))
     in
   let norm_ret (t:typ) (ae:aexp_t) =
     ret t ae
@@ -1328,10 +1320,10 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
   | EString s -> norm_ret (TName (Id "string")) (AE_Exp e)
   | EOp (Uop (UConst | UOld) as op, [e]) ->
       let (t, ae) = infer_exp env u e expected_typ in
-      ret t.norm_typ (AE_Op (op, [ae]))
+      ret t (AE_Op (op, [ae]))
   | EOp (Uop UNeg, [e]) ->
       let (t, ae) = infer_exp env u e None in
-      let t = neg_int_bound t.norm_typ in
+      let t = neg_int_bound t in
       norm_ret t (AE_Op (Uop UNeg, [ae]))
   | EOp (Uop (UNot _) as op, [e]) ->
       let tv = u_next_type_var u in
@@ -1339,7 +1331,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let (_, ae) = infer_exp env u e (Some et) in
       u_constrain_subtype u tv tProp;
       u_constrain_subtype u tv et;
-      ({norm_typ = tv}, (AE_Op (op, [ae]), Some (tv, et))) // Some (tv, et) used to resolve overload
+      (tv, (AE_Op (op, [ae]), Some (tv, et))) // Some (tv, et) used to resolve overload
 (* TODO
   | EOp (Uop (UIs x), [e]) ->
     let ix = Id ("uu___is_"+ (string_of_id x)) in
@@ -1357,7 +1349,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> ret t.norm_typ (AE_Op (Uop (UCustom op), es))
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (Uop (UCustom op), es))
       | _ -> internalErr "UCustom"
     )
 (*
@@ -1379,7 +1371,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let (_, ae2) = infer_exp env u e2 (Some et) in
       u_constrain_subtype u tv tProp;
       u_constrain_subtype u tv et;
-      ({norm_typ = tv}, (AE_Op (op, [ae1; ae2]), Some (tv, et))) // Some (tv, et) used to resolve overload
+      (tv, (AE_Op (op, [ae1; ae2]), Some (tv, et))) // Some (tv, et) used to resolve overload
   | EOp (Bop (BEquiv | BImply | BExply) as op, [e1; e2]) ->
       let (_, ae1) = infer_exp env u e1 (Some tProp) in
       let (_, ae2) = infer_exp env u e2 (Some tProp) in
@@ -1402,8 +1394,8 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let tv = u_next_type_var u in
       let (t1, ae1) = infer_exp env u e1 (Some tv) in
       let (t2, ae2) = infer_exp env u e2 (Some tv) in
-      u_constrain_subtype u t1.norm_typ tv;
-      u_constrain_subtype u t2.norm_typ tv;
+      u_constrain_subtype u t1 tv;
+      u_constrain_subtype u t2 tv;
       let t =
         // REVIEW: do we want different treatment of == between Dafny and F*?
         match (!fstar, opt, expected_typ) with
@@ -1430,7 +1422,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> ret t.norm_typ (AE_Op (Bop (BCustom op), es))
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (Bop (BCustom op), es))
       | _ -> internalErr "BCustom"
     )
   | EOp (Subscript, [e1; e2]) ->
@@ -1444,7 +1436,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let e = eapply (Operator (x + "[]")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> ret t.norm_typ (AE_Op (Subscript, es)) // TODO: save x or t1
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (Subscript, es)) // TODO: save x or t1
       | _ -> internalErr ("EOp Subscript")
     )
   | EOp (Update, [e1; e2; e3]) ->
@@ -1458,7 +1450,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let e = eapply (Operator (x + "[:=]")) [e1; e2; e3] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> ret t.norm_typ (AE_Op (Update, es)) // TODO: save x or t1
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (Update, es)) // TODO: save x or t1
       | _ -> internalErr ("EOp Update")
     )
   | EOp (Bop BIn, [e1; e2]) ->
@@ -1472,7 +1464,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let e = eapply (Operator (x + "?[]")) [e2; e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, [e2; e1]), _) -> ret t.norm_typ (AE_Op (Bop BIn, [e1; e2])) // TODO: save x or t1
+      | (AE_Apply (_, _, [e2; e1]), _) -> ret t (AE_Op (Bop BIn, [e1; e2])) // TODO: save x or t1
       | _ -> internalErr ("EOp Bop BIn")
     )
 (*
@@ -1489,7 +1481,6 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
     (
       let (t1, ae1) = infer_exp_force env u e1 expected_typ in
       let t1 = normalize_type env t1 in
-      let t1 = t1.norm_typ in
       let x1 =
         match t1 with
         | TName (Id x1) | TApply (Id x1, _) -> x1
@@ -1500,8 +1491,8 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let (t, ae) = infer_exp env u e expected_typ in
       match (t1, ae) with
       | (TTuple ts, (AE_Apply (_, _, es), _)) ->
-          ret t.norm_typ (AE_Apply (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), ts, es))
-      | (_, (AE_Apply (_, _, es), _)) -> ret t.norm_typ (AE_Op (FieldOp (Id xf), es)) // TODO: save x1 or t1
+          ret t (AE_Apply (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), ts, es))
+      | (_, (AE_Apply (_, _, es), _)) -> ret t (AE_Op (FieldOp (Id xf), es)) // TODO: save x1 or t1
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (FieldUpdate (Id xf), [e1; e2]) ->
@@ -1515,7 +1506,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let e = eapply (Operator (x1 + " ." + xf + ":=")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _) -> ret t.norm_typ (AE_Op (FieldUpdate (Id xf), es)) // TODO: save x1 or t1
+      | (AE_Apply (_, _, es), _) -> ret t (AE_Op (FieldUpdate (Id xf), es)) // TODO: save x1 or t1
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (Cond, [e1; e2; e3]) ->
@@ -1524,8 +1515,8 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       let (t1, ae1) = infer_exp env u e1 (Some tBool) in
       let (t2, ae2) = infer_exp env u e2 (Some et) in
       let (t3, ae3) = infer_exp env u e3 (Some et) in
-      u_constrain_subtype u t2.norm_typ tv;
-      u_constrain_subtype u t3.norm_typ tv;
+      u_constrain_subtype u t2 tv;
+      u_constrain_subtype u t3 tv;
       norm_ret tv (AE_Op (Cond, [ae1; ae2; ae3]))
   | EOp (Uop UToOperand, [e1]) ->
     (
@@ -1600,25 +1591,25 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
       // let x:t := ex in e
       check_not_local env x;
       let (t1, ae1) = infer_exp env u ex t in
-      let xt = match t with | Some t -> t | _ -> t1.norm_typ in
+      let xt = match t with | Some t -> t | _ -> t1 in
       let env = push_id env x xt in
       let (t2, ae2) = infer_exp env u e expected_typ in
-      u_constrain_subtype u t1.norm_typ xt;
-      ret t2.norm_typ (AE_Bind (BindLet, [ae1], [(x, t)], [], ae2))
+      u_constrain_subtype u t1 xt;
+      ret t2 (AE_Bind (BindLet, [ae1], [(x, t)], [], ae2))
   | EBind (((Forall | Exists) as b), [], fs, ts, e) ->
       // fs list of formals, that are distinct and are not local variables
       // ts: triggers
       // e: prop
       let env = List.fold (fun env (x, t) -> let t = match t with Some t -> t | None -> u_next_type_var u in push_id env x t) env fs in
       let (t, ae) = infer_exp env u e expected_typ in
-      u_constrain_subtype u t.norm_typ tProp;
-      ret t.norm_typ (AE_Bind (b, [], fs, ts, ae))
+      u_constrain_subtype u t tProp;
+      ret t (AE_Bind (b, [], fs, ts, ae))
   | EBind (Lambda, [], xs, ts, e) ->
       let xs = List.map (fun (x, t) -> match t with Some t -> (x, t) | None -> (x, u_next_type_var u)) xs in
       let env = List.fold (fun env (x, t) -> push_id env x t) env xs in
       let (t, ae) = infer_exp env u e None in
       let ae = AE_Bind (Lambda, [], List.map (fun (x, t) -> (x, Some t)) xs, ts, ae) in
-      norm_ret (TFun (List.map snd xs, t.norm_typ)) ae
+      norm_ret (TFun (List.map snd xs, t)) ae
   | ECast (e, tc) ->
       let (t, ae) = infer_exp env u e None in
       let ae = AE_Cast (ae, tc) in
@@ -1647,10 +1638,10 @@ and infer_exp_force (env:env) (u:unifier) (e:exp) (et:typ option):(typ * aexp) =
   try
     let (t, ae) = infer_exp env u e None in
     let t =
-      match t.norm_typ with
+      match t with
       | TVar (x, _) ->
         u_unify u (Some (Set.singleton x));
-        subst_typ (u.u_substs) t.norm_typ
+        subst_typ (u.u_substs) t
       | t -> t
       in
     (t, ae)
@@ -1662,7 +1653,7 @@ let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
     let (t, ae) = infer_exp env u e et in
     //printfn "t = %A  ae = %A  u = %A" t ae u;
     u_unify u None;
-    let t = subst_typ u.u_substs t.norm_typ in
+    let t = subst_typ u.u_substs t in
     let es = subst_exp env u.u_substs ae in
 //    printfn "e = %A  es = %A" (Emit_vale_text.string_of_exp e) (Emit_vale_text.string_of_exp es);
 //    printfn "e = %A\n  ae = %A\n  t = %A\n  es = %A" e ae t es;
