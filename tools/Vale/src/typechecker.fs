@@ -1627,7 +1627,7 @@ and infer_exp_force (env:env) (u:unifier) (e:exp) (et:typ option):(typ * aexp) =
         subst_typ (u.u_substs) t
       | t -> t
       in
-    (t, ae)
+    (normalize_type env t, ae)
   with err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
 
 let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
