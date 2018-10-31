@@ -246,13 +246,17 @@ let rec parse_exp (e:raw_exp):f_exp =
   | RList [RLtGt _; e; RList us] -> EAppUnivs (parse_exp e, parse_univs us)
   | RList [RArrow _; RList ((RMatch _)::_); _] -> EUnsupported "MATCH"
   | RList [RArrow _; e1; e2] ->
-      let (a, e1) = get_aqual e1 in
-      let (x, e1) =
-        match e1 with
-        | RList [RColon _; RId (_, x); e1] -> (parse_id x, e1)
-        | _ -> err ("parse_exp: RArrow: " + string_of_raw_exp e)
-        in
-      EArrow (a, x, parse_exp e1, parse_exp e2)
+      try
+      (
+        let (a, e1) = get_aqual e1 in
+        let (x, e1) =
+          match e1 with
+          | RList [RColon _; RId (_, x); e1] -> (parse_id x, e1)
+          | _ -> err ("parse_exp: RArrow: " + string_of_raw_exp e)
+          in
+        EArrow (a, x, parse_exp e1, parse_exp e2)
+      )
+      with Err s -> EUnsupported s
   | RList [RColon _; e1; RId (_, ("Tm_type" | "Tm_delayed-resolved"))] -> parse_exp e1
   | RList [RColon _; e1; RList [RColon _; RId (_, ("Tm_name" | "Tm_fvar")); _]] -> parse_exp e1
   | RList [RColon _; e1; e2] -> ETyped (parse_exp e1, parse_exp e2)

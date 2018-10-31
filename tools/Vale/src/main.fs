@@ -143,6 +143,7 @@ let main (argv) =
         | "-reprintBlankLines=false" :: l -> reprint_blank_lines := false; match_args l
         | "-conciseLemmas=false" :: l -> concise_lemmas := false; match_args l
         | "-quickMods" :: l -> quick_mods := true; match_args l
+        | "-quickMods=false" :: l -> quick_mods := false; match_args l
         | "-disableVerify" :: l -> disable_verify := true; match_args l
         | "-omitUnverified" :: l -> omit_unverified := true; match_args l
         | "-noLemmas" :: l -> no_lemmas := true ; match_args l
