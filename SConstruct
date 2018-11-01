@@ -959,6 +959,7 @@ if do_build:
   pathlib.Path('bin').mkdir(parents = True, exist_ok = True)
   pathlib.Path('obj').mkdir(parents = True, exist_ok = True)
   pathlib.Path('obj/cache_checked').mkdir(parents = True, exist_ok = True)
+  CopyFile('bin/.vale_version', '.vale_version')
 
   Export('env')
   Export('win32')
