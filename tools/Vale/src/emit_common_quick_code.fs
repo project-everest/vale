@@ -296,7 +296,7 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   // let va_old = expand_state va_old in
   let expand_arg (x, t, _, _, a) =
     if attrs_get_bool (Reserved "expand_state") false a then
-      [SAssign ([(x, None)], eapply (Reserved "expand_state") [EVar x])]
+      [SAssign ([(x, None)], eapply (Reserved "expand_state") [evar x] None)]
     else []
     in
   let expansions = List.collect expand_arg p.pargs in

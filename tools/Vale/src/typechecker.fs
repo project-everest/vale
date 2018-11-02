@@ -1302,7 +1302,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
   | EInt i -> ret (TInt (Int i, Int i)) (AE_Exp e)
   | EReal r -> ret (TName (Id "real")) (AE_Exp e)
 //    | EBitVector (n, i) -> TODO
-| EBool b -> ret tBool (AE_Exp e)
+  | EBool b -> ret tBool (AE_Exp e)
   | EString s -> ret (TName (Id "string")) (AE_Exp e)
   | EOp (Uop (UConst | UOld) as op, [e], _) ->
       let (t, ae) = infer_exp env u e expected_typ in
