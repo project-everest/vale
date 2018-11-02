@@ -84,46 +84,46 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     let qbind q xs ts e = (q + " " + (string_of_formals xs) + (string_of_triggers ts) + " :: " + (r 5 e), 6) in
     match e with
     | ELoc (loc, ee) -> try (r prec ee, prec) with err -> raise (LocErr (loc, err))
-    | EVar x -> (sid x, 99)
+    | EVar (x, _) -> (sid x, 99)
     | EInt i -> (string i, 99)
     | EReal r -> (r, 99)
     | EBitVector (n, i) -> ("bv" + (string n) + "(" + (string i) + ")", 99)
     | EBool true -> ("true", 99)
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s + "\"", 99)
-    | EOp (Uop UReveal, [EVar x]) -> ("reveal " + (sid x) + "()", 99)
-    | EOp (Uop (UNot _), [e]) -> ("!" + (r 99 e), 90)
-    | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
-    | EOp (Uop (UIs x), [e]) -> ((r 90 e) + " is " + (sid x), 90)
-    | EOp (Uop UToOperand, [e]) -> ("@" + (r 99 e), 90)
-    | EOp (Uop UOld, [e]) -> ("old(" + (r 99 e) + ")", 90)
-    | EOp (Uop UConst, [e]) -> ("const(" + (r 99 e) + ")", 90)
-    | EOp (Uop (UReveal | UGhostOnly | UCustom _), [_]) -> internalErr (sprintf "unary operator:%A" e)
-    | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
-    | EOp (Bop BIn, [e1; e2]) ->
+    | EOp (Uop UReveal, [EVar (x, _)], _) -> ("reveal " + (sid x) + "()", 99)
+    | EOp (Uop (UNot _), [e], _) -> ("!" + (r 99 e), 90)
+    | EOp (Uop UNeg, [e], _) -> ("-" + (r 99 e), 0)
+    | EOp (Uop (UIs x), [e], _) -> ((r 90 e) + " is " + (sid x), 90)
+    | EOp (Uop UToOperand, [e], _) -> ("@" + (r 99 e), 90)
+    | EOp (Uop UOld, [e], _) -> ("old(" + (r 99 e) + ")", 90)
+    | EOp (Uop UConst, [e], _) -> ("const(" + (r 99 e) + ")", 90)
+    | EOp (Uop (UReveal | UGhostOnly | UCustom _), [_], _) -> internalErr (sprintf "unary operator:%A" e)
+    | EOp (Uop _, ([] | (_::_::_)), _) -> internalErr "unary operator"
+    | EOp (Bop BIn, [e1; e2], _) ->
         ((r 90 e1) + "?[" + (r 5 e2) + "]", 90)
-    | EOp (Bop BOldAt, [e1; e2]) ->
+    | EOp (Bop BOldAt, [e1; e2], _) ->
         ("old[" + (r 5 e1) + "](" + (r 5 e2) + ")", 90)
-    | EOp (Bop op, [e1; e2]) ->
+    | EOp (Bop op, [e1; e2], _) ->
         let (pe, p1, p2) = prec_of_bop op in
         ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
-    | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr "binary operator"
-    | EOp (Subscript, [e1; e2]) -> ((r 90 e1) + "[" + (r 90 e2) + "]", 90)
-    | EOp (Update, [e1; e2; e3]) -> ((r 90 e1) + "[" + (r 90 e2) + " := " + (r 90 e3) + "]", 90)
-    | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
-    | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
-    | EOp (FieldUpdate x, [e1; e2]) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
-    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp:%A" e)
-    | EApply (x, None, es) -> ((sid x) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (x, Some ts, es) ->
+    | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr "binary operator"
+    | EOp (Subscript, [e1; e2], _) -> ((r 90 e1) + "[" + (r 90 e2) + "]", 90)
+    | EOp (Update, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " := " + (r 90 e3) + "]", 90)
+    | EOp (Cond, [e1; e2; e3], _) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
+    | EOp (FieldOp x, [e], _) -> ((r 90 e) + "." + (sid x), 90)
+    | EOp (FieldUpdate x, [e1; e2], _) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
+    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr (sprintf "EOp:%A" e)
+    | EApply (x, None, es, _) -> ((sid x) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EApply (x, Some ts, es, _) ->
         ((sid x) + "#[" + String.concat ", " (List.map string_of_typ ts) + "]("
           + String.concat ", " (List.map (r 5) es) + ")", 90)
-    | EBind (Forall, [], xs, ts, e) -> qbind "forall" xs ts e
-    | EBind (Exists, [], xs, ts, e) -> qbind "exists" xs ts e
-    | EBind (Lambda, [], xs, _, e) -> ("(" + (string_of_formals xs) + " => " + (r 5 e) + ")", 90)
-    | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " := " + (r 5 ex) + " in " + (r 5 e), 6)
-    | EBind (BindSet, [], xs, ts, e) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
-    | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _) -> internalErr "EBind"
+    | EBind (Forall, [], xs, ts, e, _) -> qbind "forall" xs ts e
+    | EBind (Exists, [], xs, ts, e, _) -> qbind "exists" xs ts e
+    | EBind (Lambda, [], xs, _, e, _) -> ("(" + (string_of_formals xs) + " => " + (r 5 e) + ")", 90)
+    | EBind (BindLet, [ex], [x], [], e, _) -> ("let " + (string_of_formal x) + " := " + (r 5 ex) + " in " + (r 5 e), 6)
+    | EBind (BindSet, [], xs, ts, e, _) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
+    | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _, _) -> internalErr "EBind"
     | ECast (e, t) -> ("#" + string_of_typ_prec 20 t + "(" + r 5 e + ")", 90)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"

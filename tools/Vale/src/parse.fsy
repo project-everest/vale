@@ -8,17 +8,17 @@ open Microsoft.FSharp.Math
 let rec id_of_exp (e:exp):id =
   match e with
   | ELoc (_, e) -> id_of_exp e
-  | EVar x -> x
-  | EOp (FieldOp x, [e]) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
+  | EVar (x, _) -> x
+  | EOp (FieldOp x, [e], _) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
   | _ -> parse_err "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
 
 let makeUop (op:uop) (loc:loc, (isCustom:bool, s:string)) (e:exp):exp =
   let op = if isCustom then UCustom s else op in
-  ELoc (loc, EOp (Uop op, [e]))
+  ELoc (loc, EOp (Uop op, [e], None))
 
 let makeBop (op:bop) (loc:loc, (isCustom:bool, s:string)) (e1:exp) (e2:exp):exp =
   let op = if isCustom then BCustom s else op in
-  ELoc (loc, EOp (Bop op, [e1; e2]))
+  ELoc (loc, EOp (Bop op, [e1; e2], None))
 
 let hasStorageAttr (a:attrs):bool =
   let rec r (a:attrs):bool =
@@ -150,9 +150,9 @@ BindOp
 
 Exp
   : Exp1 { $1 }
-  | IF Exp THEN Exp ELSE Exp { EOp (Cond, [$2; $4; $6]) }
-  | LET Formal COLONEQ Exp IN Exp { EBind (BindLet, [$4], [$2], [], $6) }
-  | BindOp Formals Triggers COLONCOLON Exp { EBind ($1, [], $2, $3, $5) }
+  | IF Exp THEN Exp ELSE Exp { EOp (Cond, [$2; $4; $6], None) }
+  | LET Formal COLONEQ Exp IN Exp { EBind (BindLet, [$4], [$2], [], $6, None) }
+  | BindOp Formals Triggers COLONCOLON Exp { EBind ($1, [], $2, $3, $5, None) }
 
 Exp1
   : LPAREN Exp RPAREN { $2 }
@@ -168,7 +168,7 @@ Exp1
   | Exp1 GT Exp1 { makeBop BGt $2 $1 $3 }
   | Exp1 LE Exp1 { makeBop BLe $2 $1 $3 }
   | Exp1 GE Exp1 { makeBop BGe $2 $1 $3 }
-  | Exp1 IS AnyId { expAt $2 (EOp (Uop (UIs $3), [$1])) }
+  | Exp1 IS AnyId { expAt $2 (EOp (Uop (UIs $3), [$1], None)) }
   | Exp1 PLUS Exp1 { makeBop BAdd $2 $1 $3 }
   | Exp1 MINUS Exp1 { makeBop BSub $2 $1 $3 }
   | Exp1 STAR Exp1 { makeBop BMul $2 $1 $3 }
@@ -176,27 +176,27 @@ Exp1
   | Exp1 PERCENT Exp1 { makeBop BMod $2 $1 $3 }
   | LPAREN MINUS Exp1 RPAREN { makeUop UNeg $2 $3 }
   | BANG Exp1 { makeUop (UNot BpProp) $1 $2 }
-  | Exp1 QLBRACKET Exp RBRACKET { expAt $2 (EOp (Bop BIn, [$3; $1])) }
-  | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3])) }
-  | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5])) }
-  | Exp1 DOT AnyId { expAt $2 (EOp (FieldOp $3, [$1])) }
-  | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (exp2id $1 $3, None, $5)) }
-  | Exp1 DOT LPAREN AnyId COLONEQ Exp RPAREN { expAt $2 (EOp (FieldUpdate $4, [$1; $6])) }
+  | Exp1 QLBRACKET Exp RBRACKET { expAt $2 (EOp (Bop BIn, [$3; $1], None)) }
+  | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3], None)) }
+  | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5], None)) }
+  | Exp1 DOT AnyId { expAt $2 (EOp (FieldOp $3, [$1], None)) }
+  | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (exp2id $1 $3, None, $5, None)) }
+  | Exp1 DOT LPAREN AnyId COLONEQ Exp RPAREN { expAt $2 (EOp (FieldUpdate $4, [$1; $6], None)) }
   | LITBOOL { expAt (fst $1) (EBool (snd $1)) }
   | LITINT { expAt (fst $1) (EInt (snd $1)) }
   | LITREAL { expAt (fst $1) (EReal (snd $1)) }
   | STRING { expAt (fst $1) (EString (snd $1)) }
   | BV LPAREN LITINT RPAREN { expAt (fst $1) (EBitVector (snd $1, snd $3)) }
-  | OLD LPAREN Exp RPAREN { expAt $1 (EOp (Uop UOld, [$3])) }
-  | OLD LBRACKET Exp RBRACKET LPAREN Exp RPAREN { expAt $1 (EOp (Bop BOldAt, [$3; $6])) }
-  | CONST LPAREN Exp RPAREN { expAt $1 (EOp (Uop UConst, [$3])) }
-  | THIS { expAt $1 (EVar (Reserved "this")) }
+  | OLD LPAREN Exp RPAREN { expAt $1 (EOp (Uop UOld, [$3], None)) }
+  | OLD LBRACKET Exp RBRACKET LPAREN Exp RPAREN { expAt $1 (EOp (Bop BOldAt, [$3; $6], None)) }
+  | CONST LPAREN Exp RPAREN { expAt $1 (EOp (Uop UConst, [$3], None)) }
+  | THIS { expAt $1 (EVar (Reserved "this", None)) }
   | HASH Type2 LPAREN Exp RPAREN { expAt $1 (ECast ($4, $2))  }
-  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, Some $3, $6)) }
-  | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, None, $3)) }
-  | TUPLE LPAREN Exps RPAREN { expAt $1 (EOp (TupleOp None, $3)) }
-  | ID { expAt (fst $1) (EVar (Id (snd $1))) }
-  | AT ID { expAt $1 (EOp (Uop UToOperand, [expAt (fst $2) (EVar (Id (snd $2)))])) }
+  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, Some $3, $6, None)) }
+  | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, None, $3, None)) }
+  | TUPLE LPAREN Exps RPAREN { expAt $1 (EOp (TupleOp None, $3, None)) }
+  | ID { expAt (fst $1) (EVar (Id (snd $1), None)) }
+  | AT ID { expAt $1 (EOp (Uop UToOperand, [expAt (fst $2) (EVar (Id (snd $2), None))], None)) }
 Exps1
   : Exp { [$1] }
   | Exp COMMA Exps1 { $1::$3 }
@@ -268,10 +268,10 @@ StmtModifier: { SmPlain } | GHOST { SmGhost } | INLINE { SmInline }
 
 ExpCall
   : { fun e -> e }
-  | GHOST { fun e -> EOp (Uop (UCall CallGhost), [e]) }
-  | LEMMA { fun e -> EOp (Uop (UCall CallLemma), [e]) }
-  | INLINE { fun e -> EOp (Uop (UCall CallInline), [e]) }
-  | CALL { fun e -> EOp (Uop (UCall CallOutline), [e]) }
+  | GHOST { fun e -> EOp (Uop (UCall CallGhost), [e], None) }
+  | LEMMA { fun e -> EOp (Uop (UCall CallLemma), [e], None) }
+  | INLINE { fun e -> EOp (Uop (UCall CallInline), [e], None) }
+  | CALL { fun e -> EOp (Uop (UCall CallOutline), [e], None) }
 
 Var
   : VAR { ($1, NotGhost) }
@@ -354,7 +354,7 @@ Stmt
       stmtAt $1 (SAssert (attrs, $5))
     }
   | CALC CalcOpOpt LBRACE CalcContents RBRACE { stmtAt $1 (SCalc ($2, $4)) }
-  | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp (Uop UReveal, [EVar $2]))) }
+  | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp (Uop UReveal, [EVar ($2, None)], None))) }
   | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
   | LET Formal COLONEQ Exp SEMI { let (x, t) = $2 in stmtAt $1 (SVar (x, t, Immutable, XGhost, [], Some $4)) }
   | LET AnyId ATEQ AnyId SEMI { stmtAt $1 (SAlias ($2, $4)) }
@@ -512,7 +512,7 @@ Decl
         fret = snd $9;
         fspecs = [];
         fbody = None;
-        fattrs = (Reserved "alias", [EVar $11])::$2}
+        fattrs = (Reserved "alias", [EVar ($11, None)])::$2}
       )
     }
   | FUNCTION Attrs AnyIdOrOp TFormalsBracket LPAREN Formals RPAREN COLON FunRet Specs EXTERN SEMI
