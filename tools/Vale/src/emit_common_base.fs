@@ -10,7 +10,7 @@ open Microsoft.FSharp.Math
 open System.Numerics
 
 let concise_lemmas = ref true;
-let quick_mods = ref false;
+let quick_mods = ref true;
 let precise_opaque = ref false;
 let reprint_decls_rev = ref ([]:decls)
 let disable_verify = ref false
@@ -52,13 +52,13 @@ let varLhsOfId (x:id):lhs = (x, Some (None, NotGhost))
 let filter_fun_attr (x, es) =
   match x with
   | Id "recursive" -> !fstar
-  | Id ("tactic" | "quick" | "decrease") -> true
+  | Id ("tactic" | "quick" | "decrease" | "public") -> true
   | _ -> false
   in
 
 let filter_proc_attr (x, es) =
   match x with
-  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick" | "recursive" | "decrease") -> true
+  | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick" | "recursive" | "decrease" | "public") -> true
   | _ -> false
   in
 
@@ -66,6 +66,10 @@ let attr_no_verify (s:string) (a:attrs):attrs =
   let verify = attrs_get_bool (Id "verify") false a in
   if !disable_verify && not verify then [(Id s, [])]
   else []
+
+let attr_public (a:attrs) : attrs =
+  let isPublic = attrs_get_bool (Id "public") false a in
+  if isPublic then [(Id "public", [])] else []
 
 // convert imperative updates to functional let assignments
 let rec let_updates_stmts (scope:Map<id, typ option>) (ss:stmt list):(Set<id> * stmt list)=

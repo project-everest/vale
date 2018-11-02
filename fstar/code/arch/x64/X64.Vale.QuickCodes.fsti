@@ -1,6 +1,7 @@
 // Optimized weakest precondition generation for 'quick' procedures
 
 module X64.Vale.QuickCodes
+open Defs_s
 open X64.Machine_s
 open X64.Vale.State
 open X64.Vale.Decls

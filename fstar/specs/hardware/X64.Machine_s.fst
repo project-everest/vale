@@ -1,6 +1,6 @@
 module X64.Machine_s
+open Defs_s
 
-irreducible let va_qattr = ()
 unfold let pow2_32 = Words_s.pow2_32
 unfold let pow2_64 = Words_s.pow2_64
 unfold let pow2_128 = Words_s.pow2_128

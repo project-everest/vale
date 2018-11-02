@@ -3,6 +3,7 @@ include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
 module Quick
 
 #verbatim{:interface}{:implementation}
+open Defs_s
 open Words_s
 open X64.Machine_s
 open X64.Vale
