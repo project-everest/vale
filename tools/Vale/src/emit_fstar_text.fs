@@ -159,9 +159,9 @@ let rec string_of_exp_prec prec e =
         let (mn, t) = name_of_id x in
         let s = if mn = "" then "" else mn + "." in
         let s = s + "__proj__" + "Mk" + string_of_id t + "__item__" + f in
-        (s + " " + (r 95 e),  90)
+        (s + " " + (r 95 e),  95)
       | _ ->
-        ((r 90 e) + "." + (sid x), 90)
+        ((r 95 e) + "." + (sid x), 95)
     | EOp (FieldUpdate x, [e1; e2], t) -> 
       let t = exp_typ e1 in
       match (t, x) with 

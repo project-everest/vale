@@ -116,7 +116,7 @@ type aexp_t =
 | AE_Apply of id * typ list * aexp list
 | AE_Bind of bindOp * aexp list * formal list * triggers * aexp
 | AE_Cast of aexp * typ
-and aexp = aexp_t * typ option * (typ * typ) option
+and aexp = aexp_t * typ * (typ * typ) option
 
 let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
   match (x, Map.tryFind x env.decls_map) with
@@ -1102,7 +1102,7 @@ let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:typ list o
     (x, t, storage, io, attrs) in
   {p_args = List.map fformal p.pargs; p_targs = targs; p_rets = List.map fformal p.prets}
 
-let insert_cast (e:exp) (t:typ) (et:typ):exp =
+let insert_cast (e:exp) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
   ECast (e, et)
 
@@ -1117,8 +1117,8 @@ let rec subst_exp env (s:substitutions)((e, t, coerce):aexp):exp =
         let es = List.map (subst_exp env s) aes in
         let bool_prop f =
           match coerce with
-          | Some (TBool BpBool, _) -> EOp (f BpBool, es, t)
-          | Some (TBool BpProp, _) -> EOp (f BpProp, es, t)
+          | Some (TBool BpBool, _) -> EOp (f BpBool, es, Some t)
+          | Some (TBool BpProp, _) -> EOp (f BpProp, es, Some t)
           | _ -> internalErr "subst_exp UNot"
         match op with
 (* TODO
@@ -1137,7 +1137,7 @@ let rec subst_exp env (s:substitutions)((e, t, coerce):aexp):exp =
         | Bop (BAnd _) -> bool_prop (fun opt -> Bop (BAnd opt))
         | Bop (BOr _) -> bool_prop (fun opt -> Bop (BOr opt))
         | Uop (UNot _) -> bool_prop (fun opt -> Uop (UNot opt))
-        | _ -> EOp (op, es, t)
+        | _ -> EOp (op, es, Some t)
       )
 //      let e = EOp (op, es) in
 //      if (typ_equal env t et) then e else insert_cast e t et
@@ -1179,25 +1179,25 @@ let rec subst_exp env (s:substitutions)((e, t, coerce):aexp):exp =
     | AE_Apply (x, ts, aes) ->
         let es = List.map (subst_exp env s) aes in
         let ts = List.map (subst_typ s) ts in
-        EApply (x, Some ts, es, t)
+        EApply (x, Some ts, es, Some t)
     | AE_Bind (bOp, aes, xs, ts, ae) ->
         let es = List.map (subst_exp env s) aes in
         let e = subst_exp env s ae in
-        EBind(bOp, es, xs, ts, e, t)
+        EBind(bOp, es, xs, ts, e, Some t)
     | AE_Cast (ae, t) ->
         ECast ((subst_exp env s ae), t)
   in
-  let e =  // annotated with the inferred type if not already
+  let annotate_exp e t =
     match e with
-    | EVar (x, None) -> EVar (x, t)
-    | EOp (op, es, None) -> EOp (op, es, t)
-    | EApply (x, ts, es, None) -> EApply (x, ts, es, t)
-    | EBind (bop, es, fs, ts, e, None) -> EBind (bop, es, fs, ts, e, t)
+    | EVar (x, _) -> EVar (x, Some t)
+    | EOp (op, es, _) -> EOp (op, es, Some t)
+    | EApply (x, ts, es, _) -> EApply (x, ts, es, Some t)
+    | EBind (bop, es, fs, ts, e, _) -> EBind (bop, es, fs, ts, e, Some t)
     | _ -> e
   in
   match coerce with
-  | None -> e
-  | Some (t, et) -> if typ_equal env t et then e else insert_cast e t et
+  | None -> annotate_exp e t
+  | Some (t, et) -> if typ_equal env t et then annotate_exp e et else insert_cast (annotate_exp e t) et
 
 let rec infer_arg_typ (env:env) (u:unifier) (args:(exp * typ option) list):(typ list * aexp list) =
   let infer_arg_typ_fold (ts, ae) ((e:exp), (et:typ option)):(typ list * aexp list) =
@@ -1267,7 +1267,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       | Some et -> if typ_equal env t et then None else Some (t, et)
       in
     u_constrain_subtype_opt u t expected_typ;
-    (t, (ae, Some t, coerce))
+    (t, (ae, t, coerce))
     in
   let check_collection_literal (x:id) (pt:primitive_type) (ts_opt:typ list option) (es:exp list) =
     let tv = u_next_type_var u in
@@ -1288,7 +1288,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         u.u_loc <- Some loc;
         let (t, ae) = infer_exp env u e expected_typ in
         u.u_loc <- old_loc;
-        (t, (AE_Loc (loc, ae), None, None))
+        (t, (AE_Loc (loc, ae), t, None))
       with err -> locErr loc err
   | EVar (x, _) ->
       let (t, info) = lookup_id env x in
@@ -1317,7 +1317,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let (_, ae) = infer_exp env u e (Some et) in
       u_constrain_subtype u tv tProp;
       u_constrain_subtype u tv et;
-      (tv, (AE_Op (op, [ae]), Some tv, Some (tv, et))) // Some (tv, et) used to resolve overload
+      (tv, (AE_Op (op, [ae]), tv, Some (tv, et))) // Some (tv, et) used to resolve overload
 (* TODO
   | EOp (Uop (UIs x), [e]) ->
     let ix = Id ("uu___is_"+ (string_of_id x)) in
@@ -1357,7 +1357,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let (_, ae2) = infer_exp env u e2 (Some et) in
       u_constrain_subtype u tv tProp;
       u_constrain_subtype u tv et;
-      (tv, (AE_Op (op, [ae1; ae2]), Some tv, Some (tv, et))) // Some (tv, et) used to resolve overload
+      (tv, (AE_Op (op, [ae1; ae2]), tv, Some (tv, et))) // Some (tv, et) used to resolve overload
   | EOp (Bop (BEquiv | BImply | BExply) as op, [e1; e2], _) ->
       let (_, ae1) = infer_exp env u e1 (Some tProp) in
       let (_, ae2) = infer_exp env u e2 (Some tProp) in
@@ -1719,7 +1719,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
       | In ->
           let tparam = operand_type_includes env xo OT_Const in
           let (t, ae) = infer_exp {env with inline_only = true} u e (Some tparam) in
-          (AE_Op (Uop UConst, [ae]), None, None)
+          (AE_Op (Uop UConst, [ae]), t, None)
       | Out | InOut -> err "cannot pass constant as 'out' or 'inout' operand"
       in
     match (storage, txo) with
@@ -1732,7 +1732,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
     | (XOperand, TName xo) ->
       (
         match skip_loc e with
-        | EVar (x, _) ->  // TODO: checking type match?
+        | EVar (x, _) ->
           (
             let (t, info) = lookup_id env x in
             match (io, info) with
@@ -1740,12 +1740,12 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
             | (_, Some (InlineLocal | ConstGlobal)) -> check_const_operand xo
             | (_, Some (StateInfo (xx, ts))) ->
                 let _ = operand_type_includes env xo (OT_State (io, xx)) in
-                (AE_Exp e, None, None)
+                (AE_Exp e, t, None)
             | ((Out | InOut), Some (OperandLocal (In, _))) ->
                 err "cannot pass 'in' operand as 'out' or 'inout' operand"
             | (_, Some (OperandLocal (_, TName xo_local))) ->
                 let _ = operand_type_includes env xo (OT_Name xo_local) in
-                (AE_Exp e, None, None)
+                (AE_Exp e, t, None)
             | (_, Some (OperandLocal (_, _))) -> internalErr (sprintf "tc_proc_operand: OperandLocal: %A %A" io info)
           )
         | EApply (x, None, es, _) ->
@@ -1759,7 +1759,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
                 let nparams = List.length pformals in
                 if nes <> nparams then err (sprintf "operand type '%s' expects %i arguments(s), found %i arguments(s)" (err_id x) nparams nes) else
                 let aes = List.map2 (tc_proc_operand env u) pformals es in
-                (AE_Apply (x, [], aes), None, None)
+                (AE_Apply (x, [], aes), t, None)
             | _ -> err (sprintf "cannot find function named '%s' or procedure operand_type named '%s'" (err_id x) (err_id x))
           )
         | _ -> check_const_operand xo
