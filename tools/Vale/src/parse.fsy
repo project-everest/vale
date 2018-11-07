@@ -5,13 +5,6 @@ open Ast_util
 open Parse_util
 open Microsoft.FSharp.Math
 
-let rec id_of_exp (e:exp):id =
-  match e with
-  | ELoc (_, e) -> id_of_exp e
-  | EVar (x, _) -> x
-  | EOp (FieldOp x, [e], _) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
-  | _ -> parse_err "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
-
 let makeUop (op:uop) (loc:loc, (isCustom:bool, s:string)) (e:exp):exp =
   let op = if isCustom then UCustom s else op in
   ELoc (loc, EOp (Uop op, [e], None))
@@ -180,7 +173,7 @@ Exp1
   | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3], None)) }
   | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5], None)) }
   | Exp1 DOT AnyId { expAt $2 (EOp (FieldOp $3, [$1], None)) }
-  | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (exp2id $1 $3, None, $5, None)) }
+  | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (EVar (exp2id $1 $3, None), None, $5, None)) }
   | Exp1 DOT LPAREN AnyId COLONEQ Exp RPAREN { expAt $2 (EOp (FieldUpdate $4, [$1; $6], None)) }
   | LITBOOL { expAt (fst $1) (EBool (snd $1)) }
   | LITINT { expAt (fst $1) (EInt (snd $1)) }
@@ -192,8 +185,8 @@ Exp1
   | CONST LPAREN Exp RPAREN { expAt $1 (EOp (Uop UConst, [$3], None)) }
   | THIS { expAt $1 (EVar (Reserved "this", None)) }
   | HASH Type2 LPAREN Exp RPAREN { expAt $1 (ECast ($4, $2))  }
-  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, Some $3, $6, None)) }
-  | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply (id_of_exp $1, None, $3, None)) }
+  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApply ($1, Some $3, $6, None)) }
+  | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply ($1, None, $3, None)) }
   | TUPLE LPAREN Exps RPAREN { expAt $1 (EOp (TupleOp None, $3, None)) }
   | ID { expAt (fst $1) (EVar (Id (snd $1), None)) }
   | AT ID { expAt $1 (EOp (Uop UToOperand, [expAt (fst $2) (EVar (Id (snd $2), None))], None)) }

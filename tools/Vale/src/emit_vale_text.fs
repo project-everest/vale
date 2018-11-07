@@ -114,9 +114,9 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EOp (FieldOp x, [e], _) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2], _) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr (sprintf "EOp:%A" e)
-    | EApply (x, None, es, _) -> ((sid x) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (x, Some ts, es, _) ->
-        ((sid x) + "#[" + String.concat ", " (List.map string_of_typ ts) + "]("
+    | EApply (e, None, es, _) -> ((r 90 e) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EApply (e, Some ts, es, _) ->
+        ((r 90 e) + "#[" + String.concat ", " (List.map string_of_typ ts) + "]("
           + String.concat ", " (List.map (r 5) es) + ")", 90)
     | EBind (Forall, [], xs, ts, e, _) -> qbind "forall" xs ts e
     | EBind (Exists, [], xs, ts, e, _) -> qbind "exists" xs ts e

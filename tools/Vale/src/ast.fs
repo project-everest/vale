@@ -73,7 +73,7 @@ type exp =
 | EBool of bool
 | EString of string
 | EOp of op * exp list * typ option
-| EApply of id * typ list option * exp list * typ option  // TODO: change to exp * typ list option * exp list * typ option
+| EApply of exp * typ list option * exp list * typ option
 | EBind of bindOp * exp list * formal list * triggers * exp * typ option
 | ECast of exp * typ
 

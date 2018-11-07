@@ -16,7 +16,7 @@ let ktype0 = KType bigint.Zero
 let ktype1 = KType bigint.One
 
 let tapply (x:id) (ts:typ list):typ = TApply (x, ts)
-let eapply (x:id) (es:exp list) (t:typ option):exp = EApply (x, None, es, t)
+let eapply (x:id) (es:exp list) (t:typ option):exp = EApply (EVar(x, None), None, es, t)
 let eapply_opt (x:id) (es:exp list) (t:typ option):exp = match es with [] -> EVar (x, t) | _ -> eapply x es t
 let evar (x:id) = EVar (x, None)
 let name_of_id x =
@@ -92,6 +92,13 @@ let rec List_assoc (a:'a) (l:('a * 'b) list):'b =
 let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr (Printf.sprintf "string_of_id: %A" x)
 let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr (Printf.sprintf "reserved_id: %A" x)
 let err_id (x:id):string = match x with Id s -> s | Reserved s -> s | Operator s -> "operator(" + s + ")"
+
+let rec id_of_exp (e:exp):id =
+  match e with
+  | ELoc (_, e) -> id_of_exp e
+  | EVar (x, _) -> x
+  | EOp (FieldOp x, [e], _) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
+  | _ -> internalErr "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
 
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with

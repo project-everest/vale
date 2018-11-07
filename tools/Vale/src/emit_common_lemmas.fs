@@ -37,7 +37,8 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (Id x, _, es, t) when is_proc env (Id x) NotGhost ->
+    | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost->
+        let x = string_of_id (id_of_exp e) in
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in
@@ -158,7 +159,8 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, _, es, t) when is_proc env x NotGhost ->
+    | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost ->
+        let x = id_of_exp e in
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
@@ -172,9 +174,9 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
         let blockLhss = List.map varLhsOfId (if total then [sM; senv.fM] else [senv.bM; sM]) in
         let sLem = SAssign (blockLhss @ lhss, lem) in
         (NotGhost, false, [sLem])
-    | EApply (x, ts, es, t) when is_proc env x Ghost ->
+    | EApply (e, ts, es, t) when is_proc env (id_of_exp e) Ghost ->
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e], _) -> sub_s0 e | _ -> sub_s0 e) es in
-        let e = EApply (x, ts, es, t)
+        let e = EApply (e, ts, es, t)
         (Ghost, false, [SAssign (lhss, e)])
     | _ -> (Ghost, false, [SAssign (lhss, sub_s0 e)])
     in

@@ -109,7 +109,7 @@ let rec string_of_exp_prec prec e =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e], t) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (x, _, es, t1)], t) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id x) es t1] t), prec)
+    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id (id_of_exp e)) es t1] t), prec)
     | EOp (Uop UReveal, [EVar (x, _)], t) -> ("reveal_opaque " + (sid x), 90)
     | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
@@ -136,7 +136,7 @@ let rec string_of_exp_prec prec e =
       )
     | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr (sprintf "binary operator: %A" e)
     | EOp (TupleOp _, es, t) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (Id "list", ts, es, t) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
+    | EApply (e, ts, es, t) when id_of_exp e = (Id "list") -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
     | EOp (Subscript, [e1; e2], t) -> 
       let t = exp_typ e1 in
       match t with
@@ -173,7 +173,7 @@ let rec string_of_exp_prec prec e =
       | _ ->
         ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr (sprintf "EOp: %A" e)
-    | EApply (x, ts, es, t) ->  ((sid x) + (string_of_type_arguments ts) + " " + (string_of_args es), 90)
+    | EApply (e, ts, es, t) ->  ((r 90 e) + (string_of_type_arguments ts) + " " + (string_of_args es), 90)
     | EBind ((Forall | Exists | Lambda), [], [], _, e, t) -> (r prec e, prec)
     | EBind (Forall, [], xs, ts, e, t) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e, t) -> qbind "exists" " . " xs ts e

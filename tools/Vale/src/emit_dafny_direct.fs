@@ -290,12 +290,12 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           else
             let tmp = built_ins.TupleType(tok, args.Count, true) in
             new DatatypeValue(tok, BuiltIns.TupleTypeName(args.Count), BuiltIns.TupleTypeCtorNamePrefix + (string args.Count), args) :> Expression
-      | EApply (Id "seq", _, es, _) ->
+      | EApply (e, _, es, _) when id_of_exp e = (Id "seq") ->
           let tok = create_token loc "[" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
           new SeqDisplayExpr(tok, elements) :> Expression
-      | EApply (Id "set", _, es, _) ->
+      | EApply (e, _, es, _) when id_of_exp e = (Id "set") ->
           let tok = create_token loc "{" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
@@ -330,7 +330,8 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           updates.Add((id, id.``val``, e2))
           new DatatypeUpdateExpr(tok, e1, updates) :> Expression
       | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr "EOp"
-      | EApply (x, _, es, _) ->
+      | EApply (e, _, es, _) ->
+          let x = id_of_exp e in
           let tok = create_token loc (sid x) in
           if (sid x).Equals("int")
           then

@@ -94,7 +94,8 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with
-    | EApply (Id xp, _, es, t) when is_proc env (Id xp) NotGhost ->
+    | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost->
+        let xp = string_of_id (id_of_exp e) in 
         inline_call xp [(x, tOpt)] es t
 //    | EApply (xp, _, es) when allowLemma ->
 //        lemma_call xp [(x, tOpt)] es
@@ -122,10 +123,10 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         in
       let xs = List.map formal_of_lhs xs in
       match skip_loc e with
-      | EApply (Id x, _, es, t) when is_proc env (Id x) NotGhost ->
-          inline_call x xs es t
-      | EApply (x, _, es, t) ->
-          lemma_call x xs es t
+      | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost ->
+          inline_call (string_of_id (id_of_exp e)) xs es t
+      | EApply (e, _, es, t) ->
+          lemma_call (id_of_exp e) xs es t
       | EOp (Uop UReveal, es, t) ->
           let x = "reveal_opaque" in
           if is_proc env (Id x) NotGhost then
@@ -152,12 +153,12 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let eb_alt () =
         // HACK
         match eb with
-        | EApply (Reserved "cmp_eq", ts, args, t) -> EApply (Id "Cmp_eq", ts, args, t)
-        | EApply (Reserved "cmp_ne", ts, args, t) -> EApply (Id "Cmp_ne", ts, args, t)
-        | EApply (Reserved "cmp_le", ts, args, t) -> EApply (Id "Cmp_le", ts, args, t)
-        | EApply (Reserved "cmp_ge", ts, args, t) -> EApply (Id "Cmp_ge", ts, args, t)
-        | EApply (Reserved "cmp_lt", ts, args, t) -> EApply (Id "Cmp_lt", ts, args, t)
-        | EApply (Reserved "cmp_gt", ts, args, t) -> EApply (Id "Cmp_gt", ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_eq") -> EApply (EVar (Id "Cmp_eq", None), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ne") -> EApply (EVar (Id "Cmp_ne", None), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_le") -> EApply (EVar (Id "Cmp_le", None), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ge") -> EApply (EVar (Id "Cmp_ge", None), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_lt") -> EApply (EVar (Id "Cmp_lt", None), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_gt") -> EApply (EVar (Id "Cmp_gt", None), ts, args, t)
         | _ -> internalErr "SIfElse"
         in
       let eb = qlemma_exp eb in

@@ -113,7 +113,7 @@ type aexp_t =
 | AE_Loc of loc * aexp
 | AE_Exp of exp
 | AE_Op of op * aexp list
-| AE_Apply of id * typ list * aexp list
+| AE_Apply of exp * typ list * aexp list
 | AE_Bind of bindOp * aexp list * formal list * triggers * aexp
 | AE_Cast of aexp * typ
 and aexp = aexp_t * typ * (typ * typ) option
@@ -1176,10 +1176,10 @@ let rec subst_exp env (s:substitutions)((e, t, coerce):aexp):exp =
         if(List.length t <> 1) then err ("cast for more than one return types not implemented");
         else insert_cast e t.Head et.Head
 *)
-    | AE_Apply (x, ts, aes) ->
+    | AE_Apply (e, ts, aes) ->
         let es = List.map (subst_exp env s) aes in
         let ts = List.map (subst_typ s) ts in
-        EApply (x, Some ts, es, Some t)
+        EApply (e, Some ts, es, Some t)
     | AE_Bind (bOp, aes, xs, ts, ae) ->
         let es = List.map (subst_exp env s) aes in
         let e = subst_exp env s ae in
@@ -1191,7 +1191,7 @@ let rec subst_exp env (s:substitutions)((e, t, coerce):aexp):exp =
     match e with
     | EVar (x, _) -> EVar (x, Some t)
     | EOp (op, es, _) -> EOp (op, es, Some t)
-    | EApply (x, ts, es, _) -> EApply (x, ts, es, Some t)
+    | EApply (e, ts, es, _) -> EApply (e, ts, es, Some t)
     | EBind (bop, es, fs, ts, e, _) -> EBind (bop, es, fs, ts, e, Some t)
     | _ -> e
   in
@@ -1269,7 +1269,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
     u_constrain_subtype_opt u t expected_typ;
     (t, (ae, t, coerce))
     in
-  let check_collection_literal (x:id) (pt:primitive_type) (ts_opt:typ list option) (es:exp list) =
+  let check_collection_literal (e:exp) (pt:primitive_type) (ts_opt:typ list option) (es:exp list) =
     let tv = u_next_type_var u in
     let () =
       match ts_opt with
@@ -1280,7 +1280,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
     let aes = List.map (fun e -> snd (infer_exp env u e (Some tv))) es in
     let xt = lookup_primitive env pt in
     let t = tapply xt [tv] in
-    ret t (AE_Apply (x, [tv], aes))
+    ret t (AE_Apply (e, [tv], aes))
   match e with
   | ELoc (loc, e) ->
       try
@@ -1477,7 +1477,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let (t, ae) = infer_exp env u e expected_typ in
       match (t1, ae) with
       | (TTuple ts, (AE_Apply (_, _, es), _,  _)) ->
-          ret t (AE_Apply (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), ts, es))
+          ret t (AE_Apply (EVar (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), None), ts, es))
       | (_, (AE_Apply (_, _, es), _, _)) -> ret t (AE_Op (FieldOp (Id xf), es))
       | _ -> internalErr ("EOp FieldOp")
     )
@@ -1572,7 +1572,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         in
       let t = TTuple ts in
       let (_, aes) = infer_exps env u (List.map2 (fun e t -> (e, Some t)) es ts) in
-      ret t (AE_Apply (Id "tuple", ts, aes))
+      ret t (AE_Apply (evar (Id "tuple"), ts, aes))
   | EBind (BindLet, [ex], [(x, t)], [], e, _) ->
       // let x:t := ex in e
       check_not_local env x;
@@ -1604,10 +1604,11 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       //// TODO: move this check to after inference:
       //if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae
       //else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
-  | EApply ((Id "list") as x, ts_opt, es, _) when !fstar -> check_collection_literal x PT_List ts_opt es
-  | EApply ((Id "seq") as x, ts_opt, es, _) when not !fstar -> check_collection_literal x PT_Seq ts_opt es
-  | EApply ((Id "set") as x, ts_opt, es, _) when not !fstar -> check_collection_literal x PT_Set ts_opt es
-  | EApply (x, ts_opt, es, _) ->
+  | EApply (e, ts_opt, es, _) when !fstar && id_of_exp e = (Id "list") -> check_collection_literal e PT_List ts_opt es
+  | EApply (e, ts_opt, es, _) when not !fstar && id_of_exp e = (Id "seq") -> check_collection_literal e PT_Seq ts_opt es
+  | EApply (e, ts_opt, es, _) when not !fstar && id_of_exp e = (Id "set") -> check_collection_literal e PT_Set ts_opt es
+  | EApply (e, ts_opt, es, _) ->
+      let x = id_of_exp e in
       let f = lookup_fun env x in
       let f = compute_fun_instance env u f ts_opt in
       if List.length f.f_args <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.f_args) (List.length es));
@@ -1615,7 +1616,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let ret_typ = f.f_ret in
   //    let env = if isExtern then {env with ghost = true} else env in
       let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e t -> (e, Some t)) es param_typs) in
-      ret ret_typ (AE_Apply (x, f.f_targs, aes))
+      ret ret_typ (AE_Apply (e, f.f_targs, aes))
   | _ ->
       notImplemented (sprintf "not yet implemented: type checking rule for %A" e)
 // infer_exp_force forces the type to a concrete type suitable for pattern matching;
@@ -1748,8 +1749,9 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
                 (AE_Exp e, t, None)
             | (_, Some (OperandLocal (_, _))) -> internalErr (sprintf "tc_proc_operand: OperandLocal: %A %A" io info)
           )
-        | EApply (x, None, es, _) ->
+        | EApply (e, None, es, _) ->
           (
+            let x = id_of_exp e in
             match lookup_name env x true with
             | (Some (Func_decl _), _) -> check_const_operand xo
             | (Some (OperandType_info (Some pformals, t, opr, os)), _) ->
@@ -1759,7 +1761,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
                 let nparams = List.length pformals in
                 if nes <> nparams then err (sprintf "operand type '%s' expects %i arguments(s), found %i arguments(s)" (err_id x) nparams nes) else
                 let aes = List.map2 (tc_proc_operand env u) pformals es in
-                (AE_Apply (x, [], aes), t, None)
+                (AE_Apply (e, [], aes), t, None)
             | _ -> err (sprintf "cannot find function named '%s' or procedure operand_type named '%s'" (err_id x) (err_id x))
           )
         | _ -> check_const_operand xo
@@ -1801,7 +1803,7 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
   let xs = List.map2 proc_ret xs pi.p_rets in
   u_unify u None;
   let es = List.map (subst_exp env u.u_substs) aes in
-  SAssign (xs, EApply (p.pname, Some pi.p_targs, es, None)) // TODO: replace None with type arguments
+  SAssign (xs, EApply (evar p.pname, Some pi.p_targs, es, None)) // TODO: replace None with type arguments
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
@@ -1846,8 +1848,9 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
         SAssign (ft t, e)
         in
       match skip_loc e with
-      | EApply (x, ts_opt, es, _) ->
+      | EApply (e, ts_opt, es, _) ->
         (
+         let x = id_of_exp e in       
           match (xs, lookup_fun_or_proc env x) with
           | (([] | [_]), FoundFun _) -> assign_exp ()
           | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")

@@ -82,15 +82,15 @@ let rec string_of_exp_prec prec e =
         ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
     | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr ("binary operator " + (sprintf "%A" e))
     | EOp (TupleOp _, es, _) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (Id "seq", _, es, _) -> ("[" + (String.concat ", " (List.map (r 5) es)) + "]", 90)
-    | EApply (Id "set", _, es, _) -> ("{" + (String.concat ", " (List.map (r 5) es)) + "}", 90)
+    | EApply (e, _, es, _) when id_of_exp e = (Id "seq") -> ("[" + (String.concat ", " (List.map (r 5) es)) + "]", 90)
+    | EApply (e, _, es, _)  when id_of_exp e = (Id "set") -> ("{" + (String.concat ", " (List.map (r 5) es)) + "}", 90)
     | EOp (Subscript, [e1; e2], _) -> ((r 90 e1) + "[" + (r 90 e2) + "]", 90)
     | EOp (Update, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " := " + (r 90 e3) + "]", 90)
     | EOp (Cond, [e1; e2; e3], _) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e], _) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2], _) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr ("EOp " + (sprintf "%A" e))
-    | EApply (x, _, es, _) -> ((sid x) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EApply (e, _, es, _) -> ((r 90 e) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EBind (Forall, [], xs, ts, e, _) -> qbind "forall" xs ts e
     | EBind (Exists, [], xs, ts, e, _) -> qbind "exists" xs ts e
     | EBind (Lambda, [], xs, _, e, _) -> ("(" + (string_of_formals xs) + " => " + (r 5 e) + ")", 90)
