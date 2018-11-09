@@ -1,4 +1,6 @@
 include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
+include{:fstar}{:open} "TestFStar"
+include{:/*TODO*/fstar}{:open} "FStar.Seq.Base"
 
 module Test
 
@@ -6,6 +8,7 @@ module Test
 open X64.Machine_s
 open X64.Vale.Decls
 open X64.Vale.InsBasic
+open FStar.Seq
 #endverbatim
 
 procedure p()
@@ -61,3 +64,30 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
     g2 := g1 + 1;
 }
 
+function operator([]) #[a:Type(0)](s:FStar.Seq.Base.seq(a), i:int):a extern;
+function operator([:=]) #[a:Type(0)](s:FStar.Seq.Base.seq(a), i:int, v:a):FStar.Seq.Base.seq(a) extern;
+function operator([]) #[a:Type(0), b:Type(0)](m:FStar.Map.t(a, b), i:a):b extern;
+function operator(?[]) #[a:Type(0), b:Type(0)](m:FStar.Map.t(a, b), i:a):prop extern;
+function operator([:=]) #[a:Type(0), b:Type(0)](m:FStar.Map.t(a, b), i:a, v:b):FStar.Map.t(a, b) extern;
+
+#verbatim{:implementation}
+let va_subscript_FStar__Seq__Base__seq = Seq.index
+let va_update_FStar__Seq__Base__seq = Seq.upd
+let va_subscript_FStar__Map__t = Map.sel
+let va_update_FStar__Map__t = Map.upd
+let va_contains_FStar__Map__t = Map.contains
+#endverbatim
+
+procedure SeqIndex(ghost s:seq(int), ghost i:int, ghost v:int) returns(ghost r:int) 
+{
+  ghost var ns := if i > 0  && i < length(s) then s[i:=v] else s;
+  r := if i > 0  && i < length(s) then ns[i] else 0;
+  assert r == v || r == 0;
+}
+
+procedure MapIndex(ghost m:FStar.Map.t(int, int), ghost i:int, ghost v:int) returns(ghost r:int) 
+{
+  ghost var nm := m[i:=v];
+  r := nm[i];
+  assert nm?[i] && r == v;
+}

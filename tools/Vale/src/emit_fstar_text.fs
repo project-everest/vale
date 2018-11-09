@@ -118,6 +118,12 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_], _) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Uop _, ([] | (_::_::_)), _) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Bop BExply, [e1; e2], t) -> (r prec (EOp (Bop BImply, [e2; e1], t)), prec)
+    | EOp (Bop BIn, [e1; e2], t) ->
+      let t = exp_typ e2 in
+      match t with
+      | Some (TApply (x, _)) ->
+        (r prec (vaApp ("contains_" + (sid x)) [e2; e1] t), prec)
+      | _ -> internalErr (sprintf "overloadded Operator ?[] missing type info: %A" e)
     | EOp (Bop op, [e1; e2], t) ->
       (
         let isChainOp (op:bop):bool =
