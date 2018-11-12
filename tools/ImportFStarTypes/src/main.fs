@@ -1105,8 +1105,11 @@ let main (argv:string array) =
           printfn "%s" err;
           printfn "\nerror at line %i column %i of string\n%s" (line lexbuf) (col lexbuf) (file lexbuf)
       in
-    !close_streams ()
+    ()
     in
+  let print_err_exit (err:string):unit =
+    print_err err;
+    !close_streams ()
   try
   (
     let parse_argv (args:string list) =
@@ -1202,6 +1205,10 @@ let main (argv:string array) =
         in
       ds
       in
+    let parse_block s =
+      try parse_block s with
+      | err -> print_err (err.ToString ()); []
+      in
     let ds = List.collect parse_block blocks in
     let ds = filter_decls ds in
     let ds = List.map decl_lift_type_binders ds in
@@ -1232,9 +1239,9 @@ let main (argv:string array) =
     ()
   )
   with
-  | Err err -> print_err err
-  | ParseErr err -> print_err err
-  | Failure err -> print_err err
-  | err -> print_err (err.ToString ())
+  | Err err -> print_err_exit err
+  | ParseErr err -> print_err_exit err
+  | Failure err -> print_err_exit err
+  | err -> print_err_exit (err.ToString ())
 
 let () = main (System.Environment.GetCommandLineArgs ())
