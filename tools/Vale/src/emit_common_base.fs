@@ -26,7 +26,7 @@ let get_lemma_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp,
 let stateToOp (e:exp):exp map_modify =
   match e with
   | EOp (OperandArg _, [e], _) -> Replace e
-  | EOp (StateOp (x, prefix, t), es, _) -> Replace (vaApp ("op_" + prefix) es (Some t))
+  | EOp (StateOp (x, prefix, t), es, _) -> Replace (vaApp_t ("op_" + prefix) es (Some t))
   | _ -> Unchanged
 
 // Turn multiple assignments into series of individual assignments
@@ -133,7 +133,7 @@ let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
       if addLabels then
         let range = evar (Id "range1") in
         let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
-        eapply (Id "label") [range; msg; e] None
+        eapply (Id "label") [range; msg; e]
       else e
       in
     match s with
@@ -177,14 +177,14 @@ let fArg (x, t, g, io, a):exp list =
   in
 
 let rec hide_ifs (e:exp):exp =
-  let thunk (e:exp):exp = EBind (Lambda, [], [(Id "_", None)], [], e, None) in
+  let thunk (e:exp):exp = ebind Lambda [] [(Id "_", None)] [] e in
   let f (e:exp):exp map_modify =
     match e with
     | EOp (Cond, [e1; e2; e3], t) ->
         let e1 = hide_ifs e1 in
         let e2 = hide_ifs e2 in
         let e3 = hide_ifs e3 in
-        Replace (vaApp "if" [e1; thunk e2; thunk e3] t)
+        Replace (vaApp_t "if" [e1; thunk e2; thunk e3] t)
     | _ -> Unchanged
     in
   map_exp f e

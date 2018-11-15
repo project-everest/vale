@@ -16,9 +16,14 @@ let ktype0 = KType bigint.Zero
 let ktype1 = KType bigint.One
 
 let tapply (x:id) (ts:typ list):typ = TApply (x, ts)
-let eapply (x:id) (es:exp list) (t:typ option):exp = EApply (EVar(x, None), None, es, t)
-let eapply_opt (x:id) (es:exp list) (t:typ option):exp = match es with [] -> EVar (x, t) | _ -> eapply x es t
 let evar (x:id) = EVar (x, None)
+let ebind (op:bindOp) (es:exp list) (fs:formal list) (ts:triggers) (e:exp) = EBind (op, es, fs, ts, e, None)
+let eop (op:op) (es:exp list) = EOp (op, es, None)
+let eapply (x:id) (es:exp list):exp = EApply (evar x, None, es, None)
+let eapply_t (x:id) (es:exp list) (t:typ option):exp = EApply (evar x, None, es, t)
+let eapply_opt (x:id) (es:exp list):exp = match es with [] -> EVar (x, None) | _ -> eapply x es
+let eapply_opt_t (x:id) (es:exp list) (t:typ option):exp = match es with [] -> EVar (x, t) | _ -> eapply_t x es t
+
 let name_of_id x =
   let s = match x with Id s | Reserved s | Operator s -> s in
   let es = s.Split ([|'.'|])  |> Array.toList in
@@ -103,7 +108,7 @@ let rec id_of_exp (e:exp):id =
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with
   | [] -> empty
-  | h::t -> List.fold (fun accum e -> EOp (Bop b, [accum; e], None)) h t
+  | h::t -> List.fold (fun accum e -> eop (Bop b) [accum; e]) h t
 let and_of_list = binary_op_of_list (BAnd BpProp) (EBool true)
 let or_of_list = binary_op_of_list (BOr BpProp) (EBool false)
 
@@ -121,9 +126,10 @@ let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
   match es with
   | [] -> []
   | (loc, SpecExp e)::es -> (loc, e)::(exps_of_spec_exps es)
-  | (loc, SpecLet (x, t, e))::es ->
+  | (loc, SpecLet (x, t, ex))::es ->
       let es = List.map snd (exps_of_spec_exps es) in
-      [(loc, EBind (BindLet, [e], [(x, t)], [], and_of_list es, None))]
+      let e = and_of_list es in
+      [(loc, EBind (BindLet, [ex], [(x, t)], [], e, exp_typ e))]
 
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
 

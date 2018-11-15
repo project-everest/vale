@@ -1332,7 +1332,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
   | EOp (Uop (UCustom op), es, _) ->
     (
       let f = lookup_fun env (Operator op) in
-      let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es None in
+      let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
       | (AE_Apply (_, _, es), _,  _) -> ret t (AE_Op (Uop (UCustom op), es))
@@ -1368,8 +1368,8 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       match (op, skip_loc e1) with
       | (op, EOp (Bop op1, [e11; e12], _)) when isIcmpOp op1 ->
           // Convert (a <= b) < c into (a <= b) && (b < c)
-          let e2 = EOp (Bop op, [e12; e2], None) in
-          let e = EOp (Bop (BAnd BpBool), [e1; e2], None) in
+          let e2 = eop (Bop op) [e12; e2] in
+          let e = eop (Bop (BAnd BpBool)) [e1; e2] in
           infer_exp env u e expected_typ
       | _ ->
         let (_, ae1) = infer_exp env u e1 (Some tInt) in
@@ -1405,7 +1405,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
   | EOp (Bop (BCustom op), es, _) ->
     (
       let f = lookup_fun env (Operator op) in
-      let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es None in
+      let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
       | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (Bop (BCustom op), es))
@@ -1419,7 +1419,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         | TName (Id x) | TApply (Id x, _) -> x
         | _ -> err (sprintf "cannot find overloaded operator([]) function for collection of type %s" (string_of_typ t1))
         in
-      let e = eapply (Operator (x + "[]")) [e1; e2] None in
+      let e = eapply (Operator (x + "[]")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
       | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (Subscript, es))
@@ -1433,7 +1433,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         | TName (Id x) | TApply (Id x, _) -> x
         | _ -> err (sprintf "cannot find overloaded operator([:=]) function for collection of type %s" (string_of_typ t1))
         in
-      let e = eapply (Operator (x + "[:=]")) [e1; e2; e3] None in
+      let e = eapply (Operator (x + "[:=]")) [e1; e2; e3] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
       | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (Update, es))
@@ -1447,7 +1447,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         | TName (Id x) | TApply (Id x, _) -> x
         | _ -> err (sprintf "cannot find overloaded operator(?[]) function for collection of type %s" (string_of_typ t2))
         in
-      let e = eapply (Operator (x + "?[]")) [e2; e1] None in
+      let e = eapply (Operator (x + "?[]")) [e2; e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
       | (AE_Apply (_, _, [e2; e1]), _, _) -> ret t (AE_Op (Bop BIn, [e1; e2]))
@@ -1473,7 +1473,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         | TTuple ts -> "tuple " + string (List.length ts)
         | _ -> err (sprintf "cannot find overloaded operator(.%s) function for type %s" xf (string_of_typ t1))
         in
-      let e = eapply (Operator (x1 + " ." + xf)) [e1] None in
+      let e = eapply (Operator (x1 + " ." + xf)) [e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match (t1, ae) with
       | (TTuple ts, (AE_Apply (_, _, es), _,  _)) ->
@@ -1489,7 +1489,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         | TName (Id x1) | TApply (Id x1, _) -> x1
         | _ -> err (sprintf "cannot find overloaded operator(.%s :=) function for type %s" xf (string_of_typ t1))
         in
-      let e = eapply (Operator (x1 + " ." + xf + ":=")) [e1; e2] None in
+      let e = eapply (Operator (x1 + " ." + xf + ":=")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
       | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (FieldUpdate (Id xf), es))
@@ -1803,7 +1803,9 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
   let xs = List.map2 proc_ret xs pi.p_rets in
   u_unify u None;
   let es = List.map (subst_exp env u.u_substs) aes in
-  SAssign (xs, EApply (evar p.pname, Some pi.p_targs, es, None)) // TODO: replace None with type arguments
+  let prets = List.map (fun (_, t, _, _, _) -> t) p.prets in
+  let tRet = match prets with | [] -> None | [t] -> Some t | _  -> Some (TTuple prets) in
+  SAssign (xs, EApply (evar p.pname, Some pi.p_targs, es, tRet))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements

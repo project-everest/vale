@@ -109,7 +109,7 @@ let rec string_of_exp_prec prec e =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e], t) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id (id_of_exp e)) es t1] t), prec)
+    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> (r prec (vaApp_t "reveal_opaque" [eapply_t (transparent_id (id_of_exp e)) es t1] t), prec)
     | EOp (Uop UReveal, [EVar (x, _)], t) -> ("reveal_opaque " + (sid x), 90)
     | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
@@ -122,7 +122,7 @@ let rec string_of_exp_prec prec e =
       let t = exp_typ e2 in
       match t with
       | Some (TApply (x, _)) ->
-        (r prec (vaApp ("contains_" + (sid x)) [e2; e1] t), prec)
+        (r prec (vaApp_t ("contains_" + (sid x)) [e2; e1] t), prec)
       | _ -> internalErr (sprintf "overloadded Operator ?[] missing type info: %A" e)
     | EOp (Bop op, [e1; e2], t) ->
       (
@@ -147,14 +147,14 @@ let rec string_of_exp_prec prec e =
       let t = exp_typ e1 in
       match t with
       | Some (TApply (x, _)) ->
-        (r prec (vaApp ("subscript_" + (sid x)) [e1; e2] t), prec)
+        (r prec (vaApp_t ("subscript_" + (sid x)) [e1; e2] t), prec)
       | _ ->
         internalErr (sprintf "overloadded Operator[] missing type info: %A" e)
     | EOp (Update, [e1; e2; e3], t) -> 
       let t = exp_typ e1 in
       match t with
       | Some (TApply (x, _)) ->
-        (r prec (vaApp ("update_" + (sid x)) [e1; e2; e3] t), prec)
+        (r prec (vaApp_t ("update_" + (sid x)) [e1; e2; e3] t), prec)
       | _ -> 
         internalErr (sprintf "overloadded Operator[:=] missing type info: %A" e)
     | EOp (Cond, [e1; e2; e3], t) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
@@ -461,7 +461,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
       | Some e -> printBody header true (sid (transparent_id f.fname)) e
     );
     let fArgs = List.map (fun (x, _) -> evar x) f.fargs in
-    let eOpaque = vaApp "make_opaque" [eapply (transparent_id f.fname) fArgs None] None in
+    let eOpaque = vaApp "make_opaque" [eapply (transparent_id f.fname) fArgs] in
     let header = if isRecursive then "and " else "let " in
     printBody header true (sid f.fname) eOpaque
   else if isPublicDecl then
