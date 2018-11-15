@@ -784,7 +784,7 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
       | Some p ->
           check_mods env p;
           let (lhss, args) = rewrite_vars_args rctx env p lhss es in
-          (lhss, EApply(EVar (x, None), ts, args, t))
+          (lhss, EApply(evar x, ts, args, t))
     )
   | _ -> (lhss, rewrite_vars_exp rctx env e)
 

@@ -1106,7 +1106,7 @@ let insert_cast (e:exp) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
   ECast (e, et)
 
-let rec subst_exp env (s:substitutions)((e, t, coerce):aexp):exp =
+let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
   let coerce = Option.map (fun (t, et) -> (subst_typ s t, subst_typ s et)) coerce in
   let e =
     match e with
@@ -1477,7 +1477,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let (t, ae) = infer_exp env u e expected_typ in
       match (t1, ae) with
       | (TTuple ts, (AE_Apply (_, _, es), _,  _)) ->
-          ret t (AE_Apply (EVar (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), None), ts, es))
+          ret t (AE_Apply (evar (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf)), ts, es))
       | (_, (AE_Apply (_, _, es), _, _)) -> ret t (AE_Op (FieldOp (Id xf), es))
       | _ -> internalErr ("EOp FieldOp")
     )

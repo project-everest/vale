@@ -153,12 +153,12 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let eb_alt () =
         // HACK
         match eb with
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_eq") -> EApply (EVar (Id "Cmp_eq", None), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ne") -> EApply (EVar (Id "Cmp_ne", None), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_le") -> EApply (EVar (Id "Cmp_le", None), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ge") -> EApply (EVar (Id "Cmp_ge", None), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_lt") -> EApply (EVar (Id "Cmp_lt", None), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_gt") -> EApply (EVar (Id "Cmp_gt", None), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_eq") -> EApply (evar (Id "Cmp_eq"), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ne") -> EApply (evar (Id "Cmp_ne"), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_le") -> EApply (evar (Id "Cmp_le"), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ge") -> EApply (evar (Id "Cmp_ge"), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_lt") -> EApply (evar (Id "Cmp_lt"), ts, args, t)
+        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_gt") -> EApply (evar (Id "Cmp_gt"), ts, args, t)
         | _ -> internalErr "SIfElse"
         in
       let eb = qlemma_exp eb in
