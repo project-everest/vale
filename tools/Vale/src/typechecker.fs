@@ -1306,7 +1306,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       | _ -> err "collection type literal requires exactly one type argument"
       in
     let aes = List.map (fun e -> snd (infer_exp env u e et)) es in
-    norm_ret pt.pt (AE_Apply (pt.name, pt.args, aes))
+    ret pt.pt (AE_Apply (pt.name, pt.args, aes))
   match e with
   | ELoc (loc, e) ->
       try
