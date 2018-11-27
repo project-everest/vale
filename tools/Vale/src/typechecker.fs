@@ -39,6 +39,18 @@ type proc_instance = {
 //  p_attrs:attrs;
 }
 
+type primitive_decl = {
+  name:id;
+  targs:tformal list;
+  pt: typ option;
+}
+
+type primitive_instance = {
+  name:id;
+  args:typ list;
+  pt: typ;
+}
+
 type id_info =
 | StateInfo of id * typ
 | OperandLocal of inout * typ
@@ -92,7 +104,7 @@ type primitive_type =
 
 type env = {
   decls_map:Map<id, name_info>; // map id to the decl info
-  primitives_map:Map<primitive_type, id>;
+  primitives_map:Map<primitive_type, primitive_decl>;
   include_modules:list<include_module>;
   inline_only:bool;
 //    scope_mods:list<scope_mod>; // a STACK of scope modifiers
@@ -231,11 +243,10 @@ let lookup_id (env:env) (x:id):(typ * id_info option) =
   | Some (t, info) -> (t, info)
   | _ -> err ("cannot find id '" + (err_id x) + "'")
 
-// TODO: type arguments for collections
-let lookup_primitive (env:env) (pt:primitive_type):id =
+let lookup_primitive (env:env) (pt:primitive_type):primitive_decl =
   match (Map.tryFind pt env.primitives_map, pt) with
-  | (None, PT_State) -> Id "state"
-  | (Some x, _) -> x
+  | (None, PT_State) -> let id = Id "state" in {name = id; targs = []; pt = Some (TName id)}
+  | (Some p, _) -> p
   | _ ->
       let s =
         match pt with
@@ -454,7 +465,12 @@ let push_typ (env:env) (x:id) (ts:tformal list option) (k:kind) (t:typ option) (
         | Id "set" -> PT_Set
         | _ -> err (sprintf "unknown primitive type name %s" (err_id x))
         in
-      {env with primitives_map = Map.add pt x env.primitives_map} // TODO: resolve x to fully-qualified name
+      let ts = 
+        match ts with
+        | None -> []
+        | Some ts -> ts 
+        in
+      {env with primitives_map = Map.add pt {name=x; targs=ts; pt=t} env.primitives_map} // TODO: resolve x to fully-qualified name
     else env
     in
   {env with decls_map = Map.add x (Type_info (ts, k, t)) env.decls_map}
@@ -1103,6 +1119,21 @@ let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:typ list o
     (x, t, storage, io, attrs) in
   {p_args = List.map fformal p.pargs; p_rets = List.map fformal p.prets}
 
+let compute_collection_instance (env:env) (u:unifier) (pt:primitive_type) (ts_opt: typ list option):primitive_instance =
+  let pt = lookup_primitive env pt in
+  let arg_typ = compute_instance env u pt.targs ts_opt in
+  let args =
+    match ts_opt with
+    | None -> List.map (fun (x, _, _) -> (arg_typ (TName x))) pt.targs 
+    | Some ts -> ts
+    in
+  let t =
+    match pt.pt with
+    | None -> tapply pt.name args 
+    | Some t -> arg_typ t in
+  {name = pt.name; args = args; pt = t }
+
+
 let insert_cast (e:exp) (t:typ) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
   ECast (e, et)
@@ -1266,17 +1297,15 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(norm_typ 
     ret (normalize_type env t) ae
     in
   let check_collection_literal (x:id) (pt:primitive_type) (ts_opt:typ list option) (es:exp list) =
-    let tv = u_next_type_var u in
-    let () =
-      match ts_opt with
-      | None -> ()
-      | Some [t] -> u_constrain_subtype u tv t
-      | Some _ -> err "collection type literal requires exactly one type argument"
+    let pt = compute_collection_instance env u pt ts_opt in
+    let et =
+      match pt.args with
+      | [] -> None
+      | [t] -> Some t
+      | _ -> err "collection type literal requires exactly one type argument"
       in
-    let aes = List.map (fun e -> snd (infer_exp env u e (Some tv))) es in
-    let xt = lookup_primitive env pt in
-    let t = tapply xt [tv] in
-    norm_ret t (AE_Apply (x, [tv], aes))
+    let aes = List.map (fun e -> snd (infer_exp env u e et)) es in
+    norm_ret pt.pt (AE_Apply (pt.name, pt.args, aes))
   match e with
   | ELoc (loc, e) ->
       try
@@ -1845,10 +1874,12 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
       match skip_loc e with
       | EApply (x, ts_opt, es) ->
         (
-          match (xs, lookup_fun_or_proc env x) with
-          | (([] | [_]), FoundFun _) -> assign_exp ()
-          | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
-          | (_, FoundProc p) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
+          match try_lookup_fun_or_proc env x with
+          | Some (FoundProc p) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
+          | _ -> // could be call to function or primitive collection type
+            match xs with
+            | ([] | [_]) -> assign_exp ()
+            | _ -> err ("Expected 0 or 1 return values from function")
         )
       | _ -> assign_exp ()
     )
@@ -1976,7 +2007,7 @@ let tc_proc (env:env) (p:proc_decl):(env * proc_decl) =
     let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
     let env = if isRecursive then push_proc env p.pname p else env in
     let globals = env in
-    let env = push_id_with_info env (Reserved "this") (TName (lookup_primitive env PT_State)) (Some MutableGhostLocal) in
+    let env = push_id_with_info env (Reserved "this") (TName (lookup_primitive env PT_State).name) (Some MutableGhostLocal) in
     let env = push_params_without_rets env p.pargs p.prets in
     let env = push_rets env p.prets in
 //    let env = {env with ghost = true}
