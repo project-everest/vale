@@ -725,8 +725,8 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
     | (x, t, XAlias _, io, _) ->
         let _ = rewrite_vars_arg rctx NotGhost None io env ea in // check argument validity
         [] // drop argument
-    | (x, t, XGhost, In, []) -> [EOp (Uop UGhostOnly, [rewrite_vars_exp rctx env ea])]
-    | (x, t, XGhost, _, []) -> err ("out/inout ghost parameters are not supported")
+    | (x, t, XGhost, In, _) -> [EOp (Uop UGhostOnly, [rewrite_vars_exp rctx env ea])]
+    | (x, t, XGhost, _, _) -> err ("out/inout ghost parameters are not supported")
     | (x, _, _, _, _) -> err ("unexpected argument for parameter " + (err_id x) + " in call to " + (err_id p.pname))
     in
   let rewrite_ret (pp, ((xlhs, _) as lhs)) =
@@ -735,7 +735,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
     | (x, t, XAlias _, _, _) ->
         let _ = rewrite_vars_arg rctx NotGhost None Out env (EVar xlhs) in // check argument validity
         ([], []) // drop argument
-    | (x, t, XGhost, _, []) -> ([lhs], [])
+    | (x, t, XGhost, _, _) -> ([lhs], [])
     | (x, _, _, _, _) -> err ("unexpected variable for return value " + (err_id x) + " in call to " + (err_id p.pname))
     in
   let args = List.concat (List.map rewrite_arg margs) in
@@ -1080,7 +1080,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
           let storage = match find_var x with InlineLocal _ -> XInline | _ -> XGhost in
           (in_id x, getType x, storage, In, [])
           in
-        let pf_state = (s_old, tState, XGhost, In, []) in
+        let pf_state = (s_old, tState, XGhost, In, [(Reserved "expand_state", [])]) in
         let p_ins_in = List.map to_pformal_in ins in
         let p_outs = List.map to_pformal outs in
         let subst_ins (ins:id list) (e:exp) =
@@ -1137,7 +1137,8 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_enter_body; spec_precedes];
             pbody = Some (sInits @ b);
-            pattrs = (Id "already_has_mod_ok", [])::p.pattrs;
+            // always non-public, even if they are generated from the body of a public procedure
+            pattrs = [(Id "public", [EBool false]); (Id "already_has_mod_ok", [])] @ p.pattrs;
           }
           in
         let p_while =

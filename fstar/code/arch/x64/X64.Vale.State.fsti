@@ -1,6 +1,7 @@
 module X64.Vale.State
 // This interface should not refer to Semantics_s
 
+open Defs_s
 open Prop_s
 open X64.Machine_s
 

@@ -246,13 +246,17 @@ let rec parse_exp (e:raw_exp):f_exp =
   | RList [RLtGt _; e; RList us] -> EAppUnivs (parse_exp e, parse_univs us)
   | RList [RArrow _; RList ((RMatch _)::_); _] -> EUnsupported "MATCH"
   | RList [RArrow _; e1; e2] ->
-      let (a, e1) = get_aqual e1 in
-      let (x, e1) =
-        match e1 with
-        | RList [RColon _; RId (_, x); e1] -> (parse_id x, e1)
-        | _ -> err ("parse_exp: RArrow: " + string_of_raw_exp e)
-        in
-      EArrow (a, x, parse_exp e1, parse_exp e2)
+      try
+      (
+        let (a, e1) = get_aqual e1 in
+        let (x, e1) =
+          match e1 with
+          | RList [RColon _; RId (_, x); e1] -> (parse_id x, e1)
+          | _ -> err ("parse_exp: RArrow: " + string_of_raw_exp e)
+          in
+        EArrow (a, x, parse_exp e1, parse_exp e2)
+      )
+      with Err s -> EUnsupported s
   | RList [RColon _; e1; RId (_, ("Tm_type" | "Tm_delayed-resolved"))] -> parse_exp e1
   | RList [RColon _; e1; RList [RColon _; RId (_, ("Tm_name" | "Tm_fvar")); _]] -> parse_exp e1
   | RList [RColon _; e1; e2] -> ETyped (parse_exp e1, parse_exp e2)
@@ -1101,8 +1105,11 @@ let main (argv:string array) =
           printfn "%s" err;
           printfn "\nerror at line %i column %i of string\n%s" (line lexbuf) (col lexbuf) (file lexbuf)
       in
-    !close_streams ()
+    ()
     in
+  let print_err_exit (err:string):unit =
+    print_err err;
+    !close_streams ()
   try
   (
     let parse_argv (args:string list) =
@@ -1198,6 +1205,10 @@ let main (argv:string array) =
         in
       ds
       in
+    let parse_block s =
+      try parse_block s with
+      | err -> print_err (err.ToString ()); []
+      in
     let ds = List.collect parse_block blocks in
     let ds = filter_decls ds in
     let ds = List.map decl_lift_type_binders ds in
@@ -1228,9 +1239,9 @@ let main (argv:string array) =
     ()
   )
   with
-  | Err err -> print_err err
-  | ParseErr err -> print_err err
-  | Failure err -> print_err err
-  | err -> print_err (err.ToString ())
+  | Err err -> print_err_exit err
+  | ParseErr err -> print_err_exit err
+  | Failure err -> print_err_exit err
+  | err -> print_err_exit (err.ToString ())
 
 let () = main (System.Environment.GetCommandLineArgs ())

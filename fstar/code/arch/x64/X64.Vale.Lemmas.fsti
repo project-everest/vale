@@ -1,4 +1,5 @@
 module X64.Vale.Lemmas
+open Defs_s
 open Prop_s
 open X64.Machine_s
 open X64.Vale.State

@@ -102,7 +102,7 @@ let rec string_of_exp_prec prec e =
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
     | EOp (Uop UReveal, [EApply (x, _, es)]) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id x) es]), prec)
-    | EOp (Uop UReveal, [EVar x]) -> ("(reveal_opaque " + (sid x) + ")", prec)
+    | EOp (Uop UReveal, [EVar x]) -> ("reveal_opaque " + (sid x), 90)
     | EOp (Uop (UNot BpBool), [e]) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e]) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
@@ -132,10 +132,10 @@ let rec string_of_exp_prec prec e =
     | EOp (Subscript, [e1; e2]) -> (r prec (vaApp "subscript" [e1; e2]), prec)
     | EOp (Update, [e1; e2; e3]) -> (r prec (vaApp "update" [e1; e2; e3]), prec)
     | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
-    | EOp (FieldOp x, [e]) -> ((r 90 e) + "." + (sid x), 90)
+    | EOp (FieldOp x, [e]) -> ((r 95 e) + "." + (sid x), 95)
     | EOp (FieldUpdate x, [e1; e2]) -> ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
-    | EApply (x, _, es) -> ("(" + (sid x) + " " + (string_of_args es) + ")", 90)
+    | EApply (x, _, es) -> ((sid x) + " " + (string_of_args es), 90)
     | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
@@ -160,9 +160,9 @@ and string_of_triggers (ts:exp list list):string =
     | [] -> ""
     | [t] -> "{:pattern" + string_of_trigger t + "}"
     | _::_::_ -> "{:pattern " + String.concat "\/ " (List.map string_of_trigger ts) + "}"
-and string_of_exp (e:exp):string = string_of_exp_prec 90 e
+and string_of_exp (e:exp):string = string_of_exp_prec 99 e
+and string_of_exp90 (e:exp):string = string_of_exp_prec 90 e
 and string_of_exps (es:exp list):string = String.concat " " (List.map string_of_exp es)
-and string_of_exps_tail (es:exp list):string = String.concat "" (List.map (fun e -> " " + string_of_exp e) es)
 and string_of_args (es:exp list):string = match es with [] -> "()" | _ -> string_of_exps es
 
 let name_of_formal (x:id, t:typ option) = sid x
@@ -212,14 +212,14 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
   | SVar (x, tOpt, _, g, a, None) -> () // used to forward-declare variables for SLetUpdates
   | SVar (x, tOpt, _, g, a, Some e) ->
       let sf = string_of_formal (x, tOpt) in
-      let rhs = " = " + (string_of_exp e) in
+      let rhs = " = " + (string_of_exp90 e) in
       ps.PrintLine ((string_of_var_storage g) + "let " + sf + rhs + " in")
   | SAlias _ -> internalErr "SAlias"
-  | SAssign ([], e) -> ps.PrintLine ((string_of_exp e) + ";")
+  | SAssign ([], e) -> ps.PrintLine ((string_of_exp90 e) + ";")
   | SAssign ([lhs], e) ->
-      ps.PrintLine ("let " + (string_of_lhs_formal lhs) + " = " + (string_of_exp e) + " in")
+      ps.PrintLine ("let " + (string_of_lhs_formal lhs) + " = " + (string_of_exp90 e) + " in")
   | SAssign ((_::_::_) as lhss, e) ->
-      ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_lhs_formal lhss)) + ") = " + (string_of_exp e) + " in")
+      ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_lhs_formal lhss)) + ") = " + (string_of_exp90 e) + " in")
   | SLetUpdates (outs, s) ->
       ps.PrintLine ("let (" + (String.concat ", " (List.map string_of_formal outs)) + ") =");
       ps.PrintLine "(";
@@ -230,7 +230,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
   | SBlock ss -> notImplemented "block"
   | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, ss2) ->
-      ps.PrintLine ("if " + (string_of_exp e) + " then");
+      ps.PrintLine ("if " + (string_of_exp90 e) + " then");
       emit_block ps "" outs ss1;
       ps.PrintLine ("else");
       emit_block ps (match outs with None -> ";" | Some _ -> "") outs ss2
@@ -250,7 +250,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
         | ([], _) -> ()
         in
       ps.PrintLine "=";
-      ps.PrintLine ("if " + (string_of_exp e) + " then");
+      ps.PrintLine ("if " + (string_of_exp90 e) + " then");
       ps.Indent ();
       ps.PrintLine ("let " + (string_of_outs_formals outs) + " =");
       emit_block ps "" outs ss;
@@ -384,7 +384,11 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isOpaque = isOpaque && not isAdmit in
   let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
-  let ps = match (isPublic, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
+  // write everything to *.fsti if it is public and not opaque or publicDecl. 
+  // For opaque and publicDecl, only "val" is written into *.fsti if it is public, 
+  // everything else goes into *.fst regardless if it is public or not.
+  let writeToPsi = isPublic && not (isOpaque || isPublicDecl) 
+  let ps = match (writeToPsi, ps.print_interface) with (true, Some psi) -> psi | _ -> ps in
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   emit_laxness ps f.fattrs;
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
@@ -404,7 +408,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
-    psi.PrintLine (sVal (sid f.fname) decreases1);
+    if isPublic then
+      psi.PrintLine (sVal (sid f.fname) decreases1);
+    else
+      ps.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid (transparent_id f.fname)) e
@@ -414,7 +421,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     let header = if isRecursive then "and " else "let " in
     printBody header true (sid f.fname) eOpaque
   else if isPublicDecl then
-    psi.PrintLine (sVal (sid f.fname) decreases1);
+    if isPublic then 
+      psi.PrintLine (sVal (sid f.fname) decreases1);
+    else
+      ps.PrintLine (sVal (sid f.fname) decreases1);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid f.fname) e
@@ -434,6 +444,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
+  let isPublic = attrs_get_bool (Id "public") false p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let decreaseExps = attrs_get_exps_opt (Id "decrease") p.pattrs in
   let isAdmit = attrs_get_bool (Id "admit") false p.pattrs in
@@ -451,7 +462,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
     let sDep = if isDependent then "|" else "" in
-    ps.PrintLine ("(ensures (" + (match p.prets with [] -> "" | _ -> "fun (" + sDep + sprets + sDep + ") -> ") + (string_of_exp es) + "))");
+    ps.PrintLine ("(ensures (" + (match p.prets with [] -> "" | _ -> "fun (" + sDep + sprets + sDep + ") -> ") + (string_of_exp_prec 5 es) + "))");
     ps.Unindent ();
     in
   let dArgs = match decreaseExps with Some es -> es | None -> List.map (fun (x, _) -> EVar x) args in
@@ -459,6 +470,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
     | (_, _) ->
+        let psi = if isPublic then psi else ps
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
         printPType psi "-> " decreases0
   );
