@@ -17,6 +17,7 @@ let ktype1 = KType bigint.One
 
 let tapply (x:id) (ts:typ list):typ = TApply (x, ts)
 let eapply (x:id) (es:exp list):exp = EApply (x, None, es)
+let eapply_t (x:id) (ts:typ list option) (es:exp list):exp = EApply (x, ts, es)
 let eapply_opt (x:id) (es:exp list):exp = match es with [] -> EVar x | _ -> eapply x es
 
 let List_mapFold (f:'s -> 't -> 'r * 's) (s:'s) (ts:'t list):('r list * 's) =

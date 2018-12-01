@@ -1,6 +1,8 @@
-include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
+//include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
 
 module Test
+
+var{:state ok()} ok:bool;
 
 #verbatim{:interface}{:implementation}
 open X64.Machine_s
@@ -8,7 +10,7 @@ open X64.Vale.Decls
 open X64.Vale.InsBasic
 #endverbatim
 
-procedure p()
+/* procedure p()
     modifies
         rax; efl;
     requires
@@ -60,4 +62,22 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
 {
     g2 := g1 + 1;
 }
+*/
 
+procedure p #[#a : Type(0)]
+  (ghost g1 : a) returns (ghost g2 : a)
+{
+  g2 := g1;
+}
+
+procedure p1 (ghost g1:int) returns(ghost g2:int)
+{
+  g2 := p(g1);
+}
+
+type{:primitive} list(a:Type(0)):Type(0) := Prims.list(a);
+procedure List() /* returns (ghost l: list(bool)) */
+{
+  ghost var l := list(10, 20, 30);
+  //ghost var ll:list(bool) := l;
+}

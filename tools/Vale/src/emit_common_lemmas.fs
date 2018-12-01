@@ -158,7 +158,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (x, _, es) when is_proc env x NotGhost ->
+    | EApply (x, ts, es) when is_proc env x NotGhost ->
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
         let (pretsOp, pretsNonOp) = List.partition (fun (_, _, storage, _, _) -> match storage with XOperand -> true | _ -> false) p.prets in
@@ -168,7 +168,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
         let es = List.map (map_exp stateToOp) es in
         let xLemma = "lemma_" + (string_of_id x) in
         let bh = if total then vaApp "hd" [EVar senv.b1] else EVar senv.b1 in
-        let lem = vaApp xLemma ([bh; EVar s0] @ listIfNot total [EVar senv.sN] @ es) in
+        let lem = vaApp_t xLemma ts ([bh; EVar s0] @ listIfNot total [EVar senv.sN] @ es) in
         let blockLhss = List.map varLhsOfId (if total then [sM; senv.fM] else [senv.bM; sM]) in
         let sLem = SAssign (blockLhss @ lhss, lem) in
         (NotGhost, false, [sLem])

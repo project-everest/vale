@@ -197,3 +197,6 @@ procedure{:typecheck}{:testShouldFail} Fail()
 {
     let y:bool := id(100);
 }
+
+var{:register eax}{:testShouldFail} b:bool;
+var{:register eax} r:int;

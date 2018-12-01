@@ -69,6 +69,10 @@ let string_of_bop (op:bop):string =
 let string_of_ghost (g:ghost) = ""
 let string_of_var_storage (g:var_storage) = ""
 
+let string_of_kind (k:kind):string =
+  match k with
+  | KType i -> "Type" + string i
+  | KDependent id -> internalErr ("not implemented yet")
 
 let rec string_of_typ (t:typ):string =
   match t with
@@ -86,6 +90,17 @@ let rec string_of_typ (t:typ):string =
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
+
+let string_of_type_argument (t:typ):string =
+  match t with
+  | TInt (_, _) -> "int"
+  | TTuple [] -> "unit"
+  | _ -> "#" + string_of_typ t 
+let string_of_type_arguments (ts:typ list option):string =
+  match ts with  
+  | None -> "" 
+  | Some [] -> ""  
+  | Some ts -> String.concat " " (List.map string_of_type_argument ts) + " "
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -135,7 +150,7 @@ let rec string_of_exp_prec prec e =
     | EOp (FieldOp x, [e]) -> ((r 95 e) + "." + (sid x), 95)
     | EOp (FieldUpdate x, [e1; e2]) -> ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
-    | EApply (x, _, es) -> ((sid x) + " " + (string_of_args es), 90)
+    | EApply (x, ts, es) -> ((sid x) + " " + (string_of_type_arguments ts) + (string_of_args es), 90)
     | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)
     | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
     | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
@@ -152,6 +167,8 @@ and string_of_ret (x:id, t:typ option) = match t with None -> internalErr (sprin
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formals (xs:formal list):string = String.concat " " (List.map string_of_formal xs)
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
+and string_of_targ (x:id, k:kind, i:type_infer):string = (sid x) + ":" + (string_of_kind k)
+and string_of_targ_bare (x:id, k:kind, i:type_infer):string = sid x
 and string_of_pformal (x:id, t:typ, _, _, _) = string_of_formal (x, Some t)
 and string_of_pformals (xs:pformal list):string = String.concat " " (List.map string_of_pformal xs)
 and string_of_trigger (es:exp list):string = String.concat "; " (List.map string_of_exp es)
@@ -179,6 +196,16 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   match xs with
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
+
+let val_string_of_targs (ts:tformal list) =
+  match ts with
+  | [] -> ""
+  | _ -> String.concat " -> " (List.map string_of_targ ts) + " -> "
+
+let let_string_of_targs (ts:tformal list) =
+  match ts with
+  | [] -> ""
+  | _ -> String.concat " " (List.map string_of_targ_bare ts) + " "
 
 let string_of_decrease (es:exp list) n =
   match es with
@@ -471,16 +498,17 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     | (Some _, None) -> ()
     | (_, _) ->
         let psi = if isPublic then psi else ps
-        psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
+        psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_targs p.ptargs) + (val_string_of_formals args));
         printPType psi "-> " decreases0
   );
   ( match p.pbody with
     | None -> ()
     | Some ss ->
+        let targs = let_string_of_targs p.ptargs in
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
         (if not isReducible then ps.PrintLine "[@\"opaque_to_smt\"]");
         let header = if isRecursive then "let rec " else "let " in
-        ps.PrintLine (header + (sid p.pname) + " " + formals + " =")
+        ps.PrintLine (header + (sid p.pname) + " " + targs + formals + " =")
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");
         ps.Indent ();
         let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in

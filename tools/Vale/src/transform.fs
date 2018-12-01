@@ -51,6 +51,7 @@ let empty_env:env =
   }
 
 let vaApp (s:string) (es:exp list):exp = eapply (Reserved s) es
+let vaApp_t (s:string) (ts:typ list option) (es:exp list):exp = eapply_t (Reserved s) ts es
 
 let vaAppOp (prefix:string) (t:typ) (es:exp list):exp =
   match t with
