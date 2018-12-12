@@ -613,9 +613,9 @@ def verify_fstar_file(options, targetfile, sourcefile, fstar_includes):
   dump_flags = ('--print_implicits --print_universes --print_effect_args --print_full_names' +
     ' --print_bound_var_types --ugly ' + dump_module_flag)
   env.Command(dumptargetfile, sourcefile,
-    f'{fstar_exe} {sourcefile} {options.verifier_flags} {fstar_z3_path}' +
+    f'{fstar_exe} {sourcefile} {options.verifier_flags} {fstar_z3_path} --admit_smt_queries true' +
     f' {fstar_includes} {" ".join(fstar_user_args)}' +
-    f' {dump_flags} 1>{dumptargetfile} 2>&1')
+    f' {dump_flags} 1>{dumptargetfile} 2> {dumptargetfile}.stderr')
   Depends(dumptargetfile, targetfile)
 
 # Scan a .dfy file to discover its dependencies, and add .dfy.verified targets for each.
@@ -926,8 +926,8 @@ def compute_fstar_deps(env, src_directories, fstar_includes):
           dump_flags = ('--print_implicits --print_universes --print_effect_args --print_full_names' +
             ' --print_bound_var_types --ugly ' + dump_module_flag)
           env.Command(dumptargetfile, t,
-            f'{fstar_exe} {t} {fstar_z3_path}' +
-            f' {dump_flags} 1>{dumptargetfile} 2>&1')
+            f'{fstar_exe} {t} {fstar_z3_path} --admit_smt_queries true' +
+            f' {dump_flags} 1>{dumptargetfile} 2> {dumptargetfile}.stderr')
         if not (dumptargetfile in dump_deps):
           dump_deps[dumptargetfile] = set()
         for s in sources:
