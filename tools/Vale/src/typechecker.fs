@@ -126,9 +126,29 @@ type aexp_t =
 | AE_Exp of exp
 | AE_Op of op * aexp list
 | AE_Apply of id * typ list * aexp list
-| AE_Bind of bindOp * aexp list * formal list * triggers * aexp
+| AE_Bind of bindOp * aexp list * formal list * atriggers * aexp
 | AE_Cast of aexp * typ
 and aexp = aexp_t * (typ * typ) option
+and atriggers = aexp list list
+
+// type annotated stmt
+type astmt =
+| AS_Loc of loc * astmt
+| AS_Stmt of stmt
+| AS_Assume of aexp
+| AS_Assert of assert_attrs * aexp
+| AS_Calc of bop option * acalcContents list
+| AS_Var of id * typ * mutability * var_storage * attrs * aexp option
+| AS_Assign of lhs list * aexp
+| AS_LetUpdates of formal list * astmt // used to turn imperative updates into functional 'let' assignments
+| AS_Block of astmt list
+| AS_QuickBlock of quick_info * astmt list // optimized proof for statements in block
+| AS_IfElse of stmt_modifier * aexp * astmt list * astmt list
+| AS_While of aexp * (loc * aexp) list * (loc * aexp list) * astmt list
+| AS_Forall of formal list * atriggers * aexp * aexp * astmt list
+| AS_Exists of formal list * atriggers * aexp
+and acalcContents = {acalc_exp:aexp; acalc_op:bop option; acalc_hints:astmt list list}
+
 
 let name_of_id x =
   let s = match x with Id s | Reserved s | Operator s -> s in
@@ -1220,8 +1240,9 @@ let rec subst_exp env (s:substitutions) ((e, coerce):aexp):exp =
         let es = List.map (subst_exp env s) aes in
         let ts = List.map (subst_typ s) ts in
         EApply (x, Some ts, es)
-    | AE_Bind (bOp, aes, xs, ts, ae) ->
+    | AE_Bind (bOp, aes, xs, ats, ae) ->
         let es = List.map (subst_exp env s) aes in
+        let ts = List.map (List.map (subst_exp env s)) ats in
         let e = subst_exp env s ae in
         EBind(bOp, es, xs, ts, e)
     | AE_Cast (ae, t) ->
@@ -1617,12 +1638,14 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       // ts: triggers
       // e: prop
       let env = List.fold (fun env (x, t) -> let t = match t with Some t -> t | None -> u_next_type_var u in push_id env x t) env fs in
+      let ts = List.map (List.map (fun e -> let (t, ae) = infer_exp env u e None in ae)) ts
       let (t, ae) = infer_exp env u e expected_typ in
       u_constrain_subtype u t tProp;
       ret t (AE_Bind (b, [], fs, ts, ae))
   | EBind (Lambda, [], xs, ts, e) ->
       let xs = List.map (fun (x, t) -> match t with Some t -> (x, t) | None -> (x, u_next_type_var u)) xs in
       let env = List.fold (fun env (x, t) -> push_id env x t) env xs in
+      let ts = List.map (List.map (fun e -> let (t, ae) = infer_exp env u e None in ae)) ts
       let (t, ae) = infer_exp env u e None in
       let ae = AE_Bind (Lambda, [], List.map (fun (x, t) -> (x, Some t)) xs, ts, ae) in
       ret (TFun (List.map snd xs, t)) ae
@@ -1678,9 +1701,9 @@ let tc_exp (env:env) (e:exp) (et:typ option):(typ * exp) =
   //| UnsupportedErr s -> printfn "%s" s; (TTuple [], e)
   | err -> (match locs_of_exp e with [] -> raise err | loc::_ -> locErr loc err)
 
-let rec update_env_stmt (env:env) (s:stmt):env =
+let rec update_env_stmt (env:env) (u:unifier) (s:stmt):env =
   match s with
-  | SLoc (loc, s) -> update_env_stmt env s
+  | SLoc (loc, s) -> update_env_stmt env u s
   | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SCalc _ -> env
   | SVar (x, t, m, g, a, eOpt) ->
     (
@@ -1694,11 +1717,31 @@ let rec update_env_stmt (env:env) (s:stmt):env =
   | SAssign (xs, e) ->
     push_lhss env xs
   | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> env
-  | SForall (xs, ts, ex, e, b) ->
-    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> internalErr "update_env_stmt" in push_id env x t) env xs
+  | SForall (xs, ts, ex, e, b) -> 
+    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> u_next_type_var u in push_id env x t) env xs
   | SExists (xs, ts, e) ->
-    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> internalErr "update_env_stmt" in push_id env x t) env xs
+    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> u_next_type_var u in push_id env x t) env xs
 
+let rec update_env_infer_stmt (env:env) (u:unifier) (s:astmt):env =
+  match s with
+  | AS_Loc (loc, s) -> update_env_infer_stmt env u s
+  | AS_Stmt (SAlias (x, y)) ->
+    (
+      let (t, _) = lookup_id env y in
+      push_id env x t
+    )
+  | AS_Var (x, t, m, g, a, eOpt) ->
+    (
+      let info = match (m, g) with (Mutable, XGhost) -> Some MutableGhostLocal | _ -> None in
+      push_id_with_info env x t info
+    )
+  | AS_Assign (xs, e) ->
+    push_lhss env xs
+  | AS_Forall (xs, ts, ex, e, b) -> 
+    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> u_next_type_var u in push_id env x t) env xs
+  | AS_Exists (xs, ts, e) ->
+    List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> u_next_type_var u in push_id env x t) env xs
+  | _ -> env
 
 (*
 let resolve_id env id:unit =
@@ -1812,8 +1855,7 @@ let assign_local (env:env) (x:id):typ =
 // TODO: check that global variable names are distinct
 // TODO: check that local variable names are distinct
 
-let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:typ list option) (es:exp list):stmt =
-  let u = new_unifier env loc in
+let tc_proc_call (env:env) (u:unifier) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:typ list option) (es:exp list):astmt =
   let pi = compute_proc_instance env u p ts_opt in
   let nxs = List.length xs in
   let nes = List.length es in
@@ -1833,38 +1875,35 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
     | (x, Some (Some tx, Ghost)) -> check_subtype x tx; lhs
     | (x, Some (_, NotGhost)) -> err (sprintf "variable '%s' must be ghost" (err_id x))
   let xs = List.map2 proc_ret xs pi.p_rets in
-  u_unify u None;
-  let es = List.map (subst_exp env u.u_substs) aes in
-  let ts = List.map (subst_typ u.u_substs) pi.p_targs in
-  SAssign (xs, EApply (p.pname, (Some ts), es))
+  let ts = pi.p_targs in
+  AS_Assign (xs, (AE_Apply (p.pname, ts, aes),  None))
 
-let rec tc_stmt (env:env) (s:stmt):stmt =
-  // TODO: need typing rules for statements
+let rec infer_stmt (env:env) (u:unifier) (s:stmt):astmt =
   match s with
-  | SLoc (loc, s) -> try SLoc (loc, tc_stmt env s) with err -> locErr loc err
+  | SLoc (loc, s) -> try AS_Loc (loc, infer_stmt env u s) with err -> locErr loc err
   | SLabel x -> err "labels are not supported"
   | SGoto x -> err "goto statements are not supported"
-  | SReturn -> s
-  | SAssume e -> let (_, e) = tc_exp env e (Some tProp) in SAssume e
-  | SAssert (attrs, e) -> let (_, e) = tc_exp env e (Some tProp) in SAssert (attrs, e)
-  | SCalc (oop, contents) -> SCalc (oop, tc_calc_contents env contents)
+  | SReturn -> AS_Stmt s
+  | SAssume e -> let (_, ae) = infer_exp env u e (Some tProp) in AS_Assume ae
+  | SAssert (attrs, e) -> let (_, ae) = infer_exp env u e (Some tProp) in AS_Assert (attrs, ae)
+  | SCalc (oop, contents) -> AS_Calc (oop, infer_calc_contents env u contents)
   | SVar (x, tOpt, m, g, a, eOpt) ->
     (
       (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());
       let (t, eOpt) =
-        let etOpt = match eOpt with | Some e -> Some (tc_exp env e tOpt) | _ -> None in
+        let etOpt = match eOpt with | Some e -> Some (infer_exp env u e tOpt) | _ -> None in
         match (tOpt, etOpt) with
         | (None, None) -> err "variable declaration must have a type or an initial expression"
-        | (None, Some (t, e)) -> (t, Some e)
+        | (None, Some (t, ae)) -> (t, Some ae)
         | (Some t, None) -> (t, None)
-        | (Some t, Some (_, e)) -> (t, Some e)
+        | (Some t, Some (_, ae)) -> (t, Some ae)
         in
-      SVar (x, Some t, m, g, a, eOpt)
+      AS_Var (x, t, m, g, a, eOpt)
     )
-  | SAlias (x, y) -> s // TODO resolve_id env y; s
+  | SAlias (x, y) -> AS_Stmt s // TODO resolve_id env y; s
   | SAssign ([], EOp (Uop UReveal, [EVar x])) ->
       //TODO: let _ = lookup_fun env x in
-      s
+      AS_Stmt s
   | SAssign (xs, e) ->
     (
       let assign_exp () =
@@ -1877,14 +1916,14 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
           | [] -> (None, fun _ -> xs)
           | _::_::_ -> internalErr "assign_exp"
           in
-        let (t, e) = tc_exp env e et in
-        SAssign (ft t, e)
+        let (t, ae) = infer_exp env u e et in
+        AS_Assign (ft t, ae)
         in
       match skip_loc e with
       | EApply (x, ts_opt, es) ->
         (
           match try_lookup_fun_or_proc env x with
-          | Some (FoundProc p) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
+          | Some (FoundProc p) -> tc_proc_call env u (loc_of_exp_opt e) p xs ts_opt es
           | _ -> // could be call to function or primitive collection type
             match xs with
             | ([] | [_]) -> assign_exp ()
@@ -1893,49 +1932,115 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
       | _ -> assign_exp ()
     )
   | SLetUpdates _ -> internalErr "SLetUpdates"
-  | SBlock b -> let (env, b) = tc_stmts env b in SBlock b
-  | SQuickBlock (x, b) -> let (env, b) = tc_stmts env b in SQuickBlock (x, b)
+  | SBlock b -> let ab = infer_stmts env u b in AS_Block ab
+  | SQuickBlock (x, b) -> let ab = infer_stmts env u b in AS_QuickBlock (x, ab)
   | SIfElse (g, e, b1, b2) ->
       // TODO: check ghostness specified by g (here and in other statements)
-      let (t, e) = tc_exp env e (Some tBool) in
-      let (_, b1) = tc_stmts env b1 in
-      let (_, b2) = tc_stmts env b2 in
-      SIfElse (g, e, b1, b2)
+      let (t, ae) = infer_exp env u e (Some tBool) in
+      let b1 = infer_stmts env u b1 in
+      let b2 = infer_stmts env u b2 in
+      AS_IfElse (g, ae, b1, b2)
   | SWhile (e, invs, ed, b) ->
-      let (t, e) = tc_exp env e (Some tBool) in
-      let invs = List_mapSnd (fun e -> let (_, e) = tc_exp env e (Some tProp) in e) invs in
-      let ed = mapSnd (List.map (fun e -> let (_, e) = tc_exp env e None in e)) ed in
-      let (_, b) = tc_stmts env b in
-      SWhile (e, invs, ed, b)
+      let (t, ae) = infer_exp env u e (Some tBool) in
+      let invs = List_mapSnd (fun e -> let (_, ae) = infer_exp env u e (Some tProp) in ae) invs in
+      let aed = mapSnd (List.map (fun e -> let (_, ae) = infer_exp env u e None in ae)) ed in
+      let ab = infer_stmts env u b in
+      AS_While (ae, invs, aed, ab)
   | SForall (xs, ts, ex, e, b) ->
-      // TODO: xs
-      // TODO: ts
-      let env1 = update_env_stmt env s in
-      let (t, ex) = tc_exp env1 ex (Some tProp) in
-      let (_, e) = tc_exp env1 e (Some tProp) in
-      let (env, b) = tc_stmts env1 b in
-      SForall (xs, ts, ex, e, b)
+      let env1 = update_env_stmt env u s in
+      let ts = List.map (List.map (fun e -> let (t, ae) = infer_exp env1 u e None in ae)) ts
+      let (t, aex) = infer_exp env1 u ex (Some tProp) in
+      let (_, ae) = infer_exp env1 u e (Some tProp) in
+      let ab = infer_stmts env1 u b in
+      AS_Forall (xs, ts, aex, ae, ab)
   | SExists (xs, ts, e) ->
-      // TODO: xs
-      // TODO: ts
-      let env1 = update_env_stmt env s in
-      let (_, e) = tc_exp env1 e (Some tProp) in
-      SExists (xs, ts, e)
-and tc_stmts (env:env) (ss:stmt list):(env * stmt list) =
+      let env1 = update_env_stmt env u s in
+      let ts = List.map (List.map (fun e -> let (t, ae) = infer_exp env1 u e None in ae)) ts
+      let (_, ae) = infer_exp env1 u e (Some tProp) in
+      AS_Exists (xs, ts, ae)
+and infer_calc_content (env:env) (u:unifier) (cc:calcContents):acalcContents =
+  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+  let (t, ae) = infer_exp env u e None in
+  let ahints = List.map (fun h -> let ss = infer_stmts env u h in ss) hints in
+  {acalc_exp = ae; acalc_op = oop; acalc_hints = ahints}
+and infer_calc_contents (env:env) (u:unifier) (contents:calcContents list):acalcContents list = List.map (fun c -> infer_calc_content env u c) contents
+and infer_stmts (env:env) (u:unifier) (ss:stmt list):astmt list =
   let (env, ss_rev) =
     List.fold
       (fun (env, l) s ->
-        let (ts:stmt) = tc_stmt env s in (update_env_stmt env ts, ts::l))
+        let ts = infer_stmt env u s in
+        let env = update_env_infer_stmt env u ts in
+        (env, ts::l))
+      (env, [])
+      ss
+    in
+  List.rev ss_rev
+
+let rec subst_stmt (env:env) (m:substitutions) (s:astmt):(stmt) =
+  match s with
+  | AS_Loc (l, s) -> SLoc (l, subst_stmt env m s)
+  | AS_Stmt s -> s
+  | AS_Assume ae -> SAssume (subst_exp env m ae)
+  | AS_Assert (attrs, ae) -> SAssert (attrs, (subst_exp env m ae))
+  | AS_Calc (bop, acalc) -> SCalc (bop, (subst_calc_contents env m acalc))
+  | AS_Var (x, t, mu, g, a, eOpt) ->
+    let t = subst_typ m t in
+    let eOpt = match eOpt with Some ae -> Some (subst_exp env m ae) | _ -> None in
+    SVar(x, (Some t), mu, g, a, eOpt)
+  | AS_Assign (ls, ae) -> SAssign(ls, subst_exp env m ae)
+  | AS_LetUpdates (fs, s) -> SLetUpdates (fs, subst_stmt env m s)
+  | AS_Block ss -> SBlock (subst_stmts env m ss)
+  | AS_QuickBlock (q, ss) -> SQuickBlock (q, subst_stmts env m ss)
+  | AS_IfElse (g, ae, ab1, ab2) -> SIfElse (g, (subst_exp env m ae), (subst_stmts env m ab1), (subst_stmts env m ab2))
+  | AS_While (ae, ainvs, aed, ab) -> 
+    let e = subst_exp env m ae in
+    let invs = List_mapSnd (fun e -> subst_exp env m e) ainvs in
+    let ed = mapSnd (List.map (fun e -> subst_exp env m e)) aed in
+    let b = subst_stmts env m ab in
+    SWhile (e, invs, ed, b)
+  | AS_Forall (xs, ats, aex, ae, ab) ->
+    let ts = List.map (List.map (subst_exp env m)) ats in
+    let ex = subst_exp env m aex in
+    let e = subst_exp env m ae in
+    let b = subst_stmts env m ab in
+    SForall (xs, ts, ex, e, b)
+  | AS_Exists (xs, ats, ae) ->
+    let ts = List.map (List.map (subst_exp env m)) ats in
+    SExists (xs, ts, (subst_exp env m ae))
+and subst_stmts (env:env) (m:substitutions) (ss: astmt list) =
+  let ss_rev =
+    List.fold
+      (fun l s ->
+        let ts = subst_stmt env m s in ts::l)
+      []
+      ss
+    in
+  List.rev ss_rev
+and subst_calc_content (env:env) (m:substitutions) (cc:acalcContents):calcContents =
+  let {acalc_exp = ae; acalc_op = oop; acalc_hints = ahints} = cc in
+  let e = subst_exp env m ae in
+  let hints = List.map (fun h -> let ss = subst_stmts env m h in ss) ahints in
+  {calc_exp = e; calc_op = oop; calc_hints = hints}
+and subst_calc_contents (env:env) (m:substitutions) (contents:acalcContents list):calcContents list = List.map (fun c -> subst_calc_content env m c) contents
+
+let tc_stmt (env:env) (s:stmt):(env * stmt) =
+  let u = new_unifier env (loc_of_stmt_opt s) in
+  // TODO: need typing rules for statements
+  let a = infer_stmt env u s in
+  u_unify u None;
+  let s = subst_stmt env u.u_substs a in
+  let env = update_env_stmt env u s in
+  (env, s)
+
+let tc_stmts (env:env) (ss:stmt list):(env * stmt list) =
+  let (env, ss_rev) =
+    List.fold
+      (fun (env, l) s ->
+        let (env, ts) = tc_stmt env s in (env, ts::l))
       (env, [])
       ss
     in
   (env, List.rev ss_rev)
-and tc_calc_content (env:env) (cc:calcContents):calcContents =
-  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
-  let (t, e) = tc_exp env e None in
-  let hints = List.map (fun h -> let (env, ss) = tc_stmts env h in ss) hints in
-  {calc_exp = e; calc_op = oop; calc_hints = hints}
-and tc_calc_contents (env:env) (contents:calcContents list):calcContents list = List.map (fun c -> tc_calc_content env c) contents
 
 let tc_spec (env:env) (loc:loc, s:spec):(env * (loc * spec) list) =
   match s with

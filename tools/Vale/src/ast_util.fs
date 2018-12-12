@@ -283,6 +283,9 @@ let locs_of_stmt (s:stmt):loc list =
     | _ -> List.concat locs
   in gather_stmt fs fe s
 
+let loc_of_stmt_opt (s:stmt):loc option =
+  match locs_of_stmt s with [] -> None | h::t -> Some h
+
 let one_loc_of_stmt (defaultLoc:loc) (s:stmt):loc =
   match locs_of_stmt s with [] -> defaultLoc | h::t -> h
 
