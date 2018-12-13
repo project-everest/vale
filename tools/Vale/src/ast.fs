@@ -66,15 +66,15 @@ type bindOp =
 
 type exp =
 | ELoc of loc * exp
-| EVar of id
+| EVar of id * typ option
 | EInt of bigint
 | EReal of string
 | EBitVector of int * bigint
 | EBool of bool
 | EString of string
-| EOp of op * exp list
-| EApply of id * typ list option * exp list // TODO: change to exp * typ list option * exp list
-| EBind of bindOp * exp list * formal list * triggers * exp
+| EOp of op * exp list * typ option
+| EApply of exp * typ list option * exp list * typ option
+| EBind of bindOp * exp list * formal list * triggers * exp * typ option
 | ECast of exp * typ
 
 and triggers = exp list list

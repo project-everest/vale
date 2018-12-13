@@ -20,13 +20,13 @@ let no_lemmas = ref false
 let require e = Requires (Refined, e)
 let ensure e = Ensures (Refined, e)
 
-let get_code_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace ec | _ -> Unchanged) e
-let get_lemma_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el]) -> Replace el | _ -> Unchanged) e
+let get_code_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el], _) -> Replace ec | _ -> Unchanged) e
+let get_lemma_exp (e:exp):exp = map_exp (fun e -> match e with EOp (CodeLemmaOp, [ec; el], _) -> Replace el | _ -> Unchanged) e
 
 let stateToOp (e:exp):exp map_modify =
   match e with
-  | EOp (OperandArg _, [e]) -> Replace e
-  | EOp (StateOp (x, prefix, t), es) -> Replace (vaApp ("op_" + prefix) es)
+  | EOp (OperandArg _, [e], _) -> Replace e
+  | EOp (StateOp (x, prefix, t), es, _) -> Replace (vaApp_t ("op_" + prefix) es (Some t))
   | _ -> Unchanged
 
 // Turn multiple assignments into series of individual assignments
@@ -40,7 +40,7 @@ let eliminate_assign_lhss (s:stmt):stmt list =
         | None ->
             let itmp = string (gen_lemma_sym ()) in
             let xtmp = Reserved ("ltmp" + itmp) in
-            let stmp = SAssign ([(x, None)], EVar xtmp) in
+            let stmp = SAssign ([(x, None)], evar xtmp) in
             ((xtmp, Some (None, Ghost)), [stmp])
         | Some _ -> ((x, dOpt), [])
       let (lhss, ss) = List.unzip (List.map f lhss) in
@@ -131,7 +131,7 @@ let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
   try
     let addLabel e =
       if addLabels then
-        let range = EVar (Id "range1") in
+        let range = evar (Id "range1") in
         let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
         eapply (Id "label") [range; msg; e]
       else e
@@ -170,21 +170,21 @@ let make_fun_params (prets:pformal list) (pargs:pformal list):formal list =
 
 let fArg (x, t, g, io, a):exp list =
   match g with
-  | XInline -> [EVar x]
-  | XOperand -> [EVar x]
+  | XInline -> [evar x]
+  | XOperand -> [evar x]
 //  | XOperand -> [vaApp "op" [EVar x]]
   | _ -> []
   in
 
 let rec hide_ifs (e:exp):exp =
-  let thunk (e:exp):exp = EBind (Lambda, [], [(Id "_", None)], [], e) in
+  let thunk (e:exp):exp = ebind Lambda [] [(Id "_", None)] [] e in
   let f (e:exp):exp map_modify =
     match e with
-    | EOp (Cond, [e1; e2; e3]) ->
+    | EOp (Cond, [e1; e2; e3], t) ->
         let e1 = hide_ifs e1 in
         let e2 = hide_ifs e2 in
         let e3 = hide_ifs e3 in
-        Replace (vaApp "if" [e1; thunk e2; thunk e3])
+        Replace (vaApp_t "if" [e1; thunk e2; thunk e3] t)
     | _ -> Unchanged
     in
   map_exp f e
@@ -204,7 +204,7 @@ let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id *
         | Read -> In
         in
       match skip_loc (exp_abstract false e) with
-      | EVar x ->
+      | EVar (x, _) ->
         (
           match Map.tryFind x env.ids with
           | Some (StateInfo (_, _, t)) -> [(io, (x, t))]

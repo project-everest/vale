@@ -20,9 +20,9 @@ let rec exp2id (e:exp) (i:id):id =
   | Id s ->
     (
       match e with
-      | ELoc(_, EVar (Id r)) ->
+      | ELoc(_, EVar (Id r, _)) ->
         Id (r + "." + s)
-      | ELoc(_, EOp (FieldOp (Id r), [ee])) ->
+      | ELoc(_, EOp (FieldOp (Id r), [ee], _)) ->
         exp2id ee (Id (r + "." + s))
       | _ -> parse_err "malformed qualified function/method name"
     )

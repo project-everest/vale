@@ -283,7 +283,7 @@ let main (argv) =
             let opened =
               match attrs_get_exps_opt (Id "open") attrs with
               | None -> None
-              | Some [EVar (Id x) | ELoc (_, EVar (Id x))] -> Some (Some x)
+              | Some [EVar (Id x, _) | ELoc (_, EVar (Id x, _))] -> Some (Some x)
               | Some _ -> Some None
             processFStarInclude incPath opened;
             []

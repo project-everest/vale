@@ -65,7 +65,7 @@ let is_rel_op (op:bop):bool =
 
 let rec is_rel_expr (exp:exp):bool =
   match exp with
-  | EOp (Bop op, _) -> is_rel_op op
+  | EOp (Bop op, _, _) -> is_rel_op op
   | _ -> false
 
 // Create Dafny Type
@@ -179,12 +179,12 @@ let create_bvar (built_ins:BuiltIns) (loc:loc) (x:id, t:typ option):BoundVar =
 
 let need_rel_chain (exp:exp):bool =
   match exp with
-  | EOp (Bop op, [e1; e2]) -> if is_rel_op op then is_rel_expr (skip_loc e1) else false
+  | EOp (Bop op, [e1; e2], _) -> if is_rel_op op then is_rel_expr (skip_loc e1) else false
   | _ -> false
 
 let rec create_chaining_rel (built_ins:BuiltIns) (loc:loc) (x:exp) (chain:ResizeArray<Expression>) (ops:ResizeArray<BinaryExpr.Opcode>) (opLocs:ResizeArray<IToken>) (prefixLimits:ResizeArray<Expression>) (first_op_tok:IToken ref):Expression =
   match x with
-  | EOp (Bop op, [e1; e2]) ->
+  | EOp (Bop op, [e1; e2], _) ->
       if is_rel_expr (skip_loc e1)
       then
         let e = create_chaining_rel built_ins (one_loc_of_exp loc e1) (skip_loc e1) chain ops opLocs prefixLimits first_op_tok in
@@ -226,7 +226,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
   try
     match x with
       | ELoc (loc, e) -> create_expression built_ins loc e
-      | EVar id ->
+      | EVar (id, _) ->
           let tok = create_token loc (sid id) in
           new NameSegment(tok, tok.``val``, null) :> Expression
       | EInt num ->
@@ -244,26 +244,26 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
       | EString s ->
           let tok = create_token loc s in
           new StringLiteralExpr(tok, s, false) :> Expression
-      | EOp (Uop UReveal, [EVar x]) ->
+      | EOp (Uop UReveal, [EVar (x, _)], _) ->
           let tok = create_token loc ("reveal_" + (sid x)) in
           let exp = new NameSegment(tok, tok.``val``, null) in
           let openParen = create_token loc "(" in
           new ApplySuffix(openParen, exp, new ResizeArray<Expression>()) :> Expression
-      | EOp (Uop (UNot _), [e]) ->
+      | EOp (Uop (UNot _), [e], _) ->
           let tok = create_token loc "!" in
           let exp = create_expression built_ins loc e in
           new UnaryOpExpr(tok, UnaryOpExpr.Opcode.Not, exp) :> Expression
-      | EOp (Uop UNeg, [e]) ->
+      | EOp (Uop UNeg, [e], _) ->
           let tok = create_token loc "-" in
           let exp = create_expression built_ins loc e in
           new NegationExpression(tok, exp) :> Expression
-      | EOp (Uop (UIs x), [e]) ->
+      | EOp (Uop (UIs x), [e], _) ->
           let exp = create_expression built_ins loc e in
           let id = create_token loc (sid x + "?") in
           new ExprDotName(id, exp, id.``val``, null) :> Expression
-      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr "unary operator"
-      | EOp (Uop _, ([] | (_::_::_))) -> internalErr "unary operator"
-      | EOp (Bop op, [e1; e2]) ->
+      | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_], _) -> internalErr "unary operator"
+      | EOp (Uop _, ([] | (_::_::_)), _) -> internalErr "unary operator"
+      | EOp (Bop op, [e1; e2], _) ->
           if need_rel_chain x
           then
             let chain = new ResizeArray<Expression>() in
@@ -281,8 +281,8 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
               match op with
               | BExply -> new BinaryExpr(tok, opcode, e2, e1) :> Expression
               | _ -> new BinaryExpr(tok, opcode, e1, e2) :> Expression
-      | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr "binary operator"
-      | EOp (TupleOp _, es) ->
+      | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr "binary operator"
+      | EOp (TupleOp _, es, _) ->
           let tok = create_token loc "(" in
           let args = new ResizeArray<Expression>() in
           List.iter (fun x -> args.Add(create_expression built_ins loc x)) es
@@ -290,38 +290,38 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           else
             let tmp = built_ins.TupleType(tok, args.Count, true) in
             new DatatypeValue(tok, BuiltIns.TupleTypeName(args.Count), BuiltIns.TupleTypeCtorNamePrefix + (string args.Count), args) :> Expression
-      | EApply (Id "seq", _, es) ->
+      | EApply (e, _, es, _) when id_of_exp e = (Id "seq") ->
           let tok = create_token loc "[" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
           new SeqDisplayExpr(tok, elements) :> Expression
-      | EApply (Id "set", _, es) ->
+      | EApply (e, _, es, _) when id_of_exp e = (Id "set") ->
           let tok = create_token loc "{" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
           new SetDisplayExpr(tok, true, elements) :> Expression
-      | EOp (Subscript, [e1; e2]) ->
+      | EOp (Subscript, [e1; e2], _) ->
           let tok = create_token loc "[" in
           let e1 = create_expression built_ins loc e1 in
           let e2 = create_expression built_ins loc e2 in
           new SeqSelectExpr(tok, true, e1, e2, null) :> Expression
-      | EOp (Update, [e1; e2; e3]) ->
+      | EOp (Update, [e1; e2; e3], _) ->
           let tok = create_token loc "[" in
           let e1 = create_expression built_ins loc e1 in
           let e2 = create_expression built_ins loc e2 in
           let e3 = create_expression built_ins loc e3 in
           new SeqUpdateExpr(tok, e1, e2, e3) :> Expression
-      | EOp (Cond, [e1; e2; e3]) ->
+      | EOp (Cond, [e1; e2; e3], _) ->
           let tok = create_token loc "if" in
           let e1 = create_expression built_ins loc e1 in
           let e2 = create_expression built_ins loc e2 in
           let e3 = create_expression built_ins loc e3 in
             new ITEExpr(tok, false, e1, e2, e3) :> Expression
-      | EOp (FieldOp x, [e]) ->
+      | EOp (FieldOp x, [e], _) ->
           let e = create_expression built_ins loc e in
           let id = create_token loc (sid x) in
           new ExprDotName(id, e, id.``val``, null) :> Expression
-      | EOp (FieldUpdate x, [e1; e2]) ->
+      | EOp (FieldUpdate x, [e1; e2], _) ->
           let tok = create_token loc "(" in
           let e1 = create_expression built_ins loc e1 in
           let e2 = create_expression built_ins loc e2 in
@@ -329,8 +329,9 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let updates = new ResizeArray<IToken * string * Expression>() in
           updates.Add((id, id.``val``, e2))
           new DatatypeUpdateExpr(tok, e1, updates) :> Expression
-      | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr "EOp"
-      | EApply (x, _, es) ->
+      | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr "EOp"
+      | EApply (e, _, es, _) ->
+          let x = id_of_exp e in
           let tok = create_token loc (sid x) in
           if (sid x).Equals("int")
           then
@@ -350,21 +351,21 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
             let openParen = create_token loc "(" in
             let args = List.fold (fun (acc:ResizeArray<Expression>) (elem:exp) -> acc.Add(create_expression built_ins loc elem); acc) (new ResizeArray<Expression>()) es
             new ApplySuffix(openParen, exp, args) :> Expression
-      | EBind (Forall, [], xs, ts, e) ->
+      | EBind (Forall, [], xs, ts, e, _) ->
           let tok = create_token loc "forall" in
           let bvars = new ResizeArray<BoundVar>() in
           List.iter (fun (x:formal) -> bvars.Add(create_bvar built_ins loc x)) xs
           let attrs = List.fold (fun (acc:Attributes) (es:exp list) -> create_attr built_ins loc ("trigger", es) acc) null ts in
           let body = create_expression built_ins loc e in
           new ForallExpr(tok, bvars, null, body, attrs) :> Expression
-      | EBind (Exists, [], xs, ts, e) ->
+      | EBind (Exists, [], xs, ts, e, _) ->
           let tok = create_token loc "exists" in
           let bvars = new ResizeArray<BoundVar>() in
           List.iter (fun (x:formal) -> bvars.Add(create_bvar built_ins loc x)) xs
           let attrs = List.fold (fun (acc:Attributes) (es:exp list) -> create_attr built_ins loc ("trigger", es) acc) null ts in
           let body = create_expression built_ins loc e in
           new ExistsExpr(tok, bvars, null, body, attrs) :> Expression
-      | EBind (Lambda, [], xs, ts, e) ->
+      | EBind (Lambda, [], xs, ts, e, _) ->
           let tok = create_token loc "(" in
           let bvars = new ResizeArray<BoundVar>() in
           List.iter (fun (x:formal) -> bvars.Add(create_bvar built_ins loc x)) xs
@@ -373,7 +374,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           let req = null in // no ensures clause for now
           let body = create_expression built_ins loc e in
           new LambdaExpr(tok, true, bvars, req, reads, body) :> Expression
-      | EBind (BindLet, [ex], [x], [], e) ->
+      | EBind (BindLet, [ex], [x], [], e, _) ->
           let tok = create_token loc "var" in
           let bvar = create_bvar built_ins loc x in
           let left = new ResizeArray<CasePattern>() in
@@ -382,10 +383,10 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           left.Add(new CasePattern(bvar.tok, bvar))
           right.Add(create_expression built_ins loc ex)
           new LetExpr(tok, left, right, e, true, null) :> Expression
-      | EBind (BindAlias, _, _, _, e) -> create_expression built_ins loc e
-      | EBind (BindSet, [], xs, ts, e) ->
+      | EBind (BindAlias, _, _, _, e, _) -> create_expression built_ins loc e
+      | EBind (BindSet, [], xs, ts, e, _) ->
           notImplemented "BindSet"
-      | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr "EBind"
+      | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr "EBind"
       | _ -> internalErr (sprintf "unexpected create_expression %A" x)
   with err -> raise (LocErr (loc, err))
 
@@ -522,7 +523,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let end_tok = create_token loc ";" in
         let get_expr (lhs:lhs):Expression =
           match lhs with
-          | (x, None) -> create_expression built_ins loc (EVar x)
+          | (x, None) -> create_expression built_ins loc (evar x)
           | _ -> internalErr "SAssign"
         let left = new  ResizeArray<Expression>() in
         let right = new ResizeArray<AssignmentRhs>() in

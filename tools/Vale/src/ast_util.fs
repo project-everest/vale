@@ -16,9 +16,37 @@ let ktype0 = KType bigint.Zero
 let ktype1 = KType bigint.One
 
 let tapply (x:id) (ts:typ list):typ = TApply (x, ts)
-let eapply (x:id) (es:exp list):exp = EApply (x, None, es)
-let eapply_t (x:id) (ts:typ list option) (es:exp list):exp = EApply (x, ts, es)
-let eapply_opt (x:id) (es:exp list):exp = match es with [] -> EVar x | _ -> eapply x es
+let evar (x:id) = EVar (x, None)
+let ebind (op:bindOp) (es:exp list) (fs:formal list) (ts:triggers) (e:exp) = EBind (op, es, fs, ts, e, None)
+let eop (op:op) (es:exp list) = EOp (op, es, None)
+let eapply (x:id) (es:exp list):exp = EApply (evar x, None, es, None)
+let eapply_t (x:id) (ts:typ list option) (es:exp list) (t:typ option):exp = EApply (evar x, ts, es, t)
+let eapply_opt (x:id) (es:exp list):exp = match es with [] -> EVar (x, None) | _ -> eapply x es
+let eapply_opt_t (x:id) (es:exp list) (t:typ option):exp = match es with [] -> EVar (x, t) | _ -> eapply_t x None es t
+
+let name_of_id x =
+  let s = match x with Id s | Reserved s | Operator s -> s in
+  let es = s.Split ([|'.'|])  |> Array.toList in
+  let rec aux s l =
+    match l with
+    | hd :: [] -> (s, hd)
+    | hd :: tl -> aux (if (s = "") then hd else (s ^ "." ^ hd)) tl
+    | _ -> failwith "Empty list." in
+  let (mn, sn) = aux "" es in
+  match x with
+  | Id _ -> (mn, Id sn)
+  | Reserved _ -> (mn, Reserved sn)
+  | Operator _ -> (mn, Operator sn)
+
+let rec exp_typ e =
+  match e with
+  | ELoc (_, e) -> exp_typ e
+  | EVar (_, t) -> t
+  | EOp (_, _, t) -> t
+  | EApply (_, _, _, t) -> t
+  | EBind (_, _, _, _, _, t) -> t
+  | ECast (_, t) -> (Some t)
+  | _ -> None
 
 let List_mapFold (f:'s -> 't -> 'r * 's) (s:'s) (ts:'t list):('r list * 's) =
   let (rs_rev, s) = List.fold (fun (rs_rev, s) t -> let (r, s) = f s t in (r::rs_rev, s)) ([], s) ts in
@@ -70,10 +98,17 @@ let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr (Prin
 let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr (Printf.sprintf "reserved_id: %A" x)
 let err_id (x:id):string = match x with Id s -> s | Reserved s -> s | Operator s -> "operator(" + s + ")"
 
+let rec id_of_exp (e:exp):id =
+  match e with
+  | ELoc (_, e) -> id_of_exp e
+  | EVar (x, _) -> x
+  | EOp (FieldOp x, [e], _) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
+  | _ -> internalErr "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
+
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with
   | [] -> empty
-  | h::t -> List.fold (fun accum e -> EOp (Bop b, [accum; e])) h t
+  | h::t -> List.fold (fun accum e -> eop (Bop b) [accum; e]) h t
 let and_of_list = binary_op_of_list (BAnd BpProp) (EBool true)
 let or_of_list = binary_op_of_list (BOr BpProp) (EBool false)
 
@@ -91,9 +126,10 @@ let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
   match es with
   | [] -> []
   | (loc, SpecExp e)::es -> (loc, e)::(exps_of_spec_exps es)
-  | (loc, SpecLet (x, t, e))::es ->
+  | (loc, SpecLet (x, t, ex))::es ->
       let es = List.map snd (exps_of_spec_exps es) in
-      [(loc, EBind (BindLet, [e], [(x, t)], [], and_of_list es))]
+      let e = and_of_list es in
+      [(loc, EBind (BindLet, [ex], [(x, t)], [], e, exp_typ e))]
 
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
 
@@ -133,9 +169,9 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     match e with
     | ELoc (loc, e) -> try ELoc (loc, r e) with err -> locErr loc err
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
-    | EBind (b, es, fs, ts, e) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e)
-    | EOp (op, es) -> EOp (op, List.map r es)
-    | EApply (x, ts, es) -> EApply (x, ts, List.map r es)
+    | EBind (b, es, fs, ts, e, t) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e, t)
+    | EOp (op, es, t) -> EOp (op, List.map r es, t)
+    | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
     | ECast (e, t) -> ECast (r e, t)
   )
 
@@ -145,9 +181,9 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     match e with
     | ELoc (loc, e) -> try [r e] with err -> locErr loc err
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> []
-    | EBind (b, es, fs, ts, e) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
-    | EOp (op, es) -> List.map r es
-    | EApply (x, ts, es) -> List.map r es
+    | EBind (b, es, fs, ts, e, _) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
+    | EOp (op, es, _) -> List.map r es
+    | EApply (x, ts, es, _) -> List.map r es
     | ECast (e, t) -> [r e]
   in f e children
 
@@ -296,7 +332,7 @@ let one_loc_of_stmt (defaultLoc:loc) (s:stmt):loc =
 let subst_reserved_exp (m:Map<id, exp>) (e:exp):exp =
   let f e =
     match e with
-    | EVar x when Map.containsKey x m -> Replace (Map.find x m)
+    | EVar (x, _) when Map.containsKey x m -> Replace (Map.find x m)
     | _ -> Unchanged
     in
   map_exp f e
@@ -304,8 +340,8 @@ let subst_reserved_exp (m:Map<id, exp>) (e:exp):exp =
 let rec free_vars_exp (e:exp):Set<id> =
   let f (e:exp) (xss:Set<id> list):Set<id> =
     match e with
-    | EVar x -> Set.singleton x
-    | EBind (_, es, fs, ts, e) ->
+    | EVar (x, _) -> Set.singleton x
+    | EBind (_, es, fs, ts, e, _) ->
         let r = free_vars_exp in
         let rs es = Set.unionMany (List.map r es) in
         let xs = Set.union (Set.unionMany (List.map rs ts)) (r e) in
@@ -355,12 +391,12 @@ let attrs_get_exp (x:id) (a:attrs):exp =
 let attrs_get_id_opt (x:id) (a:attrs):id option =
   match skip_loc_opt (attrs_get_exp_opt x a) with
   | None -> None
-  | Some (EVar x) -> Some x
+  | Some (EVar (x, _)) -> Some x
   | Some _ -> err ("argument to attribute '" + (err_id x) + "' must be an identifier")
 
 let attrs_get_id (x:id) (a:attrs):id =
   match skip_loc (attrs_get_exp x a) with
-  | EVar x -> x
+  | EVar (x, _) -> x
   | _ -> err ("argument to attribute '" + (err_id x) + "' must be an identifier")
 
 let qprefix (s:string) (t:string):string = s + (t.Replace(".", "__"))

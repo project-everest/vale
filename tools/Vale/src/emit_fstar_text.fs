@@ -90,7 +90,6 @@ let rec string_of_typ (t:typ):string =
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
-
 let string_of_type_argument (t:typ):string =
   match t with
   | TInt (_, _) -> "int"
@@ -108,24 +107,30 @@ let rec string_of_exp_prec prec e =
     let qbind q qsep xs ts e = (q + " " + (string_of_formals xs) + qsep + (string_of_triggers ts) + (r 5 e), 6) in
     match e with
     | ELoc (loc, ee) -> try (r prec ee, prec) with err -> raise (LocErr (loc, err))
-    | EVar x -> (sid x, 99)
+    | EVar (x, _) -> (sid x, 99)
     | EInt i -> (string i, 99)
     | EReal r -> (r, 99)
     | EBitVector (n, i) -> ("bv" + (string n) + "(" + (string i) + ")", 99)
     | EBool true -> ("true", 99)
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
-    | EOp (Uop (UCall CallGhost), [e]) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (x, _, es)]) -> (r prec (vaApp "reveal_opaque" [eapply (transparent_id x) es]), prec)
-    | EOp (Uop UReveal, [EVar x]) -> ("reveal_opaque " + (sid x), 90)
-    | EOp (Uop (UNot BpBool), [e]) -> ("not " + (r 99 e), 90)
-    | EOp (Uop (UNot BpProp), [e]) -> ("~" + (r 99 e), 90)
-    | EOp (Uop UNeg, [e]) -> ("-" + (r 99 e), 0)
-    | EOp (Uop (UIs x), [e]) -> ((r 90 e) + "." + (sid x) + "?", 0)
-    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_]) -> internalErr (sprintf "unary operator: %A" e)
-    | EOp (Uop _, ([] | (_::_::_))) -> internalErr (sprintf "unary operator: %A" e)
-    | EOp (Bop BExply, [e1; e2]) -> (r prec (EOp (Bop BImply, [e2; e1])), prec)
-    | EOp (Bop op, [e1; e2]) ->
+    | EOp (Uop (UCall CallGhost), [e], t) -> (r prec e, prec)
+    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> (r prec (vaApp_t "reveal_opaque" [eapply_t (transparent_id (id_of_exp e)) None es t1] t), prec)
+    | EOp (Uop UReveal, [EVar (x, _)], t) -> ("reveal_opaque " + (sid x), 90)
+    | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
+    | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
+    | EOp (Uop UNeg, [e], t) -> ("-" + (r 99 e), 0)
+    | EOp (Uop (UIs x), [e], t) -> ((r 90 e) + "." + (sid x) + "?", 0)
+    | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_], _) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Uop _, ([] | (_::_::_)), _) -> internalErr (sprintf "unary operator: %A" e)
+    | EOp (Bop BExply, [e1; e2], t) -> (r prec (EOp (Bop BImply, [e2; e1], t)), prec)
+    | EOp (Bop BIn, [e1; e2], t) ->
+      let t = exp_typ e2 in
+      match t with
+      | Some (TApply (x, _)) ->
+        (r prec (vaApp_t ("contains_" + (sid x)) [e2; e1] t), prec)
+      | _ -> internalErr (sprintf "overloadded Operator ?[] missing type info: %A" e)
+    | EOp (Bop op, [e1; e2], t) ->
       (
         let isChainOp (op:bop):bool =
           match op with
@@ -133,33 +138,63 @@ let rec string_of_exp_prec prec e =
           | _ -> false
           in
         match (op, skip_loc e1) with
-        | (op, EOp (Bop op1, [e11; e12])) when isChainOp op && isChainOp op1 ->
+        | (op, EOp (Bop op1, [e11; e12], t)) when isChainOp op && isChainOp op1 ->
             // Convert (a <= b) < c into (a <= b) && (b < c)
-            let e2 = EOp (Bop op, [e12; e2]) in
-            (r prec (EOp (Bop (BAnd BpBool), [e1; e2])), 0)
+            let e2 = EOp (Bop op, [e12; e2], t) in
+            (r prec (EOp (Bop (BAnd BpBool), [e1; e2], t)), 0)
         | _ ->
             let (pe, p1, p2) = prec_of_bop op in
             ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
       )
-    | EOp (Bop _, ([] | [_] | (_::_::_::_))) -> internalErr (sprintf "binary operator: %A" e)
-    | EOp (TupleOp _, es) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (Id "list", _, es) -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
-    | EOp (Subscript, [e1; e2]) -> (r prec (vaApp "subscript" [e1; e2]), prec)
-    | EOp (Update, [e1; e2; e3]) -> (r prec (vaApp "update" [e1; e2; e3]), prec)
-    | EOp (Cond, [e1; e2; e3]) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
-    | EOp (FieldOp x, [e]) -> ((r 95 e) + "." + (sid x), 95)
-    | EOp (FieldUpdate x, [e1; e2]) -> ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
-    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _) -> internalErr (sprintf "EOp: %A" e)
-    | EApply (x, ts, es) -> ((sid x) + " " + (string_of_type_arguments ts) + (string_of_args es), 90)
-    | EBind ((Forall | Exists | Lambda), [], [], _, e) -> (r prec e, prec)
-    | EBind (Forall, [], xs, ts, e) -> qbind "forall" " . " xs ts e
-    | EBind (Exists, [], xs, ts, e) -> qbind "exists" " . " xs ts e
-    | EBind (Lambda, [], xs, ts, e) -> qbind "fun" " -> " xs ts e
-    | EBind (BindLet, [ex], [x], [], e) -> ("let " + (string_of_formal x) + " = " + (r 5 ex) + " in " + (r 5 e), 6)
-    | EBind (BindLet, [ex], xs, [], e) -> ("let (" + String.concat ", " (List.map string_of_formal xs) + ") = " + (r 5 ex) + " in " + (r 5 e), 6)
-    | EBind (BindAlias, _, _, _, e) -> (r prec e, prec)
-    | EBind (BindSet, [], xs, ts, e) -> notImplemented "iset"
-    | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
+    | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr (sprintf "binary operator: %A" e)
+    | EOp (TupleOp _, es, t) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
+    | EApply (e, ts, es, t) when id_of_exp e = (Id "list") -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
+    | EOp (Subscript, [e1; e2], t) -> 
+      let t = exp_typ e1 in
+      match t with
+      | Some (TApply (x, _)) ->
+        (r prec (vaApp_t ("subscript_" + (sid x)) [e1; e2] t), prec)
+      | _ ->
+        internalErr (sprintf "overloadded Operator[] missing type info: %A" e)
+    | EOp (Update, [e1; e2; e3], t) -> 
+      let t = exp_typ e1 in
+      match t with
+      | Some (TApply (x, _)) ->
+        (r prec (vaApp_t ("update_" + (sid x)) [e1; e2; e3] t), prec)
+      | _ -> 
+        internalErr (sprintf "overloadded Operator[:=] missing type info: %A" e)
+    | EOp (Cond, [e1; e2; e3], t) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
+    | EOp (FieldOp x, [e], _) ->
+      let t = exp_typ e in
+      match (t, x) with 
+      | (Some (TApply (x, _)), Id f) ->
+        let (mn, t) = name_of_id x in
+        let s = if mn = "" then "" else mn + "." in
+        let s = s + "__proj__" + "Mk" + string_of_id t + "__item__" + f in
+        (s + " " + (r 95 e),  95)
+      | _ ->
+        ((r 95 e) + "." + (sid x), 95)
+    | EOp (FieldUpdate x, [e1; e2], t) -> 
+      let t = exp_typ e1 in
+      match (t, x) with 
+      | (Some (TName x), Id f) ->
+        let (mn, t) = name_of_id x in
+        let s = if mn = "" then "" else mn + "." in
+        let s = s + "__proj__" + string_of_id t + "__item__" + f in
+        (s + " " + (r 90 e1) + " " + (r 90 e2),  0)
+      | _ ->
+        ("({" + (r 90 e1) + " with " + (sid x) + " = " + (r 90 e2) + "})", 90)
+    | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr (sprintf "EOp: %A" e)
+    | EApply (e, ts, es, t) ->  ((r 90 e) + (string_of_type_arguments ts) + " " + (string_of_args es), 90)
+    | EBind ((Forall | Exists | Lambda), [], [], _, e, t) -> (r prec e, prec)
+    | EBind (Forall, [], xs, ts, e, t) -> qbind "forall" " . " xs ts e
+    | EBind (Exists, [], xs, ts, e, t) -> qbind "exists" " . " xs ts e
+    | EBind (Lambda, [], xs, ts, e, t) -> qbind "fun" " -> " xs ts e
+    | EBind (BindLet, [ex], [x], [], e, t) -> ("let " + (string_of_formal x) + " = " + (r 5 ex) + " in " + (r 5 e), 6)
+    | EBind (BindLet, [ex], xs, [], e, t) -> ("let (" + String.concat ", " (List.map string_of_formal xs) + ") = " + (r 5 ex) + " in " + (r 5 e), 6)
+    | EBind (BindAlias, _, _, _, e, t) -> (r prec e, prec)
+    | EBind (BindSet, [], xs, ts, e, t) -> notImplemented "iset"
+    | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
     | ECast (e, t) -> (r prec e, prec) // TODO: add type conversion
     | _ -> internalErr  (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
@@ -430,7 +465,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
     in
   let header = if isRecursive then "let rec " else "let " in
   // add custom metrics to convince F* that mutually recursive functions terminate
-  let dArgs = List.map (fun (x, _) -> EVar x) f.fargs in
+  let dArgs = List.map (fun (x, _) -> evar x) f.fargs in
   let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
   let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
   if isOpaque then
@@ -443,7 +478,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
       | None -> ()
       | Some e -> printBody header true (sid (transparent_id f.fname)) e
     );
-    let fArgs = List.map (fun (x, _) -> EVar x) f.fargs in
+    let fArgs = List.map (fun (x, _) -> evar x) f.fargs in
     let eOpaque = vaApp "make_opaque" [eapply (transparent_id f.fname) fArgs] in
     let header = if isRecursive then "and " else "let " in
     printBody header true (sid f.fname) eOpaque
@@ -492,7 +527,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     ps.PrintLine ("(ensures (" + (match p.prets with [] -> "" | _ -> "fun (" + sDep + sprets + sDep + ") -> ") + (string_of_exp_prec 5 es) + "))");
     ps.Unindent ();
     in
-  let dArgs = match decreaseExps with Some es -> es | None -> List.map (fun (x, _) -> EVar x) args in
+  let dArgs = match decreaseExps with Some es -> es | None -> List.map (fun (x, _) -> evar x) args in
   let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
