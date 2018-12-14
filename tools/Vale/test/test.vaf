@@ -91,3 +91,29 @@ procedure MapIndex(ghost m:FStar.Map.t(int, int), ghost i:int, ghost v:int) retu
   r := nm[i];
   assert nm?[i] && r == v;
 }
+
+procedure p0 #[#a : Type(0)] (ghost g1 : a) returns (ghost g2 : a)
+{
+  g2 := g1;
+}
+
+procedure p1 (ghost g1:int) returns(ghost g2:int)
+{
+  g2 := p0(g1);
+}
+
+procedure{:typecheck}{:testShouldFail} p2 (ghost g1:int) returns (ghost g2:bool)
+{
+  g2 := p0(g1);
+}
+
+type{:primitive} list(a:Type(0)):Type(0) := Prims.list(a);
+procedure p3() returns (ghost l: list(bool))
+{
+  l := list (true, false);
+}
+
+procedure{:typecheck}{:testShouldFail} p3() returns (ghost l: list(bool))
+{
+  l := list (1, 2, 3);
+}

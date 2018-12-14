@@ -90,16 +90,12 @@ let rec string_of_typ (t:typ):string =
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
-let string_of_type_argument (t:typ):string =
-  match t with
-  | TInt (_, _) -> "int"
-  | TTuple [] -> "unit"
-  | _ -> "#" + string_of_typ t 
+let string_of_type_argument (t:typ):string = "#" + string_of_typ t 
 let string_of_type_arguments (ts:typ list option):string =
   match ts with  
   | None -> "" 
   | Some [] -> ""  
-  | Some ts -> String.concat " " (List.map string_of_type_argument ts) + " "
+  | Some ts -> " " + String.concat " " (List.map string_of_type_argument ts)
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -202,8 +198,8 @@ and string_of_ret (x:id, t:typ option) = match t with None -> internalErr (sprin
 and string_of_formal (x:id, t:typ option) = match t with None -> sid x | Some t -> "(" + (sid x) + ":" + (string_of_typ t) + ")"
 and string_of_formals (xs:formal list):string = String.concat " " (List.map string_of_formal xs)
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
-and string_of_targ (x:id, k:kind, i:type_infer):string = (sid x) + ":" + (string_of_kind k)
-and string_of_targ_bare (x:id, k:kind, i:type_infer):string = sid x
+and string_of_targ (x:id, k:kind, i:type_infer):string = "#" + (sid x) + ":" + (string_of_kind k)
+and string_of_targ_bare (x:id, k:kind, i:type_infer):string = "#" + sid x
 and string_of_pformal (x:id, t:typ, _, _, _) = string_of_formal (x, Some t)
 and string_of_pformals (xs:pformal list):string = String.concat " " (List.map string_of_pformal xs)
 and string_of_trigger (es:exp list):string = String.concat "; " (List.map string_of_exp es)
