@@ -1,5 +1,3 @@
-include{:fstar}{:open} "Types_s"
-
 module Fstar1ifc
 
 var{:state ok()} ok:bool;

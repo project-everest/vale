@@ -19,6 +19,9 @@ See the [INSTALL](./INSTALL.md) file for installing Vale and its dependencies.
 
 See the [CODE](./CODE.md) file for more details on the various files in the repository.
 
+For cryptography implementations verified with Vale/F*, see https://github.com/project-everest/hacl-star/tree/fstar-master/vale .
+For cryptography implementations verified with Vale/Dafny, see https://github.com/project-everest/vale/tree/legacy_dafny .
+
 # Documentation
 
 See the [Vale documentation](./doc/index.html) for a description of the Vale language and Vale tool.

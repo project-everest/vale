@@ -1,4 +1,44 @@
-Vale relies on the following tools, which must be installed before building Vale:
+# Using the Vale binary release (recommended)
+
+The [Vale binary release](https://github.com/project-everest/vale/releases) relies on the following tools:
+
+* .NET (included in Windows) or mono (Unix)
+  * On an Ubuntu system, including Windows Subsystem for Linux, you can install mono with:
+    ```sudo apt install mono-devel```
+  * On Mac OS X (tested with El Capitan, 10.11.6), you can install the dependencies with
+    ```brew install mono```
+* Z3, used by F* and Dafny
+  * See https://github.com/FStarLang/binaries/tree/master/z3-tested
+
+To install the binary release, unzip the latest vale-release-*.zip file from https://github.com/project-everest/vale/releases .
+Then either add the z3 binary to your path or to the unzipped Vale bin directory.
+
+## Testing the Vale binary release
+
+To test the binary release, download [this test file](https://raw.githubusercontent.com/project-everest/vale/master/tools/Vale/test/refined3.vad),
+then run:
+
+* On Windows:
+  * bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy
+  * bin/Dafny.exe /trace refined3.dfy
+* On Unix:
+  * mono bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy
+  * mono bin/Dafny.exe /trace refined3.dfy
+
+If you have [F*](https://github.com/FStarLang/FStar) installed,
+you can also download [this test file](https://raw.githubusercontent.com/project-everest/vale/master/tools/Vale/test/types.vaf),
+then run:
+
+* On Windows:
+  * bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti
+  * fstar.exe fstar1ifc.fst
+* On Unix:
+  * mono bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti
+  * fstar.exe --query_stats fstar1ifc.fst
+
+# Building Vale from source
+
+Vale sources rely on the following tools, which must be installed before building Vale:
 
 * Python (version >= 3.6), used by SCons
   * See https://www.python.org/
@@ -11,6 +51,8 @@ Vale relies on the following tools, which must be installed before building Vale
     * This will create a directory tools/FsLexYacc that contains the FsLexYacc binaries; the build will expect to find these binaries in tools/FsLexYacc
 * C\#, used by [Dafny](https://github.com/Microsoft/dafny/blob/master/INSTALL)
   * See https://www.visualstudio.com/vs/community/ or http://www.mono-project.com/
+* Z3, used by F* and Dafny
+  * See https://github.com/FStarLang/binaries/tree/master/z3-tested
 
 On an Ubuntu system, including Windows Subsystem for Linux, you can install the dependencies with:
      ```sudo apt install scons fsharp nuget mono-devel```
@@ -27,7 +69,7 @@ To verify all Dafny sources in the [src](./src) directory, run:
 
 python.exe scons.py --DAFNY
 
-To verify all F* sources in the [src](./src) directory, run:
+To verify all F* sources in the [src](./src) directory (this requires an installation of [F*](https://github.com/FStarLang/FStar)), run:
 
 python.exe scons.py --FSTAR
 
