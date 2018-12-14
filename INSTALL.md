@@ -5,12 +5,12 @@ The [Vale binary release](https://github.com/project-everest/vale/releases) reli
 * .NET (included in Windows) or mono (Unix)
   * On an Ubuntu system, including Windows Subsystem for Linux, you can install mono with:
     ```sudo apt install mono-devel```
-  * On Mac OS X (tested with El Capitan, 10.11.6), you can install the dependencies with
+  * On Mac OS X (tested with El Capitan, 10.11.6), you can install mono with:
     ```brew install mono```
 * Z3, used by F* and Dafny
   * See https://github.com/FStarLang/binaries/tree/master/z3-tested
 
-To install the binary release, unzip the latest vale-release-*.zip file from https://github.com/project-everest/vale/releases .
+To install the binary release, unzip the latest vale-release-*.zip file from [here](https://github.com/project-everest/vale/releases).
 Then either add the z3 binary to your path or to the unzipped Vale bin directory.
 
 ## Testing the Vale binary release
@@ -19,22 +19,22 @@ To test the binary release, download [this test file](https://raw.githubusercont
 then run:
 
 * On Windows:
-  * bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy
-  * bin/Dafny.exe /trace refined3.dfy
+  * ```bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy```
+  * ```bin/Dafny.exe /trace refined3.dfy```
 * On Unix:
-  * mono bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy
-  * mono bin/Dafny.exe /trace refined3.dfy
+  * ```mono bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy```
+  * ```mono bin/Dafny.exe /trace refined3.dfy```
 
 If you have [F*](https://github.com/FStarLang/FStar) installed,
 you can also download [this test file](https://raw.githubusercontent.com/project-everest/vale/master/tools/Vale/test/types.vaf),
 then run:
 
 * On Windows:
-  * bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti
-  * fstar.exe fstar1ifc.fst
+  * ```bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti```
+  * ```fstar.exe --query_stats fstar1ifc.fst```
 * On Unix:
-  * mono bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti
-  * fstar.exe --query_stats fstar1ifc.fst
+  * ```mono bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti```
+  * ```fstar.exe --query_stats fstar1ifc.fst```
 
 # Building Vale from source
 
@@ -55,23 +55,23 @@ Vale sources rely on the following tools, which must be installed before buildin
   * See https://github.com/FStarLang/binaries/tree/master/z3-tested
 
 On an Ubuntu system, including Windows Subsystem for Linux, you can install the dependencies with:
-     ```sudo apt install scons fsharp nuget mono-devel```
+     ```sudo apt install scons fsharp nuget mono-devel```.
 
-On Mac OS X (tested with El Capitan, 10.11.6), you can install the dependencies with
-    ```brew install scons nuget mono```
+On Mac OS X (tested with El Capitan, 10.11.6), you can install the dependencies with:
+    ```brew install scons nuget mono```.
 Note that the mono package includes F\#.
 
 Once these tools are installed, running SCons in the top-level directory will build the Vale tool:
 
-python.exe scons.py
+```python.exe scons.py```
 
 To verify all Dafny sources in the [src](./src) directory, run:
 
-python.exe scons.py --DAFNY
+```python.exe scons.py --DAFNY```
 
 To verify all F* sources in the [src](./src) directory (this requires an installation of [F*](https://github.com/FStarLang/FStar)), run:
 
-python.exe scons.py --FSTAR
+```python.exe scons.py --FSTAR```
 
 NOTE: You can override tools/Kremlin by setting the KREMLIN_HOME
 environment variable to point to the directory where KreMLin is
