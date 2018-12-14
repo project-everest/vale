@@ -27,8 +27,8 @@ You can also see our academic papers describing Vale:
 
 * [Vale: Verifying High-Performance Cryptographic Assembly Code](https://project-everest.github.io/assets/vale2017.pdf)  
 Barry Bond, Chris Hawblitzel, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch, Bryan Parno, Ashay Rane, Srinath Setty, Laure Thompson. In Proceedings of the USENIX Security Symposium, 2017. Distinguished Paper Award.
-* [A Verified, Efficient Embedding of a Verifiable Assembly Language]()
-Aymeric Fromherz, Nick Giannarakis, Chris Hawblitzel, Bryan Parno, Aseem Rastogi, Nikhil Swamy
+* [A Verified, Efficient Embedding of a Verifiable Assembly Language]().
+Aymeric Fromherz, Nick Giannarakis, Chris Hawblitzel, Bryan Parno, Aseem Rastogi, Nikhil Swamy. In Proceedings of the Symposium on Principles of Programming Languages (POPL), 2019.
 
 # License
 
