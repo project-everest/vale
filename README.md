@@ -19,9 +19,6 @@ See the [INSTALL](./INSTALL.md) file for installing Vale and its dependencies.
 
 See the [CODE](./CODE.md) file for more details on the various files in the repository.
 
-For cryptography implementations verified with Vale/F*, see [HACL*](https://github.com/project-everest/hacl-star/tree/fstar-master/vale).  
-For cryptography implementations verified with Vale/Dafny, see the [Dafny legacy branch](https://github.com/project-everest/vale/tree/legacy_dafny).  
-
 # Documentation
 
 See the [Vale documentation](./doc/index.html) for a description of the Vale language and Vale tool.
@@ -32,6 +29,12 @@ You can also see our academic papers describing Vale:
 Barry Bond, Chris Hawblitzel, Manos Kapritsos, K. Rustan M. Leino, Jacob R. Lorch, Bryan Parno, Ashay Rane, Srinath Setty, Laure Thompson. In Proceedings of the USENIX Security Symposium, 2017. Distinguished Paper Award.
 * [A Verified, Efficient Embedding of a Verifiable Assembly Language](https://www.microsoft.com/en-us/research/publication/a-verified-efficient-embedding-of-a-verifiable-assembly-language/)  
 Aymeric Fromherz, Nick Giannarakis, Chris Hawblitzel, Bryan Parno, Aseem Rastogi, Nikhil Swamy. In Proceedings of the Symposium on Principles of Programming Languages (POPL), 2019.
+
+# Projects using Vale
+
+For cryptography implementations verified with Vale/F*, see [HACL*](https://github.com/project-everest/hacl-star/tree/fstar-master/vale).  
+For cryptography implementations verified with Vale/Dafny, see the [Dafny legacy branch](https://github.com/project-everest/vale/tree/legacy_dafny).  
+For the Komodo secure enclave reference monitor, see [here](https://github.com/Microsoft/Komodo) and [here](https://www.microsoft.com/en-us/research/project/komodo/).  
 
 # License
 
