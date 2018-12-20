@@ -76,6 +76,7 @@ type exp =
 | EApply of exp * typ list option * exp list * typ option
 | EBind of bindOp * exp list * formal list * triggers * exp * typ option
 | ECast of exp * typ
+| ELabel of loc * exp // marker for exp that needs to be wrapped in a loc label
 
 and triggers = exp list list
 

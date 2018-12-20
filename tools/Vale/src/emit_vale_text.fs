@@ -125,6 +125,7 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EBind (BindSet, [], xs, ts, e, _) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _, _) -> internalErr "EBind"
     | ECast (e, t) -> ("#" + string_of_typ_prec 20 t + "(" + r 5 e + ")", 90)
+    | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ghost (g:ghost) = match g with Ghost -> "ghost " | NotGhost -> ""
