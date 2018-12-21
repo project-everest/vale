@@ -485,7 +485,8 @@ def add_fslexyacc(env):
   if not os.path.isfile(str(fslex_exe)):
     packages_config = File('#tools/Vale/src/packages.config')
     packages_dir = Dir('#tools/FsLexYacc')
-    nuget_env = Environment(ENV = {'PATH' : os.environ['PATH']})
+    nuget_env = Environment()
+    nuget_env['ENV']['PATH'] = os.environ['PATH']
     if nuget_env.Execute(f'nuget{".exe" if win32 else ""} restore {packages_config} -PackagesDirectory {packages_dir}'):
       print("Unable to run nuget in order to restore FsLexYacc.  See INSTALL.md for more details.")
       Exit(1)
