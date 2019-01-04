@@ -18,9 +18,10 @@ type typ =
 | TBool of bool_or_prop
 | TInt of bnd * bnd
 | TTuple of typ list
-| TFun of typ list * typ
+| TFun of fun_typ
 | TDependent of id // the id is an expression-level variable, not a type-level variable
 | TVar of id * kind option
+and fun_typ = typ list * typ
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
