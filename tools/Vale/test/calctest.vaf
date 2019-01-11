@@ -1,0 +1,25 @@
+include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
+
+module CalcTest
+
+#verbatim{:interface}{:implementation}
+open X64.Machine_s
+open X64.Vale.Decls
+open X64.Vale.InsBasic
+#endverbatim
+
+ghost procedure lem1 (ghost a: Prims.pos)
+  ensures (2 * a > a);
+{}
+
+procedure calc0 (ghost a : Prims.pos) 
+  ensures (a + a > a);
+{
+  calc > {
+    a + a;
+    == {}
+    2 * a;
+    > { lem1(a); }
+    a;
+  }
+}

@@ -252,7 +252,17 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
   | SAssume e -> ps.PrintLine ("assume " + (string_of_exp e) + ";")
   | SAssert (_, e) -> ps.PrintLine ("assert " + (string_of_exp e) + ";")
-  | SCalc _ -> err "unsupported feature: 'calc' for F*"
+  | SCalc (op, contents, e) -> 
+      ps.PrintLine ("calc (" + string_of_bop op + ") {");
+      ps.Indent();
+      List.iter (fun {calc_exp = e; calc_op = op; calc_hints = hints} ->
+        ps.PrintLine ((string_of_exp e) + ";");
+        ps.PrintLine(string_of_bop op);
+        ps.PrintLine("{"); List.iter (emit_block ps "" outs) hints;  ps.PrintLine("}");
+      ) contents;
+      ps.PrintLine((string_of_exp e) + ";")
+      ps.Unindent();
+      ps.PrintLine("};")
   | SVar (x, tOpt, _, g, a, None) -> () // used to forward-declare variables for SLetUpdates
   | SVar (x, tOpt, _, g, a, Some e) ->
       let sf = string_of_formal (x, tOpt) in

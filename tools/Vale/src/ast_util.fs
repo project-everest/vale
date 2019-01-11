@@ -251,7 +251,7 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SReturn -> [s]
     | SAssume e -> [SAssume (fe e)]
     | SAssert (attrs, e) -> [SAssert (attrs, fe e)]
-    | SCalc (oop, contents) -> [SCalc (oop, List.map (map_calc_contents fe fs) contents)]
+    | SCalc (op, contents, e) -> [SCalc (op, List.map (map_calc_contents fe fs) contents, fe e)]
     | SVar (x, t, m, g, a, eOpt) -> [SVar (x, t, m, g, map_attrs fe a, mapOpt fe eOpt)]
     | SAlias (x, y) -> [SAlias (x, y)]
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
@@ -284,7 +284,7 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
     | SLoc (loc, s) -> try [r s] with err -> locErr loc err
     | SLabel _ | SGoto _ | SReturn -> []
     | SAssume e | SAssert (_, e) | SAssign (_, e) -> [re e]
-    | SCalc (oop, contents) -> List.collect (gather_calc_contents fs fe) contents
+    | SCalc (op, contents, e) -> List.collect (gather_calc_contents fs fe) contents @ [re e]
     | SVar (x, t, m, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))
     | SAlias (x, y) -> []
     | SLetUpdates _ -> internalErr "SLetUpdates"

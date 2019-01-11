@@ -1816,7 +1816,10 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
   | SReturn -> s
   | SAssume e -> let (_, e) = tc_exp env e (Some tProp) in SAssume e
   | SAssert (attrs, e) -> let (_, e) = tc_exp env e (Some tProp) in SAssert (attrs, e)
-  | SCalc (oop, contents) -> SCalc (oop, tc_calc_contents env contents)
+  | SCalc (op, contents, e) -> 
+    let contents = tc_calc_contents env contents in 
+    let (_, e) = tc_exp env e None in  
+    SCalc (op, contents, e)
   | SVar (x, tOpt, m, g, a, eOpt) ->
     (
       (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());

@@ -191,9 +191,9 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
   | SReturn _ -> err "unsupported feature: 'return' (unstructured code)"
   | SAssume e -> (Ghost, false, [SAssume (sub_s0 e)])
   | SAssert (attrs, e) -> (Ghost, false, [SAssert (attrs, sub_s0 e)])
-  | SCalc (oop, contents) ->
+  | SCalc (op, contents, e) ->
       let ccs = List.map (build_lemma_calcContents senv sub_s0) contents in
-      (Ghost, false, [SCalc (oop, ccs)])
+      (Ghost, false, [SCalc (op, ccs, sub_s0 e)])
   | SVar (_, _, _, (XPhysical | XOperand | XInline | XAlias _), _, _) -> (Ghost, false, [])
   | SVar (x, t, m, g, a, eOpt) -> (Ghost, false, [SVar (x, t, m, g, a, mapOpt sub_s0 eOpt)])
   | SAlias _ -> (Ghost, false, [])

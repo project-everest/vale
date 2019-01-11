@@ -190,7 +190,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SReturn -> (env, [s])
     | SAssume e -> (env, [SAssume (fee e)])
     | SAssert (attrs, e) -> (env, [SAssert (attrs, fee e)])
-    | SCalc (oop, contents) -> (env, [SCalc (oop, List.map (env_map_calc_contents fe fs env) contents)])
+    | SCalc (op, contents, e) -> (env, [SCalc (op, (List.map (env_map_calc_contents fe fs env) contents), fee e)])
     | SVar (x, t, m, g, a, eOpt) ->
         (snd (env_stmt env s), [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
     | SAlias (x, y) -> (snd (env_stmt env s), [SAlias (x, y)])
@@ -214,8 +214,8 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
 and env_map_stmts (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip (env_map_stmt fe fs) env ss))
 and env_map_calc_contents (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env)  (cc:calcContents) =
-  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
-  {calc_exp = fe env e; calc_op = oop; calc_hints = List.map (env_map_stmts fe fs env) hints}
+  let {calc_exp = e; calc_op = op; calc_hints = hints} = cc in
+  {calc_exp = fe env e; calc_op = op; calc_hints = List.map (env_map_stmts fe fs env) hints}
 
 let env_next_stmt (env:env) (s:stmt):env =
   let (env, _) = env_map_stmt (fun _ e -> e) (fun _ _ -> Unchanged) env s in
@@ -359,7 +359,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   | SReturn -> compute_exps []
   | SAssume e -> compute_exps [e]
   | SAssert (attrs, e) -> compute_exps [e]
-  | SCalc (oop, contents) -> err "unsupported feature: 'calc' for F*"
+  | SCalc (op, contents, e) -> notImplemented "not yet implemented: compute_read_mods of 'calc' for F*"
   | SVar (x, t, m, g, a, eOpt) -> compute_exps (match eOpt with None -> [] | Some e -> [e])
   | SAlias (x, y) -> compute_exps []
   | SAssign (lhss, e) ->

@@ -447,13 +447,14 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let s = new AssertStmt(start_tok, end_tok, exp, null, attrs) :> Statement in
         stmts.Add(s)
         stmts
-    | SCalc (oop, contents) ->
+    | SCalc (op, contents, e) ->
         let start_tok = create_token loc "calc" in
         let end_tok = create_token loc "}" in
-        let defOp = CalcStmt.DefaultOp in
         let makeCalcOp op = CalcStmt.BinaryCalcOp(bop2opcode op) :> CalcStmt.CalcOp in
-        let makeCalcOpOpt op = match oop with None -> defOp | Some op -> makeCalcOp op in
-        let calcOp = makeCalcOpOpt oop in
+        (* 'op' in SCalc dictate the final relation between the first value and the final value, where in Dafny
+           it set the defaultOp when op in steps are omitted. Since op is required in steps in Vale, we don't
+           need the user provided defaultOp. Therefore, it is set to CalcStmt.DefaultOp  *)
+        let calcOp = CalcStmt.DefaultOp in
         let resOp = ref calcOp in
         let checkOp nextOp =
           let maybeOp = (!resOp).ResultOp(nextOp) in
@@ -465,7 +466,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let stepOps = new ResizeArray<CalcStmt.CalcOp>() in
         let attrs = null in
         let len = List.length contents in
-        let addContents {calc_exp = e; calc_op = oop; calc_hints = chs} =
+        let addContents {calc_exp = e; calc_op = op; calc_hints = chs} =
           let exp = create_expression built_ins loc e in
           lines.Add(exp)
           if lines.Count = len then lines.Add(exp) // Dafny expects redundant last expression
@@ -474,11 +475,12 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
           let end_tok = create_token loc "}" in
           List.iter (fun ss -> subhints.Add(create_block_stmt built_ins loc ss)) chs
           hints.Add(new BlockStmt(start_tok, end_tok, subhints))
-          let stepOp = match oop with None -> calcOp | Some op -> makeCalcOp op in
+          let stepOp = makeCalcOp op in
           checkOp stepOp
           stepOps.Add(stepOp)
           in
         List.iter addContents contents
+        lines.Add(create_expression built_ins loc e)
         let s = new CalcStmt(start_tok, end_tok, calcOp, lines, hints, stepOps, attrs) in
         stmts.Add(s)
         stmts

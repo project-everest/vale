@@ -248,9 +248,6 @@ CalcOp
   | GT { BGt }
   | LE { BLe }
   | GE { BGe }
-CalcOpOpt
-  : { None }
-  | CalcOp { Some $1 }
 
 Attrs
   : { [] }
@@ -346,7 +343,7 @@ Stmt
         in
       stmtAt $1 (SAssert (attrs, $5))
     }
-  | CALC CalcOpOpt LBRACE CalcContents RBRACE { stmtAt $1 (SCalc ($2, $4)) }
+  | CALC CalcOp LBRACE CalcContents RBRACE { let (l, e) = $4 in stmtAt $1 (SCalc ($2, l, e)) }
   | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp (Uop UReveal, [EVar ($2, None)], None))) }
   | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
   | LET Formal COLONEQ Exp SEMI { let (x, t) = $2 in stmtAt $1 (SVar (x, t, Immutable, XGhost, [], Some $4)) }
@@ -366,8 +363,8 @@ CalcHints
   : { [] }
   | LBRACE Block RBRACE CalcHints { $2::$4 }
 CalcContents
-  : Exp SEMI { [{calc_exp = $1; calc_op = None; calc_hints = []}] }
-  | Exp SEMI CalcOpOpt CalcHints CalcContents { {calc_exp = $1; calc_op = $3; calc_hints = $4} :: $5 }
+  : Exp SEMI { ([], $1) }
+  | Exp SEMI CalcOp CalcHints CalcContents { let (l, e) = $5 in ({calc_exp = $1; calc_op = $3; calc_hints = $4} :: l, e)}
 
 Block
   : { [] }
