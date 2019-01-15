@@ -359,7 +359,24 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   | SReturn -> compute_exps []
   | SAssume e -> compute_exps [e]
   | SAssert (attrs, e) -> compute_exps [e]
-  | SCalc (op, contents, e) -> notImplemented "not yet implemented: compute_read_mods of 'calc' for F*"
+  | SCalc (op, contents, e) ->
+      let compute_content cc =
+        let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+        let (_, rs0, rso0, _) = compute_exps [e] in
+        let f (env1, rs0, rso0, mods0) b =
+          let (env1, rs1, rso1, mods1) = rs b in
+          (env1, Set.union rs0 rs1, Set.union rso1 rso1, Set.union mods0 mods1)
+        let (env1, rs1, rso1, mods1) = List.fold f (env1, Set.empty, Set.empty, Set.empty) hints in
+        (env1, Set.union rs0 rs1, Set.union rso0 rso1, mods1)
+      let compute_contents cs : (env * Set<id> * Set<id> * Set<id>)=
+        let f (env1, rs0, rso0, mods0) cc =
+          let (env1, rs1, rso1, mods1) = compute_content cc in
+          (env1, Set.union rs0 rs1, Set.union rso0 rso1, Set.union mods0 mods1)
+        in
+        List.fold f (env1, Set.empty, Set.empty, Set.empty) cs
+      let (_, rs1, rso1, mods1) = compute_contents contents in
+      let (_, rs0, rso0, _) = compute_exps [e] in
+      (env1, Set.union rs0 rs1, Set.union rso0 rso1, mods1)
   | SVar (x, t, m, g, a, eOpt) -> compute_exps (match eOpt with None -> [] | Some e -> [e])
   | SAlias (x, y) -> compute_exps []
   | SAssign (lhss, e) ->
