@@ -203,7 +203,6 @@ and lextoken = parse
 | "forall" { FORALL (curLoc lexbuf) }
 | "exists" { EXISTS (curLoc lexbuf) }
 | "fun" { FUN (curLoc lexbuf) }
-| "lambda" { LAMBDA (curLoc lexbuf) }
 | "old" { OLD (curLoc lexbuf) }
 | "this" { THIS (curLoc lexbuf) }
 | "true" { LITBOOL ((curLoc lexbuf), true) }

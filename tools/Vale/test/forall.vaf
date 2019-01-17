@@ -1,10 +1,10 @@
 include{:fstar}{:open} "Types_s"
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 module Forall
 
@@ -106,7 +106,7 @@ procedure Calls0()
 procedure Calls1()
 {
 
-    forall x:int {x + x} :| x >= 0 :: x + x >= x
+    forall (x:int) {x + x} :| x >= 0 x + x >= x
     {
         assert x + x >= 0;
     }
@@ -115,7 +115,7 @@ procedure Calls1()
 procedure Calls2()
 {
 
-    forall x:int, y:int {x + y} {y + x}:| x >= 0 && y >= 0 :: x + y == y + x
+    forall (x:int, y:int) {x + y} {y + x}:| x >= 0 && y >= 0  x + y == y + x
     {
         assert x + y >= 0;
     }
@@ -124,7 +124,7 @@ procedure Calls2()
 procedure Calls3()
 {
 
-    forall x:int, y:int, z: int {x + y + z, y + x + z} :| x >= 0 && y >= 0 && z >= 0 :: x + y + z == y + x + z
+    forall (x:int, y:int, z: int) {x + y + z, y + x + z} :| x >= 0 && y >= 0 && z >= 0 x + y + z == y + x + z
     {
         assert x + y + z >= x;
     }
@@ -133,7 +133,7 @@ procedure Calls3()
 procedure Calls4()
 {
 
-    forall a:int, x:int, y:int, z: int {a + x + y + z} {y + x + z + a}:| a >= 0 && x >= 0 && y >= 0 && z >= 0 :: a + x + y + z == y + x + z + a
+    forall (a:int, x:int, y:int, z: int) {a + x + y + z} {y + x + z + a}:| a >= 0 && x >= 0 && y >= 0 && z >= 0 a + x + y + z == y + x + z + a
     {
         assert a + x + y + z >= a;
     }
@@ -142,7 +142,7 @@ procedure Calls4()
 procedure Calls5()
 {
 
-    forall a:int, b:int, x:int, y:int, z: int {a + b + x + y + z, y + x + z + a + b}:| a >= 0 && x >= 0 && y >= 0 && z >= 0 :: a + b + x + y + z == y + x + z + a + b
+    forall (a:int, b:int, x:int, y:int, z: int) {a + b + x + y + z, y + x + z + a + b}:| a >= 0 && x >= 0 && y >= 0 && z >= 0  a + b + x + y + z == y + x + z + a + b
     {
         assert a + x + y + z >= a;
     }
@@ -151,7 +151,7 @@ procedure Calls5()
 procedure Calls6()
 {
 
-    forall a:int, b:int, c: int, x:int, y:int, z: int :| a >= 0 && x >= 0 && y >= 0 && z >= 0 :: a + b + c + x + y + z == y + x + z + a + b + c
+    forall (a:int, b:int, c: int, x:int, y:int, z: int) :| a >= 0 && x >= 0 && y >= 0 && z >= 0  a + b + c + x + y + z == y + x + z + a + b + c
     {
         assert a + x + y + z >= a;
     }
@@ -160,14 +160,14 @@ procedure Calls6()
 /* TODO
 procedure p()
 {
-   assert forall x, y {x + y} {y + x}:: x > 0 && y > 0 ==> x + y > x && y + x > y;
-   assert forall x, y {x + y, y + x}:: x > 0 && y > 0 ==> x + y == y + x;
+   assert forall (x, y) {x + y} {y + x} x > 0 && y > 0 ==> x + y > x && y + x > y;
+   assert forall (x, y) {x + y, y + x} x > 0 && y > 0 ==> x + y == y + x;
 }
 */
 
 procedure Double()
 {
-   forall x:int :| x >= 0 :: opaque_double(x) >= x
+   forall (x:int) :| x >= 0  opaque_double(x) >= x
    {
         assume opaque_double(x) == x + x;
    }

@@ -1,10 +1,10 @@
 module Fstar1ifc
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 operand_type reg:int := inout eax | inout ebx;
 
@@ -174,35 +174,40 @@ let opaque_double = make_opaque double
 function double (x:int) : int extern;
 function opaque_double (x:int) : int extern;
 
-procedure{:terminates} Imm(out x:reg, inline y:int)
+procedure Imm(out x:reg, inline y:int)
+    {:terminates}
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure{:terminates} Increment(inout x:reg)
+procedure Increment(inout x:reg)
+    {:terminates}
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure{:terminates} Add(inout x:reg, y:reg)
+procedure Add(inout x:reg, in y:reg)
+    {:terminates}
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure{:terminates} AddReg(inout x:reg, y:reg)
+procedure AddReg(inout x:reg, in y:reg)
+    {:terminates}
     ensures
         x == old(x + y);
 {
     Add(x, y); // coerces y from register to operand
 }
 
-procedure{:terminates} p()
+procedure p()
+    {:terminates}
     modifies
         eax;
     requires
@@ -214,7 +219,8 @@ procedure{:terminates} p()
     Increment(eax);
 }
 
-procedure{:terminates} Calls()
+procedure Calls()
+    {:terminates}
     modifies
         eax; ebx;
     ensures
@@ -242,7 +248,8 @@ procedure{:terminates} Calls()
 //    }
 }
 
-procedure{:terminates} WhileTest()
+procedure WhileTest()
+    {:terminates}
     modifies
         eax; ebx;
     requires
@@ -264,7 +271,8 @@ procedure{:terminates} WhileTest()
     }
 }
 
-procedure{:terminates} Ghosts(ghost g1:int) returns(ghost g2:int)
+procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+    {:terminates}
     ensures
         g2 == g1 + 1;
 {

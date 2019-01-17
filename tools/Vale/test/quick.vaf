@@ -127,7 +127,8 @@ let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
 
 ghost procedure lemma_self_int(ghost i:int) extern;
 
-procedure{:quick} Incr3Quick()
+procedure Incr3Quick()
+    {:quick}
     modifies
         efl;
         rax;
@@ -139,15 +140,16 @@ procedure{:quick} Incr3Quick()
     Add64(rax, 1);
 }
 
-procedure{:quick exportOnly} Add64Ghosts(
+procedure Add64Ghosts(
         inout dst:dst_opr64,
-        src:opr64,
+        in src:opr64,
         inline i:int,
         ghost g1:int,
         ghost g2:int)
     returns(
         ghost h1:int,
         ghost h2:int)
+    {:quick exportOnly}
     modifies
         efl;
     requires
@@ -172,7 +174,8 @@ let ghostId (x:int) : GTot int = x
 function ghostId (x:int) : int extern;
 
 //#reset-options "--debug Quick --debug_level SMTQuery"
-procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+procedure Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -217,7 +220,8 @@ procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
 }
 #reset-options
 
-procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+procedure CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -232,7 +236,8 @@ procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     g2 := Bump3(b, if rax < 7 then (let r:int := rax in r) else g1 + 0);
 }
 
-procedure{:quick} AddRaxG(ghost g:int)
+procedure AddRaxG(ghost g:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -261,7 +266,8 @@ procedure Incr3(ghost g:int)
     Add64(rax, 1);
 }
 
-procedure{:quick} While(ghost g1:int) returns(ghost go:int)
+procedure While(ghost g1:int) returns(ghost go:int)
+    {:quick}
     modifies
         efl;
         rax; rbx;
@@ -291,7 +297,8 @@ procedure{:quick} While(ghost g1:int) returns(ghost go:int)
     go := g2 + gc;
 }
 
-procedure{:quick} TestAssertTyping(ghost i:int) returns(ghost j:nat)
+procedure TestAssertTyping(ghost i:int) returns(ghost j:nat)
+    {:quick}
     requires
         i >= 0;
 {

@@ -2,11 +2,11 @@ include{:fstar}{:open} "Types_s"
 
 module Overload
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 operand_type reg:int := inout eax | inout ebx;
 
@@ -102,7 +102,7 @@ unfold let va_reveal_opaque = reveal_opaque
 const True:prop extern;
 const False:prop extern;
 
-procedure Calls(x:reg, y:reg)
+procedure Calls(in x:reg, in y:reg)
 {
     ghost var z := 0 < x \/ y > 0;
     ghost var t := 0 < x /\ y > 0;

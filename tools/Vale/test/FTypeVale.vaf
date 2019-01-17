@@ -7,10 +7,10 @@ type list_list (a:Type(0)):Type(0) := list(list(a));
 
 function byte_test(x:byte, y:byte):byte extern;
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state reg(ESP)} esp:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var esp:int {:state reg(ESP)};
 
 operand_type reg32:nat32 :=
 | inout eax
@@ -30,7 +30,8 @@ type buf64:Type(0) := buf(dependent(bt64));
 function buf_len #[bt:Dependent(buf_typ)](b:buf(bt)):int extern;
 */
 
-procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+procedure Expressions1(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    {:typecheck} 
 {
     let a:bool := !true;
     let b:prop := !a;
@@ -61,7 +62,8 @@ procedure{:typecheck} Expressions1(ghost x:int_range(10, 20)) returns(ghost y:in
 
 function ff(x1:byte, x2:byte, x3:byte, x4:byte):byte extern;
 
-procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+procedure Expressions2(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    {:typecheck}
     lets p := 7;
     requires x >= 15;
 {
@@ -81,40 +83,53 @@ procedure{:typecheck} Expressions2(ghost x:int_range(10, 20)) returns(ghost y:in
     if (3 < 3) {}
 }
 
-procedure{:typecheck} Dependents(ghost b:buf32, ghost bt:buf_typ)
+procedure Dependents(ghost b:buf32, ghost bt:buf_typ)
+    {:typecheck}
 {
     let c:buf(dependent(bt32)) := b;
     let d:int := buf_len(c);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost b:buf32, ghost bt:buf_typ)
+procedure Fail(ghost b:buf32, ghost bt:buf_typ)
+    {:typecheck}
+    {:testShouldFail}
 {
     ghost var x:buf(dependent(bt)); // bt is not a global constant
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:list(byte) := nil();
     let aa:list_list(byte) := a;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:int := 0;
     a := 1; // not mutable
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let d := nil(); // needs type annotation on d or type argument to nil
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let b:list(int) := nil#[bool]();
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+procedure Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    {:typecheck}
+    {:testShouldFail}
 {
     let t := 10;
     y := t;
@@ -122,15 +137,18 @@ procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(g
 
 // TODO: check that return values are assigned
 
-procedure{:typecheck} Ghosts#[a:Type(0)](ghost x:byte, ghost y:bool, inline z:byte, ghost g1:a, ghost g2:a)
+procedure Ghosts#[a:Type(0)](ghost x:byte, ghost y:bool, inline z:byte, ghost g1:a, ghost g2:a)
+    {:typecheck}
 {
 }
 
-procedure{:typecheck} Add(inout dst:opr32, src:opr32)
+procedure Add(inout dst:opr32, in src:opr32)
+    {:typecheck}
 {
 }
 
-procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
+procedure Statements(ghost x:byte, inline z:byte, in o:reg32)
+    {:typecheck}
     lets ax @= eax;
     reads esp;
     modifies eax; ebx;
@@ -146,81 +164,109 @@ procedure{:typecheck} Statements(ghost x:byte, inline z:byte, o:reg32)
     Add(eax, o);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte, o:reg32)
+procedure Fail(ghost x:byte, inline z:byte, in o:reg32)
+    {:typecheck}
+    {:testShouldFail}
     reads esp;
     modifies eax; ebx;
 {
     Ghosts(100, true, z, true, 100);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte, o:reg32)
+procedure Fail(ghost x:byte, inline z:byte, in o:reg32)
+    {:typecheck}
+    {:testShouldFail}
     reads esp;
     modifies eax; ebx;
 {
     Add(o, eax);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte)
+procedure Fail(ghost x:byte)
+    {:typecheck}
+    {:testShouldFail}
     modifies eax; ebx; esp;
 {
     Add(eax, id(id(x)));
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
     modifies eax; ebx; esp;
 {
     Add(esp, eax);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:byte, inline z:byte)
+procedure Fail(ghost x:byte, inline z:byte)
+    {:typecheck}
+    {:testShouldFail}
     modifies eax; ebx;
 {
     Ghosts(100, true, x);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:byte := byte_test(5);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:byte := byte_test(200, 500);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+procedure Fail(ghost x:int_range(10, 20)) returns(ghost y:int_range(15, 25))
+    {:typecheck}
+    {:testShouldFail}
 {
     y := x;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:bool := !5;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:prop := !true;
     let b:bool := !a;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:prop := !true;
     let b:bool := a && true;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail(p:prop)
+procedure Fail(in p:prop)
+    {:typecheck}
+    {:testShouldFail}
 {
     let a:int := if p then 10 else 10;
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let e:tuple(int, byte) := tuple(5, 555);
 }
 
-procedure{:typecheck}{:testShouldFail} Fail()
+procedure Fail()
+    {:typecheck}
+    {:testShouldFail}
 {
     let y:bool := id(100);
 }
