@@ -23,5 +23,5 @@
     "NotificationChannel" : "#vale-build",
     "PublicBranches" : [ "master" ],
 
-    ".vale_version" : "0.2.10"
+    "vale_version" : "0.2.10"
 }
