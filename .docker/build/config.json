@@ -23,5 +23,9 @@
     "NotificationChannel" : "#vale-build",
     "PublicBranches" : [ "master" ],
 
-    "vale_version" : "0.2.10"
+    "ValeProject": {
+        "z3_version": "4.5.1",
+        "fstar_version": "d12198861e796fe1fe4adb7aac84fb581d0145f3",
+        "vale_version": "0.2.10"
+    }
 }
