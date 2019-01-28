@@ -95,6 +95,7 @@ import platform
 import fnmatch
 import pathlib
 import shutil
+import json
 
 if sys.version_info < (3, 6):
   print(f'Requires Python version >= 3.6, found version {sys.version_info}')  # If the syntax of this line is invalid, the version of Python is probably older than 3.6
@@ -141,9 +142,9 @@ AddOption('--KREMLIN-PATH', dest = 'kremlin_path', type = 'string', default = kr
 AddOption('--FSTAR-PATH', dest = 'fstar_path', type = 'string', default = fstar_default_path, action = 'store',
   help = 'Specify the path to F* tool')
 AddOptYesNo('FSTAR-MY-VERSION', dest = 'fstar_my_version', default = False,
-  help = 'Use version of F* that does not necessarily match .fstar_version')
+  help = 'Use version of F* that does not necessarily match ./docker/build/config.json[fstar_version]')
 AddOptYesNo('Z3-MY-VERSION', dest = 'z3_my_version', default = False,
-  help = 'Use version of Z3 that does not necessarily match .z3_version')
+  help = 'Use version of Z3 that does not necessarily match ./docker/build/config.json[z3_version]')
 AddOption('--DARGS', dest = 'dafny_user_args', type = 'string', default=[], action = 'append',
   help='Supply temporary additional arguments to the Dafny compiler')
 AddOption('--FARGS', dest = 'fstar_user_args', type = 'string', default = [], action = 'append',
@@ -429,54 +430,46 @@ def get_build_options(srcnode):
     else:
       return None
 
-def check_fstar_version():
+def check_fstar_version(config):
   import subprocess
-  fstar_version_file = ".fstar_version"
-  if os.path.isfile(fstar_version_file):
-    with open(fstar_version_file, 'r') as myfile:
-      lines = myfile.read().splitlines()
-    version = lines[0]
-    cmd = [str(fstar_exe), '--version']
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
-    lines = o.splitlines()
-    for line in lines:
-      if '=' in line:
-        key, v = line.split('=', 1)
-        if key == 'commit' and v == version:
-          return
-    print_error(f'Expected F* version commit={version}, but fstar --version returned the following:')
-    for line in lines:
-      print_error('  ' + line)
-    print_error_exit(
-      f'Get F* version {version} from https://github.com/FStarLang/FStar,' +
-      f' modify .fstar_version, or use the --FSTAR-MY-VERSION option to override.' +
-      f' (We try to update the F* version frequently; feel free to change .fstar_version' +
-      f' to a more recent F* version as long as the build still succeeds with the new version.' +
-      f' We try to maintain the invariant that the build succeeds with the F* version in .fstar_version.)')
+  version = config['ValeProject']['fstar_version']
+  cmd = [str(fstar_exe), '--version']
+  o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
+  lines = o.splitlines()
+  for line in lines:
+    if '=' in line:
+      key, v = line.split('=', 1)
+      if key == 'commit' and v == version:
+        return
+  print_error(f'Expected F* version commit={version}, but fstar --version returned the following:')
+  for line in lines:
+    print_error('  ' + line)
+  print_error_exit(
+    f'Get F* version {version} from https://github.com/FStarLang/FStar,' +
+    f' modify docker/build/config.json[fstar_version], or use the --FSTAR-MY-VERSION option to override.' +
+    f' (We try to update the F* version frequently; feel free to change docker/build/config.json[fstar_version]' +
+    f' to a more recent F* version as long as the build still succeeds with the new version.' +
+    f' We try to maintain the invariant that the build succeeds with the F* version in docker/build/config.json[fstar_version].)')
 
-def check_z3_version(z3_exe):
+def check_z3_version(config, z3_exe):
   import subprocess
-  z3_version_file = ".z3_version"
-  if os.path.isfile(z3_version_file):
-    with open(z3_version_file, 'r') as myfile:
-      lines = myfile.read().splitlines()
-    version = lines[0]
-    cmd = [z3_exe, '--version']
-    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
-    lines = o.splitlines()
-    line = lines[0]
-    for word in line.split(' '):
-      if '.' in word:
-        if word == version:
-          return
-        break
-    print_error(f'Expected Z3 version {version}, but z3 --version returned the following:')
-    for line in lines:
-      print_error('  ' + line)
-    print_error_exit(
-      'Get a recent Z3 executable from https://github.com/FStarLang/binaries/tree/master/z3-tested,' +
-      ' modify .z3_version, or use the --Z3-MY-VERSION option to override.' +
-      ' (We rarely change the Z3 version; we strongly recommend using the expected version of Z3.)')
+  version = config['ValeProject']['z3_version']
+  cmd = [str(z3_exe), '--version']
+  o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
+  lines = o.splitlines()
+  line = lines[0]
+  for word in line.split(' '):
+    if '.' in word:
+      if word == version:
+        return
+      break
+  print_error(f'Expected Z3 version {version}, but z3 --version returned the following:')
+  for line in lines:
+    print_error('  ' + line)
+  print_error_exit(
+    'Get a recent Z3 executable from https://github.com/FStarLang/binaries/tree/master/z3-tested,' +
+    ' modify .docker/build/config.json[z3_version], or use the --Z3-MY-VERSION option to override.' +
+    ' (We rarely change the Z3 version; we strongly recommend using the expected version of Z3.)')
 
 def add_fslexyacc(env):
   # probe for fslexyacc to ensure it is installed ahead of trying to use it to build
@@ -960,7 +953,15 @@ if do_build:
   pathlib.Path('bin').mkdir(parents = True, exist_ok = True)
   pathlib.Path('obj').mkdir(parents = True, exist_ok = True)
   pathlib.Path('obj/cache_checked').mkdir(parents = True, exist_ok = True)
-  CopyFile('bin/.vale_version', '.vale_version')
+
+  config_filename = '.docker/build/config.json'
+  with open(config_filename) as myfile:
+    config = json.load(myfile)
+  vale_version = config['ValeProject']['vale_version']
+  def write_vale_version(target, source, env):
+    with open('bin/.vale_version', 'w', newline = '\n') as myfile:
+      myfile.write(f'{vale_version}\n')
+  env.Command('bin/.vale_version', config_filename, write_vale_version)
 
   Export('env')
   Export('win32')
@@ -973,11 +974,11 @@ if do_build:
 
   # Check F* and Z3 versions
   if do_fstar and not fstar_my_version:
-    check_fstar_version()
+    check_fstar_version(config)
   if verify and not z3_my_version:
     if not found_z3:
       print_error_exit('Could not find z3 executable.  Either put z3 in your path, or put it in the directory tools/Z3/, or use the --FSTARZ3=<z3-executable> option.')
-    check_z3_version(z3_exe)
+    check_z3_version(config, z3_exe)
 
   print('Processing source files')
   process_files_in(env, verify_paths)
