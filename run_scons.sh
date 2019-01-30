@@ -110,7 +110,7 @@ C:\cygwin64\bin\bash.exe $SCONS_INVOKE_FILE_BASENAME.sh
 EOF
     # TODO: convert arguments to scons to windows paths.
     echo "$pydir/python.exe '$pydir_w\\Scripts\\scons.py' $*" > "$SCONS_INVOKE_FILE_BASENAME.sh"
-    echo "echo $$? > $SCONS_INVOKE_FILE_BASENAME.err" >> "$SCONS_INVOKE_FILE_BASENAME.sh"
+    echo "echo "'$'"? > $SCONS_INVOKE_FILE_BASENAME.err" >> "$SCONS_INVOKE_FILE_BASENAME.sh"
     chmod +x "$SCONS_INVOKE_FILE_BASENAME.bat"
     "./$SCONS_INVOKE_FILE_BASENAME.bat"
     SCONS_RETCODE=$(cat "$SCONS_INVOKE_FILE_BASENAME.err")
