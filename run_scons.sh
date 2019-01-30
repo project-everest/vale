@@ -97,6 +97,7 @@ if is_windows ; then
     while
       SCONS_INVOKE_FILE_BASENAME="vale$THIS_PID""scons$SCONS_EXECS" && {
       [[ -e "$SCONS_INVOKE_FILE_BASENAME.bat" ]] ||
+      [[ -e "$SCONS_INVOKE_FILE_BASENAME.err" ]] ||
       [[ -e "$SCONS_INVOKE_FILE_BASENAME.sh" ]]
     }
     do
@@ -109,10 +110,11 @@ C:\cygwin64\bin\bash.exe $SCONS_INVOKE_FILE_BASENAME.sh
 EOF
     # TODO: convert arguments to scons to windows paths.
     echo "$pydir/python.exe '$pydir_w\\Scripts\\scons.py' $*" > "$SCONS_INVOKE_FILE_BASENAME.sh"
+    echo "echo $$? > $SCONS_INVOKE_FILE_BASENAME.err" >> "$SCONS_INVOKE_FILE_BASENAME.sh"
     chmod +x "$SCONS_INVOKE_FILE_BASENAME.bat"
     "./$SCONS_INVOKE_FILE_BASENAME.bat"
-    SCONS_RETCODE=$?
-    rm -f "$SCONS_INVOKE_FILE_BASENAME.bat" "$SCONS_INVOKE_FILE_BASENAME.sh"
+    SCONS_RETCODE=$(cat "$SCONS_INVOKE_FILE_BASENAME.err")
+    rm -f "$SCONS_INVOKE_FILE_BASENAME.bat" "$SCONS_INVOKE_FILE_BASENAME.sh" "$SCONS_INVOKE_FILE_BASENAME.err"
     exit $SCONS_RETCODE
 else
     python$SCONS_PYTHON_MAJOR_MINOR $(which scons) "$@"
