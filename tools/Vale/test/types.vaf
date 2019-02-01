@@ -197,3 +197,24 @@ procedure{:typecheck}{:testShouldFail} Fail()
 {
     let y:bool := id(100);
 }
+
+function{:typecheck} f(x:int, y:int):int 
+{
+  x + y
+}
+
+function{:typecheck}{:testShouldFail} f(x:int, y:bool):int 
+{
+  x + y
+}
+
+function{:typecheck}{:testShouldFail} f(x:int, y:int):bool 
+{
+  x + y
+}
+
+function{:typecheck}{:testShouldFail} f(x:bool):bool
+  requires x >= 0;
+{
+  x
+}

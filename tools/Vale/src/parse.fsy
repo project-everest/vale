@@ -521,6 +521,19 @@ Decl
         fattrs = $2}
       )
     }
+  | FUNCTION Attrs AnyIdOrOp TFormalsBracket LPAREN Formals RPAREN COLON FunRet Specs LBRACE Exp RBRACE
+    { ($1, DFun {
+        fname = $3;
+        fghost = Ghost;
+        ftargs = $4;
+        fargs = $6;
+        fret_name = fst $9;
+        fret = snd $9;
+        fspecs = $10;
+        fbody = Some $12;
+        fattrs = $2}
+      )
+    }
   | Proc Attrs AnyIdOrOp TFormalsBracket LPAREN ProcFormals RPAREN ProcRet Specs EXTERN SEMI
     {
       (fst $1, DProc {pname = $3; pghost = snd $1; pinline = Inline; ptargs = $4; pargs = $6; prets = $8; pspecs = $9; pbody = None; pattrs = $2})

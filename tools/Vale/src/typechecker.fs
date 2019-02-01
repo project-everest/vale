@@ -2004,6 +2004,28 @@ let tc_proc (env:env) (p:proc_decl):(env * proc_decl) =
 //      let env = push_unsupported env p.pname s in
 //      (env, p)
 
+let tc_func (env:env) (f:fun_decl) (name: id):(env * fun_decl) =
+    let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
+    let env = if isRecursive then push_func env name f else env in
+    let globals = env in
+    let env = push_id_with_info env (Reserved "this") (TName (lookup_primitive env PT_State)) (Some MutableGhostLocal) in
+    let push_arg env arg =
+      let (x, t) = arg in 
+      match t with 
+      | None -> internalErr ("not implemented yet") 
+      | Some t -> push_id env x t 
+    in
+    let env = List.fold push_arg env f.fargs in 
+    let (env, fspecs) = tc_specs env f.fspecs in
+    let (env, body) =
+      match f.fbody with
+      | None -> (env, None)
+      | Some e -> let (t, e) = tc_exp env e (Some f.fret) in (env, Some e)
+    let fNew = {f with fbody = body; fspecs = fspecs} in
+    let env = globals in
+    let env = if isRecursive then env else push_func env name f in
+    (env, fNew)
+
 let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) list) =
   let ((loc, d), verify) = decl in
   try
@@ -2030,7 +2052,7 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
     | DConst (x, t) ->
         let env = push_const env x t in
         (env, [decl])
-    | DFun ({fbody = None} as f) -> // TODO: fbody = Some e
+    | DFun f ->
       (
         let isTypeChecked = verify && (attrs_get_bool (Id "typecheck") !do_typecheck f.fattrs) in
         let name =
@@ -2052,8 +2074,23 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
           | (Operator xf, _) when xf.StartsWith(".") ->
               err (sprintf "operator(%s) expects one argument, which must be a named type" xf)
           | _ -> f.fname
-        let env = push_func env name f in
-        (env, [decl])
+        in
+        let isTestShouldFail = attrs_get_bool (Id "testShouldFail") false f.fattrs in
+        let (env, fs) =
+          if isTypeChecked then
+            if isTestShouldFail then
+              let success = try let _ = tc_func env f name in true with _ -> false in
+              if success then err "{:testShouldFail} procedure unexpectedly succeeded"
+              else (env, [])
+            else
+              let (env, f) = tc_func env f name in
+              (env, [f])
+          else if isTestShouldFail then
+            (env, [])
+          else
+            let env = push_func env name f in (env, [f])
+          in
+        (env, List.map (fun f -> ((loc, DFun f), verify)) fs)
       )
     | DProc p ->
         // TODO: add ptargs to env
