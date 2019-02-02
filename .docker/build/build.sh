@@ -39,7 +39,12 @@ function exec_build () {
     fi
 
     # Set up build environment
-    nuget restore tools/Vale/src/packages.config -PackagesDirectory tools/FsLexYacc
+    nuget_exe=nuget
+    if command -v cygpath >/dev/null 2>&1; then
+        wget https://dist.nuget.org/win-x86-commandline/latest/nuget.exe && chmod a+x nuget.exe
+        nuget_exe=./nuget.exe
+    fi
+    $nuget_exe restore tools/Vale/src/packages.config -PackagesDirectory tools/FsLexYacc
 
     if [[ $target == "vale-ci" ]]; then
         echo "target -> vale-ci"
