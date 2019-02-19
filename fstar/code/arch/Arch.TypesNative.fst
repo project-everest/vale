@@ -34,6 +34,7 @@ let lemma_ishl_nth_i n x y i =
 let lemma_ishr_nth_i n x y i =
   reveal_ishr n x y
 
+#reset-options "--using_facts_from 'Prims FStar.UInt'"
 let lemma_iand_nth n x y =
   FStar.Classical.forall_intro (lemma_iand_nth_i n x y)
 
