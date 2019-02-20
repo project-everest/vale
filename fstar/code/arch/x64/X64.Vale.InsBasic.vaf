@@ -147,12 +147,16 @@ procedure{:public}{:instruction Ins(S.Sub64(dst, src))}{:quick exportOnly} Sub64
 {
 }
 
+#reset-options "--max_fuel 0 --max_ifuel 0 --using_facts_from 'Prims FStar.UInt'"
+
 #verbatim
 let lemma_fundamental_div_mod (a b:nat64) :
   Lemma (pow2_64 `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
   =
-  ()
+  FStar.Math.Lemmas.lemma_div_mod (a `op_Multiply` b) pow2_64
 #endverbatim
+
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
 ghost procedure{:public} lemma_fundamental_div_mod(ghost a:nat64, ghost b:nat64) extern;
 
