@@ -133,6 +133,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
     | ECast (e, t) -> ECast (r e, t)
+    | ELabel (loc, e) -> ELabel (loc, r e)
   )
 
 let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
@@ -842,9 +843,9 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
         in
       let applyLets old =
         match env.lets with
-        | [] -> es
+        | [] -> List.map (fun (l, e) -> (l, ELabel(l, e))) es
         | lets ->
-            let e = and_of_list (List.map snd es) in
+            let e = and_of_list (List.map (fun (l, e) -> ELabel (l, e)) es) in
             let lets = List.map (let_of_lets old) lets in
             let addLet e (loc, bind, (x, t), ee) = ELoc (loc, ebind bind [ee] [(x, t)] [] e) in
             let e = List.fold addLet e lets in
