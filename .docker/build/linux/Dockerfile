@@ -14,7 +14,6 @@ ARG BUILDLOGFILE
 ARG MAXTHREADS
 ARG TARGET
 ARG BRANCHNAME
-ARG FSTARSOURCEVERSION
 
 # ADD SSH KEY
 RUN mkdir -p ${MYHOME}/.ssh
@@ -49,7 +48,7 @@ RUN chmod +x build.sh
 COPY --chown=everest build_helper.sh ${MYHOME}/build_helper.sh
 RUN chmod +x build_helper.sh
 
-RUN ./build_helper.sh ${TARGET} ${BUILDLOGFILE} ${MAXTHREADS} ${BRANCHNAME} ${FSTARSOURCEVERSION} || true
+RUN ./build_helper.sh ${TARGET} ${BUILDLOGFILE} ${MAXTHREADS} ${BRANCHNAME} || true
 
 # Remove ssh identities.
 RUN rm ${MYHOME}/.ssh/id_rsa

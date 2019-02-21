@@ -127,18 +127,24 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
       let scope = List.fold (fun scope (x, t) -> add_unique x t scope) scope xs in
       (scope, updates, s)
 
+let rec subst_label_exp (addLabels:bool) (e:exp):exp =
+  let addLabel loc e = 
+    let range = evar (Id "range1") in
+    let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
+    eapply (Id "label") [range; msg; e]
+  in
+  let f e =
+    match e with
+    | ELabel (l, e) -> Replace (if addLabels then addLabel l (subst_label_exp addLabels e) else (subst_label_exp addLabels e))
+    | _ -> Unchanged
+  in
+  map_exp f e
+
 let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
   try
-    let addLabel e =
-      if addLabels then
-        let range = evar (Id "range1") in
-        let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
-        eapply (Id "label") [range; msg; e]
-      else e
-      in
     match s with
     | Requires (_, e) -> ([e], [])
-    | Ensures (_, e) -> ([], [addLabel e])
+    | Ensures (_, e) -> ([], [subst_label_exp addLabels e])
     | Modifies _ -> ([], [])
     | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))

@@ -245,12 +245,13 @@ let lookup_type (env:env) (x:id):(tformal list option * kind * typ option) =
   | (Some info, x) -> info
   | _ -> err ("cannot find type '" + (err_id x) + "'")
 
-type fun_or_proc = FoundFun of fun_decl | FoundProc of proc_decl
+type fun_or_proc = FoundFunDecl of fun_decl | FoundFunExpr of fun_typ | FoundProc of proc_decl
 
 let try_lookup_fun_or_proc (env:env) (x:id):fun_or_proc option =
   match lookup_name env x true with
   | (Some (Proc_decl p), _) -> Some (FoundProc p)
-  | (Some (Func_decl f), _) -> Some (FoundFun f)
+  | (Some (Func_decl f), _) -> Some (FoundFunDecl f)
+  | (Some (Info (TFun f, _)), _) -> Some (FoundFunExpr f)
   | (Some (UnsupportedName (x, loc, msg)), _) -> unsupported loc msg ("function or procedure '" + (err_id x) + "' is declared 'unsupported'")
   | _ -> None
 
@@ -260,10 +261,20 @@ let lookup_fun_or_proc (env:env) (x:id):fun_or_proc =
   | Some t -> t
   | _ -> err ("cannot find function/procedure '" + (err_id x) + "'")
 
-let lookup_fun (env:env) (x:id):fun_decl =
+let lookup_fun_decl (env:env) (x:id):fun_decl =
   match try_lookup_fun_or_proc env x with
-  | Some (FoundFun f) -> f
+  | Some (FoundFunDecl f) -> f
   | _ -> err ("cannot find function '" + (err_id x) + "'")
+
+let try_lookup_fun_decl (env:env) (x:id):fun_decl option =
+  match try_lookup_fun_or_proc env x with
+  | Some (FoundFunDecl f) -> Some f
+  | _ -> None
+
+let lookup_fun_expr (env:env) (x:id):(typ list * typ) =
+  match try_lookup_fun_or_proc env x with
+  | Some (FoundFunExpr f) -> f
+  | _ -> err ("cannot find function'" + (err_id x) + "'")
 
 let lookup_operand_type (env:env) (x:id):(pformal list option * typ * typ option * operand_typ list) =
   match lookup_name env x true with
@@ -1331,7 +1342,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
 *)
   | EOp (Uop (UCustom op), es, _) ->
     (
-      let f = lookup_fun env (Operator op) in
+      let f = lookup_fun_decl env (Operator op) in
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
@@ -1404,7 +1415,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
 *)
   | EOp (Bop (BCustom op), es, _) ->
     (
-      let f = lookup_fun env (Operator op) in
+      let f = lookup_fun_decl env (Operator op) in
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
@@ -1609,8 +1620,13 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
   | EApply (e, ts_opt, es, _) when not !fstar && id_of_exp e = (Id "set") -> check_collection_literal e PT_Set ts_opt es
   | EApply (e, ts_opt, es, _) ->
       let x = id_of_exp e in
-      let f = lookup_fun env x in
-      let f = compute_fun_instance env u f ts_opt in
+      let f = 
+        match try_lookup_fun_decl env x with
+        | Some f -> compute_fun_instance env u f ts_opt
+        | _ ->
+          let (args, ret) = lookup_fun_expr env x in
+          { f_args = args; f_targs = []; f_ret = ret} 
+      in
       if List.length f.f_args <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.f_args) (List.length es));
       let param_typs = f.f_args in
       let ret_typ = f.f_ret in
@@ -1857,8 +1873,8 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
         (
          let x = id_of_exp e in       
           match (xs, lookup_fun_or_proc env x) with
-          | (([] | [_]), FoundFun _) -> assign_exp ()
-          | (_::_, FoundFun _) -> err ("Expected 0 or 1 return values from function")
+          | (([] | [_]), (FoundFunDecl _ | FoundFunExpr _)) -> assign_exp ()
+          | (_::_, (FoundFunDecl _ | FoundFunExpr _)) -> err ("Expected 0 or 1 return values from function")
           | (_, FoundProc p) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
         )
       | _ -> assign_exp ()

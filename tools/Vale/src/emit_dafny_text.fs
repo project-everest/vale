@@ -99,6 +99,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindSet, [], xs, ts, e, _) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr ("EBind " + (sprintf "%A" e))
     | ECast (e, _) -> (r prec e, 0)
+    | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_formal (x:id, t:typ option) = (sid x) + (match t with None -> "" | Some t -> ":" + (string_of_typ t))

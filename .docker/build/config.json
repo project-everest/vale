@@ -1,0 +1,31 @@
+{
+    "ProjectName" : "vale",
+
+    "BaseContainerIsEverestImage" : true,
+    "BaseContainerImageName" : "fstar",
+    "BaseContainerImageTagOrCommitId": "latest",
+    "BranchName" : "master",
+    "GithubCommitUrl" : "https://github.com/FStarLang/FStar/commit",
+    "OnDemandBuildDefinition" : "FStar\\FStar-{agentOS}",
+
+    "DockerFile": ".docker/build/{agentOS}/Dockerfile",
+    "DependencyFiles" : [
+        ".docker/build/build_helper.sh",
+        ".docker/build/build.sh"
+    ],
+
+    "DockerCacheEnabled" : true,
+    "CIBuildTarget" : "vale-ci",
+    "NightlyBuildTarget" : "vale-nightly",
+    "HasLogsToExtract" : true,
+
+    "NotificationEnabled" : true,
+    "NotificationChannel" : "#vale-build",
+    "PublicBranches" : [ "master" ],
+
+    "ValeProject": {
+        "recommended_z3_version": "4.5.1",
+        "recommended_fstar_version": "dfcd66fe5064b84b6b737627fa7712276c9d668e",
+        "binary_release_vale_version": "0.2.10"
+    }
+}

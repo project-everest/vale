@@ -127,8 +127,8 @@ let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
   | [] -> []
   | (loc, SpecExp e)::es -> (loc, e)::(exps_of_spec_exps es)
   | (loc, SpecLet (x, t, ex))::es ->
-      let es = List.map snd (exps_of_spec_exps es) in
-      let e = and_of_list es in
+      let es = exps_of_spec_exps es in
+      let e = and_of_list (List.map (fun (l, e) -> ELabel (l, e)) es) in
       [(loc, EBind (BindLet, [ex], [(x, t)], [], e, exp_typ e))]
 
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
@@ -173,6 +173,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
     | ECast (e, t) -> ECast (r e, t)
+    | ELabel (l, e) -> ELabel (l, r e)
   )
 
 let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
@@ -185,6 +186,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     | EOp (op, es, _) -> List.map r es
     | EApply (x, ts, es, _) -> List.map r es
     | ECast (e, t) -> [r e]
+    | ELabel (loc, e) -> [r e]
   in f e children
 
 let gather_attrs (f:exp -> 'a list -> 'a) (attrs:attrs):'a list =

@@ -18,9 +18,10 @@ type typ =
 | TBool of bool_or_prop
 | TInt of bnd * bnd
 | TTuple of typ list
-| TFun of typ list * typ
+| TFun of fun_typ
 | TDependent of id // the id is an expression-level variable, not a type-level variable
 | TVar of id * kind option
+and fun_typ = typ list * typ
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
@@ -76,6 +77,7 @@ type exp =
 | EApply of exp * typ list option * exp list * typ option
 | EBind of bindOp * exp list * formal list * triggers * exp * typ option
 | ECast of exp * typ
+| ELabel of loc * exp // marker for exp that needs to be wrapped in a loc label
 
 and triggers = exp list list
 
