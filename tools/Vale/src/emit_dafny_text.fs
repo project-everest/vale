@@ -126,10 +126,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       let sSplit = if attrs.is_split then "{:split_here}" else "" in
       ps.PrintLine ("assert" + sSplit + " " + (string_of_exp e) + ";" + "  // " + (string_of_loc !ps.cur_loc))
   | SCalc (op, contents, e) ->
-      (* 'op' in SCalc dictate the final relation between the first value and the final value, where in Dafny
-         it set the defaultOp when op in steps are omitted. Since op is required in steps in Vale, we don't
-         need the user provided defaultOp. Therefore, we don't need emit op after "calc"  *)
-      ps.PrintLine ("calc " + "{");  
+      ps.PrintLine ("calc " + string_of_bop op + " {");  
       ps.Indent();
       List.iter (fun {calc_exp = e; calc_op = op; calc_hints = hints} ->
         ps.PrintLine ((string_of_exp e) + ";");

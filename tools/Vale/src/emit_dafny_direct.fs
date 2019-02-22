@@ -451,10 +451,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let start_tok = create_token loc "calc" in
         let end_tok = create_token loc "}" in
         let makeCalcOp op = CalcStmt.BinaryCalcOp(bop2opcode op) :> CalcStmt.CalcOp in
-        (* 'op' in SCalc dictate the final relation between the first value and the final value, where in Dafny
-           it set the defaultOp when op in steps are omitted. Since op is required in steps in Vale, we don't
-           need the user provided defaultOp. Therefore, it is set to CalcStmt.DefaultOp  *)
-        let calcOp = CalcStmt.DefaultOp in
+        let calcOp = makeCalcOp op in
         let resOp = ref calcOp in
         let checkOp nextOp =
           let maybeOp = (!resOp).ResultOp(nextOp) in
