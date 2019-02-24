@@ -255,6 +255,13 @@ G |- em : tm'[a1 <- t1, ..., an <- tn]
 ------------------------------------------------ Note: if e_req isn't True, then it is checked by the SMT solver
 G |- x(e1, ..., en) : t[a1 <- t1, ..., an <- tn]
 
+G |- e0 : fun(t1, ..., tn) -> t
+G |- e1 : t1
+...
+G |- en : tn
+-------------------------------
+G |- e0(e1, ..., en) : t
+
 //TODO: this is not yet implemented:
 //G = ... x:Dependent(xk) ...
 //---------------------------
