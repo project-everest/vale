@@ -4,6 +4,9 @@ type byte:Type(0) := int_range(0, 0xff);
 type nat32:Type(0) := int_range(0, 0xffff_ffff);
 type list (a:Type(0)):Type(0) extern;
 type fake_list (a:Type(0)):Type(0) extern;
+type register:Type(0) extern;
+type map(a:Type(0), b:Type(0)):Type(0) extern;
+type seq(a:Type(0)):Type(0) extern;
 
 function byte_test(x:byte, y:byte):byte extern;
 function id #[a:Type(0)](x:a):a extern;
@@ -12,12 +15,20 @@ function cons #[a:Type(0)](hd:a, tl:list(a)):list(a) extern;
 function operator(.field1) #[a:Type(0)](l:list(a)):bool extern;
 function operator(.field1) #[a:Type(0)](l:fake_list(a)):int extern;
 
+function l_not(x:prop):prop extern;
+function l_and(x:prop, y:prop):prop extern;
+function operator([]) #[a:Type(0), b:Type(0)](m:map(a, b), i:a):b extern;
+function operator(?[]) #[a:Type(0), b:Type(0)](m:map(a, b), i:a):prop extern;
+function operator([:=]) #[a:Type(0), b:Type(0)](m:map(a, b), i:a, v:b):map(a, b) extern;
+
+const False:prop extern;
+
 var{:state ok()} ok:bool;
 var{:state reg(EAX)} eax:int;
 var{:state reg(EBX)} ebx:int;
 var{:state reg(ESP)} esp:int;
 
-operand_type reg32:nat32 :=
+operand_type reg32:nat32 @ register:=
 | inout eax
 | inout ebx
 ;
@@ -70,6 +81,91 @@ procedure{:typecheck} Expressions2(ghost x:int_range(10, 20), ghost fl:fake_list
     y := #int_range(15, 20)(x);
     assert 7 < 8;
     if (3 < 3) {}
+}
+
+procedure{:typecheck} UopExpession(src: reg32) 
+    reads eax;
+{
+    let a:int := old(eax);
+    let b:register := @src;
+    let c:prop := ~False;
+}
+
+procedure{:typecheck}{:testShouldFail} UopExpressionFail(src1: reg32, src2: opr32, inline src3: int)
+    reads eax;
+{
+    let a:bool := old(eax);
+    let s1:int := @src1;
+    let s2 := @src2;
+    let s3 := @src3;
+    let b:bool := ~False;
+    // TODO: UCustom: check f and f.alias have the same type?
+}
+
+procedure{:typecheck} BopExpression(ghost x:int, ghost m:map(int, int), ghost y: int_range(10, 20))
+{
+    let a:prop := x + 5 > 5 <==> x > 0;
+    let b:prop := x > 0 ==> x + 5 > 5;
+    let c:prop := x > 0 <== x + 5 > 5;  
+    let d:bool := x = 5;
+    let e:prop := x = 5;
+    let f:bool := x == 5;
+    let g:prop := x == 5;
+    let h:bool := x != 5;
+    let i:prop := x != 5;
+    let j:bool := x > 5;
+    let k:bool := (x >= 5) > (x -2);
+    let l:prop := m?[x];
+    let m:int := y + 3;
+    let n:prop := x > 0 /\ x < y;
+}
+
+procedure{:typecheck}{:testShouldFail} BopExpressionFail(ghost x:int, ghost y: bool, ghost z: prop, ghost m:map(int, int), ghost ir:int_range(10, 20))
+{
+    let a:bool := x + 5 > 5 <==> x > 0;
+    let b:prop := x + 5 > 5 <==> x + 5;
+    let c:prop := x + 5 <==> x > 0;
+    let d:bool := y || z;
+    let e:bool := z && z;
+    let d:bool := x = y;
+    let f:bool := x > y;
+    let g:bool := (x > 5) > y;
+    let h:prop := m?[y];
+    let i:prop := x?[x];
+    let j:int := m?[5];
+    let i:int := x + y;
+    let i:int_range(10, 20) := x - 3;
+    let j:int_range(8, 16) := ir - 3;
+    let k:int_range(31, 59) := ir * 3;
+    let l:int_range(31, 59) := ir + 2 * ir;
+    let m:int_range(4, 6) := ir / 3;
+    let n:int_range(1, 2) := ir % 3;
+    let o:bool := x > 0 /\ x < y;
+    let p:prop := x /\ x < 0;
+    let q:prop := x > 0 /\ x;
+}
+procedure{:typecheck} OpExpression(ghost m:map(int, int), ghost i:int, ghost v:int)
+{
+  // TODO: FieldOp, FieldUpdate
+  // CodeLemmaOp, RefineOp, StateOp, OperandArg
+  let a:int := m[i];
+  let b:map(int,int) := m[i:=v];
+  let c:int_range(10, 20) := if i > 0 then 10 else 20;
+}
+
+procedure{:typecheck} OpExpressionFail(ghost m:map(int, int), ghost i:int, ghost v:int) 
+{
+    //let a:tuple(int, byte) := tuple(5, true);
+    //let a:bool := m[i];
+    //let b:int := m[true];
+    //let c:int := i[i];
+    //let d:map(int, bool) := m[i:=v];
+    //let e:map(int, int) := m[i:=true];
+    //let f:map(int, int) := m[true:=v];
+    //let g:map(int, int) := i[i:=v];
+    //let h := if i > 0 then 10 else true;
+    //let j := if i then 10 else 20;
+    //let k:bool := if i > 0 then 10 else 20;
 }
 
 procedure{:typecheck}{:testShouldFail} Fail()
