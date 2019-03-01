@@ -162,15 +162,10 @@ assume val va_lemma_whileMerge_total : c:va_code -> s0:va_state -> f0:va_fuel ->
     eval_while_inv c s0 fN sN
   ))
 
-assume val make_opaque : #a:Type -> a -> a
-assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
-unfold let va_make_opaque = make_opaque
-unfold let va_reveal_opaque = reveal_opaque
-
 let double (x:int):int = x + x
-let opaque_double = make_opaque double
+[@"opaque_to_smt"]
+let opaque_double = double
 #endverbatim
-
 function double (x:int) : int extern;
 function opaque_double (x:int) : int extern;
 
@@ -268,7 +263,7 @@ procedure{:terminates} Ghosts(ghost g1:int) returns(ghost g2:int)
     ensures
         g2 == g1 + 1;
 {
-    assert opaque_double(3) == 6 by { reveal double; }
+    assert opaque_double(3) == 6 by { reveal opaque_double; }
     assert opaque_double(3) == 6;
     //assert opaque_double(4) == 8;
     g2 := g1 + 1;

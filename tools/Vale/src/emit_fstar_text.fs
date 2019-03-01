@@ -93,7 +93,6 @@ let string_of_type_arguments (ts:typ list option):string =
   | Some [] -> "" 
   | Some ts -> " " + String.concat " " (List.map string_of_type_argument ts)
 
-  
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -109,8 +108,8 @@ let rec string_of_exp_prec prec e =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e], t) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> (r prec (vaApp_t "reveal_opaque" [eapply_t (transparent_id (id_of_exp e)) es t1] t), prec)
-    | EOp (Uop UReveal, [EVar (x, _)], t) -> ("reveal_opaque " + (sid x), 90)
+    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> let x = sid (id_of_exp e) in ("reveal_opaque (`%" + x + ") " + x, prec)
+    | EOp (Uop UReveal, [EVar (x, _)], t) -> let x = sid x in ("reveal_opaque (`%" + x + ") " + x, 90)
     | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e], t) -> ("-" + (r 99 e), 0)
@@ -461,20 +460,32 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let dArgs = List.map (fun (x, _) -> evar x) f.fargs in
   let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
   let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
+  let rewrite_transparent_body fname e = 
+    let rec f e = 
+      match e with
+      | EApply (x, ts, es, t) when (id_of_exp x) = fname -> 
+        // in transparent_f, replace calls to f to call transparent_f so
+        // that f and transparent_f are not mutually recursive. Then f can be
+        // marked with [@"opaque_to_smt"] for opaque
+        Replace (EApply (evar (transparent_id fname), ts, List.map r es, t)) 
+      | _ -> Unchanged
+    and r = map_exp f in
+    map_exp f e
   if isOpaque then
     ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
     if isPublic then
-      psi.PrintLine (sVal (sid f.fname) decreases1);
+      psi.PrintLine (sVal (sid (f.fname)) "");
     else
-      ps.PrintLine (sVal (sid f.fname) decreases1);
+      ps.PrintLine (sVal (sid (f.fname)) "");
     ( match f.fbody with
       | None -> ()
-      | Some e -> printBody header true (sid (transparent_id f.fname)) e
+      | Some e -> printBody header true (sid ((transparent_id f.fname))) (if isRecursive then (rewrite_transparent_body f.fname e) else e)
     );
-    let fArgs = List.map (fun (x, _) -> evar x) f.fargs in
-    let eOpaque = vaApp "make_opaque" [eapply (transparent_id f.fname) fArgs] in
-    let header = if isRecursive then "and " else "let " in
-    printBody header true (sid f.fname) eOpaque
+    ps.PrintLine ("[@" + " \"opaque_to_smt\"" + "]");
+    ps.PrintLine ("let " + (sid f.fname) +  " =");
+    ps.Indent ();
+    ps.PrintLine (sid (transparent_id f.fname));
+    ps.Unindent ()
   else if isPublicDecl then
     if isPublic then 
       psi.PrintLine (sVal (sid f.fname) decreases1);

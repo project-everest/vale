@@ -1,6 +1,5 @@
 module Types_s
 
-open Opaque_s
 open Words_s
 open Words.Two_s
 open Words.Four_s

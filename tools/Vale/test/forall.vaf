@@ -85,13 +85,9 @@ assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM
     True
   ))
 
-assume val make_opaque : #a:Type -> a -> a
-assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
-unfold let va_make_opaque = make_opaque
-unfold let va_reveal_opaque = reveal_opaque
-
 let double (x:int):int = x + x
-let opaque_double = make_opaque double
+[@"opaque_to_smt"]
+let opaque_double = double
 #endverbatim
 
 function opaque_double (x:int) : int extern;

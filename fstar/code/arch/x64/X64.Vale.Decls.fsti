@@ -22,8 +22,6 @@ val update_of (flags:int) (new_of:bool) : (new_flags:int)
 //unfold let va_subscript = Map.sel
 unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 unfold let va_update = Map.upd
-unfold let va_make_opaque = Opaque_s.make_opaque
-unfold let va_reveal_opaque = Opaque_s.reveal_opaque
 unfold let va_hd = Cons?.hd
 //unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
 
