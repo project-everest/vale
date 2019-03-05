@@ -7,8 +7,9 @@
 # replace latest with the commit id from github using 12 characters.
 # Latest can only be used with branch master,
 # for any other branch please use the specific commit id on the config file.
+ARG DOCKERHUBPROJECT
 ARG COMMITID
-FROM fstar-windows-nt:${COMMITID}
+FROM ${DOCKERHUBPROJECT}fstar-windows-nt:${COMMITID}
 
 ARG BUILDLOGFILE
 ARG MAXTHREADS
