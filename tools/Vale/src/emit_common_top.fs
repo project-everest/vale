@@ -33,7 +33,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
           | SAssign (_, e) ->
             (
               match skip_loc e with
-              | EApply (e, _, _, _) when Map.containsKey (id_of_exp e) env.procs -> Unchanged
+              | EApply (e, _, _, _) when is_id e && Map.containsKey (id_of_exp e) env.procs -> Unchanged
               | _ -> modGhost
             )
           | SAssume _ | SAssert _ | SCalc _ | SVar _ -> modGhost
@@ -91,7 +91,7 @@ let build_decls (env:env) (includes:(string * string option option * (((loc * de
               | SAssign (_, e) ->
                 (
                   match skip_loc e with
-                  | EApply (e, _, _, _) -> Set.singleton (id_of_exp e)
+                  | EApply (e, _, _, _) when is_id e -> Set.singleton (id_of_exp e)
                   | _ -> Set.empty
                 )
               | _ -> Set.unionMany xs

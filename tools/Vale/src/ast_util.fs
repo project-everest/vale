@@ -98,12 +98,24 @@ let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr (Prin
 let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr (Printf.sprintf "reserved_id: %A" x)
 let err_id (x:id):string = match x with Id s -> s | Reserved s -> s | Operator s -> "operator(" + s + ")"
 
-let rec id_of_exp (e:exp):id =
+let rec id_of_exp_opt (e:exp):id option =
   match e with
-  | ELoc (_, e) -> id_of_exp e
-  | EVar (x, _) -> x
-  | EOp (FieldOp x, [e], _) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
-  | _ -> internalErr "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
+  | ELoc (_, e) -> id_of_exp_opt e
+  | EVar (x, _) -> Some x
+  | EOp (FieldOp x, [e], _) ->
+    (
+      match id_of_exp_opt e with
+      | None -> None
+      | Some xe -> Some (Id (string_of_id xe + "." + (string_of_id x))) // REVIEW: is "." the right notation for namespacing?
+    )
+  | _ -> None
+
+let is_id (e:exp):bool = Option.isSome (id_of_exp_opt e)
+
+let id_of_exp (e:exp):id =
+  match id_of_exp_opt e with
+  | None -> internalErr "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
+  | Some x -> x
 
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with

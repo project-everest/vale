@@ -109,7 +109,7 @@ let rec string_of_exp_prec prec e =
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e], t) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) -> (r prec (vaApp_t "reveal_opaque" [eapply_t (transparent_id (id_of_exp e)) es t1] t), prec)
+    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) when is_id e -> (r prec (vaApp_t "reveal_opaque" [eapply_t (transparent_id (id_of_exp e)) es t1] t), prec)
     | EOp (Uop UReveal, [EVar (x, _)], t) -> ("reveal_opaque " + (sid x), 90)
     | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
@@ -121,9 +121,9 @@ let rec string_of_exp_prec prec e =
     | EOp (Bop BIn, [e1; e2], t) ->
       let t = exp_typ e2 in
       match t with
-      | Some (TApply (x, _)) ->
+      | Some (TApply (x, _) | TName x) ->
         (r prec (vaApp_t ("contains_" + (sid x)) [e2; e1] t), prec)
-      | _ -> internalErr (sprintf "overloadded Operator ?[] missing type info: %A" e)
+      | _ -> internalErr (sprintf "overloaded Operator ?[] missing type info: %A : %A" e t)
     | EOp (Bop op, [e1; e2], t) ->
       (
         let isChainOp (op:bop):bool =
@@ -142,21 +142,21 @@ let rec string_of_exp_prec prec e =
       )
     | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr (sprintf "binary operator: %A" e)
     | EOp (TupleOp _, es, t) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (e, ts, es, t) when id_of_exp e = (Id "list") -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
+    | EApply (e, ts, es, t) when is_id e && id_of_exp e = (Id "list") -> ("[" + (String.concat "; " (List.map (r 5) es)) + "]", 90)
     | EOp (Subscript, [e1; e2], t) -> 
       let t = exp_typ e1 in
       match t with
-      | Some (TApply (x, _)) ->
+      | Some (TApply (x, _) | TName x) ->
         (r prec (vaApp_t ("subscript_" + (sid x)) [e1; e2] t), prec)
       | _ ->
-        internalErr (sprintf "overloadded Operator[] missing type info: %A" e)
+        internalErr (sprintf "overloaded Operator[] missing type info: %A : %A" e t)
     | EOp (Update, [e1; e2; e3], t) -> 
       let t = exp_typ e1 in
       match t with
-      | Some (TApply (x, _)) ->
+      | Some (TApply (x, _) | TName x) ->
         (r prec (vaApp_t ("update_" + (sid x)) [e1; e2; e3] t), prec)
-      | _ -> 
-        internalErr (sprintf "overloadded Operator[:=] missing type info: %A" e)
+      | _ ->
+        internalErr (sprintf "overloaded Operator[:=] missing type info: %A : %A" e t)
     | EOp (Cond, [e1; e2; e3], t) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e], _) ->
       let t = exp_typ e in

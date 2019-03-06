@@ -99,4 +99,5 @@ procedure{:typecheck} Test() returns(ghost g:int)
   assert a == 11;
   g := f(11);
   assert g == 12;
+  assert (lambda x:int :: x + 1)(12) == 13;
 }

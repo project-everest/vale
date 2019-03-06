@@ -315,7 +315,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
               [((match io with In -> Read | InOut | Out -> Modify), x)]
             )
           | EOp (Uop UConst, _, _) | EInt _ -> []
-          | EApply (e, _, args, _) when Map.containsKey (operandProc (id_of_exp e) io) env0.procs ->
+          | EApply (e, _, args, _) when is_id e && Map.containsKey (operandProc (id_of_exp e) io) env0.procs ->
             (
               let xa = id_of_exp e in
               let xa_in = operandProc xa In in
@@ -383,7 +383,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   | SAssign (lhss, e) ->
       let (rs0, mods0) =
         match skip_loc e with
-        | EApply (e, _, es, _) when Map.containsKey (id_of_exp e) env0.procs ->
+        | EApply (e, _, es, _) when is_id e && Map.containsKey (id_of_exp e) env0.procs ->
             let x = id_of_exp e in
             let p = Map.find x env0.procs in
             compute_call p lhss es
@@ -655,7 +655,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
       )
     | (NotGhost, EOp (Uop UConst, [ec], _)) -> Replace (constOp (rewrite_vars_exp rctx env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
-    | (NotGhost, EApply (e, _, args, _)) when (asOperand <> None && Map.containsKey (operandProc (id_of_exp e) io) env.procs) ->
+    | (NotGhost, EApply (e, _, args, _)) when is_id e && asOperand <> None && Map.containsKey (operandProc (id_of_exp e) io) env.procs ->
       (
         let xa = id_of_exp e in
         let xa_in = operandProc xa In in
@@ -775,7 +775,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
 let rewrite_cond_exp (env:env) (e:exp):exp =
   let r = rewrite_vars_arg None NotGhost (Some "cmp") In env in
   match skip_loc e with
-  | (EApply (e, _, es, t)) -> vaApp_t ("cmp_" + string_of_id (id_of_exp e)) (List.map r es) t
+  | (EApply (e, _, es, t)) when is_id e -> vaApp_t ("cmp_" + string_of_id (id_of_exp e)) (List.map r es) t
   | (EOp (op, es, t)) ->
     (
       match (op, es) with
@@ -794,7 +794,7 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
   | (_, ELoc (loc, e)) ->
       try let (lhss, e) = rewrite_vars_assign rctx env lhss e in (lhss, ELoc (loc, e))
       with err -> raise (LocErr (loc, err))
-  | (_, EApply(xe, ts, es, t)) ->
+  | (_, EApply(xe, ts, es, t)) when is_id xe ->
     (
       let x = id_of_exp xe in
       match Map.tryFind x env.procs with
@@ -949,7 +949,7 @@ let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
   | ELoc (loc, e) ->
       try collect_mods_assign env lhss e
       with err -> raise (LocErr (loc, err))
-  | EApply(e, _, es, _) ->
+  | EApply(e, _, es, _) when is_id e ->
     (
       let x = id_of_exp e in
       match Map.tryFind x env.procs with
@@ -1336,7 +1336,7 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
   | DVar (x, t, XState e, _) ->
     (
       match skip_loc e with
-      | EApply (e, _, es, _) ->
+      | EApply (e, _, es, _) when is_id e ->
           let env = {env with ids = Map.add x (StateInfo (string_of_id (id_of_exp e), es, t)) env.ids} in
           ([(env, env, d)], env)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
