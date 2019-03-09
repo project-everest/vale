@@ -50,15 +50,15 @@ var{:state reg(R15)} r15:nat64;
 var{:state flags()} efl:nat64;
 var{:state mem()} mem:memory;
 
-operand_type reg64:nat64 :=
+operand_type reg_opr64:nat64 @ operand :=
 | inout rax | inout rbx | inout rcx | inout rdx
 | inout rsi | inout rdi | inout rbp | inout r8
 | inout r9 | inout r10 | inout r11 | inout r12
 | inout r13 | inout r14 | inout r15
 ;
 operand_type shift_amt64:nat64 := in rcx | const;
-operand_type reg_opr64:nat64 := reg64;
-operand_type dst_opr64:nat64 @ operand := reg_opr64;
+operand_type Mem64(base:reg_opr64, inline offset:int):nat64;
+operand_type dst_opr64:nat64 @ operand := reg_opr64 | Mem64;
 operand_type opr64:nat64 := dst_opr64 | const;
 
 // add {:typecheck false} attr because Type0 is not defined. (TODO: get rid of this)
@@ -171,7 +171,7 @@ procedure{:public}{:instruction Ins(S.Mul64(src))}{:quick exportOnly} Mul64Wrap(
     lemma_fundamental_div_mod(old(rax), old(src));
 }
 
-procedure{:public}{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:quick exportOnly} Mulx64(out dst_hi:dst_opr64, out dst_lo:dst_opr64, src:opr64)
+procedure{:public}{:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}{:quick exportOnly} Mulx64(out dst_hi:reg_opr64, out dst_lo:reg_opr64, src:opr64)
     requires @dst_hi != @dst_lo;
     reads
         rdx;

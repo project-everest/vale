@@ -178,7 +178,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e], _) -> sub_s0 e | _ -> sub_s0 e) es in
         let e = EApply (e, ts, es, t)
         (Ghost, false, [SAssign (lhss, e)])
-    | _ -> (Ghost, false, [SAssign (lhss, sub_s0 e)])
+    | _ -> (Ghost, false, [SAssign (lhss, map_exp stateToOp (sub_s0 e))])
     in
   match s with
   | SLoc (loc, s) ->

@@ -54,7 +54,7 @@ let va_mod_dst_opr64 (o:operand) : mod_t =
   match o with
   | OConst n -> Mod_None
   | OReg r -> Mod_reg r
-  | OMem m -> Mod_None // TODO: support destination memory operands
+  | OMem m -> Mod_mem
 
 [@va_qattr qmodattr]
 let va_mod_reg_opr64 (o:operand) : mod_t =

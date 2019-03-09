@@ -20,6 +20,7 @@ open X64.Vale
 open X64.Vale.State
 open X64.Vale.StateLemmas
 open X64.Vale.Decls
+open X64.Vale.InsBasic
 friend X64.Vale.Decls
 module S = X64.Semantics_s
 module P = X64.Print_s
@@ -27,12 +28,17 @@ module P = X64.Print_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
-procedure{:public}{:operand} Mem_in(base:opr, inline offset:int) returns(o:opr)
+procedure{:public}{:operand} Mem64_in(base:operand, inline offset:int) returns(o:operand)
     reads
         mem;
     extern;
 
-procedure{:public}{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset))))}{:quick exportOnly}{:public} Load64(
+procedure{:public}{:operand} Mem64_out(base:operand, inline offset:int, o:operand)
+    modifies
+        mem;
+    extern;
+
+procedure{:public}{:quick exportOnly} Load64(
     out dst:dst_opr64,
         src:reg_opr64,
         inline offset:int)
@@ -43,9 +49,10 @@ procedure{:public}{:instruction Ins(S.Mov64(dst, OMem(MReg(get_reg(src), offset)
     ensures
         dst == load_mem64(old(src + offset), mem);
 {
+    Mov64(dst, Mem64(src, offset));
 }
 
-procedure{:public}{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), src))}{:quick exportOnly}{:public} Store64(
+procedure{:public}{:quick exportOnly} Store64(
         dst:reg_opr64,
         src:opr64,
         inline offset:int)
@@ -56,4 +63,5 @@ procedure{:public}{:instruction Ins(S.Mov64(OMem(MReg(get_reg(dst), offset)), sr
     ensures
         mem == old(store_mem64(dst + offset, src, mem));
 {
+    Mov64(Mem64(dst, offset), src);
 }
