@@ -86,7 +86,7 @@ let while_id (x:id) = Id ((string_of_id x) + "_while")
 let is_quick_body (a:attrs):bool =
   if List_mem_assoc (Id "quick") a then
     match List_assoc (Id "quick") a with
-    | [e] -> (match skip_loc e with EVar (Id "exportOnly", _) -> false | _ -> true)
+    | [e] -> (match skip_loc e with EVar ((Id "exportOnly" | Reserved "while"), _) -> false | _ -> true)
     | _ -> true
   else false
 
@@ -1033,7 +1033,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
           requires e(ins_in)
           ensures ed(ins_in,outs) << old(ed(ins_in))
           { ins := ins_in; b }
-        procedure{:quick false} while_p(ins_in) returns(outs)
+        procedure{:quick true} while_p(ins_in) returns(outs)
           lets L
           reads R modifies M
           requires invs(ins_in)
@@ -1175,7 +1175,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_exit];
             pbody = Some (sInits @ [sWhile]);
-            pattrs = [(Id "quick", [evar (Id "exportOnly")]); (Id "already_has_mod_ok", [])];
+            pattrs = [(Id "quick", [evar (Reserved "while")]); (Id "already_has_mod_ok", [])];
           }
           in
         hoisted := (DProc p_while)::(DProc p_body)::!hoisted;
@@ -1316,7 +1316,12 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         let ss = add_quick_blocks_stmts envp (ref 0) ss in
         Some ss
     in
-  let pNew = {p with pbody = body; pspecs = specs} in
+  let f_attr (x, es) =
+    match (x, es) with
+    | (Id "quick", [EVar (Reserved "while", _)]) -> (Id "quick", [])
+    | _ -> (x, es)
+    in
+  let pNew = {p with pbody = body; pspecs = specs; pattrs = List.map f_attr p.pattrs} in
   let envBody = envp in
   let envProc = {env with procs = Map.add p.pname pNew env.procs} in
   let envRec = if isRecursive then envProc else env in
