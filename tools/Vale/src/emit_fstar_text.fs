@@ -82,7 +82,7 @@ let rec string_of_typ (t:typ):string =
   | TInt (NegInf, Int k2) -> "(va_int_at_most " + string k2 + ")"
   | TInt (_, _) -> "int"
   | TTuple [] -> "unit"
-  | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
+  | TTuple ts -> "(" + (String.concat " & " (List.map string_of_typ ts)) + ")"
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
@@ -199,6 +199,7 @@ and string_of_formals (xs:formal list):string = String.concat " " (List.map stri
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
 and string_of_pformal (x:id, t:typ, _, _, _) = string_of_formal (x, Some t)
 and string_of_pformals (xs:pformal list):string = String.concat " " (List.map string_of_pformal xs)
+and typ_of_pformal (_, t:typ, _, _, _) = string_of_typ t
 and string_of_trigger (es:exp list):string = String.concat "; " (List.map string_of_exp es)
 and string_of_triggers (ts:exp list list):string =
     match ts with
@@ -512,7 +513,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s decreases =
     ps.Indent ();
-    let st = String.concat (if isDependent then " & " else " * ") (List.map string_of_pformal p.prets) in
+    let st = String.concat " & " (List.map typ_of_pformal p.prets) in
     ps.PrintLine (s + (match p.prets with [] -> "Lemma" | _ -> "Ghost (" + st + ")" + decreases));
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
