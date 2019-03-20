@@ -34,41 +34,41 @@ let main (argv) =
   let debug_flags = ref (Set.empty:Set<string>) in
   let print_error_loc locOpt =
     match locOpt with
-    | None -> printfn "\nerror:"
-    | Some loc -> printfn "\nerror at %s:" (string_of_loc loc)
+    | None -> eprintfn "\nerror:"
+    | Some loc -> eprintfn "\nerror at %s:" (string_of_loc loc)
     in
   let print_error_prefix locOpt =
     match !lexbufOpt with
-    | None -> printfn "\nerror processing file %s" !cur_file; print_error_loc locOpt
-    | Some lexbuf -> printfn "\nerror at line %i column %i of file %s" (line lexbuf) (col lexbuf) (file lexbuf)
+    | None -> eprintfn "\nerror processing file %s" !cur_file; print_error_loc locOpt
+    | Some lexbuf -> eprintfn "\nerror at line %i column %i of file %s" (line lexbuf) (col lexbuf) (file lexbuf)
     in
   let rec print_error locOpt e =
     match e with
     | (LocErr (loc, e)) as x ->
-        if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; print_error_loc locOpt; printfn "%s" (x.ToString ())
+        if Set.contains "stack" !debug_flags then eprintfn ""; eprintfn "internal details:"; print_error_loc locOpt; eprintfn "%s" (x.ToString ())
         print_error (Some loc) e
     | (Err s) as x ->
         print_error_loc locOpt;
-        printfn "%s" s;
-        if Set.contains "stack" !debug_flags then printfn ""; printfn "internal details:"; printfn "%s" (x.ToString ());
+        eprintfn "%s" s;
+        if Set.contains "stack" !debug_flags then eprintfn ""; eprintfn "internal details:"; eprintfn "%s" (x.ToString ());
         exit 1
     | (UnsupportedErr (s, loc, msg)) as x ->
         print_error_loc locOpt;
-        printfn "%s" s;
-        printfn "  (see %s for location of unsupported declaration)" (string_of_loc loc);
-        (match msg with None -> () | Some s-> printfn "  reason for unsupported declaration: %s" s);
+        eprintfn "%s" s;
+        eprintfn "  (see %s for location of unsupported declaration)" (string_of_loc loc);
+        (match msg with None -> () | Some s-> eprintfn "  reason for unsupported declaration: %s" s);
         exit 1
     | (InternalErr s) as x ->
         print_error_loc locOpt
-        printfn "internal error:"
-        printfn "%s" s
-        printfn "\ninternal details:"
-        printfn "%s" (x.ToString ())
+        eprintfn "internal error:"
+        eprintfn "%s" s
+        eprintfn "\ninternal details:"
+        eprintfn "%s" (x.ToString ())
         exit 1
-    | ParseErr x -> (print_error_prefix locOpt; printfn "%s" x; exit 1)
-    | :? System.ArgumentException as x -> (print_error_prefix locOpt; printfn "%s" (x.ToString ()); exit 1)
-    | Failure x -> (print_error_prefix locOpt; printfn "%s" x; exit 1)
-    | x -> (print_error_loc locOpt; printfn "%s" (x.ToString ()); exit 1)
+    | ParseErr x -> (print_error_prefix locOpt; eprintfn "%s" x; exit 1)
+    | :? System.ArgumentException as x -> (print_error_prefix locOpt; eprintfn "%s" (x.ToString ()); exit 1)
+    | Failure x -> (print_error_prefix locOpt; eprintfn "%s" x; exit 1)
+    | x -> (print_error_loc locOpt; eprintfn "%s" (x.ToString ()); exit 1)
     in
   try
   (
@@ -347,7 +347,8 @@ let main (argv) =
           let s = Path.Combine (!destDir, s) in
           let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
           let s = new System.IO.FileStream(s, System.IO.FileMode.Create) in
-          ms.WriteTo(s)
+          ms.WriteTo(s);
+          s.Close()
         in
       write_to_file !outfile stream ms;
       match stream_i with
