@@ -308,21 +308,17 @@ let main (argv) =
       in
     let ins = List.map processFile in_files in
     let decls = List.concat ins in
+    let ms = new MemoryStream() in
     let stream =
       match !outfile with
       | None -> System.Console.Out
-      | Some s ->
-          let s = Path.Combine (!destDir, s) in
-          let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
-          (new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter
+      | Some s -> (new System.IO.StreamWriter(ms)):>System.IO.TextWriter
       in
+    let ms_i = new MemoryStream() in
     let stream_i =
       match !outfile_i with
       | None -> None
-      | Some s ->
-          let s = Path.Combine (!destDir, s) in
-          let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
-          Some ((new System.IO.StreamWriter(new System.IO.FileStream(s, System.IO.FileMode.Create))):>System.IO.TextWriter)
+      | Some s -> Some ((new System.IO.StreamWriter(ms_i)):>System.IO.TextWriter)
       in
     let ps_i =
       match stream_i with
@@ -342,6 +338,23 @@ let main (argv) =
         cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
         cur_indent = ref "";
       } in
+    let write_streams () =
+      let write_to_file filename (stream:TextWriter) (ms:MemoryStream) =
+        stream.Flush();
+        match filename with
+        | None -> ()
+        | Some s ->
+          let s = Path.Combine (!destDir, s) in
+          let _ = System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName s) in
+          let s = new System.IO.FileStream(s, System.IO.FileMode.Create) in
+          ms.WriteTo(s)
+        in
+      write_to_file !outfile stream ms;
+      match stream_i with
+      | None -> ()
+      | Some s ->
+        write_to_file !outfile_i s ms_i
+      in
     let close_streams () =
       (match stream_i with None -> () | Some s -> s.Close());
       stream.Close ()
@@ -379,6 +392,7 @@ let main (argv) =
           Emit_dafny_direct.build_dafny_program mdl built_ins (List.rev !includes_rev) decls;
           DafnyDriver.Start_Dafny(List.toArray arg_list, mdl, built_ins) |> ignore
         else Emit_dafny_text.emit_decls ps decls;
+      write_streams ();
       close_streams ()
     ) with err -> close_streams (); raise err
   )
