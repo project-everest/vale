@@ -88,6 +88,12 @@ let locErrOpt (loc:loc option) (err:exn):'a = match loc with None -> raise err |
 let string_of_loc (loc:loc):string =
   "line " + (string loc.loc_line) + " column " + (string loc.loc_col) + " of file " + loc.loc_file
 
+let mk_range_of_loc loc = 
+  let l = EInt (bigint (loc.loc_line)) in
+  let c = EInt (bigint (loc.loc_col)) in 
+  let msg = EString (loc.loc_file) in
+  eapply (Id "loc_range") [msg; l; c; l; c]
+
 let rec List_mem_assoc (a:'a) (l:('a * 'b) list):bool =
   match l with [] -> false | (h, _)::t -> h = a || List_mem_assoc a t
 

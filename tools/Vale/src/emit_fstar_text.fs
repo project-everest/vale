@@ -493,7 +493,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
 
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
-  let (reqs, enss) = collect_specs false p.pspecs in
+  let (reqs, enss) = collect_specs false false p.pspecs in
   let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));

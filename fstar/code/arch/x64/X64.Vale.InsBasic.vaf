@@ -15,6 +15,7 @@ open X64.Machine_s
 open X64.Vale.State
 open X64.Vale.Decls
 open X64.Vale.QuickCode
+open X64.Vale.QuickCodes
 #endverbatim
 
 #verbatim

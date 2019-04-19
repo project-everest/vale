@@ -57,8 +57,8 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
   let outs = List.map fst outs_t in
   let env0 = env in
   let env = snd (env_stmt env s) in
-  let range = evar (Id "range1") in
-  let msg = EString ("***** PRECONDITION NOT MET AT " + string_of_loc loc + " *****") in
+  let range = mk_range_of_loc loc in
+  let msg = EString ("***** ERROR AT " + string_of_loc loc + " *****")
   let mods = evar (Reserved "mods") in
   let uses_state (e:exp):bool =
     let f (e:exp) (bs:bool list):bool =

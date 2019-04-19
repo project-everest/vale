@@ -127,30 +127,35 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
       let scope = List.fold (fun scope (x, t) -> add_unique x t scope) scope xs in
       (scope, updates, s)
 
-let rec subst_label_exp (addLabels:bool) (e:exp):exp =
+let rec subst_label_exp (addLabels:bool) (precondition:bool) (e:exp):exp =
   let addLabel loc e = 
-    let range = evar (Id "range1") in
-    let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
+    let range = mk_range_of_loc loc in
+    let msg = 
+      if precondition then
+        EString ("***** PRECONDITION NOT MET AT " + string_of_loc loc + " *****")
+      else
+        EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****")
+      in
     eapply (Id "label") [range; msg; e]
   in
   let f e =
     match e with
-    | ELabel (l, e) -> Replace (if addLabels then addLabel l (subst_label_exp addLabels e) else (subst_label_exp addLabels e))
+    | ELabel (l, e) -> Replace (if addLabels then addLabel l (subst_label_exp addLabels precondition e) else (subst_label_exp addLabels precondition e))
     | _ -> Unchanged
   in
   map_exp f e
 
-let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
+let collect_spec (addReqLabels:bool) (addEnsLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
   try
     match s with
-    | Requires (_, e) -> ([e], [])
-    | Ensures (_, e) -> ([], [subst_label_exp addLabels e])
+    | Requires (_, e) -> ([subst_label_exp addReqLabels true e], [])
+    | Ensures (_, e) -> ([], [subst_label_exp addEnsLabels false e])
     | Modifies _ -> ([], [])
     | SpecRaw _ -> internalErr "SpecRaw"
   with err -> raise (LocErr (loc, err))
 
-let collect_specs (addLabels:bool) (ss:(loc * spec) list):(exp list * exp list) =
-  let (rs, es) = List.unzip (List.map (collect_spec addLabels) ss) in
+let collect_specs (addReqLabels:bool) (addEnsLabels:bool) (ss:(loc * spec) list):(exp list * exp list) =
+  let (rs, es) = List.unzip (List.map (collect_spec addReqLabels addEnsLabels) ss) in
   (List.concat rs, List.concat es)
 
 // compute function parameters
