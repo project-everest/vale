@@ -247,7 +247,7 @@ STMT ::=
   | assume EXP ;
   | assert EXP ;
   | assert EXP by { STMTS }
-  | calc <i>[</i>CALC_OP<i>]</i> { CALC ... CALC EXP ; }
+  | calc CALC_OP { CALC ... CALC EXP ; }
   | reveal f ;
   | p ( EXP , ... , EXP) ;
   | DESTINATIONS := p ( EXP , ..., EXP ) ;
@@ -263,7 +263,7 @@ STMT ::=
       <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
       <i>[</i> else { ... } <i>]</i>
 
-CALC ::= EXP ; <i>[</i>CALC_OP<i>]</i> CALC_HINTS
+CALC ::= EXP ; CALC_OP CALC_HINTS
 CALC_HINTS ::= CALC_HINT ... CALC_HINT
 CALC_HINT ::= { STMTS }
 CALC_OP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
@@ -296,7 +296,7 @@ EXP ::=
   | ( - EXP )
   | this
   | @x
-  | f ( EXP , ... , EXP )
+  | EXP ( EXP , ... , EXP )
   | f #[ TYPE , ... , TYPE ] ( EXP , ... , EXP )
   | # TYPE ( EXP )
   | EXP [ EXP ]
@@ -410,7 +410,7 @@ lets x @= eax; y @= ebx; z := 3 + 3;
 assume x &lt; 10;
 assert x &lt;= 10;
 assert x &lt;= 10 by { myLemma(x); }
-calc { x; x * 1; { myLemma(x); } 1 * x; }
+calc == { x; == x * 1; == { myLemma(x); } 1 * x; }
 reveal myOpaqueFunction;
 Increment(x);
 eax, (ghost var x:int), y := myProc(ebx, edx, z);

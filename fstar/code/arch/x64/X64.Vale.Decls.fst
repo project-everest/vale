@@ -16,6 +16,9 @@ type ocmp = S.ocmp
 type va_fuel = nat
 let va_fuel_default () = 0
 
+let va_lemma_upd_update sM =
+  ()
+
 let va_cmp_eq o1 o2 = S.OEq o1 o2
 let va_cmp_ne o1 o2 = S.ONe o1 o2
 let va_cmp_le o1 o2 = S.OLe o1 o2

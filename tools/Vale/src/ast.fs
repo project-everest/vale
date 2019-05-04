@@ -18,9 +18,10 @@ type typ =
 | TBool of bool_or_prop
 | TInt of bnd * bnd
 | TTuple of typ list
-| TFun of typ list * typ
+| TFun of fun_typ
 | TDependent of id // the id is an expression-level variable, not a type-level variable
 | TVar of id * kind option
+and fun_typ = typ list * typ
 
 type ghost = Ghost | NotGhost
 type stmt_modifier = SmPlain | SmGhost | SmInline
@@ -76,6 +77,7 @@ type exp =
 | EApply of exp * typ list option * exp list * typ option
 | EBind of bindOp * exp list * formal list * triggers * exp * typ option
 | ECast of exp * typ
+| ELabel of loc * exp // marker for exp that needs to be wrapped in a loc label
 
 and triggers = exp list list
 
@@ -104,7 +106,7 @@ type stmt =
 | SReturn
 | SAssume of exp
 | SAssert of assert_attrs * exp
-| SCalc of bop option * calcContents list
+| SCalc of bop * calcContents list * exp
 | SVar of id * typ option * mutability * var_storage * attrs * exp option
 | SAlias of id * id
 | SAssign of lhs list * exp
@@ -115,7 +117,7 @@ type stmt =
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list
 | SExists of formal list * triggers * exp
-and calcContents = {calc_exp:exp; calc_op:bop option; calc_hints:stmt list list}
+and calcContents = {calc_exp:exp; calc_op:bop; calc_hints:stmt list list}
 
 type is_refined = Refined | Unrefined
 type mod_kind = Read | Modify | Preserve

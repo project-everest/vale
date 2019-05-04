@@ -1,7 +1,7 @@
 import os
 import shutil
 
-with open('.vale_version') as f:
+with open('bin/.vale_version') as f:
     version = f.read().splitlines()[0]
 release = f'vale-release-{version}'
 print(release)

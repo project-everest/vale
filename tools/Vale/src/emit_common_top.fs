@@ -33,7 +33,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
           | SAssign (_, e) ->
             (
               match skip_loc e with
-              | EApply (e, _, _, _) when Map.containsKey (id_of_exp e) env.procs -> Unchanged
+              | EApply (e, _, _, _) when is_id e && Map.containsKey (id_of_exp e) env.procs -> Unchanged
               | _ -> modGhost
             )
           | SAssume _ | SAssert _ | SCalc _ | SVar _ -> modGhost
@@ -59,7 +59,14 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
           if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
           let ds_p = Emit_common_lemmas.build_proc envBody envr loc p in
           let ds_q = if isQuick && not !no_lemmas then Emit_common_quick_export.build_proc envr loc p else [] in
-          ds_p @ ds_q
+          let comment (s:string) : loc * decl =
+            let isPublic = attrs_get_bool (Id "public") false p.pattrs in
+            let attrs = if isPublic then [(Id "interface", []); (Id "implementation", [])] else [] in
+            (loc, DVerbatim (attrs, [s]))
+            in
+          let beginComment = comment ("//-- " + (err_id p.pname)) in
+          let endComment = comment "//--" in
+          [beginComment] @ ds_p @ ds_q @ [endComment]
         else
           []
     | DVerbatim (attrs, lines) ->
@@ -91,7 +98,7 @@ let build_decls (env:env) (includes:(string * string option option * (((loc * de
               | SAssign (_, e) ->
                 (
                   match skip_loc e with
-                  | EApply (e, _, _, _) -> Set.singleton (id_of_exp e)
+                  | EApply (e, _, _, _) when is_id e -> Set.singleton (id_of_exp e)
                   | _ -> Set.empty
                 )
               | _ -> Set.unionMany xs

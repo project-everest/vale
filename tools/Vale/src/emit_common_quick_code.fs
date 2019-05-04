@@ -52,8 +52,9 @@ let makeFrame (env:env) (preserveModifies:bool) (p:proc_decl) (s0:id) (sM:id):ex
   let fs = List.fold (fun fs (x, t, _, _) -> (x, Some t)::fs) fs (mods false) in
   (e, List.rev pmods, List.rev fs)
 
-let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
+let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
   let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
+  let outs = List.map fst outs_t in
   let env0 = env in
   let env = snd (env_stmt env s) in
   let range = evar (Id "range1") in
@@ -94,7 +95,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
     match skip_loc e with
-    | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost->
+    | EApply (e, _, es, t) when is_id e && is_proc env (id_of_exp e) NotGhost->
         let xp = string_of_id (id_of_exp e) in 
         inline_call xp [(x, tOpt)] es t
 //    | EApply (xp, _, es) when allowLemma ->
@@ -103,8 +104,19 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         let e = qlemma_exp e in
         (true, ebind BindLet [e] [(x, tOpt)] [] eTail)
     in
+  let eb_alt (eb:exp) =
+    // HACK
+    match eb with
+    | EApply (e, ts, args, t) when is_id e && id_of_exp e = Reserved "cmp_eq" -> EApply (evar (Id "Cmp_eq"), ts, args, t)
+    | EApply (e, ts, args, t) when is_id e && id_of_exp e = Reserved "cmp_ne" -> EApply (evar (Id "Cmp_ne"), ts, args, t)
+    | EApply (e, ts, args, t) when is_id e && id_of_exp e = Reserved "cmp_le" -> EApply (evar (Id "Cmp_le"), ts, args, t)
+    | EApply (e, ts, args, t) when is_id e && id_of_exp e = Reserved "cmp_ge" -> EApply (evar (Id "Cmp_ge"), ts, args, t)
+    | EApply (e, ts, args, t) when is_id e && id_of_exp e = Reserved "cmp_lt" -> EApply (evar (Id "Cmp_lt"), ts, args, t)
+    | EApply (e, ts, args, t) when is_id e && id_of_exp e = Reserved "cmp_gt" -> EApply (evar (Id "Cmp_gt"), ts, args, t)
+    | _ -> internalErr "unsupported if/while condition"
+    in
   match s with
-  | SLoc (loc, s) -> build_qcode_stmt env outs loc s (needsState, eTail)
+  | SLoc (loc, s) -> build_qcode_stmt env outs_t loc s (needsState, eTail)
   | SAlias _ -> (needsState, eTail)
   | SAssign ([(x, None)], e) ->
       let tOpt =
@@ -123,9 +135,9 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
         in
       let xs = List.map formal_of_lhs xs in
       match skip_loc e with
-      | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost ->
+      | EApply (e, _, es, t) when is_id e && is_proc env (id_of_exp e) NotGhost ->
           inline_call (string_of_id (id_of_exp e)) xs es t
-      | EApply (e, _, es, t) ->
+      | EApply (e, _, es, t) when is_id e ->
           lemma_call (id_of_exp e) xs es t
       | EOp (Uop UReveal, es, t) ->
           let x = "reveal_opaque" in
@@ -141,8 +153,7 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       // eTailLet = (let (...gs...) = g in eTail)
       // pass eTailLet as tail to s
       let eTailLet = ebind BindLet [evar (Reserved "g")] xs [] eTail in
-      let outs = List.map fst xs in
-      build_qcode_stmt env outs loc s (needsState, eTailLet)
+      build_qcode_stmt env xs loc s (needsState, eTailLet)
   | SAssume e ->
       let e = qlemma_exp e in
       (true, eapply (Id "qAssume") [range; msg; e; eTail])
@@ -150,28 +161,52 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let e = qlemma_exp e in
       (true, eapply (Id "qAssert") [range; msg; e; eTail])
   | SIfElse (((SmInline | SmPlain) as sm), eb, ss1, ss2) ->
-      let eb_alt () =
-        // HACK
-        match eb with
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_eq") -> EApply (evar (Id "Cmp_eq"), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ne") -> EApply (evar (Id "Cmp_ne"), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_le") -> EApply (evar (Id "Cmp_le"), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_ge") -> EApply (evar (Id "Cmp_ge"), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_lt") -> EApply (evar (Id "Cmp_lt"), ts, args, t)
-        | EApply (e, ts, args, t) when (id_of_exp e) = (Reserved "cmp_gt") -> EApply (evar (Id "Cmp_gt"), ts, args, t)
-        | _ -> internalErr "SIfElse"
-        in
       let eb = qlemma_exp eb in
-      let eqc1 = build_qcode_block false env outs loc ss1 in
-      let eqc2 = build_qcode_block false env outs loc ss2 in
+      let eqc1 = build_qcode_block false env outs_t loc ss1 in
+      let eqc2 = build_qcode_block false env outs_t loc ss2 in
       let (sq, eCmp) =
         match sm with
         | SmInline -> ("qInlineIf", eb)
-        | _ -> ("qIf", qlemma_exp (eb_alt ()))
+        | _ -> ("qIf", qlemma_exp (eb_alt eb))
         in
       let eIf = eapply (Id sq) (qmods_opt mods @ [eCmp; eqc1; eqc2]) in
       let fTail = ebind Lambda [] [(Reserved "s", Some tState); (Reserved "g", None)] [] eTail in
       (true, eapply (Id "QBind") [range; msg; eIf; fTail])
+  | SWhile (eb, invs, (_, [ed]), ss) ->
+      let eb = qlemma_exp eb in
+      let inv = and_of_list (List.map snd invs) in
+      let eInv = qlemma_exp inv in
+      let ed = qlemma_exp ed in // TODO: more than one decreases expression --> ed = %[...]
+      let eqc = build_qcode_block false env outs_t loc ss in
+      let eCmp = eb_alt eb in
+      let xs = (Reserved "s", Some tState) in
+      let xg = (Reserved "g", None) in
+      let xOuts = List.map (fun x -> (x, None)) outs in
+      let outTuple = eop (TupleOp None) (List.map evar outs) in
+      // REVIEW: this is ugly: for normalizability, we have to say
+      //   let g1 = (let (g1, ..., gn) = g in g1) in
+      //   ...
+      //   let gn = (let (g1, ..., gn) = g in gn) in
+      //   e
+      // instead of
+      //   let (g1, ..., gn) = g in e
+      // (this is because "forall ... (g:a)" in wp_While introduces a g that's a variable, not a tuple constructor)
+      let fbind_g e = ebind BindLet [evar (Reserved "g")] xOuts [] e in
+      let rec fbind_gs gs e =
+        match gs with
+        | [] -> e
+        | (gk, t)::gs ->
+            let egk = fbind_g (evar gk) in
+            ebind BindLet [egk] [(gk, t)] [] (fbind_gs gs e)
+        in
+      let fbinds_g = fbind_gs outs_t in
+      let fqc = ebind Lambda [] [xg] [] (fbinds_g eqc) in
+      let fInv = ebind Lambda [] [xs; xg] [] (fbinds_g eInv) in
+      let fd = ebind Lambda [] [xs; xg] [] (fbinds_g ed) in
+      let eWhile = eapply (Id "qWhile") (qmods_opt mods @ [eCmp; fqc; fInv; fd; outTuple]) in
+      let eTail = ebind BindLet [eop (TupleOp None) (List.map evar outs)] [xg] [] eTail in
+      let fTail = ebind Lambda [] [xs; xg] [] (fbinds_g eTail) in
+      (true, eapply (Id "QBind") [range; msg; eWhile; fTail])
   | SForall ([], [], (EBool true | ECast (EBool true, _)), ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
@@ -179,14 +214,15 @@ let rec build_qcode_stmt (env:env) (outs:id list) (loc:loc) (s:stmt) ((needsStat
       let eAssertBy = eapply (Id "qAssertBy") (qmods_opt mods @ [range; msg; ep; eQcs; evar s; eTail]) in
       (true, eAssertBy)
   | _ -> err ()
-and build_qcode_stmts (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
+and build_qcode_stmts (env:env) (outs_t:formal list) (loc:loc) (ss:stmt list):exp =
+  let outs = List.map fst outs_t in
   let outTuple = eop (TupleOp None) (List.map evar outs) in
   let empty = eapply (Id "QEmpty") [outTuple] in
-  let (needsState, e) = List.foldBack (build_qcode_stmt env outs loc) ss (false, empty) in
+  let (needsState, e) = List.foldBack (build_qcode_stmt env outs_t loc) ss (false, empty) in
   e
-and build_qcode_block (add_old:bool) (env:env) (outs:id list) (loc:loc) (ss:stmt list):exp =
+and build_qcode_block (add_old:bool) (env:env) (outs_t:formal list) (loc:loc) (ss:stmt list):exp =
   let s = Reserved "s" in
-  let eStmts = build_qcode_stmts env outs loc ss in
+  let eStmts = build_qcode_stmts env outs_t loc ss in
   let eLet = if add_old then ebind BindLet [evar s] [(Reserved "old_s", Some tState)] [] eStmts else eStmts in
   let fApp = ebind Lambda [] [(s, Some tState)] [] eLet in
   eapply (Id "qblock") (qmods_opt (evar (Reserved "mods")) @ [fApp])
@@ -274,7 +310,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   let tRetQuick = tapply (Id "quickCode") [tRet; tCodeApp] in
   let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
   let (_, ss) = let_updates_stmts mutable_scope ss in
-  let outs = List.map fst prets in
+  let outs = List.map (fun (x, t) -> (x, Some t)) prets in
   let eQuick = build_qcode_block true env outs loc ss in
   let fCodes =
     {

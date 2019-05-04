@@ -125,6 +125,7 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EBind (BindSet, [], xs, ts, e, _) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _, _) -> internalErr "EBind"
     | ECast (e, t) -> ("#" + string_of_typ_prec 20 t + "(" + r 5 e + ")", 90)
+    | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_ghost (g:ghost) = match g with Ghost -> "ghost " | NotGhost -> ""
@@ -164,14 +165,15 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       let sAssert = if attrs.is_inv then "invariant" else "assert" in
       let sSplit = if attrs.is_split then "{:split_here}" else "" in
       ps.PrintLine (sAssert + sSplit + " " + (string_of_exp e) + ";")
-  | SCalc (oop, contents) ->
-      ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
+  | SCalc (op, contents, e) ->
+      ps.PrintLine ("calc " +  string_of_bop op  + " {");
       ps.Indent();
-      List.iter (fun {calc_exp = e; calc_op = oop; calc_hints = hints} ->
+      List.iter (fun {calc_exp = e; calc_op = op; calc_hints = hints} ->
         ps.PrintLine ((string_of_exp e) + ";");
-        (match oop with | None -> () | Some op -> ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent());
+        ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent();
         List.iter (emit_block ps) hints
       ) contents;
+      ps.PrintLine((string_of_exp e) + ";")
       ps.Unindent();
       ps.PrintLine("}")
   | SVar (x, tOpt, Immutable, XGhost, [], Some e) ->

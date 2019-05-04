@@ -98,12 +98,24 @@ let string_of_id (x:id):string = match x with Id s -> s | _ -> internalErr (Prin
 let reserved_id (x:id):string = match x with Reserved s -> s | _ -> internalErr (Printf.sprintf "reserved_id: %A" x)
 let err_id (x:id):string = match x with Id s -> s | Reserved s -> s | Operator s -> "operator(" + s + ")"
 
-let rec id_of_exp (e:exp):id =
+let rec id_of_exp_opt (e:exp):id option =
   match e with
-  | ELoc (_, e) -> id_of_exp e
-  | EVar (x, _) -> x
-  | EOp (FieldOp x, [e], _) -> Id (string_of_id (id_of_exp e) + "." + (string_of_id x)) // REVIEW: is "." the right notation for namespacing?
-  | _ -> internalErr "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
+  | ELoc (_, e) -> id_of_exp_opt e
+  | EVar (x, _) -> Some x
+  | EOp (FieldOp x, [e], _) ->
+    (
+      match id_of_exp_opt e with
+      | None -> None
+      | Some xe -> Some (Id (string_of_id xe + "." + (string_of_id x))) // REVIEW: is "." the right notation for namespacing?
+    )
+  | _ -> None
+
+let is_id (e:exp):bool = Option.isSome (id_of_exp_opt e)
+
+let id_of_exp (e:exp):id =
+  match id_of_exp_opt e with
+  | None -> internalErr "in function application, the function must be an identifier (arbitrary expressions as functions not yet implemented)"
+  | Some x -> x
 
 let binary_op_of_list (b:bop) (empty:exp) (es:exp list) =
   match es with
@@ -127,8 +139,8 @@ let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
   | [] -> []
   | (loc, SpecExp e)::es -> (loc, e)::(exps_of_spec_exps es)
   | (loc, SpecLet (x, t, ex))::es ->
-      let es = List.map snd (exps_of_spec_exps es) in
-      let e = and_of_list es in
+      let es = exps_of_spec_exps es in
+      let e = and_of_list (List.map (fun (l, e) -> ELabel (l, e)) es) in
       [(loc, EBind (BindLet, [ex], [(x, t)], [], e, exp_typ e))]
 
 type 'a map_modify = Unchanged | Replace of 'a | PostProcess of ('a -> 'a)
@@ -173,6 +185,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
     | ECast (e, t) -> ECast (r e, t)
+    | ELabel (l, e) -> ELabel (l, r e)
   )
 
 let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
@@ -185,6 +198,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     | EOp (op, es, _) -> List.map r es
     | EApply (x, ts, es, _) -> List.map r es
     | ECast (e, t) -> [r e]
+    | ELabel (loc, e) -> [r e]
   in f e children
 
 let gather_attrs (f:exp -> 'a list -> 'a) (attrs:attrs):'a list =
@@ -251,7 +265,7 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SReturn -> [s]
     | SAssume e -> [SAssume (fe e)]
     | SAssert (attrs, e) -> [SAssert (attrs, fe e)]
-    | SCalc (oop, contents) -> [SCalc (oop, List.map (map_calc_contents fe fs) contents)]
+    | SCalc (op, contents, e) -> [SCalc (op, List.map (map_calc_contents fe fs) contents, fe e)]
     | SVar (x, t, m, g, a, eOpt) -> [SVar (x, t, m, g, map_attrs fe a, mapOpt fe eOpt)]
     | SAlias (x, y) -> [SAlias (x, y)]
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
@@ -284,7 +298,7 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
     | SLoc (loc, s) -> try [r s] with err -> locErr loc err
     | SLabel _ | SGoto _ | SReturn -> []
     | SAssume e | SAssert (_, e) | SAssign (_, e) -> [re e]
-    | SCalc (oop, contents) -> List.collect (gather_calc_contents fs fe) contents
+    | SCalc (op, contents, e) -> List.collect (gather_calc_contents fs fe) contents @ [re e]
     | SVar (x, t, m, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))
     | SAlias (x, y) -> []
     | SLetUpdates _ -> internalErr "SLetUpdates"

@@ -290,12 +290,12 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           else
             let tmp = built_ins.TupleType(tok, args.Count, true) in
             new DatatypeValue(tok, BuiltIns.TupleTypeName(args.Count), BuiltIns.TupleTypeCtorNamePrefix + (string args.Count), args) :> Expression
-      | EApply (e, _, es, _) when id_of_exp e = (Id "seq") ->
+      | EApply (e, _, es, _) when is_id e && id_of_exp e = (Id "seq") ->
           let tok = create_token loc "[" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
           new SeqDisplayExpr(tok, elements) :> Expression
-      | EApply (e, _, es, _) when id_of_exp e = (Id "set") ->
+      | EApply (e, _, es, _) when is_id e && id_of_exp e = (Id "set") ->
           let tok = create_token loc "{" in
           let elements = new ResizeArray<Expression>() in
           List.iter (fun x -> elements.Add(create_expression built_ins loc x)) es
@@ -331,7 +331,7 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
           new DatatypeUpdateExpr(tok, e1, updates) :> Expression
       | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr "EOp"
       | EApply (e, _, es, _) ->
-          let x = id_of_exp e in
+          let x = match id_of_exp_opt e with Some x -> x | None -> Id "" in
           let tok = create_token loc (sid x) in
           if (sid x).Equals("int")
           then
@@ -447,13 +447,11 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let s = new AssertStmt(start_tok, end_tok, exp, null, attrs) :> Statement in
         stmts.Add(s)
         stmts
-    | SCalc (oop, contents) ->
+    | SCalc (op, contents, e) ->
         let start_tok = create_token loc "calc" in
         let end_tok = create_token loc "}" in
-        let defOp = CalcStmt.DefaultOp in
         let makeCalcOp op = CalcStmt.BinaryCalcOp(bop2opcode op) :> CalcStmt.CalcOp in
-        let makeCalcOpOpt op = match oop with None -> defOp | Some op -> makeCalcOp op in
-        let calcOp = makeCalcOpOpt oop in
+        let calcOp = makeCalcOp op in
         let resOp = ref calcOp in
         let checkOp nextOp =
           let maybeOp = (!resOp).ResultOp(nextOp) in
@@ -465,7 +463,7 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         let stepOps = new ResizeArray<CalcStmt.CalcOp>() in
         let attrs = null in
         let len = List.length contents in
-        let addContents {calc_exp = e; calc_op = oop; calc_hints = chs} =
+        let addContents {calc_exp = e; calc_op = op; calc_hints = chs} =
           let exp = create_expression built_ins loc e in
           lines.Add(exp)
           if lines.Count = len then lines.Add(exp) // Dafny expects redundant last expression
@@ -474,11 +472,12 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
           let end_tok = create_token loc "}" in
           List.iter (fun ss -> subhints.Add(create_block_stmt built_ins loc ss)) chs
           hints.Add(new BlockStmt(start_tok, end_tok, subhints))
-          let stepOp = match oop with None -> calcOp | Some op -> makeCalcOp op in
+          let stepOp = makeCalcOp op in
           checkOp stepOp
           stepOps.Add(stepOp)
           in
         List.iter addContents contents
+        lines.Add(create_expression built_ins loc e)
         let s = new CalcStmt(start_tok, end_tok, calcOp, lines, hints, stepOps, attrs) in
         stmts.Add(s)
         stmts

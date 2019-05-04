@@ -1,0 +1,49 @@
+include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
+
+module CalcTest
+
+#verbatim{:interface}{:implementation}
+open X64.Machine_s
+open X64.Vale.Decls
+open X64.Vale.InsBasic
+#endverbatim
+
+ghost procedure lem1 (ghost a: Prims.pos)
+    ensures (2 * a > a);
+{}
+
+procedure calc0 (ghost a : Prims.pos) 
+    ensures (a + a > a);
+{
+    calc > {
+        a + a;
+        == {}
+        2 * a;
+        > { lem1(a); }
+        a;
+    }
+}
+
+#verbatim
+assume val make_opaque : #a:Type -> a -> a
+assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
+
+let f_def (x:int):int = x + 1
+let f = make_opaque f_def
+#endverbatim
+
+function f_def (x:int) : int extern;
+function f (x:int) : int extern;
+
+procedure TestCalc()
+    ensures f(f(0)) == 2;
+{
+    calc ==
+    {
+        f(f(0));
+        == { reveal f_def; }
+        f(0) + 1;
+        == { reveal f_def; }
+        2;
+    }
+}

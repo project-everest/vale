@@ -82,8 +82,8 @@ let rec string_of_exp_prec prec e =
         ((r p1 e1) + " " + (string_of_bop op) + " " + (r p2 e2), pe)
     | EOp (Bop _, ([] | [_] | (_::_::_::_)), _) -> internalErr ("binary operator " + (sprintf "%A" e))
     | EOp (TupleOp _, es, _) -> ("(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
-    | EApply (e, _, es, _) when id_of_exp e = (Id "seq") -> ("[" + (String.concat ", " (List.map (r 5) es)) + "]", 90)
-    | EApply (e, _, es, _)  when id_of_exp e = (Id "set") -> ("{" + (String.concat ", " (List.map (r 5) es)) + "}", 90)
+    | EApply (e, _, es, _) when is_id e && id_of_exp e = (Id "seq") -> ("[" + (String.concat ", " (List.map (r 5) es)) + "]", 90)
+    | EApply (e, _, es, _)  when is_id e && id_of_exp e = (Id "set") -> ("{" + (String.concat ", " (List.map (r 5) es)) + "}", 90)
     | EOp (Subscript, [e1; e2], _) -> ((r 90 e1) + "[" + (r 90 e2) + "]", 90)
     | EOp (Update, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " := " + (r 90 e3) + "]", 90)
     | EOp (Cond, [e1; e2; e3], _) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
@@ -99,6 +99,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindSet, [], xs, ts, e, _) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr ("EBind " + (sprintf "%A" e))
     | ECast (e, _) -> (r prec e, 0)
+    | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
 and string_of_formal (x:id, t:typ option) = (sid x) + (match t with None -> "" | Some t -> ":" + (string_of_typ t))
@@ -124,14 +125,15 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssert (attrs, e) ->
       let sSplit = if attrs.is_split then "{:split_here}" else "" in
       ps.PrintLine ("assert" + sSplit + " " + (string_of_exp e) + ";" + "  // " + (string_of_loc !ps.cur_loc))
-  | SCalc (oop, contents) ->
-      ps.PrintLine ("calc " + (match oop with None -> "" | Some op -> string_of_bop op + " ") + "{");
+  | SCalc (op, contents, e) ->
+      ps.PrintLine ("calc " + string_of_bop op + " {");  
       ps.Indent();
-      List.iter (fun {calc_exp = e; calc_op = oop; calc_hints = hints} ->
+      List.iter (fun {calc_exp = e; calc_op = op; calc_hints = hints} ->
         ps.PrintLine ((string_of_exp e) + ";");
-        (match oop with | None -> () | Some op -> ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent());
+        ps.Unindent(); ps.PrintLine(string_of_bop op); ps.Indent();
         List.iter (emit_block ps) hints
       ) contents;
+      ps.PrintLine((string_of_exp e) + ";")
       ps.Unindent();
       ps.PrintLine("}")
   | SVar (x, tOpt, _, g, a, eOpt) ->

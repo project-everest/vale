@@ -50,15 +50,15 @@ var r15:nat64 {:state reg(R15)};
 var efl:nat64 {:state flags()};
 var mem:memory {:state mem()};
 
-operand_type reg64:nat64 :=
+operand_type reg_opr64:nat64 @ operand :=
 | inout rax | inout rbx | inout rcx | inout rdx
 | inout rsi | inout rdi | inout rbp | inout r8
 | inout r9 | inout r10 | inout r11 | inout r12
 | inout r13 | inout r14 | inout r15
 ;
 operand_type shift_amt64:nat64 := in rcx | const;
-operand_type reg_opr64:nat64 := reg64;
-operand_type dst_opr64:nat64 @ operand := reg_opr64;
+operand_type Mem64(in base:reg_opr64, inline offset:int):nat64;
+operand_type dst_opr64:nat64 @ operand := reg_opr64 | Mem64;
 operand_type opr64:nat64 := dst_opr64 | const;
 
 // add {:typecheck false} attr because Type0 is not defined. (TODO: get rid of this)
@@ -177,13 +177,16 @@ procedure Sub64Wrap(inout dst:dst_opr64, in src:opr64)
 {
 }
 
+#reset-options "--max_fuel 0 --max_ifuel 0 --using_facts_from 'Prims FStar.UInt'"
+
 #verbatim
 let lemma_fundamental_div_mod (a b:nat64) :
   Lemma (pow2_64 `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
   =
-  ()
+  FStar.Math.Lemmas.lemma_div_mod (a `op_Multiply` b) pow2_64
 #endverbatim
 
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 ghost procedure lemma_fundamental_div_mod(ghost a:nat64, ghost b:nat64) {:public} extern;
 
 procedure Mul64Wrap(in src:opr64)
@@ -200,7 +203,7 @@ procedure Mul64Wrap(in src:opr64)
     lemma_fundamental_div_mod(old(rax), old(src));
 }
 
-procedure Mulx64(out dst_hi:dst_opr64, out dst_lo:dst_opr64, in src:opr64)
+procedure Mulx64(out dst_hi:reg_opr64, out dst_lo:reg_opr64, in src:opr64)
     {:public}
     {:instruction Ins(S.Mulx64(dst_hi, dst_lo, src))}
     {:quick exportOnly}

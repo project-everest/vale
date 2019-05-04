@@ -92,3 +92,14 @@ procedure MapIndex(ghost m:FStar.Map.t(int, int), ghost i:int, ghost v:int) retu
   r := nm[i];
   assert nm?[i] && r == v;
 }
+
+procedure Test() returns(ghost g:int)
+  {:typecheck}
+{
+  let f:fun(int) -> int := fun(x:int) x + 1;
+  let a:int := f(10);
+  assert a == 11;
+  g := f(11);
+  assert g == 12;
+  assert (fun(x:int) x + 1)(12) == 13;
+}

@@ -86,7 +86,7 @@ let while_id (x:id) = Id ((string_of_id x) + "_while")
 let is_quick_body (a:attrs):bool =
   if List_mem_assoc (Id "quick") a then
     match List_assoc (Id "quick") a with
-    | [e] -> (match skip_loc e with EVar (Id "exportOnly", _) -> false | _ -> true)
+    | [e] -> (match skip_loc e with EVar ((Id "exportOnly" | Reserved "while"), _) -> false | _ -> true)
     | _ -> true
   else false
 
@@ -133,6 +133,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
     | ECast (e, t) -> ECast (r e, t)
+    | ELabel (loc, e) -> ELabel (loc, r e)
   )
 
 let rec env_map_exp_state (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
@@ -190,7 +191,7 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SReturn -> (env, [s])
     | SAssume e -> (env, [SAssume (fee e)])
     | SAssert (attrs, e) -> (env, [SAssert (attrs, fee e)])
-    | SCalc (oop, contents) -> (env, [SCalc (oop, List.map (env_map_calc_contents fe fs env) contents)])
+    | SCalc (op, contents, e) -> (env, [SCalc (op, (List.map (env_map_calc_contents fe fs env) contents), fee e)])
     | SVar (x, t, m, g, a, eOpt) ->
         (snd (env_stmt env s), [SVar (x, t, m, g, map_attrs fee a, mapOpt fee eOpt)])
     | SAlias (x, y) -> (snd (env_stmt env s), [SAlias (x, y)])
@@ -214,8 +215,8 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
 and env_map_stmts (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip (env_map_stmt fe fs) env ss))
 and env_map_calc_contents (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list) map_modify) (env:env)  (cc:calcContents) =
-  let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
-  {calc_exp = fe env e; calc_op = oop; calc_hints = List.map (env_map_stmts fe fs env) hints}
+  let {calc_exp = e; calc_op = op; calc_hints = hints} = cc in
+  {calc_exp = fe env e; calc_op = op; calc_hints = List.map (env_map_stmts fe fs env) hints}
 
 let env_next_stmt (env:env) (s:stmt):env =
   let (env, _) = env_map_stmt (fun _ e -> e) (fun _ _ -> Unchanged) env s in
@@ -314,7 +315,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
               [((match io with In -> Read | InOut | Out -> Modify), x)]
             )
           | EOp (Uop UConst, _, _) | EInt _ -> []
-          | EApply (e, _, args, _) when Map.containsKey (operandProc (id_of_exp e) io) env0.procs ->
+          | EApply (e, _, args, _) when is_id e && Map.containsKey (operandProc (id_of_exp e) io) env0.procs ->
             (
               let xa = id_of_exp e in
               let xa_in = operandProc xa In in
@@ -359,13 +360,30 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
   | SReturn -> compute_exps []
   | SAssume e -> compute_exps [e]
   | SAssert (attrs, e) -> compute_exps [e]
-  | SCalc (oop, contents) -> err "unsupported feature: 'calc' for F*"
+  | SCalc (op, contents, e) ->
+      let compute_content cc =
+        let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
+        let (_, rs0, rso0, _) = compute_exps [e] in
+        let f (env1, rs0, rso0, mods0) b =
+          let (env1, rs1, rso1, mods1) = rs b in
+          (env1, Set.union rs0 rs1, Set.union rso1 rso1, Set.union mods0 mods1)
+        let (env1, rs1, rso1, mods1) = List.fold f (env1, Set.empty, Set.empty, Set.empty) hints in
+        (env1, Set.union rs0 rs1, Set.union rso0 rso1, mods1)
+      let compute_contents cs : (env * Set<id> * Set<id> * Set<id>)=
+        let f (env1, rs0, rso0, mods0) cc =
+          let (env1, rs1, rso1, mods1) = compute_content cc in
+          (env1, Set.union rs0 rs1, Set.union rso0 rso1, Set.union mods0 mods1)
+        in
+        List.fold f (env1, Set.empty, Set.empty, Set.empty) cs
+      let (_, rs1, rso1, mods1) = compute_contents contents in
+      let (_, rs0, rso0, _) = compute_exps [e] in
+      (env1, Set.union rs0 rs1, Set.union rso0 rso1, mods1)
   | SVar (x, t, m, g, a, eOpt) -> compute_exps (match eOpt with None -> [] | Some e -> [e])
   | SAlias (x, y) -> compute_exps []
   | SAssign (lhss, e) ->
       let (rs0, mods0) =
         match skip_loc e with
-        | EApply (e, _, es, _) when Map.containsKey (id_of_exp e) env0.procs ->
+        | EApply (e, _, es, _) when is_id e && Map.containsKey (id_of_exp e) env0.procs ->
             let x = id_of_exp e in
             let p = Map.find x env0.procs in
             compute_call p lhss es
@@ -637,7 +655,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
       )
     | (NotGhost, EOp (Uop UConst, [ec], _)) -> Replace (constOp (rewrite_vars_exp rctx env ec))
     | (NotGhost, EInt _) -> Replace (constOp e)
-    | (NotGhost, EApply (e, _, args, _)) when (asOperand <> None && Map.containsKey (operandProc (id_of_exp e) io) env.procs) ->
+    | (NotGhost, EApply (e, _, args, _)) when is_id e && asOperand <> None && Map.containsKey (operandProc (id_of_exp e) io) env.procs ->
       (
         let xa = id_of_exp e in
         let xa_in = operandProc xa In in
@@ -757,7 +775,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
 let rewrite_cond_exp (env:env) (e:exp):exp =
   let r = rewrite_vars_arg None NotGhost (Some "cmp") In env in
   match skip_loc e with
-  | (EApply (e, _, es, t)) -> vaApp_t ("cmp_" + string_of_id (id_of_exp e)) (List.map r es) t
+  | (EApply (e, _, es, t)) when is_id e -> vaApp_t ("cmp_" + string_of_id (id_of_exp e)) (List.map r es) t
   | (EOp (op, es, t)) ->
     (
       match (op, es) with
@@ -776,7 +794,7 @@ let rec rewrite_vars_assign (rctx:rewrite_ctx) (env:env) (lhss:lhs list) (e:exp)
   | (_, ELoc (loc, e)) ->
       try let (lhss, e) = rewrite_vars_assign rctx env lhss e in (lhss, ELoc (loc, e))
       with err -> raise (LocErr (loc, err))
-  | (_, EApply(xe, ts, es, t)) ->
+  | (_, EApply(xe, ts, es, t)) when is_id xe ->
     (
       let x = id_of_exp xe in
       match Map.tryFind x env.procs with
@@ -842,9 +860,9 @@ let desugar_spec (env:env) ((loc:loc), (s:spec)):(env * (loc * spec) list) map_m
         in
       let applyLets old =
         match env.lets with
-        | [] -> es
+        | [] -> List.map (fun (l, e) -> (l, ELabel(l, e))) es
         | lets ->
-            let e = and_of_list (List.map snd es) in
+            let e = and_of_list (List.map (fun (l, e) -> ELabel (l, e)) es) in
             let lets = List.map (let_of_lets old) lets in
             let addLet e (loc, bind, (x, t), ee) = ELoc (loc, ebind bind [ee] [(x, t)] [] e) in
             let e = List.fold addLet e lets in
@@ -931,7 +949,7 @@ let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
   | ELoc (loc, e) ->
       try collect_mods_assign env lhss e
       with err -> raise (LocErr (loc, err))
-  | EApply(e, _, es, _) ->
+  | EApply(e, _, es, _) when is_id e ->
     (
       let x = id_of_exp e in
       match Map.tryFind x env.procs with
@@ -1015,7 +1033,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
           requires e(ins_in)
           ensures ed(ins_in,outs) << old(ed(ins_in))
           { ins := ins_in; b }
-        procedure{:quick false} while_p(ins_in) returns(outs)
+        procedure{:quick true} while_p(ins_in) returns(outs)
           lets L
           reads R modifies M
           requires invs(ins_in)
@@ -1157,7 +1175,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_exit];
             pbody = Some (sInits @ [sWhile]);
-            pattrs = [(Id "quick", [evar (Id "exportOnly")]); (Id "already_has_mod_ok", [])];
+            pattrs = [(Id "quick", [evar (Reserved "while")]); (Id "already_has_mod_ok", [])];
           }
           in
         hoisted := (DProc p_while)::(DProc p_body)::!hoisted;
@@ -1298,7 +1316,12 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         let ss = add_quick_blocks_stmts envp (ref 0) ss in
         Some ss
     in
-  let pNew = {p with pbody = body; pspecs = specs} in
+  let f_attr (x, es) =
+    match (x, es) with
+    | (Id "quick", [EVar (Reserved "while", _)]) -> (Id "quick", [])
+    | _ -> (x, es)
+    in
+  let pNew = {p with pbody = body; pspecs = specs; pattrs = List.map f_attr p.pattrs} in
   let envBody = envp in
   let envProc = {env with procs = Map.add p.pname pNew env.procs} in
   let envRec = if isRecursive then envProc else env in
@@ -1318,7 +1341,7 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
   | DVar (x, t, XState e, _) ->
     (
       match skip_loc e with
-      | EApply (e, _, es, _) ->
+      | EApply (e, _, es, _) when is_id e ->
           let env = {env with ids = Map.add x (StateInfo (string_of_id (id_of_exp e), es, t)) env.ids} in
           ([(env, env, d)], env)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")

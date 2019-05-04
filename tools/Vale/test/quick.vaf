@@ -266,7 +266,30 @@ procedure Incr3(ghost g:int)
     Add64(rax, 1);
 }
 
-procedure While(ghost g1:int) returns(ghost go:int)
+procedure While0()
+    {:quick}
+    modifies
+        efl;
+        rax; rbx;
+    requires
+        rax < 200;
+        rbx < 100;
+{
+    Add64(rax, 0);
+    while (rax < rbx)
+        invariant
+            rax <= 200;
+            rbx <= 100;
+            rax >= old(rax);
+        decreases
+            (200 - rax);
+    {
+        Add64(rax, 1);
+    }
+    Add64(rax, 3);
+}
+
+procedure While1(ghost g1:int) returns(ghost go:int)
     {:quick}
     modifies
         efl;
@@ -293,6 +316,41 @@ procedure While(ghost g1:int) returns(ghost go:int)
         g2 := g2 + 1;
     }
     assert g2 == rax;
+    Add64(rax, 3);
+    go := g2 + gc;
+}
+
+procedure While2(ghost g1:int) returns(ghost go:int)
+    {:quick}
+    modifies
+        efl;
+        rax; rbx;
+    requires
+        rax < 200;
+        rbx < 100;
+{
+    Add64(rax, 0);
+    let gc := g1;
+    ghost var g2:int := rax;
+    ghost var g3:int := rax;
+    while (rax < rbx)
+        invariant
+            rax <= 200;
+            rbx <= 100;
+            g2 == rax;
+            g2 >= old(g2);
+            g3 == rax;
+            rax >= old(rax);
+            g1 == old(g1);
+        decreases
+            (200 - rax);
+    {
+        Add64(rax, 1);
+        g2 := g2 + 1;
+        g3 := g3 + 1;
+    }
+    assert g2 == rax;
+    assert g3 == rax;
     Add64(rax, 3);
     go := g2 + gc;
 }

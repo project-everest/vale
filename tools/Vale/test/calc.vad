@@ -9,11 +9,12 @@ function G(x:int, y:int):int extern;
 
 procedure Q()
 {
-    calc
+    calc ==
     {
         F(100);
+     ==
         100 + 25;
-        { assert 100 + 25 == 120 + 5; }
+     == { assert 100 + 25 == 120 + 5; }
         120 + 5;
      <= { assert true; }
         G(120, 5);
@@ -27,6 +28,7 @@ procedure Q()
         false;
      <==>
         false && true;
+     ==>
         { assert 100 + 25 == 120 + 5; }
         true;
     }
