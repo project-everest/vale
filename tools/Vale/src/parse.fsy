@@ -57,11 +57,11 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> PLUS MINUS STAR SLASH PERCENT
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
 %token <loc * (bool * string)> ATEQ COLONEQ
-%token <loc> HAVOC OLD THIS COLONCOLON
+%token <loc> HAVOC OLD THIS
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TTYPE TYPE OPERAND_TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
 %token <loc> DDEPENDENT DEPENDENT
-%token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT BY ASSUME CALC DECREASES INVARIANT COLON COLONBAR YIELD SEMI
+%token <loc> LEMMA CALL RETURN IF WHILE FOR GOTO ASSERT IMPLIES BY ASSUME CALC DECREASES INVARIANT COLON YIELD SEMI
 %token <loc> RETURNS LETS REQUIRES ENSURES READS MODIFIES PRESERVES
 %token <loc> FORALL EXISTS FUN
 %token <loc> INCLUDE
@@ -289,20 +289,14 @@ Decreases
   : { parse_err "a while loop must contain zero or more invariants followed by exactly one decreases clause" }
   | DECREASES STAR SEMI { ($1, []) }
   | DECREASES Exps1 SEMI { ($1, $2) }
+
 ExpAssign
   : Lhss1 COLONEQ ExpCall Exp
     {
       let (loc, (_, s)) = $2 in
       stmtAt loc (SAssign ($1, $3 $4))
     }
-/*
-ExpAssigns1
-  : ExpAssign { $1 }
-  | ExpAssign COMMA ExpAssigns1 { $1 @ $3 }
-ExpAssigns
-  : { [] }
-  | ExpAssigns1 { $1 }
-*/
+
 Stmt
   : ID COLON { stmtAt (fst $1) (SLabel (Id (snd $1))) }
   | GOTO AnyId SEMI { stmtAt $1 (SGoto $2) }
@@ -312,25 +306,20 @@ Stmt
     {
       stmtAt $1 (SWhile ($3, exps_of_spec_exps $5, $6, $8))
     }
-/* We haven't used this; removing it removes the need for ExpAssigns, simplifying the grammar
-  | FOR LPAREN ExpAssigns SEMI Exp SEMI ExpAssigns RPAREN Invariants Decreases LBRACE Block RBRACE
+  | FORALL LPAREN Formals RPAREN Triggers Exp BY LBRACE Block RBRACE
     {
-      $3 @ (stmtAt $1 (SWhile ($5, exps_of_spec_exps $9, $10, $12 @ $7)))
+      stmtAt $1 (SForall ($3, $5, EBool true, $6, $9))
     }
-*/
-  | FORALL LPAREN Formals RPAREN Triggers Exp LBRACE Block RBRACE
+  | FORALL LPAREN Formals RPAREN Triggers Exp IMPLIES Exp BY LBRACE Block RBRACE
     {
-      stmtAt $1 (SForall ($3, $5, EBool true, $6, $8))
-    }
-  | FORALL LPAREN Formals RPAREN Triggers COLONBAR Exp Exp LBRACE Block RBRACE
-    {
-      stmtAt $1 (SForall ($3, $5, $7, $8, $10))
+      stmtAt $1 (SForall ($3, $5, $6, $8, $11))
     }
   | EXISTS LPAREN Formals RPAREN Triggers Exp SEMI { stmtAt $1 (SExists ($3, $5, $6)) }
   | INVARIANT Exp SEMI { stmtAt $1 (SAssert ({assert_attrs_default with is_inv = true}, $2)) }
   | ASSUME Exp SEMI { stmtAt $1 (SAssume $2) }
   | ASSERT Exp SEMI { stmtAt $1 (SAssert (assert_attrs_default, $2)) }
   | ASSERT Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], EBool true, $2, $5)) }
+  | ASSERT Exp IMPLIES Exp BY LBRACE Block RBRACE { stmtAt $1 (SForall ([], [], $2, $4, $7)) }
   | ASSERT LBRACECOLON AnyId RBRACE Exp SEMI
     {
       let attrs =

@@ -157,8 +157,6 @@ and lextoken = parse
       | ("#", _, _) -> HASH loc
       | (".", _, _) -> DOT loc
       | (":", _, _) -> COLON loc
-      | (":|", _, _) -> COLONBAR loc
-      | ("::", _, _) -> COLONCOLON loc
       | ("->", _, _) -> MINUSGT loc
       | (_, None, None) -> parse_err ("unknown token '" + s + "'")
       | (_, None, Some f) -> f loc
@@ -191,6 +189,7 @@ and lextoken = parse
 | "decreases" { DECREASES (curLoc lexbuf) }
 | "invariant" { INVARIANT (curLoc lexbuf) }
 | "assert" { ASSERT (curLoc lexbuf) }
+| "implies" { IMPLIES (curLoc lexbuf) }
 | "by" { BY (curLoc lexbuf) }
 | "assume" { ASSUME (curLoc lexbuf) }
 | "calc" { CALC (curLoc lexbuf) }
