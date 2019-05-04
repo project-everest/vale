@@ -54,9 +54,7 @@ let op = (op_char | '*' | '/' op_char)+ ('/' | "//" | "/*")?
 
 rule comment = parse
 | "*/" { () }
-| "*)" { () }
 | "/*" { comment lexbuf ; comment lexbuf }
-| "(*" { comment lexbuf ; comment lexbuf }
 | "\n\r" { next_line lexbuf; comment lexbuf }
 | "\r\n" { next_line lexbuf; comment lexbuf }
 | ['\n''\r'] { next_line lexbuf; comment lexbuf }
