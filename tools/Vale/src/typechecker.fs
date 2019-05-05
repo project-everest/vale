@@ -113,7 +113,8 @@ type aexp_t =
 | AE_Loc of loc * aexp
 | AE_Exp of exp
 | AE_Op of op * aexp list
-| AE_Apply of exp * typ list * aexp list
+| AE_ApplyX of id * typ list * aexp list
+| AE_ApplyE of aexp * aexp list
 | AE_Bind of bindOp * aexp list * formal list * triggers * aexp
 | AE_Cast of aexp * typ
 and aexp = aexp_t * typ * (typ * typ) option
@@ -271,11 +272,6 @@ let try_lookup_fun_decl (env:env) (x:id):fun_decl option =
   | Some (FoundFunDecl f) -> Some f
   | _ -> None
 
-let lookup_fun_expr (env:env) (x:id):(typ list * typ) =
-  match try_lookup_fun_or_proc env x with
-  | Some (FoundFunExpr f) -> f
-  | _ -> err ("cannot find function'" + (err_id x) + "'")
-
 let lookup_operand_type (env:env) (x:id):(pformal list option * typ * typ option * operand_typ list) =
   match lookup_name env x true with
   | (Some (OperandType_info (pformals, t, opr, os)), _) -> (pformals, t, opr, os)
@@ -332,8 +328,8 @@ let rec normalize_type (env:env) (t:typ):typ =
   | TVar _ -> t
   | TBool _ -> t
   | TInt _ -> t
-  | TTuple ts -> t
-  | TFun (ts, t) -> t
+  | TTuple _ -> t
+  | TFun (_, _) -> t
   | TDependent x ->
       let (_, x) = lookup_name env x true in
       TDependent x
@@ -1117,6 +1113,14 @@ let insert_cast (e:exp) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
   ECast (e, et)
 
+let lookup_id_or_fun (env:env) (u:unifier) (x:id):(typ * id_info option) =
+  match lookup_name env x true with
+  | (Some (Func_decl f), _) ->
+      let fi = compute_fun_instance env u f None in
+      let t = TFun (fi.f_args, fi.f_ret) in
+      (t, None)
+  | _ -> lookup_id env x
+
 let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
   let coerce = Option.map (fun (t, et) -> (subst_typ s t, subst_typ s et)) coerce in
   let e =
@@ -1187,10 +1191,14 @@ let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
         if(List.length t <> 1) then err ("cast for more than one return types not implemented");
         else insert_cast e t.Head et.Head
 *)
-    | AE_Apply (e, ts, aes) ->
+    | AE_ApplyX (x, ts, aes) ->
         let es = List.map (subst_exp env s) aes in
         let ts = List.map (subst_typ s) ts in
-        EApply (e, Some ts, es, Some t)
+        EApply (EVar (x, None), Some ts, es, Some t)
+    | AE_ApplyE (ae, aes) ->
+        let e = subst_exp env s ae in
+        let es = List.map (subst_exp env s) aes in
+        EApply (e, None, es, Some t)
     | AE_Bind (bOp, aes, xs, ts, ae) ->
         let es = List.map (subst_exp env s) aes in
         let e = subst_exp env s ae in
@@ -1291,7 +1299,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
     let aes = List.map (fun e -> snd (infer_exp env u e (Some tv))) es in
     let xt = lookup_primitive env pt in
     let t = tapply xt [tv] in
-    ret t (AE_Apply (e, [tv], aes))
+    ret t (AE_ApplyX (id_of_exp e, [tv], aes))
   match e with
   | ELoc (loc, e) ->
       try
@@ -1302,7 +1310,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         (t, (AE_Loc (loc, ae), t, None))
       with err -> locErr loc err
   | EVar (x, _) ->
-      let (t, info) = lookup_id env x in
+      let (t, info) = lookup_id_or_fun env u x in
       let () =
         match (env.inline_only, info) with
         | (false, _) -> ()
@@ -1346,7 +1354,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _,  _) -> ret t (AE_Op (Uop (UCustom op), es))
+      | (AE_ApplyX (_, _, es), _,  _) -> ret t (AE_Op (Uop (UCustom op), es))
       | _ -> internalErr "UCustom"
     )
 (*
@@ -1419,7 +1427,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (Bop (BCustom op), es))
+      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (Bop (BCustom op), es))
       | _ -> internalErr "BCustom"
     )
   | EOp (Subscript, [e1; e2], _) ->
@@ -1433,7 +1441,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x + "[]")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (Subscript, es))
+      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (Subscript, es))
       | _ -> internalErr ("EOp Subscript")
     )
   | EOp (Update, [e1; e2; e3], _) ->
@@ -1447,7 +1455,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x + "[:=]")) [e1; e2; e3] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (Update, es))
+      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (Update, es))
       | _ -> internalErr ("EOp Update")
     )
   | EOp (Bop BIn, [e1; e2], _) ->
@@ -1461,7 +1469,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x + "?[]")) [e2; e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, [e2; e1]), _, _) -> ret t (AE_Op (Bop BIn, [e1; e2]))
+      | (AE_ApplyX (_, _, [e2; e1]), _, _) -> ret t (AE_Op (Bop BIn, [e1; e2]))
       | _ -> internalErr ("EOp Bop BIn")
     )
 (*
@@ -1487,9 +1495,9 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x1 + " ." + xf)) [e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match (t1, ae) with
-      | (TTuple ts, (AE_Apply (_, _, es), _,  _)) ->
-          ret t (AE_Apply (evar (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf)), ts, es))
-      | (_, (AE_Apply (_, _, es), _, _)) -> ret t (AE_Op (FieldOp (Id xf), es))
+      | (TTuple ts, (AE_ApplyX (_, _, es), _,  _)) ->
+          ret t (AE_ApplyX (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), ts, es))
+      | (_, (AE_ApplyX (_, _, es), _, _)) -> ret t (AE_Op (FieldOp (Id xf), es))
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (FieldUpdate (Id xf), [e1; e2], _) ->
@@ -1503,7 +1511,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x1 + " ." + xf + ":=")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_Apply (_, _, es), _, _) -> ret t (AE_Op (FieldUpdate (Id xf), es))
+      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (FieldUpdate (Id xf), es))
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (Cond, [e1; e2; e3], _) ->
@@ -1583,7 +1591,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         in
       let t = TTuple ts in
       let (_, aes) = infer_exps env u (List.map2 (fun e t -> (e, Some t)) es ts) in
-      ret t (AE_Apply (evar (Id "tuple"), ts, aes))
+      ret t (AE_ApplyX (Id "tuple", ts, aes))
   | EBind (BindLet, [ex], [(x, t)], [], e, _) ->
       // let x:t := ex in e
       check_not_local env x;
@@ -1615,24 +1623,30 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       //// TODO: move this check to after inference:
       //if (is_subtype env t tc_norm || is_subtype env tc_norm t) then norm_ret tc ae
       //else err (sprintf "cannot cast between types %s and %s that do not have subtype relationship" (string_of_typ t.norm_typ) (string_of_typ tc))
-  | EApply (e, ts_opt, es, _) when !fstar && id_of_exp e = (Id "list") -> check_collection_literal e PT_List ts_opt es
-  | EApply (e, ts_opt, es, _) when not !fstar && id_of_exp e = (Id "seq") -> check_collection_literal e PT_Seq ts_opt es
-  | EApply (e, ts_opt, es, _) when not !fstar && id_of_exp e = (Id "set") -> check_collection_literal e PT_Set ts_opt es
+  | EApply (e, ts_opt, es, _) when !fstar && is_id e && id_of_exp e = (Id "list") -> check_collection_literal e PT_List ts_opt es
+  | EApply (e, ts_opt, es, _) when not !fstar && is_id e && id_of_exp e = (Id "seq") -> check_collection_literal e PT_Seq ts_opt es
+  | EApply (e, ts_opt, es, _) when not !fstar && is_id e && id_of_exp e = (Id "set") -> check_collection_literal e PT_Set ts_opt es
   | EApply (e, ts_opt, es, _) ->
-      let x = id_of_exp e in
-      let f = 
-        match try_lookup_fun_decl env x with
-        | Some f -> compute_fun_instance env u f ts_opt
-        | _ ->
-          let (args, ret) = lookup_fun_expr env x in
-          { f_args = args; f_targs = []; f_ret = ret} 
-      in
-      if List.length f.f_args <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.f_args) (List.length es));
-      let param_typs = f.f_args in
-      let ret_typ = f.f_ret in
-  //    let env = if isExtern then {env with ghost = true} else env in
-      let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e t -> (e, Some t)) es param_typs) in
-      ret ret_typ (AE_Apply (e, f.f_targs, aes))
+      let applyE () =
+        let fargs = List.map (fun _ -> u_next_type_var u) es in
+        let fret = u_next_type_var u in
+        let (_, ae) = infer_exp env u e (Some (TFun (fargs, fret))) in
+        let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e t -> (e, Some t)) es fargs) in
+        ret fret (AE_ApplyE (ae, aes))
+      let applyX x f =
+        if List.length f.f_args <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.f_args) (List.length es));
+    //    let env = if isExtern then {env with ghost = true} else env in
+        let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e t -> (e, Some t)) es f.f_args) in
+        ret f.f_ret (AE_ApplyX (x, f.f_targs, aes))
+        in
+      match id_of_exp_opt e with
+      | Some x ->
+        (
+          match try_lookup_fun_decl env x with
+          | None -> applyE ()
+          | Some f -> applyX x (compute_fun_instance env u f ts_opt)
+        )
+      | None -> applyE ()
   | _ ->
       notImplemented (sprintf "not yet implemented: type checking rule for %A" e)
 // infer_exp_force forces the type to a concrete type suitable for pattern matching;
@@ -1765,7 +1779,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
                 (AE_Exp e, t, None)
             | (_, Some (OperandLocal (_, _))) -> internalErr (sprintf "tc_proc_operand: OperandLocal: %A %A" io info)
           )
-        | EApply (e, None, es, _) ->
+        | EApply (e, None, es, _) when is_id e ->
           (
             let x = id_of_exp e in
             match lookup_name env x true with
@@ -1777,7 +1791,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
                 let nparams = List.length pformals in
                 if nes <> nparams then err (sprintf "operand type '%s' expects %i arguments(s), found %i arguments(s)" (err_id x) nparams nes) else
                 let aes = List.map2 (tc_proc_operand env u) pformals es in
-                (AE_Apply (e, [], aes), t, None)
+                (AE_ApplyX (x, [], aes), t, None)
             | _ -> err (sprintf "cannot find function named '%s' or procedure operand_type named '%s'" (err_id x) (err_id x))
           )
         | _ -> check_const_operand xo
@@ -1820,11 +1834,23 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
   u_unify u None;
   let es = List.map (subst_exp env u.u_substs) aes in
   let prets = List.map (fun (_, t, _, _, _) -> t) p.prets in
-  let tRet = match prets with | [] -> None | [t] -> Some t | _  -> Some (TTuple prets) in
-  SAssign (xs, EApply (evar p.pname, Some pi.p_targs, es, tRet))
+  let subt = subst_typ u.u_substs in
+  let tRet = match prets with | [] -> None | [t] -> Some (subt t) | _  -> Some (subt (TTuple prets)) in
+  let targs = List.map subt pi.p_targs in
+  SAssign (xs, EApply (evar p.pname, Some targs, es, tRet))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
+  let is_proc_call (e:exp):bool =
+    match skip_loc e with
+    | EApply (e, _, _, _) when is_id e ->
+      (
+        match lookup_fun_or_proc env (id_of_exp e) with
+        | FoundProc p -> true
+        | _ -> false
+      )
+    | _ -> false
+    in
   match s with
   | SLoc (loc, s) -> try SLoc (loc, tc_stmt env s) with err -> locErr loc err
   | SLabel x -> err "labels are not supported"
@@ -1836,6 +1862,10 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
     let contents = tc_calc_contents env contents in 
     let (_, e) = tc_exp env e None in  
     SCalc (op, contents, e)
+  | SVar (x, tOpt, Immutable, XGhost, [], Some e) when is_proc_call e ->
+      tc_stmt env (SAssign ([(x, Some (tOpt, Ghost))], e))
+  | SVar (x, tOpt, Mutable, XGhost, a, Some e) when is_proc_call e ->
+      err "cannot assign procedure return value directly to new mutable ghost variable; use 'let' instead of 'ghost var' to assign to immutable variable or declare 'ghost var' in a separate statement before the call"
   | SVar (x, tOpt, m, g, a, eOpt) ->
     (
       (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());
@@ -1869,12 +1899,11 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
         SAssign (ft t, e)
         in
       match skip_loc e with
-      | EApply (e, ts_opt, es, _) ->
+      | EApply (e, ts_opt, es, _) when is_id e ->
         (
-         let x = id_of_exp e in
-         // HACK: don't check call to "reveal_opaque". This is code that is going to be replaced with F* reveal
-         if string_of_id x = "Opaque_s.reveal_opaque" then s 
-         else
+          let x = id_of_exp e in
+          // HACK: don't check call to "reveal_opaque". This is code that is going to be replaced with F* reveal
+          if string_of_id x = "Opaque_s.reveal_opaque" then s else
           match (xs, lookup_fun_or_proc env x) with
           | (([] | [_]), (FoundFunDecl _ | FoundFunExpr _)) -> assign_exp ()
           | (_::_, (FoundFunDecl _ | FoundFunExpr _)) -> err ("Expected 0 or 1 return values from function")

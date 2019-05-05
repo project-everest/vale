@@ -1,9 +1,9 @@
 include{:fstar}{:open} "Types_s"
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 module Recursive
 
@@ -75,7 +75,9 @@ assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM
   ))
 #endverbatim
 
-procedure {:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)
+procedure KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)
+  {:recursive}
+  {:decrease n}
 {
   inline if (0 < n) {
     w_out := KeyExpansionRoundUnrolledRecursive(w_in, n-1);

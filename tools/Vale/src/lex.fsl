@@ -54,9 +54,7 @@ let op = (op_char | '*' | '/' op_char)+ ('/' | "//" | "/*")?
 
 rule comment = parse
 | "*/" { () }
-| "*)" { () }
 | "/*" { comment lexbuf ; comment lexbuf }
-| "(*" { comment lexbuf ; comment lexbuf }
 | "\n\r" { next_line lexbuf; comment lexbuf }
 | "\r\n" { next_line lexbuf; comment lexbuf }
 | ['\n''\r'] { next_line lexbuf; comment lexbuf }
@@ -100,7 +98,6 @@ and lextoken = parse
 | "//"[^'\n''\r']* { lextoken lexbuf }
 | "#line"[' ']+ { line_number lexbuf }
 | "/*" { comment lexbuf ; lextoken lexbuf }
-| "(*" { comment lexbuf ; lextoken lexbuf }
 | "#ifdef"[' ']+['A'-'Z''a'-'z''0'-'9''_''$''?']+
 {
   let s = lexeme lexbuf in
@@ -159,8 +156,6 @@ and lextoken = parse
       | ("#", _, _) -> HASH loc
       | (".", _, _) -> DOT loc
       | (":", _, _) -> COLON loc
-      | (":|", _, _) -> COLONBAR loc
-      | ("::", _, _) -> COLONCOLON loc
       | ("->", _, _) -> MINUSGT loc
       | (_, None, None) -> parse_err ("unknown token '" + s + "'")
       | (_, None, Some f) -> f loc
@@ -193,6 +188,7 @@ and lextoken = parse
 | "decreases" { DECREASES (curLoc lexbuf) }
 | "invariant" { INVARIANT (curLoc lexbuf) }
 | "assert" { ASSERT (curLoc lexbuf) }
+| "implies" { IMPLIES (curLoc lexbuf) }
 | "by" { BY (curLoc lexbuf) }
 | "assume" { ASSUME (curLoc lexbuf) }
 | "calc" { CALC (curLoc lexbuf) }
@@ -203,7 +199,6 @@ and lextoken = parse
 | "forall" { FORALL (curLoc lexbuf) }
 | "exists" { EXISTS (curLoc lexbuf) }
 | "fun" { FUN (curLoc lexbuf) }
-| "lambda" { LAMBDA (curLoc lexbuf) }
 | "old" { OLD (curLoc lexbuf) }
 | "this" { THIS (curLoc lexbuf) }
 | "true" { LITBOOL ((curLoc lexbuf), true) }

@@ -67,22 +67,22 @@
 
     <pre><code>
       procedure Increment(inout register x:int)
-        ensures
-          x == old(x) + 1;
+          ensures
+              x == old(x) + 1;
       { ... }
 
       var{:state reg(EAX)} eax:int;
 
       procedure p()
-        modifies
-          eax;
-        requires
-          eax &gt;= 0;
-        ensures
-          eax &gt;= 2;
+          modifies
+              eax;
+          requires
+              eax &gt;= 0;
+          ensures
+              eax &gt;= 2;
       {
-        Increment(eax);
-        Increment(eax);
+          Increment(eax);
+          Increment(eax);
       }
     </code></pre>
 
@@ -216,7 +216,7 @@ PFORMALS ::= PFORMAL , ... , PFORMAL
 <a href="#parameters">PFORMAL</a> ::=
   | ghost x : TYPE
   | inline x : TYPE
-  | x : ot
+  | in x : ot
   | out x : ot
   | inout x : ot
 
@@ -246,18 +246,18 @@ STMTS ::= STMT ... STMT
 STMT ::=
   | assume EXP ;
   | assert EXP ;
-  | assert EXP by { STMTS }
+  | assert <i>[</i>EXP implies<i>]</i> EXP by { STMTS }
+  | forall ( FORMALS ) TRIGGERS <i>[</i>EXP implies<i>]</i> EXP by { STMTS }
+  | let exists ( FORMALS ) TRIGGERS EXP ;
+  | let x <i>[</i>: TYPE<i>]</i> := e ;
+  | let x1 @= x2 ;
+  | ghost var x <i>[</i>: TYPE<i>]</i> <i>[</i>:= EXP<i>]</i> ;
   | calc CALC_OP { CALC ... CALC EXP ; }
   | reveal f ;
   | p ( EXP , ... , EXP) ;
   | DESTINATIONS := p ( EXP , ..., EXP ) ;
   | x := EXP ;
   | this := EXP ;
-  | ghost var x <i>[</i>: TYPE<i>]</i> <i>[</i>:= EXP<i>]</i> ;
-  | let x <i>[</i>: TYPE<i>]</i> := e ;
-  | let x1 @= x2 ;
-  | forall FORMALS TRIGGERS <i>[</i>:| EXP<i>]</i> :: EXP { STMTS }
-  | exists FORMALS TRIGGERS :: EXP ;
   | while ( EXP ) INVARIANTS DECREASE { STMTS }
   | <i>[</i>ghost<i>]</i> <i>[</i>inline<i>]</i> if ( EXP ) { STMTS }
       <i>[</i> else if ( EXP ) { STMTS } ... else if ( EXP ) { STMTS } <i>]</i>
@@ -268,10 +268,12 @@ CALC_HINTS ::= CALC_HINT ... CALC_HINT
 CALC_HINT ::= { STMTS }
 CALC_OP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
 
-DESTINATIONS := DESTINATION <i>[</i> , ... , DESTINATION <i>]</i>
+DESTINATIONS ::=
+  | DESTINATION <i>[</i> , ... , DESTINATION <i>]</i>
+  | let ( FORMAL , ... , FORMAL )
 DESTINATION ::=
   | x
-  | ( ghost var x <i>[</i>: TYPE<i>]</i> )
+  | ( let x <i>[</i>: TYPE<i>]</i> )
 
 INVARIANTS ::= INVARIANT ... INVARIANT
 INVARIANT ::= invariant EXP ; ... EXP ;
@@ -321,9 +323,9 @@ EXP ::=
   | EXP &lt;==&gt; EXP
   | if EXP then EXP else EXP
   | let FORMAL := EXP in EXP
-  | forall FORMALS TRIGGERS :: EXP
-  | exists FORMALS TRIGGERS :: EXP
-  | lambda FORMALS TRIGGERS :: EXP
+  | forall ( FORMALS ) TRIGGERS EXP
+  | exists ( FORMALS ) TRIGGERS EXP
+  | fun    ( FORMALS ) TRIGGERS EXP
   | ( EXP )
 
 OTYPS ::= <i>[</i> | <i>]</i> OTYP | ... | OTYP
@@ -409,18 +411,18 @@ lets x @= eax; y @= ebx; z := 3 + 3;
 
 assume x &lt; 10;
 assert x &lt;= 10;
-assert x &lt;= 10 by { myLemma(x); }
+assert x &lt;= 10 implies p(x) by { myLemma(x); }
+forall (x:int, y:int) x &lt; y implies x &lt;= y by { ... }
+let exists (x:int) 0 &lt;= x;
+let x := eax; // copy eax's current value into immutable x
+let x @= eax; // let x be an alias for register eax
+ghost var x:uint32 := 33 + 44; // mutable x
 calc == { x; == x * 1; == { myLemma(x); } 1 * x; }
 reveal myOpaqueFunction;
 Increment(x);
-eax, (ghost var x:int), y := myProc(ebx, edx, z);
+eax, (let x:int), y := myProc(ebx, edx, z);
 x := 5;
 
-ghost var x:uint32 := 33 + 44; // mutable x
-let x := eax; // copy eax's current value into immutable x
-let x @= eax; // let x be an alias for register eax
-forall x:int, y:int :| x &lt; y :: x &lt;= y { ... }
-exists x:int :| 0 &lt;= x;
 while (eax != 0) invariant true; decreases *; { ... }
 if (eax != 5) { Increment(edx) } else { eax := 0; }
 
@@ -432,6 +434,8 @@ if (eax != 5) { Increment(edx) } else { eax := 0; }
 
 
 
+(let x:int), (let y) := myProc();
+let (x:int, y) := myProc(); // same as previous line
 
 
 
@@ -484,7 +488,7 @@ tuple(5, 15, true) // Dafny, F*
 |   &lt;==&gt; has lowest precedence
 
 let x := 3 in x + 1
-forall x, y {foo(x, y)} :: foo(x, y) || x == y
+forall(x:int, y:int){foo(x, y)} foo(x, y) || x == y
 
 
 
@@ -558,13 +562,13 @@ type byte : Type(0) := int_range(0, 0xff);
       <tr><td>Grammar (attributes)</td></tr>
       <tr>
       <td>
-      <pre>
+        <pre>
 INCLUDE ::= include ATTRIBUTES "STRING"
 
 DECL ::=
   ...
-  | var ATTRIBUTES x : TYPE ;
-  | procedure ATTRIBUTES p ( ... ) ...
+  | var x : TYPE ATTRIBUTES ;
+  | procedure p ( ... ) ATTRIBUTES ...
   ...
 
 ATTRIBUTES ::= ATTRIBUTE ... ATTRIBUTE
@@ -636,14 +640,14 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     <pre><code>
       procedure p(...) ...
       {
-        ...
-        while (eax != 10) ...
-        {
-          ghost var savedThis := this;
           ...
-          assert eax == old[savedThis](eax) + 1;
-        }
-        ...
+          while (eax != 10) ...
+          {
+              let savedThis := this;
+              ...
+              assert eax == old[savedThis](eax) + 1;
+          }
+          ...
       }
     </code></pre>
 
@@ -689,7 +693,7 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
     with the keywords "out" and "inout":
 
     <pre><code>
-      procedure Move(out register dst:int, operand src:int)
+      procedure Move(out register dst:int, in operand src:int)
       procedure Increment(inout register dst:int)
     </code></pre>
 
@@ -716,19 +720,19 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
 
     <pre><code>
       procedure Add(inout register dst:int, operand src:int)
-        requires
-          dst + src &lt; 0x1_0000_0000;
-        ensures
-          dst = old(dst + src);
+          requires
+              dst + src &lt; 0x1_0000_0000;
+          ensures
+              dst = old(dst + src);
       { ... }
 
       procedure p2() ...
       {
-        Add(eax, ebx); // instantiate Add with destination eax and source ebx
-        Add(ebx, eax); // instantiate Add with destination ebx and source eax
-        Add(eax, 7);   // instantiate Add with destination eax and source 7
-        Add(eax, 2 + 2);   // instantiate Add with destination eax and source 4
-        assert eax == old(eax + ebx) + 11;
+          Add(eax, ebx); // instantiate Add with destination eax and source ebx
+          Add(ebx, eax); // instantiate Add with destination ebx and source eax
+          Add(eax, 7);   // instantiate Add with destination eax and source 7
+          Add(eax, 2 + 2);   // instantiate Add with destination eax and source 4
+          assert eax == old(eax + ebx) + 11;
       }
     </code></pre>
 

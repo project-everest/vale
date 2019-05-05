@@ -37,7 +37,7 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   let rec assign e =
     match e with
     | ELoc (_, e) -> assign e
-    | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost->
+    | EApply (e, _, es, t) when is_id e && is_proc env (id_of_exp e) NotGhost->
         let x = string_of_id (id_of_exp e) in
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
@@ -159,7 +159,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
     let lhss = List.map (fun xd -> match xd with (Reserved "s", None) -> (s0, None) | _ -> xd) lhss in
     match e with
     | ELoc (loc, e) -> try assign lhss e with err -> raise (LocErr (loc, err))
-    | EApply (e, _, es, t) when is_proc env (id_of_exp e) NotGhost ->
+    | EApply (e, _, es, t) when is_id e && is_proc env (id_of_exp e) NotGhost ->
         let x = id_of_exp e in
         let p = Map.find x env.procs in
         let pargs = List.filter (fun (_, _, storage, _, _) -> match storage with XAlias _ -> false | _ -> true) p.pargs in
@@ -178,7 +178,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e], _) -> sub_s0 e | _ -> sub_s0 e) es in
         let e = EApply (e, ts, es, t)
         (Ghost, false, [SAssign (lhss, e)])
-    | _ -> (Ghost, false, [SAssign (lhss, sub_s0 e)])
+    | _ -> (Ghost, false, [SAssign (lhss, map_exp stateToOp (sub_s0 e))])
     in
   match s with
   | SLoc (loc, s) ->
@@ -520,7 +520,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     if benv.is_instruction then
       // Body of instruction lemma
       let dummy = Reserved "dummy" in
-      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [evar b0; evar s0]) in
+      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [attrs_get_exp (Id "instruction") p.pattrs; evar s0]) in
       let senv = { env = env; benv = benv; b1 = dummy; bM = dummy; code = evar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
       let ss = build_lemma_ghost_stmts senv stmts in
       [sReveal; sOldS] @ sBlock @ listIf total [sState] @ ss

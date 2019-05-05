@@ -29,7 +29,8 @@ let double (x:int):int = x + x
 
 function double (x:int):int extern;
 
-procedure{:typecheck} Calls()
+procedure Calls()
+    {:typecheck}
     requires
         rax < 7;
     modifies
@@ -47,7 +48,7 @@ procedure{:typecheck} Calls()
         Add64Wrap(rax, rbx);
         if (rbx == 3)
         {
-            ghost var dummy := 2;
+            let dummy := 2;
             Add64Wrap(rax, rbx);
             z := z + 2;
         }
@@ -80,23 +81,25 @@ let va_contains_FStar__Map__t = Map.contains
 
 procedure SeqIndex(ghost s:seq(int), ghost i:int, ghost v:int) returns(ghost r:int) 
 {
-  ghost var ns := if i > 0  && i < length(s) then s[i:=v] else s;
+  let ns := if i > 0  && i < length(s) then s[i:=v] else s;
   r := if i > 0  && i < length(s) then ns[i] else 0;
   assert r == v || r == 0;
 }
 
 procedure MapIndex(ghost m:FStar.Map.t(int, int), ghost i:int, ghost v:int) returns(ghost r:int) 
 {
-  ghost var nm := m[i:=v];
+  let nm := m[i:=v];
   r := nm[i];
   assert nm?[i] && r == v;
 }
 
-procedure{:typecheck} Test() returns(ghost g:int)
+procedure Test() returns(ghost g:int)
+  {:typecheck}
 {
-  let f:fun(int) -> int := lambda x:int :: x + 1;
+  let f:fun(int) -> int := fun(x:int) x + 1;
   let a:int := f(10);
   assert a == 11;
   g := f(11);
   assert g == 12;
+  assert (fun(x:int) x + 1)(12) == 13;
 }

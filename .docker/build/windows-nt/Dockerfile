@@ -7,12 +7,13 @@
 # replace latest with the commit id from github using 12 characters.
 # Latest can only be used with branch master,
 # for any other branch please use the specific commit id on the config file.
+ARG DOCKERHUBPROJECT
 ARG COMMITID
-FROM fstar-windows-nt:${COMMITID}
+FROM ${DOCKERHUBPROJECT}fstar-windows-nt:${COMMITID}
 
 ARG BUILDLOGFILE
 ARG MAXTHREADS
-ARG TARGET
+ARG BUILDTARGET
 ARG BRANCHNAME
 
 # Add ssh key
@@ -49,7 +50,7 @@ RUN Invoke-BashCmd rm vale/commitinfofilename.json
 COPY build.sh build.sh
 COPY build_helper.sh build_helper.sh
 
-RUN Invoke-BashCmd ./build_helper.sh $Env:TARGET $Env:BUILDLOGFILE $Env:MAXTHREADS $Env:BRANCHNAME '||' true
+RUN Invoke-BashCmd ./build_helper.sh $Env:BUILDTARGET $Env:BUILDLOGFILE $Env:MAXTHREADS $Env:BRANCHNAME '||' true
 
 # Remove ssh key.
 RUN Invoke-BashCmd rm .ssh/id_rsa

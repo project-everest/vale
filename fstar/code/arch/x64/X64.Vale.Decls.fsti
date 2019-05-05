@@ -75,6 +75,7 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
 [@va_qattr] unfold let va_const_cmp (n:int) : va_cmp = OConst n
 [@va_qattr] unfold let va_coerce_reg_opr64_to_cmp (r:va_operand_reg_opr64) : va_cmp = r
+[@va_qattr] unfold let va_coerce_reg_opr64_to_operand (o:va_operand_reg_opr64) : operand = o
 [@va_qattr] unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
 [@va_qattr] unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
 [@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
@@ -92,18 +93,18 @@ val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
 
 [@va_qattr]
-unfold let va_opr_code_Mem (o:operand) (offset:int) : operand =
+unfold let va_opr_code_Mem64 (o:operand) (offset:int) : operand =
   match o with
   | OConst n -> OConst (n + offset)
   | OReg r -> OMem (MReg r offset)
   | _ -> OConst 42
 
-let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) : Lemma
+let va_opr_lemma_Mem64 (s:va_state) (base:operand) (offset:int) : Lemma
   (requires
     OReg? base /\
-    valid_mem64 (eval_operand base s + offset ) s.mem
+    valid_mem64 (eval_operand base s + offset) s.mem
   )
-  (ensures valid_operand (va_opr_code_Mem base offset) s)
+  (ensures valid_operand (va_opr_code_Mem64 base offset) s)
   =
   ()
 
@@ -119,7 +120,14 @@ let va_opr_lemma_Mem (s:va_state) (base:operand) (offset:int) : Lemma
 
 (* Predicates *)
 [@va_qattr] unfold let va_is_src_opr64 (o:operand) (s:va_state) = valid_operand o s
-[@va_qattr] let va_is_dst_opr64 (o:operand) (s:va_state) = match o with OReg Rsp -> false | OReg _ -> true | _ -> false
+
+[@va_qattr] let va_is_dst_opr64 (o:operand) (s:va_state) =
+  match o with
+  | OReg Rsp -> False
+  | OReg _ -> True
+  | OMem _ -> valid_operand o s
+  | OConst _ -> False
+
 [@va_qattr] unfold let va_is_dst_dst_opr64 (o:va_dst_operand) (s:va_state) = va_is_dst_opr64 o s
 [@va_qattr] unfold let va_is_src_reg (r:reg) (s:va_state) = True
 [@va_qattr] unfold let va_is_dst_reg (r:reg) (s:va_state) = True
@@ -156,7 +164,7 @@ let va_update_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
   match o with
   | OConst n -> sK
   | OReg r -> va_update_reg r sM sK
-  | OMem m -> va_update_mem sM sK
+  | OMem m -> update_operand o (eval_operand o sM) sK
 
 [@va_qattr] unfold
 let va_update_dst_operand (o:operand) (sM:va_state) (sK:va_state) : va_state =
@@ -193,25 +201,18 @@ let va_upd_operand_xmm (x:xmm) (v:quad32) (s:state) : state =
 
 [@va_qattr]
 let va_upd_operand_dst_opr64 (o:operand) (v:nat64) (s:state) : state =
-  match o with
-  | OConst n -> s
-  | OReg r -> update_reg r v s
-  | OMem m -> s // TODO: support destination memory operands
+  update_operand o v s
 
 [@va_qattr]
 let va_upd_operand_reg_opr64 (o:operand) (v:nat64) (s:state) : state =
-  match o with
-  | OConst n -> s
-  | OReg r -> update_reg r v s
-  | OMem m -> s
+  update_operand o v s
 
-let va_lemma_upd_update (sM:state) : Lemma
+val va_lemma_upd_update (sM:state) : Lemma
   (
     (forall (sK:state) (o:operand).{:pattern (va_update_operand_dst_opr64 o sM sK)} va_is_dst_dst_opr64 o sK ==> va_update_operand_dst_opr64 o sM sK == va_upd_operand_dst_opr64 o (eval_operand o sM) sK) /\
     (forall (sK:state) (o:operand).{:pattern (va_update_operand_reg_opr64 o sM sK)} va_is_dst_reg_opr64 o sK ==> va_update_operand_reg_opr64 o sM sK == va_upd_operand_reg_opr64 o (eval_operand o sM) sK) /\
     (forall (sK:state) (x:xmm).{:pattern (va_update_operand_xmm x sM sK)} va_update_operand_xmm x sM sK == va_upd_operand_xmm x (eval_xmm x sM) sK)
   )
-  = ()
 
 (** Constructors for va_codes *)
 [@va_qattr] unfold let va_CNil () : va_codes = []

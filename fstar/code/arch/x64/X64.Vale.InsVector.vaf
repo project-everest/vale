@@ -48,22 +48,22 @@ module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 #endverbatim
 
-var{:state xmm(0)} xmm0:quad32;
-var{:state xmm(1)} xmm1:quad32;
-var{:state xmm(2)} xmm2:quad32;
-var{:state xmm(3)} xmm3:quad32;
-var{:state xmm(4)} xmm4:quad32;
-var{:state xmm(5)} xmm5:quad32;
-var{:state xmm(6)} xmm6:quad32;
-var{:state xmm(7)} xmm7:quad32;
-var{:state xmm(8)} xmm8:quad32;
-var{:state xmm(9)} xmm9:quad32;
-var{:state xmm(10)} xmm10:quad32;
-var{:state xmm(11)} xmm11:quad32;
-var{:state xmm(12)} xmm12:quad32;
-var{:state xmm(13)} xmm13:quad32;
-var{:state xmm(14)} xmm14:quad32;
-var{:state xmm(15)} xmm15:quad32;
+var xmm0:quad32 {:state xmm(0)};
+var xmm1:quad32 {:state xmm(1)};
+var xmm2:quad32 {:state xmm(2)};
+var xmm3:quad32 {:state xmm(3)};
+var xmm4:quad32 {:state xmm(4)};
+var xmm5:quad32 {:state xmm(5)};
+var xmm6:quad32 {:state xmm(6)};
+var xmm7:quad32 {:state xmm(7)};
+var xmm8:quad32 {:state xmm(8)};
+var xmm9:quad32 {:state xmm(9)};
+var xmm10:quad32 {:state xmm(10)};
+var xmm11:quad32 {:state xmm(11)};
+var xmm12:quad32 {:state xmm(12)};
+var xmm13:quad32 {:state xmm(13)};
+var xmm14:quad32 {:state xmm(14)};
+var xmm15:quad32 {:state xmm(15)};
 
 operand_type xmm:quad32 :=
 | inout xmm0 | inout xmm1 | inout xmm2 | inout xmm3
@@ -72,7 +72,10 @@ operand_type xmm:quad32 :=
 | inout xmm12 | inout xmm13 | inout xmm14 | inout xmm15
 ;
 
-procedure{:public}{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly} Paddd(inout dst:xmm, src:xmm)
+procedure Paddd(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.Paddd(dst, src))}
+    {:quick exportOnly} 
     modifies efl;
     ensures
         dst == old(Mkfour(
@@ -83,30 +86,41 @@ procedure{:public}{:instruction Ins(S.Paddd(dst, src))}{:quick exportOnly} Paddd
 {
 }
 
-procedure{:public}{:instruction Ins(S.Pxor(dst, src))}{:quick exportOnly} Pxor(inout dst:xmm, src:xmm)
+procedure Pxor(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.Pxor(dst, src))}
+    {:quick exportOnly}
     ensures
         dst == old(quad32_xor(dst, src));
 {
 }
 
-procedure{:public}{:instruction Ins(S.Pslld(dst, amt))}{:quick exportOnly} Pslld(inout dst:xmm, inline amt:int)
+procedure Pslld(inout dst:xmm, inline amt:int)
+    {:public}
+    {:instruction Ins(S.Pslld(dst, amt))}
+    {:quick exportOnly}
     requires
         0 <= amt < 32;
     ensures
-        dst == four_map((lambda i:nat32 :: ishl32(i, amt)), old(dst));
+        dst == four_map((fun(i:nat32) ishl32(i, amt)), old(dst));
 {
 }
 
-procedure{:public}{:instruction Ins(S.Psrld(dst, amt))}{:quick exportOnly} Psrld(inout dst:xmm, inline amt:int)
+procedure Psrld(inout dst:xmm, inline amt:int)
+    {:public}
+    {:instruction Ins(S.Psrld(dst, amt))}
+    {:quick exportOnly}
     requires
         0 <= amt < 32;
     ensures
-        dst == four_map((lambda i:nat32 :: ishr32(i, amt)), old(dst));
+        dst == four_map((fun(i:nat32) ishr32(i, amt)), old(dst));
 {
 }
 
-procedure{:public}{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exportOnly}
-    Pshufd(inout dst:xmm, src:xmm, inline permutation:imm8)
+procedure Pshufd(inout dst:xmm, in src:xmm, inline permutation:imm8)
+    {:public}
+    {:instruction Ins(S.Pshufd(dst, src, permutation))}
+    {:quick exportOnly}
     ensures
         dst == old(Mkfour(
             select_word(src, byte_to_twobits(permutation).lo0),
@@ -116,8 +130,10 @@ procedure{:public}{:instruction Ins(S.Pshufd(dst, src, permutation))}{:quick exp
 {
 }
 
-procedure{:public}{:instruction Ins(S.Pcmpeqd(dst, src))}{:quick exportOnly}
-    Pcmpeqd(inout dst:xmm, src:xmm)
+procedure Pcmpeqd(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.Pcmpeqd(dst, src))}
+    {:quick exportOnly}
     ensures
         dst == old(Mkfour(
             if src.lo0 = dst.lo0 then 0xFFFFFFFF else 0,
@@ -127,8 +143,10 @@ procedure{:public}{:instruction Ins(S.Pcmpeqd(dst, src))}{:quick exportOnly}
 {
 }
 
-procedure{:public}{:instruction Ins(S.Pextrq(dst, src, index))}{:quick exportOnly}
-    Pextrq(out dst:dst_opr64, src:xmm, inline index:imm8)
+procedure Pextrq(out dst:dst_opr64, in src:xmm, inline index:imm8)
+    {:public}
+    {:instruction Ins(S.Pextrq(dst, src, index))}
+    {:quick exportOnly}
     requires
         index < 2;
     ensures
@@ -136,8 +154,10 @@ procedure{:public}{:instruction Ins(S.Pextrq(dst, src, index))}{:quick exportOnl
 {
 }
 
-procedure{:public}{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnly}
-    Pinsrd(inout dst:xmm, src:opr64, inline index:imm8)
+procedure Pinsrd(inout dst:xmm, in src:opr64, inline index:imm8)
+    {:public}
+    {:instruction Ins(S.Pinsrd(dst, src, index))}
+    {:quick exportOnly}
     requires
         src < pow2_32;
         index < 4;
@@ -146,8 +166,9 @@ procedure{:public}{:instruction Ins(S.Pinsrd(dst, src, index))}{:quick exportOnl
 {
 }
 
-procedure{:public}{:quick exportOnly}
-    PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, out tmp:reg_opr64)
+procedure PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, out tmp:reg_opr64)
+    {:public}
+    {:quick exportOnly}
     requires
         index < 4;
     ensures
@@ -157,8 +178,10 @@ procedure{:public}{:quick exportOnly}
     Pinsrd(dst, tmp, index);
 }
 
-procedure{:public}{:instruction Ins(S.Pinsrq(dst, src, index))}{:quick exportOnly}
-    Pinsrq(inout dst:xmm, src:opr64, inline index:imm8)
+procedure Pinsrq(inout dst:xmm, in src:opr64, inline index:imm8)
+    {:public}
+    {:instruction Ins(S.Pinsrq(dst, src, index))}
+    {:quick exportOnly}
     requires
         index < 2;
     ensures
@@ -166,8 +189,9 @@ procedure{:public}{:instruction Ins(S.Pinsrq(dst, src, index))}{:quick exportOnl
 {
 }
 
-procedure{:public}{:quick exportOnly}
-    PinsrqImm(inout dst:xmm, inline immediate:nat64, inline index:imm8, out tmp:reg_opr64)
+procedure PinsrqImm(inout dst:xmm, inline immediate:nat64, inline index:imm8, out tmp:reg_opr64)
+    {:public}
+    {:quick exportOnly}
     requires
         index < 2;
     ensures
@@ -177,7 +201,10 @@ procedure{:public}{:quick exportOnly}
     Pinsrq(dst, tmp, index);
 }
 
-procedure{:public}{:instruction Ins(S.VPSLLDQ(dst, src, 4))}{:quick exportOnly} VPSLLDQ4(inout dst:xmm, src:xmm)
+procedure VPSLLDQ4(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.VPSLLDQ(dst, src, 4))}
+    {:quick exportOnly}
     ensures
         dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
 {
