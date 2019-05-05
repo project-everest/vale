@@ -1,24 +1,28 @@
 include "common.vad"
 
-procedure{:instruction Ins(InsImm(x, y))} Imm(out x:reg, inline y:int)
+procedure Imm(out x:reg, inline y:int)
+    {:instruction Ins(InsImm(x, y))}
     ensures
         x == y;
 {
 }
 
-procedure{:instruction Ins(InsIncr(x))} Increment(inout x:mem_opr)
+procedure Increment(inout x:mem_opr)
+    {:instruction Ins(InsIncr(x))}
     ensures
         x == old(x) + 1;
 {
 }
 
-procedure{:instruction Ins(InsAdd(x, y))} Add(inout x:reg, y:opr)
+procedure Add(inout x:reg, in y:opr)
+    {:instruction Ins(InsAdd(x, y))}
     ensures
         x == old(x + y);
 {
 }
 
-procedure{:operand} Mem_in(base:reg, inline offset:int) returns(o:mem_opr)
+procedure Mem_in(in base:reg, inline offset:int) returns(o:mem_opr)
+    {:operand}
     reads
         mem;
 /* not yet needed (currently handled by va_is_src_mem_operand_int, etc.):
@@ -29,7 +33,8 @@ procedure{:operand} Mem_in(base:reg, inline offset:int) returns(o:mem_opr)
 */
     extern;
 
-procedure{:operand} Mem_out(base:reg, inline offset:int, o:mem_opr)
+procedure Mem_out(in base:reg, inline offset:int, in o:mem_opr)
+    {:operand}
     modifies
         mem;
 /* not yet needed (currently handled by va_is_dst_mem_operand_int, etc.):
@@ -45,7 +50,7 @@ function method va_opr_code_Mem(base:va_register, offset:int):va_mem_operand { O
 function method va_opr_lemma_Mem(s:va_state, base:va_register, offset:int):va_mem_operand { OMem(base, offset) }
 #endverbatim
 
-procedure AddReg(inout x:reg, y:reg)
+procedure AddReg(inout x:reg, in y:reg)
     ensures
         x == old(x + y);
 {
@@ -69,8 +74,8 @@ procedure p()
     Increment(Mem(eax, 10));
 }
 
-procedure{:frame false} pp()
-    // {:frame false} ==> no reads/modifies needed
+procedure pp()
+    {:frame false} // ==> no reads/modifies needed
     requires
         ok;
         eax >= 0;
@@ -86,7 +91,7 @@ type pos = i:nat | i > 0 witness 1
 function Double(x:int):int extern;
 function le(x:int, y:int):bool extern;
 
-procedure{:typecheck} Calls()
+procedure Calls()
     modifies
         eax; ebx;
     ensures

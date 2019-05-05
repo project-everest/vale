@@ -43,7 +43,8 @@ function MyModule.MyMethod(b:bool):int extern;
 operand_type reg_MyModule.MyType:int @ register := reg;
 operand_type opr_MyRecord:MyRecord;
 
-procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
+procedure Increment(inout x:reg)
+    {:instruction Ins(InsIncr(OOpr(OReg(x))))}
     ensures
         x == old(x) + 1;
 {
@@ -76,7 +77,7 @@ procedure Q(
     ghost g:int,
     ghost eleven:MyModule.ParamType(int),
     ghost twelve:MyModule.ParamType(MyModule.MyType),
-    dt:opr_MyRecord)
+    in dt:opr_MyRecord)
     requires
         F(eax + 3);
         g >= 0;
@@ -98,7 +99,7 @@ procedure Q(
     assert a3 == a4 + 2;
     ghost if (a3 < 10)
     {
-      a3 := a3 + 1;
+        a3 := a3 + 1;
     }
     ghost var u := MyModule.MyFunction(iii);
     ghost var y := MyModule.MyMethod(false);

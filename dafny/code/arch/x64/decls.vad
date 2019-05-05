@@ -10,11 +10,11 @@ import opened dafny_wrappers
 import opened operations
 #endverbatim
 
-type{:primitive} state:Type(0) extern;
+type state:Type(0) {:primitive} extern;
 type nat:Type(0) := int_range(0, _);
 type uint32:Type(0) := int_range(0, 0xffff_ffff);
 type uint64:Type(0) := int_range(0, 0xffff_ffff_ffff_ffff);
-type{:primitive} seq(a:Type(0)):Type(0) extern;
+type seq(a:Type(0)):Type(0) {:primitive} extern;
 type map(a:Type(0), b:Type(0)):Type(0) extern;
 type Quadword:Type(0) extern;
 type memEntry:Type(0) extern;
@@ -60,50 +60,50 @@ function shr32(x:uint32, amount:uint32):uint32 extern; // TODO: requires clause
 function QuadwordXor(a:Quadword, b:Quadword):Quadword extern;
 function Cf(flags:uint32):bool extern;
 
-var{:state ok()} ok:bool;
+var ok:bool {:state ok()};
 
-var{:state reg32(X86Eax)} eax:uint32;
-var{:state reg32(X86Ebx)} ebx:uint32;
-var{:state reg32(X86Ecx)} ecx:uint32;
-var{:state reg32(X86Edx)} edx:uint32;
-var{:state reg32(X86Esi)} esi:uint32;
-var{:state reg32(X86Edi)} edi:uint32;
-var{:state reg32(X86Ebp)} ebp:uint32;
-var{:state reg32(X86R8)}  r8d:uint32;
-var{:state reg32(X86R9)}  r9d:uint32;
-var{:state reg32(X86R10)} r10d:uint32;
-var{:state reg32(X86R11)} r11d:uint32;
-var{:state reg32(X86R12)} r12d:uint32;
-var{:state reg32(X86R13)} r13d:uint32;
-var{:state reg32(X86R14)} r14d:uint32;
-var{:state reg32(X86R15)} r15d:uint32;
+var  eax:uint32 {:state reg32(X86Eax)};
+var  ebx:uint32 {:state reg32(X86Ebx)};
+var  ecx:uint32 {:state reg32(X86Ecx)};
+var  edx:uint32 {:state reg32(X86Edx)};
+var  esi:uint32 {:state reg32(X86Esi)};
+var  edi:uint32 {:state reg32(X86Edi)};
+var  ebp:uint32 {:state reg32(X86Ebp)};
+var  r8d:uint32 {:state reg32(X86R8)};
+var  r9d:uint32 {:state reg32(X86R9)};
+var r10d:uint32 {:state reg32(X86R10)};
+var r11d:uint32 {:state reg32(X86R11)};
+var r12d:uint32 {:state reg32(X86R12)};
+var r13d:uint32 {:state reg32(X86R13)};
+var r14d:uint32 {:state reg32(X86R14)};
+var r15d:uint32 {:state reg32(X86R15)};
 
-var{:state reg64(X86Eax)} rax:uint64;
-var{:state reg64(X86Ebx)} rbx:uint64;
-var{:state reg64(X86Ecx)} rcx:uint64;
-var{:state reg64(X86Edx)} rdx:uint64;
-var{:state reg64(X86Esi)} rsi:uint64;
-var{:state reg64(X86Edi)} rdi:uint64;
-var{:state reg64(X86Ebp)} rbp:uint64;
-var{:state reg64(X86R8)}  r8:uint64;
-var{:state reg64(X86R9)}  r9:uint64;
-var{:state reg64(X86R10)} r10:uint64;
-var{:state reg64(X86R11)} r11:uint64;
-var{:state reg64(X86R12)} r12:uint64;
-var{:state reg64(X86R13)} r13:uint64;
-var{:state reg64(X86R14)} r14:uint64;
-var{:state reg64(X86R15)} r15:uint64;
+var rax:uint64 {:state reg64(X86Eax)};
+var rbx:uint64 {:state reg64(X86Ebx)};
+var rcx:uint64 {:state reg64(X86Ecx)};
+var rdx:uint64 {:state reg64(X86Edx)};
+var rsi:uint64 {:state reg64(X86Esi)};
+var rdi:uint64 {:state reg64(X86Edi)};
+var rbp:uint64 {:state reg64(X86Ebp)};
+var r8:uint64  {:state reg64(X86R8)} ;
+var r9:uint64  {:state reg64(X86R9)} ;
+var r10:uint64 {:state reg64(X86R10)};
+var r11:uint64 {:state reg64(X86R11)};
+var r12:uint64 {:state reg64(X86R12)};
+var r13:uint64 {:state reg64(X86R13)};
+var r14:uint64 {:state reg64(X86R14)};
+var r15:uint64 {:state reg64(X86R15)};
 
-var{:state Quadword(0)} xmm0:Quadword;
-var{:state Quadword(1)} xmm1:Quadword;
-var{:state Quadword(2)} xmm2:Quadword;
-var{:state Quadword(3)} xmm3:Quadword;
-var{:state Quadword(4)} xmm4:Quadword;
-var{:state Quadword(5)} xmm5:Quadword;
+var xmm0:Quadword {:state Quadword(0)};
+var xmm1:Quadword {:state Quadword(1)};
+var xmm2:Quadword {:state Quadword(2)};
+var xmm3:Quadword {:state Quadword(3)};
+var xmm4:Quadword {:state Quadword(4)};
+var xmm5:Quadword {:state Quadword(5)};
 
-var{:state flags()} efl:uint32;
-var{:state mem()}   mem:heap;
-var{:state stack()} stack:Stack;
+var efl:uint32 {:state flags()};
+var mem:heap {:state mem()};
+var stack:Stack {:state stack()};
 
 operand_type reg32:uint32 :=
 | inout eax | inout ebx | inout ecx | inout edx
@@ -142,8 +142,8 @@ ghost procedure lemma_lowerUpper64(ghost i:uint64) extern;
 ghost procedure lemma_BitwiseAdd32EquivalentToAddMod2To32(ghost x:uint32, ghost y:uint32) extern;
 ghost procedure lemma_BitwiseAdd64EquivalentToAddMod2To64(ghost x:uint64, ghost y:uint64) extern;
 
-procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
-          Load(out dst:opr32, src:opr64, inline offset:int)
+procedure Load(out dst:opr32, in src:opr64, inline offset:int)
+    {:instruction Ins(Mov32(dst, MakeHeapOp(src, offset)))}
     requires
         ValidSrcAddr(mem, src + offset, 32);
     reads
@@ -156,8 +156,8 @@ procedure{:instruction Ins(Mov32(dst, MakeHeapOp(src, offset))) }
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
-          Store(dst:opr64, src:opr32, inline offset:int)
+procedure Store(in dst:opr64, in src:opr32, inline offset:int)
+    {:instruction Ins(Mov32(MakeHeapOp(dst, offset), src))}
     requires/ensures
         ValidDstAddr(mem, dst + offset, 32);
     modifies
@@ -169,8 +169,8 @@ procedure{:instruction Ins(Mov32(MakeHeapOp(dst, offset), src)) }
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Mov32(dst, stack(slot))) }
-          LoadStack(out dst:opr32, inline slot:int)
+procedure LoadStack(out dst:opr32, inline slot:int)
+    {:instruction Ins(Mov32(dst, stack(slot)))}
     requires/ensures
         HasStackSlot(stack, slot);
     reads
@@ -182,8 +182,8 @@ procedure{:instruction Ins(Mov32(dst, stack(slot))) }
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Mov32(stack(slot), src)) }
-          StoreStack(inline slot:int, src:opr32)
+procedure StoreStack(inline slot:int, in src:opr32)
+    {:instruction Ins(Mov32(stack(slot), src))}
     requires/ensures
         HasStackSlot(stack, slot);
     modifies
@@ -196,8 +196,8 @@ procedure{:instruction Ins(Mov32(stack(slot), src)) }
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Mov64(dst, stack(slot))) }
-          LoadStack64(out dst:opr64, inline slot:int)
+procedure LoadStack64(out dst:opr64, inline slot:int)
+    {:instruction Ins(Mov64(dst, stack(slot)))}
     requires/ensures
         HasStackSlot(stack, slot);
         HasStackSlot(stack, slot + 1);
@@ -210,8 +210,8 @@ procedure{:instruction Ins(Mov64(dst, stack(slot))) }
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Mov64(stack(slot), src)) }
-          StoreStack64(inline slot:int, src:opr64)
+procedure StoreStack64(inline slot:int, in src:opr64)
+    {:instruction Ins(Mov64(stack(slot), src))}
     requires/ensures
         HasStackSlot(stack, slot);
         HasStackSlot(stack, slot + 1);
@@ -227,7 +227,8 @@ procedure{:instruction Ins(Mov64(stack(slot), src)) }
     lemma_lowerUpper64(src);
 }
 
-procedure{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
+procedure incr(inout dst:opr32)
+    {:instruction Ins(Add32(dst, OConst(1)))}
     requires
         0 <= dst <= 1000;
     modifies
@@ -239,7 +240,8 @@ procedure{:instruction Ins(Add32(dst, OConst(1)))} incr(inout dst:opr32)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
+procedure Add32(inout dst:opr32, in src:opr32)
+    {:instruction Ins(Add32(dst, src))}
     requires
         src + dst < 0x1_0000_0000;
     modifies
@@ -252,7 +254,8 @@ procedure{:instruction Ins(Add32(dst, src))} Add32(inout dst:opr32, src:opr32)
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
-procedure{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr32)
+procedure Add32Wrap(inout dst:opr32, in src:opr32)
+    {:instruction Ins(Add32(dst, src))}
     modifies
         efl;
     ensures
@@ -264,7 +267,8 @@ procedure{:instruction Ins(Add32(dst, src))} Add32Wrap(inout dst:opr32, src:opr3
     lemma_BitwiseAdd32EquivalentToAddMod2To32(old(dst), old(src));
 }
 
-procedure{:instruction Ins(Add64(dst, src))} Add64(inout dst:opr64, src:opr64)
+procedure Add64(inout dst:opr64, in src:opr64)
+    {:instruction Ins(Add64(dst, src))}
     requires
         src + dst < 0x1_0000_0000_0000_0000;
     modifies
@@ -277,7 +281,8 @@ procedure{:instruction Ins(Add64(dst, src))} Add64(inout dst:opr64, src:opr64)
     lemma_BitwiseAdd64EquivalentToAddMod2To64(old(dst), old(src));
 }
 
-procedure{:instruction Ins(Mov32(dst, src))} Mov32(out dst:opr32, src:opr32)
+procedure Mov32(out dst:opr32, in src:opr32)
+    {:instruction Ins(Mov32(dst, src))}
     ensures
         dst == old(src);
 {
@@ -285,7 +290,8 @@ procedure{:instruction Ins(Mov32(dst, src))} Mov32(out dst:opr32, src:opr32)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Mov64(dst, src))} Mov64(out dst:opr64, src:opr64)
+procedure Mov64(out dst:opr64, in src:opr64)
+    {:instruction Ins(Mov64(dst, src))}
     ensures
         dst == old(src);
 {
@@ -293,7 +299,8 @@ procedure{:instruction Ins(Mov64(dst, src))} Mov64(out dst:opr64, src:opr64)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
+procedure Xor32(inout dst:opr32, in src:opr32)
+    {:instruction Ins(Xor32(dst, src))}
     modifies efl;
     ensures
         dst == xor32(old(dst), old(src));
@@ -302,7 +309,8 @@ procedure{:instruction Ins(Xor32(dst, src))} Xor32(inout dst:opr32, src:opr32)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:opr64, src:opr64)
+procedure Xor64(inout dst:opr64, in src:opr64)
+    {:instruction Ins(Xor64(dst, src))}
     modifies efl;
     ensures
         dst == xor64(old(dst), old(src));
@@ -311,7 +319,8 @@ procedure{:instruction Ins(Xor64(dst, src))} Xor64(inout dst:opr64, src:opr64)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(And32(dst, src))} And32(inout dst:opr32, src:opr32)
+procedure And32(inout dst:opr32, in src:opr32)
+    {:instruction Ins(And32(dst, src))}
     modifies efl;
     ensures
         dst == and32(old(dst), old(src));
@@ -320,7 +329,8 @@ procedure{:instruction Ins(And32(dst, src))} And32(inout dst:opr32, src:opr32)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
+procedure Not32(inout dst:opr32)
+    {:instruction Ins(Not32(dst))}
     modifies efl;
     ensures
         dst == not32(old(dst));
@@ -329,7 +339,8 @@ procedure{:instruction Ins(Not32(dst))} Not32(inout dst:opr32)
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, inline amount:uint32)
+procedure Rol32(inout dst:opr32, inline amount:uint32)
+    {:instruction Ins(Rol32(dst, OConst(amount)))}
     requires
         0 <= amount < 32;
     modifies efl;
@@ -340,7 +351,8 @@ procedure{:instruction Ins(Rol32(dst, OConst(amount)))} Rol32(inout dst:opr32, i
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, inline amount:uint32)
+procedure Ror32(inout dst:opr32, inline amount:uint32)
+    {:instruction Ins(Ror32(dst, OConst(amount)))}
     requires
         0 <= amount < 32;
     modifies efl;
@@ -351,7 +363,8 @@ procedure{:instruction Ins(Ror32(dst, OConst(amount)))} Ror32(inout dst:opr32, i
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, inline amount:uint32)
+procedure Shl32(inout dst:opr32, inline amount:uint32)
+    {:instruction Ins(Shl32(dst, OConst(amount)))}
     requires
         0 <= amount < 32;
     modifies efl;
@@ -362,7 +375,8 @@ procedure{:instruction Ins(Shl32(dst, OConst(amount)))} Shl32(inout dst:opr32, i
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, inline amount:uint32)
+procedure Shr32(inout dst:opr32, inline amount:uint32)
+    {:instruction Ins(Shr32(dst, OConst(amount)))}
     requires
         0 <= amount < 32;
     modifies efl;
@@ -373,7 +387,8 @@ procedure{:instruction Ins(Shr32(dst, OConst(amount)))} Shr32(inout dst:opr32, i
     reveal x86_ValidState;
 }
 
-procedure{:instruction Ins(Pxor(dst, src))} Pxor(inout dst:opr_quad, src:opr_quad)
+procedure Pxor(inout dst:opr_quad, in src:opr_quad)
+    {:instruction Ins(Pxor(dst, src))}
     modifies efl;
     ensures
         dst == old(QuadwordXor(dst, src));

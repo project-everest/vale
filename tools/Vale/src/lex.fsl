@@ -98,7 +98,6 @@ and lextoken = parse
 | "//"[^'\n''\r']* { lextoken lexbuf }
 | "#line"[' ']+ { line_number lexbuf }
 | "/*" { comment lexbuf ; lextoken lexbuf }
-| "(*" { comment lexbuf ; lextoken lexbuf }
 | "#ifdef"[' ']+['A'-'Z''a'-'z''0'-'9''_''$''?']+
 {
   let s = lexeme lexbuf in

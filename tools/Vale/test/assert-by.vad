@@ -18,7 +18,8 @@ function G(i:int):bool extern;
 ghost procedure L(ghost i:int) extern;
 function OpaqueTruth(x:int):bool extern;
 
-procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
+procedure Increment(inout x:reg)
+    {:instruction Ins(InsIncr(OOpr(OReg(x))))}
     ensures
         x == old(x) + 1;
 {

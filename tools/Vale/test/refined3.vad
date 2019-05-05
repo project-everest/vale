@@ -1,11 +1,11 @@
-var{:state ok()} ok:bool;
-var{:state reg(X)} x:int;
-var{:state reg(Y)} y:int;
-var{:state reg(Z)} z:int;
-var{:state reg(W)} w:int;
+var ok:bool {:state ok()};
+var x:int {:state reg(X)};
+var y:int {:state reg(Y)};
+var z:int {:state reg(Z)};
+var w:int {:state reg(W)};
 
 type nat:Type(0) := int_range(0, _);
-type{:primitive} seq(a:Type(0)):Type(0) extern;
+type seq(a:Type(0)):Type(0) {:primitive} extern;
 type map(a:Type(0), b:Type(0)):Type(0) extern;
 type reg:Type(0) extern;
 const X:reg extern;
@@ -280,14 +280,16 @@ lemma va_lemma_whileFalse(b:obool, c:code, s0:va_state, sN:va_state) returns(s1:
 
 #endverbatim
 
-procedure{:instruction Ins(InsImm(dst, imm))} Imm(out dst:opr, inline imm:int)
+procedure Imm(out dst:opr, inline imm:int)
+    {:instruction Ins(InsImm(dst, imm))}
     ensures
         dst == imm;
 {
     reveal evalCodeOpaque;
 }
 
-procedure{:instruction Ins(InsAdd(dst, src))} Add(inout dst:opr, src:opr)
+procedure Add(inout dst:opr, in src:opr)
+    {:instruction Ins(InsAdd(dst, src))}
     ensures
         dst == old(dst) + old(src);
 {
@@ -445,7 +447,8 @@ procedure RotateBody(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout 
     reveal RotateInv;
 }
 
-procedure{:recursive} RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
+procedure RotateLoop(inline n:nat, inout a:opr, inout b:opr, inout c:opr, inout d:opr)
+    {:recursive}
     requires
         @a == RotateReg(16 - n);
         @b == RotateReg(17 - n);
@@ -540,7 +543,8 @@ procedure InlineIfInTheMiddle(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure{:recursive} Unroll(inline n:nat)
+procedure Unroll(inline n:nat)
+    {:recursive}
     requires/ensures
         x >= 0;
     ensures
@@ -558,7 +562,7 @@ procedure{:recursive} Unroll(inline n:nat)
 
 // --------------------------------------------------------------
 
-procedure GhostReturn(ghost g:int, inline n:bool, src:opr, ghost i:int) returns (ghost h:int)
+procedure GhostReturn(ghost g:int, inline n:bool, in src:opr, ghost i:int) returns (ghost h:int)
     requires
         g <= x;
         Inv(x, y, g, i);
@@ -579,7 +583,7 @@ procedure GhostReturn(ghost g:int, inline n:bool, src:opr, ghost i:int) returns 
     h := g + 1;
 }
 
-procedure GhostReturnCaller(ghost kg:int, source:opr)
+procedure GhostReturnCaller(ghost kg:int, in source:opr)
     requires/ensures
         kg <= x;
     requires
@@ -602,8 +606,7 @@ procedure GhostReturnCaller(ghost kg:int, source:opr)
 
 // --------------------------------------------------------------
 
-procedure GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
-      returns (ghost h:int)
+procedure GhostReturnY(ghost g:int, inline n:bool, in src:opr, ghost i:int) returns (ghost h:int)
     requires
         true;
     ensures
@@ -617,9 +620,10 @@ procedure GhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
     Add(x, z);
 }
 
-procedure GhostReturnCallerY(ghost kg:int, source:opr)
+procedure GhostReturnCallerY(ghost kg:int, in source:opr)
     requires
-         @source != X && @source != Z;
+         @source != X;
+         @source != Z;
     requires
         Easy(x, y, kg, 0);
     ensures
@@ -635,8 +639,7 @@ procedure GhostReturnCallerY(ghost kg:int, source:opr)
     kh := GhostReturnY(kg, true, source, ki);
 }
 
-procedure UGhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
-      returns (ghost h:int)
+procedure UGhostReturnY(ghost g:int, inline n:bool, in src:opr, ghost i:int) returns (ghost h:int)
     reads
         y;
     modifies
@@ -646,7 +649,7 @@ procedure UGhostReturnY(ghost g:int, inline n:bool, src:opr, ghost i:int)
     Add(x, z);
 }
 
-procedure UGhostReturnCallerY(ghost kg:int, source:opr)
+procedure UGhostReturnCallerY(ghost kg:int, in source:opr)
     requires
         @source != X && @source != Z;
         Easy(x, y, kg, 0);
@@ -663,13 +666,13 @@ procedure UGhostReturnCallerY(ghost kg:int, source:opr)
 
 // --------------------------------------------------------------
 
-procedure ProcA(src:opr)
+procedure ProcA(in src:opr)
     modifies x;
 {
 }
 
-procedure ProcB(source:opr)
-    requires  @source != X;
+procedure ProcB(in source:opr)
+    requires @source != X;
     modifies x;
 {
     ProcA(source);
