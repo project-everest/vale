@@ -28,20 +28,23 @@ module P = X64.Print_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
-procedure{:public}{:operand} Mem64_in(base:operand, inline offset:int) returns(o:operand)
+procedure Mem64_in(in base:operand, inline offset:int) returns(o:operand)
+    {:public}
+    {:operand}
     reads
         mem;
     extern;
 
-procedure{:public}{:operand} Mem64_out(base:operand, inline offset:int, o:operand)
+procedure Mem64_out(in base:operand, inline offset:int, in o:operand)
+    {:public}
+    {:operand}
     modifies
         mem;
     extern;
 
-procedure{:public}{:quick exportOnly} Load64(
-    out dst:dst_opr64,
-        src:reg_opr64,
-        inline offset:int)
+procedure Load64(out dst:dst_opr64, in src:reg_opr64, inline offset:int)
+    {:public}
+    {:quick exportOnly}
     reads
         mem;
     requires
@@ -52,10 +55,9 @@ procedure{:public}{:quick exportOnly} Load64(
     Mov64(dst, Mem64(src, offset));
 }
 
-procedure{:public}{:quick exportOnly} Store64(
-        dst:reg_opr64,
-        src:opr64,
-        inline offset:int)
+procedure Store64(in dst:reg_opr64, in src:opr64, inline offset:int)
+    {:public}
+    {:quick exportOnly}
     modifies
         mem;
     requires

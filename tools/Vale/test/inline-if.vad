@@ -1,6 +1,7 @@
 include "common.vad"
 
-procedure{:instruction Ins(InsIncr(OOpr(OReg(o))))} incr(inout o:reg)
+procedure incr(inout o:reg)
+    {:instruction Ins(InsIncr(OOpr(OReg(o))))}
 {
 }
 
@@ -15,7 +16,7 @@ procedure P(ghost g:int, inline k:int, inout r:reg)
         incr(r);
     }
     ghost if (10 <= g) {
-        ghost var h := g + 1;
+        let h := g + 1;
     }
 }
 

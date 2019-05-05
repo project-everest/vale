@@ -1224,7 +1224,7 @@ let main (argv:string array) =
           // REVIEW: why are there duplicates?
           duplicates := Set.add d.f_name (!duplicates);
           let unsupported msg =
-            printline (sprintf "const{:unsupported%s} %s:_ extern;" msg (string_of_vale_name d.f_name));
+            printline (sprintf "const %s:_ {:unsupported%s} extern;" (string_of_vale_name d.f_name) msg);
             printline ""
             in
           match (d.f_category, d.f_typ) with

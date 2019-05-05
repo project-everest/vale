@@ -13,12 +13,14 @@ import opened x64_decls
 import opened operations
 #endverbatim
 
-procedure{:operand} Mem_in(base:opr, inline offset:int) returns(o:mem)
+procedure Mem_in(in base:opr, inline offset:int) returns(o:mem)
+    {:operand}
     reads
         mem;
     extern;
 
-procedure{:instruction Ins(Add64(dst, src))} Add64Wrap(inout dst:opr64, src:mem64)
+procedure Add64Wrap(inout dst:opr64, in src:mem64)
+    {:instruction Ins(Add64(dst, src))}
     modifies
         efl;
     ensures
@@ -36,10 +38,8 @@ procedure{:instruction Ins(Add64(dst, src))} Add64Wrap(inout dst:opr64, src:mem6
 //    }
 }
 
-procedure{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset)))} Load64(
-    out dst:opr64,
-        src:opr64,
-        inline offset:int)
+procedure Load64(out dst:opr64, in src:opr64, inline offset:int)
+    {:instruction Ins(Mov64(dst, MakeHeapOp(src, offset)))}
     reads
         mem;
     requires
@@ -58,10 +58,8 @@ procedure{:instruction Ins(Mov64(dst, MakeHeapOp(src, offset)))} Load64(
 //    }
 }
 
-procedure{:instruction Ins(Mov64(MakeHeapOp(dst, offset), src))} Store64(
-    dst:opr64,
-    src:opr64,
-    inline offset:int)
+procedure Store64(in dst:opr64, in src:opr64, inline offset:int)
+    {:instruction Ins(Mov64(MakeHeapOp(dst, offset), src))}
     modifies
         mem;
     requires/ensures
@@ -71,11 +69,12 @@ procedure{:instruction Ins(Mov64(MakeHeapOp(dst, offset), src))} Store64(
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-//    ghost var v := old(src);
+//    let v := old(src);
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:opr64, src1:opr64, src2:opr64)
+procedure AddLea64(out dst:opr64, in src1:opr64, in src2:opr64)
+    {:instruction Ins(AddLea64(dst, src1, src2))}
     requires
         src1 + src2 < 0x1_0000_0000_0000_0000;
     ensures
@@ -86,7 +85,8 @@ procedure{:instruction Ins(AddLea64(dst, src1, src2))} AddLea64(out dst:opr64, s
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:opr64, src:opr64)
+procedure Sub64(inout dst:opr64, in src:opr64)
+    {:instruction Ins(Sub64(dst, src))}
     requires
         0 <= dst - src;
     modifies
@@ -99,7 +99,8 @@ procedure{:instruction Ins(Sub64(dst, src))} Sub64(inout dst:opr64, src:opr64)
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:opr64, src:opr64)
+procedure Sub64Wrap(inout dst:opr64, in src:opr64)
+    {:instruction Ins(Sub64(dst, src))}
     modifies
         efl;
     ensures
@@ -111,7 +112,8 @@ procedure{:instruction Ins(Sub64(dst, src))} Sub64Wrap(inout dst:opr64, src:opr6
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:opr64, src:mem64)
+procedure Adc64Wrap(inout dst:opr64, in src:mem64)
+    {:instruction Ins(AddCarry64(dst, src))}
     modifies
         efl;
     ensures
@@ -126,7 +128,8 @@ procedure{:instruction Ins(AddCarry64(dst, src))} Adc64Wrap(inout dst:opr64, src
     lemma_BitwiseAdd64EquivalentToAddMod2To64(old(dst), old(src));
 }
 
-procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:opr64, src:opr64)
+procedure IMul64Wrap(inout dst:opr64, in src:opr64)
+    {:instruction Ins(IMul64(dst, src))}
     modifies
         efl;
     ensures
@@ -139,7 +142,8 @@ procedure{:instruction Ins(IMul64(dst, src))} IMul64Wrap(inout dst:opr64, src:op
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Mul64(src))} Mul64Wrap(src:opr64)
+procedure Mul64Wrap(in src:opr64)
+    {:instruction Ins(Mul64(src))}
     modifies
         efl;
         rax;
@@ -155,7 +159,8 @@ procedure{:instruction Ins(Mul64(src))} Mul64Wrap(src:opr64)
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(And64(dst, src))} And64(inout dst:opr64, src:opr64)
+procedure And64(inout dst:opr64, in src:opr64)
+    {:instruction Ins(And64(dst, src))}
     modifies
         efl;
     ensures
@@ -166,7 +171,8 @@ procedure{:instruction Ins(And64(dst, src))} And64(inout dst:opr64, src:opr64)
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:opr64, src:shift64)
+procedure Shl64(inout dst:opr64, in src:shift64)
+    {:instruction Ins(Shl64(dst, src))}
     modifies
         efl;
     requires
@@ -179,7 +185,8 @@ procedure{:instruction Ins(Shl64(dst, src))} Shl64(inout dst:opr64, src:shift64)
 //    this := MaybeUpdateOk(old(this), this);
 }
 
-procedure{:instruction Ins(Shr64(dst, src))} Shr64(inout dst:opr64, src:shift64)
+procedure Shr64(inout dst:opr64, in src:shift64)
+    {:instruction Ins(Shr64(dst, src))}
     modifies
         efl;
     requires

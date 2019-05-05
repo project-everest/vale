@@ -8,15 +8,16 @@ import opened x64decls_temp = x64_decls
 import opened x64decls64_temp = x64_decls64
 #endverbatim
 
-procedure{:timeLimitMultiplier 2} Copy64()
+procedure Copy64()
+    {:timeLimitMultiplier 2}
     requires/ensures
         rsi % 8 == 0;
         rdi % 8 == 0;
         rsi + 32 <= rdi || rdi + 32 <= rsi;
-        forall i {mem?[i]}{ValidSrcAddr(mem, i, 64)} :: rsi <= i < rsi + 32 && i % 8 == 0 ==> ValidSrcAddr(mem, i, 64);
-        forall i {mem?[i]}{ValidDstAddr(mem, i, 64)} :: rdi <= i < rdi + 32 && i % 8 == 0 ==> ValidDstAddr(mem, i, 64);
+        forall(i:int){mem?[i]}{ValidSrcAddr(mem, i, 64)} rsi <= i < rsi + 32 && i % 8 == 0 ==> ValidSrcAddr(mem, i, 64);
+        forall(i:int){mem?[i]}{ValidDstAddr(mem, i, 64)} rdi <= i < rdi + 32 && i % 8 == 0 ==> ValidDstAddr(mem, i, 64);
     ensures
-        forall i :: 0 <= i < 32 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
+        forall(i:int) 0 <= i < 32 && i % 8 == 0 ==> mem[rdi + i] == mem[rsi + i];
     reads
         rsi; rdi;
     modifies

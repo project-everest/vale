@@ -1831,6 +1831,16 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
+  let is_proc_call (e:exp):bool =
+    match skip_loc e with
+    | EApply (e, _, _, _) when is_id e ->
+      (
+        match lookup_fun_or_proc env (id_of_exp e) with
+        | FoundProc p -> true
+        | _ -> false
+      )
+    | _ -> false
+    in
   match s with
   | SLoc (loc, s) -> try SLoc (loc, tc_stmt env s) with err -> locErr loc err
   | SLabel x -> err "labels are not supported"
@@ -1842,6 +1852,10 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
     let contents = tc_calc_contents env contents in 
     let (_, e) = tc_exp env e None in  
     SCalc (op, contents, e)
+  | SVar (x, tOpt, Immutable, XGhost, [], Some e) when is_proc_call e ->
+      tc_stmt env (SAssign ([(x, Some (tOpt, Ghost))], e))
+  | SVar (x, tOpt, Mutable, XGhost, a, Some e) when is_proc_call e ->
+      err "cannot assign procedure return value directly to new mutable ghost variable; use 'let' instead of 'ghost var' to assign to immutable variable or declare 'ghost var' in a separate statement before the call"
   | SVar (x, tOpt, m, g, a, eOpt) ->
     (
       (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());
