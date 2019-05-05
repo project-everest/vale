@@ -598,7 +598,7 @@ procedure GhostReturnCaller(ghost kg:int, in source:opr)
 {
     ghost var ki:int := 0;
     ghost var kh:int := 0;
-    ghost var n:int := 17;
+    let n:int := 17;
     kh := GhostReturn(kg, true, source, ki);
     assert R(kh, kg);
     ki := ki + 1;

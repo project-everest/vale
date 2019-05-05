@@ -69,7 +69,7 @@ procedure Store64(in dst:opr64, in src:opr64, inline offset:int)
 {
     reveal evalCodeOpaque;
     reveal x86_ValidState;
-//    ghost var v := old(src);
+//    let v := old(src);
 //    this := MaybeUpdateOk(old(this), this);
 }
 

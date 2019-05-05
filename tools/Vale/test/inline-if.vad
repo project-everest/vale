@@ -16,7 +16,7 @@ procedure P(ghost g:int, inline k:int, inout r:reg)
         incr(r);
     }
     ghost if (10 <= g) {
-        ghost var h := g + 1;
+        let h := g + 1;
     }
 }
 

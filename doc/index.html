@@ -268,10 +268,12 @@ CALC_HINTS ::= CALC_HINT ... CALC_HINT
 CALC_HINT ::= { STMTS }
 CALC_OP ::= &lt; | &gt; | &lt;= | &gt;= | == | &amp;&amp; | || | &lt;== | ==&gt; | &lt;==&gt;
 
-DESTINATIONS := DESTINATION <i>[</i> , ... , DESTINATION <i>]</i>
+DESTINATIONS ::=
+  | DESTINATION <i>[</i> , ... , DESTINATION <i>]</i>
+  | let ( FORMAL , ... , FORMAL )
 DESTINATION ::=
   | x
-  | ( ghost var x <i>[</i>: TYPE<i>]</i> )
+  | ( let x <i>[</i>: TYPE<i>]</i> )
 
 INVARIANTS ::= INVARIANT ... INVARIANT
 INVARIANT ::= invariant EXP ; ... EXP ;
@@ -418,7 +420,7 @@ ghost var x:uint32 := 33 + 44; // mutable x
 calc == { x; == x * 1; == { myLemma(x); } 1 * x; }
 reveal myOpaqueFunction;
 Increment(x);
-eax, (ghost var x:int), y := myProc(ebx, edx, z);
+eax, (let x:int), y := myProc(ebx, edx, z);
 x := 5;
 
 while (eax != 0) invariant true; decreases *; { ... }
@@ -432,6 +434,8 @@ if (eax != 5) { Increment(edx) } else { eax := 0; }
 
 
 
+(let x:int), (let y) := myProc();
+let (x:int, y) := myProc(); // same as previous line
 
 
 
@@ -639,7 +643,7 @@ ATTRIBUTE ::= {: x EXP , ... , EXP }
           ...
           while (eax != 10) ...
           {
-              ghost var savedThis := this;
+              let savedThis := this;
               ...
               assert eax == old[savedThis](eax) + 1;
           }

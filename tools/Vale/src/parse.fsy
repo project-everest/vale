@@ -256,22 +256,20 @@ Attrs
 GhostOpt: { NotGhost } | GHOST { Ghost }
 StmtModifier: { SmPlain } | GHOST { SmGhost } | INLINE { SmInline }
 
+/* TODO: remove this
 ExpCall
   : { fun e -> e }
   | GHOST { fun e -> EOp (Uop (UCall CallGhost), [e], None) }
   | LEMMA { fun e -> EOp (Uop (UCall CallLemma), [e], None) }
   | INLINE { fun e -> EOp (Uop (UCall CallInline), [e], None) }
   | CALL { fun e -> EOp (Uop (UCall CallOutline), [e], None) }
+*/
 
-Var
-  : VAR { ($1, NotGhost) }
-  | GHOST VAR { ($1, Ghost) }
 VarAttrs
-  : VAR Attrs { let (s, a) = storageAttrs $2 in ($1, s, a) }
-  | GHOST VAR Attrs { ($1, XGhost, $3) }
+  : GHOST VAR Attrs { ($1, XGhost, $3) }
 VarInit
   : { None }
-  | COLONEQ ExpCall Exp { Some ($2 $3) }
+  | COLONEQ Exp { Some $2 }
 VarType
   : { None }
   | COLON Type { Some $2 }
@@ -280,7 +278,7 @@ Lhs
 // TODO:  : Exp1 { ($1, None) }
   : AnyId { ($1, None) }
   | THIS { (Reserved "this", None) }
-  | LPAREN Var AnyId VarType RPAREN { let (_, g) = $2 in ($3, Some ($4, g)) } // REVIEW: what about "let" here?
+  | LPAREN LET AnyId VarType RPAREN { ($3, Some ($4, Ghost)) }
 Lhss1
   : Lhs { [$1] }
   | Lhs COMMA Lhss1 { $1::$3 }
@@ -291,10 +289,10 @@ Decreases
   | DECREASES Exps1 SEMI { ($1, $2) }
 
 ExpAssign
-  : Lhss1 COLONEQ ExpCall Exp
+  : Lhss1 COLONEQ Exp
     {
       let (loc, (_, s)) = $2 in
-      stmtAt loc (SAssign ($1, $3 $4))
+      stmtAt loc (SAssign ($1, $3))
     }
 
 Stmt
@@ -337,6 +335,11 @@ Stmt
   | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
   | LET Formal COLONEQ Exp SEMI { let (x, t) = $2 in stmtAt $1 (SVar (x, t, Immutable, XGhost, [], Some $4)) }
   | LET AnyId ATEQ AnyId SEMI { stmtAt $1 (SAlias ($2, $4)) }
+  | LET LPAREN Formals RPAREN COLONEQ Exp SEMI
+    {
+      let lhss = List.map (fun (x, t) -> (x, Some (t, Ghost))) $3 in
+      stmtAt $1 (SAssign (lhss, $6))
+    }
   | ExpAssign SEMI { $1 }
   | Exp1 SEMI { stmtAt (one_loc_of_exp $2 $1) (SAssign ([], $1)) }
 IfStmt

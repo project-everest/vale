@@ -104,10 +104,10 @@ const False:prop extern;
 
 procedure Calls(in x:reg, in y:reg)
 {
-    ghost var z := 0 < x \/ y > 0;
-    ghost var t := 0 < x /\ y > 0;
-    ghost var a := 1 +/**/3; // make sure that comments are parsed correctly
-    ghost var b := 1 +// make sure that comments are parsed correct
+    let z := 0 < x \/ y > 0;
+    let t := 0 < x /\ y > 0;
+    let a := 1 +/**/3; // make sure that comments are parsed correctly
+    let b := 1 +// make sure that comments are parsed correct
         3;
     assert (False ==> True);
     assert (True <== False);

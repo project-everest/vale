@@ -89,20 +89,20 @@ procedure Q(
         eax; ebx;
 {
     P(ebx, 10, 100, eleven, twelve);
-    ghost var a1 := g + 1;
-    ghost var a2 := eax;
+    let a1 := g + 1;
+    let a2 := eax;
     P(ebx, 20, a1, eleven, twelve);
     assert ebx == old(ebx) + 2;
     ghost var a3 := eax;
-    ghost var a4 := old(eax);
+    let a4 := old(eax);
     assert a3 == a2 + 1;
     assert a3 == a4 + 2;
     ghost if (a3 < 10)
     {
         a3 := a3 + 1;
     }
-    ghost var u := MyModule.MyFunction(iii);
-    ghost var y := MyModule.MyMethod(false);
+    let u := MyModule.MyFunction(iii);
+    let y := MyModule.MyMethod(false);
     P(ebx, 30, a1 + a1, eleven, twelve);
     L(eax);
 }
