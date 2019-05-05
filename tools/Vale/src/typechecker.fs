@@ -328,8 +328,8 @@ let rec normalize_type (env:env) (t:typ):typ =
   | TVar _ -> t
   | TBool _ -> t
   | TInt _ -> t
-  | TTuple ts -> t
-  | TFun (ts, t) -> t
+  | TTuple _ -> t
+  | TFun (_, _) -> t
   | TDependent x ->
       let (_, x) = lookup_name env x true in
       TDependent x
@@ -1113,6 +1113,14 @@ let insert_cast (e:exp) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
   ECast (e, et)
 
+let lookup_id_or_fun (env:env) (u:unifier) (x:id):(typ * id_info option) =
+  match lookup_name env x true with
+  | (Some (Func_decl f), _) ->
+      let fi = compute_fun_instance env u f None in
+      let t = TFun (fi.f_args, fi.f_ret) in
+      (t, None)
+  | _ -> lookup_id env x
+
 let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
   let coerce = Option.map (fun (t, et) -> (subst_typ s t, subst_typ s et)) coerce in
   let e =
@@ -1302,7 +1310,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         (t, (AE_Loc (loc, ae), t, None))
       with err -> locErr loc err
   | EVar (x, _) ->
-      let (t, info) = lookup_id env x in
+      let (t, info) = lookup_id_or_fun env u x in
       let () =
         match (env.inline_only, info) with
         | (false, _) -> ()
@@ -1826,8 +1834,10 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
   u_unify u None;
   let es = List.map (subst_exp env u.u_substs) aes in
   let prets = List.map (fun (_, t, _, _, _) -> t) p.prets in
-  let tRet = match prets with | [] -> None | [t] -> Some t | _  -> Some (TTuple prets) in
-  SAssign (xs, EApply (evar p.pname, Some pi.p_targs, es, tRet))
+  let subt = subst_typ u.u_substs in
+  let tRet = match prets with | [] -> None | [t] -> Some (subt t) | _  -> Some (subt (TTuple prets)) in
+  let targs = List.map subt pi.p_targs in
+  SAssign (xs, EApply (evar p.pname, Some targs, es, tRet))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
