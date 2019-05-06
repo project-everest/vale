@@ -68,6 +68,9 @@ val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 unfold let va_hd = Cons?.hd
 unfold let va_tl = Cons?.tl
 
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
+
 let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
   b0 = c
 

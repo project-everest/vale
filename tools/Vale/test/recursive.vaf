@@ -33,6 +33,10 @@ let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfEls
 let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
 unfold let va_tl = Cons?.tl
 unfold let va_hd = Cons?.hd
+
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
+
 let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
 let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
 let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c

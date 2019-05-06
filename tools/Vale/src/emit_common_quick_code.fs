@@ -139,12 +139,10 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
           inline_call (string_of_id (id_of_exp e)) xs es t
       | EApply (e, _, es, t) when is_id e ->
           lemma_call (id_of_exp e) xs es t
-      | EOp (Uop UReveal, es, t) ->
-          let x = "reveal_opaque" in
-          if is_proc env (Id x) NotGhost then
-             inline_call x xs es t
-          else
-             lemma_call (Id x) xs es t
+      | EOp (Uop UReveal, [EVar (x, _) as ex], t) ->
+          lemma_call (Reserved "reveal_opaque") xs [EOp (Uop UFStarNameString, [ex], None); ex] t
+      | EOp (Uop UReveal, [EApply (EVar (x, _) as ex, _, _, _) as ea], t) ->
+          lemma_call (Reserved "reveal_opaque") xs [EOp (Uop UFStarNameString, [e], None); ea] t
       | _ -> err ()
     )
   | SVar (x, tOpt, _, XGhost, _, Some e) -> assign_or_var false x tOpt e

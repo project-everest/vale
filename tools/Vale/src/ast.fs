@@ -32,7 +32,7 @@ type exp_call = CallGhost | CallLemma | CallInline | CallOutline
 type uop =
 | UNot of bool_or_prop | UNeg | UOld | UIs of id
 | UConst
-| UReveal | UGhostOnly | UToOperand
+| UReveal | UFStarNameString | UGhostOnly | UToOperand
 | UCall of exp_call
 | UCustom of string
 
