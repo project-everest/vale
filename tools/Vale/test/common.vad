@@ -1,6 +1,6 @@
 type nat:Type(0) := int_range(0, _);
 type pos:Type(0) := int_range(1, _);
-type{:primitive} seq(a:Type(0)):Type(0) extern;
+type seq(a:Type(0)):Type(0) {:primitive} extern;
 type map(a:Type(0), b:Type(0)):Type(0) extern;
 type register:Type(0) extern;
 const EAX:register extern;
@@ -10,14 +10,14 @@ function operator([]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):b extern; // T
 function operator([ := ]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a, v:b):map(a, b) extern;
 function operator(?[]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):bool extern;
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:map(int, int);
+var ok:bool {:state ok()} ;
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:map(int, int) {:state mem()};
 
 operand_type reg:int @ register := inout eax | inout ebx;
-operand_type Mem(base:reg, inline offset:int):int;
+operand_type Mem(in base:reg, inline offset:int):int;
 operand_type opr:int := reg | const;
 operand_type mem_opr:int := opr | Mem;
 

@@ -32,7 +32,7 @@ type exp_call = CallGhost | CallLemma | CallInline | CallOutline
 type uop =
 | UNot of bool_or_prop | UNeg | UOld | UIs of id
 | UConst
-| UReveal | UGhostOnly | UToOperand
+| UReveal | UFStarNameString | UGhostOnly | UToOperand
 | UCall of exp_call
 | UCustom of string
 
@@ -98,7 +98,7 @@ type var_storage =
 
 type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool; is_quicktype:bool}
 type quick_info = {qsym:string; qmods:id list}
-type lhs = id * (typ option * ghost) option // TODO: we only allow Ghost here, so no need to mention possibility of NotGhost
+type lhs = id * (typ option * ghost) option // TODO: we only allow Ghost here, so no need to mention possibility of NotGhost; can just be id * formal option
 type stmt =
 | SLoc of loc * stmt
 | SLabel of id

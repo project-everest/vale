@@ -520,7 +520,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     if benv.is_instruction then
       // Body of instruction lemma
       let dummy = Reserved "dummy" in
-      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [evar b0; evar s0]) in
+      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [attrs_get_exp (Id "instruction") p.pattrs; evar s0]) in
       let senv = { env = env; benv = benv; b1 = dummy; bM = dummy; code = evar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
       let ss = build_lemma_ghost_stmts senv stmts in
       [sReveal; sOldS] @ sBlock @ listIf total [sState] @ ss

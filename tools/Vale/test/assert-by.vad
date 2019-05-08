@@ -18,7 +18,8 @@ function G(i:int):bool extern;
 ghost procedure L(ghost i:int) extern;
 function OpaqueTruth(x:int):bool extern;
 
-procedure{:instruction Ins(InsIncr(OOpr(OReg(x))))} Increment(inout x:reg)
+procedure Increment(inout x:reg)
+    {:instruction Ins(InsIncr(OOpr(OReg(x))))}
     ensures
         x == old(x) + 1;
 {
@@ -49,8 +50,8 @@ procedure Q(inline iii:int, ghost g:int)
         eax; ebx;
 {
     P(ebx, 10, 100);
-    ghost var a1 := g + 1;
-    ghost var a2 := eax;
+    let a1 := g + 1;
+    let a2 := eax;
     P(ebx, 20, a1);
     assert ebx == old(ebx) + 2;
     assert OpaqueTruth(65) by
@@ -59,7 +60,7 @@ procedure Q(inline iii:int, ghost g:int)
         reveal OpaqueTruth;
     }
     ghost var a3 := eax;
-    ghost var a4 := old(eax);
+    let a4 := old(eax);
     assert a2 == a4 + 1 by
     {
         assert a3 == a2 + 1;

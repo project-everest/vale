@@ -13,7 +13,7 @@ FROM ${DOCKERHUBPROJECT}fstar-linux:${COMMITID}
 
 ARG BUILDLOGFILE
 ARG MAXTHREADS
-ARG TARGET
+ARG BUILDTARGET
 ARG BRANCHNAME
 
 # ADD SSH KEY
@@ -49,7 +49,7 @@ RUN chmod +x build.sh
 COPY --chown=everest build_helper.sh ${MYHOME}/build_helper.sh
 RUN chmod +x build_helper.sh
 
-RUN ./build_helper.sh ${TARGET} ${BUILDLOGFILE} ${MAXTHREADS} ${BRANCHNAME} || true
+RUN ./build_helper.sh ${BUILDTARGET} ${BUILDLOGFILE} ${MAXTHREADS} ${BRANCHNAME} || true
 
 # Remove ssh identities.
 RUN rm ${MYHOME}/.ssh/id_rsa

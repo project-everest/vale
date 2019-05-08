@@ -1,9 +1,9 @@
 include{:fstar}{:open} "Types_s"
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 module Recursive
 
@@ -33,6 +33,10 @@ let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfEls
 let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
 unfold let va_tl = Cons?.tl
 unfold let va_hd = Cons?.hd
+
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
+
 let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
 let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
 let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
@@ -73,15 +77,11 @@ assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM
   (ensures (fun fN ->
     True
   ))
-
-assume val make_opaque : #a:Type -> a -> a
-assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
-unfold let va_make_opaque = make_opaque
-unfold let va_reveal_opaque = reveal_opaque
-
 #endverbatim
 
-procedure {:recursive}{:decrease n} KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)
+procedure KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)
+  {:recursive}
+  {:decrease n}
 {
   inline if (0 < n) {
     w_out := KeyExpansionRoundUnrolledRecursive(w_in, n-1);

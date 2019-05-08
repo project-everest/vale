@@ -328,8 +328,8 @@ let rec normalize_type (env:env) (t:typ):typ =
   | TVar _ -> t
   | TBool _ -> t
   | TInt _ -> t
-  | TTuple ts -> t
-  | TFun (ts, t) -> t
+  | TTuple _ -> t
+  | TFun (_, _) -> t
   | TDependent x ->
       let (_, x) = lookup_name env x true in
       TDependent x
@@ -1113,6 +1113,14 @@ let insert_cast (e:exp) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
   ECast (e, et)
 
+let lookup_id_or_fun (env:env) (u:unifier) (x:id):(typ * id_info option) =
+  match lookup_name env x true with
+  | (Some (Func_decl f), _) ->
+      let fi = compute_fun_instance env u f None in
+      let t = TFun (fi.f_args, fi.f_ret) in
+      (t, None)
+  | _ -> lookup_id env x
+
 let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
   let coerce = Option.map (fun (t, et) -> (subst_typ s t, subst_typ s et)) coerce in
   let e =
@@ -1302,7 +1310,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         (t, (AE_Loc (loc, ae), t, None))
       with err -> locErr loc err
   | EVar (x, _) ->
-      let (t, info) = lookup_id env x in
+      let (t, info) = lookup_id_or_fun env u x in
       let () =
         match (env.inline_only, info) with
         | (false, _) -> ()
@@ -1826,11 +1834,23 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
   u_unify u None;
   let es = List.map (subst_exp env u.u_substs) aes in
   let prets = List.map (fun (_, t, _, _, _) -> t) p.prets in
-  let tRet = match prets with | [] -> None | [t] -> Some t | _  -> Some (TTuple prets) in
-  SAssign (xs, EApply (evar p.pname, Some pi.p_targs, es, tRet))
+  let subt = subst_typ u.u_substs in
+  let tRet = match prets with | [] -> None | [t] -> Some (subt t) | _  -> Some (subt (TTuple prets)) in
+  let targs = List.map subt pi.p_targs in
+  SAssign (xs, EApply (evar p.pname, Some targs, es, tRet))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
+  let is_proc_call (e:exp):bool =
+    match skip_loc e with
+    | EApply (e, _, _, _) when is_id e ->
+      (
+        match lookup_fun_or_proc env (id_of_exp e) with
+        | FoundProc p -> true
+        | _ -> false
+      )
+    | _ -> false
+    in
   match s with
   | SLoc (loc, s) -> try SLoc (loc, tc_stmt env s) with err -> locErr loc err
   | SLabel x -> err "labels are not supported"
@@ -1842,6 +1862,10 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
     let contents = tc_calc_contents env contents in 
     let (_, e) = tc_exp env e None in  
     SCalc (op, contents, e)
+  | SVar (x, tOpt, Immutable, XGhost, [], Some e) when is_proc_call e ->
+      tc_stmt env (SAssign ([(x, Some (tOpt, Ghost))], e))
+  | SVar (x, tOpt, Mutable, XGhost, a, Some e) when is_proc_call e ->
+      err "cannot assign procedure return value directly to new mutable ghost variable; use 'let' instead of 'ghost var' to assign to immutable variable or declare 'ghost var' in a separate statement before the call"
   | SVar (x, tOpt, m, g, a, eOpt) ->
     (
       (match tOpt with | Some t -> let _ = check_type env t in () | None -> ());
@@ -1878,6 +1902,8 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
       | EApply (e, ts_opt, es, _) when is_id e ->
         (
           let x = id_of_exp e in
+          // HACK: don't check call to "reveal_opaque". This is code that is going to be replaced with F* reveal
+          if string_of_id x = "Opaque_s.reveal_opaque" then s else
           match (xs, lookup_fun_or_proc env x) with
           | (([] | [_]), (FoundFunDecl _ | FoundFunExpr _)) -> assign_exp ()
           | (_::_, (FoundFunDecl _ | FoundFunExpr _)) -> err ("Expected 0 or 1 return values from function")

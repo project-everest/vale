@@ -26,7 +26,7 @@ procedure Copy16()
         valid_mem64(rdi + 8, mem);
         rsi + 16 <= rdi || rdi + 16 <= rsi;
     ensures
-        forall i :: 0 <= i && i < 16 && i % 8 = 0 ==> load_mem64(rsi + i, mem) == load_mem64(rdi + i, mem);
+        forall(i) 0 <= i && i < 16 && i % 8 = 0 ==> load_mem64(rsi + i, mem) == load_mem64(rdi + i, mem);
     reads
         rsi; rdi;
     modifies
@@ -39,7 +39,8 @@ procedure Copy16()
     Mov64(Mem64(rdi, 8), rbx); // equivalent to: Store64(rdi, rbx, 8);
 }
 
-procedure{:quick} Copy16Q()
+procedure Copy16Q()
+    {:quick}
     requires/ensures
         valid_mem64(rsi, mem);
         valid_mem64(rsi + 8, mem);
@@ -47,7 +48,7 @@ procedure{:quick} Copy16Q()
         valid_mem64(rdi + 8, mem);
         rsi + 16 <= rdi || rdi + 16 <= rsi;
     ensures
-        forall i :: 0 <= i && i < 16 && i % 8 = 0 ==> load_mem64(rsi + i, mem) == load_mem64(rdi + i, mem);
+        forall(i) 0 <= i && i < 16 && i % 8 = 0 ==> load_mem64(rsi + i, mem) == load_mem64(rdi + i, mem);
     reads
         rsi; rdi;
     modifies
@@ -60,7 +61,7 @@ procedure{:quick} Copy16Q()
     Mov64(Mem64(rdi, 8), rbx); // equivalent to: Store64(rdi, rbx, 8);
 }
 
-procedure{:quick} benchmark_quick_modifies(
+procedure benchmark_quick_modifies(
         inline win:bool,
         ghost old_xmm6:quad32,
         ghost old_xmm7:quad32,
@@ -73,6 +74,7 @@ procedure{:quick} benchmark_quick_modifies(
         ghost old_xmm14:quad32,
         ghost old_xmm15:quad32
         )
+    {:quick}
     requires
         win ==> old_xmm15 == xmm6;
         win ==> old_xmm15 == xmm6;

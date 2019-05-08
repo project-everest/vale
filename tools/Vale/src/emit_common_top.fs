@@ -59,7 +59,14 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
           if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
           let ds_p = Emit_common_lemmas.build_proc envBody envr loc p in
           let ds_q = if isQuick && not !no_lemmas then Emit_common_quick_export.build_proc envr loc p else [] in
-          ds_p @ ds_q
+          let comment (s:string) : loc * decl =
+            let isPublic = attrs_get_bool (Id "public") false p.pattrs in
+            let attrs = if isPublic then [(Id "interface", []); (Id "implementation", [])] else [] in
+            (loc, DVerbatim (attrs, [s]))
+            in
+          let beginComment = comment ("//-- " + (err_id p.pname)) in
+          let endComment = comment "//--" in
+          [beginComment] @ ds_p @ ds_q @ [endComment]
         else
           []
     | DVerbatim (attrs, lines) ->

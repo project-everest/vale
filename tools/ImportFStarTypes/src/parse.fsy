@@ -109,6 +109,7 @@ exp1
   | META COLON exp1s LBRACE META LPAREN exp1s AT exp RPAREN RBRACE LBRACE exp RBRACE { RMeta (fst $1) }
   | META COLON exp1s LBRACE META LPAREN exp1s RARROW exp1s AT exp RPAREN RBRACE LBRACE exp RBRACE { RMeta (fst $1) }
   | COMMA { RComma $1 }
+  | LBRACECOLON PATTERN RBRACE exp1 { RList [RPattern $1; RList []; $4] }
   | LBRACECOLON PATTERN pat1 RBRACE exp1 { RList [RPattern $1; RList $3; $5] }
   | LBRACECOLON exp RBRACE exp1 { RList [RAttribute $1; $2; $4] }
   | DOLLAR exp1 { RList [RDollar $1; $2] }
