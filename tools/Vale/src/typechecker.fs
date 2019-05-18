@@ -1903,7 +1903,7 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
         (
           let x = id_of_exp e in
           // HACK: don't check call to "reveal_opaque". This is code that is going to be replaced with F* reveal
-          if string_of_id x = "Opaque_s.reveal_opaque" then s else
+          if (string_of_id x).EndsWith("Opaque_s.reveal_opaque") then s else
           match (xs, lookup_fun_or_proc env x) with
           | (([] | [_]), (FoundFunDecl _ | FoundFunExpr _)) -> assign_exp ()
           | (_::_, (FoundFunDecl _ | FoundFunExpr _)) -> err ("Expected 0 or 1 return values from function")

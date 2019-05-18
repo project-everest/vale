@@ -493,7 +493,8 @@ let rec universe0_exp (e:f_exp):f_exp =
   let r = universe0_exp in
   match e with
   | EId {name = Some "Prims._\"bool\""} -> EBool
-  | EId {name = Some ("Prop_s.prop0" | "Prims._\"prop\"" | "Prims.logical")} -> EProp
+  | EId {name = Some ("Prims._\"prop\"" | "Prims.logical")} -> EProp
+  | EId {name = Some x} when x.EndsWith(".prop0") -> EProp
   | EId _ | EInt _ | EUnitValue | EBool | EProp | EUnsupported _ -> e
   | EType u -> EType (universe0_univ u)
   | EComp (e1, e2, es) -> EComp (r e1, r e2, List.map r es)
@@ -801,7 +802,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
         | (_, (_, []), None) ->
             [(env, {d with f_category = "type"; f_binders = bs_promote; f_body = body})]
         | (_, (_, x::_), None) ->
-            [(env, {d with f_category = "unsupported"; f_typ = EUnsupported (sprintf "tried to interpret as type, but %s does not have kind Type(0) (if this is supposed to be a function, not a type, consider returning 'Prop_s.prop0')" (string_of_id x))})]
+            [(env, {d with f_category = "unsupported"; f_typ = EUnsupported (sprintf "tried to interpret as type, but %s does not have kind Type(0) (if this is supposed to be a function, not a type, consider returning 'prop0')" (string_of_id x))})]
         | ([], _, Some (r, None)) ->
             [(env, {d with f_category = "type"; f_body = Some (range_to_int_type r)})]
         | ([], _, Some (r, Some (local_env_bounds_opt, xr, bounds))) ->
