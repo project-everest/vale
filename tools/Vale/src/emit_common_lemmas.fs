@@ -21,9 +21,6 @@ type build_env =
     is_terminating:bool;
     code_name:string -> id;
     frame_exp:id -> exp * exp;
-    gen_quick_block:env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list;
-    gen_quick_block_funs:unit -> decls;
-    quick_code_funs:fun_decl list ref;
   }
 
 (* Build code value for body of procedure Q:
@@ -49,31 +46,6 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   | SLoc (loc, s) ->
       try List.map (fun e -> ELoc (loc, e)) (build_code_stmt env benv s) with err -> raise (LocErr (loc, err))
   | SBlock b -> [rs b]
-  | SQuickBlock (info, b) ->
-      // REVIEW: would be more consistent to generate a value of type "code" rather than "codes",
-      // but the normalization doesn't seem to work as well for "code".
-      let p = benv.proc in
-      let fParams = make_fun_params p.prets p.pargs in
-      let name = benv.code_name (info.qsym + "_") in
-      let f =
-        {
-          fname = name;
-          fghost = NotGhost;
-          ftargs = [];
-          fargs = fParams;
-          fret_name = None;
-//          fret = tCode;
-          fret = tCodes;
-          fspecs = [];
-//          fbody = Some (rs b);
-          fbody = Some (build_code_stmts env benv b);
-          fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" benv.proc.pattrs;
-        }
-        in
-      benv.quick_code_funs := f::!(benv.quick_code_funs);
-      let e = eapply name (List.map (fun (x, t) -> EVar(x,t)) fParams) in
-//      [e]
-      [vaApp "Block" [e]]
   | SIfElse (SmPlain, cmp, ss1, ss2) ->
       let e1 = rs ss1 in
       let e2 = rs ss2 in
@@ -199,12 +171,6 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
   | SAlias _ -> (Ghost, false, [])
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> (NotGhost, true, build_lemma_block senv b)
-  | SQuickBlock (info, b) ->
-      let outS = (sM, Some (Some tState, Ghost)) in
-      let outF = (senv.fM, Some (Some tFuel, Ghost)) in
-      let outG = (Reserved "g", None) in
-      let ss = benv.gen_quick_block env info [outS; outF; outG] [evar s0] b in
-      (NotGhost, true, ss)
   | SIfElse (SmGhost, e, ss1, ss2) ->
       let e = sub_s0 e in
       let ss1 = build_lemma_ghost_stmts senv ss1 in
@@ -431,7 +397,7 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
           [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
     }
     in
-  List.map (fun f -> (loc, DFun f)) (List.rev (f::!(benv.quick_code_funs)))
+  List.map (fun f -> (loc, DFun f)) [f]
 
 let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):decls =
   // generate va_lemma_Q
@@ -636,7 +602,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           | SVar (x, _, _, XGhost, _, _) -> x::(List.concat xss)
           | _ -> List.concat xss
           in
-        let (gen_quick_block, gen_quick_block_funs) = Emit_common_quick_code.make_gen_quick_block loc p in
         let benv =
           {
             proc = p;
@@ -648,9 +613,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
             is_terminating = attrs_get_bool (Id "terminates") !fstar p.pattrs;
             code_name = codeName;
             frame_exp = makeFrame env p s0;
-            gen_quick_block = gen_quick_block;
-            gen_quick_block_funs = gen_quick_block_funs;
-            quick_code_funs = ref [];
           }
           in
         let rstmts = stmts_refined stmts in
@@ -667,6 +629,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           if isQuick then
             Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
-        fCodes @ (if !no_lemmas then [] else quickDecls @ (gen_quick_block_funs ()) @ pLemma)
+        fCodes @ (if !no_lemmas then [] else quickDecls @ pLemma)
     in
   bodyDecls //@ blockLemmaDecls

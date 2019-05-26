@@ -113,9 +113,6 @@ and let_update_stmt (scope:Map<id, typ option>) (updates:Set<id>) (s:stmt):(Map<
   | SBlock b ->
       let (u, b) = let_updates_stmts scope b in
       (scope, Set.union updates u, make_let u (SBlock b))
-  | SQuickBlock (x, b) ->
-      let (u, b) = let_updates_stmts scope b in
-      (scope, Set.union updates u, make_let u (SQuickBlock (x, b)))
   | SIfElse (g, e, b1, b2) ->
       let (u1, b1) = let_updates_stmts scope b1 in
       let (u2, b2) = let_updates_stmts scope b2 in

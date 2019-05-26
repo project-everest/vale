@@ -129,8 +129,6 @@ let assert_attrs_default =
     is_inv = false;
     is_split = false;
     is_refined = false;
-    is_quickstart = false;
-    is_quickend = false;
     is_quicktype = false;
   }
 
@@ -271,7 +269,6 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> [SBlock (map_stmts fe fs b)]
-    | SQuickBlock (x, b) -> [SQuickBlock (x, map_stmts fe fs b)]
     | SIfElse (g, e, b1, b2) -> [SIfElse (g, fe e, map_stmts fe fs b1, map_stmts fe fs b2)]
     | SWhile (e, invs, ed, b) ->
         [SWhile (
@@ -303,7 +300,6 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
     | SAlias (x, y) -> []
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> rs b
-    | SQuickBlock (x, b) -> rs b
     | SIfElse (g, e, b1, b2) -> [re e] @ (rs b1) @ (rs b2)
     | SWhile (e, invs, ed, b) -> [re e] @ (List.map re (List.map snd invs)) @ (List.map re (snd ed)) @ (rs b)
     | SForall (xs, ts, ex, e, b) -> (List.collect (List.map re) ts) @ [re e] @ (rs b)

@@ -96,7 +96,7 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool; is_quicktype:bool}
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quicktype:bool}
 type quick_info = {qsym:string; qmods:id list}
 type lhs = id * (typ option * ghost) option // TODO: we only allow Ghost here, so no need to mention possibility of NotGhost; can just be id * formal option
 type stmt =
@@ -112,7 +112,6 @@ type stmt =
 | SAssign of lhs list * exp
 | SLetUpdates of formal list * stmt // used to turn imperative updates into functional 'let' assignments
 | SBlock of stmt list
-| SQuickBlock of quick_info * stmt list // optimized proof for statements in block
 | SIfElse of stmt_modifier * exp * stmt list * stmt list
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list

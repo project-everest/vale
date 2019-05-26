@@ -53,7 +53,7 @@ let makeFrame (env:env) (preserveModifies:bool) (p:proc_decl) (s0:id) (sM:id):ex
   (e, List.rev pmods, List.rev fs)
 
 let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((needsState:bool), (eTail:exp)):(bool * exp) =
-  let err () = internalErr (Printf.sprintf "make_gen_quick_block: %A" s) in
+  let err () = internalErr (Printf.sprintf "build_qcode_stmt: %A" s) in
   let outs = List.map fst outs_t in
   let env0 = env in
   let env = snd (env_stmt env s) in
@@ -224,65 +224,6 @@ and build_qcode_block (add_old:bool) (env:env) (outs_t:formal list) (loc:loc) (s
   let eLet = if add_old then ebind BindLet [evar s] [(Reserved "old_s", Some tState)] [] eStmts else eStmts in
   let fApp = ebind Lambda [] [(s, Some tState)] [] eLet in
   eapply (Id "qblock") (qmods_opt (evar (Reserved "mods")) @ [fApp])
-
-let make_gen_quick_block (loc:loc) (p:proc_decl):((env -> quick_info -> lhs list -> exp list -> stmt list -> stmt list) * (unit -> decls)) =
-  let funs = ref ([]:decls) in
-  let fArgs = (List.collect fArg p.prets) @ (List.collect fArg p.pargs) in
-  let fParams = make_fun_params p.prets p.pargs in
-  let pParams = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
-  let pArgs = List.map (fun (x, _) -> evar x) pParams in
-  let gen_quick_block env info outs args ss =
-    let id = Reserved ("qcode_" + info.qsym + "_" + (string_of_id p.pname)) in
-    let cid = Reserved ("code_" + info.qsym + "_" + (string_of_id p.pname)) in
-    let tArgs = List.map (fun (x, _) -> TName x) fParams in
-    let tCodeApp = tapply cid tArgs in
-//    let fBody = build_qcode_block false env [] loc ss in
-    let fBody = build_qcode_stmts env [] loc ss in
-    let fCode =
-      {
-        fname = id;
-        fghost = Ghost;
-        ftargs = [];
-        fargs = pParams;
-        fret_name = None;
-//        fret = tapply (Reserved "quickCode") [tUnit; tCodeApp];
-        fret = tapply  (Id "quickCodes") [tUnit; tCodeApp];
-        fspecs = [];
-        fbody = Some (hide_ifs fBody);
-        fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
-      }
-      in
-    let dFun = DFun fCode in
-    funs := (loc, dFun)::!funs;
-    (*
-      let (va_s2, va_fc2, ()) = wp_run_code_norm (va_code_1_Incr3 ()) (va_quick_1_Incr3 ()) va_s0
-        (fun (s0:state) (sN:state) -> va_update_reg Rax sN (va_update_flags sN s0))
-        (fun (sN:state) (sN':state) -> va_get_reg Rax sN == va_get_reg Rax sN' /\ va_get_flags sN == va_get_flags sN')
-    *)
-    let eCode = eapply cid fArgs in
-    let eQCode = eapply id pArgs in
-    let s0 = Reserved "s0" in
-    let sM = Reserved "sM" in
-    let sN = Reserved "sN" in
-    let eqMod x =
-      let getM = stateGet {env with state = evar sM} x in
-      let getN = stateGet {env with state = evar sN} x in
-      eop (Bop (BEq BpProp)) [getM; getN]
-      in
-    let eEq = and_of_list (List.map eqMod info.qmods) in
-    let fEq = ebind Lambda [] [(sM, Some tState); (sN, Some tState)] [] eEq in
-    let frameMod e x =
-      match Map.tryFind x env.ids with
-      | Some (StateInfo (prefix, es, t)) -> vaApp ("update_" + prefix) (es @ [evar sN; e])
-      | _ -> internalErr ("gen_quick_block: could not find variable " + (err_id x))
-      in
-    let eUpdate = List.fold frameMod (evar s0) info.qmods in
-    let fUpdate = ebind Lambda [] [(s0, Some tState); (sN, Some tState)] [] eUpdate in
-    let sLemma = SAssign (outs, eapply (Id "wp_run_norm") (eCode::eQCode::args @ [fUpdate; fEq])) in
-    [sLemma]
-    in
-  let gen_quick_block_funs () = List.rev !funs in
-  (gen_quick_block, gen_quick_block_funs)
 
 let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   (*

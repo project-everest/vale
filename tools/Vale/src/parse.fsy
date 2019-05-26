@@ -323,8 +323,6 @@ Stmt
       let attrs =
         match ($3, skip_loc $5) with
         | (Id "split_here", EBool true) -> {assert_attrs_default with is_split = true}
-        | (Id "quick_start", EBool true) -> {assert_attrs_default with is_quickstart = true}
-        | (Id "quick_end", EBool true) -> {assert_attrs_default with is_quickend = true}
         | (Id "quick_type", _) -> {assert_attrs_default with is_quicktype = true}
         | _ -> parse_err ("unknown attribute: " + (err_id $3))
         in

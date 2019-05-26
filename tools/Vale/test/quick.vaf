@@ -251,6 +251,7 @@ procedure AddRaxG(ghost g:int)
 }
 
 procedure Incr3(ghost g:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -260,7 +261,6 @@ procedure Incr3(ghost g:int)
     ensures
         rax == old(rax) + 3;
 {
-    assert{:quick_start} true;
     Add64(rax, 1);
     AddRaxG(g + 1);
     Add64(rax, 1);

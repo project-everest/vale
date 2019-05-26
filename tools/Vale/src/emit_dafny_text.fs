@@ -149,7 +149,6 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
   | SAssign _ -> emit_stmts ps (eliminate_assign_lhss s)
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock ss -> notImplemented "block"
-  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, []) ->
       ps.PrintLine ("if (" + (string_of_exp e) + ")");
       emit_block ps ss1

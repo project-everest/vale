@@ -283,7 +283,6 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
-  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp90 e) + " then");
       emit_block ps "" outs ss1;

@@ -1694,7 +1694,7 @@ let rec update_env_stmt (env:env) (s:stmt):env =
     push_id env x t
   | SAssign (xs, e) ->
     push_lhss env xs
-  | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> env
+  | SLetUpdates _ | SBlock _ | SIfElse _ | SWhile _ -> env
   | SForall (xs, ts, ex, e, b) ->
     List.fold (fun env (x, t)-> let t = match t with Some t -> t | None -> internalErr "update_env_stmt" in push_id env x t) env xs
   | SExists (xs, ts, e) ->
@@ -1913,7 +1913,6 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
     )
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> let (env, b) = tc_stmts env b in SBlock b
-  | SQuickBlock (x, b) -> let (env, b) = tc_stmts env b in SQuickBlock (x, b)
   | SIfElse (g, e, b1, b2) ->
       // TODO: check ghostness specified by g (here and in other statements)
       let (t, e) = tc_exp env e (Some tBool) in
