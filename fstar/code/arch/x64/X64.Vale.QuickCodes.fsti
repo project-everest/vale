@@ -319,12 +319,12 @@ let va_state_match (s0:state) (s1:state) : Pure Type0
   s0.mem == s1.mem
 
 [@va_qattr]
-unfold let wp_sound_code_pre (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) : Type0 =
+unfold let wp_sound_code_pre (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) : Type0 =
   forall (ok:bool) (regs:Regs.t) (xmms:Xmms.t) (flags:nat64) (mem:memory).
     let s0' = {ok = ok; regs = regs; xmms = xmms; flags = flags; mem = mem} in
     s0 == s0' ==> QProc?.wp qc s0' (k s0')
 
-unfold let wp_sound_code_post (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) ((sN:state), (fN:fuel), (gN:a)) : Type0 =
+unfold let wp_sound_code_post (#a:Type0) (#c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) ((sN:state), (fN:fuel), (gN:a)) : Type0 =
   eval c s0 fN sN /\
   update_state_mods qc.mods sN s0 == sN /\
   k s0 sN gN
@@ -346,7 +346,7 @@ unfold let normal_steps : list string =
 
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr [`%va_qattr]; delta_only normal_steps] x
 
-val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) :
+val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) :
   Ghost (state * fuel * a)
     (normal (wp_sound_code_pre qc s0 k))
     (wp_sound_code_post qc s0 k)

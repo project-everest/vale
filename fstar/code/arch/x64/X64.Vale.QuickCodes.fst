@@ -246,7 +246,7 @@ let wp_sound_code #a c qc k s0 =
   let QProc c _ wp proof = qc in
   proof s0 k
 
-let wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> state -> a -> Type0) :
+let wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) :
   Ghost (state * fuel * a)
     (wp_sound_code_pre qc s0 k)
     (wp_sound_code_post qc s0 k)
