@@ -162,6 +162,7 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
         let xs = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.pargs in
         let pre = rename_args p.ptargs xs ts es (and_of_list reqs) in
         let post = rename_args p.ptargs xs ts es (and_of_list enss) in
+        let post = ebind Lambda [] [(Id "_", None)] [] post in
         let eCall = eapply (Id "QLemma") [range; msg; pre; post; fApp; eTail] in
         (true, eCall)
     | _ -> notImplemented "lemma calls with return values"
@@ -237,6 +238,7 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
           let f ex =
             let esx = EOp (Uop UFStarNameString, [ex], None) in
             let eq = eapply (Reserved "reveal_eq") [esx; e; e] in
+            let eq = ebind Lambda [] [(Id "_", None)] [] eq in
             let ecall = eapply (Reserved "reveal_opaque") [esx; e] in
             let ef = ebind Lambda [] [(Id "_", None)] [] ecall in
             (true, eapply (Id "QLemma") [range; msg; EBool true; eq; ef; eTail])

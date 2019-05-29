@@ -57,8 +57,8 @@ noeq type quickCodes (a:Type0) : codes -> Type =
     (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
 //| QBindPURE: #cs:codes -> b:Type -> r:range -> msg:string -> pre:((b -> GTot Type0) -> GTot Type0) ->
 //    (unit -> PURE b pre) -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
-| QLemma: #cs:codes -> r:range -> msg:string -> pre:Type0 -> post:Type0 ->
-    (unit -> Lemma (requires pre) (ensures post)) -> quickCodes a cs -> quickCodes a cs
+| QLemma: #cs:codes -> r:range -> msg:string -> pre:Type0 -> post:(squash pre -> Type0) ->
+    (unit -> Lemma (requires pre) (ensures post ())) -> quickCodes a cs -> quickCodes a cs
 | QGhost: #cs:codes -> b:Type -> r:range -> msg:string -> pre:Type0 -> post:(b -> Type0) ->
     (unit -> Ghost b (requires pre) (ensures post)) -> (b -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
 
@@ -123,7 +123,7 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (mods:mods_t) (k:state ->
         label r msg (pre p))
 *)
   | QLemma r msg pre post l qcs ->
-      label r msg pre /\ (post ==> wp cs qcs mods k s0)
+      label r msg pre /\ (post () ==> wp cs qcs mods k s0)
   | QGhost b r msg pre post l qcs ->
       let c::cs = cs in
       label r msg pre /\ (forall (g:b). post g ==> wp cs (qcs g) mods k s0)
@@ -289,14 +289,14 @@ val qAssertLemma (p:Type0) : tAssertLemma p
 
 [@va_qattr]
 let qAssert (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
-  QLemma r msg e e (qAssertLemma e) qcs
+  QLemma r msg e (fun () -> e) (qAssertLemma e) qcs
 
 let tAssumeLemma (p:Type0) = unit -> Lemma (requires True) (ensures p)
 val qAssumeLemma (p:Type0) : tAssumeLemma p
 
 [@va_qattr]
 let qAssume (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
-  QLemma r msg True e (qAssumeLemma e) qcs
+  QLemma r msg True (fun () -> e) (qAssumeLemma e) qcs
 
 let tAssertSquashLemma (p:Type0) = unit -> Ghost (squash p) (requires p) (ensures fun () -> p)
 val qAssertSquashLemma (p:Type0) : tAssertSquashLemma p
@@ -313,7 +313,7 @@ val qAssertByLemma (#a:Type) (p:Type0) (qcs:quickCodes a []) (mods:mods_t) (s0:s
 
 [@va_qattr]
 let qAssertBy (#a:Type) (#cs:codes) (mods:mods_t) (r:range) (msg:string) (p:Type0) (qcsBy:quickCodes unit []) (s0:state) (qcsTail:quickCodes a cs) : quickCodes a cs =
-  QLemma r msg (wp [] qcsBy mods (fun _ _ -> p) s0) p (qAssertByLemma p qcsBy mods s0) qcsTail
+  QLemma r msg (wp [] qcsBy mods (fun _ _ -> p) s0) (fun () -> p) (qAssertByLemma p qcsBy mods s0) qcsTail
 
 ///// Code
 
