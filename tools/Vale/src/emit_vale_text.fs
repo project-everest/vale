@@ -116,7 +116,7 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EOp ((Subscript | Update | Cond | FieldOp _ | FieldUpdate _ | CodeLemmaOp | RefineOp | StateOp _ | OperandArg _), _, _) -> internalErr (sprintf "EOp:%A" e)
     | EApply (e, None, es, _) -> ((r 90 e) + "(" + (String.concat ", " (List.map (r 5) es)) + ")", 90)
     | EApply (e, Some ts, es, _) ->
-        ((r 90 e) + "#[" + String.concat ", " (List.map string_of_typ ts) + "]("
+        ((r 90 e) + "#[" + String.concat ", " (List.map string_of_typ (List.map snd ts)) + "]("
           + String.concat ", " (List.map (r 5) es) + ")", 90)
     | EBind (Forall, [], xs, ts, e, _) -> qbind "forall" xs ts e
     | EBind (Exists, [], xs, ts, e, _) -> qbind "exists" xs ts e
@@ -124,7 +124,7 @@ let rec string_of_exp_prec (prec:int) (e:exp):string =
     | EBind (BindLet, [ex], [x], [], e, _) -> ("let " + (string_of_formal x) + " := " + (r 5 ex) + " in " + (r 5 e), 6)
     | EBind (BindSet, [], xs, ts, e, _) -> ("iset " + (string_of_formals xs) + (string_of_triggers ts) + " | " + (r 5 e), 6)
     | EBind ((Forall | Exists | Lambda | BindLet | BindAlias | BindSet), _, _, _, _, _) -> internalErr "EBind"
-    | ECast (e, t) -> ("#" + string_of_typ_prec 20 t + "(" + r 5 e + ")", 90)
+    | ECast (_, e, t) -> ("#" + string_of_typ_prec 20 t + "(" + r 5 e + ")", 90)
     | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"

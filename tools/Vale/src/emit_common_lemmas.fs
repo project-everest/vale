@@ -31,15 +31,17 @@ function method{:opaque} va_code_Q(...):va_code
 *)
 let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   let rs = build_code_block env benv in
-  let rec assign e =
-    match e with
-    | ELoc (_, e) -> assign e
-    | EApply (e, _, es, t) when is_id e && is_proc env (id_of_exp e) NotGhost->
+  let empty_block = vaApp "Block" [vaApp "CNil" []] in
+  let rec assign xs e =
+    match (xs, e) with
+    | (_, ELoc (_, e)) -> assign xs e
+    | (_, EApply (e, _, es, t)) when is_id e && is_proc env (id_of_exp e) NotGhost->
         let x = string_of_id (id_of_exp e) in
         let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
         let es = List.map get_code_exp es in
         let es = List.map (map_exp stateToOp) es in
         [vaApp_t ("code_" + x) es t]
+//    | ((_::_), EApply (e, _, es, t)) when is_id e && benv.is_quick -> [empty_block]
     | _ -> []
     in
   match s with
@@ -57,7 +59,8 @@ let rec build_code_stmt (env:env) (benv:build_env) (s:stmt):exp list =
   | SWhile (cmp, ed, invs, ss) ->
       let ess = rs ss in
       [vaApp "While" [map_exp stateToOp cmp; ess]]
-  | SAssign (_, e) -> assign e
+  | SAssign (xs, e) -> assign xs e
+  | SAssert ({is_quicktype = Some _}, e) -> [empty_block]
   | _ -> []
 and build_code_stmts (env:env) (benv:build_env) (stmts:stmt list):exp =
   let empty = vaApp "CNil" [] in
@@ -180,7 +183,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
       let codeId = match code with EVar (x, _) -> x | _ -> internalErr (sprintf "SIfElse: %A" code) in
       let cond = Reserved ("cond_" + (reserved_id codeId)) in
       let i1 = string (gen_lemma_sym ()) in
-      let s1 = Reserved("s" + i1) in
+      let s1 = Reserved ("s" + i1) in
       let sCode = listIf total [SAssign ([varLhsOfId codeId], vaApp "hd" [evar senv.b1])] in
       let codeCond = vaApp "get_ifCond" [code] in
       let codet = vaApp "get_ifTrue" [code] in

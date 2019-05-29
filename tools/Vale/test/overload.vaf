@@ -20,6 +20,7 @@ let contains = Map.contains
 type register = | EAX | EBX
 
 type va_bool = bool
+type va_prop = Type0
 type va_int = int
 type va_int_at_least (k:int) = i:int{i >= k}
 type va_int_at_most (k:int) = i:int{i <= k}

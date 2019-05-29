@@ -61,17 +61,6 @@ operand_type Mem64(in base:reg_opr64, inline offset:int):nat64;
 operand_type dst_opr64:nat64 @ operand := reg_opr64 | Mem64;
 operand_type opr64:nat64 := dst_opr64 | const;
 
-// add {:typecheck false} attr because Type0 is not defined. (TODO: get rid of this)
-procedure AssertQuickType(ghost p:Type0) returns(ghost u:squash(p))
-    {:public}
-    {:quick exportOnly}
-    {:typecheck false} 
-    requires
-        p;
-{
-    u := tuple();
-}
-
 procedure Mov64(inout dst:dst_opr64, in src:opr64)
     {:public}
     {:instruction Ins(S.Mov64(dst,src))}

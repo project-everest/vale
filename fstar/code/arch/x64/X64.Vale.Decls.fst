@@ -14,6 +14,10 @@ let update_of = Lemmas.update_of
 let ins = S.ins
 type ocmp = S.ocmp
 type va_fuel = nat
+
+let mul_nat_helper x y =
+  FStar.Math.Lemmas.nat_times_nat_is_nat x y
+
 let va_fuel_default () = 0
 
 let va_lemma_upd_update sM =

@@ -23,6 +23,7 @@ type substitutions = Map<id, typ>
 
 // fun_decl instantiated with type arguments
 type fun_instance = {
+  f_name:id;
   f_args:typ list;
   f_targs:typ list;
   f_ret:typ;
@@ -113,10 +114,10 @@ type aexp_t =
 | AE_Loc of loc * aexp
 | AE_Exp of exp
 | AE_Op of op * aexp list
-| AE_ApplyX of id * typ list * aexp list
+| AE_ApplyX of id * typ option * (tqual * typ) list * aexp list
 | AE_ApplyE of aexp * aexp list
 | AE_Bind of bindOp * aexp list * formal list * triggers * aexp
-| AE_Cast of aexp * typ
+| AE_Cast of cast * aexp * typ
 and aexp = aexp_t * typ * (typ * typ) option
 
 let lookup_name (env:env) (x:id) (include_import:bool):(name_info option * id) =
@@ -1059,11 +1060,11 @@ and unify env (m:substitutions) (tc:typ_constraints):substitutions =
     unify env m t
 *)
 
-let compute_type_arguments (env:env) (u:unifier) (tparams:tformal list) (ts_opt:typ list option): substitutions =
+let compute_type_arguments (env:env) (u:unifier) (tparams:tformal list) (ts_opt:(tqual * typ) list option): substitutions =
   let targOpts =
     match ts_opt with
     | None -> List.map (fun _ -> None) tparams
-    | Some ts -> List.map Some ts
+    | Some ts -> List.map (fun (_, t) -> Some t) ts
     in
   let nts = List.length targOpts in
   let nks = List.length tparams in
@@ -1082,7 +1083,7 @@ let compute_instance (env:env) (u:unifier) (targMap:substitutions):(typ -> typ) 
   let arg_typ t = replace_typ_arg t in
   arg_typ
 
-let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (ts_opt:typ list option):fun_instance =
+let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (ts_opt:(tqual * typ) list option):fun_instance =
   let targMap = compute_type_arguments env u f.ftargs ts_opt in
   let targs = Map.fold (fun l x t -> l@[t]) [] targMap in
   let arg_typ = compute_instance env u targMap in
@@ -1093,9 +1094,9 @@ let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (ts_opt:typ list opt
       f.fargs
       in
   let ret = arg_typ f.fret in
-  {f_args = args; f_targs = targs; f_ret = ret (*; f_ret_name = f.fret_name; f_specs = f.fspecs; f_attrs = f.fattrs*)}
+  {f_name = f.fname; f_args = args; f_targs = targs; f_ret = ret (*; f_ret_name = f.fret_name; f_specs = f.fspecs; f_attrs = f.fattrs*)}
 
-let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:typ list option):proc_instance =
+let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:(tqual * typ) list option):proc_instance =
   let targMap = compute_type_arguments env u p.ptargs ts_opt in
   let targs = Map.fold (fun l x t -> l@[t]) [] targMap in
   let arg_typ = compute_instance env u targMap in
@@ -1109,9 +1110,9 @@ let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:typ list o
     (x, t, storage, io, attrs) in
   {p_args = List.map fformal p.pargs; p_targs = targs; p_rets = List.map fformal p.prets}
 
-let insert_cast (e:exp) (et:typ):exp =
+let insert_cast (c:cast) (e:exp) (et:typ):exp =
   // cast from type 't' to 'et' and it is checked by SMT solver
-  ECast (e, et)
+  ECast (c, e, et)
 
 let lookup_id_or_fun (env:env) (u:unifier) (x:id):(typ * id_info option) =
   match lookup_name env x true with
@@ -1191,10 +1192,10 @@ let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
         if(List.length t <> 1) then err ("cast for more than one return types not implemented");
         else insert_cast e t.Head et.Head
 *)
-    | AE_ApplyX (x, ts, aes) ->
+    | AE_ApplyX (x, tfun, ts, aes) ->
         let es = List.map (subst_exp env s) aes in
-        let ts = List.map (subst_typ s) ts in
-        EApply (EVar (x, None), Some ts, es, Some t)
+        let ts = List.map (fun (q, t) -> (q, subst_typ s t)) ts in
+        EApply (EVar (x, tfun), Some ts, es, Some t)
     | AE_ApplyE (ae, aes) ->
         let e = subst_exp env s ae in
         let es = List.map (subst_exp env s) aes in
@@ -1203,8 +1204,8 @@ let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
         let es = List.map (subst_exp env s) aes in
         let e = subst_exp env s ae in
         EBind(bOp, es, xs, ts, e, Some t)
-    | AE_Cast (ae, t) ->
-        ECast ((subst_exp env s ae), t)
+    | AE_Cast (c, ae, t) ->
+        ECast (c, (subst_exp env s ae), t)
   in
   let annotate_exp e t =
     match e with
@@ -1216,7 +1217,7 @@ let rec subst_exp env (s:substitutions) ((e, t, coerce):aexp):exp =
   in
   match coerce with
   | None -> annotate_exp e t
-  | Some (t, et) -> if typ_equal env t et then annotate_exp e et else insert_cast (annotate_exp e t) et
+  | Some (t, et) -> if typ_equal env t et then annotate_exp e et else insert_cast Upcast (annotate_exp e t) et
 
 let rec infer_arg_typ (env:env) (u:unifier) (args:(exp * typ option) list):(typ list * aexp list) =
   let infer_arg_typ_fold (ts, ae) ((e:exp), (et:typ option)):(typ list * aexp list) =
@@ -1288,18 +1289,18 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
     u_constrain_subtype_opt u t expected_typ;
     (t, (ae, t, coerce))
     in
-  let check_collection_literal (e:exp) (pt:primitive_type) (ts_opt:typ list option) (es:exp list) =
+  let check_collection_literal (e:exp) (pt:primitive_type) (ts_opt:(tqual * typ) list option) (es:exp list) =
     let tv = u_next_type_var u in
     let () =
       match ts_opt with
       | None -> ()
-      | Some [t] -> u_constrain_subtype u tv t
+      | Some [(_, t)] -> u_constrain_subtype u tv t
       | Some _ -> err "collection type literal requires exactly one type argument"
       in
     let aes = List.map (fun e -> snd (infer_exp env u e (Some tv))) es in
     let xt = lookup_primitive env pt in
     let t = tapply xt [tv] in
-    ret t (AE_ApplyX (id_of_exp e, [tv], aes))
+    ret t (AE_ApplyX (id_of_exp e, None, [(TqImplicit, tv)], aes))
   match e with
   | ELoc (loc, e) ->
       try
@@ -1354,7 +1355,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_ApplyX (_, _, es), _,  _) -> ret t (AE_Op (Uop (UCustom op), es))
+      | (AE_ApplyX (_, _, _, es), _,  _) -> ret t (AE_Op (Uop (UCustom op), es))
       | _ -> internalErr "UCustom"
     )
 (*
@@ -1364,11 +1365,19 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
     err (sprintf  "unsupported Uop '%A' in typechecker" op)
 *)
   | EOp (Bop op, [e1; e2], _) when isArithmeticOp op ->
+    (
     // op in {+, -, *, /, %}
       let (t1, ae1) = infer_exp_force env u e1 None in
       let (t2, ae2) = infer_exp_force env u e2 None in
       let t = unify_int_bound env t1 t2 op in
-      ret t (AE_Op (Bop op, [ae1; ae2]))
+      let is_const e = match skip_loc e with | EInt _ -> true | _ -> false in
+      match (op, normalize_type env t1, normalize_type env t2, is_const e1, is_const e2) with
+      | (BMul, TInt (Int i1, _), TInt (Int i2, _), false, false) when i1 >= bigint.Zero && i2 >= bigint.Zero ->
+          // This helps the solver with nonlinear multiplication of nonnegative numbers
+          // TODO: generalize this to other operations and cases
+          ret t (AE_ApplyX (Reserved "mul_nat", None, [], [ae1; ae2]))
+      | _ -> ret t (AE_Op (Bop op, [ae1; ae2]))
+    )
   | EOp (Bop (BAnd _ | BOr _) as op, [e1; e2], _) ->
       let tv = u_next_type_var u in
       let et = match expected_typ with | None -> tv | Some t -> t in
@@ -1427,7 +1436,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (attrs_get_id (Reserved "alias") f.fattrs) es in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (Bop (BCustom op), es))
+      | (AE_ApplyX (_, _, _, es), _, _) -> ret t (AE_Op (Bop (BCustom op), es))
       | _ -> internalErr "BCustom"
     )
   | EOp (Subscript, [e1; e2], _) ->
@@ -1441,7 +1450,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x + "[]")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (Subscript, es))
+      | (AE_ApplyX (_, _, _, es), _, _) -> ret t (AE_Op (Subscript, es))
       | _ -> internalErr ("EOp Subscript")
     )
   | EOp (Update, [e1; e2; e3], _) ->
@@ -1455,7 +1464,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x + "[:=]")) [e1; e2; e3] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (Update, es))
+      | (AE_ApplyX (_, _, _, es), _, _) -> ret t (AE_Op (Update, es))
       | _ -> internalErr ("EOp Update")
     )
   | EOp (Bop BIn, [e1; e2], _) ->
@@ -1469,7 +1478,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x + "?[]")) [e2; e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_ApplyX (_, _, [e2; e1]), _, _) -> ret t (AE_Op (Bop BIn, [e1; e2]))
+      | (AE_ApplyX (_, _, _, [e2; e1]), _, _) -> ret t (AE_Op (Bop BIn, [e1; e2]))
       | _ -> internalErr ("EOp Bop BIn")
     )
 (*
@@ -1495,9 +1504,10 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x1 + " ." + xf)) [e1] in
       let (t, ae) = infer_exp env u e expected_typ in
       match (t1, ae) with
-      | (TTuple ts, (AE_ApplyX (_, _, es), _,  _)) ->
-          ret t (AE_ApplyX (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), ts, es))
-      | (_, (AE_ApplyX (_, _, es), _, _)) -> ret t (AE_Op (FieldOp (Id xf), es))
+      | (TTuple ts, (AE_ApplyX (_, _, _, es), _,  _)) ->
+          let ts = List.map (fun t -> (TqImplicit, t)) ts in
+          ret t (AE_ApplyX (Id (sprintf "__proj__Mktuple%d__item__%s" (List.length ts) xf), None, ts, es))
+      | (_, (AE_ApplyX (_, _, _, es), _, _)) -> ret t (AE_Op (FieldOp (Id xf), es))
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (FieldUpdate (Id xf), [e1; e2], _) ->
@@ -1511,7 +1521,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let e = eapply (Operator (x1 + " ." + xf + ":=")) [e1; e2] in
       let (t, ae) = infer_exp env u e expected_typ in
       match ae with
-      | (AE_ApplyX (_, _, es), _, _) -> ret t (AE_Op (FieldUpdate (Id xf), es))
+      | (AE_ApplyX (_, _, _, es), _, _) -> ret t (AE_Op (FieldUpdate (Id xf), es))
       | _ -> internalErr ("EOp FieldOp")
     )
   | EOp (Cond, [e1; e2; e3], _) ->
@@ -1591,7 +1601,7 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         in
       let t = TTuple ts in
       let (_, aes) = infer_exps env u (List.map2 (fun e t -> (e, Some t)) es ts) in
-      ret t (AE_ApplyX (Id "tuple", ts, aes))
+      ret t (AE_Op (TupleOp (Some ts), aes))
   | EBind (BindLet, [ex], [(x, t)], [], e, _) ->
       // let x:t := ex in e
       check_not_local env x;
@@ -1615,9 +1625,9 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       let (t, ae) = infer_exp env u e None in
       let ae = AE_Bind (Lambda, [], List.map (fun (x, t) -> (x, Some t)) xs, ts, ae) in
       ret (TFun (List.map snd xs, t)) ae
-  | ECast (e, tc) ->
+  | ECast (c, e, tc) ->
       let (t, ae) = infer_exp env u e None in
-      let ae = AE_Cast (ae, tc) in
+      let ae = AE_Cast (c, ae, normalize_type env tc) in
       ret tc ae
       //REVIEW: casts across arbitrary types seem to be useful (e.g. for module friends)
       //// TODO: move this check to after inference:
@@ -1637,7 +1647,11 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
         if List.length f.f_args <> List.length es then err (sprintf "number of args doesn't match number of parameters, expected %i, got %i" (List.length f.f_args) (List.length es));
     //    let env = if isExtern then {env with ghost = true} else env in
         let (arg_typs, aes) = infer_arg_typ env u (List.map2 (fun e t -> (e, Some t)) es f.f_args) in
-        ret f.f_ret (AE_ApplyX (x, f.f_targs, aes))
+        let tfun = TFun (f.f_args, f.f_ret) in
+        // TODO: here we resolve x to its fully qualified name (f.f_name), but eventually we should also do this elsewhere
+        // TODO: compute tqual
+        let ts = List.map (fun t -> (TqImplicit, t)) f.f_targs in
+        ret f.f_ret (AE_ApplyX (f.f_name, Some tfun, ts, aes))
         in
       match id_of_exp_opt e with
       | Some x ->
@@ -1791,7 +1805,7 @@ let rec tc_proc_operand (env:env) (u:unifier) (pf:pformal) (e:exp):aexp =
                 let nparams = List.length pformals in
                 if nes <> nparams then err (sprintf "operand type '%s' expects %i arguments(s), found %i arguments(s)" (err_id x) nparams nes) else
                 let aes = List.map2 (tc_proc_operand env u) pformals es in
-                (AE_ApplyX (x, [], aes), t, None)
+                (AE_ApplyX (x, None, [], aes), t, None)
             | _ -> err (sprintf "cannot find function named '%s' or procedure operand_type named '%s'" (err_id x) (err_id x))
           )
         | _ -> check_const_operand xo
@@ -1809,7 +1823,7 @@ let assign_local (env:env) (x:id):typ =
 // TODO: check that global variable names are distinct
 // TODO: check that local variable names are distinct
 
-let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:typ list option) (es:exp list):stmt =
+let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:(tqual * typ) list option) (es:exp list):stmt =
   let u = new_unifier env loc in
   let pi = compute_proc_instance env u p ts_opt in
   let nxs = List.length xs in
@@ -1836,8 +1850,10 @@ let tc_proc_call (env:env) (loc:loc option) (p:proc_decl) (xs:lhs list) (ts_opt:
   let prets = List.map (fun (_, t, _, _, _) -> t) p.prets in
   let subt = subst_typ u.u_substs in
   let tRet = match prets with | [] -> None | [t] -> Some (subt t) | _  -> Some (subt (TTuple prets)) in
-  let targs = List.map subt pi.p_targs in
-  SAssign (xs, EApply (evar p.pname, Some targs, es, tRet))
+  let tret = match tRet with None -> TTuple [] | Some t -> t in
+  let targs = List.map (fun t -> (TqImplicit, subt t)) pi.p_targs in
+  let tfun = TFun (List.map (fun (_, t, _, _, _) -> t) pi.p_args, tret) in
+  SAssign (xs, EApply (EVar (p.pname, Some tfun), Some targs, es, tRet))
 
 let rec tc_stmt (env:env) (s:stmt):stmt =
   // TODO: need typing rules for statements
@@ -1880,7 +1896,7 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
       SVar (x, Some t, m, g, a, eOpt)
     )
   | SAlias (x, y) -> s // TODO resolve_id env y; s
-  | SAssign ([], EOp (Uop UReveal, [EVar (x, _)], _)) ->
+  | SAssign ([], EOp (Uop UReveal, e, _)) ->
       //TODO: let _ = lookup_fun env x in
       s
   | SAssign (xs, e) ->

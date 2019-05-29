@@ -184,8 +184,12 @@ Exp1
   | OLD LBRACKET Exp RBRACKET LPAREN Exp RPAREN { expAt $1 (EOp (Bop BOldAt, [$3; $6], None)) }
   | CONST LPAREN Exp RPAREN { expAt $1 (EOp (Uop UConst, [$3], None)) }
   | THIS { expAt $1 (EVar (Reserved "this", None)) }
-  | HASH Type2 LPAREN Exp RPAREN { expAt $1 (ECast ($4, $2))  }
-  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN { expAt $2 (EApply ($1, Some $3, $6, None)) }
+  | HASH Type2 LPAREN Exp RPAREN { expAt $1 (ECast (Downcast, $4, $2))  }
+  | Exp1 HASHLBRACKET TypeArgsOpt RBRACKET LPAREN Exps RPAREN
+    {
+      let ts = List.map (fun t -> (TqImplicit, t)) $3 in
+      expAt $2 (EApply ($1, Some ts, $6, None))
+    }
   | Exp1 LPAREN Exps RPAREN { expAt $2 (EApply ($1, None, $3, None)) }
   | TUPLE LPAREN Exps RPAREN { expAt $1 (EOp (TupleOp None, $3, None)) }
   | ID { expAt (fst $1) (EVar (Id (snd $1), None)) }
@@ -323,13 +327,17 @@ Stmt
       let attrs =
         match ($3, skip_loc $5) with
         | (Id "split_here", EBool true) -> {assert_attrs_default with is_split = true}
-        | (Id "quick_type", _) -> {assert_attrs_default with is_quicktype = true}
+        | (Id "quick_type", _) -> {assert_attrs_default with is_quicktype = Some false}
         | _ -> parse_err ("unknown attribute: " + (err_id $3))
         in
       stmtAt $1 (SAssert (attrs, $5))
     }
   | CALC CalcOp LBRACE CalcContents RBRACE { let (l, e) = $4 in stmtAt $1 (SCalc ($2, l, e)) }
   | REVEAL AnyId SEMI { stmtAt $1 (SAssign ([], EOp (Uop UReveal, [EVar ($2, None)], None))) }
+  | REVEAL AnyId LPAREN Exps RPAREN SEMI
+    {
+      stmtAt $1 (SAssign ([], EOp (Uop UReveal, [(EApply (EVar ($2, None), None, $4, None))], None)))
+    }
   | VarAttrs AnyId VarType VarInit SEMI { let (l, g, a) = $1 in stmtAt l (SVar ($2, $3, Mutable, g, a, $4)) }
   | LET Formal COLONEQ Exp SEMI { let (x, t) = $2 in stmtAt $1 (SVar (x, t, Immutable, XGhost, [], Some $4)) }
   | LET AnyId ATEQ AnyId SEMI { stmtAt $1 (SAlias ($2, $4)) }

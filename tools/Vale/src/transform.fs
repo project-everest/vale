@@ -132,7 +132,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         EBind (b, es, fs, List.map (List.map r) ts, r e, t)
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
-    | ECast (e, t) -> ECast (r e, t)
+    | ECast (c, e, t) -> ECast (c, r e, t)
     | ELabel (loc, e) -> ELabel (loc, r e)
   )
 
@@ -306,7 +306,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
       | (_, _, XOperand, io, _) ->
         (
           match skip_loc ea with
-          | ECast (e, _) ->
+          | ECast (_, e, _) ->
             collect_operand (pp, e)
           | EVar (x, _) ->
             (
@@ -721,7 +721,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         | _ -> err ("memory operand must have the form mem[base + offset] where mem is a variable")
       )
 *)
-    | (NotGhost, ECast(e, t)) -> Unchanged  // TODO: need to rewrite e
+    | (NotGhost, ECast(_, e, t)) -> Unchanged  // TODO: need to rewrite e
     | (NotGhost, _) ->
         err "unsupported expression (if the expression is intended as a load/store operand, try declaring 'operand_type x(...):...')"
         // Replace (codeLemma e)
@@ -920,16 +920,74 @@ let check_no_duplicates (es:(loc * exp) list):unit =
   f ss
 
 ///////////////////////////////////////////////////////////////////////////////
+// Insert quick-code checks that expression preconditions are satisfied
 
-let add_quick_type_stmts (ss:stmt list):stmt list =
-  let sym = ref 0 in
-  let fs (s:stmt) =
-    match s with
-    | SAssert ({is_quicktype = true}, e) ->
-        incr sym;
-        let x = Reserved ("u" + (string !sym)) in
-        Replace [SAssign ([(x, Some (None, Ghost))], eapply (Id "AssertQuickType") [e])]
+let rec subst_label_exp (addLabels:bool) (e:exp):exp =
+  let addLabel loc e = 
+    let range = evar (Id "range1") in
+    let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
+    eapply (Id "label") [range; msg; e]
+  in
+  let f e =
+    match e with
+    | ELabel (l, e) -> Replace (if addLabels then addLabel l (subst_label_exp addLabels e) else (subst_label_exp addLabels e))
     | _ -> Unchanged
+  in
+  map_exp f e
+
+let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
+  try
+    match s with
+    | Requires (_, e) -> ([e], [])
+    | Ensures (_, e) -> ([], [subst_label_exp addLabels e])
+    | Modifies _ -> ([], [])
+    | SpecRaw _ -> internalErr "SpecRaw"
+  with err -> raise (LocErr (loc, err))
+
+let collect_specs (addLabels:bool) (ss:(loc * spec) list):(exp list * exp list) =
+  let (rs, es) = List.unzip (List.map (collect_spec addLabels) ss) in
+  (List.concat rs, List.concat es)
+
+let rename_args (xts:tformal list) (xs:formal list) (ts:(tqual * typ) list option) (es:exp list) (e:exp):exp =
+  let xts = List.map (fun (x, _, _) -> (x, None)) xts in // HACK: ignore the kinds
+  let f = ebind Lambda [] (xts @ xs) [] e in
+  let ts = Option.map (fun ts -> List.map (fun (_, t) -> (TqExplicit, t)) ts) ts in
+  EApply (f, ts, es, None)
+
+let add_assert_quicktype_for_exp_reqs (env:env) (ss:stmt list):stmt list =
+  let fs (s:stmt) =
+    let gather_exp_reqs (e:exp) (children:exp list list):exp list =
+      let children = List.concat children in
+      match e with
+      | EApply (e, ts, es, _) when is_id e && Map.containsKey (id_of_exp e) env.funs ->
+        (
+          let x = id_of_exp e in
+          let f = Map.find x env.funs in
+          let (reqs, enss) = collect_specs false f.fspecs in
+          match reqs with
+          | [] -> children
+          | _ ->
+              let ereqs = rename_args f.ftargs f.fargs ts es (and_of_list reqs) in
+              children @ [ereqs] // children come first, since they may be needed to type-check ereqs
+        )
+      | ECast (Downcast, e, TInt (b1, b2)) ->
+          let make_req b bop =
+            match b with
+            | Int i -> [eop (Bop bop) [e; EInt i]]
+            | _ -> []
+            in
+          children @ make_req b1 BGe @ make_req b2 BLe
+      // TODO: turn all EBind into forall
+      // TODO: special treatment of ==>, if-then-else
+      | _ -> children
+      in
+    let exp_reqs = List.concat (gather_exps_in_stmt List.concat gather_exp_reqs s) in
+    match exp_reqs with
+    | [] -> Unchanged
+    | _ ->
+        let e = and_of_list exp_reqs in
+        let sAssert = SAssert ({assert_attrs_default with is_quicktype = Some true}, e) in
+        Replace [sAssert; s]
     in
   map_stmts (fun e -> e) fs ss
 
@@ -1228,8 +1286,8 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
         let ss = resolve_overload_stmts envp ss in
         //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
-        let ss = add_quick_type_stmts ss in
         let ss = rewrite_vars_stmts envp ss in
+        let ss = if isQuick then add_assert_quicktype_for_exp_reqs envp ss else ss in
         Some ss
     in
   let f_attr (x, es) =
@@ -1263,6 +1321,8 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )
   | DFun ({fbody = None} as f) ->
+      let (_, specs) = env_map_specs (fun _ e -> e) desugar_spec env f.fspecs in
+      let f = {f with fspecs = specs} in
       ([], {env with funs = Map.add f.fname f env.funs})
   | DProc p ->
     (

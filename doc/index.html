@@ -254,6 +254,7 @@ STMT ::=
   | ghost var x <i>[</i>: TYPE<i>]</i> <i>[</i>:= EXP<i>]</i> ;
   | calc CALC_OP { CALC ... CALC EXP ; }
   | reveal f ;
+  | reveal f ( EXP , ... , EXP) ;
   | p ( EXP , ... , EXP) ;
   | DESTINATIONS := p ( EXP , ..., EXP ) ;
   | x := EXP ;
@@ -419,6 +420,7 @@ let x @= eax; // let x be an alias for register eax
 ghost var x:uint32 := 33 + 44; // mutable x
 calc == { x; == x * 1; == { myLemma(x); } 1 * x; }
 reveal myOpaqueFunction;
+reveal myOpaqueFunction(5, true, x);
 Increment(x);
 eax, (let x:int), y := myProc(ebx, edx, z);
 x := 5;

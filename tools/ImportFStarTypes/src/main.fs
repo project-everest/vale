@@ -9,9 +9,7 @@ exception InternalErr of string
 exception LocErr of loc * exn
 let err (s:string):'a = raise (Err s)
 
-// REVIEW: the type checker doesn't (yet) care what's in the requires/ensures clauses for imported declarations;
-// is there any reason to keep them?
-let keep_req_ens = false;
+let keep_req_ens = true;
 
 type string_tree_raw =
 | StLeaf of string
@@ -361,9 +359,9 @@ let rec unsupported (e:f_exp):string option =
   | EBool -> None
   | EProp -> None
   | EType u -> None
-  | EComp (EAppUnivs (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, _), e1, _) when not keep_req_ens ->
+  | EComp (EAppUnivs (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, _), e1, _) ->
       unsupported e1
-  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, e1, _) when not keep_req_ens ->
+  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, e1, _) ->
       unsupported e1
   | EComp (e1, e2, es) -> exps_unsupported (e1::e2::es)
   | EApp (e, aes) -> exps_unsupported (e::(List.map snd aes))
@@ -544,7 +542,7 @@ let rec take_arrows (e:f_exp):(f_exp list * f_exp) =
   | _ -> ([], e)
 
 let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:f_exp):bool =
-  // printfn "// is_vale_type? %s" (string_of_exp e);
+  //printfn "// is_vale_type? %s" (string_of_exp e);
   //let r e = let b = is_vale_type false false env e in printfn "is_vale_type %A %s" b (string_of_exp e); b in
   let r = is_vale_type false false env in
   let may_be_refine e =
@@ -564,10 +562,12 @@ let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:f_exp):bool =
       let dxe = { f_name = xe; f_qualifiers = []; f_category = "val"; f_udecls = []; f_binders = []; f_typ = e1; f_body = None} in
       let env2 = Map.add xe dxe env in
       //printfn "%A %A %A" (r e1) (is_vale_exp env er) (is_vale_exp env2 ee);
-      if keep_req_ens then
-        r e1 && is_vale_exp env er && is_vale_exp env2 ee
-      else
-        r e1
+      r e1
+      // Deal with req/ens elsewhere
+      //if keep_req_ens then
+      //  r e1 && is_vale_exp env er && is_vale_exp env2 ee
+      //else
+      //  r e1
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)]) ->
       may_be_refine e
@@ -730,7 +730,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
   let bs_promote = List.map promote_binder bs in
   let bs_are_Type = List.collect (fun (_, x, e) -> match e with (Some (EType _)) -> [] | _ -> [x]) bs in
   let bs_promote_are_Type = List.collect (fun (_, x, e) -> match e with (Some _) -> [] | _ -> [x]) bs_promote in
-  // printfn "// examining %s" d.f_name;
+  //printfn "// examining %s" d.f_name;
   reason := None;
   let typed_binders = List.forall (fun (_, _, t) -> Option.isSome t) in
   let rec add_binders (bs:f_binder list) (e:f_exp):f_exp =
@@ -965,8 +965,14 @@ let rec tree_of_vale_exp (e:v_exp):string_tree =
   | VLet (x, t, e1, e2) ->
       st_paren [st_list [st_leaf "let"; st_leaf x; st_leaf ":"; tree_of_vale_type t; st_leaf ":="; r e1; st_leaf "in"]; r e2]
 
+let is_type_param (a:aqual) (t:f_exp option):bool =
+  match (a, t) with
+  | ((Implicit | Equality), _) -> true
+  | (_, Some (EType _)) -> true
+  | _ -> false
+
 // returns parameters, requires, ensures, return type
-let rec take_params (e:f_exp):(effect * f_binder list * f_exp list * (id * f_exp) option * f_exp) =
+let rec take_params (env:env) (only_implicits_so_far:bool) (e:f_exp):(effect * f_binder list * f_exp list * (id * f_exp) option * f_exp) =
   let may_be_refine_req (x:id) (e:f_exp):(f_exp list * f_exp) =
     match e with
     | ERefine (x1, e1, e2) ->
@@ -980,17 +986,31 @@ let rec take_params (e:f_exp):(effect * f_binder list * f_exp list * (id * f_exp
     | _ -> (None, e)
     in
   match e with
-  | EArrow (a, x, t, e2) ->
+  | EArrow (a, ({name = Some xx} as x), t, e2) ->
       let (req, t) = may_be_refine_req x t in
       let b = (a, x, Some t) in
-      let (effect, bs, reqs, enss, e) = take_params e2 in
+      let dx = { f_name = xx; f_qualifiers = []; f_category = (if is_type_param a (Some t) then "type" else "val"); f_udecls = []; f_binders = []; f_typ = t; f_body = None} in
+      let env = Map.add xx dx env in
+      let (effect, bs, reqs, enss, e) = take_params env (only_implicits_so_far && (a = Implicit)) e2 in
       (effect, b::bs, req @ reqs, enss, e)
   | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma" as g)}, e1, [req; EFun ([(_, xens, _)], ens)]) ->
       let effect = match g with "Prims.Ghost" -> EffectGhost | "Prims.Lemma" -> EffectLemma | _ -> EffectOther in
-      if keep_req_ens then
-        (effect, [], [req], Some (xens, ens), e1)
-      else
-        (effect, [], [], None, e1)
+      let is_nontrivial e =
+        match e with
+        | EId {name = Some "Prims.l_True"} -> false
+        | _ -> true
+        in
+      let reqs = if keep_req_ens && is_vale_exp env req && is_nontrivial req then [req] else [] in
+      let enss = if keep_req_ens && is_vale_exp env ens && is_nontrivial ens then Some (xens, ens) else None in
+      (effect, [], reqs, enss, e1)
+  | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, ((EArrow _) as e))])
+  | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, ((EArrow _) as e), []) when only_implicits_so_far ->
+      // For "let f1 = f2" declarations,
+      // when f2 has a polymorphic function type with implicit parameters,
+      // --use_two_phase_tc true causes f1 to have a different type from f2.
+      // (If f2 has type "#a -> b -> Tot c", f1 has type "#a -> Tot (b -> Tot c)".)
+      // As a heuristic, try to eliminate the extra Tot:
+      take_params env true e
   | EComp (EId {name = Some ("Prims.Tot" | "Prims.GTot")}, e, [])
   | EApp (EId {name = Some ("Tot" | "GTot")}, [(_, e)])
   | e ->
@@ -1018,19 +1038,14 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
     )
   | "val" ->
     (
-      let (effect, bs, reqs, enss, t) = take_params d.f_typ in
+      let (effect, bs, reqs, enss, t) = take_params env true d.f_typ in
       let is_proc = match effect with EffectGhost | EffectLemma -> true | EffectOther -> false in
       let bs = d.f_binders @ bs in
-      let (prefix, ps) =
+      let (prefix, attrs, ps) =
         match bs with
-        | [] -> ("const", [])
+        | [] -> ("const", [], [])
         | _ ->
-            let is_tparam (a, _, t) =
-              match (a, t) with
-              | ((Implicit | Equality), _) -> true
-              | (_, Some (EType _)) -> true
-              | _ -> false
-              in
+            let is_tparam (a, _, t) = is_type_param a t
             let (bst, bsv) = List.partition is_tparam bs in
             let promote_binder (a, x, e) =
               let e =
@@ -1057,8 +1072,13 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
               | (true, [(_, _, Some (EId {name = Some "Prims.unit"}))]) -> []
               | _ -> bsv
               in
-            ((if is_proc then "ghost procedure" else "function"),
-              tparams @ [st_paren (trees_of_comma_list (List.map fv bsv))])
+            let (prefix, attrs) =
+              match (is_proc, effect) with
+              | (true, EffectLemma) -> ("ghost procedure", [st_leaf "{:infer_spec}"])
+              | (true, _) -> ("ghost procedure", [])
+              | (false, _) -> ("function", [])
+              in
+            (prefix, attrs, tparams @ [st_paren (trees_of_comma_list (List.map fv bsv))])
         in
       let tree_req = List.map (fun e -> st_list [st_leaf "requires"; tree_of_vale_exp (vale_exp_of_exp env e); st_leaf ";"]) reqs in
       let vale_t = vale_type_of_exp env t in
@@ -1086,7 +1106,7 @@ let tree_of_vale_decl (env:env) (d:f_decl):string_tree =
         | EffectGhost -> [st_leaf "returns"; tree_t]
         | EffectOther -> [st_leaf ":"; tree_t]
         in
-      let typing = ret @ tree_req @ tree_ens @ [st_leaf "extern"; st_leaf ";"] in
+      let typing = ret @ attrs @ tree_req @ tree_ens @ [st_leaf "extern"; st_leaf ";"] in
       st_list ([st_leaf prefix; tree_of_vale_name d.f_name] @ ps @ typing)
     )
   | _ -> err ("internal error: tree_of_vale_decl: " + d.f_category)

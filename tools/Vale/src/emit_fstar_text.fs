@@ -12,7 +12,7 @@ let prevResetOptionsPsi = ref ""
 
 let sid (x:id):string =
   match x with
-  | Id s -> s
+  | Id s -> if s.StartsWith("uu___") then "_" + s else s
   | Reserved s -> qprefix "va_" s
   | Operator s -> internalErr (sprintf "custom operator: %A" x)
 
@@ -68,6 +68,8 @@ let string_of_bop (op:bop):string =
 let string_of_ghost (g:ghost) = ""
 let string_of_var_storage (g:var_storage) = ""
 
+let string_of_int (i:bigint):string =
+  if i < bigint.Zero then "(" + string i + ")" else string i
 
 let rec string_of_typ (t:typ):string =
   match t with
@@ -76,17 +78,20 @@ let rec string_of_typ (t:typ):string =
   | TApply (x, ts) -> "(" + (sid x) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
   | TBool BpBool -> "bool"
   | TBool BpProp -> "prop"
-  | TInt (Int k1, Int k2) -> "(va_int_range " + string k1 + " " + string k2 + ")"
-  | TInt (Int k1, Inf) -> "(va_int_at_least " + string k1 + ")"
-  | TInt (NegInf, Int k2) -> "(va_int_at_most " + string k2 + ")"
+  | TInt (Int k1, Int k2) -> "(va_int_range " + string_of_int k1 + " " + string_of_int k2 + ")"
+  | TInt (Int k1, Inf) -> "(va_int_at_least " + string_of_int k1 + ")"
+  | TInt (NegInf, Int k2) -> "(va_int_at_most " + string_of_int k2 + ")"
   | TInt (_, _) -> "int"
   | TTuple [] -> "unit"
   | TTuple ts -> "(" + (String.concat " & " (List.map string_of_typ ts)) + ")"
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
-let string_of_type_argument (t:typ):string = "#" + string_of_typ t
-let string_of_type_arguments (ts:typ list option):string = 
+let string_of_type_argument ((q:tqual), (t:typ)):string =
+  match q with
+  | TqExplicit -> string_of_typ t
+  | TqImplicit -> "#" + string_of_typ t
+let string_of_type_arguments (ts:(tqual * typ) list option):string = 
   match ts with 
   | None -> ""
   | Some [] -> "" 
@@ -100,7 +105,7 @@ let rec string_of_exp_prec prec e =
     match e with
     | ELoc (loc, ee) -> try (r prec ee, prec) with err -> raise (LocErr (loc, err))
     | EVar (x, _) -> (sid x, 99)
-    | EInt i -> (string i, 99)
+    | EInt i -> (string_of_int i, 99)
     | EReal r -> (r, 99)
     | EBitVector (n, i) -> ("bv" + (string n) + "(" + (string i) + ")", 99)
     | EBool true -> ("true", 99)
@@ -188,7 +193,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindAlias, _, _, _, e, t) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e, t) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
-    | ECast (e, t) -> (r prec e, prec) // TODO: add type conversion
+    | ECast (c, e, t) -> (r prec e, prec) // TODO: add type conversion
     | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr  (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"

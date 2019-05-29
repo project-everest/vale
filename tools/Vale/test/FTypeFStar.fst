@@ -16,6 +16,9 @@ assume val ff3 (z:int) : Ghost int (requires True) (ensures fun y -> xeq2 10 20 
 assume val ff4 (_:unit) : Lemma True
 // TODO: Ghost returning tuple should be converted to multiple return values
 
+assume val ffreq2 (z:int) : Pure int (requires z > 0) (ensures fun _ -> True)
+//assume val ffreq2 (z:int) : Pure int (requires True) (ensures fxeq2)
+
 let natN (n:nat) = x:nat{x < n}
 let nat8 = natN 256
 

@@ -111,12 +111,31 @@ let update_state_mods_weaken (mods mods':mods_t) (s' s:state) : Lemma
   FStar.Classical.forall_intro f1;
   update_state_mods_to mods' s' s
 
-let call_QLemma (#a:Type0) (#cs:codes) (r:range) (msg:string) (pre:((unit -> GTot Type0) -> GTot Type0)) (l:unit -> PURE unit pre) (qcs:quickCodes a cs) (mods:mods_t) (k:state -> a -> Type0) (s0:state) :
-  Lemma
-  (requires (forall (p:unit -> GTot Type0). (wp cs qcs mods k s0 ==> p ()) ==> label r msg (pre p)))
-  (ensures (wp cs qcs mods k s0))
+let call_QPURE
+    (#a:Type0) (#cs:codes) (r:range) (msg:string) (pre:((unit -> GTot Type0) -> GTot Type0))
+    (l:unit -> PURE unit pre) (qcs:quickCodes a cs) (mods:mods_t) (k:state -> a -> Type0) (s0:state)
+  : Lemma
+  (requires
+    (forall (p:unit -> GTot Type0).{:pattern pre p}
+      (wp cs qcs mods k s0 ==> p ()) ==> label r msg (pre p)))
+  (ensures wp cs qcs mods k s0)
   =
   l ()
+
+(*
+let call_QBindPURE
+    (#a #b:Type0) (#cs:codes) (r:range) (msg:string) (pre:((b -> GTot Type0) -> GTot Type0))
+    (l:unit -> PURE b pre) (qcs:state -> b -> GTot (quickCodes a cs)) (mods:mods_t)
+    (k:state -> a -> Type0) (s0:state)
+  : Ghost b
+  (requires
+    (forall (p:b -> GTot Type0).{:pattern pre p}
+      (forall (g:b).{:pattern guard_free (p g)}
+        wp cs (qcs s0 g) mods k s0 ==> p g) ==> label r msg (pre p)))
+  (ensures fun g -> (wp cs (qcs s0 g) mods k s0))
+  =
+  l ()
+*)
 
 let rec wp_sound #a cs qcs mods k s0 =
   let qcs0 = qcs in
@@ -151,11 +170,27 @@ let rec wp_sound #a cs qcs mods k s0 =
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       (sN, fN', gN)
   | QPURE r msg pre l qcs' ->
-      call_QLemma r msg pre l qcs' mods k s0;
+      call_QPURE r msg pre l qcs' mods k s0;
       wp_sound cs qcs' mods k s0
+(*
+  | QBindPURE b r msg pre l qcs' ->
+      let c::cs = cs in
+      let (sM, fM) = va_lemma_empty_total s0 [] in
+      let g = call_QBindPURE r msg pre l qcs' mods k s0 in
+      let (sN, fN, gN) = wp_sound cs (qcs' s0 g) mods k s0 in
+      let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
+      (sN, fN', gN)
+*)
   | QLemma _ _ pre post l qcs' ->
       l ();
       wp_sound cs qcs' mods k s0
+  | QGhost b _ _ pre post l qcs' ->
+      let c::cs = cs in
+      let (sM, fM) = va_lemma_empty_total s0 [] in
+      let g = l () in
+      let (sN, fN, gN) = wp_sound cs (qcs' g) mods k s0 in
+      let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
+      (sN, fN', gN)
 
 let qblock_proof #a #cs qcs mods s0 k =
   wp_sound cs (qcs s0) mods k s0
@@ -238,6 +273,7 @@ let qWhile_proof #a #d #c b qc mods inv dec g0 s0 k =
 
 let qAssertLemma p = fun () -> ()
 let qAssumeLemma p = fun () -> assume p
+let qAssertSquashLemma p = fun () -> ()
 
 let qAssertByLemma #a p qcs mods s0 =
   fun () -> let _ = wp_sound [] qcs mods (fun _ _ -> p) s0 in ()

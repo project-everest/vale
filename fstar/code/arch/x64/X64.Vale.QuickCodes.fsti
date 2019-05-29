@@ -48,15 +48,36 @@ let if_code (b:bool) (c1:code) (c2:code) : code = if b then c1 else c2
 
 noeq type quickCodes (a:Type0) : codes -> Type =
 | QEmpty: a -> quickCodes a []
-| QSeq: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string -> quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
-| QBind: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string -> quickCode b c -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a (c::cs)
+| QSeq: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string ->
+    quickCode b c -> quickCodes a cs -> quickCodes a (c::cs)
+| QBind: #b:Type -> #c:code -> #cs:codes -> r:range -> msg:string ->
+    quickCode b c -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a (c::cs)
 | QGetState: #cs:codes -> (state -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
-| QPURE: #cs:codes -> r:range -> msg:string -> pre:((unit -> GTot Type0) -> GTot Type0) -> (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
-| QLemma: #cs:codes -> r:range -> msg:string -> pre:Type0 -> post:Type0 -> (unit -> Lemma (requires pre) (ensures post)) -> quickCodes a cs -> quickCodes a cs
+| QPURE: #cs:codes -> r:range -> msg:string -> pre:((unit -> GTot Type0) -> GTot Type0) ->
+    (unit -> PURE unit pre) -> quickCodes a cs -> quickCodes a cs
+//| QBindPURE: #cs:codes -> b:Type -> r:range -> msg:string -> pre:((b -> GTot Type0) -> GTot Type0) ->
+//    (unit -> PURE b pre) -> (state -> b -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
+| QLemma: #cs:codes -> r:range -> msg:string -> pre:Type0 -> post:Type0 ->
+    (unit -> Lemma (requires pre) (ensures post)) -> quickCodes a cs -> quickCodes a cs
+| QGhost: #cs:codes -> b:Type -> r:range -> msg:string -> pre:Type0 -> post:(b -> Type0) ->
+    (unit -> Ghost b (requires pre) (ensures post)) -> (b -> GTot (quickCodes a cs)) -> quickCodes a ((Block [])::cs)
 
 [@va_qattr]
-let qPURE (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) (r:range) (msg:string) ($l:unit -> PURE unit pre) (qcs:quickCodes a cs) : quickCodes a cs =
+let qPURE
+    (#cs:codes) (#pre:(unit -> GTot Type0) -> GTot Type0) (#a:Type0) (r:range) (msg:string)
+    ($l:unit -> PURE unit pre) (qcs:quickCodes a cs)
+  : quickCodes a cs =
   QPURE r msg pre l qcs
+
+(* REVIEW: this might be useful, but inference of pre doesn't work as well as for qPURE
+  (need to provide pre explicitly; as a result, no need to put $ on l)
+[@va_qattr]
+let qBindPURE
+    (#a #b:Type0) (#cs:codes) (pre:(b -> GTot Type0) -> GTot Type0) (r:range) (msg:string)
+    (l:unit -> PURE b pre) (qcs:state -> b -> GTot (quickCodes a cs))
+  : quickCodes a ((Block [])::cs) =
+  QBindPURE b r msg pre l qcs
+*)
 
 [@va_qattr]
 let wp_proc (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:state -> a -> Type0) : Type0 =
@@ -93,8 +114,19 @@ let rec wp (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (mods:mods_t) (k:state ->
         (forall (u:unit).{:pattern (guard_free (p u))} wp cs qcs mods k s0 ==> p ())
         ==>
         label r msg (pre p))
+(*
+  | QBindPURE b r msg pre l qcs ->
+      let c::cs = cs in
+      (forall (p:b -> GTot Type0).//{:pattern (pre p)}
+        (forall (g:b).{:pattern (guard_free (p g))} wp cs (qcs s0 g) mods k s0 ==> p g)
+        ==>
+        label r msg (pre p))
+*)
   | QLemma r msg pre post l qcs ->
       label r msg pre /\ (post ==> wp cs qcs mods k s0)
+  | QGhost b r msg pre post l qcs ->
+      let c::cs = cs in
+      label r msg pre /\ (forall (g:b). post g ==> wp cs (qcs g) mods k s0)
 // Hoist lambdas out of main definition to avoid issues with function equality
 and wp_Seq (#a:Type0) (#b:Type0) (cs:codes) (qcs:quickCodes b cs) (mods:mods_t) (k:state -> b -> Type0) :
   Tot (wp_Seq_t a) (decreases %[cs; 1; qcs])
@@ -265,6 +297,15 @@ val qAssumeLemma (p:Type0) : tAssumeLemma p
 [@va_qattr]
 let qAssume (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:quickCodes a cs) : quickCodes a cs =
   QLemma r msg True e (qAssumeLemma e) qcs
+
+let tAssertSquashLemma (p:Type0) = unit -> Ghost (squash p) (requires p) (ensures fun () -> p)
+val qAssertSquashLemma (p:Type0) : tAssertSquashLemma p
+
+[@va_qattr]
+let qAssertSquash
+    (#a:Type) (#cs:codes) (r:range) (msg:string) (e:Type0) (qcs:squash e -> GTot (quickCodes a cs))
+  : quickCodes a ((Block [])::cs) =
+  QGhost (squash e) r msg e (fun () -> e) (qAssertSquashLemma e) qcs
 
 let tAssertByLemma (#a:Type) (p:Type0) (qcs:quickCodes a []) (mods:mods_t) (s0:state) =
   unit -> Lemma (requires wp [] qcs mods (fun _ _ -> p) s0) (ensures p)
