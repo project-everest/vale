@@ -1060,7 +1060,7 @@ and unify env (m:substitutions) (tc:typ_constraints):substitutions =
     unify env m t
 *)
 
-let compute_type_arguments (env:env) (u:unifier) (tparams:tformal list) (ts_opt:(tqual * typ) list option): substitutions =
+let compute_type_arguments (env:env) (u:unifier) (tparams:tformal list) (ts_opt:(tqual * typ) list option):substitutions =
   let targOpts =
     match ts_opt with
     | None -> List.map (fun _ -> None) tparams
@@ -1085,7 +1085,7 @@ let compute_instance (env:env) (u:unifier) (targMap:substitutions):(typ -> typ) 
 
 let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (ts_opt:(tqual * typ) list option):fun_instance =
   let targMap = compute_type_arguments env u f.ftargs ts_opt in
-  let targs = Map.fold (fun l x t -> l@[t]) [] targMap in
+  let targs = List.map (fun (x, _, _) -> Map.find x targMap) f.ftargs in
   let arg_typ = compute_instance env u targMap in
   let args =
     List.fold
@@ -1098,7 +1098,7 @@ let compute_fun_instance (env:env) (u:unifier) (f:fun_decl) (ts_opt:(tqual * typ
 
 let compute_proc_instance (env:env) (u:unifier) (p:proc_decl) (ts_opt:(tqual * typ) list option):proc_instance =
   let targMap = compute_type_arguments env u p.ptargs ts_opt in
-  let targs = Map.fold (fun l x t -> l@[t]) [] targMap in
+  let targs = List.map (fun (x, _, _) -> Map.find x targMap) p.ptargs in
   let arg_typ = compute_instance env u targMap in
   let fformal (x, t, storage, io, attrs):pformal =
     let t =
