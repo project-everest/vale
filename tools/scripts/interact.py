@@ -18,6 +18,9 @@
 #     - A change to a {:public} Vale procedure's spec causes the fsti file to change
 #       (a change to a non-public Vale procedure's spec does not change the fsti file,
 #       and does not need a reset)
+# - We recommend running with the commandline tool rlwrap, e.g.,
+#       python interact.py -f obj/MyFile.fst.checked.cmd
+#   which will give you a readline-interface.  For example, it will give you arrow-based command history.
 
 import sys
 import argparse
@@ -41,7 +44,10 @@ def add_cmd(argv, short, long, args, name, dest, req):
         return None
 
 argv = sys.argv[1 : ]
-argparser = argparse.ArgumentParser()
+helper_text  = "We recommend running this script using the commandline tool 'rlwrap', "
+helper_text += "which will give you a readline-interface.  "
+helper_text += "For example, it will give you arrow-based command history."
+argparser = argparse.ArgumentParser(description=helper_text)
 cmd_fstar = add_cmd(argv, '-f', '--fstar-cmd', '--fstar-args', 'F*', 'cmd_file_fstar', True)
 cmd_vale = add_cmd(argv, '-v', '--vale-cmd', '--vale-args', 'Vale', 'cmd_file_vale', False)
 argparser.add_argument('--fstar-file', action = 'store', dest = 'file_fstar',
