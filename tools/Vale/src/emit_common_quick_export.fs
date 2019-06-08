@@ -25,7 +25,7 @@ Example: Add64
   ENS = x == (va_eval_dst_opr64 s0 dst) + (va_eval_opr64 s0 src)
   UPDATES = (update_operand dst x ({s0 with flags = flags}))
   UPDATES_SM = (update_operand dst (eval_operand dst sM) ({s0 with flags = sM.flags}))
-  PMODS = [va_mod_dst_opr64 dst; Mod_flags]
+  PMODS = [va_mod_dst_opr64 dst; va_Mod_flags]
 
 // Function
 let wp_X PARAMS (s0:state) (k:state -> A -> Type0) : Type0 =

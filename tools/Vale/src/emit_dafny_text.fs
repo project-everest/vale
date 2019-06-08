@@ -49,6 +49,7 @@ let string_of_var_storage (g:var_storage) = match g with XGhost -> "ghost " | _ 
 
 let rec string_of_typ (t:typ):string =
   match t with
+  | TName (Id "state") -> sid (Reserved "state")
   | TName x -> sid x
   | TApply (x, ts) -> (sid x) + "<" + (String.concat ", " (List.map string_of_typ ts)) + ">"
   | TBool _ -> "bool"

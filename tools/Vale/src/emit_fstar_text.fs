@@ -73,6 +73,7 @@ let string_of_int (i:bigint):string =
 
 let rec string_of_typ (t:typ):string =
   match t with
+  | TName (Id "state") -> sid (Reserved "state")
   | TName x -> sid x
   | TApply (x, []) -> "(" + (sid x) + " ())"
   | TApply (x, ts) -> "(" + (sid x) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
