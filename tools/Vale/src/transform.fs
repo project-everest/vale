@@ -132,7 +132,7 @@ let rec env_map_exp (f:env -> exp -> exp map_modify) (env:env) (e:exp):exp =
         EBind (b, es, fs, List.map (List.map r) ts, r e, t)
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
-    | ECast (e, t) -> ECast (r e, t)
+    | ECast (c, e, t) -> ECast (c, r e, t)
     | ELabel (loc, e) -> ELabel (loc, r e)
   )
 
@@ -173,7 +173,7 @@ let rec env_stmt (env:env) (s:stmt):(env * env) =
   | SAssign (xs, e) ->
       let ids = List.fold (fun ids (x, dOpt) -> match dOpt with None -> ids | Some (t, _) -> Map.add x (GhostLocal (Mutable, t)) ids) env.ids xs in
       (env, {env with ids = ids})
-  | SLetUpdates _ | SBlock _ | SQuickBlock _ | SIfElse _ | SWhile _ -> (env, env)
+  | SLetUpdates _ | SBlock _ | SIfElse _ | SWhile _ -> (env, env)
   | SForall (xs, ts, ex, e, b) ->
       ({env with ids = List.fold (fun env (x, t) -> Map.add x (GhostLocal (Immutable, t)) env) env.ids xs}, env)
   | SExists (xs, ts, e) ->
@@ -198,7 +198,6 @@ let rec env_map_stmt (fe:env -> exp -> exp) (fs:env -> stmt -> (env * stmt list)
     | SAssign (xs, e) -> (snd (env_stmt env s), [SAssign (xs, fee e)])
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock b -> (env, [SBlock (rs b)])
-    | SQuickBlock (x, b) -> (env, [SQuickBlock (x, rs b)])
     | SIfElse (g, e, b1, b2) -> (env, [SIfElse (g, fee e, rs b1, rs b2)])
     | SWhile (e, invs, ed, b) ->
         (env, [SWhile (fee e, List_mapSnd fee invs, mapSnd (List.map fee) ed, rs b)])
@@ -307,7 +306,7 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
       | (_, _, XOperand, io, _) ->
         (
           match skip_loc ea with
-          | ECast (e, _) ->
+          | ECast (_, e, _) ->
             collect_operand (pp, e)
           | EVar (x, _) ->
             (
@@ -395,7 +394,6 @@ let rec compute_read_mods_stmt (env0:env) (env1:env) (s:stmt):(env * Set<id> * S
       (env1, Set.union rs0 reads, readsOld, Set.union mods0 mods)
   | SLetUpdates _ -> internalErr "SLetUpdates"
   | SBlock b -> rs b
-  | SQuickBlock (_, b) -> rs b
   | SIfElse (g, e, b1, b2) ->
       let (_, rs0, rso0, _) = compute_exps [e] in
       let (_, rs1, rso1, mods1) = rs b1 in
@@ -723,7 +721,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         | _ -> err ("memory operand must have the form mem[base + offset] where mem is a variable")
       )
 *)
-    | (NotGhost, ECast(e, t)) -> Unchanged  // TODO: need to rewrite e
+    | (NotGhost, ECast(_, e, t)) -> Unchanged  // TODO: need to rewrite e
     | (NotGhost, _) ->
         err "unsupported expression (if the expression is intended as a load/store operand, try declaring 'operand_type x(...):...')"
         // Replace (codeLemma e)
@@ -922,97 +920,74 @@ let check_no_duplicates (es:(loc * exp) list):unit =
   f ss
 
 ///////////////////////////////////////////////////////////////////////////////
-// Add quick blocks for assert{:quick_start}...assert{:quick_end}
+// Insert quick-code checks that expression preconditions are satisfied
 
-let is_assert_quick_start (s:stmt):bool =
-  match skip_loc_stmt s with
-  | SAssert ({is_quickstart = true}, e) ->
-    (
-      match skip_loc e with
-      | EBool true -> true
-      | _ -> false
-    )
-  | _ -> false
+let rec subst_label_exp (addLabels:bool) (e:exp):exp =
+  let addLabel loc e = 
+    let range = evar (Id "range1") in
+    let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
+    eapply (Id "label") [range; msg; e]
+  in
+  let f e =
+    match e with
+    | ELabel (l, e) -> Replace (if addLabels then addLabel l (subst_label_exp addLabels e) else (subst_label_exp addLabels e))
+    | _ -> Unchanged
+  in
+  map_exp f e
 
-let is_assert_quick_end (s:stmt):bool =
-  match skip_loc_stmt s with
-  | SAssert ({is_quickend = true}, e) ->
-    (
-      match skip_loc e with
-      | EBool true -> true
-      | _ -> false
-    )
-  | _ -> false
+let collect_spec (addLabels:bool) (loc:loc, s:spec):(exp list * exp list) =
+  try
+    match s with
+    | Requires (_, e) -> ([e], [])
+    | Ensures (_, e) -> ([], [subst_label_exp addLabels e])
+    | Modifies _ -> ([], [])
+    | SpecRaw _ -> internalErr "SpecRaw"
+  with err -> raise (LocErr (loc, err))
 
-let rec collect_mods_assign (env:env) (lhss:lhs list) (e:exp):id list =
-  match e with
-  | ELoc (loc, e) ->
-      try collect_mods_assign env lhss e
-      with err -> raise (LocErr (loc, err))
-  | EApply(e, _, es, _) when is_id e ->
-    (
-      let x = id_of_exp e in
-      match Map.tryFind x env.procs with
-      | None -> []
-      | Some p ->
-          let fArg e =
-            match skip_loc e with
-            | EOp (StateOp (x, _, _), _, _) -> [x]
+let collect_specs (addLabels:bool) (ss:(loc * spec) list):(exp list * exp list) =
+  let (rs, es) = List.unzip (List.map (collect_spec addLabels) ss) in
+  (List.concat rs, List.concat es)
+
+let rename_args (xts:tformal list) (xs:formal list) (ts:(tqual * typ) list option) (es:exp list) (e:exp):exp =
+  let xts = List.map (fun (x, _, _) -> (x, None)) xts in // HACK: ignore the kinds
+  let f = ebind Lambda [] (xts @ xs) [] e in
+  let ts = Option.map (fun ts -> List.map (fun (_, t) -> (TqExplicit, t)) ts) ts in
+  EApply (f, ts, es, None)
+
+let add_assert_quicktype_for_exp_reqs (env:env) (ss:stmt list):stmt list =
+  let fs (s:stmt) =
+    let gather_exp_reqs (e:exp) (children:exp list list):exp list =
+      let children = List.concat children in
+      match e with
+      | EApply (e, ts, es, _) when is_id e && Map.containsKey (id_of_exp e) env.funs ->
+        (
+          let x = id_of_exp e in
+          let f = Map.find x env.funs in
+          let (reqs, enss) = collect_specs false f.fspecs in
+          match reqs with
+          | [] -> children
+          | _ ->
+              let ereqs = rename_args f.ftargs f.fargs ts es (and_of_list reqs) in
+              children @ [ereqs] // children come first, since they may be needed to type-check ereqs
+        )
+      | ECast (Downcast, e, TInt (b1, b2)) ->
+          let make_req b bop =
+            match b with
+            | Int i -> [eop (Bop bop) [e; EInt i]]
             | _ -> []
             in
-          let xsOut = List.collect fArg es in
-          xsOut @ (collect_mods p)
-    )
-  | _ -> []
-
-let collect_mods_stmts (env:env) (ss:stmt list):id list =
-  let fe (e:exp) (mods:id list list):id list = List.concat mods in
-  let fs (s:stmt) (mods:id list list):id list =
-    match s with
-    | SAssign (lhss, e) -> List.concat ((collect_mods_assign env lhss e)::mods)
-    | _ -> List.concat mods
-    in
-  let mods = gather_stmts fs fe ss in
-  Set.toList (Set.ofList (List.concat mods))
-
-let rec add_quick_blocks_stmt (env:env) (next_sym:int ref) (s:stmt):stmt =
-  let r = add_quick_blocks_stmt env next_sym in
-  let rs = add_quick_blocks_stmts env next_sym in
-  match s with
-  | SLoc (loc, s) -> SLoc (loc, r s)
-  | SLabel _ | SGoto _ | SReturn | SAssume _ | SAssert _ | SAssign _ | SCalc _ | SVar _ | SAlias _ | SForall _ | SExists _-> s
-  | SLetUpdates _ -> internalErr "SLetUpdates"
-  | SQuickBlock _ -> internalErr "SQuickBlock"
-  | SBlock b -> SBlock (rs b)
-  | SIfElse (g, e, b1, b2) -> SIfElse (g, e, rs b1, rs b2)
-  | SWhile (e, invs, ed, b) -> SWhile (e, invs, ed, rs b)
-and collect_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):(stmt list * stmt list) =
-  match ss with
-  | [] -> ([], [])
-  | s::ss when is_assert_quick_end s -> ([], ss)
-  | s::ss ->
-      let (ss1, ss2) = collect_quick_blocks_stmts env next_sym ss in
-      (s::ss1, ss2)
-and add_quick_blocks_stmts (env:env) (next_sym:int ref) (ss:stmt list):stmt list =
-  match ss with
-  | [] -> []
-  | s::ss when is_assert_quick_start s ->
-      incr next_sym;
-      let sym = string !next_sym in
-      let (ss1, ss2) = collect_quick_blocks_stmts env next_sym ss in
-      let info = {qsym = sym; qmods = collect_mods_stmts env ss1} in
-      (SQuickBlock (info, ss1))::(add_quick_blocks_stmts env next_sym ss2)
-  | s::ss -> (add_quick_blocks_stmt env next_sym s)::(add_quick_blocks_stmts env next_sym ss)
-
-let add_quick_type_stmts (ss:stmt list):stmt list =
-  let sym = ref 0 in
-  let fs (s:stmt) =
-    match s with
-    | SAssert ({is_quicktype = true}, e) ->
-        incr sym;
-        let x = Reserved ("u" + (string !sym)) in
-        Replace [SAssign ([(x, Some (None, Ghost))], eapply (Id "AssertQuickType") [e])]
-    | _ -> Unchanged
+          children @ make_req b1 BGe @ make_req b2 BLe
+      // TODO: turn all EBind into forall
+      // TODO: special treatment of ==>, if-then-else
+      | _ -> children
+      in
+    let exp_reqs = List.concat (gather_exps_in_stmt List.concat gather_exp_reqs s) in
+    match exp_reqs with
+    | [] -> Unchanged
+    | _ ->
+        let e = and_of_list exp_reqs in
+        let sAssert = SAssert ({assert_attrs_default with is_quicktype = Some true}, e) in
+        Replace [sAssert; s]
     in
   map_stmts (fun e -> e) fs ss
 
@@ -1311,9 +1286,8 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
         let ss = if isFrame then map_stmts (fun e -> e) add_while_ok ss else ss in
         let ss = resolve_overload_stmts envp ss in
         //let ss = assume_updates_stmts envp p.pargs p.prets ss (List.map snd pspecs) in
-        let ss = add_quick_type_stmts ss in
         let ss = rewrite_vars_stmts envp ss in
-        let ss = add_quick_blocks_stmts envp (ref 0) ss in
+        let ss = if isQuick then add_assert_quicktype_for_exp_reqs envp ss else ss in
         Some ss
     in
   let f_attr (x, es) =
@@ -1347,6 +1321,8 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )
   | DFun ({fbody = None} as f) ->
+      let (_, specs) = env_map_specs (fun _ e -> e) desugar_spec env f.fspecs in
+      let f = {f with fspecs = specs} in
       ([], {env with funs = Map.add f.fname f env.funs})
   | DProc p ->
     (

@@ -26,7 +26,7 @@ let add_reprint_decl (env:env) (loc:loc) (d:decl):unit =
         let fs (s:stmt):stmt list map_modify =
           let modGhost = if !reprint_ghost_stmts then Unchanged else Replace [] in
           match s with
-          | SLoc _ | SLabel _ | SGoto _ | SReturn | SAlias _ | SLetUpdates _ | SBlock _ | SQuickBlock _ -> Unchanged
+          | SLoc _ | SLabel _ | SGoto _ | SReturn | SAlias _ | SLetUpdates _ | SBlock _ -> Unchanged
           | SIfElse ((SmInline | SmPlain), _, _, _) -> Unchanged
           | SWhile _ when !reprint_loop_invs -> Unchanged
           | SWhile (e, _, (l, _), s) -> Replace [SWhile (e, [], (l, []), s)]
@@ -59,7 +59,14 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
           if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
           let ds_p = Emit_common_lemmas.build_proc envBody envr loc p in
           let ds_q = if isQuick && not !no_lemmas then Emit_common_quick_export.build_proc envr loc p else [] in
-          ds_p @ ds_q
+          let comment (s:string) : loc * decl =
+            let isPublic = attrs_get_bool (Id "public") false p.pattrs in
+            let attrs = if isPublic then [(Id "interface", []); (Id "implementation", [])] else [] in
+            (loc, DVerbatim (attrs, [s]))
+            in
+          let beginComment = comment ("//-- " + (err_id p.pname)) in
+          let endComment = comment "//--" in
+          [beginComment] @ ds_p @ ds_q @ [endComment]
         else
           []
     | DVerbatim (attrs, lines) ->

@@ -387,6 +387,8 @@ and create_expression (built_ins:BuiltIns) (loc:loc) (x:exp):Expression =
       | EBind (BindSet, [], xs, ts, e, _) ->
           notImplemented "BindSet"
       | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr "EBind"
+      | ECast (_, e, _) -> create_expression built_ins loc e
+      | ELabel (l, e) -> create_expression built_ins loc e
       | _ -> internalErr (sprintf "unexpected create_expression %A" x)
   with err -> raise (LocErr (loc, err))
 
@@ -554,7 +556,6 @@ let rec create_stmt (built_ins:BuiltIns) (loc:loc) (s:stmt):ResizeArray<Statemen
         stmts
     | SLetUpdates _ -> internalErr "SLetUpdates"
     | SBlock ss -> notImplemented "block"
-    | SQuickBlock _ -> internalErr "quick_block"
     | SIfElse (_, e, ss1, ss2) ->
         let tok = create_token loc "if" in
         let guard = create_expression built_ins loc e in

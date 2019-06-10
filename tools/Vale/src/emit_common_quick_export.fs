@@ -37,19 +37,6 @@ let wp_X PARAMS (s0:state) (k:state -> A -> Type0) : Type0 =
   )
 
 // Procedure
-val wpMonotone_X PARAMS (s0:state) (k1:state -> A -> Type0) (k2:state -> A -> Type0) : Lemma
-  (requires (forall (s:state) (g:A). k1 s g ==> k2 s g))
-  (ensures wp_X ARGS s0 k1 ==> wp_X ARGS s0 k2) =
-let wpMonotone_X PARAMS s0 k1 k2 = ()
-
-val wpCompute_X PARAMS (s0:state) : Ghost (state * fuel * A)
-  (requires wp_X ARGS s0 k_true)
-  (ensures fun _ -> True)
-let wpCompute_X PARAMS s0 =
-  let (sM, f0, g1, ..., gn) = va_lemma_X (va_code_X ARGS) s0 ARGS in
-  let g = (g1, ..., gn) in
-  (sM, f0, g)
-
 val wpProof_X PARAMS (s0:state) (k:state -> A -> Type0) : Lemma
   (requires wp_X ARGS s0 k)
   (ensures t_ensure (va_code_X ARGS) PMODS (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
@@ -58,12 +45,13 @@ let wpProof_X PARAMS s0 k =
   va_lemma_upd_update sM;
   assert (state_eq sM UPDATES_SM);
   lemma_norm_mods PMODS sM s0;
-  ()
+  let g = (g1, ..., gn) in
+  (sM, f0, g)
 
 // Function
 [@"opaque_to_smt"]
 let quick_X PARAMS : quickCode A (va_code_X ARGS) =
-  va_QProc (va_code_X ARGS) PMODS (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
+  va_QProc (va_code_X ARGS) PMODS (wp_X ARGS) (wpProof_X ARGS)
 *)
 
 let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
@@ -94,8 +82,6 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     | xts -> TTuple (List.map snd xts)
     in
   let wp_X = Reserved ("wp_" + (string_of_id p.pname)) in
-  let wpMonotone_X = Reserved ("wpMonotone_" + (string_of_id p.pname)) in
-  let wpCompute_X = Reserved ("wpCompute_" + (string_of_id p.pname)) in
   let wpProof_X = Reserved ("wpProof_" + (string_of_id p.pname)) in
   let lemma_X = Reserved ("lemma_" + (string_of_id p.pname)) in
   let s = Reserved "s" in
@@ -146,62 +132,20 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
     }
     in
 
-  // wpMonotone_X declaration
+  // wpProof_X declaration
   let applyOpt f args = match args with [] -> evar f | _ -> eapply f args in
   let appArgs x = applyOpt x eArgs in
   let arg x t = (x, t, XGhost, In, []) in
   let pS0 = arg s0 tState in
-  let pK1 = arg k1 tContinue in
-  let pK2 = arg k2 tContinue in
-  let appSG k = eapply k [evar s; evar g] in
-  let reqImp = eop (Bop BImply) [appSG k1; appSG k2] in
-  let reqForall = ebind Forall [] [(s, Some tState); (g, Some tA)] [] reqImp in // TODO: triggers
-  let appWp k = eapply wp_X (eArgs @ [evar s0; evar k]) in
-  let ensImp = eop (Bop BImply) [appWp k1; appWp k2] in
-  let specReq = Requires (Unrefined, reqForall) in
-  let specEns = Ensures (Unrefined, ensImp) in
-  // wpMonotone_X body
-  let pMonotone =
-    {
-      pname = wpMonotone_X;
-      pghost = Ghost;
-      pinline = Outline;
-      ptargs = p.ptargs;
-      pargs = pargs @ [pS0; pK1; pK2];
-      prets = [];
-      pspecs = [(loc, specReq); (loc, specEns)];
-      pbody = Some [];
-      pattrs = attr_public p.pattrs @ attr_no_verify "admit" p.pattrs;
-    }
-    in
-
-  // wpCompute_X declaration
   let rSM = arg sM tState in
   let rF0 = arg f0 tFuel in
   let rG = arg g tA in
-  let specReq = Requires (Unrefined, eapply wp_X (eArgs @ [evar s0; evar k_true])) in
-  let specEns = Ensures (Unrefined, eTrue) in
-  // wpCompute_X body
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
   let sCallLemma = SAssign ((sM, None)::(f0, None)::gAssigns, eapply lemma_X (eCode::(evar s0)::eArgs)) in
   let sAssignG = SAssign ([(g, None)], ghostRetTuple) in
-  let pCompute=
-    {
-      pname = wpCompute_X;
-      pghost = Ghost;
-      pinline = Outline;
-      ptargs = p.ptargs;
-      pargs = pargs @ [pS0];
-      prets = [rSM; rF0; rG];
-      pspecs = [(loc, specReq); (loc, specEns)];
-      pbody = Some [sCallLemma; sAssignG];
-      pattrs = [(Id "reducible", [])] @ attr_public p.pattrs @ attr_no_verify "admit" p.pattrs;
-    }
-    in
-
-  // wpProof_X declaration
   let pK = arg k tContinue in
-  let specEnsArgs = [eCode] @ qmods_opt ePMods @ [appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; evar s0; evar k] in
+  let eRet = eop (TupleOp None) [evar sM; evar f0; evar g] in
+  let specEnsArgs = [eCode] @ qmods_opt ePMods @ [appArgs wp_X; evar s0; evar k; eRet] in
   let specReq = Requires (Unrefined, eapply wp_X (eArgs @ [evar s0; evar k])) in
   let specEns = Ensures (Unrefined, eapply (Id "t_ensure") specEnsArgs) in
   // wpProof_X body
@@ -216,18 +160,17 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       pinline = Outline;
       ptargs = p.ptargs;
       pargs = pargs @ [pS0; pK];
-      prets = [];
+      prets = [rSM; rF0; rG];
       pspecs = [(loc, specReq); (loc, specEns)];
-      pbody = Some ([sCallLemma; sLemmaUpd; sAssertEq] @ qmods_opt sLemmaNormMods);
+      pbody = Some ([sCallLemma; sLemmaUpd; sAssertEq] @ qmods_opt sLemmaNormMods @ [sAssignG]);
       pattrs = attr_public p.pattrs @ attr_no_verify "admit" p.pattrs;
     }
     in
 
   // quick_X
   //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpProof_X ARGS)
-  //   va_QProc (va_code_X ARGS) (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) (wpProof_X ARGS)
   let tRetQuick = tapply (Reserved "quickCode") [tA; tCode] in
-  let eQuick = eapply (Reserved "QProc") ([eCode] @ qmods_opt ePMods @ [appArgs wp_X; appArgs wpMonotone_X; appArgs wpCompute_X; appArgs wpProof_X]) in
+  let eQuick = eapply (Reserved "QProc") ([eCode] @ qmods_opt ePMods @ [appArgs wp_X; appArgs wpProof_X]) in
   let fQuick =
     {
       fname = Reserved ("quick_" + (string_of_id p.pname));
@@ -241,4 +184,4 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
       fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_public p.pattrs @ attr_no_verify "lax" p.pattrs;
     }
     in
-  [(loc, DFun fWp); (loc, DProc pMonotone); (loc, DProc pCompute); (loc, DProc pProof); (loc, DFun fQuick)]
+  [(loc, DFun fWp); (loc, DProc pProof); (loc, DFun fQuick)]

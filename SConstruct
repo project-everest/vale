@@ -280,12 +280,12 @@ verify_options = [
   ('.dfy', BuildOptions(dafny_default_args_larith)),
 
   # .fst/.fsti files default to this set of options
-  ('.fst', BuildOptions(fstar_default_args + ' --use_two_phase_tc false')),
-  ('.fsti', BuildOptions(fstar_default_args + ' --use_two_phase_tc false')),
+  ('.fst', BuildOptions(fstar_default_args)),
+  ('.fsti', BuildOptions(fstar_default_args)),
 
   # .vad/.vaf files default to this set of options when compiling .dfy/.fst/.fsti
   ('.vad', BuildOptions(dafny_default_args_larith)),
-  ('.vaf', BuildOptions(fstar_default_args + ' --use_two_phase_tc false')),
+  ('.vaf', BuildOptions(fstar_default_args)),
 ]
 
 verify_options_dict = { k:v for (k, v) in verify_options }

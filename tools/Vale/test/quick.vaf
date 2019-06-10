@@ -123,11 +123,103 @@ let rec lemma_self_int (i:int) : Lemma
 
 let va_assert (p:Type0) : Lemma (requires p) (ensures p) = ()
 let va_assume (p:Type0) : Lemma (requires True) (ensures p) = assume p
+
+let ghost_return_one (a:int) : Pure int
+  (requires a >= 0)
+  (ensures fun x -> x == a)
+  =
+  a
+
+let ghost_return_multi (a b:int) : Pure (int & int)
+  (requires a >= 0 /\ b >= 0)
+  (ensures fun (x, y) -> x == a /\ y == b)
+  =
+  (a, b)
 #endverbatim
 
-ghost procedure lemma_self_int(ghost i:int) extern;
+ghost procedure lemma_self_int(ghost i:int)
+    requires
+        0 <= i;
+    ensures
+        self_int(i) == i;
+    extern;
 
-procedure{:quick} Incr3Quick()
+ghost procedure ghost_return_one(ghost a:int) returns(ghost x:int)
+    requires
+        a >= 0;
+    ensures
+        x == a;
+    extern;
+
+ghost procedure ghost_return_multi(ghost a:int, ghost b:int) returns(ghost x:int, ghost y:int)
+    requires
+        a >= 0;
+        b >= 0;
+    ensures
+        x == a;
+        y == b;
+    extern;
+
+procedure proc_return_multi(ghost a:int, ghost b:int) returns(ghost x:int, ghost y:int)
+    {:quick}
+    requires
+        a >= 0;
+        b >= 0;
+    ensures
+        x == a;
+        y == b;
+{
+    x := a;
+    y := b;
+}
+
+/*
+procedure CallMulti(ghost a:int)
+    {:quick}
+    requires
+        a == 3;
+{
+    let x0 := ghost_return_one(a);
+    assert x0 == 3;
+//    let (x1, y1) := ghost_return_multi(a, 4);
+//    assert x1 == 3;
+//    assert y1 == 4;
+//    let (x2, y2) := proc_return_multi(3, 4);
+//    assert x2 == 3;
+//    assert y2 == 4;
+}
+*/
+
+#verbatim
+let f_nat (n:nat) : int = n
+let lemma_test_subtype (n:nat) (b:Type0) (i:int) (p:pos) : Lemma
+  (requires n > 4)
+  (ensures n > 3)
+  =
+  ()
+#endverbatim
+
+function f_nat(n:nat):int extern;
+ghost procedure lemma_test_subtype(ghost n:nat, ghost b:prop, ghost i:int, ghost p:pos)
+    requires n > 4;
+    ensures n > 3;
+    extern;
+
+procedure test_subtype(ghost m:pos, ghost b:prop/*TODO:bool*/, ghost i:int)
+    {:quick}
+    requires
+        m > 4;
+        i > 4;
+    ensures m > 3;
+{
+    lemma_test_subtype(m, b, f_nat(m), m);
+    let x := #(int_range(3, _))(m);
+    let y := #pos(i);
+//    lemma_test_subtype(7, True/*TODO:true*/, f_nat(7), 7);
+}
+
+procedure Incr3Quick()
+    {:quick}
     modifies
         efl;
         rax;
@@ -139,15 +231,16 @@ procedure{:quick} Incr3Quick()
     Add64(rax, 1);
 }
 
-procedure{:quick exportOnly} Add64Ghosts(
+procedure Add64Ghosts(
         inout dst:dst_opr64,
-        src:opr64,
+        in src:opr64,
         inline i:int,
         ghost g1:int,
         ghost g2:int)
     returns(
         ghost h1:int,
         ghost h2:int)
+    {:quick exportOnly}
     modifies
         efl;
     requires
@@ -172,7 +265,8 @@ let ghostId (x:int) : GTot int = x
 function ghostId (x:int) : int extern;
 
 //#reset-options "--debug Quick --debug_level SMTQuery"
-procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+procedure Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -217,7 +311,8 @@ procedure{:quick} Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
 }
 #reset-options
 
-procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+procedure CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -232,7 +327,8 @@ procedure{:quick} CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     g2 := Bump3(b, if rax < 7 then (let r:int := rax in r) else g1 + 0);
 }
 
-procedure{:quick} AddRaxG(ghost g:int)
+procedure AddRaxG(ghost g:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -246,6 +342,7 @@ procedure{:quick} AddRaxG(ghost g:int)
 }
 
 procedure Incr3(ghost g:int)
+    {:quick}
     modifies
         efl;
         rax;
@@ -255,13 +352,13 @@ procedure Incr3(ghost g:int)
     ensures
         rax == old(rax) + 3;
 {
-    assert{:quick_start} true;
     Add64(rax, 1);
     AddRaxG(g + 1);
     Add64(rax, 1);
 }
 
-procedure{:quick} While0()
+procedure While0()
+    {:quick}
     modifies
         efl;
         rax; rbx;
@@ -283,7 +380,8 @@ procedure{:quick} While0()
     Add64(rax, 3);
 }
 
-procedure{:quick} While1(ghost g1:int) returns(ghost go:int)
+procedure While1(ghost g1:int) returns(ghost go:int)
+    {:quick}
     modifies
         efl;
         rax; rbx;
@@ -313,7 +411,8 @@ procedure{:quick} While1(ghost g1:int) returns(ghost go:int)
     go := g2 + gc;
 }
 
-procedure{:quick} While2(ghost g1:int) returns(ghost go:int)
+procedure While2(ghost g1:int) returns(ghost go:int)
+    {:quick}
     modifies
         efl;
         rax; rbx;
@@ -347,11 +446,73 @@ procedure{:quick} While2(ghost g1:int) returns(ghost go:int)
     go := g2 + gc;
 }
 
-procedure{:quick} TestAssertTyping(ghost i:int) returns(ghost j:nat)
+procedure TestAssertTyping(ghost i:int) returns(ghost j:pos)
+    {:quick}
+    reads rax; rbx;
     requires
-        i >= 0;
+        i > 0;
+        rax > 0;
+        rbx > 0;
 {
-    assert{:quick_type} i >= 0;
-    assert{:quick_type} i >= 0;
-    j := #nat(i);
+    assert{:quick_type} i > 0;
+    j := #pos(i);
+    let tmp := rax;
+    assert{:quick_type} tmp > 0;
+    j := #pos(tmp);
+    assert{:quick_type} rbx > 0;
+    j := #pos(rbx);
 }
+
+function normalize(p:prop):prop extern;
+
+ghost procedure assert_normalize(ghost p:prop)
+    requires
+        normalize(p);
+    ensures
+        p;
+{
+}
+
+procedure test_assert_norm()
+    {:quick}
+{
+    assert_normalize(pow2(16) == 0x10000);
+    assert pow2(16) == 0x10000;
+}
+
+#verbatim
+let freq (x y:int) : Pure int (requires x < y) (ensures fun _ -> True) = x + y
+
+[@"opaque_to_smt"]
+let freqo (x y:int) : Pure int (requires x < y) (ensures fun _ -> True) = x + y
+#endverbatim
+
+function freq(x:int, y:int):int
+    requires
+        x < y;
+    extern;
+
+function freqo(x:int, y:int):int
+    requires
+        x < y;
+    extern;
+
+procedure test_freq(ghost z:int)
+    {:quick}
+    requires
+        z == 3;
+{
+    assert freq(2, z) == 5;
+    reveal freqo(2, z);
+    assert freqo(2, z) == 5;
+    reveal freqo;
+    assert freqo(1, z + 1) == 5;
+    assert eq2(2, 2);
+}
+
+procedure test_arith(ghost x:pos)
+{
+    let a:nat := 2 * x;
+    let b:nat := x * x;
+}
+

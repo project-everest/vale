@@ -2,11 +2,11 @@ include{:fstar}{:open} "Types_s"
 
 module Overload
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 operand_type reg:int := inout eax | inout ebx;
 
@@ -20,6 +20,7 @@ let contains = Map.contains
 type register = | EAX | EBX
 
 type va_bool = bool
+type va_prop = Type0
 type va_int = int
 type va_int_at_least (k:int) = i:int{i >= k}
 type va_int_at_most (k:int) = i:int{i <= k}
@@ -40,6 +41,9 @@ let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
 let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
 let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
 let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
+
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
 
 type va_state = map register int
 let va_get_ok (s:va_state) : GTot Type = True
@@ -91,23 +95,17 @@ assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM
   (ensures (fun fN ->
     True
   ))
-
-assume val make_opaque : #a:Type -> a -> a
-assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
-unfold let va_make_opaque = make_opaque
-unfold let va_reveal_opaque = reveal_opaque
-
 #endverbatim
 
 const True:prop extern;
 const False:prop extern;
 
-procedure Calls(x:reg, y:reg)
+procedure Calls(in x:reg, in y:reg)
 {
-    ghost var z := 0 < x \/ y > 0;
-    ghost var t := 0 < x /\ y > 0;
-    ghost var a := 1 +/**/3; // make sure that comments are parsed correctly
-    ghost var b := 1 +// make sure that comments are parsed correct
+    let z := 0 < x \/ y > 0;
+    let t := 0 < x /\ y > 0;
+    let a := 1 +/**/3; // make sure that comments are parsed correctly
+    let b := 1 +// make sure that comments are parsed correct
         3;
     assert (False ==> True);
     assert (True <== False);

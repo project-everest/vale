@@ -22,10 +22,13 @@ val update_of (flags:int) (new_of:bool) : (new_flags:int)
 //unfold let va_subscript = Map.sel
 unfold let va_subscript (#a:eqtype) (#b:Type) (x:Map.t a b) (y:a) : Tot b = Map.sel x y
 unfold let va_update = Map.upd
-unfold let va_make_opaque = Opaque_s.make_opaque
-unfold let va_reveal_opaque = Opaque_s.reveal_opaque
 unfold let va_hd = Cons?.hd
 //unfold let va_tl = Cons?.tl // F* inlines "let ... = va_tl ..." more than we'd like; revised definition below suppresses this
+
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+// REVIEW: why is x' necessary to keep x from being normalized?
+[@va_qattr] unfold let va_reveal_eq (#ax:Type) (s:string) (x x':ax) = norm [zeta; delta_only [s]] #ax x == x'
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
 
 // hide 'if' so that x and y get fully normalized
 let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
@@ -56,6 +59,11 @@ unfold let va_operand_shift_amt64 = operand
 unfold let va_cmp = operand
 unfold let va_register = reg
 unfold let va_operand_xmm = xmm
+
+val mul_nat_helper (x y:nat) : Lemma (x `op_Multiply` y >= 0)
+[@va_qattr] unfold let va_mul_nat (x y:nat) : nat =
+  mul_nat_helper x y;
+  x `op_Multiply` y
 
 [@va_qattr] unfold let va_expand_state (s:state) : state = s
 

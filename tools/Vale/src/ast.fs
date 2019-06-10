@@ -32,7 +32,7 @@ type exp_call = CallGhost | CallLemma | CallInline | CallOutline
 type uop =
 | UNot of bool_or_prop | UNeg | UOld | UIs of id
 | UConst
-| UReveal | UGhostOnly | UToOperand
+| UReveal | UFStarNameString | UGhostOnly | UToOperand
 | UCall of exp_call
 | UCustom of string
 
@@ -65,6 +65,8 @@ type bindOp =
 | BindAlias // x @= eax (different from x := eax in treatment of old(x))
 | BindSet
 
+type tqual = TqExplicit | TqImplicit
+type cast = Upcast | Downcast
 type exp =
 | ELoc of loc * exp
 | EVar of id * typ option
@@ -74,9 +76,9 @@ type exp =
 | EBool of bool
 | EString of string
 | EOp of op * exp list * typ option
-| EApply of exp * typ list option * exp list * typ option
+| EApply of exp * (tqual * typ) list option * exp list * typ option
 | EBind of bindOp * exp list * formal list * triggers * exp * typ option
-| ECast of exp * typ
+| ECast of cast * exp * typ
 | ELabel of loc * exp // marker for exp that needs to be wrapped in a loc label
 
 and triggers = exp list list
@@ -96,9 +98,9 @@ type var_storage =
 | XAlias of var_alias * exp // variable is a name for some other storage
 | XState of exp // top-level declaration of member of the state (e.g. a register)
 
-type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quickstart:bool; is_quickend:bool; is_quicktype:bool}
+type assert_attrs = {is_inv:bool; is_split:bool; is_refined:bool; is_quicktype:bool option}
 type quick_info = {qsym:string; qmods:id list}
-type lhs = id * (typ option * ghost) option // TODO: we only allow Ghost here, so no need to mention possibility of NotGhost
+type lhs = id * (typ option * ghost) option // TODO: we only allow Ghost here, so no need to mention possibility of NotGhost; can just be id * formal option
 type stmt =
 | SLoc of loc * stmt
 | SLabel of id
@@ -112,7 +114,6 @@ type stmt =
 | SAssign of lhs list * exp
 | SLetUpdates of formal list * stmt // used to turn imperative updates into functional 'let' assignments
 | SBlock of stmt list
-| SQuickBlock of quick_info * stmt list // optimized proof for statements in block
 | SIfElse of stmt_modifier * exp * stmt list * stmt list
 | SWhile of exp * (loc * exp) list * (loc * exp list) * stmt list
 | SForall of formal list * triggers * exp * exp * stmt list

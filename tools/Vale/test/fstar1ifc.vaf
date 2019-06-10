@@ -1,10 +1,10 @@
 module Fstar1ifc
 
-var{:state ok()} ok:bool;
-var{:state reg(EAX)} eax:int;
-var{:state reg(EBX)} ebx:int;
-var{:state flags()} efl:int;
-var{:state mem()} mem:int;
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
 
 operand_type reg:int := inout eax | inout ebx;
 
@@ -67,6 +67,9 @@ val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
 
 unfold let va_hd = Cons?.hd
 unfold let va_tl = Cons?.tl
+
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
 
 let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
   b0 = c
@@ -162,47 +165,47 @@ assume val va_lemma_whileMerge_total : c:va_code -> s0:va_state -> f0:va_fuel ->
     eval_while_inv c s0 fN sN
   ))
 
-assume val make_opaque : #a:Type -> a -> a
-assume val reveal_opaque : #a:Type -> x:a -> Lemma (x == make_opaque x)
-unfold let va_make_opaque = make_opaque
-unfold let va_reveal_opaque = reveal_opaque
-
 let double (x:int):int = x + x
-let opaque_double = make_opaque double
+[@"opaque_to_smt"]
+let opaque_double = double
 #endverbatim
-
 function double (x:int) : int extern;
 function opaque_double (x:int) : int extern;
 
-procedure{:terminates} Imm(out x:reg, inline y:int)
+procedure Imm(out x:reg, inline y:int)
+    {:terminates}
     ensures
         x == y;
 {
     assume false;
 }
 
-procedure{:terminates} Increment(inout x:reg)
+procedure Increment(inout x:reg)
+    {:terminates}
     ensures
         x == old(x) + 1;
 {
     assume false;
 }
 
-procedure{:terminates} Add(inout x:reg, y:reg)
+procedure Add(inout x:reg, in y:reg)
+    {:terminates}
     ensures
         x == old(x + y);
 {
     assume false;
 }
 
-procedure{:terminates} AddReg(inout x:reg, y:reg)
+procedure AddReg(inout x:reg, in y:reg)
+    {:terminates}
     ensures
         x == old(x + y);
 {
     Add(x, y); // coerces y from register to operand
 }
 
-procedure{:terminates} p()
+procedure p()
+    {:terminates}
     modifies
         eax;
     requires
@@ -214,7 +217,8 @@ procedure{:terminates} p()
     Increment(eax);
 }
 
-procedure{:terminates} Calls()
+procedure Calls()
+    {:terminates}
     modifies
         eax; ebx;
     ensures
@@ -242,7 +246,8 @@ procedure{:terminates} Calls()
 //    }
 }
 
-procedure{:terminates} WhileTest()
+procedure WhileTest()
+    {:terminates}
     modifies
         eax; ebx;
     requires
@@ -264,11 +269,12 @@ procedure{:terminates} WhileTest()
     }
 }
 
-procedure{:terminates} Ghosts(ghost g1:int) returns(ghost g2:int)
+procedure Ghosts(ghost g1:int) returns(ghost g2:int)
+    {:terminates}
     ensures
         g2 == g1 + 1;
 {
-    assert opaque_double(3) == 6 by { reveal double; }
+    assert opaque_double(3) == 6 by { reveal opaque_double; }
     assert opaque_double(3) == 6;
     //assert opaque_double(4) == 8;
     g2 := g1 + 1;

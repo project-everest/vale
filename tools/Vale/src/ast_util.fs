@@ -45,7 +45,7 @@ let rec exp_typ e =
   | EOp (_, _, t) -> t
   | EApply (_, _, _, t) -> t
   | EBind (_, _, _, _, _, t) -> t
-  | ECast (_, t) -> (Some t)
+  | ECast (_, _, t) -> (Some t)
   | _ -> None
 
 let List_mapFold (f:'s -> 't -> 'r * 's) (s:'s) (ts:'t list):('r list * 's) =
@@ -135,9 +135,7 @@ let assert_attrs_default =
     is_inv = false;
     is_split = false;
     is_refined = false;
-    is_quickstart = false;
-    is_quickend = false;
-    is_quicktype = false;
+    is_quicktype = None;
   }
 
 let rec exps_of_spec_exps (es:(loc * spec_exp) list):(loc * exp) list =
@@ -190,7 +188,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EBind (b, es, fs, ts, e, t) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e, t)
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
     | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
-    | ECast (e, t) -> ECast (r e, t)
+    | ECast (c, e, t) -> ECast (c, r e, t)
     | ELabel (l, e) -> ELabel (l, r e)
   )
 
@@ -203,7 +201,7 @@ let rec gather_exp (f:exp -> 'a list -> 'a) (e:exp):'a =
     | EBind (b, es, fs, ts, e, _) -> (List.map r es) @ (List.collect (List.map r) ts) @ [r e]
     | EOp (op, es, _) -> List.map r es
     | EApply (x, ts, es, _) -> List.map r es
-    | ECast (e, t) -> [r e]
+    | ECast (c, e, t) -> [r e]
     | ELabel (loc, e) -> [r e]
   in f e children
 
@@ -275,9 +273,8 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SVar (x, t, m, g, a, eOpt) -> [SVar (x, t, m, g, map_attrs fe a, mapOpt fe eOpt)]
     | SAlias (x, y) -> [SAlias (x, y)]
     | SAssign (xs, e) -> [SAssign (xs, fe e)]
-    | SLetUpdates _ -> internalErr "SLetUpdates"
+    | SLetUpdates (xs, s) -> [SLetUpdates (xs, map_stmt_one fe fs s)]
     | SBlock b -> [SBlock (map_stmts fe fs b)]
-    | SQuickBlock (x, b) -> [SQuickBlock (x, map_stmts fe fs b)]
     | SIfElse (g, e, b1, b2) -> [SIfElse (g, fe e, map_stmts fe fs b1, map_stmts fe fs b2)]
     | SWhile (e, invs, ed, b) ->
         [SWhile (
@@ -290,6 +287,10 @@ let rec map_stmt (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt
     | SExists (xs, ts, e) ->
         [SExists (xs, List.map (List.map fe) ts, fe e)]
   )
+and map_stmt_one (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (s:stmt):stmt =
+  match map_stmt fe fs s with
+  | [s] -> s
+  | b -> SBlock b
 and map_stmts (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (ss:stmt list):stmt list = List.collect (map_stmt fe fs) ss
 and map_calc_contents (fe:exp -> exp) (fs:stmt -> stmt list map_modify) (cc:calcContents): calcContents =
   let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
@@ -307,9 +308,8 @@ let rec gather_stmt (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt
     | SCalc (op, contents, e) -> List.collect (gather_calc_contents fs fe) contents @ [re e]
     | SVar (x, t, m, g, a, eOpt) -> (gather_attrs fe a) @ (List.map re (list_of_opt eOpt))
     | SAlias (x, y) -> []
-    | SLetUpdates _ -> internalErr "SLetUpdates"
+    | SLetUpdates (xs, s) -> [r s]
     | SBlock b -> rs b
-    | SQuickBlock (x, b) -> rs b
     | SIfElse (g, e, b1, b2) -> [re e] @ (rs b1) @ (rs b2)
     | SWhile (e, invs, ed, b) -> [re e] @ (List.map re (List.map snd invs)) @ (List.map re (snd ed)) @ (rs b)
     | SForall (xs, ts, ex, e, b) -> (List.collect (List.map re) ts) @ [re e] @ (rs b)
@@ -320,6 +320,18 @@ and gather_stmts (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (ss:stmt l
 and gather_calc_contents (fs:stmt -> 'a list -> 'a) (fe:exp -> 'a list -> 'a) (cc:calcContents):'a list =
   let {calc_exp = e; calc_op = oop; calc_hints = hints} = cc in
   [gather_exp fe e] @ (List.collect (gather_stmts fs fe) hints)
+
+// Just traverse expressions, not substatements
+let gather_exps_in_stmt (merge:'a list -> 'a) (fe:exp -> 'a list -> 'a) (s:stmt):'a list =
+  let re = gather_exp fe in
+  let r = gather_stmt (fun _ children -> merge children) fe in
+  match s with
+  | SLoc (loc, s) -> []
+  | SLabel _ | SGoto _ | SReturn | SAlias _ | SBlock _ | SLetUpdates _ -> []
+  | SAssume _ | SAssert _ | SAssign _ | SCalc _ | SVar _ | SExists _ -> [r s]
+  | SIfElse (g, e, b1, b2) -> [re e]
+  | SWhile (e, invs, ed, b) -> [re e] @ (List.map re (List.map snd invs)) @ (List.map re (snd ed))
+  | SForall (xs, ts, ex, e, b) -> (List.collect (List.map re) ts) @ [re e]
 
 let rec skip_loc_stmt (s:stmt):stmt =
   match s with

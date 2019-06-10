@@ -12,7 +12,7 @@ let prevResetOptionsPsi = ref ""
 
 let sid (x:id):string =
   match x with
-  | Id s -> s
+  | Id s -> if s.StartsWith("uu___") then "_" + s else s
   | Reserved s -> qprefix "va_" s
   | Operator s -> internalErr (sprintf "custom operator: %A" x)
 
@@ -22,7 +22,6 @@ let prefix_id (prefix:string) (x:id):id =
   | Reserved s -> Reserved (prefix + s)
   | Operator s -> internalErr (sprintf "prefix_id: %A %A" prefix s)
 
-let transparent_id (x:id):id = prefix_id "transparent_" x
 let irreducible_id (x:id):id = prefix_id "irreducible_" x
 let internal_id (x:id):id = prefix_id "internal_" x
 
@@ -69,6 +68,8 @@ let string_of_bop (op:bop):string =
 let string_of_ghost (g:ghost) = ""
 let string_of_var_storage (g:var_storage) = ""
 
+let string_of_int (i:bigint):string =
+  if i < bigint.Zero then "(" + string i + ")" else string i
 
 let rec string_of_typ (t:typ):string =
   match t with
@@ -77,23 +78,25 @@ let rec string_of_typ (t:typ):string =
   | TApply (x, ts) -> "(" + (sid x) + " " + (String.concat " " (List.map string_of_typ ts)) + ")"
   | TBool BpBool -> "bool"
   | TBool BpProp -> "prop"
-  | TInt (Int k1, Int k2) -> "(va_int_range " + string k1 + " " + string k2 + ")"
-  | TInt (Int k1, Inf) -> "(va_int_at_least " + string k1 + ")"
-  | TInt (NegInf, Int k2) -> "(va_int_at_most " + string k2 + ")"
+  | TInt (Int k1, Int k2) -> "(va_int_range " + string_of_int k1 + " " + string_of_int k2 + ")"
+  | TInt (Int k1, Inf) -> "(va_int_at_least " + string_of_int k1 + ")"
+  | TInt (NegInf, Int k2) -> "(va_int_at_most " + string_of_int k2 + ")"
   | TInt (_, _) -> "int"
   | TTuple [] -> "unit"
-  | TTuple ts -> "(" + (String.concat " * " (List.map string_of_typ ts)) + ")"
+  | TTuple ts -> "(" + (String.concat " & " (List.map string_of_typ ts)) + ")"
   | TFun (ts, t) -> "(" + (String.concat " -> " (List.map string_of_typ (ts @ [t]))) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"
-let string_of_type_argument (t:typ):string = "#" + string_of_typ t
-let string_of_type_arguments (ts:typ list option):string = 
+let string_of_type_argument ((q:tqual), (t:typ)):string =
+  match q with
+  | TqExplicit -> string_of_typ t
+  | TqImplicit -> "#" + string_of_typ t
+let string_of_type_arguments (ts:(tqual * typ) list option):string = 
   match ts with 
   | None -> ""
   | Some [] -> "" 
   | Some ts -> " " + String.concat " " (List.map string_of_type_argument ts)
 
-  
 
 let rec string_of_exp_prec prec e =
   let r = string_of_exp_prec in
@@ -102,15 +105,16 @@ let rec string_of_exp_prec prec e =
     match e with
     | ELoc (loc, ee) -> try (r prec ee, prec) with err -> raise (LocErr (loc, err))
     | EVar (x, _) -> (sid x, 99)
-    | EInt i -> (string i, 99)
+    | EInt i -> (string_of_int i, 99)
     | EReal r -> (r, 99)
     | EBitVector (n, i) -> ("bv" + (string n) + "(" + (string i) + ")", 99)
     | EBool true -> ("true", 99)
     | EBool false -> ("false", 99)
     | EString s -> ("\"" + s.Replace("\\", "\\\\") + "\"", 99)
     | EOp (Uop (UCall CallGhost), [e], t) -> (r prec e, prec)
-    | EOp (Uop UReveal, [EApply (e, _, es, t1)], t) when is_id e -> (r prec (vaApp_t "reveal_opaque" [eapply_t (transparent_id (id_of_exp e)) es t1] t), prec)
-    | EOp (Uop UReveal, [EVar (x, _)], t) -> ("reveal_opaque " + (sid x), 90)
+    | EOp (Uop UReveal, [EApply (e, _, es, t1) as ea], t) when is_id e -> (r prec (eapply (Reserved "reveal_opaque") [EOp (Uop UFStarNameString, [e], None); ea]), prec)
+    | EOp (Uop UReveal, [EVar (x, _) as e], t) -> (r prec (eapply (Reserved "reveal_opaque") [EOp (Uop UFStarNameString, [e], None); e]), prec)
+    | EOp (Uop UFStarNameString, [e], _) -> ("`%" + r 99 e, 0)
     | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e], t) -> ("-" + (r 99 e), 0)
@@ -189,7 +193,7 @@ let rec string_of_exp_prec prec e =
     | EBind (BindAlias, _, _, _, e, t) -> (r prec e, prec)
     | EBind (BindSet, [], xs, ts, e, t) -> notImplemented "iset"
     | EBind ((Forall | Exists | Lambda | BindLet | BindSet), _, _, _, _, _) -> internalErr (sprintf "EBind: %A" e)
-    | ECast (e, t) -> (r prec e, prec) // TODO: add type conversion
+    | ECast (c, e, t) -> (r prec e, prec) // TODO: add type conversion
     | ELabel (l, e) -> (r prec e, prec)
     | _ -> internalErr  (sprintf "unexpected exp %A " e)
   in if prec <= ePrec then s else "(" + s + ")"
@@ -199,6 +203,7 @@ and string_of_formals (xs:formal list):string = String.concat " " (List.map stri
 and string_of_formal_bare (x:id, t:typ option) = match t with None -> sid x | Some t -> (sid x) + ":" + (string_of_typ t)
 and string_of_pformal (x:id, t:typ, _, _, _) = string_of_formal (x, Some t)
 and string_of_pformals (xs:pformal list):string = String.concat " " (List.map string_of_pformal xs)
+and typ_of_pformal (_, t:typ, _, _, _) = string_of_typ t
 and string_of_trigger (es:exp list):string = String.concat "; " (List.map string_of_exp es)
 and string_of_triggers (ts:exp list list):string =
     match ts with
@@ -225,10 +230,10 @@ let let_string_of_formals (useTypes:bool) (xs:formal list) =
   | [] -> "()"
   | _ -> string_of_formals (List.map (fun (x, t) -> (x, if useTypes then t else None)) xs)
 
-let string_of_decrease (es:exp list) n =
+let string_of_decrease (es:exp list) =
   match es with
   | [] -> ""
-  | _ -> sprintf "(decreases %%[%s;%i])" (String.concat ";" (List.map string_of_exp es)) n
+  | _ -> sprintf "(decreases %%[%s])" (String.concat ";" (List.map string_of_exp es))
 
 let string_of_outs_exp (outs:(bool * formal list) option):string =
   match outs with
@@ -283,7 +288,6 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
       ps.Unindent ();
       ps.PrintLine ") in"
   | SBlock ss -> notImplemented "block"
-  | SQuickBlock _ -> internalErr "quick_block"
   | SIfElse (_, e, ss1, ss2) ->
       ps.PrintLine ("if " + (string_of_exp90 e) + " then");
       emit_block ps "" outs ss1;
@@ -429,14 +433,14 @@ let emit_laxness (ps:print_state) (a:attrs):unit =
 
 let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   ps.PrintLine ("");
-  let isOpaqueToSmt = attrs_get_bool (Id "opaque_to_smt") false f.fattrs in
   let isOpaque = attrs_get_bool (Id "opaque") false f.fattrs in
+  let isAdmit = attrs_get_bool (Id "admit") false f.fattrs in
+  let isOpaque = isOpaque && not isAdmit in
+  let isOpaqueToSmt = isOpaque || attrs_get_bool (Id "opaque_to_smt") false f.fattrs in
   let isPublic = attrs_get_bool (Id "public") false f.fattrs in
   let isPublicDecl = attrs_get_bool (Id "public_decl") false f.fattrs in
   let isQAttr = attrs_get_bool (Id "qattr") false f.fattrs in
-  let isAdmit = attrs_get_bool (Id "admit") false f.fattrs in
-  let isPublicDecl = isPublicDecl || (isOpaque && isAdmit) in
-  let isOpaque = isOpaque && not isAdmit in
+  let isPublicDecl = isPublicDecl || isOpaque in
   let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
   (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   // write everything to *.fsti if it is public and not opaque or publicDecl. 
@@ -459,27 +463,12 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let header = if isRecursive then "let rec " else "let " in
   // add custom metrics to convince F* that mutually recursive functions terminate
   let dArgs = List.map (fun (x, _) -> evar x) f.fargs in
-  let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
-  let decreases1 = if isRecursive then string_of_decrease dArgs 1 else "" in
-  if isOpaque then
-    ps.PrintLine (sVal (sid (transparent_id f.fname)) decreases0);
-    if isPublic then
-      psi.PrintLine (sVal (sid f.fname) decreases1);
-    else
-      ps.PrintLine (sVal (sid f.fname) decreases1);
-    ( match f.fbody with
-      | None -> ()
-      | Some e -> printBody header true (sid (transparent_id f.fname)) e
-    );
-    let fArgs = List.map (fun (x, _) -> evar x) f.fargs in
-    let eOpaque = vaApp "make_opaque" [eapply (transparent_id f.fname) fArgs] in
-    let header = if isRecursive then "and " else "let " in
-    printBody header true (sid f.fname) eOpaque
-  else if isPublicDecl then
+  let decreases0 = if isRecursive then string_of_decrease dArgs else "" in
+  if isPublicDecl then
     if isPublic then 
-      psi.PrintLine (sVal (sid f.fname) decreases1);
+      psi.PrintLine (sVal (sid f.fname) decreases0);
     else
-      ps.PrintLine (sVal (sid f.fname) decreases1);
+      ps.PrintLine (sVal (sid f.fname) decreases0);
     ( match f.fbody with
       | None -> ()
       | Some e -> printBody header true (sid f.fname) e
@@ -512,7 +501,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let rets = List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets in
   let printPType (ps:print_state) s decreases =
     ps.Indent ();
-    let st = String.concat (if isDependent then " & " else " * ") (List.map string_of_pformal p.prets) in
+    let st = String.concat " & " (List.map typ_of_pformal p.prets) in
     ps.PrintLine (s + (match p.prets with [] -> "Lemma" | _ -> "Ghost (" + st + ")" + decreases));
     ps.PrintLine ("(requires " + (string_of_exp rs) + ")");
     let sprets = String.concat ", " (List.map (fun (x, _, _, _, _) -> sid x) p.prets) in
@@ -521,7 +510,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     ps.Unindent ();
     in
   let dArgs = match decreaseExps with Some es -> es | None -> List.map (fun (x, _) -> evar x) args in
-  let decreases0 = if isRecursive then string_of_decrease dArgs 0 else "" in
+  let decreases0 = if isRecursive then string_of_decrease dArgs else "" in
   ( match (tactic, ps.print_interface) with
     | (Some _, None) -> ()
     | (_, _) ->
