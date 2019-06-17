@@ -42,7 +42,7 @@ let makeFrame (env:env) (preserveModifies:bool) (p:proc_decl) (s0:id) (sM:id):ex
   let frameArg e (x, xx, t) = vaApp_t ("upd_" + (vaOperandTyp t)) [evar x; evar xx; e] (exp_typ e) in
   let framePArg (x, _, t) = vaApp ("mod_" + (vaTyp t)) [evar x] in
   let frameMod e (x, t, prefix, es) = vaApp_t ("upd_" + prefix) (es @ [evar x; e]) (exp_typ e) in
-  let framePMod (_, t, prefix, es) = eapply_opt (Id ("Mod_" + prefix)) es in
+  let framePMod (_, t, prefix, es) = eapply_opt (Reserved ("Mod_" + prefix)) es in
   let e = evar s0 in
   let e = List.fold frameArg e args in
   let e = List.fold frameMod e (mods false) in
