@@ -15,6 +15,13 @@ type mod_t =
 | Mod_mem: mod_t
 unfold let mods_t = list mod_t
 
+[@va_qattr] unfold let va_Mod_None = Mod_None
+[@va_qattr] unfold let va_Mod_ok = Mod_ok
+[@va_qattr] unfold let va_Mod_reg = Mod_reg
+[@va_qattr] unfold let va_Mod_xmm = Mod_xmm
+[@va_qattr] unfold let va_Mod_flags = Mod_flags
+[@va_qattr] unfold let va_Mod_mem = Mod_mem
+
 [@va_qattr "opaque_to_smt"]
 let mod_eq (x y:mod_t) : Pure bool (requires True) (ensures fun b -> b == (x = y)) =
   match x with

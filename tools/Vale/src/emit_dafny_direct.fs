@@ -84,6 +84,7 @@ let rec create_type (built_ins:BuiltIns) (t:typ):Type = // ignoring function typ
       | "string" ->
           let tok = create_dummy_token "string" in
           new UserDefinedType(tok, tok.``val``, null) :> Type
+      | "state" -> create_type built_ins (TName (Reserved "state"))
       | s ->
           if s.Contains "." then notImplemented "type creation for types with dots"
           else

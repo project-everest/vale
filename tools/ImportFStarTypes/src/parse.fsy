@@ -85,6 +85,7 @@ any
   | LITINT any { ((snd $1).ToString())::$2 }
   | META any { "META"::$2 }
   | ID any { (snd $1)::$2 }
+  | PATTERN any { "PATTERN"::$2 }
 
 exp
   : exp1s { rlist_opt $1 }
