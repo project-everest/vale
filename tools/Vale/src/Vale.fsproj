@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -74,8 +74,13 @@ fsyacc --module "Parse" -v $(ProjectDir)parse.fsy -o parse.fs</PreBuildEvent>
       <Visible>false</Visible>
       <Link>lex.fs</Link>
     </Compile>
+    <Compile Include="typechecker.fs" />
     <Compile Include="transform.fs" />
-    <Compile Include="emit_common.fs" />
+    <Compile Include="emit_common_base.fs" />
+    <Compile Include="emit_common_lemmas.fs" />
+    <Compile Include="emit_common_quick_code.fs" />
+    <Compile Include="emit_common_quick_export.fs" />
+    <Compile Include="emit_common_top.fs" />
     <Compile Include="emit_dafny_text.fs" />
     <Compile Include="emit_dafny_direct.fs" />
     <Compile Include="emit_fstar_text.fs" />
