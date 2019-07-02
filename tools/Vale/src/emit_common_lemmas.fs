@@ -581,6 +581,7 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in
   let isQuick = is_quick_body p.pattrs in
+  let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs in
   let reqs =
     List.collect (fun (loc, s) ->
         match s with
@@ -632,6 +633,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           if isQuick then
             Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
-        fCodes @ (if !no_lemmas then [] else quickDecls @ pLemma)
+        fCodes @ (if !no_lemmas || isCodeOnly then [] else quickDecls @ pLemma)
     in
   bodyDecls //@ blockLemmaDecls

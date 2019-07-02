@@ -55,10 +55,11 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
     | DProc p ->
         let isVerify = List_mem_assoc (Id "verify") p.pattrs in
         let isQuick = List_mem_assoc (Id "quick") p.pattrs in
+        let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs in
         if verify then
           if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
           let ds_p = Emit_common_lemmas.build_proc envBody envr loc p in
-          let ds_q = if isQuick && not !no_lemmas then Emit_common_quick_export.build_proc envr loc p else [] in
+          let ds_q = if isQuick && not !no_lemmas && not isCodeOnly then Emit_common_quick_export.build_proc envr loc p else [] in
           let comment (s:string) : loc * decl =
             let isPublic = attrs_get_bool (Id "public") false p.pattrs in
             let attrs = if isPublic then [(Id "interface", []); (Id "implementation", [])] else [] in
