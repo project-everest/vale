@@ -106,8 +106,6 @@ procedure Test() returns(ghost g:int)
 
 procedure CodeOnlyProcedure()
   {:codeOnly}
-  modifies
-    efl; rax; /* REVIEW: Is it possible for us to no longer require these? */
   ensures
     false; /* Since we are only generating the code, the postcondition is irrelevant */
 {
