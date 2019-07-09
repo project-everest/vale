@@ -71,7 +71,7 @@ and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
 
 (* Build codegen_success value for body of procedure Q *)
-let build_codegen_success_stmt (env:env) (s:stmt):exp option list =
+let build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
   let rec merge (xs:exp option list) : exp option =
     match xs with
     | [] -> None
@@ -83,7 +83,8 @@ let build_codegen_success_stmt (env:env) (s:stmt):exp option list =
   let rec aux (e:exp) (xs:exp option list) : exp option =
     match e with
     | ELoc (_, e) -> aux e xs
-    | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost ->
+    | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost && q <> (id_of_exp e) ->
+      (* REVIEW: We assume correct generation upon recursion *)
       let x = string_of_id (id_of_exp e) in
       let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
       let es = List.map get_code_exp es in
@@ -92,10 +93,10 @@ let build_codegen_success_stmt (env:env) (s:stmt):exp option list =
     | _ -> merge xs
   in
   gather_stmts (fun _ -> merge) aux [s]
-let build_codegen_success_stmts (env:env) (stmts:stmt list):exp =
+let build_codegen_success_stmts (q:id) (env:env) (stmts:stmt list):exp =
   let empty = vaApp "ttrue" [] in
   let cons el e = match e with | None -> el | Some e -> vaApp "pbool_and" [e; el] in
-  let slist = List.collect (build_codegen_success_stmt env) stmts in
+  let slist = List.collect (build_codegen_success_stmt q env) stmts in
   List.fold cons empty (List.rev slist)
 
 // compute parameters/returns for procedures (abstract/concrete/lemma)
@@ -445,7 +446,7 @@ let build_codegen_success (loc:loc) (env:env) (benv:build_env) (stmts:stmt list)
         fret_name = None;
         fret = tPbool;
         fspecs = [];
-        fbody = Some (build_codegen_success_stmts env stmts);
+        fbody = Some (build_codegen_success_stmts p.pname env stmts);
         fattrs =
           if benv.is_quick then
             [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
