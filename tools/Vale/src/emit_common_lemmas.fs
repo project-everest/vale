@@ -71,13 +71,16 @@ and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
 
 (* Build codegen_success value for body of procedure Q *)
-let build_codegen_success_stmt (env:env) (s:stmt):exp list =
-  let rec merge (xs:exp list) : exp =
+let build_codegen_success_stmt (env:env) (s:stmt):exp option list =
+  let rec merge (xs:exp option list) : exp option =
     match xs with
-    | [] -> vaApp "ttrue" []
-    | x :: xs -> vaApp "pbool_and" [x; merge xs]
+    | [] -> None
+    | None :: xs -> merge xs
+    | Some x :: xs -> (match merge xs with
+                       | None -> Some x
+                       | Some x' -> Some (vaApp "pbool_and" [x; x']))
   in
-  let rec aux (e:exp) (xs:exp list) : exp =
+  let rec aux (e:exp) (xs:exp option list) : exp option =
     match e with
     | ELoc (_, e) -> aux e xs
     | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost ->
@@ -85,13 +88,13 @@ let build_codegen_success_stmt (env:env) (s:stmt):exp list =
       let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
       let es = List.map get_code_exp es in
       let es = List.map (map_exp stateToOp) es in
-      merge (vaApp ("codegen_success_" + x) es :: xs)
+      merge (Some (vaApp ("codegen_success_" + x) es) :: xs)
     | _ -> merge xs
   in
   gather_stmts (fun _ -> merge) aux [s]
 let build_codegen_success_stmts (env:env) (stmts:stmt list):exp =
   let empty = vaApp "ttrue" [] in
-  let cons el e = vaApp "pbool_and" [e; el] in
+  let cons el e = match e with | None -> el | Some e -> vaApp "pbool_and" [e; el] in
   let slist = List.collect (build_codegen_success_stmt env) stmts in
   List.fold cons empty (List.rev slist)
 
