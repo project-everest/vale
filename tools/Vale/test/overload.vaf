@@ -33,6 +33,11 @@ type va_code =
   | IfElse : ifCond:ocmp -> ifTrue:va_code -> ifFalse:va_code -> va_code
 and va_codes = list va_code
 
+type va_pbool = Vale.Def.PossiblyMonad.pbool
+let va_ttrue () = Vale.Def.PossiblyMonad.ttrue
+let va_ffalse = Vale.Def.PossiblyMonad.ffalse
+let va_pbool_and x y = Vale.Def.PossiblyMonad.op_Amp_Amp_Dot x y
+
 let va_CNil () = []
 let va_CCons x y = x::y
 let va_Block (block:va_codes) : Tot va_code = Block block
