@@ -70,6 +70,31 @@ and build_code_stmts (env:env) (benv:build_env) (stmts:stmt list):exp =
 and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
 
+(* Build codegen_success value for body of procedure Q *)
+let build_codegen_success_stmt (env:env) (s:stmt):exp list =
+  let rec merge (xs:exp list) : exp =
+    match xs with
+    | [] -> vaApp "ttrue" []
+    | x :: xs -> vaApp "pbool_and" [x; merge xs]
+  in
+  let rec aux (e:exp) (xs:exp list) : exp =
+    match e with
+    | ELoc (_, e) -> aux e xs
+    | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost ->
+      let x = string_of_id (id_of_exp e) in
+      let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
+      let es = List.map get_code_exp es in
+      let es = List.map (map_exp stateToOp) es in
+      merge (vaApp ("codegen_success_" + x) es :: xs)
+    | _ -> merge xs
+  in
+  gather_stmts (fun _ -> merge) aux [s]
+let build_codegen_success_stmts (env:env) (stmts:stmt list):exp =
+  let empty = vaApp "ttrue" [] in
+  let cons el e = vaApp "pbool_and" [e; el] in
+  let slist = List.collect (build_codegen_success_stmt env) stmts in
+  List.fold cons empty (List.rev slist)
+
 // compute parameters/returns for procedures (abstract/concrete/lemma)
 // pfIsRet == false ==> pf is input parameter
 // pfIsRet == true ==> pf is output return value
@@ -402,6 +427,32 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
     in
   List.map (fun f -> (loc, DFun f)) [f]
 
+let build_codegen_success (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
+  if !fstar then (
+    let p = benv.proc in
+    if p.pghost = Ghost then [] else
+    let fParams = make_fun_params p.prets p.pargs in
+    let attrs = List.filter filter_fun_attr p.pattrs in
+    let f =
+      {
+        fname = Reserved ("codegen_success_" + (string_of_id p.pname));
+        fghost = NotGhost;
+        ftargs = [];
+        fargs = fParams;
+        fret_name = None;
+        fret = tPbool;
+        fspecs = [];
+        fbody = Some (build_codegen_success_stmts env stmts);
+        fattrs =
+          if benv.is_quick then
+            [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
+          else
+            [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
+      }
+      in
+    List.map (fun f -> (loc, DFun f)) [f]
+  ) else []
+
 let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stmt list):decls =
   // generate va_lemma_Q
   let p = benv.proc in
@@ -620,6 +671,7 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           in
         let rstmts = stmts_refined stmts in
         let fCodes = build_code loc env benv rstmts in
+        let fCodeGenSuccess = build_codegen_success loc env benv rstmts in
         let dummy = Reserved "dummy" in
         let senv = { env = env; benv = benv; b1 = b1; bM = dummy; code = evar dummy; s0 = s0; f0 = fM; sM = sM; fM = fM; sN = dummy; loc = loc;} in
         let bstmts =
@@ -632,6 +684,6 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           if isQuick then
             Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
-        fCodes @ (if !no_lemmas then [] else quickDecls @ pLemma)
+        fCodes @ fCodeGenSuccess @ (if !no_lemmas then [] else quickDecls @ pLemma)
     in
   bodyDecls //@ blockLemmaDecls

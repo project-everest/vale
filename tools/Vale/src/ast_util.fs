@@ -10,6 +10,7 @@ let tInt = TInt (NegInf, Inf)
 let tOperand xo = TName (Reserved xo)
 let tState = TName (Reserved "state")
 let tCode = TName (Reserved "code")
+let tPbool = TName (Reserved "pbool")
 let tCodes = TName (Reserved "codes")
 let tFuel = TName (Reserved "fuel")
 let ktype0 = KType bigint.Zero
