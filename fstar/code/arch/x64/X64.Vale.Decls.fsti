@@ -60,6 +60,11 @@ unfold let va_cmp = operand
 unfold let va_register = reg
 unfold let va_operand_xmm = xmm
 
+val va_pbool : Type0
+val va_ttrue : unit -> va_pbool
+val va_ffalse : string -> va_pbool
+val va_pbool_and : va_pbool -> va_pbool -> va_pbool
+
 val mul_nat_helper (x y:nat) : Lemma (x `op_Multiply` y >= 0)
 [@va_qattr] unfold let va_mul_nat (x y:nat) : nat =
   mul_nat_helper x y;
