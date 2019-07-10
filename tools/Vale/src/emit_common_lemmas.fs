@@ -83,8 +83,7 @@ let rec build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
   let rec aux (e:exp) (xs:exp option list) : exp option =
     match e with
     | ELoc (_, e) -> aux e xs
-    | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost && q <> (id_of_exp e) ->
-      (* REVIEW: We assume correct generation upon recursion *)
+    | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost ->
       let x = string_of_id (id_of_exp e) in
       let es = List.filter (fun e -> match e with EOp (Uop UGhostOnly, _, _) -> false | _ -> true) es in
       let es = List.map get_code_exp es in
