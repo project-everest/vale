@@ -65,6 +65,12 @@ val va_ttrue : unit -> va_pbool
 val va_ffalse : string -> va_pbool
 val va_pbool_and : va_pbool -> va_pbool -> va_pbool
 
+noeq
+type va_transformation_result = {
+  success : va_pbool;
+  result : va_code;
+}
+
 val mul_nat_helper (x y:nat) : Lemma (x `op_Multiply` y >= 0)
 [@va_qattr] unfold let va_mul_nat (x y:nat) : nat =
   mul_nat_helper x y;
