@@ -71,7 +71,7 @@ and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
 
 (* Build codegen_success value for body of procedure Q *)
-let build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
+let rec build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
   let rec merge (xs:exp option list) : exp option =
     match xs with
     | [] -> None
@@ -92,8 +92,16 @@ let build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
       merge (Some (vaApp ("codegen_success_" + x) es) :: xs)
     | _ -> merge xs
   in
-  gather_stmts (fun _ -> merge) aux [s]
-let build_codegen_success_stmts (q:id) (env:env) (stmts:stmt list):exp =
+  let aux_stmt (s:stmt) (xs:exp option list) : exp option =
+    match s with
+    | SIfElse (SmInline, cmp, ss1, ss2) ->
+        let e1 = build_codegen_success_stmts q env ss1 in
+        let e2 = build_codegen_success_stmts q env ss2 in
+        Some (eop Cond [map_exp stateToOp cmp; e1; e2])
+    | _ -> merge xs
+  in
+  gather_stmts aux_stmt aux [s]
+and build_codegen_success_stmts (q:id) (env:env) (stmts:stmt list):exp =
   let empty = vaApp "ttrue" [] in
   let cons el e = match e with | None -> el | Some e -> vaApp "pbool_and" [e; el] in
   let slist = List.collect (build_codegen_success_stmt q env) stmts in
