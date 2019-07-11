@@ -1,0 +1,69 @@
+include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
+
+module Transform
+
+
+
+#verbatim{:interface}{:implementation}
+open Defs_s
+open Words_s
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.InsBasic
+open X64.Vale.QuickCode
+open X64.Vale.QuickCodes
+#endverbatim
+
+#verbatim{:implementation}
+
+assume val reorder :
+  orig:va_code ->
+  hint:va_code ->
+  va_transformation_result
+
+assume val lemma_reorder :
+  orig:va_code ->
+  hint:va_code ->
+  transformed:va_code ->
+  va_s0:va_state -> va_sM:va_state -> va_fM:va_fuel ->
+  Ghost (va_state & va_fuel)
+    (requires (
+        (va_require_total transformed (reorder orig hint).result va_s0) /\
+        (va_get_ok va_s0) /\
+        (va_ensure_total orig va_s0 va_sM va_fM) /\
+        (va_get_ok va_sM)))
+    (ensures (fun (va_sM', va_fM') ->
+         (va_fM' == va_fM) /\
+         (va_sM == va_sM') /\
+         (va_ensure_total transformed va_s0 va_sM' va_fM') /\
+         (va_get_ok va_sM')))
+
+#endverbatim
+
+procedure foo_hint()
+    {:quick}
+    modifies
+        rax; rbx; efl;
+    ensures
+        rax == 10;
+        rbx == 2;
+{
+    Mov64(rax, 10);
+    Mov64(rbx, 2);
+}
+
+procedure foo_result()
+    {:quickExportOnly}
+    {:transform reorder, foo_hint}
+    modifies
+        rax; rbx; efl;
+    ensures
+        rax == 10;
+        rbx == 2;
+{
+    // The code used to write the proof, and is replaced
+    Mov64(rbx, 2);
+    Mov64(rax, 10);
+}
