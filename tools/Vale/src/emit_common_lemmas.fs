@@ -450,7 +450,7 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
   let fParams = make_fun_params p.prets p.pargs in
   let aParams : exp list = List.map EVar fParams in
   let attrs = List.filter filter_fun_attr p.pattrs in
-  let body : exp = eapply_exp (exp_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) []] in
+  let body : exp = eapply_exp (exp_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) aParams] in
   let f =
     {
       fname = Reserved ("transform_" + string_of_id p.pname);
