@@ -48,7 +48,7 @@ procedure foo_hint()
 }
 
 procedure foo_result()
-    {:quickExportOnly}
+    {:quick}
     {:transform reorder, foo_hint}
     modifies
         rax; rbx; efl;

@@ -627,16 +627,6 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       let senv = { env = env; benv = benv; b1 = dummy; bM = dummy; code = evar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
       let ss = build_lemma_ghost_stmts senv stmts in
       [sReveal; sOldS] @ sBlock @ listIf total [sState] @ ss
-    else if benv.is_quick then
-      let range = evar (Id "range1") in
-      let msg = EString ("***** MODIFIES CLAUSE NOT MET AT " + string_of_loc loc + " *****") in
-      let eFrameX = vaApp "state_match" [evar sM; eFrameExp] in
-      let eFrameL = eapply (Id "label") [range; msg; eFrameX] in
-      let (_, enssL) = collect_specs true (List.concat pspecs) in
-      let enssL = enssL @ (if !quick_mods then [] else [eFrameL]) in
-      Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
-    else if benv.is_operand then
-      err "operand procedures must be declared extern"
     else if List_mem_assoc (Id "transform") p.pattrs then (
         let orig = Reserved "orig" in
         let hint = Reserved "hint" in
@@ -662,7 +652,17 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
                                                                           sM_orig;
                                                                           fM_orig]))
       ]
-    ) else
+    ) else if benv.is_quick then
+        let range = evar (Id "range1") in
+        let msg = EString ("***** MODIFIES CLAUSE NOT MET AT " + string_of_loc loc + " *****") in
+        let eFrameX = vaApp "state_match" [evar sM; eFrameExp] in
+        let eFrameL = eapply (Id "label") [range; msg; eFrameX] in
+        let (_, enssL) = collect_specs true (List.concat pspecs) in
+        let enssL = enssL @ (if !quick_mods then [] else [eFrameL]) in
+        Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
+    else if benv.is_operand then
+      err "operand procedures must be declared extern"
+    else
       // Body of ordinary lemma
       let ss = stmts_refined bstmts in
       match p.pghost with
