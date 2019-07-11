@@ -13,6 +13,7 @@ let tCode = TName (Reserved "code")
 let tPbool = TName (Reserved "pbool")
 let tCodes = TName (Reserved "codes")
 let tFuel = TName (Reserved "fuel")
+let tTransformationResult = TName (Reserved "transformation_result")
 let ktype0 = KType bigint.Zero
 let ktype1 = KType bigint.One
 

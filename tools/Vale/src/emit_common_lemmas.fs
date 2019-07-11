@@ -406,6 +406,62 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
   let e = List.fold frameMod e specModsIo in
   (e, vaApp "state_eq" [evar sM; e])
 
+let string_of_transform_orig (p:proc_decl) : string =
+  "untransformedoriginal_" + string_of_id p.pname
+
+let string_of_transform_hint (p:proc_decl) : string =
+  match List_assoc (Id "transform") p.pattrs with
+  | [] -> err "transformation not specified"
+  | [_] -> err "transformation doesn't specify code to transform into"
+  | [_;x] -> string_of_id (id_of_exp x)
+  | _ -> err "too many arguments to transformation"
+
+let id_of_transform_function (p:proc_decl) : id =
+  match List_assoc (Id "transform") p.pattrs with
+  | [] -> err "transformation not specified"
+  | [_] -> err "transformation doesn't specify code to transform into"
+  | [x;_] -> (match x with
+              | EVar (i, _) | ELoc (_, (EVar (i, _))) -> i
+              | _ -> err "invalid transformation function specified")
+  | _ -> err "too many arguments to transformation"
+
+let id_of_transform_lemma (p:proc_decl) : id =
+  let aux (s:string) : string =
+      match List.ofArray (Array.rev (s.Split [|'.'|])) with
+      | [] -> err "impossible to get lemma name for transformation"
+      | x :: xs -> String.concat "." ("lemma_" + x :: xs) in
+  match id_of_transform_function p with
+  | Id s -> Id (aux s)
+  | Reserved s -> Reserved (aux s)
+  | Operator s -> Operator (aux s)
+
+let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
+  let p = benv.proc in
+  let codeorig = string_of_transform_orig p in
+  let codehint = string_of_transform_hint p in
+  let fParams = make_fun_params p.prets p.pargs in
+  let aParams : exp list = List.map EVar fParams in
+  let attrs = List.filter filter_fun_attr p.pattrs in
+  let body : exp = eapply (id_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) []] in
+  let f =
+    {
+      fname = Reserved ("transform_" + string_of_id p.pname);
+      fghost = NotGhost;
+      ftargs = [];
+      fargs = fParams;
+      fret_name = None;
+      fret = tTransformationResult;
+      fspecs = [];
+      fbody = Some body;
+      fattrs =
+        if benv.is_quick then
+          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
+        else
+          [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
+    }
+    in
+  [(loc, DFun f)]
+
 (* Build function for code for procedure Q
 function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand):va_code
 {
@@ -414,6 +470,8 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand)
 *)
 let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
+  let isTransform = List_mem_assoc (Id "transform") p.pattrs in
+  let precode = if isTransform then build_pre_code_via_transform loc env benv stmts else [] in
   if p.pghost = Ghost then [] else
   let fParams = make_fun_params p.prets p.pargs in
   let attrs = List.filter filter_fun_attr p.pattrs in
@@ -428,6 +486,7 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
       fspecs = [];
       fbody =
         if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
+        else if isTransform then Some (eapply (Reserved "get_result") [vaApp ("transform_" + string_of_id p.pname) (List.map EVar fParams)])
         else Some (build_code_block env benv stmts);
       fattrs =
         if benv.is_quick then
@@ -436,13 +495,15 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
           [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
     }
     in
-  List.map (fun f -> (loc, DFun f)) [f]
+  precode @ List.map (fun f -> (loc, DFun f)) [f]
 
 let build_codegen_success (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   if !fstar then (
     let p = benv.proc in
+    let isTransform = List_mem_assoc (Id "transform") p.pattrs in
     if p.pghost = Ghost then [] else
     let fParams = make_fun_params p.prets p.pargs in
+    let aParams = List.map EVar fParams in
     let attrs = List.filter filter_fun_attr p.pattrs in
     let f =
       {
@@ -453,7 +514,10 @@ let build_codegen_success (loc:loc) (env:env) (benv:build_env) (stmts:stmt list)
         fret_name = None;
         fret = tPbool;
         fspecs = [];
-        fbody = Some (build_codegen_success_stmts p.pname env stmts);
+        fbody = if isTransform
+                then Some (vaApp "pbool_and" [vaApp ("codegen_success_" + string_of_transform_orig p) aParams;
+                                              eapply (Reserved "get_success") [vaApp ("transform_" + string_of_id p.pname) aParams]])
+                else Some (build_codegen_success_stmts p.pname env stmts);
         fattrs =
           if benv.is_quick then
             [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
@@ -565,7 +629,29 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
     else if benv.is_operand then
       err "operand procedures must be declared extern"
-    else
+    else if List_mem_assoc (Id "transform") p.pattrs then (
+        let orig = Reserved "orig" in
+        let hint = Reserved "hint" in
+        let transformed = Reserved "transformed" in
+        let sM_orig = Reserved "sM_orig" in
+        let fM_orig = Reserved "fM_orig" in
+        let cArgs = List.map (fun (x, _, _, _, _) -> evar x) p.pargs in
+        let lArgs = List.map (fun (x, _, _, _, _) -> evar x) pargs in
+        let a1 x v = SAssign ([(x, None)], v) in
+        let a2 x y v = SAssign ([(x, None); (y, None)], v) in
+        [
+          a1 orig (vaApp ("code_" + string_of_transform_orig p) cArgs);
+          a1 hint (vaApp ("code_" + string_of_transform_hint p) cArgs);
+          a1 transformed (vaApp ("code_" + string_of_id p.pname) cArgs);
+          a2 sM_orig fM_orig (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: List.tail lArgs));
+          a2 sM fM (eapply (id_of_transform_lemma p) (List.map evar [orig;
+                                                                     hint;
+                                                                     transformed;
+                                                                     s0;
+                                                                     sM_orig;
+                                                                     fM_orig]))
+      ]
+    ) else
       // Body of ordinary lemma
       let ss = stmts_refined bstmts in
       match p.pghost with
@@ -637,8 +723,13 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
     in
   exportSpecsDecls @ [(loc, DProc pLemma)]
 
-let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
+let rec build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   gen_lemma_sym_count := 0;
+  let isTransform = List_mem_assoc (Id "transform") p.pattrs in
+  let preTransformDecls = (
+      if isTransform
+      then build_proc envBody env loc ({p with pname = Id (string_of_transform_orig p); pattrs = List.filter (fun (x,_) -> x <> Id "transform") p.pattrs})
+      else []) in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in
@@ -692,9 +783,9 @@ let build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
           in
         let pLemma = build_lemma env benv b1 rstmts bstmts in
         let quickDecls =
-          if isQuick then
+          if isQuick && not isTransform then
             Emit_common_quick_code.build_qcode envBody loc p stmts
           else []
         fCodes @ fCodeGenSuccess @ (if !no_lemmas then [] else quickDecls @ pLemma)
     in
-  bodyDecls //@ blockLemmaDecls
+  preTransformDecls @ bodyDecls //@ blockLemmaDecls
