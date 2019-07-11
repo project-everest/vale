@@ -1140,6 +1140,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             pattrs = [(Id "public", [EBool false]); (Id "already_has_mod_ok", [])] @ p.pattrs;
           }
           in
+        let passthrough_pattrs_while = List.filter (fun (x, _) -> x = Id "codeOnly") p.pattrs in
         let p_while =
           {
             pname = xp_while;
@@ -1150,7 +1151,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_exit];
             pbody = Some (sInits @ [sWhile]);
-            pattrs = [(Id "quick", [evar (Reserved "while")]); (Id "already_has_mod_ok", [])];
+            pattrs = [(Id "quick", [evar (Reserved "while")]); (Id "already_has_mod_ok", [])] @ passthrough_pattrs_while;
           }
           in
         hoisted := (DProc p_while)::(DProc p_body)::!hoisted;
