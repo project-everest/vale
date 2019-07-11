@@ -633,7 +633,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
         let transformed = Reserved "transformed" in
         let sM_orig = Reserved "sM_orig" in
         let fM_orig = Reserved "fM_orig" in
-        let cArgs = List.map (fun (x, _, _, _, _) -> evar x) p.pargs in
+        let cArgs = List.map (fun (x, _) -> evar x) (make_fun_params p.prets p.pargs) in
         let lArgs = List.map (fun (x, _, _, _, _) -> evar x) pargs in
         let a1 x v = SAssign ([(x, None)], v) in
         let a2 x y v = SAssign ([(x, None); (y, None)], v) in
