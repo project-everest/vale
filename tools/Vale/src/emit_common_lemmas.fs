@@ -416,29 +416,32 @@ let string_of_transform_hint (p:proc_decl) : string =
   | [_;x] -> string_of_id (id_of_exp x)
   | _ -> err "too many arguments to transformation"
 
-let id_of_transform_function (p:proc_decl) : id =
-  let rec unwrap_elocs (e:exp) : exp =
-    match e with
-    | ELoc (_, e) -> unwrap_elocs e
-    | _ -> e
-  in
+let exp_of_transform_function (p:proc_decl) : exp =
   match List_assoc (Id "transform") p.pattrs with
   | [] -> err "transformation not specified"
   | [_] -> err "transformation doesn't specify code to transform into"
-  | [x;_] -> (match unwrap_elocs x with
-              | EVar (i, _) -> i
-              | _ -> err "invalid transformation function specified")
+  | [x;_] -> x
   | _ -> err "too many arguments to transformation"
 
-let id_of_transform_lemma (p:proc_decl) : id =
-  let aux (s:string) : string =
-      match List.ofArray (Array.rev (s.Split [|'.'|])) with
-      | [] -> err "impossible to get lemma name for transformation"
-      | x :: xs -> String.concat "." ("lemma_" + x :: xs) in
-  match id_of_transform_function p with
-  | Id s -> Id (aux s)
-  | Reserved s -> Reserved (aux s)
-  | Operator s -> Operator (aux s)
+let exp_of_transform_lemma (p:proc_decl) : exp =
+  let prefix s i =
+    match i with
+    | Id i -> Id (s + i)
+    | Reserved i -> Reserved (s + i)
+    | Operator i -> Operator (s + i)
+  in
+  let rec to_lemma (e:exp) : exp =
+    match e with
+    | ELoc (l, e) -> ELoc (l, to_lemma e)
+    | ELabel (l, e) -> ELabel (l, to_lemma e)
+    | EVar (i, _) -> EVar (prefix "lemma_" i, None)
+    | EOp (FieldOp i, es, _) -> EOp (FieldOp (prefix "lemma_" i), es, None)
+    | _ -> err "Invalid transform function"
+  in
+  to_lemma (exp_of_transform_function p)
+
+let eapply_exp (x:exp) (es:exp list) =
+  EApply (x, None, es, None)
 
 let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
@@ -447,7 +450,7 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
   let fParams = make_fun_params p.prets p.pargs in
   let aParams : exp list = List.map EVar fParams in
   let attrs = List.filter filter_fun_attr p.pattrs in
-  let body : exp = eapply (id_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) []] in
+  let body : exp = eapply_exp (exp_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) []] in
   let f =
     {
       fname = Reserved ("transform_" + string_of_id p.pname);
@@ -652,12 +655,12 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
           a2 sM_orig fM_orig (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: List.tail lArgs));
           reveal (vaApp ("transform_" + string_of_id p.pname) cArgs);
           reveal (vaApp ("code_" + string_of_id p.pname) cArgs);
-          a2 sM fM (eapply (id_of_transform_lemma p) (List.map evar [orig;
-                                                                     hint;
-                                                                     transformed;
-                                                                     s0;
-                                                                     sM_orig;
-                                                                     fM_orig]))
+          a2 sM fM (eapply_exp (exp_of_transform_lemma p) (List.map evar [orig;
+                                                                          hint;
+                                                                          transformed;
+                                                                          s0;
+                                                                          sM_orig;
+                                                                          fM_orig]))
       ]
     ) else
       // Body of ordinary lemma
