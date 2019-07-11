@@ -103,3 +103,17 @@ procedure Test() returns(ghost g:int)
   assert g == 12;
   assert (fun(x:int) x + 1)(12) == 13;
 }
+
+procedure CodeOnlyProcedure()
+  {:codeOnly}
+  ensures
+    false; /* Since we are only generating the code, the postcondition is irrelevant */
+{
+    Add64Wrap(rax, 1);
+    Add64Wrap(rax, 1);
+}
+
+#verbatim{:implementation}
+let test_codeonlyprocedure1 () : Tot unit =
+  assert (va_code_CodeOnlyProcedure == va_code_CodeOnlyProcedure) (* Check that it is defined *)
+#endverbatim

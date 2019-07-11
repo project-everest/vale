@@ -1182,6 +1182,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isAlreadyModOk = List_mem_assoc (Id "already_has_mod_ok") p.pattrs in
   let isQuick = is_quick_body p.pattrs in
+  let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs in
   let preserveSpecs =
     List.collect
       (fun spec ->
@@ -1261,7 +1262,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let envpIn = {envpIn with abstractOld = true} in
   let envp = envpIn in
   let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
-  let envp = {envp with checkMods = isFrame} in
+  let envp = {envp with checkMods = isFrame && not isCodeOnly} in
   let envp = {envp with abstractOld = false} in
   let specs = List_mapSnd (rewrite_vars_spec envpIn envp) pspecs in
   let specs = List_mapSnd (resolve_overload_spec envpIn envp) specs in
