@@ -417,11 +417,16 @@ let string_of_transform_hint (p:proc_decl) : string =
   | _ -> err "too many arguments to transformation"
 
 let id_of_transform_function (p:proc_decl) : id =
+  let rec unwrap_elocs (e:exp) : exp =
+    match e with
+    | ELoc (_, e) -> unwrap_elocs e
+    | _ -> e
+  in
   match List_assoc (Id "transform") p.pattrs with
   | [] -> err "transformation not specified"
   | [_] -> err "transformation doesn't specify code to transform into"
-  | [x;_] -> (match x with
-              | EVar (i, _) | ELoc (_, (EVar (i, _))) -> i
+  | [x;_] -> (match unwrap_elocs x with
+              | EVar (i, _) -> i
               | _ -> err "invalid transformation function specified")
   | _ -> err "too many arguments to transformation"
 
