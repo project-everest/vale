@@ -2,8 +2,6 @@ include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
 
 module Transform
 
-
-
 #verbatim{:interface}{:implementation}
 open Defs_s
 open Words_s
@@ -43,12 +41,7 @@ assume val lemma_reorder :
 #endverbatim
 
 procedure foo_hint()
-    {:quick}
-    modifies
-        rax; rbx; efl;
-    ensures
-        rax == 10;
-        rbx == 2;
+    {:codeOnly}
 {
     Mov64(rax, 10);
     Mov64(rbx, 2);
