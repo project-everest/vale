@@ -639,11 +639,14 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
         let lArgs = List.map (fun (x, _, _, _, _) -> evar x) pargs in
         let a1 x v = SAssign ([(x, None)], v) in
         let a2 x y v = SAssign ([(x, None); (y, None)], v) in
+        let reveal x = SAssign ([], eop (Uop UReveal) [x]) in
         [
           a1 orig (vaApp ("code_" + string_of_transform_orig p) cArgs);
           a1 hint (vaApp ("code_" + string_of_transform_hint p) cArgs);
           a1 transformed (vaApp ("code_" + string_of_id p.pname) cArgs);
           a2 sM_orig fM_orig (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: List.tail lArgs));
+          reveal (vaApp ("transform_" + string_of_id p.pname) cArgs);
+          reveal (vaApp ("code_" + string_of_id p.pname) cArgs);
           a2 sM fM (eapply (id_of_transform_lemma p) (List.map evar [orig;
                                                                      hint;
                                                                      transformed;
