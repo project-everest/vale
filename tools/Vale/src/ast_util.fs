@@ -502,3 +502,4 @@ let reprint_loop_invs = ref true;
 let reprint_blank_lines = ref true;
 let gen_lemma_sym_count = ref 0
 let gen_lemma_sym ():int = incr gen_lemma_sym_count; !gen_lemma_sym_count
+let global_code_only = ref false;

@@ -1183,7 +1183,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isAlreadyModOk = List_mem_assoc (Id "already_has_mod_ok") p.pattrs in
   let isQuick = is_quick_body p.pattrs in
-  let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs in
+  let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs || !global_code_only in
   let preserveSpecs =
     List.collect
       (fun spec ->
