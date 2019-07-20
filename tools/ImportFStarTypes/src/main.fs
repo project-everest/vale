@@ -841,7 +841,7 @@ let to_vale_decl ((env:env), (envs_ds_rev:(env * f_decl) list)) (d:f_decl):(env 
         if x.Contains("__proj__Mk") && x.Contains("__item__") then
           let i = x.IndexOf("__item__") + "__item__".Length in
           let xf = x.Substring(i) in
-          let xo = "operator(." + xf + ")" in
+          let xo = "operator/*" + x + "*/(." + xf + ")" in // HACK: use comment to prevent duplicate names from getting discarded
           [(env, dv); (env, {dv with f_name = xo})]
         else [(env, dv)]
     | _ ->

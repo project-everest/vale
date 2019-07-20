@@ -550,7 +550,7 @@ let check_state_info_mod (env:env) (x:id) (io:inout):unit =
   | (false, _, _) -> ()
   | (true, In, _) -> ()
   | (true, (InOut | Out), true) -> ()
-  | (true, (InOut | Out), false) -> err ("variable " + (err_id x) + "must be declared in procedure's modifies clause")
+  | (true, (InOut | Out), false) -> err ("variable " + (err_id x) + " must be declared in procedure's modifies clause")
 
 let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
   let readWrite = check_state_info env x in
