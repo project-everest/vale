@@ -48,8 +48,10 @@ helper_text  = "We recommend running this script using the commandline tool 'rlw
 helper_text += "which will give you a readline-interface.  "
 helper_text += "For example, it will give you arrow-based command history."
 argparser = argparse.ArgumentParser(description=helper_text)
-cmd_fstar = add_cmd(argv, '-f', '--fstar-cmd', '--fstar-args', 'F*', 'cmd_file_fstar', True)
+cmd_fstar = add_cmd(argv, '-f', '--fstar-cmd', '--fstar-args', 'F*', 'cmd_file_fstar', False)
 cmd_vale = add_cmd(argv, '-v', '--vale-cmd', '--vale-args', 'Vale', 'cmd_file_vale', False)
+argparser.add_argument('-a', '--auto', action = 'store', required=False,
+    help='Try to automatically find cmd files given a module name')
 argparser.add_argument('--fstar-file', action = 'store', dest = 'file_fstar',
     help = 'specify path of F* file (by default, the first .fst or .fsti file from the F* command is chosen)')
 argparser.add_argument('--vale-file', action = 'store', dest = 'file_vale',
@@ -63,9 +65,13 @@ def get_cmd(cmd, arg):
             if '&&' in cmd:
                 cmd = cmd[0 : cmd.index('&&')] # strip any trailing && ... from command
     return cmd
-    
-cmd_fstar = get_cmd(cmd_fstar, args.cmd_file_fstar)
-cmd_vale = get_cmd(cmd_vale, args.cmd_file_vale)
+
+if not args.auto is None:
+    cmd_fstar = get_cmd(cmd_fstar, 'obj/%s.fst.checked.cmd' % args.auto)
+    cmd_vale = get_cmd(cmd_vale, 'obj/%s.fst.cmd' % args.auto)
+else:
+    cmd_fstar = get_cmd(cmd_fstar, args.cmd_file_fstar)
+    cmd_vale = get_cmd(cmd_vale, args.cmd_file_vale)
 cmd_fstar_ide = shlex.split(cmd_fstar) + ['--ide']
 
 file_fstar = args.file_fstar
