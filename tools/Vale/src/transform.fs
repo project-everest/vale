@@ -80,8 +80,8 @@ let vaTyp (t:typ) : string =
 let in_id (x:id) = Reserved ("in_" + (string_of_id x))
 let old_id (x:id) = Reserved ("old_" + (string_of_id x))
 let prev_id (x:id) = Reserved ("prev_" + (string_of_id x))
-let body_id (x:id) = Id ((string_of_id x) + "_body")
-let while_id (x:id) = Id ((string_of_id x) + "_while")
+let body_id (x:id) (n:int) = Id ((string_of_id x) + "_body" + (string n))
+let while_id (x:id) (n:int) = Id ((string_of_id x) + "_while" + (string n))
 
 let is_quick_body (a:attrs):bool =
   if List_mem_assoc (Id "quick") a then
@@ -995,6 +995,7 @@ let add_assert_quicktype_for_exp_reqs (env:env) (ss:stmt list):stmt list =
 // Hoist while loops into top-level procedures
 
 let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
+  let nLabel = ref 0 in
   let hoisted = ref ([]:decl list) in
   let hoist_while env s =
     match s with
@@ -1020,8 +1021,9 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
           ... outs := while_p(ins); ...
         }
       *)
-        let xp_body = body_id p.pname in
-        let xp_while = while_id p.pname in
+        let xp_body = body_id p.pname !nLabel in
+        let xp_while = while_id p.pname !nLabel in
+        incr nLabel;
         let (_, raw_reads, raw_readsOld, raw_mods) = compute_read_mods_stmt env empty_env s in
         let mods = Set.map (resolve_alias env) raw_mods in
         let reads = Set.map (resolve_alias env) raw_reads in
@@ -1137,7 +1139,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             pspecs = specs @ [spec_enter_body; spec_precedes];
             pbody = Some (sInits @ b);
             // always non-public, even if they are generated from the body of a public procedure
-            pattrs = [(Id "public", [EBool false]); (Id "already_has_mod_ok", [])] @ p.pattrs;
+            pattrs = [(Id "public", [EBool false])] @ p.pattrs;
           }
           in
         let passthrough_pattrs_while = List.filter (fun (x, _) -> x = Id "codeOnly") p.pattrs in
@@ -1151,7 +1153,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             prets = p_outs;
             pspecs = specs @ [spec_exit];
             pbody = Some (sInits @ [sWhile]);
-            pattrs = [(Id "quick", [evar (Reserved "while")]); (Id "already_has_mod_ok", [])] @ passthrough_pattrs_while;
+            pattrs = [(Id "quick", [evar (Reserved "while")])] @ passthrough_pattrs_while;
           }
           in
         hoisted := (DProc p_while)::(DProc p_body)::!hoisted;
@@ -1181,7 +1183,6 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let isFrame = attrs_get_bool (Id "frame") (p.pghost = NotGhost) p.pattrs in
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
-  let isAlreadyModOk = List_mem_assoc (Id "already_has_mod_ok") p.pattrs in
   let isQuick = is_quick_body p.pattrs in
   let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs || !global_code_only in
   let preserveSpecs =
@@ -1196,6 +1197,13 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
       p.pspecs
     in
   let ok = evar (Id "ok") in
+  let isAlreadyModOk =
+    List.exists (fun (_, s) ->
+      match s with
+      | SpecRaw (RawSpec (RModifies _, [(_, SpecExp (EVar (Id "ok", _)))])) -> true
+      | _ -> false)
+      p.pspecs
+      in
   let okMod = SpecRaw (RawSpec (RModifies Preserve, [(loc, SpecExp ok)])) in
   let okReqEns = SpecRaw (RawSpec (RRequiresEnsures, [(loc, SpecExp ok)])) in
   let okSpecs = (if isAlreadyModOk then [] else [(loc, okMod)]) @ [(loc, okReqEns)] in

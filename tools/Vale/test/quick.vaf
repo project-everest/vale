@@ -357,14 +357,19 @@ procedure Incr3(ghost g:int)
     Add64(rax, 1);
 }
 
-procedure While0()
+procedure While0(ghost g:int)
     {:quick}
+    lets
+        x := g;
+    reads
+        rcx;
     modifies
         efl;
         rax; rbx;
     requires
         rax < 200;
         rbx < 100;
+        rcx < 300;
 {
     Add64(rax, 0);
     while (rax < rbx)
@@ -372,10 +377,18 @@ procedure While0()
             rax <= 200;
             rbx <= 100;
             rax >= old(rax);
+            rcx < 300;
         decreases
-            (200 - rax);
+            200 - rax;
     {
+//        assert x == g;
         Add64(rax, 1);
+    }
+    while (rax < rbx)
+        invariant
+            rax >= rbx;
+        decreases 0;
+    {
     }
     Add64(rax, 3);
 }
