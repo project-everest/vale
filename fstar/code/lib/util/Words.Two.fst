@@ -1,4 +1,5 @@
 module Words.Two
+open FStar.Mul
 
 let lemma_fundamental_div_mod (x:nat64) :
   Lemma (x = x % pow2_32 + pow2_32 * ((x / pow2_32) % pow2_32))

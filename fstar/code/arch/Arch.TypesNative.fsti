@@ -1,4 +1,5 @@
 module Arch.TypesNative
+open FStar.Mul
 open Words_s
 open Types_s
 open TypesNative_s

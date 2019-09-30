@@ -18,6 +18,7 @@ open X64.Vale.QuickCode
 #endverbatim
 
 #verbatim
+open FStar.Mul
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State
@@ -170,9 +171,9 @@ procedure Sub64Wrap(inout dst:dst_opr64, in src:opr64)
 
 #verbatim
 let lemma_fundamental_div_mod (a b:nat64) :
-  Lemma (pow2_64 `op_Multiply` (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a `op_Multiply` b)
+  Lemma (pow2_64 * (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a * b)
   =
-  FStar.Math.Lemmas.lemma_div_mod (a `op_Multiply` b) pow2_64
+  FStar.Math.Lemmas.lemma_div_mod (a * b) pow2_64
 #endverbatim
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"

@@ -1,4 +1,5 @@
 module X64.Vale.QuickCodes
+open FStar.Mul
 
 #reset-options "--initial_ifuel 1 --z3rlimit 30"
 
@@ -236,7 +237,7 @@ let qIf_proof #a #c1 #c2 b qc1 qc2 mods s0 k =
 let rec qWhile_proof_rec
     (#a #d:Type) (#c:code) (b:cmp) (qc:a -> quickCode a c) (mods:mods_t) (inv:state -> a -> Type0)
     (dec:state -> a -> d) (s0 s1:state) (g1:a) (f1:fuel) (k:state -> a -> Type0)
-  : Ghost (state * va_fuel * a)
+  : Ghost (state & va_fuel & a)
   (requires
     wp_While b qc mods inv dec g1 s1 k /\
     eval_while_inv (While (cmp_to_ocmp b) c) s0 f1 s1 /\
@@ -283,7 +284,7 @@ let wp_sound_code #a c qc k s0 =
   proof s0 k
 
 let wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) :
-  Ghost (state * fuel * a)
+  Ghost (state & fuel & a)
     (wp_sound_code_pre qc s0 k)
     (wp_sound_code_post qc s0 k)
   =

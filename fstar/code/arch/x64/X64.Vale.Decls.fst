@@ -1,4 +1,5 @@
 module X64.Vale.Decls
+open FStar.Mul
 open X64.Machine_s
 open X64.Vale
 open X64.Vale.State
@@ -18,7 +19,7 @@ type va_fuel = nat
 type va_pbool = Vale.Def.PossiblyMonad.pbool
 let va_ttrue () = Vale.Def.PossiblyMonad.ttrue
 let va_ffalse = Vale.Def.PossiblyMonad.ffalse
-let va_pbool_and x y = Vale.Def.PossiblyMonad.op_Amp_Amp_Dot x y
+let va_pbool_and x y = Vale.Def.PossiblyMonad.((&&.)) x y
 
 let mul_nat_helper x y =
   FStar.Math.Lemmas.nat_times_nat_is_nat x y

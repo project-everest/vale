@@ -1,4 +1,5 @@
 module X64.Vale.Lemmas
+open FStar.Mul
 open Defs_s
 open Prop_s
 open X64.Machine_s
@@ -19,7 +20,7 @@ let update_of (flags:int) (new_of:bool) = S.update_of (int_to_nat64 flags) new_o
 let eval_code (c:code) (s0:state) (f0:fuel) (s1:state) : prop0 =
   Some s1 == S.eval_code c f0 s0
 
-let eval_ins (c:code) (s0:state) : Pure ((sM:state) * (f0:fuel))
+let eval_ins (c:code) (s0:state) : Pure (state & fuel)
   (requires Ins? c)
   (ensures fun (sM, f0) ->
     eval_code c s0 f0 sM
@@ -92,14 +93,14 @@ val lemma_merge_total (b0:codes) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:s
   )
   (ensures eval_code (Block b0) s0 (compute_merge_total f0 fM) sN)
 
-val lemma_empty_total (s0:state) (bN:codes) : Pure ((sM:state) * (fM:fuel))
+val lemma_empty_total (s0:state) (bN:codes) : Pure (state & fuel)
   (requires True)
   (ensures (fun (sM, fM) ->
     s0 == sM /\
     eval_code (Block []) s0 fM sM
   ))
 
-val lemma_ifElse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) : Pure (bool * state * state * fuel)
+val lemma_ifElse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) : Pure (bool & state & state & fuel)
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
@@ -128,18 +129,18 @@ val lemma_ifElseFalse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) 
 
 val eval_while_inv (c:code) (s0:state) (fW:fuel) (sW:state) : prop0
 
-val lemma_while_total (b:ocmp) (c:code) (s0:state) : Pure ((s1:state) * (f1:fuel))
+val lemma_while_total (b:ocmp) (c:code) (s0:state) : Pure (state & fuel)
   (requires True)
   (ensures fun (s1, f1) ->
     s1 == s0 /\
     eval_while_inv (While b c) s1 f1 s1
   )
 
-val lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Pure ((s1:state) * (f1:fuel))
+val lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Pure (state & fuel)
   (requires eval_ocmp sW b)
   (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
-val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Pure ((s1:state) * (f1:fuel))
+val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Pure (state & fuel)
   (requires
     valid_ocmp b sW /\
     not (eval_ocmp sW b) /\

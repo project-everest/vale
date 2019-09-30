@@ -81,39 +81,39 @@ let va_contains_FStar__Map__t = Map.contains
 
 procedure SeqIndex(ghost s:seq(int), ghost i:int, ghost v:int) returns(ghost r:int) 
 {
-  let ns := if i > 0  && i < length(s) then s[i:=v] else s;
-  r := if i > 0  && i < length(s) then ns[i] else 0;
-  assert r == v || r == 0;
+    let ns := if i > 0  && i < length(s) then s[i := v] else s;
+    r := if i > 0  && i < length(s) then ns[i] else 0;
+    assert r == v || r == 0;
 }
 
 procedure MapIndex(ghost m:FStar.Map.t(int, int), ghost i:int, ghost v:int) returns(ghost r:int) 
 {
-  let nm := m[i:=v];
-  r := nm[i];
-  assert nm?[i] && r == v;
+    let nm := m[i:=v];
+    r := nm[i];
+    assert nm?[i] && r == v;
 }
 
 procedure Test() returns(ghost g:int)
-  {:typecheck}
+    {:typecheck}
 {
-  let f:fun(int) -> int := fun(x:int) x + 1;
-  let a:int := f(10);
-  assert a == 11;
-  g := f(11);
-  assert g == 12;
-  assert (fun(x:int) x + 1)(12) == 13;
+    let f:fun(int) -> int := fun(x:int) x + 1;
+    let a:int := f(10);
+    assert a == 11;
+    g := f(11);
+    assert g == 12;
+    assert (fun(x:int) x + 1)(12) == 13;
 }
 
 procedure CodeOnlyProcedure()
-  {:codeOnly}
-  ensures
-    false; /* Since we are only generating the code, the postcondition is irrelevant */
+    {:codeOnly}
+    ensures
+        false; // Since we are only generating the code, the postcondition is irrelevant
 {
     Add64Wrap(rax, 1);
     Add64Wrap(rax, 1);
 }
 
 #verbatim{:implementation}
-let test_codeonlyprocedure1 () : Tot unit =
-  assert (va_code_CodeOnlyProcedure == va_code_CodeOnlyProcedure) (* Check that it is defined *)
+let test_codeonlyprocedure1 () : unit =
+  assert (va_code_CodeOnlyProcedure == va_code_CodeOnlyProcedure) // Check that it is defined
 #endverbatim

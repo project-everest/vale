@@ -1,4 +1,5 @@
 module Vale.Def.PossiblyMonad
+open FStar.Mul
 
 /// Similar to the [maybe] monad in Haskell (which is like the
 /// [option] type in F* and OCaml), but instead, we also store the

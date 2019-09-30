@@ -1,6 +1,7 @@
 // Optimized weakest precondition generation for 'quick' procedures
 
 module X64.Vale.QuickCodes
+open FStar.Mul
 open Defs_s
 open X64.Machine_s
 open X64.Vale.State
@@ -138,7 +139,7 @@ and wp_Bind (#a:Type0) (#b:Type0) (cs:codes) (qcs:state -> a -> GTot (quickCodes
   let f s0 g = wp cs (qcs s0 g) mods k s0 in f
 
 val wp_sound (#a:Type0) (cs:codes) (qcs:quickCodes a cs) (mods:mods_t) (k:state -> a -> Type0) (s0:state)
-  : Ghost (state * va_fuel * a)
+  : Ghost (state & va_fuel & a)
   (requires wp cs qcs mods k s0)
   (ensures fun (sN, fN, gN) ->
     eval (Block cs) s0 fN sN /\ update_state_mods mods sN s0 == sN /\ k sN gN
@@ -153,7 +154,7 @@ let wp_block (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) (mods:m
   wp cs (qcs s0) mods k s0
 
 val qblock_proof (#a:Type) (#cs:codes) (qcs:state -> GTot (quickCodes a cs)) (mods:mods_t) (s0:state) (k:state -> a -> Type0)
-  : Ghost (state * va_fuel * a)
+  : Ghost (state & va_fuel & a)
   (requires wp_block qcs mods s0 k)
   (ensures fun (sM, f0, g) ->
     eval_code (block cs) s0 f0 sM /\ update_state_mods mods sM s0 == sM /\ k sM g
@@ -172,7 +173,7 @@ let wp_InlineIf (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (q
   (not b ==> mods_contains mods qc2.mods /\ QProc?.wp qc2 s0 k)
 
 val qInlineIf_proof (#a:Type) (#c1:code) (#c2:code) (b:bool) (qc1:quickCode a c1) (qc2:quickCode a c2) (mods:mods_t) (s0:state) (k:state -> a -> Type0)
-  : Ghost (state * va_fuel * a)
+  : Ghost (state & va_fuel & a)
   (requires wp_InlineIf b qc1 qc2 mods s0 k)
   (ensures fun (sM, f0, g) ->
     eval_code (if_code b c1 c2) s0 f0 sM /\ update_state_mods mods sM s0 == sM /\ k sM g
@@ -228,7 +229,7 @@ let wp_If (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quic
   (not (eval_cmp s0 b) ==> mods_contains mods qc2.mods /\ QProc?.wp qc2 s0 k)
 
 val qIf_proof (#a:Type) (#c1:code) (#c2:code) (b:cmp) (qc1:quickCode a c1) (qc2:quickCode a c2) (mods:mods_t) (s0:state) (k:state -> a -> Type0)
-  : Ghost (state * va_fuel * a)
+  : Ghost (state & va_fuel & a)
   (requires wp_If b qc1 qc2 mods s0 k)
   (ensures fun (sM, f0, g) ->
     eval_code (IfElse (cmp_to_ocmp b) c1 c2) s0 f0 sM /\ update_state_mods mods sM s0 == sM /\ k sM g
@@ -268,7 +269,7 @@ let wp_While
 val qWhile_proof
     (#a #d:Type) (#c:code) (b:cmp) (qc:a -> quickCode a c) (mods:mods_t) (inv:state -> a -> Type0)
     (dec:state -> a -> d) (g0:a) (s0:state) (k:state -> a -> Type0)
-  : Ghost (state * va_fuel * a)
+  : Ghost (state & va_fuel & a)
   (requires wp_While b qc mods inv dec g0 s0 k)
   (ensures fun (sM, f0, g) ->
     eval_code (While (cmp_to_ocmp b) c) s0 f0 sM /\ update_state_mods mods sM s0 == sM /\ k sM g
@@ -318,7 +319,7 @@ let qAssertBy (#a:Type) (#cs:codes) (mods:mods_t) (r:range) (msg:string) (p:Type
 ///// Code
 
 val wp_sound_code (#a:Type0) (c:code) (qc:quickCode a c) (k:state -> a -> Type0) (s0:state) :
-  Ghost ((sN:state) * (fN:fuel) * (g:a))
+  Ghost (state & fuel & a)
   (requires QProc?.wp qc s0 k)
   (ensures fun (sN, fN, gN) -> eval_code c s0 fN sN /\ update_state_mods qc.mods sN s0 == sN /\ k sN gN)
 
@@ -388,7 +389,7 @@ unfold let normal_steps : list string =
 unfold let normal (x:Type0) : Type0 = norm [iota; zeta; simplify; primops; delta_attr [`%va_qattr]; delta_only normal_steps] x
 
 val wp_sound_code_norm (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) :
-  Ghost (state * fuel * a)
+  Ghost (state & fuel & a)
     (normal (wp_sound_code_pre qc s0 k))
     (wp_sound_code_post qc s0 k)
 

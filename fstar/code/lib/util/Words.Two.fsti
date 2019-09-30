@@ -1,5 +1,6 @@
 module Words.Two
 
+open FStar.Mul
 open Types_s
 open Words_s
 open Words.Two_s

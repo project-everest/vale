@@ -1,4 +1,5 @@
 module X64.Vale.StateLemmas
+open FStar.Mul
 
 #reset-options "--initial_fuel 2 --max_fuel 2"
 

@@ -1,4 +1,5 @@
 module X64.Machine_s
+open FStar.Mul
 open Defs_s
 
 unfold let pow2_32 = Words_s.pow2_32

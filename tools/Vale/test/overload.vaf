@@ -13,8 +13,8 @@ operand_type reg:int := inout eax | inout ebx;
 #verbatim{:interface}
 open FStar.Map
 let map = Map.t
-let op_String_Access = Map.sel
-let op_String_Assignment = Map.upd
+let (.[]) = Map.sel
+let (.[]<-) = Map.upd
 let contains = Map.contains
 
 type register = | EAX | EBX
@@ -36,7 +36,7 @@ and va_codes = list va_code
 type va_pbool = Vale.Def.PossiblyMonad.pbool
 let va_ttrue () = Vale.Def.PossiblyMonad.ttrue
 let va_ffalse = Vale.Def.PossiblyMonad.ffalse
-let va_pbool_and x y = Vale.Def.PossiblyMonad.op_Amp_Amp_Dot x y
+let va_pbool_and x y = Vale.Def.PossiblyMonad.((&&.)) x y
 
 let va_CNil () = []
 let va_CCons x y = x::y
@@ -78,7 +78,7 @@ let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
 let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
   True
 
-unfold let disequality = op_disEquality
+unfold let disequality = (<>)
 #endverbatim
 
 

@@ -1,4 +1,5 @@
 module X64.Vale.QuickCode
+open FStar.Mul
 open Defs_s
 open X64.Machine_s
 open X64.Vale.State
@@ -78,7 +79,7 @@ let t_ensure (#a:Type0) (c:va_code) (mods:mods_t) (wp:quickProc_wp a) (s0:state)
   fun (sM, f0, g) -> eval_code c s0 f0 sM /\ update_state_mods mods sM s0 == sM /\ k sM g
 
 let t_proof (#a:Type0) (c:va_code) (mods:mods_t) (wp:quickProc_wp a) : Type =
-  s0:state -> k:(state -> a -> Type0) -> Ghost (state * va_fuel * a)
+  s0:state -> k:(state -> a -> Type0) -> Ghost (state & va_fuel & a)
     (requires wp s0 k)
     (ensures t_ensure c mods wp s0 k)
 

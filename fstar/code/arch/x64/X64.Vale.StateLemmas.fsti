@@ -1,4 +1,5 @@
 module X64.Vale.StateLemmas
+open FStar.Mul
 open X64.Machine_s
 open X64.Vale.State
 open FStar.FunctionalExtensionality

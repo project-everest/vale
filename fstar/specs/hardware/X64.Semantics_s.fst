@@ -1,5 +1,6 @@
 module X64.Semantics_s
 
+open FStar.Mul
 open Defs_s
 open X64.Machine_s
 open Words_s
@@ -8,8 +9,8 @@ open Words.Four_s
 open Types_s
 open FStar.Seq.Base
 
-let op_String_Access = Map.sel
-let op_String_Assignment = Map.upd
+let (.[]) = Map.sel
+let (.[]<-) = Map.upd
 
 type ins =
   | Mov64      : dst:operand -> src:operand -> ins
@@ -123,7 +124,7 @@ let update_operand_preserve_flags' (o:operand) (v:nat64) (s:state) : state =
 let update_operand' (o:operand) (ins:ins) (v:nat64) (s:state) : state =
   { (update_operand_preserve_flags' o v s) with flags = havoc s ins }
 
-(* REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure? *)
+// REVIEW: Will we regret exposing a mod here?  Should flags be something with more structure?
 let cf (flags:nat64) : bool =
   flags % 2 = 1
 
@@ -157,8 +158,8 @@ let update_of (flags:nat64) (new_of:bool) : (new_flags:nat64{overflow new_flags 
     else
       flags
 
-(* Define a stateful monad to simplify defining the instruction semantics *)
-let st (a:Type) = state -> a * state
+// Define a stateful monad to simplify defining the instruction semantics
+let st (a:Type) = state -> a & state
 
 unfold
 let return (#a:Type) (x:a) :st a =
@@ -201,7 +202,7 @@ let check (valid: state -> bool) : st unit =
 unfold
 let run (f:st unit) (s:state) : state = snd (f s)
 
-(* Monadic update operations *)
+// Monadic update operations
 unfold
 let update_operand_preserve_flags (dst:operand) (v:nat64) :st unit =
   check (valid_dst_operand dst);;
@@ -235,7 +236,7 @@ let update_cf_of (new_cf new_of:bool) :st unit =
   s <-- get;
   set ( { s with flags = update_cf (update_of s.flags new_of) new_cf } )
 
-(* Core definition of instruction semantics *)
+// Core definition of instruction semantics
 let eval_ins (ins:ins) : st unit =
   s <-- get;
   match ins with
@@ -301,7 +302,7 @@ let eval_ins (ins:ins) : st unit =
 
   | IMul64 dst src ->
     check (valid_operand src);;
-    update_operand dst ins ((eval_operand dst s `op_Multiply` eval_operand src s) % 0x10000000000000000)
+    update_operand dst ins ((eval_operand dst s * eval_operand src s) % 0x10000000000000000)
 
   | Xor64 dst src ->
     check (valid_operand src);;

@@ -1,5 +1,6 @@
 module Arch.Types
 
+open FStar.Mul
 open Types_s
 open Words_s
 open Words.Four_s

@@ -72,15 +72,18 @@ and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
 
 (* Build codegen_success value for body of procedure Q *)
 let rec build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
-  let rec merge (xs:exp option list) : exp option =
+  let rec merge (xs:exp option list):exp option =
     match xs with
     | [] -> None
     | None :: xs -> merge xs
-    | Some x :: xs -> (match merge xs with
-                       | None -> Some x
-                       | Some x' -> Some (vaApp "pbool_and" [x; x']))
-  in
-  let rec aux (e:exp) (xs:exp option list) : exp option =
+    | Some x :: xs ->
+      (
+        match merge xs with
+        | None -> Some x
+        | Some x' -> Some (vaApp "pbool_and" [x; x'])
+      )
+    in
+  let rec aux (e:exp) (xs:exp option list):exp option =
     match e with
     | ELoc (_, e) -> aux e xs
     | EApply (e, _, es, _) when is_id e && is_proc env (id_of_exp e) NotGhost ->
@@ -90,15 +93,15 @@ let rec build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
       let es = List.map (map_exp stateToOp) es in
       merge (Some (vaApp ("codegen_success_" + x) es) :: xs)
     | _ -> merge xs
-  in
-  let aux_stmt (s:stmt) (xs:exp option list) : exp option =
+    in
+  let aux_stmt (s:stmt) (xs:exp option list):exp option =
     match s with
     | SIfElse (SmInline, cmp, ss1, ss2) ->
         let e1 = build_codegen_success_stmts q env ss1 in
         let e2 = build_codegen_success_stmts q env ss2 in
         Some (eop Cond [map_exp stateToOp cmp; e1; e2])
     | _ -> merge xs
-  in
+    in
   gather_stmts aux_stmt aux [s]
 and build_codegen_success_stmts (q:id) (env:env) (stmts:stmt list):exp =
   let empty = vaApp "ttrue" [] in
@@ -406,38 +409,38 @@ let makeFrame (env:env) (p:proc_decl) (s0:id) (sM:id):(exp * exp) =
   let e = List.fold frameMod e specModsIo in
   (e, vaApp "state_eq" [evar sM; e])
 
-let string_of_transform_orig (p:proc_decl) : string =
+let string_of_transform_orig (p:proc_decl):string =
   "untransformedoriginal_" + string_of_id p.pname
 
-let string_of_transform_hint (p:proc_decl) : string =
+let string_of_transform_hint (p:proc_decl):string =
   match List_assoc (Id "transform") p.pattrs with
   | [] -> err "transformation not specified"
   | [_] -> err "transformation doesn't specify code to transform into"
-  | [_;x] -> string_of_id (id_of_exp x)
+  | [_; x] -> string_of_id (id_of_exp x)
   | _ -> err "too many arguments to transformation"
 
-let exp_of_transform_function (p:proc_decl) : exp =
+let exp_of_transform_function (p:proc_decl):exp =
   match List_assoc (Id "transform") p.pattrs with
   | [] -> err "transformation not specified"
   | [_] -> err "transformation doesn't specify code to transform into"
-  | [x;_] -> x
+  | [x; _] -> x
   | _ -> err "too many arguments to transformation"
 
-let exp_of_transform_lemma (p:proc_decl) : exp =
+let exp_of_transform_lemma (p:proc_decl):exp =
   let prefix s i =
     match i with
     | Id i -> Id (s + i)
     | Reserved i -> Reserved (s + i)
     | Operator i -> Operator (s + i)
-  in
-  let rec to_lemma (e:exp) : exp =
+    in
+  let rec to_lemma (e:exp):exp =
     match e with
     | ELoc (l, e) -> ELoc (l, to_lemma e)
     | ELabel (l, e) -> ELabel (l, to_lemma e)
     | EVar (i, _) -> EVar (prefix "lemma_" i, None)
     | EOp (FieldOp i, es, _) -> EOp (FieldOp (prefix "lemma_" i), es, None)
     | _ -> err "Invalid transform function"
-  in
+    in
   to_lemma (exp_of_transform_function p)
 
 let eapply_exp (x:exp) (es:exp list) =
@@ -448,9 +451,9 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
   let codeorig = string_of_transform_orig p in
   let codehint = string_of_transform_hint p in
   let fParams = make_fun_params p.prets p.pargs in
-  let aParams : exp list = List.map EVar fParams in
+  let aParams:exp list = List.map EVar fParams in
   let attrs = List.filter filter_fun_attr p.pattrs in
-  let body : exp = eapply_exp (exp_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) aParams] in
+  let body:exp = eapply_exp (exp_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) aParams] in
   let f =
     {
       fname = Reserved ("transform_" + string_of_id p.pname);
@@ -522,10 +525,12 @@ let build_codegen_success (loc:loc) (env:env) (benv:build_env) (stmts:stmt list)
         fret_name = None;
         fret = tPbool;
         fspecs = [];
-        fbody = if isTransform
-                then Some (vaApp "pbool_and" [vaApp ("codegen_success_" + string_of_transform_orig p) aParams;
-                                              eapply (Reserved "get_success") [vaApp ("transform_" + string_of_id p.pname) aParams]])
-                else Some (build_codegen_success_stmts p.pname env stmts);
+        fbody =
+          if isTransform
+          then Some (vaApp "pbool_and" [
+            vaApp ("codegen_success_" + string_of_transform_orig p) aParams;
+            eapply (Reserved "get_success") [vaApp ("transform_" + string_of_id p.pname) aParams]])
+          else Some (build_codegen_success_stmts p.pname env stmts);
         fattrs =
           if benv.is_quick then
             [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
@@ -635,8 +640,8 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
         let fM_orig = Reserved "fM_orig" in
         let cArgs = List.map (fun (x, _) -> evar x) (make_fun_params p.prets p.pargs) in
         let lArgs = List.map (fun (x, _, _, _, _) -> evar x) pargs in
-        let asgn_pf (is:id list) (xs:pformal list) v = SAssign (List.map (fun x -> (x, None)) is @
-                                                                List.map (fun (x, _, _, _, _ ) -> (x, None)) xs, v) in
+        let asgn_pf (is:id list) (xs:pformal list) v =
+          SAssign (List.map (fun x -> (x, None)) is @ List.map (fun (x, _, _, _, _ ) -> (x, None)) xs, v) in
         let a1 x v = SAssign ([(x, None)], v) in
         let a2 x y v = SAssign ([(x, None); (y, None)], v) in
         let reveal x = SAssign ([], eop (Uop UReveal) [x]) in
@@ -648,13 +653,10 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
           asgn_pf [sM_orig; fM_orig] (tl (tl prets)) (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: tl lArgs));
           reveal (vaApp ("transform_" + string_of_id p.pname) cArgs);
           reveal (vaApp ("code_" + string_of_id p.pname) cArgs);
-          a2 sM fM (eapply_exp (exp_of_transform_lemma p) (List.map evar [orig;
-                                                                          hint;
-                                                                          transformed;
-                                                                          s0;
-                                                                          sM_orig;
-                                                                          fM_orig]))
-      ]
+          a2 sM fM
+            (eapply_exp (exp_of_transform_lemma p)
+            (List.map evar [orig; hint; transformed; s0; sM_orig; fM_orig]))
+        ]
     ) else if benv.is_quick then
         let range = evar (Id "range1") in
         let msg = EString ("***** MODIFIES CLAUSE NOT MET AT " + string_of_loc loc + " *****") in
@@ -740,10 +742,11 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
 let rec build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   gen_lemma_sym_count := 0;
   let isTransform = List_mem_assoc (Id "transform") p.pattrs in
-  let preTransformDecls = (
-      if isTransform
-      then build_proc envBody env loc ({p with pname = Id (string_of_transform_orig p); pattrs = List.filter (fun (x,_) -> x <> Id "transform") p.pattrs})
-      else []) in
+  let preTransformDecls =
+    if isTransform
+    then build_proc envBody env loc ({p with pname = Id (string_of_transform_orig p); pattrs = List.filter (fun (x,_) -> x <> Id "transform") p.pattrs})
+    else []
+    in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in

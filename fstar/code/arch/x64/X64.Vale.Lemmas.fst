@@ -1,4 +1,5 @@
 module X64.Vale.Lemmas
+open FStar.Mul
 open X64.Machine_s
 open X64.Vale.State
 module S = X64.Semantics_s

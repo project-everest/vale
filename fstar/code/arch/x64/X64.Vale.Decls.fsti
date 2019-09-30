@@ -6,6 +6,7 @@ module X64.Vale.Decls
 // because they refer to Semantics_s.
 // Regs_i and State_i are ok, because they do not refer to Semantics_s.
 
+open FStar.Mul
 open Defs_s
 open Prop_s
 open X64.Machine_s
@@ -34,7 +35,7 @@ let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
 let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
   if b then x () else y ()
 
-(* Type aliases *)
+// Type aliases
 unfold let va_bool = bool
 unfold let va_prop = Type0
 unfold let va_int = int
@@ -61,9 +62,9 @@ unfold let va_register = reg
 unfold let va_operand_xmm = xmm
 
 val va_pbool : Type0
-val va_ttrue : unit -> va_pbool
-val va_ffalse : string -> va_pbool
-val va_pbool_and : va_pbool -> va_pbool -> va_pbool
+val va_ttrue (_:unit) : va_pbool
+val va_ffalse (reason:string) : va_pbool
+val va_pbool_and (x y:va_pbool) : va_pbool
 
 noeq
 type va_transformation_result = {
@@ -73,17 +74,17 @@ type va_transformation_result = {
 unfold let va_get_success (r:va_transformation_result) : va_pbool = r.success
 unfold let va_get_result (r:va_transformation_result) : va_code = r.result
 
-val mul_nat_helper (x y:nat) : Lemma (x `op_Multiply` y >= 0)
+val mul_nat_helper (x y:nat) : Lemma (x * y >= 0)
 [@va_qattr] unfold let va_mul_nat (x y:nat) : nat =
   mul_nat_helper x y;
-  x `op_Multiply` y
+  x * y
 
 [@va_qattr] unfold let va_expand_state (s:state) : state = s
 
-(* Abbreviations *)
+// Abbreviations
 unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
 
-(* Constructors *)
+// Constructors
 val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
 [@va_qattr] unfold let va_op_xmm_xmm (x:xmm) : va_operand_xmm = x
@@ -132,7 +133,7 @@ let va_opr_lemma_Mem64 (s:va_state) (base:operand) (offset:int) : Lemma
   ()
 
 
-(* Evaluation *)
+// Evaluation
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand o s
 [@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : GTot nat64 = eval_operand o s
 [@va_qattr] unfold let va_eval_shift_amt64  (s:va_state) (o:va_shift_amt)   : GTot nat64 = eval_operand o s
@@ -141,7 +142,7 @@ let va_opr_lemma_Mem64 (s:va_state) (base:operand) (offset:int) : Lemma
 [@va_qattr] unfold let va_eval_reg_opr64    (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand o s
 [@va_qattr] unfold let va_eval_xmm          (s:va_state) (x:xmm)            : quad32 = eval_xmm x s
 
-(* Predicates *)
+// Predicates
 [@va_qattr] unfold let va_is_src_opr64 (o:operand) (s:va_state) = valid_operand o s
 
 [@va_qattr] let va_is_dst_opr64 (o:operand) (s:va_state) =
@@ -160,7 +161,7 @@ let va_opr_lemma_Mem64 (s:va_state) (base:operand) (offset:int) : Lemma
 [@va_qattr] unfold let va_is_src_xmm (x:xmm) (s:va_state) = True
 [@va_qattr] unfold let va_is_dst_xmm (x:xmm) (s:va_state) = True
 
-(* Getters *)
+// Getters
 [@va_qattr] unfold let va_get_ok (s:va_state) : bool = s.ok
 [@va_qattr] unfold let va_get_flags (s:va_state) : int = s.flags
 [@va_qattr] unfold let va_get_reg (r:reg) (s:va_state) : nat64 = eval_reg r s
@@ -173,7 +174,7 @@ let va_opr_lemma_Mem64 (s:va_state) (base:operand) (offset:int) : Lemma
 [@va_qattr] let va_upd_reg (r:reg) (v:nat64) (s:state) : state = update_reg r v s
 [@va_qattr] let va_upd_xmm (x:xmm) (v:quad32) (s:state) : state = update_xmm x v s
 
-(* Framing: va_update_foo means the two states are the same except for foo *)
+// Framing: va_update_foo means the two states are the same except for foo
 [@va_qattr] unfold let va_update_ok (sM:va_state) (sK:va_state) : va_state = va_upd_ok sM.ok sK
 [@va_qattr] unfold let va_update_flags (sM:va_state) (sK:va_state) : va_state = va_upd_flags sM.flags sK
 [@va_qattr] unfold let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : va_state =
@@ -237,11 +238,11 @@ val va_lemma_upd_update (sM:state) : Lemma
     (forall (sK:state) (x:xmm).{:pattern (va_update_operand_xmm x sM sK)} va_update_operand_xmm x sM sK == va_upd_operand_xmm x (eval_xmm x sM) sK)
   )
 
-(** Constructors for va_codes *)
+// Constructors for va_codes
 [@va_qattr] unfold let va_CNil () : va_codes = []
 [@va_qattr] unfold let va_CCons (hd:va_code) (tl:va_codes) : va_codes = hd::tl
 
-(** Constructors for va_code *)
+// Constructors for va_code
 unfold let va_Block (block:va_codes) : va_code = Block block
 unfold let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
 unfold let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
@@ -260,11 +261,11 @@ unfold let va_get_ifFalse (c:va_code{IfElse? c}) : va_code = IfElse?.ifFalse c
 unfold let va_get_whileCond (c:va_code{While? c}) : ocmp = While?.whileCond c
 unfold let va_get_whileBody (c:va_code{While? c}) : va_code = While?.whileBody c
 
-(** Map syntax **)
+// Map syntax
 // syntax for map accesses, m.[key] and m.[key] <- value
 type map (key:eqtype) (value:Type) = Map.t key value
-let op_String_Access     = Map.sel
-let op_String_Assignment = Map.upd
+let (.[]) = Map.sel
+let (.[]<-) = Map.upd
 
 val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : prop0
 val eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : prop0
@@ -356,14 +357,14 @@ val va_lemma_merge_total (b0:va_codes) (s0:va_state) (f0:va_fuel) (sM:va_state) 
     eval_code (va_Block b0) s0 fN sN
   ))
 
-val va_lemma_empty_total (s0:va_state) (bN:va_codes) : Ghost ((sM:va_state) * (fM:va_fuel))
+val va_lemma_empty_total (s0:va_state) (bN:va_codes) : Ghost (va_state & va_fuel)
   (requires True)
   (ensures (fun (sM, fM) ->
     s0 == sM /\
     eval_code (va_Block []) s0 fM sM
   ))
 
-val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : Ghost (bool * va_state * va_state * va_fuel)
+val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : Ghost (bool & va_state & va_state & va_fuel)
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
@@ -393,18 +394,18 @@ val va_lemma_ifElseFalse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state
 let va_whileInv_total (b:ocmp) (c:va_code) (s0:va_state) (sN:va_state) (f0:va_fuel) : prop0 =
   eval_while_inv (While b c) s0 f0 sN
 
-val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost ((s1:va_state) * (f1:va_fuel))
+val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost (va_state & va_fuel)
   (requires True)
   (ensures fun (s1, f1) ->
     s1 == s0 /\
     eval_while_inv (While b c) s1 f1 s1
   )
 
-val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
+val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost (va_state & va_fuel)
   (requires eval_ocmp sW b /\ valid_ocmp b sW)
   (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
 
-val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost ((s1:va_state) * (f1:va_fuel))
+val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost (va_state & va_fuel)
   (requires
     valid_ocmp b sW /\
     not (eval_ocmp sW b) /\
