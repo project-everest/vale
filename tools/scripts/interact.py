@@ -224,8 +224,8 @@ last = None
 while True:
     print()
     print('type v <blockname> to verify a block, r to reset, l to list blocks, q to quit, enter to repeat last')
-    inp = sys.stdin.readline().split()
     try:
+        inp = sys.stdin.readline().split()
         if len(inp) == 0 and last != None:
             inp = last
             print(' '.join(inp))
@@ -252,4 +252,6 @@ while True:
         print(f"  {e['message']}")
         for r in e['ranges']:
             print(f"  range: {r}")
+    except BaseException as e:
+        print(e)
 
