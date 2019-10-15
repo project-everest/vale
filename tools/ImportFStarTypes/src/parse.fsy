@@ -162,10 +162,8 @@ ids_commas
   | COMMA ids_commas { $2 }
 
 attr
-  : LPAREN attrs RPAREN { $2 }
-  | STRING { [$1] }
-  | SEMI { [($1, ";")] }
-  | ID { [$1] }
+  : exp1 { [] }
+  | SEMI { [] }
 
 attrs
   : { [] }
