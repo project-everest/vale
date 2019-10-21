@@ -415,14 +415,14 @@ let string_of_transform_orig (p:proc_decl):string =
 let string_of_transform_hint (p:proc_decl):string =
   match List_assoc (Id "transform") p.pattrs with
   | [] -> err "transformation not specified"
-  | [_] -> err "transformation doesn't specify code to transform into"
+  | [_] -> ""
   | [_; x] -> string_of_id (id_of_exp x)
   | _ -> err "too many arguments to transformation"
 
 let exp_of_transform_function (p:proc_decl):exp =
   match List_assoc (Id "transform") p.pattrs with
   | [] -> err "transformation not specified"
-  | [_] -> err "transformation doesn't specify code to transform into"
+  | [x] -> x
   | [x; _] -> x
   | _ -> err "too many arguments to transformation"
 
@@ -453,7 +453,7 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
   let fParams = make_fun_params p.prets p.pargs in
   let aParams:exp list = List.map EVar fParams in
   let attrs = List.filter filter_fun_attr p.pattrs in
-  let body:exp = eapply_exp (exp_of_transform_function p) [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) aParams] in
+  let body:exp = eapply_exp (exp_of_transform_function p) (if codehint = "" then [vaApp ("code_" + codeorig) aParams] else [vaApp ("code_" + codeorig) aParams; vaApp ("code_" + codehint) aParams]) in
   let f =
     {
       fname = Reserved ("transform_" + string_of_id p.pname);
@@ -645,17 +645,18 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
         let a1 x v = SAssign ([(x, None)], v) in
         let a2 x y v = SAssign ([(x, None); (y, None)], v) in
         let reveal x = SAssign ([], eop (Uop UReveal) [x]) in
+        let is_hint = not (string_of_transform_hint p = "") in
         let tl = List.tail in
         [
           a1 orig (vaApp ("code_" + string_of_transform_orig p) cArgs);
-          a1 hint (vaApp ("code_" + string_of_transform_hint p) cArgs);
+        ] @ (if is_hint then [a1 hint (vaApp ("code_" + string_of_transform_hint p) cArgs)] else []) @ [
           a1 transformed (vaApp ("code_" + string_of_id p.pname) cArgs);
           asgn_pf [sM_orig; fM_orig] (tl (tl prets)) (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: tl lArgs));
           reveal (vaApp ("transform_" + string_of_id p.pname) cArgs);
           reveal (vaApp ("code_" + string_of_id p.pname) cArgs);
           a2 sM fM
             (eapply_exp (exp_of_transform_lemma p)
-            (List.map evar [orig; hint; transformed; s0; sM_orig; fM_orig]))
+            (List.map evar ([orig] @ (if is_hint then [hint] else []) @ [transformed; s0; sM_orig; fM_orig])))
         ]
     ) else if benv.is_quick then
         let range = evar (Id "range1") in
