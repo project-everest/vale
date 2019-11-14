@@ -65,6 +65,9 @@ rule lextoken = parse
 | "by" { BY (curLoc lexbuf) } (* part of ascribed *)
 | "effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
 | "new_effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
+| "new_effect_for_free" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
+| "layered_effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
+| "layered_effect_for_free" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
 | "sub_effect" { EFFECT (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_pattern" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Meta_named" { META (curLoc lexbuf, lexeme lexbuf) }
