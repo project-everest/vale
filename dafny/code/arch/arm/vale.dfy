@@ -76,6 +76,10 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
  && ValidRegState'(s1.regs)
 }
 
+lemma va_ins_lemma(b0:code, s0:va_state)
+{
+}
+
 function method fromOperand(o:operand):operand { o }
 function method va_const_operand(n:uint32):operand { OConst(n) }
 function method va_const_opr32(n:uint32):operand { OConst(n) }

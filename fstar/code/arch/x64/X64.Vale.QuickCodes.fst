@@ -9,6 +9,11 @@ let lemma_label_Type0 (r:range) (msg:string) (p:Type0) : Lemma
 
 let lemma_label_bool r msg b = lemma_label_Type0 r msg b
 
+let rec empty_list_is_small #a x =
+  match x with
+  | [] -> ()
+  | h::t -> empty_list_is_small t
+
 let state_mod_eq (m:mod_t) (s1 s2:state) =
   match m with
   | Mod_None -> True
@@ -192,6 +197,10 @@ let rec wp_sound #a cs qcs mods k s0 =
       let (sN, fN, gN) = wp_sound cs (qcs' g) mods k s0 in
       let fN' = va_lemma_merge_total (c::cs) s0 fM sM fN sN in
       (sN, fN', gN)
+  | QAssertBy r msg p qcsBy qcs ->
+      empty_list_is_small cs;
+      let _ = wp_sound [] qcsBy mods (k_AssertBy p) s0 in
+      wp_sound cs qcs mods k s0
 
 let qblock_proof #a #cs qcs mods s0 k =
   wp_sound cs (qcs s0) mods k s0
@@ -239,12 +248,13 @@ let rec qWhile_proof_rec
     (dec:state -> a -> d) (s0 s1:state) (g1:a) (f1:fuel) (k:state -> a -> Type0)
   : Ghost (state & va_fuel & a)
   (requires
+    state_inv s1 /\
     wp_While b qc mods inv dec g1 s1 k /\
     eval_while_inv (While (cmp_to_ocmp b) c) s0 f1 s1 /\
     update_state_mods mods s1 s0 == s1)
   (ensures fun (s2, f2, g2) ->
     eval_code (While (cmp_to_ocmp b) c) s0 f2 s2 /\
-    update_state_mods mods s2 s0 == s2 /\ k s2 g2
+    update_state_mods mods s2 s0 == s2 /\ state_inv s2 /\ k s2 g2
   )
   (decreases (dec s1 g1))
   =
@@ -276,8 +286,8 @@ let qAssertLemma p = fun () -> ()
 let qAssumeLemma p = fun () -> assume p
 let qAssertSquashLemma p = fun () -> ()
 
-let qAssertByLemma #a p qcs mods s0 =
-  fun () -> let _ = wp_sound [] qcs mods (fun _ _ -> p) s0 in ()
+//let qAssertByLemma #a p qcs mods s0 =
+//  fun () -> let _ = wp_sound [] qcs mods (fun _ _ -> p) s0 in ()
 
 let wp_sound_code #a c qc k s0 =
   let QProc c _ wp proof = qc in
@@ -285,7 +295,7 @@ let wp_sound_code #a c qc k s0 =
 
 let wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:(s0':state{s0 == s0'}) -> state -> a -> Type0) :
   Ghost (state & fuel & a)
-    (wp_sound_code_pre qc s0 k)
+    (t_require s0 /\ wp_sound_code_pre qc s0 k)
     (wp_sound_code_post qc s0 k)
   =
   wp_sound_code c qc (k s0) s0

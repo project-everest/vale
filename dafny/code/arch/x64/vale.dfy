@@ -176,6 +176,10 @@ predicate va_ensure(b0:codes, b1:codes, s0:va_state, s1:va_state, sN:va_state)
  && x86_ValidState(s1)
 }
 
+lemma va_ins_lemma(b0:code, s0:va_state)
+{
+}
+
 function method va_const_operand(n:uint64):opr { OConst(n) }
 function method va_const_opr_imm8(n:imm8):opr { OConst(n) }
 function method va_const_opr32(n:uint32):opr { OConst(n) }

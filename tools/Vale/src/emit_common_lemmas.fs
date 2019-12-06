@@ -627,45 +627,49 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
   let sStmts =
     if benv.is_instruction then
       // Body of instruction lemma
+      let ins = attrs_get_exp (Id "instruction") p.pattrs in
+      let sInsLemma = SAssign ([], vaApp "ins_lemma" [ins; evar s0]) in
       let dummy = Reserved "dummy" in
-      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [attrs_get_exp (Id "instruction") p.pattrs; evar s0]) in
+      let sState = SAssign ([(sM, None); (fM, None)], vaApp "eval_ins" [ins; evar s0]) in
       let senv = { env = env; benv = benv; b1 = dummy; bM = dummy; code = evar dummy; s0 = sM; f0 = dummy; sM = sM; fM = dummy; sN = dummy; loc = loc;} in
       let ss = build_lemma_ghost_stmts senv stmts in
-      [sReveal; sOldS] @ sBlock @ listIf total [sState] @ ss
+      [sReveal; sOldS; sInsLemma] @ sBlock @ listIf total [sState] @ ss
     else if List_mem_assoc (Id "transform") p.pattrs then (
-        let orig = Reserved "orig" in
-        let hint = Reserved "hint" in
-        let transformed = Reserved "transformed" in
-        let sM_orig = Reserved "sM_orig" in
-        let fM_orig = Reserved "fM_orig" in
-        let cArgs = List.map (fun (x, _) -> evar x) (make_fun_params p.prets p.pargs) in
-        let lArgs = List.map (fun (x, _, _, _, _) -> evar x) pargs in
-        let asgn_pf (is:id list) (xs:pformal list) v =
-          SAssign (List.map (fun x -> (x, None)) is @ List.map (fun (x, _, _, _, _ ) -> (x, None)) xs, v) in
-        let a1 x v = SAssign ([(x, None)], v) in
-        let a2 x y v = SAssign ([(x, None); (y, None)], v) in
-        let reveal x = SAssign ([], eop (Uop UReveal) [x]) in
-        let is_hint = not (string_of_transform_hint p = "") in
-        let tl = List.tail in
-        [
-          a1 orig (vaApp ("code_" + string_of_transform_orig p) cArgs);
-        ] @ (if is_hint then [a1 hint (vaApp ("code_" + string_of_transform_hint p) cArgs)] else []) @ [
-          a1 transformed (vaApp ("code_" + string_of_id p.pname) cArgs);
-          asgn_pf [sM_orig; fM_orig] (tl (tl prets)) (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: tl lArgs));
-          reveal (vaApp ("transform_" + string_of_id p.pname) cArgs);
-          reveal (vaApp ("code_" + string_of_id p.pname) cArgs);
-          a2 sM fM
-            (eapply_exp (exp_of_transform_lemma p)
-            (List.map evar ([orig] @ (if is_hint then [hint] else []) @ [transformed; s0; sM_orig; fM_orig])))
-        ]
-    ) else if benv.is_quick then
-        let range = evar (Id "range1") in
-        let msg = EString ("***** MODIFIES CLAUSE NOT MET AT " + string_of_loc loc + " *****") in
-        let eFrameX = vaApp "state_match" [evar sM; eFrameExp] in
-        let eFrameL = eapply (Id "label") [range; msg; eFrameX] in
-        let (_, enssL) = collect_specs true (List.concat pspecs) in
-        let enssL = enssL @ (if !quick_mods then [] else [eFrameL]) in
-        Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
+      let orig = Reserved "orig" in
+      let hint = Reserved "hint" in
+      let transformed = Reserved "transformed" in
+      let sM_orig = Reserved "sM_orig" in
+      let fM_orig = Reserved "fM_orig" in
+      let cArgs = List.map (fun (x, _) -> evar x) (make_fun_params p.prets p.pargs) in
+      let lArgs = List.map (fun (x, _, _, _, _) -> evar x) pargs in
+      let asgn_pf (is:id list) (xs:pformal list) v =
+        SAssign (List.map (fun x -> (x, None)) is @ List.map (fun (x, _, _, _, _ ) -> (x, None)) xs, v) in
+      let a1 x v = SAssign ([(x, None)], v) in
+      let a2 x y v = SAssign ([(x, None); (y, None)], v) in
+      let reveal x = SAssign ([], eop (Uop UReveal) [x]) in
+      let is_hint = not (string_of_transform_hint p = "") in
+      let tl = List.tail in
+      [
+        a1 orig (vaApp ("code_" + string_of_transform_orig p) cArgs);
+      ] @ (if is_hint then [a1 hint (vaApp ("code_" + string_of_transform_hint p) cArgs)] else []) @ [
+        a1 transformed (vaApp ("code_" + string_of_id p.pname) cArgs);
+        asgn_pf [sM_orig; fM_orig] (tl (tl prets)) (vaApp ("lemma_" + string_of_transform_orig p) (evar orig :: tl lArgs));
+        reveal (vaApp ("transform_" + string_of_id p.pname) cArgs);
+        reveal (vaApp ("code_" + string_of_id p.pname) cArgs);
+        a2 sM fM
+          (eapply_exp (exp_of_transform_lemma p)
+          (List.map evar ([orig] @ (if is_hint then [hint] else []) @ [transformed; s0; sM_orig; fM_orig])))
+      ]
+    )
+    else if benv.is_quick then (
+      let range = evar (Id "range1") in
+      let msg = EString ("***** MODIFIES CLAUSE NOT MET AT " + string_of_loc loc + " *****") in
+      let eFrameX = vaApp "state_match" [evar sM; eFrameExp] in
+      let eFrameL = eapply (Id "label") [range; msg; eFrameX] in
+      let (_, enssL) = collect_specs true (List.concat pspecs) in
+      let enssL = enssL @ (if !quick_mods then [] else [eFrameL]) in
+      Emit_common_quick_code.build_proc_body env loc p (eapply codeName fArgs) (and_of_list enssL)
+    )
     else if benv.is_operand then
       err "operand procedures must be declared extern"
     else

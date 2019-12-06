@@ -314,8 +314,8 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
   | SForall ([], [], (EBool true | ECast (_, EBool true, _)), ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
-      let s = Reserved "s" in
-      let eAssertBy = eapply (Id "qAssertBy") (qmods_opt mods @ [range; msg; ep; eQcs; evar s; eTail]) in
+      //let s = Reserved "s" in
+      let eAssertBy = eapply (Id "qAssertBy") [range; msg; ep; eQcs; eTail] in
       (true, eAssertBy)
   | _ -> ierr ()
 and build_qcode_stmts (env:env) (outs_t:formal list) (loc:loc) (ss:stmt list):exp =

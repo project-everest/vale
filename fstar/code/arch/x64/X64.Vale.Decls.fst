@@ -38,6 +38,10 @@ let va_cmp_gt o1 o2 = S.OGt o1 o2
 
 let eval_code = Lemmas.eval_code
 let eval_while_inv = Lemmas.eval_while_inv
+
+let mem_inv m = True
+let va_ins_lemma c0 s0 = ()
+
 let eval_ocmp = Lemmas.eval_ocmp
 let valid_ocmp = Lemmas.valid_ocmp
 

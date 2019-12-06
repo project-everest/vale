@@ -255,6 +255,10 @@ predicate va_ensure(b0:va_codes, b1:va_codes, s0:va_state, s1:va_state, sN:va_st
 
 // lemmas
 
+lemma va_ins_lemma(b0:code, s0:va_state)
+{
+}
+
 lemma va_lemma_block(b0:va_codes, s0:state, sN:state) returns(s1:state, c1:va_code, b1:va_codes)
     requires b0.CCons?
     requires eval_code(va_Block(b0), s0, sN)

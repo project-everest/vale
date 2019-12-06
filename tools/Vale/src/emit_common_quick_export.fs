@@ -38,8 +38,8 @@ let wp_X PARAMS (s0:state) (k:state -> A -> Type0) : Type0 =
 
 // Procedure
 val wpProof_X PARAMS (s0:state) (k:state -> A -> Type0) : Lemma
-  (requires wp_X ARGS s0 k)
-  (ensures t_ensure (va_code_X ARGS) PMODS (wp_X ARGS) (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
+  (requires t_require s0 /\ wp_X ARGS s0 k)
+  (ensures t_ensure (va_code_X ARGS) PMODS (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
 let wpProof_X PARAMS s0 k =
   let (sM, f0, g1, ..., gn) = va_lemma_X (va_code_X ARGS) s0 ARGS in
   va_lemma_upd_update sM;
@@ -144,8 +144,10 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let sAssignG = SAssign ([(g, None)], ghostRetTuple) in
   let pK = arg k tContinue in
   let eRet = eop (TupleOp None) [evar sM; evar f0; evar g] in
-  let specEnsArgs = [eCode] @ qmods_opt ePMods @ [appArgs wp_X; evar s0; evar k; eRet] in
-  let specReq = Requires (Unrefined, eapply wp_X (eArgs @ [evar s0; evar k])) in
+  let specEnsArgs = [eCode] @ qmods_opt ePMods @ [evar s0; evar k; eRet] in
+  let specReq1 = eapply (Id "t_require") [evar s0] in
+  let specReq2 = eapply wp_X (eArgs @ [evar s0; evar k]) in
+  let specReq = Requires (Unrefined, eop (Bop (BAnd BpProp)) [specReq1; specReq2]) in
   let specEns = Ensures (Unrefined, eapply (Id "t_ensure") specEnsArgs) in
   // wpProof_X body
   let sLemmaUpd = SAssign ([], eapply (Reserved "lemma_upd_update") [evar sM]) in
