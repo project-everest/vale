@@ -21,7 +21,7 @@ type id_info =
 | ThreadLocal of id_local
 | InlineLocal of typ option
 | OperandLocal of inout * typ
-| StateInfo of string * exp list * typ
+| StateInfo of string * exp list * typ * id list
 | OperandAlias of id * id_info
 
 type env =
@@ -532,7 +532,7 @@ let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:s
 
 let stateGet (env:env) (x:id):exp =
   match Map.find x env.ids with
-  | StateInfo (prefix, es, t) -> vaApp_t ("get_" + prefix) (es @ [env.state]) (Some t)
+  | StateInfo (prefix, es, t, _) -> vaApp_t ("get_" + prefix) (es @ [env.state]) (Some t)
   | _ -> internalErr "stateGet"
 
 let refineOp (env:env) (io:inout) (x:id) (e:exp):exp =
@@ -556,6 +556,7 @@ let rewrite_state_info (env:env) (x:id) (prefix:string) (es:exp list):exp =
   let readWrite = check_state_info env x in
   refineOp env (if readWrite then InOut else In) x (stateGet env x)
 
+(*
 let collect_mods (p:proc_decl):id list =
   let spec_mods (_, s) =
     match s with
@@ -568,6 +569,7 @@ let collect_mods (p:proc_decl):id list =
     | _ -> []
     in
   List.collect spec_mods p.pspecs
+*)
 
 let check_mods (env:env) (p:proc_decl):unit =
   let check_spec (_, s) =
@@ -638,7 +640,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
                       let getType t = match t with Some t -> t | None -> err ((err_id x) + " must have type annotation") in
                       let es = if inParam then evar (Reserved "old_s") else env.state in
                       vaEvalOp (getType t) es e)
-          | StateInfo (prefix, es, t) ->
+          | StateInfo (prefix, es, t, _) ->
             (
               match (g, asOperand) with
               | (Ghost, _) -> Replace (rewrite_state_info env x prefix es)
@@ -919,6 +921,24 @@ let check_no_duplicates (es:(loc * exp) list):unit =
     in
   f ss
 
+let add_mods_updates (loc:loc) (env:env) (m:Map<id, bool>):(loc * spec) list * Map<id, bool> =
+  let rec add_mod_update (outs:(loc * spec) list * Map<id, bool>) (x:id):(loc * spec) list * Map<id, bool> =
+    match Map.tryFind x env.ids with
+    | Some (StateInfo (_, _, _, xs)) ->
+        let (specs, m) = outs in
+        let xs = List.filter (fun x -> not (Map.containsKey x m)) xs in
+        let specs = List.map (fun x -> (loc, Modifies (Modify, evar x))) xs @ specs in
+        let m = List.fold (fun m x -> Map.add x true m) m xs in
+        let outs = (specs, m) in
+        List.fold add_mod_update outs xs
+    | _ -> outs
+    in
+  let xs = Map.toList m in
+  let xs = List.filter snd xs in
+  let xs = List.map fst xs in
+  List.fold add_mod_update ([], m) xs
+  
+
 ///////////////////////////////////////////////////////////////////////////////
 // Insert quick-code checks that expression preconditions are satisfied
 
@@ -1073,7 +1093,7 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
           match resolve_find_var x with
           | GhostLocal (_, None) | InlineLocal None -> err ("variable " + (err_id x) + " needs explicit type annotation to use inside while loop")
           | GhostLocal (_, Some t) | InlineLocal (Some t) -> t
-          | StateInfo (_, _, t) -> t
+          | StateInfo (_, _, t, _) -> t
           | _ -> err ("variables in while loops must be ghost, inline, or state component: " + (err_id x))
           in
         let to_pformal (x:id):pformal = (x, getType x, XGhost, In, []) in
@@ -1265,9 +1285,12 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let pOrig = p in
   let p = {p with pbody = body; pspecs = pspecs} in
   // Compute mods list and final environment for body
-  let mods = List.collect (fun (loc, s) -> match s with Modifies (m, e) -> [(loc, m, e)] | _ -> []) pspecs in
-  check_no_duplicates (List.map (fun (_, _, e) -> (loc, e)) mods);
-  let envpIn = {envpIn with mods = Map.ofList (List.map (mod_id envpIn) mods)} in
+  let mods_list = List.collect (fun (loc, s) -> match s with Modifies (m, e) -> [(loc, m, e)] | _ -> []) pspecs in
+  check_no_duplicates (List.map (fun (_, _, e) -> (loc, e)) mods_list);
+  let mods_map = Map.ofList (List.map (mod_id envpIn) mods_list) in
+  let (upd_specs, mods_map) = add_mods_updates loc envpIn mods_map in
+  let pspecs = upd_specs @ pspecs in
+  let envpIn = {envpIn with mods = mods_map} in
   let envpIn = {envpIn with abstractOld = true} in
   let envp = envpIn in
   let envp = {envp with ids = List.fold (addParam true) envp.ids p.prets} in
@@ -1322,11 +1345,17 @@ let rec transform_decl (env:env) (loc:loc) (d:decl):((env * env * decl) list * e
   | DVar (x, t, XAlias (AliasThread, e), _) ->
       let env = {env with ids = Map.add x (ThreadLocal {local_in_param = false; local_exp = e; local_typ = Some t}) env.ids} in
       ([(env, env, d)], env)
-  | DVar (x, t, XState e, _) ->
+  | DVar (x, t, XState e, attrs) ->
     (
+      let upd (x:id, e:exp list):id list =
+        match (x, List.map skip_loc e) with
+        | (Id "updates", [EVar (x, _)]) -> [x]
+        | _ -> []
+        in
+      let upds = List.collect upd attrs in
       match skip_loc e with
       | EApply (e, _, es, _) when is_id e ->
-          let env = {env with ids = Map.add x (StateInfo (string_of_id (id_of_exp e), es, t)) env.ids} in
+          let env = {env with ids = Map.add x (StateInfo (string_of_id (id_of_exp e), es, t, upds)) env.ids} in
           ([(env, env, d)], env)
       | _ -> err ("declaration of state member " + (err_id x) + " must provide an expression of the form f(...args...)")
     )

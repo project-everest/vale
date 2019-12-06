@@ -32,7 +32,7 @@ let makeFrame (env:env) (preserveModifies:bool) (p:proc_decl) (s0:id) (sM:id):ex
     | (InOut | Out) ->
       (
         match Map.tryFind x env.ids with
-        | Some (StateInfo (prefix, es, t)) -> [(id_x x, t, prefix, es)]
+        | Some (StateInfo (prefix, es, t, _)) -> [(id_x x, t, prefix, es)]
         | _ -> internalErr ("frameMod: could not find variable " + (err_id x))
       )
     | _ -> []

@@ -184,7 +184,7 @@ let specModIo (env:env) (preserveModifies:bool) (loc:loc, s:spec):(inout * (id *
       | EVar (x, _) ->
         (
           match Map.tryFind x env.ids with
-          | Some (StateInfo (_, _, t)) -> [(io, (x, t))]
+          | Some (StateInfo (_, _, t, _)) -> [(io, (x, t))]
           | _ -> internalErr ("specMod: could not find variable " + (err_id x))
         )
       | _ -> []
