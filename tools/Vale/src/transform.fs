@@ -685,15 +685,18 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
         let ecs = List.collect (fun e -> match e with EOp (Uop UGhostOnly, [e], _) -> [] | _ -> [e]) es in
         let es = List.map (fun e -> match e with EOp (Uop UGhostOnly, [e], _) -> e | _ -> e) es in
         let xa_fc = Reserved ("opr_code_" + (string_of_id xa)) in
-        let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
         let eCode = eapply xa_fc ecs in
         if !fstar then
+          let xa_fl = Id ((string_of_id xa) + "_lemma") in
           let ofStateOp (e:exp):exp =
-            match e with
-            | EOp (StateOp (x, prefix, _), es, t) -> vaApp_t ("op_" + prefix) es t
-            | _ -> e
+            let e = 
+              match e with
+              | EOp (StateOp (x, prefix, _), es, t) -> vaApp_t ("op_" + prefix) es t
+              | _ -> e
+              in
+            eop (Uop UGhostOnly) [e]
             in
-          let eLemma = eapply xa_fl (env.state::(List.map ofStateOp es)) in
+          let eLemma = eapply xa_fl (List.map ofStateOp es) in
           let sLemma = SAssign ([], eLemma) in
           let sLemma = match locs with [] -> sLemma | loc::_ -> SLoc (loc, sLemma) in
           match rctx with
@@ -702,6 +705,7 @@ let rec rewrite_vars_arg (rctx:rewrite_ctx) (g:ghost) (asOperand:string option) 
               calls := sLemma::!calls;
               Replace (eop CodeLemmaOp [eCode; eCode])
         else
+          let xa_fl = Reserved ("opr_lemma_" + (string_of_id xa)) in
           let eLemma = eapply xa_fl (env.state::es) in
           Replace (eop CodeLemmaOp [eCode; eLemma])
       )

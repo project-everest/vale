@@ -42,6 +42,20 @@ procedure Mem64_out(in base:operand, inline offset:int, in o:operand)
         mem;
     extern;
 
+procedure Mem64_lemma(ghost base:operand, ghost offset:int)
+    {:public}
+    {:quick exportOnly}
+    {:typecheck false}
+    reads
+        mem;
+    requires
+        base is OReg;
+        valid_mem64(eval_operand(base, this) + offset, mem);
+    ensures
+        valid_operand(va_opr_code_Mem64(base, offset), this);
+{
+}
+
 procedure Load64(out dst:dst_opr64, in src:reg_opr64, inline offset:int)
     {:public}
     {:quick exportOnly}

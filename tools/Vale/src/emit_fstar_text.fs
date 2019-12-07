@@ -119,7 +119,7 @@ let rec string_of_exp_prec prec e =
     | EOp (Uop (UNot BpBool), [e], t) -> ("not " + (r 99 e), 90)
     | EOp (Uop (UNot BpProp), [e], t) -> ("~" + (r 99 e), 90)
     | EOp (Uop UNeg, [e], t) -> ("-" + (r 99 e), 0)
-    | EOp (Uop (UIs x), [e], t) -> ((r 90 e) + "." + (sid x) + "?", 0)
+    | EOp (Uop (UIs x), [e], t) -> ((sid x) + "? " + (r 90 e), 0)
     | EOp (Uop (UReveal | UOld | UConst | UGhostOnly | UToOperand | UCustom _), [_], _) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Uop _, ([] | (_::_::_)), _) -> internalErr (sprintf "unary operator: %A" e)
     | EOp (Bop BExply, [e1; e2], t) -> (r prec (EOp (Bop BImply, [e2; e1], t)), prec)

@@ -123,15 +123,6 @@ unfold let va_opr_code_Mem64 (o:operand) (offset:int) : operand =
   | OReg r -> OMem (MReg r offset)
   | _ -> OConst 42
 
-let va_opr_lemma_Mem64 (s:va_state) (base:operand) (offset:int) : Lemma
-  (requires
-    OReg? base /\
-    valid_mem64 (eval_operand base s + offset) s.mem
-  )
-  (ensures valid_operand (va_opr_code_Mem64 base offset) s)
-  =
-  ()
-
 
 // Evaluation
 [@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand o s
