@@ -257,12 +257,6 @@ let try_lookup_fun_or_proc (env:env) (x:id):fun_or_proc option =
   | (Some (UnsupportedName (x, loc, msg)), _) -> unsupported loc msg ("function or procedure '" + (err_id x) + "' is declared 'unsupported'")
   | _ -> None
 
-let lookup_fun_or_proc (env:env) (x:id):fun_or_proc =
-//  let x = if x = Id "not" then Id "Prims.l_not" else x in
-  match try_lookup_fun_or_proc env x with
-  | Some t -> t
-  | _ -> err ("cannot find function/procedure '" + (err_id x) + "'")
-
 let lookup_fun_decl (env:env) (x:id):fun_decl =
   match try_lookup_fun_or_proc env x with
   | Some (FoundFunDecl f) -> f
@@ -1861,8 +1855,8 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
     match skip_loc e with
     | EApply (e, _, _, _) when is_id e ->
       (
-        match lookup_fun_or_proc env (id_of_exp e) with
-        | FoundProc p -> true
+        match try_lookup_fun_or_proc env (id_of_exp e) with
+        | Some (FoundProc p) -> true
         | _ -> false
       )
     | _ -> false
@@ -1920,10 +1914,10 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
           let x = id_of_exp e in
           // HACK: don't check call to "reveal_opaque". This is code that is going to be replaced with F* reveal
           if (string_of_id x).EndsWith("Opaque_s.reveal_opaque") then s else
-          match (xs, lookup_fun_or_proc env x) with
-          | (([] | [_]), (FoundFunDecl _ | FoundFunExpr _)) -> assign_exp ()
-          | (_::_, (FoundFunDecl _ | FoundFunExpr _)) -> err ("Expected 0 or 1 return values from function")
-          | (_, FoundProc p) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
+          match (xs, try_lookup_fun_or_proc env x) with
+          | (([] | [_]), (None | Some (FoundFunDecl _ | FoundFunExpr _))) -> assign_exp ()
+          | (_::_, (None | Some (FoundFunDecl _ | FoundFunExpr _))) -> err ("Expected 0 or 1 return values from function")
+          | (_, Some (FoundProc p)) -> tc_proc_call env (loc_of_exp_opt e) p xs ts_opt es
         )
       | _ -> assign_exp ()
     )
