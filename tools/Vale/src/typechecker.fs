@@ -10,7 +10,7 @@ open System
 open Microsoft.FSharp.Text.Lexing
 
 let fstar = ref false;
-let do_typecheck = ref false;
+let do_typecheck = ref true;
 
 let string_of_kind = Emit_vale_text.string_of_kind
 let string_of_typ = Emit_vale_text.string_of_typ

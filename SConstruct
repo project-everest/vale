@@ -708,7 +708,7 @@ def translate_vad_file(options, source_vad):
   target = file_drop_extension(to_obj_dir(source_vad))
   target_dfy = File(target + '.dfy')
   env.Command(target_dfy, [source_vad, vale_exe],
-    f'{mono} {vale_exe} -typecheck -includeSuffix .vad .dfy -dafnyText' +
+    f'{mono} {vale_exe} -includeSuffix .vad .dfy -dafnyText' +
     f' -sourceFrom BASE dafny -destFrom BASE obj/dafny'
     f' -in {source_vad} -out {target_dfy}' +
     f' {" ".join(vale_user_args)}')
@@ -727,7 +727,7 @@ def translate_vaf_file(options, source_vaf):
   types_include = ''
   types_include = f'-include {target}.types.vaf'
   env.Command(targets, [source_vaf, vale_exe],
-    f'{mono} {vale_exe} -fstarText -typecheck {types_include} {opt_vale_includes}' +
+    f'{mono} {vale_exe} -fstarText {types_include} {opt_vale_includes}' +
     f' -in {source_vaf} -out {target_fst} -outi {target_fsti}' +
     f' {vale_scons_args} {" ".join(vale_user_args)}')
   return targets
