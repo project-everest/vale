@@ -38,19 +38,19 @@ let wp_X PARAMS (s0:state) (k:state -> A -> Type0) : Type0 =
 
 // Procedure
 val wpProof_X PARAMS (s0:state) (k:state -> A -> Type0) : Lemma
-  (requires t_require s0 /\ wp_X ARGS s0 k)
-  (ensures t_ensure (va_code_X ARGS) PMODS (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
+  (requires va_t_require s0 /\ wp_X ARGS s0 k)
+  (ensures va_t_ensure (va_code_X ARGS) PMODS (wpMonotone_X ARGS) (wpCompute_X ARGS) s0 k)
 let wpProof_X PARAMS s0 k =
   let (sM, f0, g1, ..., gn) = va_lemma_X (va_code_X ARGS) s0 ARGS in
   va_lemma_upd_update sM;
   assert (state_eq sM UPDATES_SM);
-  lemma_norm_mods PMODS sM s0;
+  va_lemma_norm_mods PMODS sM s0;
   let g = (g1, ..., gn) in
   (sM, f0, g)
 
 // Function
 [@"opaque_to_smt"]
-let quick_X PARAMS : quickCode A (va_code_X ARGS) =
+let quick_X PARAMS : va_quickCode A (va_code_X ARGS) =
   va_QProc (va_code_X ARGS) PMODS (wp_X ARGS) (wpProof_X ARGS)
 *)
 
@@ -145,15 +145,15 @@ let build_proc (env:env) (loc:loc) (p:proc_decl):decls =
   let pK = arg k tContinue in
   let eRet = eop (TupleOp None) [evar sM; evar f0; evar g] in
   let specEnsArgs = [eCode] @ qmods_opt ePMods @ [evar s0; evar k; eRet] in
-  let specReq1 = eapply (Id "t_require") [evar s0] in
+  let specReq1 = eapply (Reserved "t_require") [evar s0] in
   let specReq2 = eapply wp_X (eArgs @ [evar s0; evar k]) in
   let specReq = Requires (Unrefined, eop (Bop (BAnd BpProp)) [specReq1; specReq2]) in
-  let specEns = Ensures (Unrefined, eapply (Id "t_ensure") specEnsArgs) in
+  let specEns = Ensures (Unrefined, eapply (Reserved "t_ensure") specEnsArgs) in
   // wpProof_X body
   let sLemmaUpd = SAssign ([], eapply (Reserved "lemma_upd_update") [evar sM]) in
   let (_, eqUpdates) = Emit_common_lemmas.makeFrame env p s0 sM in
   let sAssertEq = SAssert (assert_attrs_default, eqUpdates) in
-  let sLemmaNormMods = SAssign ([], eapply (Id "lemma_norm_mods") [ePMods; evar sM; evar s0]) in
+  let sLemmaNormMods = SAssign ([], eapply (Reserved "lemma_norm_mods") [ePMods; evar sM; evar s0]) in
   let pProof =
     {
       pname = wpProof_X;

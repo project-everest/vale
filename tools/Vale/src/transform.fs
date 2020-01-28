@@ -948,7 +948,7 @@ let add_mods_updates (loc:loc) (env:env) (m:Map<id, bool>):(loc * spec) list * M
 
 let rec subst_label_exp (addLabels:bool) (e:exp):exp =
   let addLabel loc e = 
-    let range = evar (Id "range1") in
+    let range = evar (Reserved "range1") in
     let msg = EString ("***** POSTCONDITION NOT MET AT " + string_of_loc loc + " *****") in
     eapply (Id "label") [range; msg; e]
   in

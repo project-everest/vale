@@ -300,4 +300,4 @@ let wp_sound_code_wrap (#a:Type0) (c:code) (qc:quickCode a c) (s0:state) (k:(s0'
   =
   wp_sound_code c qc (k s0) s0
 
-let wp_sound_code_norm = wp_sound_code_wrap
+let va_wp_sound_code_norm = wp_sound_code_wrap

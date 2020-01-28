@@ -62,7 +62,7 @@ let rec fbind_gs (g:id) (xOuts:formal list) (gs:formal list) (e:exp) : exp =
   //   let (g1, ..., gn) = g in e
   // Currently:
   //   - in while, "forall ... (g:a)" in wp_While introduces a g that's a variable, not a tuple constructor
-  //   - in lemma calls, all return values for qBindPURE are passed in a single variable
+  //   - in lemma calls, all return values for va_qBindPURE are passed in a single variable
   let fbind_g e = ebind BindLet [evar g] xOuts [] e in
   match gs with
   | [] -> e
@@ -93,7 +93,7 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
   let outs = List.map fst outs_t in
   let env0 = env in
   let env = snd (env_stmt env s) in
-  let range = evar (Id "range1") in
+  let range = evar (Reserved "range1") in
   let msg = EString ("***** PRECONDITION NOT MET AT " + string_of_loc loc + " *****") in
   let msgs = EString ("***** EXPRESSION PRECONDITIONS NOT MET WITHIN " + string_of_loc loc + " *****") in
   let mods = evar (Reserved "mods") in
@@ -111,10 +111,10 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
     let e = vaApp_t ("quick_" + x) es t in
     let f g eTail =
       let fTail = ebind Lambda [] [(Reserved "s", Some tState); g] [] eTail in
-      (uses_state e, eapply (Id "QBind") [range; msg; e; fTail])
+      (uses_state e, eapply (Reserved "QBind") [range; msg; e; fTail])
       in
     match (needsState, rets) with
-    | (false, []) -> (uses_state e, eapply (Id "QSeq") [range; msg; e; eTail])
+    | (false, []) -> (uses_state e, eapply (Reserved "QSeq") [range; msg; e; eTail])
     | (true, []) -> f (Id "_", None) eTail
     | (_, [g]) -> f g eTail
     | _ ->
@@ -147,14 +147,14 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
     let eApp = eapply_t x es t in
     let fApp = ebind Lambda [] [(Id "_", Some tUnit)] [] eApp in
     let app qPure eTail =
-      let eCall = eapply (Id qPure) [range; msg; fApp; eTail] in
+      let eCall = eapply (Reserved qPure) [range; msg; fApp; eTail] in
       let eCall = List.fold (fun e (xt, ex) -> ebind BindLet [ex] [xt] [] e) eCall xlets in
       (true, eCall)
       in
     match (infer_spec, rets, pOpt) with
     | (true, [], _) -> app "qPURE" eTail
     | (false, [], Some p) ->
-        // QLemma range msg pre post fApp eTail
+        // va_QLemma range msg pre post fApp eTail
         let p = Map.find x env.procs in
         // pre = (fun(x1...xn) req)(e1...en)
         // post = (fun(x1...xn) ens)(e1...en)
@@ -163,7 +163,7 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
         let pre = rename_args p.ptargs xs ts es (and_of_list reqs) in
         let post = rename_args p.ptargs xs ts es (and_of_list enss) in
         let post = ebind Lambda [] [(Id "_", None)] [] post in
-        let eCall = eapply (Id "QLemma") [range; msg; pre; post; fApp; eTail] in
+        let eCall = eapply (Reserved "QLemma") [range; msg; pre; post; fApp; eTail] in
         (true, eCall)
     | _ -> notImplemented "lemma calls with return values"
 (* TODO: use QGhost and instantiate pre and post explicitly
@@ -176,13 +176,13 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
         let pre = and_of_list reqs in
         let post = and_of_list enss in
         let eTail = ebind Lambda [] [(xarg, Some targ)] [] eTail in
-        let eCall = EApply (evar (Id "QLemma"), Some [t], [range; msg; pre; post; fApp; eTail], None) in
+        let eCall = EApply (evar (Reserved "QLemma"), Some [t], [range; msg; pre; post; fApp; eTail], None) in
         (true, eCall)
-    | [x] -> app "qBindPURE" (ebind Lambda [] [(dummy, None); x] [] eTail)
+    | [x] -> vaApp "qBindPURE" (ebind Lambda [] [(dummy, None); x] [] eTail)
     | _::_ ->
         let eTail = fbind_gs g rets rets eTail in
         let eTail = ebind Lambda [] [(dummy, None); (g, None)] [] eTail in
-        app "qBindPURE" eTail
+        vaApp "qBindPURE" eTail
 *)
     in
   let assign_or_var (allowLemma:bool) (x:id) (tOpt:typ option) (e:exp):(bool * exp) =
@@ -241,7 +241,7 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
             let eq = ebind Lambda [] [(Id "_", None)] [] eq in
             let ecall = eapply (Reserved "reveal_opaque") [esx; e] in
             let ef = ebind Lambda [] [(Id "_", None)] [] ecall in
-            (true, eapply (Id "QLemma") [range; msg; EBool true; eq; ef; eTail])
+            (true, eapply (Reserved "QLemma") [range; msg; EBool true; eq; ef; eTail])
             in
           match skip_loc e with
           | EVar (x, _) -> f e
@@ -264,14 +264,14 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
       build_qcode_stmt env xs loc s (needsState, eTailLet)
   | SAssume e ->
       let e = qlemma_exp e in
-      (true, eapply (Id "qAssume") [range; msg; e; eTail])
+      (true, eapply (Reserved "qAssume") [range; msg; e; eTail])
   | SAssert ({is_quicktype = Some b}, e) ->
       let e = qlemma_exp e in
       let eTail = ebind Lambda [] [(Id "_", None)] [] eTail in
-      (true, eapply (Id "qAssertSquash") [range; (if b then msgs else msg); e; eTail])
+      (true, eapply (Reserved "qAssertSquash") [range; (if b then msgs else msg); e; eTail])
   | SAssert (_, e) ->
       let e = qlemma_exp e in
-      (true, eapply (Id "qAssert") [range; msg; e; eTail])
+      (true, eapply (Reserved "qAssert") [range; msg; e; eTail])
   | SIfElse (((SmInline | SmPlain) as sm), eb, ss1, ss2) ->
       let eb = qlemma_exp eb in
       let eqc1 = build_qcode_block false env outs_t loc ss1 in
@@ -281,9 +281,9 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
         | SmInline -> ("qInlineIf", eb)
         | _ -> ("qIf", qlemma_exp (eb_alt eb))
         in
-      let eIf = eapply (Id sq) (qmods_opt mods @ [eCmp; eqc1; eqc2]) in
+      let eIf = eapply (Reserved sq) (qmods_opt mods @ [eCmp; eqc1; eqc2]) in
       let fTail = ebind Lambda [] [(Reserved "s", Some tState); (Reserved "g", None)] [] eTail in
-      (true, eapply (Id "QBind") [range; msg; eIf; fTail])
+      (true, eapply (Reserved "QBind") [range; msg; eIf; fTail])
   | SWhile (eb, invs, (_, [ed]), ss) ->
       let eb = qlemma_exp eb in
       let inv = and_of_list (List.map snd invs) in
@@ -307,21 +307,21 @@ let rec build_qcode_stmt (env:env) (outs_t:formal list) (loc:loc) (s:stmt) ((nee
       let fqc = ebind Lambda [] [xg] [] (fbinds_g eqc) in
       let fInv = ebind Lambda [] [xs; xg] [] (fbinds_g eInv) in
       let fd = ebind Lambda [] [xs; xg] [] (fbinds_g ed) in
-      let eWhile = eapply (Id "qWhile") (qmods_opt mods @ [eCmp; fqc; fInv; fd; outTuple]) in
+      let eWhile = eapply (Reserved "qWhile") (qmods_opt mods @ [eCmp; fqc; fInv; fd; outTuple]) in
       let eTail = ebind BindLet [eop (TupleOp None) (List.map evar outs)] [xg] [] eTail in
       let fTail = ebind Lambda [] [xs; xg] [] (fbinds_g eTail) in
-      (true, eapply (Id "QBind") [range; msg; eWhile; fTail])
+      (true, eapply (Reserved "QBind") [range; msg; eWhile; fTail])
   | SForall ([], [], (EBool true | ECast (_, EBool true, _)), ep, ss) ->
       let ep = qlemma_exp ep in
       let eQcs = build_qcode_stmts env [] loc ss in
       //let s = Reserved "s" in
-      let eAssertBy = eapply (Id "qAssertBy") [range; msg; ep; eQcs; eTail] in
+      let eAssertBy = eapply (Reserved "qAssertBy") [range; msg; ep; eQcs; eTail] in
       (true, eAssertBy)
   | _ -> ierr ()
 and build_qcode_stmts (env:env) (outs_t:formal list) (loc:loc) (ss:stmt list):exp =
   let outs = List.map fst outs_t in
   let outTuple = eop (TupleOp None) (List.map evar outs) in
-  let empty = eapply (Id "QEmpty") [outTuple] in
+  let empty = eapply (Reserved "QEmpty") [outTuple] in
   let (needsState, e) = List.foldBack (build_qcode_stmt env outs_t loc) ss (false, empty) in
   e
 and build_qcode_block (add_old:bool) (env:env) (outs_t:formal list) (loc:loc) (ss:stmt list):exp =
@@ -334,12 +334,12 @@ and build_qcode_block (add_old:bool) (env:env) (outs_t:formal list) (loc:loc) (s
 let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   (*
   [@"opaque_to_smt"]
-  let va_qcode_Add3 (va_mods:mods_t) : quickCode unit (va_code_Add3 ()) = qblock (
+  let va_qcode_Add3 (va_mods:mods_t) : va_quickCode unit (va_code_Add3 ()) = qblock (
     fun (va_s:state) -> let va_old_s = va_s in
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
-    QEmpty ()
+    va_QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+    va_QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+    va_QSeq (va_quick_Add64 (OReg Rax) (OConst 1)) (
+    va_QEmpty ()
     )))
   )
   *)
@@ -352,7 +352,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
   let cid = Reserved ("code_" + (string_of_id p.pname)) in
   let tArgs = List.map (fun (x, _) -> TName x) cParams in
   let tCodeApp = tapply cid tArgs in
-  let tRetQuick = tapply (Id "quickCode") [tRet; tCodeApp] in
+  let tRetQuick = tapply (Reserved "quickCode") [tRet; tCodeApp] in
   let mutable_scope = Map.ofList (List.map (fun (x, t, _, _, _) -> (x, Some t)) p.prets) in
   let (_, ss) = let_updates_stmts mutable_scope ss in
   let outs = List.map (fun (x, t) -> (x, Some t)) prets in
@@ -362,7 +362,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
       fname = Reserved ("qcode_" + (string_of_id p.pname));
       fghost = NotGhost;
       ftargs = [];
-      fargs = (qmods_opt (Reserved "mods", Some (TName (Id "mods_t")))) @ qParams;
+      fargs = (qmods_opt (Reserved "mods", Some (TName (Reserved "mods_t")))) @ qParams;
       fret_name = None;
       fret = tRetQuick;
       fspecs = [];
@@ -392,9 +392,9 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   let qc = Reserved "qc" in
   let (_, pmods, _) = makeFrame env true p s0 sM in
   let ePMods = eapply (Id "list") pmods in
-  let sMods = SAssign ([(mods, Some (Some (TName (Id "mods_t")), Ghost))], ePMods) in
+  let sMods = SAssign ([(mods, Some (Some (TName (Reserved "mods_t")), Ghost))], ePMods) in
 //  let wpSound_X = Reserved ("wpSound_" + (string_of_id p.pname)) in
-  let wpSound_X = Id "wp_sound_code_norm" in
+  let wpSound_X = Reserved "wp_sound_code_norm" in
   let qCodes_X = Reserved ("qcode_" + (string_of_id p.pname)) in
   let ghostRets = List.collect (fun (x, t, g, _, _) -> match g with XGhost -> [(x, t)] | _ -> []) p.prets in
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
@@ -407,8 +407,8 @@ let build_proc_body (env:env) (loc:loc) (p:proc_decl) (code:exp) (ens:exp):stmt 
   // assert_norm (va_qc.mods == va_mods)
   let eQcMods = eop (FieldOp (Id "mods")) [evar qc] in
   let sQcNorm = SAssign ([], eapply (Id "assert_norm") [eop (Bop (BEq BpProp)) [eQcMods; evar mods]]) in
-  // lemma_norm_mods va_mods va_sM va_s0
-  let sLemmaNormMods = SAssign ([], eapply (Id "lemma_norm_mods") [ePMods; evar sM; evar s0]) in
+  // va_lemma_norm_mods va_mods va_sM va_s0
+  let sLemmaNormMods = SAssign ([], eapply (Reserved "lemma_norm_mods") [ePMods; evar sM; evar s0]) in
   let gAssigns = List.map (fun (x, _) -> (x, None)) ghostRets in
   let sAssignGs =
     match ghostRets with
