@@ -104,8 +104,7 @@ predicate ValidGlobalsAddr(globals:map<global, seq<uint32>>, g:global, addr:int)
 }
 #endverbatim
 
-procedure rLDRglobal(out rd:opr32, inline g:global,
-          in base:opr32, in ofs:opr32)
+procedure LdrGlobal(out rd:opr32, inline g:global, in base:opr32, in ofs:opr32)
     {:instruction Ins(LDR_global(rd, g, base, ofs))}
     requires
         ValidGlobalsAddr(globals, g, base + ofs);
@@ -120,7 +119,7 @@ procedure rLDRglobal(out rd:opr32, inline g:global,
     reveal ValidMemState;
 }
 
-procedure rSTR(in rd:opr_reg, in base:opr32, in ofs:opr32)
+procedure Str(in rd:opr_reg, in base:opr32, in ofs:opr32)
     {:instruction Ins(STR(rd, base, ofs))}
     requires
         ValidAddr(mem, base + ofs);
@@ -137,7 +136,7 @@ procedure rSTR(in rd:opr_reg, in base:opr32, in ofs:opr32)
     reveal ValidMemState;
 }
 
-procedure rMOV(out dst:opr32, in src:opr32)
+procedure Mov(out dst:opr32, in src:opr32)
     {:instruction Ins(MOV(dst, src))}
     ensures
         dst == old(src);
@@ -147,7 +146,7 @@ procedure rMOV(out dst:opr32, in src:opr32)
     reveal ValidMemState;
 }
 
-procedure rMOVShift(out dst:opr32, in src:opr_snd, inline shift:Shift)
+procedure MovShift(out dst:opr32, in src:opr_snd, inline shift:Shift)
     {:instruction Ins(MOV(dst, OShift(GetProbableReg(src), shift)))}
     ensures
         dst == old(EvalShift(old(src), shift));
@@ -157,7 +156,7 @@ procedure rMOVShift(out dst:opr32, in src:opr_snd, inline shift:Shift)
     reveal ValidMemState;
 }
 
-procedure rEOR(out dst:opr32, in src1:opr32, in src2:opr32)
+procedure Eor(out dst:opr32, in src1:opr32, in src2:opr32)
     {:instruction Ins(EOR(dst, src1, src2))}
     ensures
         dst == BitwiseXor(old(src1), old(src2));
@@ -167,7 +166,7 @@ procedure rEOR(out dst:opr32, in src1:opr32, in src2:opr32)
     reveal ValidMemState;
 }
 
-procedure rEORShift(out dst:opr32, in src1:opr32, in src2:opr_snd, inline shift:Shift)
+procedure EorShift(out dst:opr32, in src1:opr32, in src2:opr_snd, inline shift:Shift)
     {:instruction Ins(EOR(dst, src1, OShift(GetProbableReg(src2), shift)))} 
     ensures
         dst == BitwiseXor(old(src1), EvalShift(old(src2), shift));
@@ -177,7 +176,7 @@ procedure rEORShift(out dst:opr32, in src1:opr32, in src2:opr_snd, inline shift:
     reveal ValidMemState;
 }
 
-procedure rADD(out dst:opr32, in src1:opr32, in src2:opr32)
+procedure Add(out dst:opr32, in src1:opr32, in src2:opr32)
     {:instruction Ins(ADD(dst, src1, src2))}
     requires
         src1 + src2 < 0x1_0000_0000;
@@ -189,7 +188,7 @@ procedure rADD(out dst:opr32, in src1:opr32, in src2:opr32)
     reveal ValidMemState;
 }
 
-procedure rSUB(out dst:opr32, in src1:opr32, in src2:opr32)
+procedure Sub(out dst:opr32, in src1:opr32, in src2:opr32)
     {:instruction Ins(SUB(dst, src1, src2))}
     requires
         src1 - src2 >= 0;
@@ -201,7 +200,7 @@ procedure rSUB(out dst:opr32, in src1:opr32, in src2:opr32)
     reveal ValidMemState;
 }
 
-procedure rADDWrap(out dst:opr32, in src1:opr32, in src2:opr32)
+procedure AddWrap(out dst:opr32, in src1:opr32, in src2:opr32)
     {:instruction Ins(ADD(dst, src1, src2))}
     ensures
         dst == BitwiseAdd32(old(src1), old(src2));
@@ -212,7 +211,7 @@ procedure rADDWrap(out dst:opr32, in src1:opr32, in src2:opr32)
     reveal BitwiseAdd32;
 }
 
-procedure rADDWrapShift(out dst:opr32, in src1:opr32, in src2:opr_snd, inline shift:Shift)
+procedure AddWrapShift(out dst:opr32, in src1:opr32, in src2:opr_snd, inline shift:Shift)
     {:instruction Ins(ADD(dst, src1, OShift(GetProbableReg(src2), shift)))}
     ensures
         dst == BitwiseAdd32(old(src1), EvalShift(old(src2), shift));
@@ -223,7 +222,7 @@ procedure rADDWrapShift(out dst:opr32, in src1:opr32, in src2:opr_snd, inline sh
     reveal BitwiseAdd32;
 }
 
-procedure rAND(out dst:opr32, in src1:opr32, in src2:opr32)
+procedure And(out dst:opr32, in src1:opr32, in src2:opr32)
     {:instruction Ins(AND(dst, src1, src2))}
     ensures
         dst == old(BitwiseAnd(src1, src2));
