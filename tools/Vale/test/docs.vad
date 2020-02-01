@@ -1,0 +1,393 @@
+include "common.vad"
+include{:verbatim} "docs_helper.dfy"
+
+#verbatim
+function method va_code_IncrEax():va_code
+
+lemma va_lemma_IncrEax(va_b0:va_codes, va_s0:va_state, va_sN:va_state)
+    returns (va_bM:va_codes, va_sM:va_state)
+    requires va_require(va_b0, va_code_IncrEax(), va_s0, va_sN)
+    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
+    requires va_get_ok(va_s0)
+    ensures  va_get_ok(va_sM)
+    requires 0 <= va_get_reg(EAX, va_s0) < 100
+    ensures  va_get_reg(EAX, va_sM) == va_get_reg(EAX, va_s0) + 1
+    ensures  va_state_eq(va_sM, va_update_reg(EAX, va_sM,
+        va_update_ok(va_sM, va_s0)))
+#endverbatim
+
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+
+procedure IncrEax()
+    modifies
+        eax;
+    requires
+        0 <= eax < 100;
+    ensures
+        eax == old(eax) + 1;
+    extern;
+
+procedure Test()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax < 99;
+    ensures
+        eax == old(eax) + 2;
+        ebx == old(ebx);
+{
+    IncrEax();
+    IncrEax();
+}
+
+procedure TestControl()
+    modifies
+        eax;
+    requires
+        0 <= eax < 100;
+    ensures
+        eax == 100;
+{
+    if (eax < 50)
+    {
+        IncrEax();
+        IncrEax();
+    }
+
+    while (eax < 100)
+        invariant
+            0 <= eax <= 100;
+        decreases
+            100 - eax;
+    {
+        IncrEax();
+    }
+}
+
+procedure Add(inout x:reg, in y:opr)
+    {:instruction Ins(InsAdd(x, y))}
+    ensures
+        x == old(x + y);
+{
+}
+
+procedure TestAdd()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax < 99;
+    ensures
+        eax == old(eax) + 30;
+        ebx == old(ebx) - 30;
+{
+    Add(eax, 10);
+    Add(eax, 20);
+    Add(ebx, (-30));
+}
+
+procedure AddThree(inout x:reg)
+    ensures
+        x == old(x + 3);
+{
+    Add(x, 1);
+    Add(x, 2);
+}
+
+procedure TestThree()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax < 99;
+    ensures
+        eax == old(eax) + 6;
+        ebx == old(ebx) + 3;
+{
+    AddThree(eax);
+    AddThree(eax);
+    AddThree(ebx);
+}
+
+procedure AddMaybeThree(inline b:bool, inout x:reg)
+    ensures
+        x == old(x) + (if b then 3 else 1);
+{
+    Add(x, 1);
+    inline if (b)
+    {
+        Add(x, 2);
+    }
+}
+
+procedure TestMaybeThree()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax < 99;
+    ensures
+        eax == old(eax) + 3;
+        ebx == old(ebx) + 1;
+{
+    AddMaybeThree(true, eax);
+    AddMaybeThree(false, ebx);
+}
+
+procedure Add2N(inline n:int, inout x:reg)
+    {:recursive}
+    requires
+        n >= 0;
+    ensures
+        x == old(x + 3 * n);
+{
+    inline if (n > 0)
+    {
+        Add(x, 1);
+        Add(x, 2);
+        Add2N(n - 1, x);
+    }
+}
+
+procedure TestAdd2N()
+    modifies
+        eax;
+    requires
+        0 <= eax < 99;
+    ensures
+        eax == old(eax) + 9;
+{
+    Add2N(3, eax);
+}
+
+procedure Ghosts1()
+    requires
+        eax == 0;
+    modifies
+        eax; ebx;
+    ensures
+        ebx == old(ebx) + 100;
+{
+    let lo := ebx;
+    let hi := lo + 100;
+    while (eax < 100)
+        invariant
+            lo <= ebx <= hi;
+            ebx == lo + eax;
+        decreases
+            100 - eax;
+    {
+        Add(eax, 1);
+        Add(ebx, 1);
+    }
+}
+
+procedure Ghosts2()
+    lets
+        lo := ebx;
+        hi := lo + 100;
+    requires
+        eax == 0;
+    modifies
+        eax; ebx;
+    ensures
+        ebx == hi;
+{
+    while (eax < 100)
+        invariant
+            lo <= ebx <= hi;
+            ebx == lo + eax;
+        decreases
+            100 - eax;
+    {
+        Add(eax, 1);
+        Add(ebx, 1);
+    }
+}
+
+procedure Ghosts3()
+    requires
+        eax == 0;
+    modifies
+        eax; ebx;
+    ensures
+        ebx == old(ebx) + 100;
+{
+    let lo := ebx;
+    let hi := lo + 100;
+    ghost var countdown:int := 100;
+
+    while (eax < 100)
+        invariant
+            lo <= ebx <= hi;
+            ebx == lo + eax;
+            countdown == 100 - eax;
+        decreases
+            countdown;
+    {
+        Add(eax, 1);
+        Add(ebx, 1);
+        countdown := countdown - 1;
+    }
+}
+
+ghost procedure ghost_example(ghost x:int) returns(ghost y:int)
+    requires
+        10 <= x;
+    ensures
+        20 <= y;
+{
+    y := x;
+    y := y + x;
+    ghost if (x > 100)
+    {
+        y := y + 1;
+    }
+    assert 20 <= y; // not necessary; for illustration purposes only
+}
+
+/* TODO:
+ghost procedure lemma_cube_positive(ghost x:int)
+    requires
+        0 <= x;
+    ensures
+        0 <= x * x * x;
+{
+}
+
+ghost procedure test_cube_positive()
+    reads
+        eax;
+    ensures
+        0 <= eax ==> 0 <= eax * eax * eax;
+{
+    assert 0 <= eax implies 0 <= eax * eax * eax by
+    {
+        lemma_cube_positive(eax);
+    }
+}
+*/
+
+ghost procedure lemma_commute_mul(ghost x:int, ghost y:int)
+    ensures
+        x * y == y * x;
+{
+}
+
+ghost procedure lemma_square_plus_minus_half(ghost x:int)
+    ensures
+        x * (x + 1) / 2 == x * (x - 1) / 2 + x;
+    extern;
+
+procedure ArithmeticSum(ghost n:int)
+    modifies
+        eax; ebx;
+    requires
+        0 <= n;
+        ebx == 0;
+        eax == n;
+    ensures
+        ebx == n * (n + 1) / 2;
+{
+    while (0 < eax)
+        invariant
+            0 <= eax;
+            ebx + eax * (eax + 1) / 2 == n * (n + 1) / 2;
+        decreases
+            eax;
+    {
+        lemma_square_plus_minus_half(eax);
+        lemma_commute_mul(eax, eax - 1);
+        Add(ebx, eax);
+        Add(eax, (-1));
+    }
+}
+
+procedure ArithmeticSum2(ghost n:int)
+    modifies
+        eax; ebx;
+    requires
+        0 <= n;
+        ebx == 0;
+        eax == n;
+    ensures
+        ebx == n * (n + 1) / 2;
+{
+    while (0 < eax)
+        invariant
+            0 <= eax;
+            ebx + eax * (eax + 1) / 2 == n * (n + 1) / 2;
+        decreases
+            eax;
+    {
+        let b' := ebx + eax;
+        let a' := eax - 1;
+        assert b' + a' * (a' + 1) / 2 == n * (n + 1) / 2 by
+        {
+            lemma_square_plus_minus_half(eax);
+            lemma_commute_mul(eax, eax - 1);
+        }
+
+        Add(ebx, eax);
+        Add(eax, (-1));
+    }
+}
+
+procedure ArithmeticSum3(ghost n:int)
+    modifies
+        eax; ebx;
+    requires
+        0 <= n;
+        ebx == 0;
+        eax == n;
+    ensures
+        ebx == n * (n + 1) / 2;
+{
+    while (0 < eax)
+        invariant
+            0 <= eax;
+            ebx + eax * (eax + 1) / 2 == n * (n + 1) / 2;
+        decreases
+            eax;
+    {
+        let a := eax;
+        let b := ebx;
+        let b' := b + a;
+        let a' := a - 1;
+        calc ==
+        {
+            b' + a' * (a' + 1) / 2;
+            ==
+            b + a' * (a' + 1) / 2 + a;
+            ==
+            b + (a - 1) * a / 2 + a;
+            == {lemma_commute_mul(a - 1, a);}
+            b + a * (a - 1) / 2 + a;
+            == {lemma_square_plus_minus_half(a);}
+            b + a * (a + 1) / 2;
+            ==
+            n * (n + 1) / 2;
+        }
+
+        Add(ebx, eax);
+        Add(eax, (-1));
+    }
+}
+
+procedure Increment(inout x:reg)
+    ensures
+        x == old(x) + 1;
+{
+    Add(x, 1);
+}
+
+procedure P()
+    modifies
+        eax;
+    requires
+        eax >= 0;
+    ensures
+        eax >= 2;
+{
+    Increment(eax);
+    Increment(eax);
+}

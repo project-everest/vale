@@ -276,6 +276,8 @@ verify_options = [
   ('tools/Vale/test/*/*.fst', BuildOptions(fstar_default_args)),
   ('tools/Vale/test/*/*.fsti', BuildOptions(fstar_default_args)),
 
+  ('tools/Vale/test/docs_helper.dfy',  BuildOptions(dafny_default_args_nlarith)),
+
   # .dfy files default to this set of options
   ('.dfy', BuildOptions(dafny_default_args_larith)),
 
