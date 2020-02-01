@@ -21,7 +21,7 @@ See the [CODE](./CODE.md) file for more details on the various files in the repo
 
 # Documentation
 
-See the [Vale documentation](./doc/index.html) for a description of the Vale language and Vale tool.
+See the [Vale documentation](https://project-everest.github.io/vale/) for a description of the Vale language and Vale tool.
 
 You can also see our academic papers describing Vale:
 
