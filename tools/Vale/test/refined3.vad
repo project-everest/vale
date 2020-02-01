@@ -95,16 +95,13 @@ predicate evalCode(c:code, s0:state, sN:state)
 // Untrusted Vale interface
 
 type opr = reg
-type va_operand = opr
-type va_operand_opr = va_operand
+type va_operand_opr = opr
 type va_value_opr = int
-function method va_op_opr_reg(r:reg):va_operand { r }
-function method va_op_cmp_reg(r:reg):va_operand { r }
+function method va_op_opr_reg(r:reg):opr { r }
+function method va_op_cmp_reg(r:reg):opr { r }
 predicate va_is_src_opr(o:opr, s:va_state) { true }
 predicate va_is_dst_opr(o:opr, s:va_state) { true }
 
-type va_bool = bool
-type va_int = int
 type va_code = code
 type va_codes = codes
 type va_state = state
@@ -163,7 +160,7 @@ predicate{:opaque} evalCodeOpaque(c:code, s0:state, sN:state) { evalCode(c, s0, 
 predicate evalCode_lax(c:code, s0:state, sN:state) { s0.ok ==> evalCodeOpaque(c, s0, sN) }
 predicate evalWhile_lax(b:obool, c:code, n:nat, s0:state, sN:state) { s0.ok ==> evalWhileOpaque(b, c, n, s0, sN) }
 
-function va_eval_opr(s:state, o:va_operand):int
+function va_eval_opr(s:state, o:opr):int
 {
     getReg(s, o)
 }

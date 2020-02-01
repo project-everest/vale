@@ -472,7 +472,6 @@ FunRet
 ProcRet
   : Attrs AnyId COLON Type { if hasStorageAttr $1 then let (s, a) = storageAttrs $1 in ($2, $4, s, Out, a) else ($2, $4, XOperand, Out, $1) }
   | GHOST Attrs AnyId COLON Type { ($3, $5, XGhost, Out, $2) }
-  | INLINE Attrs AnyId COLON Type { ($3, $5, XInline, Out, $2) }
 ProcRets1
   : ProcRet { [$1] }
   | ProcRet COMMA ProcRets1 { $1::$3 }

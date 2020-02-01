@@ -19,8 +19,6 @@ let contains = Map.contains
 
 type register = | EAX | EBX
 
-type va_bool = bool
-type va_int = int
 type ins = | IPlaceholder : int -> ins
 type ocmp = | OLe: o1:register -> o2:register -> ocmp
 type va_code =
@@ -53,18 +51,17 @@ let va_get_reg (r:register) (s:va_state) : GTot int = s.[r]
 let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
 let va_update_reg (r:register) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
 
-type va_register = register
 type va_operand_reg = register
-let va_op_reg_reg (r:register) : Tot va_register = r
+let va_op_reg_reg (r:register) : Tot register = r
 let va_is_src_reg (r:register) (s:va_state) = True
 let va_is_dst_reg (r:register) (s:va_state) = True
 let va_update_register (r:register) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
 let va_update_operand_reg (r:register) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
-let va_eval_reg (s:va_state) (r:va_register) : GTot int = s.[r]
+let va_eval_reg (s:va_state) (r:register) : GTot int = s.[r]
 
-type va_cmp = register
-let va_op_cmp_reg (r:va_register) : va_cmp = r
-let va_cmp_le (a:va_register) (b:va_register) : ocmp = OLe a b
+type cmp_operand = register
+let va_op_cmp_reg (r:register) : cmp_operand = r
+let va_cmp_le (a:register) (b:register) : ocmp = OLe a b
 
 let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
 

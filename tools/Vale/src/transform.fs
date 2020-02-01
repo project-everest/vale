@@ -757,7 +757,7 @@ and rewrite_vars_args (rctx:rewrite_ctx) (env:env) (p:proc_decl) (rets:lhs list)
     in
   let rewrite_ret (pp, ((xlhs, _) as lhs)) =
     match pp with
-    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg rctx NotGhost (Some (vaOperandTyp t)) Out env (evar xlhs)])
+    | (x, t, XOperand, _, _) -> ([], [rewrite_vars_arg rctx NotGhost (Some (vaTyp t)) Out env (evar xlhs)]) // REVIEW: this case is probably no longer used
     | (x, t, XAlias _, _, _) ->
         let _ = rewrite_vars_arg rctx NotGhost None Out env (evar xlhs) in // check argument validity
         ([], []) // drop argument

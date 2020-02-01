@@ -15,18 +15,18 @@ module MyModule {
     function method MyFunction(x:int):int { x + x }
     type ParamType<G> = seq<G>
 }
-type va_operand_reg_MyModule__MyType = va_register
-predicate va_is_src_reg_MyModule__MyType(x:va_register, s:va_state) { true }
-predicate va_is_dst_reg_MyModule__MyType(x:va_register, s:va_state) { true }
-function va_eval_reg_MyModule__MyType(s:va_state, o:va_register):int { eval_reg(o, s) }
-function method va_coerce_reg_MyModule__MyType_to_reg(r:va_register):va_register { r }
+type va_operand_reg_MyModule__MyType = register
+predicate va_is_src_reg_MyModule__MyType(x:register, s:va_state) { true }
+predicate va_is_dst_reg_MyModule__MyType(x:register, s:va_state) { true }
+function va_eval_reg_MyModule__MyType(s:va_state, o:register):int { eval_reg(o, s) }
+function method va_coerce_reg_MyModule__MyType_to_reg(r:register):register { r }
 function va_update_operand_reg_MyModule__MyType(r:register, sM:va_state, sK:va_state):va_state { va_update_reg(r, sM, sK) }
-function method va_op_reg_MyModule__MyType_reg(r:register):va_register { r }
+function method va_op_reg_MyModule__MyType_reg(r:register):register { r }
 
 datatype MyRecord = MakeRecord(a:int, b:bool)
-type va_operand_opr_MyRecord = va_operand
-predicate va_is_src_opr_MyRecord(dt:va_operand, s:va_state)
-function va_eval_opr_MyRecord(s:state, o:va_operand):MyRecord
+type va_operand_opr_MyRecord = operand
+predicate va_is_src_opr_MyRecord(dt:operand, s:va_state)
+function va_eval_opr_MyRecord(s:state, o:operand):MyRecord
 #endverbatim
 
 type MyRecord:Type(0) extern;

@@ -36,9 +36,6 @@ let va_if (#a:Type) (b:bool) (x:(_:unit{b}) -> a) (y:(_:unit{~b}) -> a) : a =
   if b then x () else y ()
 
 // Type aliases
-unfold let va_bool = bool
-unfold let va_prop = Type0
-unfold let va_int = int
 let va_int_at_least (k:int) = i:int{i >= k}
 let va_int_at_most (k:int) = i:int{i <= k}
 let va_int_range (k1 k2:int) = i:int{k1 <= i /\ i <= k2}
@@ -49,16 +46,14 @@ unfold let va_codes = list va_code
 let va_tl (cs:va_codes) : Ghost va_codes (requires Cons? cs) (ensures fun tl -> tl == Cons?.tl cs) = Cons?.tl cs
 unfold let va_state = state
 val va_fuel : Type0
-unfold let va_operand = operand
 unfold let va_operand_opr64 = operand
-let va_reg_operand = o:operand{OReg? o}
+let reg_operand = o:operand{OReg? o}
 let va_operand_reg_opr64 = o:operand{OReg? o}
-unfold let va_dst_operand = operand
+unfold let dst_operand = operand
 unfold let va_operand_dst_opr64 = operand
-unfold let va_shift_amt = operand
+unfold let shift_amt = operand
 unfold let va_operand_shift_amt64 = operand
-unfold let va_cmp = operand
-unfold let va_register = reg
+unfold let cmp_operand = operand
 unfold let va_operand_xmm = xmm
 
 val va_pbool : Type0
@@ -82,39 +77,24 @@ val mul_nat_helper (x y:nat) : Lemma (x * y >= 0)
 [@va_qattr] unfold let va_expand_state (s:state) : state = s
 
 // Abbreviations
-unfold let get_reg (o:va_reg_operand) : reg = OReg?.r o
+unfold let get_reg (o:reg_operand) : reg = OReg?.r o
 
 // Constructors
 val va_fuel_default : unit -> va_fuel
-[@va_qattr] unfold let va_op_operand_reg (r:reg) : va_operand = OReg r
 [@va_qattr] unfold let va_op_xmm_xmm (x:xmm) : va_operand_xmm = x
-[@va_qattr] unfold let va_op_opr_reg (r:reg) : va_operand = OReg r
-[@va_qattr] unfold let va_op_opr64_reg (r:reg) : va_operand = OReg r
-[@va_qattr] unfold let va_const_operand (n:int) = OConst n
+[@va_qattr] unfold let va_op_opr64_reg (r:reg) : operand = OReg r
 [@va_qattr] unfold let va_const_opr64 (n:int) = OConst n
-[@va_qattr] unfold let va_const_shift_amt (n:int) : va_shift_amt = OConst n
-[@va_qattr] unfold let va_const_shift_amt64 (n:int) : va_shift_amt = OConst n
-[@va_qattr] unfold let va_op_shift_amt_reg(r:reg) : va_shift_amt = OReg r
-[@va_qattr] unfold let va_op_shift_amt64_reg (r:reg) : va_shift_amt = OReg r
-[@va_qattr] unfold let va_op_cmp_reg (r:reg) : va_cmp = OReg r
-[@va_qattr] unfold let va_const_cmp (n:int) : va_cmp = OConst n
-[@va_qattr] unfold let va_coerce_reg_opr64_to_cmp (r:va_operand_reg_opr64) : va_cmp = r
-[@va_qattr] unfold let va_coerce_reg_opr64_to_operand (o:va_operand_reg_opr64) : operand = o
-[@va_qattr] unfold let va_coerce_register_to_operand (r:va_register) : va_operand = OReg r
-[@va_qattr] unfold let va_coerce_operand_to_reg_operand (o:va_operand{OReg? o}) : va_reg_operand = o
-[@va_qattr] unfold let va_coerce_dst_operand_to_reg_operand (o:va_dst_operand{OReg? o}) : va_reg_operand = o
+[@va_qattr] unfold let va_const_shift_amt64 (n:int) : shift_amt = OConst n
+[@va_qattr] unfold let va_op_shift_amt64_reg (r:reg) : shift_amt = OReg r
+[@va_qattr] unfold let va_op_cmp_reg (r:reg) : cmp_operand = OReg r
+[@va_qattr] unfold let va_const_cmp (n:int) : cmp_operand = OConst n
+[@va_qattr] unfold let va_coerce_reg_opr64_to_cmp (r:va_operand_reg_opr64) : cmp_operand = r
 [@va_qattr] unfold let va_coerce_reg_opr64_to_dst_opr64 (o:va_operand_reg_opr64) : va_operand_dst_opr64 = o
 [@va_qattr] unfold let va_coerce_reg_opr64_to_opr64 (o:va_operand_reg_opr64) : va_operand_opr64 = o
-[@va_qattr] unfold let va_coerce_operand_to_cmp(o:va_operand) : va_cmp = o
-[@va_qattr] unfold let va_coerce_opr64_to_cmp (o:va_operand) : va_cmp = o
-[@va_qattr] unfold let va_op_register (r:reg) : va_register = r
-[@va_qattr] unfold let va_op_reg_oprerand_reg (r:reg) : va_reg_operand = OReg r
-[@va_qattr] unfold let va_op_reg_opr64_reg (r:reg) : va_reg_operand = OReg r
-[@va_qattr] unfold let va_op_dst_operand_reg (r:reg) : va_dst_operand = OReg r
-[@va_qattr] unfold let va_op_dst_opr64_reg (r:reg) : va_dst_operand = OReg r
-[@va_qattr] unfold let va_coerce_operand_to_dst_operand (o:va_operand) : va_dst_operand = o
-[@va_qattr] unfold let va_coerce_dst_operand_to_operand (o:va_dst_operand) : va_operand = o
-[@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:va_dst_operand) : va_operand = o
+[@va_qattr] unfold let va_coerce_opr64_to_cmp (o:operand) : cmp_operand = o
+[@va_qattr] unfold let va_op_reg_opr64_reg (r:reg) : reg_operand = OReg r
+[@va_qattr] unfold let va_op_dst_opr64_reg (r:reg) : dst_operand = OReg r
+[@va_qattr] unfold let va_coerce_dst_opr64_to_opr64 (o:dst_operand) : operand = o
 
 [@va_qattr]
 unfold let va_opr_code_Mem64 (o:operand) (offset:int) : operand =
@@ -125,12 +105,12 @@ unfold let va_opr_code_Mem64 (o:operand) (offset:int) : operand =
 
 
 // Evaluation
-[@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand o s
-[@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:va_dst_operand) : GTot nat64 = eval_operand o s
-[@va_qattr] unfold let va_eval_shift_amt64  (s:va_state) (o:va_shift_amt)   : GTot nat64 = eval_operand o s
-[@va_qattr] unfold let va_eval_cmp_uint64   (s:va_state) (r:va_cmp)         : GTot nat64 = eval_operand r s
-[@va_qattr] unfold let va_eval_reg64        (s:va_state) (r:va_register)    : GTot nat64 = eval_reg r s
-[@va_qattr] unfold let va_eval_reg_opr64    (s:va_state) (o:va_operand)     : GTot nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_opr64        (s:va_state) (o:operand)     : GTot nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_dst_opr64    (s:va_state) (o:dst_operand) : GTot nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_shift_amt64  (s:va_state) (o:shift_amt)   : GTot nat64 = eval_operand o s
+[@va_qattr] unfold let va_eval_cmp_uint64   (s:va_state) (r:cmp_operand)         : GTot nat64 = eval_operand r s
+[@va_qattr] unfold let va_eval_reg64        (s:va_state) (r:reg)    : GTot nat64 = eval_reg r s
+[@va_qattr] unfold let va_eval_reg_opr64    (s:va_state) (o:operand)     : GTot nat64 = eval_operand o s
 [@va_qattr] unfold let va_eval_xmm          (s:va_state) (x:xmm)            : quad32 = eval_xmm x s
 
 // Predicates
@@ -143,7 +123,7 @@ unfold let va_opr_code_Mem64 (o:operand) (offset:int) : operand =
   | OMem _ -> valid_operand o s
   | OConst _ -> False
 
-[@va_qattr] unfold let va_is_dst_dst_opr64 (o:va_dst_operand) (s:va_state) = va_is_dst_opr64 o s
+[@va_qattr] unfold let va_is_dst_dst_opr64 (o:dst_operand) (s:va_state) = va_is_dst_opr64 o s
 [@va_qattr] unfold let va_is_src_reg (r:reg) (s:va_state) = True
 [@va_qattr] unfold let va_is_dst_reg (r:reg) (s:va_state) = True
 [@va_qattr] unfold let va_is_src_shift_amt64 (o:operand) (s:va_state) = valid_operand o s /\ (va_eval_shift_amt64 s o) < 64
@@ -238,12 +218,12 @@ unfold let va_Block (block:va_codes) : va_code = Block block
 unfold let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
 unfold let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
 
-val va_cmp_eq (o1:va_operand) (o2:va_operand) : ocmp
-val va_cmp_ne (o1:va_operand) (o2:va_operand) : ocmp
-val va_cmp_le (o1:va_operand) (o2:va_operand) : ocmp
-val va_cmp_ge (o1:va_operand) (o2:va_operand) : ocmp
-val va_cmp_lt (o1:va_operand) (o2:va_operand) : ocmp
-val va_cmp_gt (o1:va_operand) (o2:va_operand) : ocmp
+val va_cmp_eq (o1:operand) (o2:operand) : ocmp
+val va_cmp_ne (o1:operand) (o2:operand) : ocmp
+val va_cmp_le (o1:operand) (o2:operand) : ocmp
+val va_cmp_ge (o1:operand) (o2:operand) : ocmp
+val va_cmp_lt (o1:operand) (o2:operand) : ocmp
+val va_cmp_gt (o1:operand) (o2:operand) : ocmp
 
 unfold let va_get_block (c:va_code{Block? c}) : va_codes = Block?.block c
 unfold let va_get_ifCond (c:va_code{IfElse? c}) : ocmp = IfElse?.ifCond c
@@ -283,62 +263,62 @@ unfold let va_evalCond (b:ocmp) (s:va_state) : GTot bool = eval_ocmp s b
 
 val valid_ocmp : c:ocmp -> s:va_state -> GTot bool
 
-val lemma_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_cmp_eq : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_eq o1 o2)) <==> (va_eval_opr64 s o1 == va_eval_opr64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_eq o1 o2))]
 
-val lemma_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_cmp_ne : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_ne o1 o2)) <==> (va_eval_opr64 s o1 <> va_eval_opr64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_ne o1 o2))]
 
-val lemma_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_cmp_le : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_le o1 o2)) <==> (va_eval_opr64 s o1 <= va_eval_opr64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_le o1 o2))]
 
-val lemma_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_cmp_ge : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_ge o1 o2)) <==> (va_eval_opr64 s o1 >= va_eval_opr64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_ge o1 o2))]
 
-val lemma_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_cmp_lt : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_lt o1 o2)) <==> (va_eval_opr64 s o1 < va_eval_opr64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_lt o1 o2))]
 
-val lemma_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_cmp_gt : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_gt o1 o2)) <==> (va_eval_opr64 s o1 > va_eval_opr64 s o2))
   [SMTPat (eval_ocmp s (va_cmp_gt o1 o2))]
 
-val lemma_valid_cmp_eq : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_valid_cmp_eq : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_eq o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_eq o1 o2) s)]
 
-val lemma_valid_cmp_ne : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_valid_cmp_ne : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ne o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_ne o1 o2) s)]
 
-val lemma_valid_cmp_le : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_valid_cmp_le : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_le o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_le o1 o2) s)]
 
-val lemma_valid_cmp_ge : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_valid_cmp_ge : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_ge o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_ge o1 o2) s)]
 
-val lemma_valid_cmp_lt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_valid_cmp_lt : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_lt o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_lt o1 o2) s)]
 
-val lemma_valid_cmp_gt : s:va_state -> o1:va_operand -> o2:va_operand -> Lemma
+val lemma_valid_cmp_gt : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures (valid_operand o1 s /\ valid_operand o2 s) ==> (valid_ocmp (va_cmp_gt o1 o2) s))
   [SMTPat (valid_ocmp (va_cmp_gt o1 o2) s)]

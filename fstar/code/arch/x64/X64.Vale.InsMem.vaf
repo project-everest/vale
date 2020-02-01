@@ -28,14 +28,14 @@ module P = X64.Print_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
-procedure Mem64_in(in base:operand, inline offset:int) returns(o:operand)
+procedure Mem64_in(in base:reg_opr64, inline offset:int) returns(o:operand)
     {:public}
     {:operand}
     reads
         mem;
     extern;
 
-procedure Mem64_out(in base:operand, inline offset:int, in o:operand)
+procedure Mem64_out(in base:reg_opr64, inline offset:int, in o:operand)
     {:public}
     {:operand}
     modifies

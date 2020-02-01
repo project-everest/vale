@@ -28,7 +28,7 @@ operand_type mem_opr:int := opr | Mem;
 datatype register = EAX | EBX
 
 datatype operand = OReg(r:register) | OConst(n:int)
-datatype ocmp = OLe(o1:operand, o2:operand)
+datatype ocmp = OLt(o1:operand, o2:operand) | OLe(o1:operand, o2:operand)
 datatype mem_operand = OMem(base:register, offset:int) | OOpr(o:operand)
 
 datatype ins =
@@ -104,6 +104,7 @@ predicate mem_opr_ok(o:mem_operand, s:state)
 predicate eval_ocmp(s:state, c:ocmp)
 {
     match c
+        case OLt(o1, o2) => eval_opr(o1, s) < eval_opr(o2, s)
         case OLe(o1, o2) => eval_opr(o1, s) <= eval_opr(o2, s)
 }
 
@@ -146,8 +147,6 @@ predicate eval_code(c:code, s0:state, sN:state)
 //////////////////// Vale interface ////////////////////////
 
 // types
-type va_bool = bool
-type va_int = int
 type va_codes = codes
 type va_code = code
 
@@ -160,58 +159,48 @@ function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
 function va_update_reg(r:register, sM:va_state, sK:va_state):va_state { sK.(regs := sK.regs[r := va_get_reg(r, sM)]) }
 function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(mem := sM.mem) }
 
-// register
-type va_register = register
-
-// register = register * int
-type va_operand_reg = va_register
+// operand_type reg
+type va_operand_reg = register
 type va_value_reg = int
-function method va_op_reg_reg(r:register):va_register { r }
+function method va_op_reg_reg(r:register):register { r }
 predicate va_is_src_reg(r:register, s:va_state) { true }
 predicate va_is_dst_reg(r:register, s:va_state) { true }
 function va_update_operand_reg(r:register, sM:va_state, sK:va_state):va_state { va_update_reg(r, sM, sK) }
-function va_eval_reg(s:va_state, r:va_register):int { eval_reg(r, s) }
+function va_eval_reg(s:va_state, r:register):int { eval_reg(r, s) }
 
-// operand
-type va_operand = operand
-
-// operand = operand * int
-type va_operand_opr = va_operand
+// operand_type opr
+type va_operand_opr = operand
 type va_value_opr = int
-function method va_op_opr_reg(r:register):va_operand { OReg(r) }
+function method va_op_opr_reg(r:register):operand { OReg(r) }
 predicate va_is_src_opr(o:operand, s:va_state) { true }
 predicate va_is_dst_opr(o:operand, s:va_state) { o.OReg? }
-function method va_const_opr(x:int):va_operand { OConst(x) }
+function method va_const_opr(x:int):operand { OConst(x) }
 function va_update_opr(o:operand, sM:va_state, sK:va_state):va_state requires o.OReg? { va_update_reg(o.r, sM, sK) }
-function va_eval_opr(s:va_state, r:va_operand):int { eval_opr(r, s) }
+function va_eval_opr(s:va_state, r:operand):int { eval_opr(r, s) }
 
-// mem_operand
-type va_mem_operand = mem_operand
-
-// mem_operand = mem_operand * int
-type va_operand_mem_opr = va_mem_operand
+// operand_type mem_opr
+type va_operand_mem_opr = mem_operand
 type va_value_mem_opr = int
-function method va_op_mem_opr_reg(r:register):va_mem_operand { OOpr(OReg(r)) }
-function method va_op_mem_opr_operand(o:operand):va_mem_operand { OOpr(o) }
+function method va_op_mem_opr_reg(r:register):mem_operand { OOpr(OReg(r)) }
 predicate va_is_src_mem_opr(o:mem_operand, s:va_state) { mem_opr_ok(o, s) }
 predicate va_is_dst_mem_opr(o:mem_operand, s:va_state) { mem_opr_ok(o, s) && (o.OOpr? ==> o.o.OReg?) }
-function method va_mem_opr_const_opr(x:int):va_mem_operand { OOpr(OConst(x)) }
+function method va_mem_opr_const_opr(x:int):mem_operand { OOpr(OConst(x)) }
 function va_update_operand_mem_opr(o:mem_operand, sM:va_state, sK:va_state):va_state requires o.OOpr? ==> o.o.OReg?
 {
   match o
     case OMem(base, offset) => sK.(mem := sK.mem[eval_reg(base, sK) + offset := eval_mem_opr(o, sM)])
     case OOpr(o) => va_update_reg(o.r, sM, sK)
 }
-function va_eval_mem_opr(s:va_state, o:va_mem_operand):int { eval_mem_opr(o, s) }
+function va_eval_mem_opr(s:va_state, o:mem_operand):int { eval_mem_opr(o, s) }
 
-// cmp
-type va_cmp = operand
-function method va_op_cmp_reg(r:register):va_cmp { OReg(r) }
-function method va_const_cmp(x:int):va_cmp { OConst(x) }
-function va_eval_cmp_int(s:va_state, r:va_cmp):int { eval_opr(r, s) }
+// operand_type cmp
+type cmp_operand = operand
+function method va_op_cmp_reg(r:register):cmp_operand { OReg(r) }
+function method va_const_cmp(x:int):cmp_operand { OConst(x) }
+function va_eval_cmp_int(s:va_state, r:cmp_operand):int { eval_opr(r, s) }
 
 // coercions
-function method va_coerce_reg_to_opr(r:va_register):va_operand { OReg(r) }
+function method va_coerce_reg_to_opr(r:register):operand { OReg(r) }
 
 // code
 function method va_CNil():va_codes { CNil() }
@@ -219,7 +208,8 @@ function method va_CCons(hd:va_code, tl:va_codes):va_codes { CCons(hd, tl) }
 function method va_Block(block:va_codes):va_code { Block(block) }
 function method va_IfElse(ifCond:ocmp, ifTrue:va_code, ifFalse:va_code):va_code { IfElse(ifCond, ifTrue, ifFalse) }
 function method va_While(whileCond:ocmp, whileBody:va_code):va_code { While(whileCond, whileBody) }
-function method va_cmp_le(a:va_operand, b:va_operand):ocmp { OLe(a, b) }
+function method va_cmp_lt(a:operand, b:operand):ocmp { OLt(a, b) }
+function method va_cmp_le(a:operand, b:operand):ocmp { OLe(a, b) }
 function va_get_block(c:va_code):va_codes requires c.Block? { c.block }
 function va_get_ifCond(c:code):ocmp requires c.IfElse? { c.ifCond }
 function va_get_ifTrue(c:code):code requires c.IfElse? { c.ifTrue }

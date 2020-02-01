@@ -474,7 +474,7 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
   [(loc, DFun f)]
 
 (* Build function for code for procedure Q
-function method{:opaque} va_code_Q(iii:int, dummy:va_operand, dummy2:va_operand):va_code
+function method{:opaque} va_code_Q(iii:int, dummy:va_operand_reg, dummy2:va_operand_reg):va_code
 {
   va_Block(...)
 }

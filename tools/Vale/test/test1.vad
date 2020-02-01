@@ -46,8 +46,8 @@ procedure Mem_out(in base:reg, inline offset:int, in o:mem_opr)
     extern;
 
 #verbatim
-function method va_opr_code_Mem(base:va_register, offset:int):va_mem_operand { OMem(base, offset) }
-function method va_opr_lemma_Mem(s:va_state, base:va_register, offset:int):va_mem_operand { OMem(base, offset) }
+function method va_opr_code_Mem(base:register, offset:int):mem_operand { OMem(base, offset) }
+function method va_opr_lemma_Mem(s:va_state, base:register, offset:int):mem_operand { OMem(base, offset) }
 #endverbatim
 
 procedure AddReg(inout x:reg, in y:reg)

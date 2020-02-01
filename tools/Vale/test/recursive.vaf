@@ -16,8 +16,6 @@ let contains = Map.contains
 
 type reg = | EAX | EBX
 
-type va_bool = bool
-type va_int = int
 type ins = | IPlaceholder : int -> ins
 type ocmp = | OLe: o1:reg -> o2:reg -> ocmp
 type va_code =
