@@ -14,14 +14,9 @@ type opr = operand
 //
 ////////////////////////////////////////////////////////////////////////
 
-type va_int = int
-type va_bool = bool
-type va_operand = operand
 type va_code = code
 type va_codes = codes
 type va_state = state
-
-type imm8 = uint8
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -33,50 +28,37 @@ function va_get_ok(s:va_state):bool { s.ok }
 //function va_get_reg32(r:x86reg, s:va_state):uint32 requires r in s.regs && IsUInt32(s.regs[r]) { s.regs[r] }
 function va_get_reg32(r:x86reg, s:va_state):uint32 requires r in s.regs { if IsUInt32(s.regs[r]) then s.regs[r] else lower64(s.regs[r]) }
 function va_get_reg64(r:x86reg, s:va_state):uint64 requires r in s.regs { s.regs[r] }
-function va_get_Quadword(r:int, s:va_state):Quadword requires r in s.xmms { s.xmms[r] }
+function va_get_opr_quad(r:int, s:va_state):Quadword requires r in s.xmms { s.xmms[r] }
 function va_get_flags(s:va_state):uint32 { s.flags }
 function va_get_mem(s:va_state):heap { s.heap }
 function va_get_stack(s:va_state):Stack { s.stack }
 
 function va_update_ok(sM:va_state, sK:va_state):va_state { sK.(ok := sM.ok) }
-function va_modify_reg32(r:x86reg, sM:va_state, sK:va_state):va_state
-    requires r in sM.regs
-{ sK.(regs := sK.regs[r := sM.regs[r]]) }
 function va_update_reg64(r:x86reg, sM:va_state, sK:va_state):va_state
     requires r in sM.regs
 { sK.(regs := sK.regs[r := sM.regs[r]]) }
-function va_modify_Quadword(r:int, sM:va_state, sK:va_state):va_state
+function modify_Quadword(r:int, sM:va_state, sK:va_state):va_state
     requires r in sM.xmms
 { sK.(xmms := sK.xmms[r := sM.xmms[r]]) }
 function va_update_mem(sM:va_state, sK:va_state):va_state { sK.(heap := sM.heap) }
 function va_update_flags(sM:va_state, sK:va_state):va_state { sK.(flags := sM.flags) }
 function va_update_stack(sM:va_state, sK:va_state):va_state { sK.(stack := sM.stack) }
 
-predicate va_is_src_opr_imm8(o:opr, s:va_state) { o.OConst? && 0 <= o.n < 256 }
-
 type va_value_opr32 = uint32
-type va_operand_opr32 = va_operand
+type va_operand_opr32 = operand
 predicate is_src_opr32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm?) }
 predicate va_is_src_opr32(o:opr, s:va_state) { (o.OConst? && IsUInt32(o.n)) || (o.OReg? && !o.r.X86Xmm? && o.r in s.regs && IsUInt32(s.regs[o.r])) }
 predicate va_is_dst_opr32(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? && o.r in s.regs && IsUInt32(s.regs[o.r]) }
 
 type va_value_opr64 = uint64
-type va_operand_opr64 = va_operand
+type va_operand_opr64 = operand
 predicate va_is_src_opr64(o:opr, s:va_state) { o.OConst? || (o.OReg? && !o.r.X86Xmm?) }
 predicate va_is_dst_opr64(o:opr, s:va_state) { o.OReg? && !o.r.X86Xmm? }
 
 type va_value_opr_quad  = Quadword
-type va_operand_opr_quad = va_operand
+type va_operand_opr_quad = operand
 predicate va_is_src_opr_quad(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
 predicate va_is_dst_opr_quad(o:opr, s:va_state) { o.OReg? && o.r.X86Xmm? && 0 <= o.r.xmm <= 7 }
-
-type va_value_opr_imm8 = imm8
-type va_operand_opr_imm8 = va_operand
-function va_eval_opr_imm8(s:va_state, o:opr):uint32
-    requires va_is_src_opr_imm8(o, s);
-{
-    o.n
-}
 
 function va_eval_opr32(s:va_state, o:opr):uint32
     requires is_src_opr32(o, s);
@@ -126,7 +108,7 @@ function va_update_operand(o:opr, sM:va_state, sK:va_state):va_state
     requires o.r in sM.regs;
     requires o.r.X86Xmm? ==> o.r.xmm in sM.xmms;
 {
-    if o.r.X86Xmm? then va_modify_Quadword(o.r.xmm, sM, sK) else va_update_reg64(o.r, sM, sK)
+    if o.r.X86Xmm? then modify_Quadword(o.r.xmm, sM, sK) else va_update_reg64(o.r, sM, sK)
 }
 
 predicate va_state_eq(s0:va_state, s1:va_state)
@@ -180,17 +162,10 @@ lemma va_ins_lemma(b0:code, s0:va_state)
 {
 }
 
-function method va_const_operand(n:uint64):opr { OConst(n) }
-function method va_const_opr_imm8(n:imm8):opr { OConst(n) }
 function method va_const_opr32(n:uint32):opr { OConst(n) }
 function method va_const_opr64(n:uint64):opr { OConst(n) }
-function method va_op_operand_reg32(r:x86reg):opr { OReg(r) }
 function method va_op_opr32_reg32(r:x86reg):opr { OReg(r) }
-function method va_op_operand_reg64(r:x86reg):opr { OReg(r) }
-function method va_op_opr_reg64(r:x86reg):opr { OReg(r) }
 function method va_op_opr64_reg64(r:x86reg):opr { OReg(r) }
-function method va_op_operand_Quadword(r:int):opr { OReg(X86Xmm(r)) }
-function method va_op_opr_quad_Quadword(r:int):opr { OReg(X86Xmm(r)) }
 function method va_op_cmp_reg32(r:x86reg):opr { OReg(r) }
 function method va_op_cmp_reg64(r:x86reg):opr { OReg(r) }
 

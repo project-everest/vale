@@ -9,9 +9,6 @@ type opr = operand
 //-----------------------------------------------------------------------------
 // Vale Types
 //-----------------------------------------------------------------------------
-type va_int = int
-type va_bool = bool
-type va_operand = operand
 type va_code = code
 type va_codes = codes
 type va_state = state
@@ -81,7 +78,6 @@ lemma va_ins_lemma(b0:code, s0:va_state)
 }
 
 function method fromOperand(o:operand):operand { o }
-function method va_const_operand(n:uint32):operand { OConst(n) }
 function method va_const_opr32(n:uint32):operand { OConst(n) }
 
 function method va_cmp_eq(o1:operand, o2:operand):obool { OCmp(OEq, o1, o2) }
@@ -102,12 +98,9 @@ function method va_get_ifFalse(c:code):code requires c.IfElse? { c.ifFalse }
 function method va_get_whileCond(c:code):obool requires c.While? { c.whileCond }
 function method va_get_whileBody(c:code):code requires c.While? { c.whileBody }
 
-function method va_op_operand_osp():operand { OSP }
 function method va_op_opr32_osp():operand { OSP }
-function method va_op_operand_olr():operand { OLR }
 function method va_op_opr_reg_olr():operand { OLR }
 function method va_op_opr32_olr():operand { OLR }
-function method va_op_operand_reg(r:ARMReg):operand { OReg(r) }
 function method va_op_opr32_reg(r:ARMReg):operand { OReg(r) }
 function method va_op_opr_snd_reg(r:ARMReg):operand { OReg(r) }
 function method va_op_opr_reg_reg(r:ARMReg):operand { OReg(r) }
@@ -174,18 +167,18 @@ function va_update_operand(o:operand, sM:va_state, sK:va_state):va_state
 function method GetProbableReg(o:operand) : ARMReg { if o.OReg? then o.r else R0 }
 
 type va_value_opr32 = uint32
-type va_operand_opr32 = va_operand
+type va_operand_opr32 = operand
 predicate va_is_src_opr32(o:operand, s:va_state) { ValidOperand(o) }
 predicate va_is_dst_opr32(o:operand, s:va_state) { ValidRegOperand(o) }
 
 type reg = uint32
 type va_value_opr_reg = reg
-type va_operand_opr_reg = va_operand
+type va_operand_opr_reg = operand
 predicate va_is_src_opr_reg(o:operand, s:va_state) { ValidRegOperand(o) }
 
 type snd = uint32
 type va_value_opr_snd = snd
-type va_operand_opr_snd = va_operand
+type va_operand_opr_snd = operand
 predicate va_is_src_opr_snd(o:operand, s:va_state) { ValidOperand(o) && o.OReg? }
 
 //predicate va_is_src_operandglobal(g:global, s:va_state) { ValidGlobal(g) }
