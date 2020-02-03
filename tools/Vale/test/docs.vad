@@ -87,6 +87,22 @@ procedure TestAdd()
     Add(ebx, (-30));
 }
 
+procedure TestAddAlias()
+    lets
+        a @= eax; b @= ebx;
+    modifies
+        a; b;
+    requires
+        0 <= a < 99;
+    ensures
+        a == old(a) + 30;
+        b == old(b) - 30;
+{
+    Add(a, 10);
+    Add(a, 20);
+    Add(b, (-30));
+}
+
 procedure AddThree(inout x:reg)
     ensures
         x == old(x + 3);
@@ -391,3 +407,60 @@ procedure P()
     Increment(eax);
     Increment(eax);
 }
+
+type my_bool:Type(0) := bool;
+type nat:Type(0) := int_range(0, _);
+type pos:Type(0) := int_range(1, _);
+type int_map(a:Type(0)):Type(0) := map(int, a);
+
+#verbatim
+ghost method g1<a, b>(x:a, y:b)
+{
+}
+#endverbatim
+
+ghost procedure g1#[a:Type(0), b:Type(0)](ghost x:a, ghost y:b)
+//    returns(ghost r:a, ghost s:b)
+    extern;
+
+ghost procedure g2()
+{
+//    let (r, s) := g1(10, true); // TODO
+    g1(10, true);
+    g1#[int, bool](10, true);
+}
+
+ghost procedure cast_test(ghost i:int)
+    requires
+        i >= 0;
+{
+    let n:nat := #nat(i);
+}
+
+procedure IncrTwo(inout dst1:reg, inout dst2:reg)
+    requires
+        dst1 < 100;
+        dst2 < 100;
+        @dst1 != @dst2;
+    ensures
+        dst1 == old(dst1) + 1;
+        dst2 == old(dst2) + 1;
+{
+    Add(dst1, 1);
+    Add(dst2, 1);
+}
+
+/* TODO
+procedure Aliases()
+    modifies
+        eax; ebx;
+    ensures
+        ebx == old(eax) + 2;
+{
+    let x @= eax;
+    Add(x, 1); // add 1 to eax
+    Mov(ebx, x); // move eax into ebx
+    let x @= ebx;
+    Add(x, 1); // add 1 to ebx
+}
+*/

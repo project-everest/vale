@@ -46,12 +46,11 @@
 
 ::
 
-    /*
-    binary operators:
-      left-associative
-      (but ==> is right-associative)
-
-      highest precedence
+    //binary operators:
+    //  left-associative
+    //  but ==> is right-associative
+    //
+    //highest precedence
       /|\
        | * / %
        | + -
@@ -61,8 +60,7 @@
        | <== ==>
        | <==>
       \|/
-      lowest precedence
-    */
+    //lowest precedence
 
 ::
 

@@ -1,4 +1,4 @@
-.. highlight:: none
+.. highlight:: vale
 
 Using the Vale tool
 ===================

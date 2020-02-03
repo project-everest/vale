@@ -3,7 +3,7 @@ To build the documentation, type:
 ```
 pip install sphinx_rtd_theme
 cd doc/rtd
-sphinx-build.exe -M html . ../../obj/_build
+sphinx-build.exe -M html . ../../obj/_build -E -a
 ```
 
 The documentation will be in `obj/_build/html/*`.

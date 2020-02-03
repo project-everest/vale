@@ -1,4 +1,4 @@
-.. highlight:: none
+.. highlight:: vale
 
 Introduction
 ============
@@ -25,3 +25,6 @@ Since these definitions and lemmas vary between frameworks,
 Vale program written for one verification framework may not be verifiable
 by another framework.
 
+For source code, binary releases, installation instructions,
+and links to academic papers about Vale,
+see the `Vale GitHub repository <https://github.com/project-everest/vale>`_.

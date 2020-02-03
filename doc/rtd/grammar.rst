@@ -1,4 +1,4 @@
-.. highlight:: none
+.. highlight:: vale
 
 Complete Vale syntax
 ====================
@@ -89,6 +89,9 @@ Grammar
 +----------------------------------------------------------+-----------------------------------------------------------+
 | .. include:: grammar_otyps.rst                           |                                                           |
 +----------------------------------------------------------+-----------------------------------------------------------+
+| TYPE_ARGS                                                |                                                           |
+|   | ``#[`` TYPE ``,`` ... ``,`` TYPE ``]``               |                                                           |
++----------------------------------------------------------+-----------------------------------------------------------+
 | .. include:: grammar_type.rst                            | .. include:: example_type.rst                             |
 +----------------------------------------------------------+-----------------------------------------------------------+
 | KIND                                                     |                                                           |
@@ -149,6 +152,7 @@ Currently, attributes are only supported in the following places:
 |   | ``include`` ATTRIBUTES ``"`` **filename** ``"``      |                                                           |
 | DECL                                                     |                                                           |
 |   | ...                                                  |                                                           |
+|   | ``type`` **T** ... ATTRIBUTES extern ``;``           |                                                           |
 |   | ``var`` **x** ``:`` TYPE ATTRIBUTES ``;``            |                                                           |
 |   | ``procedure`` **P** ``(`` PFORMALS ``)``             |                                                           |
 |   |     ATTRIBUTES                                       |                                                           |
@@ -192,3 +196,7 @@ Currently, the following attributes are supported:
 
   * {:state f(EXP, ..., EXP)},
     indicating that the variable **x** corresponds to a field f(EXP, ..., EXP) of the state type.
+
+* on types:
+
+  * {:primitive}, declaring a primitive type like ``state``, ``string``, or ``list``

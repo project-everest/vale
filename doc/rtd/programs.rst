@@ -1,9 +1,11 @@
-.. highlight:: none
+.. highlight:: vale
 
-Vale programs
-=============
+.. _programs:
 
-A vale program consists of a series of top-level declarations,
+Programs and procedures
+=======================
+
+A Vale program consists of a series of top-level declarations,
 including global variable declarations and procedure declarations.
 For example, the following Vale program defines global variables and procedures to
 represent simple assembly language code on a hypothetical x86-like architecture:
@@ -626,3 +628,31 @@ is true if ``0 <= eax`` is true.
 (Without the ``0 <= eax`` condition, the call to ``lemma_cube_positive``
 would fail because ``eax`` might be negative.)
 
+Global variable aliases
+-----------------------
+
+Procedures can use ``lets`` declarations to introduce local aliases (alternate names)
+for global variables:
+
+::
+
+    procedure TestAddAlias()
+        lets
+            a @= eax; b @= ebx;
+        modifies
+            a; b;
+        requires
+            0 <= a < 99;
+        ensures
+            a == old(a) + 30;
+            b == old(b) - 30;
+    {
+        Add(a, 10);
+        Add(a, 20);
+        Add(b, (-30));
+    }
+
+In contrast to ``lets a := eax``, which introduces an immutable ghost variable ``a``
+holding a copy of ``eax``'s initial value,
+``lets a @= eax`` introduces a mutable alias for ``eax``.
+``a`` can be used interchangeably with ``eax`` in the specification and body of the procedure ``TestAddAlias``.

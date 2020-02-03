@@ -1,4 +1,4 @@
-.. highlight:: none
+.. highlight:: vale
 
 .. _interface:
 
@@ -192,4 +192,11 @@ A special operand type **O** = ``cmp`` is used for conditionals in if/else and w
   * op_O_f(...):O -- build operand O from f or f(...)
   * get_f(..., s:state):t -- get field f or f(...) from state s
   * update_f(..., sM:state, sK:state):state -- return sK updated with a copy of sM's field f or f(...)
+
+* Functions and procedures for operand constructors P(...params...)
+
+  * opr_code_P(...non-ghost params...):operand_type -- construct operand for P
+  * opr_lemma_P(state, ...params...):operand_type (Dafny only) -- lemma called for each occurrence of P
+  * P_lemma(...params as ghost...) (FStar only) -- Vale procedure (no ``va_`` prefix) called for each occurrence of P
+
 
