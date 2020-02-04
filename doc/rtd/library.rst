@@ -1,5 +1,6 @@
 .. highlight:: vale
 
+
 .. _interface:
 
 Interface with verification framework
@@ -22,6 +23,7 @@ These names are unmangled when translating from the Vale source language
 to the verification language:
 the names ``bool`` and ``real`` in Vale source code are translated into the names
 ``bool`` and ``real`` in the verification language, not ``va_bool`` and ``va_real``.
+
 
 Vale-generated code
 -------------------
@@ -49,7 +51,7 @@ passing a register named eax as an argument:
     procedure Increment(inout x:reg)
         ensures
             x == old(x) + 1;
-    { ... }
+        extern;
 
     procedure P()
         modifies
@@ -122,6 +124,99 @@ The details of the generated code may vary depending on the exact version of the
 (To see examples of up-to-do date generated code,
 try running the Vale tool and examining the generated code.)
 
+
+.. _instructions:
+
+Instructions
+------------
+
+For the example procedure ``P`` from the previous section, Vale generates
+functions ``va_code_P`` and ``va_lemma_P`` automatically.
+The increment procedure ``Increment``, however, is declared ``extern``,
+and Vale does not generate code for ``extern`` declarations.
+It's possible to write the Dafny (or FStar)
+``va_code_Increment`` and ``va_lemma_Increment`` functions manually,
+but this is inconvenient.
+
+The ``{:instruction ...}`` attribute provides a more convenient approach
+than ``extern`` to implement ``Increment`` and other primitive instructions:
+
+::
+
+    procedure Increment(inout x:reg)
+        {:instruction Ins(InsAdd(x, OConst(1)))}
+        ensures
+            x == old(x) + 1;
+    {
+        // empty body in this example,
+        // but can contain additional ghost code if needed
+    }
+
+Vale generates a ``va_code_Increment`` function containing the expression
+from the ``{:instruction ...}`` attribute:
+
+::
+
+  function method{:opaque} va_code_Increment(x:va_operand_reg):va_code
+  {
+    Ins(InsAdd(x, OConst(1)))
+  }
+
+  lemma va_lemma_Increment(va_b0:va_codes, va_s0:va_state, va_sN:va_state, x:va_operand_reg)
+    returns (va_bM:va_codes, va_sM:va_state)
+    requires va_require(va_b0, va_code_Increment(x), va_s0, va_sN)
+    requires va_is_dst_reg(x, va_s0)
+    ensures  va_ensure(va_b0, va_bM, va_s0, va_sM, va_sN)
+    requires va_get_ok(va_s0)
+    ensures  va_get_ok(va_sM)
+    ensures  va_eval_reg(va_sM, x) == va_eval_reg(va_s0, x) + 1
+    ensures  va_state_eq(va_sM, va_update_ok(va_sM, va_update_operand_reg(x, va_sM, va_s0)))
+  {
+    reveal_va_code_Increment();
+    var va_old_s:va_state := va_s0;
+    va_ins_lemma(Ins(InsAdd(x, OConst(1))), va_s0);
+    ghost var va_ltmp1, va_cM:va_code, va_ltmp2 := va_lemma_block(va_b0, va_s0, va_sN);
+    va_sM := va_ltmp1;
+    va_bM := va_ltmp2;
+  }
+
+Vale also generates a ``va_lemma_Increment`` that reveals the definition of
+``va_code_Increment`` and calls a user-supplied lemma ``va_ins_lemma``,
+as shown above.
+If these are insufficient to prove ``va_lemma_Increment``'s postconditions,
+the body of the Vale ``P`` procedure can also contain additional ghost code,
+such as calls to lemmas, as hints to complete the proof.
+
+For the definitions above to succeed, the programmer must manually supply
+definitions of instructions and their semantics:
+
+::
+
+    // Manually-written Dafny code:
+    datatype register = EAX | EBX
+    datatype operand = OReg(r:register) | OConst(n:int)
+    datatype ins =
+      InsAdd(dstAdd:register, srcAdd:operand)
+    | InsSub(dstAdd:register, srcAdd:operand)
+    datatype code =
+      Ins(ins:ins)
+    | Block(block:codes)
+    | IfElse(ifCond:ocmp, ifTrue:code, ifFalse:code)
+    | While(whileCond:ocmp, whileBody:code)
+    datatype codes = CNil() | CCons(hd:code, tl:codes)
+    ...
+    predicate eval_ins(ins:ins, s0:state, sN:state)
+    {
+        ...
+            match ins
+                case InsAdd(dst, src) =>
+                    sN == update_reg(dst, s0, eval_reg(dst, s0) + eval_opr(src, s0))
+                ...
+    }
+    type va_operand_reg = register
+    ...
+
+
 Vale libraries
 --------------
 
@@ -193,10 +288,14 @@ A special operand type **O** = ``cmp`` is used for conditionals in if/else and w
   * get_f(..., s:state):t -- get field f or f(...) from state s
   * update_f(..., sM:state, sK:state):state -- return sK updated with a copy of sM's field f or f(...)
 
-* Functions and procedures for operand constructors P(...params...)
+* Functions and procedures for operand constructors P(...params...):
 
   * opr_code_P(...non-ghost params...):operand_type -- construct operand for P
   * opr_lemma_P(state, ...params...):operand_type (Dafny only) -- lemma called for each occurrence of P
   * P_lemma(...params as ghost...) (FStar only) -- Vale procedure (no ``va_`` prefix) called for each occurrence of P
 
+* Functions for overloaded collection operators with name ``x`` (currently FStar only):
 
+  * va_subscript_x(c:container, k:key):value
+  * va_update_x(c:container, k:key, v:value):container
+  * va_contains_x(c:container, k:key):bool

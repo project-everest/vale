@@ -54,7 +54,7 @@ let rec string_of_typ (t:typ):string =
   | TApply (x, ts) -> (sid x) + "<" + (String.concat ", " (List.map string_of_typ ts)) + ">"
   | TBool _ -> "bool"
   | TInt (b1, b2) -> "int"
-  | TFun (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") " + (string_of_typ t)
+  | TFun (ts, t) -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ") -> " + (string_of_typ t)
   | TTuple ts -> "(" + (String.concat ", " (List.map string_of_typ ts)) + ")"
   | TDependent x -> sid x
   | TVar _ -> internalErr "string_of_typ: TVar"

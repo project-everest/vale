@@ -29,13 +29,12 @@
     let s1:seq(int) := f();
     let s2:seq(int) := s1[3 := "hi"];
     assert s2[3] == "hi";
-    // Dafny only; like Dafny "10 in m":
+    // assert that map m has key 10
     assert m?[10];
 
 ::
 
     old(x)
-    old[snapshotOfThis](x)
 
 ::
 

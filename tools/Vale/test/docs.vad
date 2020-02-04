@@ -390,10 +390,10 @@ procedure ArithmeticSum3(ghost n:int)
 }
 
 procedure Increment(inout x:reg)
+    {:instruction Ins(InsAdd(x, OConst(1)))}
     ensures
         x == old(x) + 1;
 {
-    Add(x, 1);
 }
 
 procedure P()
@@ -462,5 +462,133 @@ procedure Aliases()
     Mov(ebx, x); // move eax into ebx
     let x @= ebx;
     Add(x, 1); // add 1 to ebx
+}
+*/
+
+#verbatim
+const seven:int := 7
+
+function sum3(x:int, y:int, z:int):int {x + y + z}
+
+function sqr(x:int):(z:int)
+    ensures
+        z >= 0;
+{
+    lemma_square(x);
+    x * x
+}
+
+function id<a>(x:a):a {x}
+#endverbatim
+
+const seven:int extern;
+
+function sum3(x:int, y:int, z:int):int extern;
+
+function sqr(x:int):(z:int)
+    ensures
+        z >= 0;
+    extern;
+
+function id#[a:Type(0)](x:a):a extern;
+
+ghost procedure test_functions()
+{
+    assert seven == 7;
+
+    assert sum3(10, 20, 30) == 60;
+    assert sqr(10) == 100;
+    assert id(10) == 10;
+    assert id#[int](10) == 10;
+
+    let f:fun(int, int, int) -> int := sum3;
+    assert f(10, 20, 30) == 60;
+
+    let g:fun(int) -> int := id;
+    assert g(10) == 10;
+}
+
+#verbatim
+function{:opaque} opaque_sum(x:int, y:int):int {x + y}
+#endverbatim
+
+function opaque_sum(x:int, y:int):int extern;
+
+ghost procedure test_opaque()
+{
+    reveal opaque_sum;
+    assert opaque_sum(10, 20) == 30;
+}
+
+#token #+# precedence +
+function operator(#+#) (a:int, b:int):int := opaque_sum;
+
+ghost procedure test_opaque2()
+{
+    reveal opaque_sum;
+    assert 10 #+# 20 == 30;
+}
+
+#verbatim
+datatype int_pair = Mkint_pair(fst:int, snd:int)
+#endverbatim
+
+type int_pair:Type(0) extern;
+function Mkint_pair(fst:int, snd:int):int_pair extern;
+function operator(.fst) (p:int_pair):int extern;
+function operator(.snd) (p:int_pair):int extern;
+function operator(.fst :=) (p:int_pair, v:int):int_pair extern;
+function operator(.snd :=) (p:int_pair, v:int):int_pair extern;
+
+ghost procedure test_overload()
+{
+    let x := Mkint_pair(10, 20);
+    assert x.fst == 10;
+    assert x.snd == 20;
+    let x2 := x.(fst := 11);
+    assert x2.fst == 11;
+    assert x2.snd == 20;
+}
+
+#verbatim
+function{:opaque} f1(x:int, y:int):bool {x < y}
+function{:opaque} f2(x:int, y:int):bool {x <= y}
+lemma lemma_f1_f2(x:int, y:int)
+    requires f1(x, y)
+    ensures  f2(x, y)
+{
+    reveal_f1();
+    reveal_f2();
+}
+#endverbatim
+
+function f1(x:int, y:int):bool extern;
+function f2(x:int, y:int):bool extern;
+
+ghost procedure lemma_f1_f2(ghost x:int, ghost y:int)
+    requires
+        f1(x, y);
+    ensures
+        f2(x, y);
+    extern;
+
+ghost procedure test_forall()
+    ensures
+        forall(x:int, y:int){f1(x, y)}{f2(x, y)} f1(x, y) ==> f2(x, y);
+{
+    forall (x:int, y:int){f2(x, y)}
+        f1(x, y) implies f2(x, y) by
+    {
+        lemma_f1_f2(x, y);
+    }
+}
+
+/* TODO:
+ghost procedure test_exists()
+    requires
+        exists(x:int, y:int){f1(x, y)} f1(x, y);
+{
+    let exists (x:int, y:int){f1(x, y)} f1(x, y);
+    lemma_f1_f2(x, y);
 }
 */

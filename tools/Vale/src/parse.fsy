@@ -316,7 +316,7 @@ Stmt
     {
       stmtAt $1 (SForall ($3, $5, $6, $8, $11))
     }
-  | EXISTS LPAREN Formals RPAREN Triggers Exp SEMI { stmtAt $1 (SExists ($3, $5, $6)) }
+  | LET EXISTS LPAREN Formals RPAREN Triggers Exp SEMI { stmtAt $1 (SExists ($4, $6, $7)) }
   | INVARIANT Exp SEMI { stmtAt $1 (SAssert ({assert_attrs_default with is_inv = true}, $2)) }
   | ASSUME Exp SEMI { stmtAt $1 (SAssume $2) }
   | ASSERT Exp SEMI { stmtAt $1 (SAssert (assert_attrs_default, $2)) }

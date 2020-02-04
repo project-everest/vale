@@ -21,7 +21,6 @@ EXP
   | EXP ``.`` ``(`` **D** ``:=`` EXP ``)``
 
   | ``old`` ``(`` EXP ``)``
-  | ``old`` ``[`` EXP ``]`` ``(`` EXP ``)``
 
   | seq ``(`` EXP ``,`` ... ``,`` EXP ``)``
   | set ``(`` EXP ``,`` ... ``,`` EXP ``)``
@@ -43,9 +42,9 @@ EXP
 
   | ``if`` EXP ``then`` EXP ``else`` EXP
   | ``let`` FORMAL ``:=`` EXP ``in`` EXP
+  | ``fun``    ``(`` FORMALS ``)`` EXP
 
   | ``forall`` ``(`` FORMALS ``)`` TRIGGERS EXP
   | ``exists`` ``(`` FORMALS ``)`` TRIGGERS EXP
-  | ``fun``    ``(`` FORMALS ``)`` TRIGGERS EXP
 
   | ``(`` EXP ``)``

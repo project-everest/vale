@@ -4,3 +4,7 @@ lemma lemma_square_plus_minus_half(x:int)
 {
 }
 
+lemma lemma_square(x:int)
+    ensures x * x >= 0
+{
+}

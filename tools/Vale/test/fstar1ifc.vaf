@@ -282,3 +282,71 @@ procedure Ghosts(ghost g1:int) returns(ghost g2:int)
     g2 := g1 + 1;
 }
 
+type string:Type(0) {:primitive} extern;
+const _"`%prop":string extern;
+
+procedure StringNames()
+{
+    let s:string := _"`%prop";
+}
+
+#verbatim
+//type int_pair = | IntPair : fst:int -> snd:int -> int_pair
+type int_pair = {fst:int; snd:int}
+let seq = Seq.seq
+let length = Seq.length
+
+let va_subscript_seq (#a:Type0) (s:seq a) (i:nat) : Pure a
+  (requires i < length s)
+  (ensures fun _ -> True)
+  =
+  Seq.index s i
+
+let va_update_seq (#a:Type0) (s:seq a) (i:nat) (v:a) : Pure (seq a)
+  (requires i < length s)
+  (ensures fun _ -> True)
+  =
+  Seq.upd s i v
+
+let va_contains_map (#a:eqtype) (#b:Type0) (m:map a b) (k:a) : bool =
+  Map.contains m k
+
+let va_subscript_map = Map.sel
+#endverbatim
+
+type nat:Type(0) := int_range(0, _);
+
+type int_pair:Type(0) extern;
+function Mkint_pair(fst:int, snd:int):int_pair extern;
+function operator(.fst) (p:int_pair):int extern;
+function operator(.snd) (p:int_pair):int extern;
+function operator(.fst :=) (p:int_pair, v:int):int_pair extern;
+function operator(.snd :=) (p:int_pair, v:int):int_pair extern;
+
+type seq(a:Type(0)):Type(0) extern;
+type map(a:Type(0), b:Type(0)):Type(0) extern;
+
+function length#[a:Type(0)](s:seq(a)):nat extern;
+
+function operator([]) #[a:Type(0)](s:seq(a), i:int):a extern;
+function operator([ := ]) #[a:Type(0)](s:seq(a), i:int, v:a):seq(a) extern;
+function operator([]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):b extern;
+function operator([ := ]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a, v:b):map(a, b) extern;
+function operator(?[]) #[a:Type(0), b:Type(0)](m:map(a, b), key:a):bool extern;
+
+ghost procedure test_overload(ghost s:seq(nat), ghost m:map(int, nat))
+    requires
+        length(s) > 3;
+{
+    let x := Mkint_pair(10, 20);
+    assert x.fst == 10;
+    assert x.snd == 20;
+//    let x2 := x.(fst := 11);
+//    assert x2.fst == 11;
+//    assert x2.snd == 20;
+
+    let s2:seq(nat) := s[3 := 30];
+    assert s2[3] == 30;
+
+    assert m?[100] ==> m[100] >= 0;
+}

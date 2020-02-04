@@ -1,5 +1,8 @@
 .. highlight:: vale
 
+
+.. _syntax:
+
 Complete Vale syntax
 ====================
 
@@ -100,6 +103,7 @@ Grammar
 |   | ``Dependent`` ``(`` **t** ``)``                      |                                                           |
 +----------------------------------------------------------+-----------------------------------------------------------+
 
+
 .. _verbatim:
 
 Verbatim blocks
@@ -136,6 +140,43 @@ For example, verbatim blocks may be used to declare types, functions,
 and lemmas in the underlying verification languages so that these
 declarations may be used inside Vale procedures.
 
+For FStar code, verbatim blocks can be written to the interface file (``.fsti``)
+via ``#verbatim{:interface}``,
+the implementation file (``.fst``)
+via ``#verbatim`` or ``#verbatim{:implementation}``
+or both via ``#verbatim{:interface}{:implementation}``.
+
+
+.. _lexical:
+
+Lexical structure
+-----------------
+
+Single-line comments begin with ``//``.
+Longer comments can be placed in ``/*`` ... ``*/``.
+Comments can be nested inside each other: ``/* a /* b */ c */`` is a valid comment.
+Whitespace includes spaces, newlines, and carriage returns; tab characters are not allowed.
+
+Variable names can include letters, ``_`` characters, ``'`` characters after the first character,
+and digits after the first character.
+There are special function names ``operator(+)``, ``operator(-)``, etc. to represent operators
+in function declarations (see :ref:`functions`).
+
+Vale programs can define new operator tokens
+out of the characters
+``!`` ``%`` ``+`` ``-`` ``&`` ``^`` ``|`` ``<`` ``>`` ``=`` ``.`` ``#`` ``:`` ``$`` ``?`` ````` ``~`` ``@`` ``\`` ``/``
+using the ``#token`` directive:
+
+::
+
+    #token +. precedence +
+
+``#token`` declares a new token (``+.`` in the example above)
+that is parsed with the same precedence and associativity as an existing token
+(``+`` in the example above).
+This token can then be used for a custom operator, as described in :ref:`custom`.
+
+
 .. _attributes:
 
 Attributes
@@ -143,7 +184,8 @@ Attributes
 
 Some elements of the Vale grammar may be annotated with *attributes*
 that supply additional information to Vale or to the verification language.
-Currently, attributes are only supported in the following places:
+Currently, attributes are only supported in the following places and
+on verbatim blocks:
 
 +----------------------------------------------------------+-----------------------------------------------------------+
 | Grammar (attributes)                                     | Examples and notes                                        |
@@ -155,8 +197,9 @@ Currently, attributes are only supported in the following places:
 |   | ``type`` **T** ... ATTRIBUTES extern ``;``           |                                                           |
 |   | ``var`` **x** ``:`` TYPE ATTRIBUTES ``;``            |                                                           |
 |   | ``procedure`` **P** ``(`` PFORMALS ``)``             |                                                           |
-|   |     ATTRIBUTES                                       |                                                           |
 |   |     *[* ``returns`` ... *]* ...                      |                                                           |
+|   |     ATTRIBUTES                                       |                                                           |
+|   |     SPECS                                            |                                                           |
 |   |     ...                                              |                                                           |
 |   | ...                                                  |                                                           |
 +----------------------------------------------------------+-----------------------------------------------------------+
@@ -166,12 +209,15 @@ Currently, attributes are only supported in the following places:
 |   ``{:`` **x** EXP ``,`` ... ``,`` EXP ``}``             |                                                           |
 +----------------------------------------------------------+-----------------------------------------------------------+
 
+Attributes are not checked by Vale's type checker, so they can contain arbitrary expressions.
+
 Currently, the following attributes are supported:
 
 * on include directives:
 
   * {:from x};
     filename is interpreted relative to the path alias x rather than to the current directory
+    (see :ref:`includes` and :ref:`tool`)
   * {:verbatim} (Dafny only):
     include a file written directly in the underlying verification language,
     rather than including another Vale file
@@ -186,6 +232,7 @@ Currently, the following attributes are supported:
     set or increase the time limit for this procedure
   * {:instruction EXP},
     indicating a primitive procedure that is implemented with the code value specified by the expression EXP
+    (see :ref:`instructions`)
   * {:recursive} and {:decrease EXP}, indicating that a procedure may call itself,
     optionally specifying a decreases clause to prove the recursion's termination
   * {:operand}, indicating an operand constructor
@@ -200,3 +247,100 @@ Currently, the following attributes are supported:
 * on types:
 
   * {:primitive}, declaring a primitive type like ``state``, ``string``, or ``list``
+
+* on verbatim blocks:
+
+  * {:interface} and {:implementation} (FStar only) -- see :ref:`verbatim`
+
+
+Coding conventions
+------------------
+
+The following conventions are recommended (not required) for Vale programs:
+
+* Names
+
+  * Names of non-ghost procedures (including instructions) start with an upper-case letter.
+    Names of ghost procedures start with a lower-case letter.
+    This helps to distinguish ghost and non-ghost procedure calls.
+    Note that for FStar, ghost procedures *must* start with a lower-case letter;
+    FStar will reject upper-case ghost procedure names.
+  * Names of functions and constants may start with lower-case or upper-case letters,
+    depending on the underlying verification framework conventions.
+    FStar and Dafny typically use upper-case for datatype constructor functions
+    and lower-case for other functions.
+  * Names of types and global variables start with lower-case letters.
+  * Names of operand types start with a lower-case letter, except for operand constructors,
+    which start with an upper-case letter.
+  * Names of type parameters and local variables should start with lower-case letters.
+    In FStar, this is required.
+  * Lower-case names use underscores to separate words: ``my_name``.
+    Upper-case names may use underscores: ``MyName`` or ``My_Name`` or ``My_name``.
+
+* Formatting
+
+  * Indentation is 4 spaces.
+  * ``//`` is used for single-line comments, ``/* ... */`` for multi-line comments.
+  * If a function's parameters or procedure's parameters are too long to fit on a single line,
+    the parameters all go on one or more separate lines and are double-indented (8 spaces).
+  * Statements and specifications that are too long for a single line are broken into multiple
+    lines, with the extra lines indented 4 spaces more than the first line.
+  * Binary operators have spaces around them: ``x * y``, ``x / y``, ``x % y``, ``x + y``, ..., ``x <==> y``.
+    Colons do not: ``x:int``.  Commas have spaces after them: ``(x, y, z)``..
+  * ``if``, ``while``, ``forall``, and ``let exists`` statements have a space before parentheses:
+    ``if (...)``, ``while (...)``, ``forall (...)``, ``let exists (...)``.
+    In other places, there is no space before parentheses: ``my_lemma(...)``, ``my_function(...)``.
+  * Curly brackets ``{`` and ``}``, for multi-line blocks of statements, go on their own line.
+    This is largely because ``procedure`` and ``while`` loops have specifications (``requires``, ``invariant``, etc.)
+    that get in the way of a ``{`` appearing on the same line as the ``procedure`` or ``while``
+    keyword.
+  * Each procedure attribute gets its own line.
+  * Specification keywords like ``requires``, ``ensures``, ``modifies``, etc. are single-indented
+    relative to a procedure or ``while`` loop.
+    The specification expressions appear on a separate line from the specification keywords
+    and are indented 4 spaces more than the keywords.
+
+Example:
+
+::
+
+    // This is a short procedure
+    procedure ShortProc(ghost x:int, ghost y:int)
+        modifies
+            eax;
+    {
+        Add(eax, 1);
+    }
+
+    /*
+    This is a longer procedure.
+    Its parameters don't fit on a line, so they are indented 8 spaces.
+    */
+    procedure MyLongProcedure(
+            inline b:bool,
+            inout dst:reg, in src:reg,
+            ghost apple_banana:bool, ghost cat_dog:int, ghost earth_fire:int)
+        {:public}
+        {:timeLimit 10}
+        modifies
+            eax; ebx;
+        requires
+            10 <= eax < 20;
+            ebx == (if apple_banana then cat_dog else
+                7 * (earth_fire + src));
+    {
+        inline if (b)
+        {
+            while (eax < 100)
+                invariant
+                    0 <= eax <= 100;
+                decreases
+                    100 - eax;
+            {
+                Add(eax, 1);
+                MyOtherLongProcedure(b, dst, src, apple_banana, cat_dog,
+                    7 * (earth_fire + src), eax, ebx);
+                my_lemma(cat_dog);
+            }
+        }
+    }

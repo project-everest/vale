@@ -1,5 +1,6 @@
 .. highlight:: vale
 
+
 .. _programs:
 
 Programs and procedures
@@ -50,6 +51,9 @@ increments register ``eax``; the ``extern`` keyword
 indicates that the procedure's body is defined elsewhere.
 The body of the ``Test`` procedure represents assembly language code that calls ``IncrEax`` twice,
 adding 2 to ``eax``.
+
+
+.. _procedures:
 
 Procedures
 ----------
@@ -119,6 +123,7 @@ For this, ``while`` loops need to specify an expression that decreases towards
 some lower bound, such as 0.  This expression must strictly decrease in each loop iteration.
 In the example above, ``100 - eax`` decreases in each iteration, since ``eax`` increases in each iteration.
 If termination isn't required, the while loop can specify ``decreases *;``, which allows infinite loops.
+
 
 Macros and instructions
 -----------------------
@@ -199,6 +204,7 @@ so that ``TestThree``'s body is equivalent to:
     Add(eax, 2);
     Add(ebx, 1);
     Add(ebx, 2);
+
 
 Inline parameters and recursive macros
 --------------------------------------
@@ -304,6 +310,7 @@ this has the effect of generating a long sequence of unrolled instructions:
 (Note that recursive procedures require an attribute ``{:recursive}`` to call themselves;
 without this, Vale would not consider the ``Add2N``'s name to be in scope inside ``Add2N``'s body.
 Vale does not support mutually recursive procedures.)
+
 
 Ghost variables and ghost code
 ------------------------------
@@ -423,8 +430,8 @@ Ghost code can also contain:
 * ``assume`` statements
 * ``ghost if`` statements
 * ``calc`` statements
-* ``reveal`` statements
-* ``forall`` and ``exists`` statements
+* ``reveal`` statements (see :ref:`functions`)
+* ``forall`` and ``exists`` statements (see :ref:`quantifiers`)
 
 *Ghost procedures* can only contain ghost code.
 Although they can read global variables, such as ``eax``, they cannot modify global variables.
@@ -459,7 +466,8 @@ This can be used for documentation and diagnostics.
 ``assert`` statements can occassionally act as hint to the underlying verification framework:
 if a proof relies on ``forall (x) ...f(x)...`` expressions for which the verification framework
 needs hints on how to instantiate the quantified variable ``x``,
-``assert f(10)``, for example can serve as a hint to instantiate ``x`` with 10.
+``assert f(10)``, for example can serve as a hint to instantiate ``x`` with 10
+(see :ref:`quantifiers`).
 (Such hints can be abused: if a proof seems to need a long series of
 seemingly arbitrary ``assert`` statements to succeed,
 it's often a sign that the proof needs to be restructured in a clearer way.)
@@ -628,6 +636,7 @@ is true if ``0 <= eax`` is true.
 (Without the ``0 <= eax`` condition, the call to ``lemma_cube_positive``
 would fail because ``eax`` might be negative.)
 
+
 Global variable aliases
 -----------------------
 
@@ -656,3 +665,72 @@ In contrast to ``lets a := eax``, which introduces an immutable ghost variable `
 holding a copy of ``eax``'s initial value,
 ``lets a @= eax`` introduces a mutable alias for ``eax``.
 ``a`` can be used interchangeably with ``eax`` in the specification and body of the procedure ``TestAddAlias``.
+
+
+.. _includes:
+
+Modules and includes
+--------------------
+
+Vale files can ``include`` declarations from other Vale files.
+Suppose, for example, that file ``b.vad`` includes file ``a.vad``:
+
+::
+
+    include "a.vad"
+
+In this case, ``a.vad``'s declarations will appear as ``extern`` declarations to ``b.vad``.
+
+Vale tries to find the file ``a.vad`` in the same directory as ``b.vad``.
+If the files are in different directories, the ``include`` directive can use a path relative to ``b.vad``:
+
+::
+
+    include "../../d/a.vad"
+
+As an alternative to looking for the file relative to ``b.vad``'s directory,
+the ``include`` directive can supply a named *path alias*.
+Vale will then try to find the file relative to the path associated with this alias:
+
+::
+
+    include{:from STDLIB} "d/a.vad"
+
+The path for the alias (e.g. ``STDLIB``) is defined with command-line arguments (see :ref:`attributes` and :ref:`tool`).
+
+When Vale generates Dafny code, the generated code may need to include other Dafny files.
+Rather than using a verbatim block for this (see :ref:`verbatim`),
+the Vale file can use a verbatim include, which is translated into a Dafny include in the generated Dafny code:
+
+::
+
+    include{:verbatim} "vale.dfy"
+    include{:verbatim} "vale64.dfy"
+    include{:verbatim}{:from BASE} "code/lib/util/operations.dfy"
+    include "decls.vad"
+
+Vale code may have to refer to definitions from FStar module,
+which use qualified names like ``FStar.Seq.seq`` or ``X64.Machine_s.state``.
+The current best way to do this is with ``include{:fstar}{:open}``,
+specifying the FStar *module name* (not the filename):
+
+::
+
+    include{:fstar}{:open} "X64.Machine_s"
+    include{:fstar}{:open Sequence} "FStar.Seq"
+    ...
+    const s:state extern; // state refers to X64.Machine_s.state
+    const q:Sequence.seq extern; // Sequence.seq refers to FStar.Seq.seq
+
+Using the ``{:open}`` attribute,
+Vale code refers to FStar names without the module prefix (e.g. without ``X64.Machine_s.``).
+Using the ``{:open x}`` attribute,
+Vale code refers to FStar names with an alternate module prefix ``x`` (e.g. ``Sequence.``).
+
+Every generated FStar file needs a module declaration.
+Rather than using a verbatim block for this (see :ref:`verbatim`),
+the Vale file can use a Vale module declaration:
+
+::
+
+    module A

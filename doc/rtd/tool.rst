@@ -1,5 +1,8 @@
 .. highlight:: vale
 
+
+.. _tool:
+
 Using the Vale tool
 ===================
 
@@ -31,14 +34,14 @@ If no ``-out`` argument is given, code is generated to standard output.
   **[FStar only]** specify the name of the generated .fsti file
 
 **-includeSuffix .vad .dfy**
-  **[Dafny only]** specify that if ``a.vad`` includes ``b.vad``,
-  then the generated ``a.dfy`` file should include ``b.dfy``
+  **[Dafny only]** specify that if ``b.vad`` includes ``a.vad``,
+  then the generated ``b.dfy`` file should include ``a.dfy``
 
 **-include <filename.vad>**
   include another .vad or .vaf file (alternative to using ``include`` directives inside the .vad/.vaf files)
 
 **-sourceFrom x path**
-  let x be an alias to path in ``include`` directives in source files (see :ref:`attributes`)
+  let x be an alias to path in ``include`` directives in source files (see :ref:`attributes` and :ref:`includes`)
 
 **-destFrom x path**
   let x be an alias to path in generated .dfy files
