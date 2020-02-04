@@ -22,7 +22,7 @@ If no ``-out`` argument is given, code is generated to standard output.
   run Dafny directly without generating an intermediate Dafny file
 
 **-fstarText**
-  generate an FStar module (a .fst file and a .fsti file) for Dafny to verify
+  generate an FStar module (a .fst file and a .fsti file) for FStar to verify
 
 **-in <filename.vad>**
   specify one or more input .vad or .vaf files
