@@ -9,7 +9,6 @@ open Transform
 open Microsoft.FSharp.Math
 open System.Numerics
 
-let concise_lemmas = ref true;
 let quick_mods = ref true;
 let precise_opaque = ref false;
 let reprint_decls_rev = ref ([]:decls)

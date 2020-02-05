@@ -141,9 +141,6 @@ let main (argv) =
         | "-reprintGhostStmts=false" :: l -> reprint_ghost_stmts := false; match_args l
         | "-reprintLoopInvs=false" :: l -> reprint_loop_invs := false; match_args l
         | "-reprintBlankLines=false" :: l -> reprint_blank_lines := false; match_args l
-        | "-conciseLemmas=false" :: l -> concise_lemmas := false; match_args l
-        | "-quickMods" :: l -> quick_mods := true; match_args l
-        | "-quickMods=false" :: l -> quick_mods := false; match_args l
         | "-noLemmas" :: l -> no_lemmas := true ; match_args l
         | "-typecheck" :: l -> do_typecheck := true; match_args l
         | "-typecheck=false" :: l -> do_typecheck := false; match_args l
