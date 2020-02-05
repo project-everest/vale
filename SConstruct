@@ -263,6 +263,9 @@ verify_paths = [
 manual_dependencies = {
 }
 
+ulib_cache = f'{fstar_path}/ulib/.cache'
+external_paths = [ulib_cache]
+
 #
 # Table of special-case sources which requires non-default arguments
 #
@@ -544,6 +547,13 @@ def report_verification_failures():
 #
 ##################################################################################################
 
+def find_external_fstar_file(module):
+  for d in external_paths:
+    for suffix in ('.fsti', '.fst', '.fsti.checked', '.fst.checked'):
+      if os.path.isfile(os.path.join(d, module + suffix)):
+        return File(os.path.join(d, module + suffix.replace('.checked', '')))
+  return None
+
 def add_module_for_file(file):
   global all_modules
   m = file_module_name(file)
@@ -679,12 +689,15 @@ def vaf_dependency_scan(env, file):
   typesfile = File(f'{obj_file_base}.types.vaf')
   for (attrs, inc) in vaf_includes:
     if vale_fstar_re.search(attrs):
-      dumpsourcebase = to_obj_dir(File(f'{fsti_map[inc]}'))
+      if inc in fsti_map:
+        dumpsourcebase = to_obj_dir(File(f'{fsti_map[inc]}'))
+      else:
+        dumpsourcebase = find_external_fstar_file(inc)
+        if dumpsourcebase == None:
+          print_error_exit(f'could not find external F* module {inc} included by {file} in paths {external_paths}')
       dumpsourcefile = File(f'{dumpsourcebase}.dump')
       if is_our_file(dumpsourcebase):
         vaf_dump_deps[str(file)].add(str(dumpsourcefile))
-      else:
-        print_error_exit(f'TODO: not implemented: .vaf includes extern F* file {inc}')
     else:
       f = os.path.join('fstar' if vale_from_base_re.search(attrs) else dirname, inc)
       # if A.vaf includes B.vaf, then manually establish these dependencies:

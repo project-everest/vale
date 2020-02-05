@@ -1,6 +1,6 @@
 include "../../../fstar/code/arch/x64/X64.Vale.InsBasic.vaf"
 include{:fstar}{:open} "TestFStar"
-include{:/*TODO*/fstar}{:open} "FStar.Seq.Base"
+include{:fstar}{:open} "FStar.Seq.Base"
 
 module Test
 
