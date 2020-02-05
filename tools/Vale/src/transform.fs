@@ -12,8 +12,6 @@ open Parse
 open TypeChecker
 open Microsoft.FSharp.Math
 
-let assumeUpdates = ref 0
-
 type id_local = {local_in_param:bool; local_exp:exp; local_typ:typ option} // In parameters are read-only and refer to old(state)
 type id_info =
 | GhostLocal of mutability * typ option
@@ -445,87 +443,6 @@ let resolve_overload_stmt (env:env) (s:stmt):(env * stmt list) =
 
 let resolve_overload_stmts (env:env) (ss:stmt list):stmt list =
   List.concat (snd (List_mapFoldFlip resolve_overload_stmt env ss))
-
-///////////////////////////////////////////////////////////////////////////////
-// Propagate variables through state via assumes (if requested)
-
-(*
-// Currently only works for straight-line code (no if/else or while)
-let assume_updates_stmts (env:env) (args:pformal list) (rets:pformal list) (ss:stmt list) (specs:spec list):stmt list =
-  if !assumeUpdates = 0 then ss else
-  let thisAt i = Reserved ("assume_this_" + (string i)) in
-  let setPrev (i:int) (prev:Map<id, int>) (xs:id list):(int * Map<id, int> * stmt list) =
-    match xs with
-    | [] -> (i, prev, [])
-    | _::_ ->
-        let ss = [SVar (thisAt i, Some tState, XGhost, [], Some (EVar (Reserved "this")))] in
-        let prev = List.fold (fun prev x -> Map.add x i prev) prev xs in
-        (i + 1, prev, ss)
-    in
-  let genAssume (env:env) (prev:Map<id, int>) (x:id):stmt list =
-    match Map.tryFind x env.ids with
-    | None | Some (GhostLocal _) -> []
-    | Some (OperandLocal _ | ThreadLocal _ | ProcLocal _ | InlineLocal _ | StateInfo _) ->
-        let old_state = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar (Reserved "this")]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar (Reserved "this")]) in
-//        let old_x = match Map.tryFind x prev with None -> EOp (Uop UOld, [EVar x]) | Some i -> EOp (Bop BOldAt, [EVar (thisAt i); EVar x]) in
-        let eq = EApply (Reserved "eq_ops", [old_state; EVar (Reserved "this"); (EOp (Uop UToOperand, [EVar x]))]) in
-        [(if !assumeUpdates = 1 then SAssume eq else SAssert (assert_attrs_default, eq))]
-    in
-  let f (env:env, i:int, prev:Map<id, int>, sss:stmt list list) (s:stmt) =
-    let rec r s =
-      match s with
-      | SLoc (loc, s) ->
-          let (i, prev, ss) = r s in
-          (i, prev, List.map (fun s -> SLoc (loc, s)) ss)
-      | (SLabel _ | SGoto _ | SReturn) -> (i, prev, [s])
-      | SVar (x, t, (XGhost | XInline | XOperand | XPhysical | XState _), a, eOpt) ->
-          (i, prev, [s])
-      | SVar (x, t, XAlias _, a, eOpt) ->
-          let (i, prev, ss) = setPrev i prev [x] in
-          (i, prev, [s] @ ss)
-      | SAssign (lhss, e) ->
-        (
-          match skip_loc e with
-          | EApply (x, es) when Map.containsKey x env.procs ->
-              let xfs = Set.toList (free_vars_stmt s) in
-              let ssAssume = List.collect (genAssume env prev) xfs in
-              let (mrets, margs) = match_proc_args (Map.find x env.procs) lhss es in
-              let xrets = List.map (fun ((_, _, g, _, _), (x, _)) -> (EVar x, Out, g)) mrets in
-              let xargs = List.map (fun ((_, _, g, io, _), e) -> (skip_loc e, io, g)) margs in
-              let fx e_io_g =
-                match e_io_g with
-                | (EVar x, (Out | InOut), (XOperand | XAlias _ | XInline)) -> [x]
-                | _ -> []
-                in
-              let xsOut = List.collect fx (xrets @ xargs) in
-              let (i, prev, ssSet) = setPrev i prev xsOut in
-              (i, prev, ssAssume @ [s] @ ssSet)
-          | _ ->
-              let xfs = Set.toList (free_vars_stmt s) in
-              (i, prev, (List.collect (genAssume env prev) xfs) @ [s])
-        )
-      | (SAssume _ | SAssert _ | SForall _ | SExists _) ->
-          let xfs = Set.toList (free_vars_stmt s) in
-          (i, prev, (List.collect (genAssume env prev) xfs) @ [s])
-      | (SIfElse _ | SWhile _) ->
-          // Not yet supported
-          (i, prev, [s])
-      in
-    let (i, prev, ss) = r s in
-    let sss = ss::sss in
-    let env = env_next_stmt env s in
-    (env, i, prev, sss)
-  in
-  let (env, i, prev, sssRev) = List.fold f (env, 0, Map.empty, []) ss in
-  let ss = List.concat (List.rev sssRev) in
-  let enss = List.collect (fun s -> match s with Ensures e -> [s] | _ -> []) specs in
-  let globals = List.collect (fun (x, info) -> match info with ThreadLocal _ -> [x] | _ -> []) (Map.toList env.ids) in
-  let xArgs = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _ (* TODO? InOut | Out *)) -> [x] | _ -> []) args in
-  let xRets = List.collect (fun (x, _, g, io, _) -> match (g, io) with ((XOperand | XAlias _ | XInline), _) -> [x] | _ -> []) rets in
-  let xfs = Set.toList (Set.unionMany [Set.ofList globals; Set.ofList xArgs; Set.ofList xRets; free_vars_specs enss]) in
-  let ensAssume = List.collect (genAssume env prev) xfs in
-  ss @ ensAssume
-*)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Rewrite variables

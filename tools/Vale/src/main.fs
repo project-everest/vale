@@ -132,7 +132,6 @@ let main (argv) =
           match l with
           | [] -> failwith "Specify debug feature name"
           | x :: l -> debug_flags := Set.add x !debug_flags; match_args l
-        | "-assumeUpdates" :: s :: l -> assumeUpdates := System.Int32.Parse(s); match_args l
         | "-break" :: l -> ignore (System.Diagnostics.Debugger.Launch()); match_args l
         | "-codeOnly" :: l -> global_code_only := true; match_args l
         | "-reprint" :: file :: l -> reprint_file := Some file; match_args l
