@@ -142,9 +142,9 @@ AddOption('--KREMLIN-PATH', dest = 'kremlin_path', type = 'string', default = kr
 AddOption('--FSTAR-PATH', dest = 'fstar_path', type = 'string', default = fstar_default_path, action = 'store',
   help = 'Specify the path to F* tool')
 AddOptYesNo('FSTAR-MY-VERSION', dest = 'fstar_my_version', default = False,
-  help = 'Use version of F* that does not necessarily match ./docker/build/config.json[recommended_fstar_version]')
+  help = 'Use version of F* that does not necessarily match .docker/build/config.json[recommended_fstar_version]')
 AddOptYesNo('Z3-MY-VERSION', dest = 'z3_my_version', default = False,
-  help = 'Use version of Z3 that does not necessarily match ./docker/build/config.json[recommended_z3_version]')
+  help = 'Use version of Z3 that does not necessarily match .docker/build/config.json[recommended_z3_version]')
 AddOption('--DARGS', dest = 'dafny_user_args', type = 'string', default=[], action = 'append',
   help='Supply temporary additional arguments to the Dafny compiler')
 AddOption('--FARGS', dest = 'fstar_user_args', type = 'string', default = [], action = 'append',
@@ -448,10 +448,10 @@ def check_fstar_version(config):
     print_error('  ' + line)
   print_error_exit(
     f'Get F* version {version} from https://github.com/FStarLang/FStar,' +
-    f' modify docker/build/config.json[recommended_fstar_version], or use the --FSTAR-MY-VERSION option to override.' +
-    f' (We try to update the F* version frequently; feel free to change docker/build/config.json[recommended_fstar_version]' +
+    f' modify .docker/build/config.json[recommended_fstar_version], or use the --FSTAR-MY-VERSION option to override.' +
+    f' (We try to update the F* version frequently; feel free to change .docker/build/config.json[recommended_fstar_version]' +
     f' to a more recent F* version as long as the build still succeeds with the new version.' +
-    f' We try to maintain the invariant that the build succeeds with the F* version in docker/build/config.json[recommended_fstar_version].)')
+    f' We try to maintain the invariant that the build succeeds with the F* version in .docker/build/config.json[recommended_fstar_version].)')
 
 def check_z3_version(config, z3_exe):
   import subprocess
