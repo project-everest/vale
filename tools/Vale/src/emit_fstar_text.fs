@@ -323,88 +323,34 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
   | SForall (xs, ts, ex, e, ss) ->
     (
       let l = sid (Reserved "forall_lemma") in
-      let gen_aux_lemma l f intro n xs rest =
-        ps.PrintLine ("let " + l + ":" + (let_string_of_formals true xs) + "-> Lemma");
-        ps.Indent ();
-        ps.PrintLine ("(forall " + (let_string_of_formals true rest) + ". " + (string_of_triggers ts));
-        ps.PrintLine ("(" + (string_of_exp ex) + "==>" + (string_of_exp e) + ")" + ")");
-        ps.PrintLine (" = fun " + (let_string_of_formals false xs) + "->" + intro);
-        let p = [ for i in 1 .. n -> "t"+(string i)] in
-        let string_of_p = String.concat " " p in
-        ps.PrintLine (" (fun " + string_of_p + " -> FStar.Classical.move_requires " + "(" + f + " " + (let_string_of_formals false xs) + " " + string_of_p + ")" + ")");
-        ps.Unindent ();
-      in
-      let forall_intro_name l n =
-        if n >3 then l + "_forall_intro_" + (string n) else "FStar.Classical.forall_intro_3"
-      in
-      let rec gen_forall_intro l n =
-        match n with
-        | 0 | 1 | 2 | 3 -> ()
-        | _ ->
-          (
-            gen_forall_intro l (n-1);
-            ps.PrintLine("let " + (forall_intro_name l n));
-            let t = [ for i in 1 .. n -> "(#t"+ (string i) + ":Type)"] in
-            let p = [ for i in 1 .. n -> "a"+ (string i)] in
-            let pt = [ for i in 1 .. n -> "a"+ (string i) + ":" + "t" + (string i)] in
-            let ptp = [ for i in 1 .. n -> "(a"+ (string i) + ":" + "t" + (string i) + ")"] in
-            ps.Indent ();
-            ps.PrintLine((String.concat "" t) + " (#p:(" + (String.concat " -> " pt) + " -> Type0))");
-            ps.PrintLine("($f: (" + (String.concat " -> " pt) + " -> Lemma (p " + (String.concat " " p) +  ")))");
-            ps.PrintLine(":Lemma (forall " + (String.concat " " ptp) + ". p " + (String.concat " " p) + ")");
-            ps.PrintLine("= let g: " + pt.Head + " -> Lemma (forall " + (String.concat " " ptp.Tail) + ".p " + (String.concat " " p) + ")");
-            ps.PrintLine("  = fun " + p.Head + " -> " + (forall_intro_name  l (n-1)) + " (f " + p.Head + ") in");
-            ps.PrintLine("FStar.Classical.forall_intro g in");
-            ps.Unindent ();
-          )
-      in
-      let rec gen_forall l f (xs: formal list) =
-        match xs.Length with
-        | 0 -> ps.PrintLine(l)
-        | 1 -> ps.PrintLine("FStar.Classical.forall_intro " + "(FStar.Classical.move_requires " + f + ")")
-        | 2 -> ps.PrintLine("FStar.Classical.forall_intro_2 " + "(fun x -> FStar.Classical.move_requires " + "(" + f + " x)" + ")")
-        | 3 -> ps.PrintLine("FStar.Classical.forall_intro_3 " + "(fun x y -> FStar.Classical.move_requires " + "(" + f + " x y)" + ")")
-        | _ ->
-         (
-            let aux_name = f + "_1" in
-            let n = xs.Length - 1 in
-            gen_forall_intro l n;
-            gen_aux_lemma aux_name f (forall_intro_name l n) (n-1) [xs.Head] xs.Tail;
-            ps.PrintLine "in";
-            ps.PrintLine("FStar.Classical.forall_intro " + "(FStar.Classical.move_requires " + aux_name + ")");
-          )
-      in
-      let gen_lemma l xs ts ex e ss =
-        let f = l + "_f" in
-        ps.PrintLine ("let " + f + " " + (let_string_of_formals true xs) + " : Lemma ");
-        ps.Indent ();
-        ps.PrintLine ("(requires " + (string_of_exp ex) + ")");
-        ps.PrintLine ("(ensures " + (string_of_exp e) + ")");
-        ps.PrintLine "=";
-        emit_block ps " in " None ss;
-        ps.Unindent ();
-        gen_forall l f xs;
-      in
-      ps.PrintLine ("let " + l + " () : Lemma ");
+      ps.PrintLine ("let " + l + " " + (let_string_of_formals true xs) + " : Lemma");
+      ps.Indent ();
+      ps.PrintLine ("(requires " + (string_of_exp ex) + ")");
+      ps.PrintLine ("(ensures " + (string_of_exp e) + ")");
       match (xs, ts) with
       | ([], []) ->
-          ps.PrintLine ("(requires " + (string_of_exp ex) + ")");
-          ps.PrintLine ("(ensures " + (string_of_exp e) + ")");
           ps.PrintLine "=";
-          emit_block ps (" in " + l + " ();") None ss;
+          ps.Unindent ();
+          let s =
+            match skip_loc ex with
+            | EBool true | ECast (_, EBool true, _) -> l
+            | _ -> "FStar.Classical.move_requires " + l
+            in
+          emit_block ps (" in " + s + " ();") None ss
       | ([], _::_) -> err "trigger only allowed with one or more variables"
-      | (_, _) ->
-        (
-          ps.Indent();
-          ps.PrintLine ("(forall " + (string_of_formals xs) + ". " + (string_of_triggers ts) + "(" + (string_of_exp ex) + "==>" + (string_of_exp e) + ")" + ")");
-          ps.Unindent();
-          ps.PrintLine "=";
-          ps.Indent ();
-          gen_lemma l xs ts ex e ss;
-          ps.Unindent ()
-          ps.PrintLine "in";
-        )
-        ps.PrintLine(l + "();");
+      | (_::_, ts) ->
+          let smtpat es = "SMTPat (" + (string_of_exp es) + ")" in
+          let smtpats es = "[" + String.concat "; " (List.map smtpat es) + "]" in
+          let pats = 
+            match ts with
+            | [] -> err "in fstar mode, forall statements must have at least one trigger"
+            | [es] -> smtpats es
+            | _::_ -> "[SMTPatOr [" + String.concat "; " (List.map smtpats ts) + "]]"
+            in
+          ps.PrintLine pats;
+          ps.PrintLine ("=");
+          ps.Unindent ();
+          emit_block ps " in" None ss
     )
   | SExists (xs, ts, e) -> notImplemented "exists statements"
 and emit_stmts (ps:print_state) (outs:(bool * formal list) option) (stmts:stmt list) =

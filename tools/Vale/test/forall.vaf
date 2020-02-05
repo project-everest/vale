@@ -61,6 +61,7 @@ procedure Calls5()
 procedure Calls6()
 {
     forall (a:int, b:int, c:int, x:int, y:int, z:int)
+        {a + b + c + x + y + z}
         a >= 0 && x >= 0 && y >= 0 && z >= 0 implies
         a + b + c + x + y + z == y + x + z + a + b + c by
     {
@@ -78,14 +79,17 @@ procedure p()
 
 procedure Double(ghost g:int)
 {
-/*TODO: generate correct F* code for this:
+    assert g >= 0 ==> opaque_double(g) >= g by
+    {
+        assume opaque_double(g) == g + g;
+    }
+
     assert g >= 0 implies opaque_double(g) >= g by
     {
         assume opaque_double(g) == g + g;
     }
-*/
 
-    forall (x:int) x >= 0 implies opaque_double(x) >= x by
+    forall (x:int){opaque_double(x)} x >= 0 implies opaque_double(x) >= x by
     {
         assume opaque_double(x) == x + x;
     }
