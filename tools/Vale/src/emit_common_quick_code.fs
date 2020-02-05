@@ -367,7 +367,7 @@ let build_qcode (env:env) (loc:loc) (p:proc_decl) (ss:stmt list):decls =
       fret = tRetQuick;
       fspecs = [];
       fbody = Some (hide_ifs eQuick);
-      fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])] @ attr_no_verify "admit" p.pattrs;
+      fattrs = [(Id "opaque_to_smt", []); (Id "qattr", [])];
     }
     in
   [(loc, DFun fCodes)]

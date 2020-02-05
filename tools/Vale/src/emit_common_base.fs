@@ -13,8 +13,6 @@ let concise_lemmas = ref true;
 let quick_mods = ref true;
 let precise_opaque = ref false;
 let reprint_decls_rev = ref ([]:decls)
-let disable_verify = ref false
-let omit_unverified = ref false
 let no_lemmas = ref false
 
 let require e = Requires (Refined, e)
@@ -61,11 +59,6 @@ let filter_proc_attr (x, es) =
   | Id ("timeLimit" | "timeLimitMultiplier" | "tactic" | "quick" | "recursive" | "decrease" | "public") -> true
   | _ -> false
   in
-
-let attr_no_verify (s:string) (a:attrs):attrs =
-  let verify = attrs_get_bool (Id "verify") false a in
-  if !disable_verify && not verify then [(Id s, [])]
-  else []
 
 let attr_public (a:attrs) : attrs =
   let isPublic = attrs_get_bool (Id "public") false a in

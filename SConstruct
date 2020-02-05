@@ -155,8 +155,6 @@ AddOption('--KARGS', dest = 'kremlin_user_args', type = 'string', default = [], 
   help = 'Supply temporary additional arguments to the Kremlin compiler')
 AddOption('--CACHE-DIR', dest = 'cache_dir', type = 'string', default = None, action = 'store',
   help = 'Specify the SCons Shared Cache Directory')
-AddOption('--ONE', dest = 'single_vaf', type = 'string', default = None, action = 'store',
-  help = 'Only verify one specified .vaf file, and in that file, only verify procedures or verbatim blocks marked as {:verify}.')
 AddOptYesNo('COLOR', dest = 'do_color', default = True,
   help="Add color to build output")
 AddOptYesNo('DUMP-ARGS', dest = 'dump_args', default = False,
@@ -182,10 +180,8 @@ fstar_my_version = GetOption('fstar_my_version')
 z3_my_version = GetOption('z3_my_version')
 do_color = GetOption('do_color')
 dump_args = GetOption('dump_args')
-single_vaf = GetOption('single_vaf')
 profile = GetOption('profile')
 
-is_single_vaf = not (single_vaf is None)
 verify = do_dafny or do_fstar
 
 ##################################################################################################
@@ -238,7 +234,7 @@ dafny_default_args_nlarith = ('/ironDafny /allocated:1 /induction:1 /compile:0'
 dafny_default_args_larith = dafny_default_args_nlarith + ' /noNLarith'
 
 fstar_default_args_nosmtencoding = ('--max_fuel 1 --max_ifuel 1'
-  + (' --initial_ifuel 1' if is_single_vaf else ' --initial_ifuel 0')
+  + (' --initial_ifuel 0')
   # The main purpose of --z3cliopt smt.QI.EAGER_THRESHOLD=100 is to make sure that matching loops get caught
   # Don't remove unless you're sure you've used the axiom profiler to make sure you have no matching loops
   + ' --z3cliopt smt.arith.nl=false --z3cliopt smt.QI.EAGER_THRESHOLD=100 --z3cliopt smt.CASE_SPLIT=3'
@@ -251,7 +247,7 @@ fstar_default_args = (fstar_default_args_nosmtencoding
   + ' --smtencoding.elim_box true --smtencoding.l_arith_repr native --smtencoding.nl_arith_repr wrapped'
   )
 
-vale_scons_args = '-disableVerify -omitUnverified' if is_single_vaf else ''
+vale_scons_args = ''
 vale_includes = f'-include {File("fstar/code/lib/util/operator.vaf")}'
 
 verify_paths = [
@@ -843,17 +839,14 @@ def process_files_in(env, directories):
     # Process and verify files:
     fstar_include_paths = compute_include_paths(src_include_paths, obj_include_paths, 'obj')
     fstar_includes = compute_includes(src_include_paths, obj_include_paths, 'obj')
-    if is_single_vaf:
-      process_vaf_file(env, File(single_vaf), fstar_includes)
-    else:
-      for file in fsts:
-        process_fstar_file(env, file, fstar_includes)
-      for file in fstis:
-        process_fstar_file(env, file, fstar_includes)
-      for file in vafs:
-        process_vaf_file(env, file, fstar_includes)
-      for target in manual_dependencies:
-        Depends(target, manual_dependencies[target])
+    for file in fsts:
+      process_fstar_file(env, file, fstar_includes)
+    for file in fstis:
+      process_fstar_file(env, file, fstar_includes)
+    for file in vafs:
+      process_vaf_file(env, file, fstar_includes)
+    for target in manual_dependencies:
+      Depends(target, manual_dependencies[target])
 
 ##################################################################################################
 #
@@ -997,7 +990,7 @@ if do_build:
 
   print('Processing source files')
   process_files_in(env, verify_paths)
-  if do_fstar and not is_single_vaf:
+  if do_fstar:
     compute_fstar_deps(env, verify_paths, compute_include_paths(src_include_paths, obj_include_paths, 'obj/dummies'))
     for x in vaf_dump_deps:
       compute_module_types(env, x)

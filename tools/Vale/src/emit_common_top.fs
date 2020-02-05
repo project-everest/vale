@@ -53,11 +53,9 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
   try
     match d with
     | DProc p ->
-        let isVerify = List_mem_assoc (Id "verify") p.pattrs in
         let isQuick = List_mem_assoc (Id "quick") p.pattrs in
         let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs || !global_code_only in
         if verify then
-          if isVerify && not !disable_verify then err "{:verify} attribute is only allowed with -disableVerify command line flag" else
           let ds_p = Emit_common_lemmas.build_proc envBody envr loc p in
           let ds_q = if isQuick && not !no_lemmas && not isCodeOnly then Emit_common_quick_export.build_proc envr loc p else [] in
           let comment (s:string) : loc * decl =
@@ -71,7 +69,6 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
         else
           []
     | DVerbatim (attrs, lines) ->
-        let attrs = attrs @ attr_no_verify "lax" attrs in
         if verify then [(loc, DVerbatim (attrs, lines))] else []
     | _ ->
         if verify then [(loc, d)] else []
@@ -87,36 +84,6 @@ let build_decl (env:env) ((loc:loc, d1:decl), verify:bool):env * decls =
   with err -> raise (LocErr (loc, err))
 
 let build_decls (env:env) (includes:(string * string option option * (((loc * decl) * bool) list)) list) (ds:((loc * decl) * bool) list):decls =
-  let ds =
-    if !disable_verify && !omit_unverified then
-      // omit any declarations not verified and not referenced by verified declaration
-      let verifyDecls = List.map fst (List.filter snd ds) in
-      let verifiedProcRefs ((l:loc), (d:decl)):Set<id> =
-        match d with
-        | DProc {pname = x; pbody = Some ss; pattrs = attrs} when attrs_get_bool (Id "verify") false attrs ->
-            let fs (s:stmt) (xs:Set<id> list):Set<id> =
-              match s with
-              | SAssign (_, e) ->
-                (
-                  match skip_loc e with
-                  | EApply (e, _, _, _) when is_id e -> Set.singleton (id_of_exp e)
-                  | _ -> Set.empty
-                )
-              | _ -> Set.unionMany xs
-              in
-            let fe (e:exp) (xs:Set<id> list):Set<id> = Set.empty in
-            let xs = Set.unionMany (gather_stmts fs fe ss)
-            Set.add x xs
-        | _ -> Set.empty
-        in
-      let verifyRefs = Set.unionMany (List.map verifiedProcRefs verifyDecls) in
-      let omitUnverified (((l:loc), (d:decl)), (verify:bool)) =
-        match (verify, d) with
-        | (true, DProc p) -> ((l, d), Set.contains p.pname verifyRefs)
-        | _ -> ((l, d), verify)
-        in
-      List.map omitUnverified ds
-    else ds
   let ds = tc_decls includes ds in
   let (env, dss) = List_mapFoldFlip build_decl env ds in
   List.concat dss

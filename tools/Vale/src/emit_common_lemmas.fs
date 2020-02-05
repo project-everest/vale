@@ -466,9 +466,9 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
       fbody = Some body;
       fattrs =
         if benv.is_quick then
-          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
+          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs
         else
-          [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
+          [(Id "opaque", [])] @ attrs;
     }
     in
   [(loc, DFun f)]
@@ -501,9 +501,9 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
         else Some (build_code_block env benv stmts);
       fattrs =
         if benv.is_quick then
-          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
+          [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs
         else
-          [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
+          [(Id "opaque", [])] @ attrs;
     }
     in
   precode @ List.map (fun f -> (loc, DFun f)) [f]
@@ -533,9 +533,9 @@ let build_codegen_success (loc:loc) (env:env) (benv:build_env) (stmts:stmt list)
           else Some (build_codegen_success_stmts p.pname env stmts);
         fattrs =
           if benv.is_quick then
-            [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs @ attr_no_verify "admit" benv.proc.pattrs
+            [(Id "opaque_to_smt", []); (Id "public_decl", []); (Id "qattr", [])] @ attrs
           else
-            [(Id "opaque", [])] @ attrs @ attr_no_verify "admit" p.pattrs;
+            [(Id "opaque", [])] @ attrs;
       }
       in
     List.map (fun f -> (loc, DFun f)) [f]
@@ -739,7 +739,7 @@ let build_lemma (env:env) (benv:build_env) (b1:id) (stmts:stmt list) (bstmts:stm
       prets = prets;
       pspecs = pLemmaSpecs;
       pbody = Some (sStmts);
-      pattrs = List.filter filter_proc_attr p.pattrs @ attr_no_verify "admit" p.pattrs;
+      pattrs = List.filter filter_proc_attr p.pattrs;
     }
     in
   exportSpecsDecls @ [(loc, DProc pLemma)]
