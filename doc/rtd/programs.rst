@@ -486,7 +486,7 @@ in Dafny or FStar libraries rather than requiring that all proofs be done direct
 
 The following example illustrates calls to ghost procedures.
 The code assumes that two lemmas about arithmetic,
-``lemma_commute_mul`` and ``lemma_commute_mul``,
+``lemma_commute_mul`` and ``lemma_square_plus_minus_half``,
 have already been proven in the underlying verification framework:
 
 ::
@@ -496,7 +496,7 @@ have already been proven in the underlying verification framework:
             x * y == y * x;
         extern;
 
-    ghost procedure lemma_commute_mul(ghost x:int)
+    ghost procedure lemma_square_plus_minus_half(ghost x:int)
         ensures
             x * (x + 1) / 2 == x * (x - 1) / 2 + x;
         extern;
