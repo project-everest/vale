@@ -1,85 +1,10 @@
+include "common.vaf"
 include{:fstar}{:open} "Types_s"
-var ok:bool {:state ok()};
-var eax:int {:state reg(EAX)};
-var ebx:int {:state reg(EBX)};
-var efl:int {:state flags()};
-var mem:int {:state mem()};
 
 module Recursive
 
-#verbatim{:interface}
-open FStar.Map
-let map = Map.t
-let (.[]) = Map.sel
-let (.[]<-) = Map.upd
-let contains = Map.contains
-
-type reg = | EAX | EBX
-
-type ins = | IPlaceholder : int -> ins
-type ocmp = | OLe: o1:reg -> o2:reg -> ocmp
-type va_code =
-  | Ins : ins:ins -> va_code
-  | Block : block:va_codes -> va_code
-  | IfElse : ifCond:ocmp -> ifTrue:va_code -> ifFalse:va_code -> va_code
-and va_codes = list va_code
-
-type va_pbool = Vale.Def.PossiblyMonad.pbool
-let va_ttrue () = Vale.Def.PossiblyMonad.ttrue
-let va_ffalse = Vale.Def.PossiblyMonad.ffalse
-let va_pbool_and x y = Vale.Def.PossiblyMonad.((&&.)) x y
-
-let va_CNil () = []
-let va_CCons x y = x::y
-let va_Block (block:va_codes) : Tot va_code = Block block
-let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
-let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
-unfold let va_tl = Cons?.tl
-unfold let va_hd = Cons?.hd
-
-// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
-let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
-
-let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
-let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
-let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
-
-type va_state = map reg int
-let va_get_ok (s:va_state) : GTot Type = True
-let va_get_reg (r:reg) (s:va_state) : GTot int = s.[r]
-let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
-let va_update_reg (r:reg) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
-
-let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
-
-type va_fuel = int
-
-let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
-  b0 = c
-
-let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
-  True
-
-#endverbatim
-
 #verbatim
-let eval_ocmp (s:va_state) (c:ocmp) :bool =
-  match c with
-  | OLe r1 r2 -> s.[r1] <= s.[r2]
-
-assume val va_lemma_empty_total : s0:va_state -> bN:va_codes -> Ghost ((sM:va_state) * (fM:va_fuel))
-  (requires True)
-  (ensures (fun (sM, fM) ->
-    s0 == sM
-  ))
-
-assume val va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
-  (requires
-    Cons? b0
-  )
-  (ensures (fun fN ->
-    True
-  ))
+open Common
 #endverbatim
 
 procedure KeyExpansionRoundUnrolledRecursive(ghost w_in:int, inline n:int) returns (ghost w_out:int)

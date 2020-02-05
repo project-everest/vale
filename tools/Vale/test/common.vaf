@@ -1,0 +1,201 @@
+include{:fstar}{:open} "Types_s"
+
+module Common
+
+var ok:bool {:state ok()};
+var eax:int {:state reg(EAX)};
+var ebx:int {:state reg(EBX)};
+var efl:int {:state flags()};
+var mem:int {:state mem()};
+
+operand_type reg:int := inout eax | inout ebx;
+
+#verbatim{:interface}
+module Map=FStar.Map
+let map = Map.t
+let (.[]) = Map.sel
+let (.[]<-) = Map.upd
+let contains = Map.contains
+
+type register = | EAX | EBX
+
+type va_int_at_least (k:int) = i:int{i >= k}
+type va_int_at_most (k:int) = i:int{i <= k}
+type va_int_range (k1 k2:int) = i:int{k1 <= i /\ i <= k2}
+
+type ins = | IPlaceholder : int -> ins
+type ocmp = | OLe: o1:register -> o2:register -> ocmp
+type va_code =
+  | Ins : ins:ins -> va_code
+  | Block : block:va_codes -> va_code
+  | IfElse : ifCond:ocmp -> ifTrue:va_code -> ifFalse:va_code -> va_code
+  | While : whileCond:ocmp -> whileBody:va_code -> va_code
+and va_codes = list va_code
+
+type va_pbool = Vale.Def.PossiblyMonad.pbool
+let va_ttrue () = Vale.Def.PossiblyMonad.ttrue
+let va_ffalse = Vale.Def.PossiblyMonad.ffalse
+let va_pbool_and x y = Vale.Def.PossiblyMonad.((&&.)) x y
+
+let va_CNil () = []
+let va_CCons x y = x::y
+let va_Block (block:va_codes) : Tot va_code = Block block
+let va_IfElse (ifCond:ocmp) (ifTrue:va_code) (ifFalse:va_code) : va_code = IfElse ifCond ifTrue ifFalse
+let va_While (whileCond:ocmp) (whileBody:va_code) : va_code = While whileCond whileBody
+let va_get_block (c:va_code{Block? c}) : GTot va_codes = Block?.block c
+let va_get_ifCond (c:va_code{IfElse? c}) : GTot ocmp = IfElse?.ifCond c
+let va_get_ifTrue (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifTrue c
+let va_get_ifFalse (c:va_code{IfElse? c}) : GTot va_code = IfElse?.ifFalse c
+let va_get_whileCond (c:va_code{While? c}) : GTot ocmp = While?.whileCond c
+let va_get_whileBody (c:va_code{While? c}) : GTot va_code = While?.whileBody c
+
+type va_state = map register int
+let va_get_ok (s:va_state) : GTot Type = True
+let va_get_reg (r:register) (s:va_state) : GTot int = s.[r]
+let va_update_ok (sM:va_state) (sK:va_state) : GTot va_state = sK
+let va_update_reg (r:register) (sM:va_state) (sK:va_state) : GTot va_state = sK.[r] <- sM.[r]
+
+type va_operand_reg = register
+let va_op_reg_reg (r:register) : Tot register = r
+let va_is_src_reg (r:register) (s:va_state) = True
+let va_is_dst_reg (r:register) (s:va_state) = True
+let va_update_register (r:register) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_update_operand_reg (r:register) (sM:va_state) (sK:va_state) : GTot va_state = va_update_reg r sM sK
+let va_eval_reg (s:va_state) (r:register) : GTot int = s.[r]
+
+type cmp_operand = register
+let va_op_cmp_reg (r:register) : cmp_operand = r
+let va_cmp_le (a:register) (b:register) : ocmp = OLe a b
+
+let va_state_eq (s0:va_state) (s1:va_state) : Type = s0.[EAX] = s1.[EAX] /\ s0.[EBX] = s1.[EBX]
+
+type va_fuel = int
+
+val eval_code (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
+
+unfold let va_hd = Cons?.hd
+unfold let va_tl = Cons?.tl
+
+// REVIEW: FStar.Pervasives.reveal_opaque doesn't include zeta, so it fails for recursive functions
+let va_reveal_opaque (s:string) = norm_spec [zeta; delta_only [s]]
+
+let va_require_total (b0:va_code) (c:va_code) (s0:va_state) : Type =
+  b0 = c
+
+let va_ensure_total (b0:va_code) (s0:va_state) (s1:va_state) (f1:va_fuel) : Type =
+  eval_code b0 s0 f1 s1
+
+let eval_ocmp (s:va_state) (c:ocmp) : bool =
+  match c with
+  | OLe r1 r2 -> s.[r1] <= s.[r2]
+
+let va_lemma_empty_total : s0:va_state -> bN:va_codes -> Ghost ((sM:va_state) * (fM:va_fuel))
+  (requires True)
+  (ensures (fun (sM, fM) ->
+    s0 == sM /\
+    eval_code (Block []) s0 fM sM
+  ))
+  =
+  admit ()
+
+let va_lemma_merge_total : b0:va_codes -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
+  (requires
+    Cons? b0 /\
+    eval_code (Cons?.hd b0) s0 f0 sM /\
+    eval_code (Block (Cons?.tl b0)) sM fM sN
+  )
+  (ensures (fun fN ->
+    eval_code (Block b0) s0 fN sN
+  ))
+  =
+  admit ()
+
+let va_lemma_ifElse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> Ghost (bool * va_state * va_state * va_fuel)
+  (requires True)
+  (ensures  (fun (cond, sM, sN, f0) -> cond == eval_ocmp s0 ifb /\ sM == s0))
+  =
+  admit ()
+
+let va_lemma_ifElseTrue_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> Lemma
+  (requires
+    eval_ocmp s0 ifb /\
+    eval_code ct s0 f0 sM
+  )
+  (ensures
+    eval_code (IfElse ifb ct cf) s0 f0 sM
+  )
+  =
+  admit ()
+
+let va_lemma_ifElseFalse_total : ifb:ocmp -> ct:va_code -> cf:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> Lemma
+  (requires
+    not (eval_ocmp s0 ifb) /\
+    eval_code cf s0 f0 sM
+  )
+  (ensures
+    eval_code (IfElse ifb ct cf) s0 f0 sM
+  )
+  =
+  admit ()
+
+let eval_while_inv (c:va_code) (s0:va_state) (fW:va_fuel) (sW:va_state) : Type0
+  =
+  admit ()
+
+let va_whileInv_total (b:ocmp) (c:va_code) (s0:va_state) (sN:va_state) (f0:va_fuel) : Type0 =
+  eval_while_inv (While b c) s0 f0 sN
+
+unfold let va_evalCond (b:ocmp) (s:va_state) : bool = eval_ocmp s b
+
+let va_lemma_while_total : b:ocmp -> c:va_code -> s0:va_state -> Ghost ((s1:va_state) * (f1:va_fuel))
+  (requires True)
+  (ensures fun (s1, f1) ->
+    s1 == s0 /\
+    eval_while_inv (While b c) s1 f1 s1
+  )
+  =
+  admit ()
+
+let va_lemma_whileTrue_total : b:ocmp -> c:va_code -> s0:va_state -> sW:va_state -> fW:va_fuel -> Ghost ((s1:va_state) * (f1:va_fuel))
+  (requires eval_ocmp sW b)
+  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
+  =
+  admit ()
+
+let va_lemma_whileFalse_total : b:ocmp -> c:va_code -> s0:va_state -> sW:va_state -> fW:va_fuel -> Ghost ((s1:va_state) * (f1:va_fuel))
+  (requires
+    not (eval_ocmp sW b) /\
+    eval_while_inv (While b c) s0 fW sW
+  )
+  (ensures fun (s1, f1) ->
+    s1 == sW /\
+    eval_code (While b c) s0 f1 s1
+  )
+  =
+  admit ()
+
+let va_lemma_whileMerge_total : c:va_code -> s0:va_state -> f0:va_fuel -> sM:va_state -> fM:va_fuel -> sN:va_state -> Ghost (fN:va_fuel)
+  (requires
+    While? c /\
+    eval_ocmp sM (While?.whileCond c) /\
+    eval_while_inv c s0 f0 sM /\
+    eval_code (While?.whileBody c) sM fM sN
+  )
+  (ensures (fun fN ->
+    eval_while_inv c s0 fN sN
+  ))
+  =
+  admit ()
+
+let double (x:int):int = x + x
+[@"opaque_to_smt"]
+let opaque_double = double
+#endverbatim
+
+#verbatim
+assume val eval_code_assume (c:va_code) (s0:va_state) (f0:va_fuel) (sN:va_state) : Type0
+let eval_code = eval_code_assume
+#endverbatim
+
+function double (x:int) : int extern;
+function opaque_double (x:int) : int extern;
