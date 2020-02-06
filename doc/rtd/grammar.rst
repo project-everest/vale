@@ -234,6 +234,8 @@ Currently, the following attributes are supported:
     push-options/pop-options around procedure (examples: ``{:options z3rlimit(20), max_ifuel(2)}``,
     ``{:options smtencoding.nl_arith_repr(boxwrap)}``,
     ``{:options using_facts_from("* -FStar.Seq.Base"), debug(FStar.Seq.Base)}``)
+  * {:restartProver} (FStar only)
+    restart theorem prover to improve theorem prover predictability (``#restart-solver`` in FStar)
   * {:instruction EXP},
     indicating a primitive procedure that is implemented with the code value specified by the expression EXP
     (see :ref:`instructions`)
