@@ -328,6 +328,7 @@ let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
         ps.PrintLine ("module " + s);
     | DPragma (ResetOptions s) ->
         ps.PrintLine ("#reset-options " + s)
+    | DPragma (PushOptions _) -> ()
     | DVerbatim (attrs, lines) ->
         ps.PrintLine("#verbatim" + (string_of_attrs attrs));
         List.iter ps.PrintUnbrokenLine lines;

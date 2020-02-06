@@ -24,9 +24,8 @@ open X64.Vale.InsBasic
 friend X64.Vale.Decls
 module S = X64.Semantics_s
 module P = X64.Print_s
-#endverbatim
-
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
 
 procedure Mem64_in(in base:reg_opr64, inline offset:int) returns(o:operand)
     {:public}

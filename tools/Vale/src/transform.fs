@@ -1083,7 +1083,11 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
             pattrs = [(Id "public", [EBool false])] @ p.pattrs;
           }
           in
-        let passthrough_pattrs_while = List.filter (fun (x, _) -> x = Id "codeOnly") p.pattrs in
+        let passthrough_pattrs_while =
+          List.filter
+            (fun (x, _) -> x = Id "codeOnly" || x = Id "options" || x = Id "restartProver")
+            p.pattrs
+          in
         let p_while =
           {
             pname = xp_while;
@@ -1125,7 +1129,7 @@ let transform_proc (env:env) (loc:loc) (p:proc_decl):transformed =
   let isRecursive = attrs_get_bool (Id "recursive") false p.pattrs in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
   let isQuick = is_quick_body p.pattrs in
-  let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs || !global_code_only in
+  let isCodeOnly = attrs_get_bool (Id "codeOnly") false p.pattrs || !global_code_only in
   let preserveSpecs =
     List.collect
       (fun spec ->

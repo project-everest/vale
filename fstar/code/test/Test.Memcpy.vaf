@@ -16,9 +16,8 @@ open X64.Vale.InsMem
 open X64.Vale.InsVector
 #endverbatim
 
-#reset-options "--z3rlimit 20 --debug Test.Memcpy --debug_level print_normalized_terms"
-
 procedure Copy16()
+//    {:options z3rlimit(20), debug(Test.Memcpy), debug_level(print_normalized_terms)}
     requires/ensures
         valid_mem64(rsi, mem);
         valid_mem64(rsi + 8, mem);

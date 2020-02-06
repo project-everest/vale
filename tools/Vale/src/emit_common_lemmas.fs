@@ -756,7 +756,7 @@ let rec build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in
   let isQuick = is_quick_body p.pattrs in
-  let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs || !global_code_only in
+  let isCodeOnly = attrs_get_bool (Id "codeOnly") false p.pattrs || !global_code_only in
   let reqs =
     List.collect (fun (loc, s) ->
         match s with

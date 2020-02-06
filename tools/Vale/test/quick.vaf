@@ -264,9 +264,9 @@ let ghostId (x:int) : GTot int = x
 
 function ghostId (x:int) : int extern;
 
-//#reset-options "--debug Quick --debug_level SMTQuery"
 procedure Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     {:quick}
+//    {:options debug(Quick), debug_level(SMTQuery)}
     modifies
         efl;
         rax;
@@ -309,7 +309,6 @@ procedure Bump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     assert gtmp == g1 + rax;
     assert g2 == old(rax);
 }
-#reset-options
 
 procedure CallBump3(inline b:bool, ghost g1:int) returns(ghost g2:int)
     {:quick}

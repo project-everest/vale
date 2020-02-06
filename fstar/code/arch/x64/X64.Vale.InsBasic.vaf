@@ -27,9 +27,8 @@ open X64.Vale.Decls
 friend X64.Vale.Decls
 module S = X64.Semantics_s
 module P = X64.Print_s
-#endverbatim
-
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
 
 var ok:bool {:state ok()};
 var rax:nat64 {:state reg(Rax)};
@@ -167,16 +166,16 @@ procedure Sub64Wrap(inout dst:dst_opr64, in src:opr64)
 {
 }
 
-#reset-options "--max_fuel 0 --max_ifuel 0 --using_facts_from 'Prims FStar.UInt'"
-
 #verbatim
+#restart-solver
+#push-options "--max_fuel 0 --max_ifuel 0 --using_facts_from 'Prims FStar.UInt'"
 let lemma_fundamental_div_mod (a b:nat64) :
   Lemma (pow2_64 * (FStar.UInt.mul_div #64 a b) + (FStar.UInt.mul_mod #64 a b) == a * b)
   =
   FStar.Math.Lemmas.lemma_div_mod (a * b) pow2_64
+#pop-options
 #endverbatim
 
-#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 ghost procedure lemma_fundamental_div_mod(ghost a:nat64, ghost b:nat64) {:public} extern;
 
 procedure Mul64Wrap(in src:opr64)

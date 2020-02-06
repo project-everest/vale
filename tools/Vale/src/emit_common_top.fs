@@ -54,7 +54,9 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
     match d with
     | DProc p ->
         let isQuick = List_mem_assoc (Id "quick") p.pattrs in
-        let isCodeOnly = List_mem_assoc (Id "codeOnly") p.pattrs || !global_code_only in
+        let isRestart = attrs_get_bool (Id "restartProver") false p.pattrs in
+        let isCodeOnly = attrs_get_bool (Id "codeOnly") false p.pattrs || !global_code_only in
+        let options = attrs_get_exps_opt (Id "options") p.pattrs in
         if verify then
           let ds_p = Emit_common_lemmas.build_proc envBody envr loc p in
           let ds_q = if isQuick && not !no_lemmas && not isCodeOnly then Emit_common_quick_export.build_proc envr loc p else [] in
@@ -65,7 +67,14 @@ let build_one_decl (verify:bool) (loc:loc) (envr:env, envBody:env, d:decl):decls
             in
           let beginComment = comment ("//-- " + (err_id p.pname)) in
           let endComment = comment "//--" in
-          [beginComment] @ ds_p @ ds_q @ [endComment]
+          let (pushes, pops) =
+            match (!fstar, options) with
+            | (false, _) -> ([], [])
+            | (true, None) -> ([], [])
+            | (true, Some es) -> ([(loc, DPragma (PushOptions es))], [(loc, DVerbatim ([], ["#pop-options"]))])
+            in
+          let restarts = if !fstar && isRestart then [(loc, DVerbatim ([], ["#restart-solver"]))] else [] in
+          [beginComment] @ pushes @ restarts @ ds_p @ ds_q @ pops @ [endComment]
         else
           []
     | DVerbatim (attrs, lines) ->

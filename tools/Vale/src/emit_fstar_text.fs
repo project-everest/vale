@@ -495,6 +495,18 @@ let emit_decl (ps:print_state) (opens:(string * string option option) list) (loc
         resetOptions := s;
         prevResetOptionsPs := s;
         ps.PrintUnbrokenLine ("#reset-options " + s)
+    | DPragma (PushOptions ops) ->
+        let rec dump e =
+          match skip_locs e with
+          | EVar _ | EInt _ | EBool _ -> string_of_exp e
+          | EString s -> "'" + s + "'"
+          | EOp (FieldOp x, [e], _) -> dump e + "." + sid x 
+          | EApply (e, _, es, _) -> dump e + " " + String.concat " " (List.map dump es)
+          | _ ->
+              err "options in :options attribute must consist of variables, ., integers, strings, booleans, and function applications"
+          in
+        let s = String.concat " " (List.map (fun e -> "--" + dump e) ops) in
+        ps.PrintUnbrokenLine ("#push-options \"" + s + "\"")
     | DVar _ -> ()
     | DFun f -> emit_fun ps loc f
     | DProc p -> emit_proc ps loc p

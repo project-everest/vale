@@ -434,7 +434,7 @@ Ghost code can also contain:
 * ``forall`` and ``exists`` statements (see :ref:`quantifiers`)
 
 *Ghost procedures* can only contain ghost code.
-Although they can read global variables, such as ``eax``, they cannot modify global variables.
+They cannot read or modify global variables.
 The following somewhat silly example illustrates operations by ghost code on ghost variables:
 
 ::

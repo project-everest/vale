@@ -183,7 +183,7 @@ let rec map_exp (f:exp -> exp map_modify) (e:exp):exp =
     | EVar _ | EInt _ | EReal _ | EBitVector _ | EBool _ | EString _ -> e
     | EBind (b, es, fs, ts, e, t) -> EBind (b, List.map r es, fs, List.map (List.map r) ts, r e, t)
     | EOp (op, es, t) -> EOp (op, List.map r es, t)
-    | EApply (x, ts, es, t) -> EApply (x, ts, List.map r es, t)
+    | EApply (ex, ts, es, t) -> EApply (r ex, ts, List.map r es, t)
     | ECast (c, e, t) -> ECast (c, r e, t)
     | ELabel (l, e) -> ELabel (l, r e)
   )

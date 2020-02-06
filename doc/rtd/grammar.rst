@@ -230,6 +230,10 @@ Currently, the following attributes are supported:
 
   * {:timeLimit n} and {:timeLimitMultiplier n} (Dafny only)
     set or increase the time limit for this procedure
+  * {:options ...} (FStar only)
+    push-options/pop-options around procedure (examples: ``{:options z3rlimit(20), max_ifuel(2)}``,
+    ``{:options smtencoding.nl_arith_repr(boxwrap)}``,
+    ``{:options using_facts_from("* -FStar.Seq.Base"), debug(FStar.Seq.Base)}``)
   * {:instruction EXP},
     indicating a primitive procedure that is implemented with the code value specified by the expression EXP
     (see :ref:`instructions`)
