@@ -181,7 +181,6 @@ type proc_decl =
 
 type prag =
 | ModuleName of string
-| ResetOptions of string
 | PushOptions of exp list
 
 type operand_typ =

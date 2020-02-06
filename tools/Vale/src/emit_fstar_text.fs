@@ -6,10 +6,6 @@ open Transform
 open Emit_common_base
 open Microsoft.FSharp.Math
 
-let resetOptions = ref ""
-let prevResetOptionsPs = ref ""
-let prevResetOptionsPsi = ref ""
-
 let sid (x:id):string =
   match x with
   | Id s -> if s.StartsWith("uu___") then "_" + s else s
@@ -491,10 +487,6 @@ let emit_decl (ps:print_state) (opens:(string * string option option) list) (loc
         match ps.print_interface with None -> () | Some psi -> psi.PrintLine ("module " + s);
         // TODO: emit "open M" from "include {:fstar}{:open} M
         // List.iter (emit_open ps) opens
-    | DPragma (ResetOptions s) ->
-        resetOptions := s;
-        prevResetOptionsPs := s;
-        ps.PrintUnbrokenLine ("#reset-options " + s)
     | DPragma (PushOptions ops) ->
         let rec dump e =
           match skip_locs e with

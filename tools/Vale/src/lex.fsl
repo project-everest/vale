@@ -112,13 +112,6 @@ and lextoken = parse
 }
 | "#else" { preprocess_skip false lexbuf ; lextoken lexbuf }
 | "#endif" { lextoken lexbuf }
-| "#reset-options" { RESET_OPTIONS (curLoc lexbuf, "") }
-| "#reset-options "[^'\n''\r']*
-{
-  let s = lexeme lexbuf in
-  let i1 = "#reset-options ".Length in
-  RESET_OPTIONS (curLoc lexbuf, s.Substring(i1))
-}
 | "#token"[' ']+[^' ''\n''\r']+[' ']+"precedence"[' ']+[^' ''\n''\r']+[' ']*
 {
   let s = lexeme lexbuf in
