@@ -372,7 +372,6 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let isQAttr = attrs_get_bool (Id "qattr") false f.fattrs in
   let isPublicDecl = isPublicDecl || isOpaque in
   let isRecursive = attrs_get_bool (Id "recursive") false f.fattrs in
-  (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   // write everything to *.fsti if it is public and not opaque or publicDecl. 
   // For opaque and publicDecl, only "val" is written into *.fsti if it is public, 
   // everything else goes into *.fst regardless if it is public or not.
@@ -394,8 +393,10 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let dArgs = List.map (fun (x, _) -> evar x) f.fargs in
   let decreases0 = if isRecursive then string_of_decrease dArgs else "" in
   if isPublicDecl then
-    if isPublic then 
+    if isPublic then (
+      psi.PrintLine ("")
       psi.PrintLine (sVal (sid f.fname) decreases0);
+    )
     else
       ps.PrintLine (sVal (sid f.fname) decreases0);
     ( match f.fbody with
@@ -414,7 +415,6 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   let (reqs, enss) = collect_specs false p.pspecs in
   let (rs, es) = (and_of_list reqs, and_of_list enss) in
   ps.PrintLine ("");
-  (match ps.print_interface with None -> () | Some psi -> psi.PrintLine (""));
   let psi = match ps.print_interface with None -> ps | Some psi -> psi in
   let tactic = match p.pbody with None -> None | Some _ -> attrs_get_exp_opt (Id "tactic") p.pattrs in
   let isPublic = attrs_get_bool (Id "public") false p.pattrs in
@@ -441,6 +441,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     | (Some _, None) -> ()
     | (_, _) ->
         let psi = if isPublic then psi else ps
+        psi.PrintLine ("");
         psi.PrintLine ("val " + (sid p.pname) + " : " + (val_string_of_formals args));
         printPType psi "-> " decreases0
   );
