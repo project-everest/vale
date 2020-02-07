@@ -32,10 +32,10 @@ type va_code =
   | While : whileCond:ocmp -> whileBody:va_code -> va_code
 and va_codes = list va_code
 
-type va_pbool = Vale.Def.PossiblyMonad.pbool
-let va_ttrue () = Vale.Def.PossiblyMonad.ttrue
-let va_ffalse = Vale.Def.PossiblyMonad.ffalse
-let va_pbool_and x y = Vale.Def.PossiblyMonad.((&&.)) x y
+type va_pbool = unit
+let va_ttrue () = ()
+let va_ffalse (s:string) = ()
+let va_pbool_and x y = ()
 
 let va_CNil () = []
 let va_CCons x y = x::y
@@ -199,3 +199,28 @@ let eval_code = eval_code_assume
 
 function double (x:int) : int extern;
 function opaque_double (x:int) : int extern;
+
+// Used by INSTALL.md
+procedure IncrEax()
+    modifies
+        eax;
+    requires
+        0 <= eax < 100;
+    ensures
+        eax == old(eax) + 1;
+{
+    assume false;
+}
+
+procedure Test()
+    modifies
+        eax; ebx;
+    requires
+        0 <= eax < 99;
+    ensures
+        eax == old(eax) + 2;
+        ebx == old(ebx);
+{
+    IncrEax();
+    IncrEax();
+}

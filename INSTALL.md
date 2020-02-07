@@ -19,22 +19,22 @@ To test the binary release, download [this test file](https://raw.githubusercont
 then run:
 
 * On Windows:
-  * ```bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy```
+  * ```bin/vale.exe -in refined3.vad -out refined3.dfy```
   * ```bin/Dafny.exe /trace refined3.dfy```
 * On Unix:
-  * ```mono bin/vale.exe -typecheck -in refined3.vad -out refined3.dfy```
+  * ```mono bin/vale.exe -in refined3.vad -out refined3.dfy```
   * ```mono bin/Dafny.exe /trace refined3.dfy```
 
 If you have [F*](https://github.com/FStarLang/FStar) installed,
-you can also download [this test file](https://raw.githubusercontent.com/project-everest/vale/master/tools/Vale/test/types.vaf),
+you can also download [this test file](https://raw.githubusercontent.com/project-everest/vale/master/tools/Vale/test/common.vaf),
 then run:
 
 * On Windows:
-  * ```bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti```
-  * ```fstar.exe --query_stats fstar1ifc.fst```
+  * ```bin/vale.exe -fstarText -in common.vaf -out common.fst -outi common.fsti```
+  * ```fstar.exe --query_stats common.fst```
 * On Unix:
-  * ```mono bin/vale.exe -typecheck -fstarText -in fstar1ifc.vaf -out fstar1ifc.fst -outi fstar1ifc.fsti```
-  * ```fstar.exe --query_stats fstar1ifc.fst```
+  * ```mono bin/vale.exe -fstarText -in common.vaf -out common.fst -outi common.fsti```
+  * ```fstar.exe --query_stats common.fst```
 
 # Building Vale from source
 
