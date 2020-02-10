@@ -32,7 +32,7 @@ Aymeric Fromherz, Nick Giannarakis, Chris Hawblitzel, Bryan Parno, Aseem Rastogi
 
 # Projects using Vale
 
-For cryptography implementations verified with Vale/F*, see [HACL*](https://github.com/project-everest/hacl-star/tree/fstar-master/vale).  
+For cryptography implementations verified with Vale/F*, see [HACL*](https://github.com/project-everest/hacl-star/tree/master/vale).  
 For cryptography implementations verified with Vale/Dafny, see the [Dafny legacy branch](https://github.com/project-everest/vale/tree/legacy_dafny).  
 For the Komodo secure enclave reference monitor, see [here](https://github.com/Microsoft/Komodo) and [here](https://www.microsoft.com/en-us/research/project/komodo/).  
 
