@@ -384,7 +384,7 @@ val va_lemma_while_total (b:ocmp) (c:va_code) (s0:va_state) : Ghost (va_state & 
 
 val va_lemma_whileTrue_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost (va_state & va_fuel)
   (requires eval_ocmp sW b /\ valid_ocmp b sW)
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
+  (ensures fun (s1, f1) -> s1 == {sW with flags = havoc sW b} /\ f1 == fW)
 
 val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (fW:va_fuel) : Ghost (va_state & va_fuel)
   (requires
@@ -393,7 +393,7 @@ val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (
     eval_while_inv (While b c) s0 fW sW
   )
   (ensures fun (s1, f1) ->
-    s1 == {sW with flags = s1.flags} /\
+    s1 == {sW with flags = havoc sW b} /\
     eval_code (While b c) s0 f1 s1
   )
 

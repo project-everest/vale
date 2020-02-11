@@ -356,6 +356,13 @@ procedure Incr3(ghost g:int)
     Add64(rax, 1);
 }
 
+procedure ModFlags()
+    {:quick}
+    modifies
+        efl;
+{
+}
+
 procedure While0(ghost g:int)
     {:quick}
     lets
@@ -388,6 +395,7 @@ procedure While0(ghost g:int)
             rax >= rbx;
         decreases 0;
     {
+        ModFlags(); // HACK TODO: remove this: this is here only so the Vale retains "modifies efl" in the loop
     }
     Add64(rax, 3);
 }

@@ -138,7 +138,7 @@ val lemma_while_total (b:ocmp) (c:code) (s0:state) : Pure (state & fuel)
 
 val lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Pure (state & fuel)
   (requires eval_ocmp sW b)
-  (ensures fun (s1, f1) -> s1 == sW /\ f1 == fW)
+  (ensures fun (s1, f1) -> s1 == {sW with flags = S.havoc sW b} /\ f1 == fW)
 
 val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : Pure (state & fuel)
   (requires
@@ -147,7 +147,7 @@ val lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) : P
     eval_while_inv (While b c) s0 fW sW
   )
   (ensures fun (s1, f1) ->
-    s1 == {sW with flags = s1.flags} /\
+    s1 == {sW with flags = S.havoc sW b} /\
     eval_code (While b c) s0 f1 s1
   )
 
