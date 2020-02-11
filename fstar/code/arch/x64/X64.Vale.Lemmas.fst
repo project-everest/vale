@@ -6,36 +6,34 @@ module S = X64.Semantics_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
 
-val increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) : Lemma
+let rec increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) : Lemma
   (requires eval_code c s0 f0 sN /\ f0 <= fN)
   (ensures eval_code c s0 fN sN)
   (decreases %[f0; c])
-
-val increase_fuels (c:codes) (s0:state) (f0:fuel) (sN:state) (fN:fuel) : Lemma
-  (requires eval_code (Block c) s0 f0 sN /\ f0 <= fN)
-  (ensures eval_code (Block c) s0 fN sN)
-  (decreases %[f0; c])
-
-let rec increase_fuel (c:code) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
+  =
   match c with
   | Ins ins -> ()
   | Block l -> increase_fuels l s0 f0 sN fN
-  | IfElse b t f ->
-      let s0 = ensure_valid_ocmp b s0 in
-      if eval_ocmp s0 b then increase_fuel t s0 f0 sN fN else increase_fuel f s0 f0 sN fN
-  | While b c ->
-      let s0 = ensure_valid_ocmp b s0 in
-      if not (eval_ocmp s0 b) then ()
+  | IfElse cond t f ->
+      let (s0, b) = S.run_ocmp s0 cond in
+      if b then increase_fuel t s0 f0 sN fN else increase_fuel f s0 f0 sN fN
+  | While cond c ->
+      let (s0, b) = S.run_ocmp s0 cond in
+      if not b then ()
       else
       (
         match S.eval_code c (f0 - 1) s0 with
         | None -> ()
         | Some s1 ->
             increase_fuel c s0 (f0 - 1) s1 (fN - 1);
-            if s1.ok then increase_fuel (While b c) s1 (f0 - 1) sN (fN - 1)
+            if s1.ok then increase_fuel (While cond c) s1 (f0 - 1) sN (fN - 1)
             else ()
       )
-and increase_fuels (c:codes) (s0:state) (f0:fuel) (sN:state) (fN:fuel) =
+and increase_fuels (c:codes) (s0:state) (f0:fuel) (sN:state) (fN:fuel) : Lemma
+  (requires eval_code (Block c) s0 f0 sN /\ f0 <= fN)
+  (ensures eval_code (Block c) s0 fN sN)
+  (decreases %[f0; c])
+  =
   match c with
   | [] -> ()
   | h::t ->
@@ -71,7 +69,7 @@ let lemma_empty_total (s0:state) (bN:codes) =
   (s0, 0)
 
 let lemma_ifElse_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) =
-  (eval_ocmp s0 ifb, s0, s0, 0)
+  (eval_ocmp s0 ifb, ({s0 with flags = S.havoc s0 ifb}), s0, 0)
 
 let lemma_ifElseTrue_total (ifb:ocmp) (ct:code) (cf:code) (s0:state) (f0:fuel) (sM:state) =
   ()
@@ -95,19 +93,22 @@ let lemma_whileTrue_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
 
 let lemma_whileFalse_total (b:ocmp) (c:code) (s0:state) (sW:state) (fW:fuel) =
   let f1 = fW + 1 in
+  let (s1, _) = S.run_ocmp sW b in
   assert (S.eval_code (While b c) f1 s0 == S.eval_code (While b c) 1 sW);
-  assert (eval_code (While b c) s0 f1 sW);
-  (sW, f1)
+  assert (eval_code (While b c) s0 f1 s1);
+  (s1, f1)
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 30"
 let lemma_whileMerge_total (c:code) (s0:state) (f0:fuel) (sM:state) (fM:fuel) (sN:state) =
+  let cond = While?.whileCond c in
   let fN:nat = f0 + fM + 1 in
   let fForall (f:nat) : Lemma
     (requires Some? (S.eval_code c f sN))
     (ensures S.eval_code c (f + fN) s0 == S.eval_code c f sN) =
     let Some sZ = S.eval_code c f sN in
     let fZ = if f > fM then f else fM in
-    increase_fuel (While?.whileBody c) sM fM sN fZ;
+    let sM' = {sM with flags = S.havoc sM cond} in
+    increase_fuel (While?.whileBody c) sM' fM sN fZ;
     increase_fuel c sN f sZ fZ;
     assert (S.eval_code c (fZ + 1) sM == Some sZ);
     assert (S.eval_code c (fZ + 1) sM == S.eval_code c (fZ + 1 + f0) s0);

@@ -49,7 +49,7 @@ type ocmp =
 type code = precode ins ocmp
 type codes = list code
 
-assume val havoc : state -> ins -> nat64
+assume val havoc (#a:Type0) : state -> a -> nat64
 
 unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
@@ -83,9 +83,6 @@ let update_reg' (r:reg) (v:nat64) (s:state) : state =
 
 let update_xmm' (x:xmm) (v:quad32) (s:state) : state =
   { s with xmms = xmms_make (fun (x':xmm) -> if x' = x then v else s.xmms x') }
-
-val mod_8: (n:nat{n < pow2_64}) -> nat8
-let mod_8 n = n % 0x100
 
 let update_mem (ptr:int) (v:nat64) (s:state) : state =
   { s with mem = store_mem64 ptr v s.mem }
@@ -386,39 +383,38 @@ let eval_ins (ins:ins) : st unit =
     let shifted_xmm = Mkfour 0 src_q.lo0 src_q.lo1 src_q.hi2 in
     update_xmm_preserve_flags dst shifted_xmm
 
+let run_ocmp (s:state) (c:ocmp) : state & bool =
+  let s = run (check (valid_ocmp c)) s in
+  ({s with flags = havoc s c}, eval_ocmp s c)
 
 (*
  * These functions return an option state
  * None case arises when the while loop runs out of fuel
  *)
-// TODO: IfElse and While should havoc the flags
-val eval_code:  c:code           -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
-val eval_codes: l:codes          -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; l])
-val eval_while: b:ocmp -> c:code -> fuel:nat -> s:state -> Tot (option state) (decreases %[fuel; c])
-
-let rec eval_code c fuel s =
+let rec eval_code (c:code) (fuel:nat) (s:state) : Tot (option state) (decreases %[fuel; c]) =
   match c with
-  | Ins ins                       -> Some (run (eval_ins ins) s)
-  | Block l                       -> eval_codes l fuel s
-  | IfElse ifCond ifTrue ifFalse  ->
-    let s = run (check (valid_ocmp ifCond)) s in
-    if eval_ocmp s ifCond then eval_code ifTrue fuel s else eval_code ifFalse fuel s
-  | While b c                     -> eval_while b c fuel s
-
-and eval_codes l fuel s =
+  | Ins ins ->
+    Some (run (eval_ins ins) s)
+  | Block l ->
+    eval_codes l fuel s
+  | IfElse cond ifTrue ifFalse  ->
+    let (s, b) = run_ocmp s cond in
+    if b then eval_code ifTrue fuel s else eval_code ifFalse fuel s
+  | While b c ->
+    eval_while b c fuel s
+and eval_codes (l:codes) (fuel:nat) (s:state) : Tot (option state) (decreases %[fuel; l]) =
   match l with
   | []   -> Some s
   | c::tl ->
     let s_opt = eval_code c fuel s in
     if None? s_opt then None else eval_codes tl fuel (Some?.v s_opt)
-
-and eval_while b c fuel s0 =
+and eval_while (cond:ocmp) (c:code) (fuel:nat) (s0:state) : Tot (option state) (decreases %[fuel; c]) =
   if fuel = 0 then None else
-  let s0 = run (check (valid_ocmp b)) s0 in
-  if not (eval_ocmp s0 b) then Some s0
+  let (s0, b) = run_ocmp s0 cond in
+  if not b then Some s0
   else
     match eval_code c (fuel - 1) s0 with
     | None -> None
     | Some s1 ->
-      if s1.ok then eval_while b c (fuel - 1) s1  // success: continue to next iteration
+      if s1.ok then eval_while cond c (fuel - 1) s1  // success: continue to next iteration
       else Some s1  // failure: propagate failure immediately

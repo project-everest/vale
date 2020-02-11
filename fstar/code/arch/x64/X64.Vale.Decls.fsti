@@ -263,6 +263,8 @@ unfold let va_evalCond (b:ocmp) (s:va_state) : GTot bool = eval_ocmp s b
 
 val valid_ocmp : c:ocmp -> s:va_state -> GTot bool
 
+val havoc (#a:Type0) : va_state -> a -> nat64
+
 val lemma_cmp_eq : s:va_state -> o1:operand -> o2:operand -> Lemma
   (requires True)
   (ensures  (eval_ocmp s (va_cmp_eq o1 o2)) <==> (va_eval_opr64 s o1 == va_eval_opr64 s o2))
@@ -347,14 +349,14 @@ val va_lemma_ifElse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) : G
   (requires True)
   (ensures  (fun (cond, sM, sN, f0) ->
     cond == eval_ocmp s0 ifb /\
-    sM == s0
+    sM == ({s0 with flags = havoc s0 ifb})
   ))
 
 val va_lemma_ifElseTrue_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) : Lemma
   (requires
     valid_ocmp ifb s0 /\
     eval_ocmp s0 ifb /\
-    eval_code ct s0 f0 sM
+    eval_code ct ({s0 with flags = havoc s0 ifb}) f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -364,7 +366,7 @@ val va_lemma_ifElseFalse_total (ifb:ocmp) (ct:va_code) (cf:va_code) (s0:va_state
   (requires
     valid_ocmp ifb s0 /\
     not (eval_ocmp s0 ifb) /\
-    eval_code cf s0 f0 sM
+    eval_code cf ({s0 with flags = havoc s0 ifb}) f0 sM
   )
   (ensures
     eval_code (IfElse ifb ct cf) s0 f0 sM
@@ -391,19 +393,19 @@ val va_lemma_whileFalse_total (b:ocmp) (c:va_code) (s0:va_state) (sW:va_state) (
     eval_while_inv (While b c) s0 fW sW
   )
   (ensures fun (s1, f1) ->
-    s1 == sW /\
+    s1 == {sW with flags = s1.flags} /\
     eval_code (While b c) s0 f1 s1
   )
 
 val va_lemma_whileMerge_total (c:va_code) (s0:va_state) (f0:va_fuel) (sM:va_state) (fM:va_fuel) (sN:va_state) : Ghost (fN:va_fuel)
-  (requires
-    While? c /\
+  (requires While? c /\ (
+    let cond = While?.whileCond c in
     sN.ok /\
-    valid_ocmp (While?.whileCond c) sM /\
-    eval_ocmp sM (While?.whileCond c) /\
+    valid_ocmp cond sM /\
+    eval_ocmp sM cond /\
     eval_while_inv c s0 f0 sM /\
-    eval_code (While?.whileBody c) sM fM sN
-  )
+    eval_code (While?.whileBody c) ({sM with flags = havoc sM cond}) fM sN
+  ))
   (ensures (fun fN ->
     eval_while_inv c s0 fN sN
   ))

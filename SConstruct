@@ -873,10 +873,10 @@ def compute_fstar_deps(env, src_directories, fstar_includes):
     includes += ["--include", include]
   lines = []
   depsBackupFile = 'obj/fstarDepsBackup.d'
-  args = ["--dep", "make"] + includes + files
+  args = ["--dep", "make", "--already_cached", "Prims FStar"] + includes + files
   cmd = [fstar_exe] + args
   cmd = [str(x) for x in cmd]
-  #print(" ".join(cmd))
+  #print(" ".join(cmd)) # note: this won't work without '' around Prims FStar
   try:
     print('F* dependency analysis starting')
     o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
