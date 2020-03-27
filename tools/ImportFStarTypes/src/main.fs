@@ -359,9 +359,9 @@ let rec unsupported (e:f_exp):string option =
   | EBool -> None
   | EProp -> None
   | EType u -> None
-  | EComp (EAppUnivs (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, _), e1, _) ->
+  | EComp (EAppUnivs (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "FStar.Pervasives.Lemma")}, _), e1, _) ->
       unsupported e1
-  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, e1, _) ->
+  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "FStar.Pervasives.Lemma")}, e1, _) ->
       unsupported e1
   | EComp (e1, e2, es) -> exps_unsupported (e1::e2::es)
   | EApp (e, aes) -> exps_unsupported (e::(List.map snd aes))
@@ -558,7 +558,7 @@ let rec is_vale_type (outer:bool) (leftmost:bool) (env:env) (e:f_exp):bool =
   | EId _ -> is_vale_type_id env e
   | EBool -> true
   | EProp -> true
-  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma")}, e1, [er; EFun ([(_, {name = Some xe}, _)], ee)]) when outer ->
+  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "FStar.Pervasives.Lemma")}, e1, [er; EFun ([(_, {name = Some xe}, _)], ee)]) when outer ->
       let dxe = { f_name = xe; f_qualifiers = []; f_category = "val"; f_udecls = []; f_binders = []; f_typ = e1; f_body = None} in
       let env2 = Map.add xe dxe env in
       //printfn "%A %A %A" (r e1) (is_vale_exp env er) (is_vale_exp env2 ee);
@@ -993,8 +993,8 @@ let rec take_params (env:env) (only_implicits_so_far:bool) (e:f_exp):(effect * f
       let env = Map.add xx dx env in
       let (effect, bs, reqs, enss, e) = take_params env (only_implicits_so_far && (a = Implicit)) e2 in
       (effect, b::bs, req @ reqs, enss, e)
-  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "Prims.Lemma" as g)}, e1, [req; EFun ([(_, xens, _)], ens)]) ->
-      let effect = match g with "Prims.Ghost" -> EffectGhost | "Prims.Lemma" -> EffectLemma | _ -> EffectOther in
+  | EComp (EId {name = Some ("Prims.Pure" | "Prims.Ghost" | "FStar.Pervasives.Lemma" as g)}, e1, [req; EFun ([(_, xens, _)], ens)]) ->
+      let effect = match g with "Prims.Ghost" -> EffectGhost | "FStar.Pervasives.Lemma" -> EffectLemma | _ -> EffectOther in
       let is_nontrivial e =
         match e with
         | EId {name = Some "Prims.l_True"} -> false
