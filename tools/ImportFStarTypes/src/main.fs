@@ -255,7 +255,7 @@ let rec parse_exp (e:raw_exp):f_exp =
         EArrow (a, x, parse_exp e1, parse_exp e2)
       )
       with Err s -> EUnsupported s
-  | RList [RColon _; e1; RId (_, ("Tm_type" | "Tm_delayed-resolved"))] -> parse_exp e1
+  | RList [RColon _; e1; RId (_, ("Tm_type" | "Tm_delayed"))] -> parse_exp e1
   | RList [RColon _; e1; RList [RColon _; RId (_, ("Tm_name" | "Tm_fvar")); _]] -> parse_exp e1
   | RList [RColon _; e1; e2] -> ETyped (parse_exp e1, parse_exp e2)
   | RList [RRefine _; RList [RColon _; RId (_, x); e1]; e2] -> ERefine (parse_id x, parse_exp e1, parse_exp e2)
