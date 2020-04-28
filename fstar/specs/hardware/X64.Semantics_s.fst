@@ -55,7 +55,7 @@ unfold let eval_reg (r:reg) (s:state) : nat64 = s.regs r
 unfold let eval_xmm (i:xmm) (s:state) : quad32 = s.xmms i
 unfold let eval_mem (ptr:int) (s:state) : nat64 = load_mem64 ptr s.mem
 
-[@va_qattr]
+[@@va_qattr]
 let eval_maddr (m:maddr) (s:state) : int =
   let open FStar.Mul in
     match m with

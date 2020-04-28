@@ -377,7 +377,7 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
   let sg = match f.fghost with Ghost -> "GTot" | NotGhost -> "Tot" in
   let sVal x decreases = "val " + x + " : " + (val_string_of_formals f.fargs) + " -> " + sg + " " + (string_of_typ f.fret) + decreases in
   let printBody header hasDecl x e =
-    (if isOpaqueToSmt || isQAttr then ps.PrintLine ("[@" + (if isOpaqueToSmt then " \"opaque_to_smt\"" else "") + (if isQAttr then " va_qattr" else "") + "]"));
+    (if isOpaqueToSmt || isQAttr then ps.PrintLine ("[@@ " + (if isOpaqueToSmt then "\"opaque_to_smt\"; " else "") + (if isQAttr then "va_qattr; " else "") + "]"));
     let sRet = if hasDecl then "" else " : " + (string_of_typ f.fret) in
     ps.PrintLine (header + x + " " + (let_string_of_formals (not hasDecl) f.fargs) + sRet + " =");
     ps.Indent ();
@@ -445,7 +445,7 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
     | None -> ()
     | Some ss ->
         let formals = let_string_of_formals (match tactic with None -> false | Some _ -> true) args in
-        (if not isReducible then ps.PrintLine "[@\"opaque_to_smt\"]");
+        (if not isReducible then ps.PrintLine "[@@ \"opaque_to_smt\"; ]");
         let header = if isRecursive then "let rec " else "let " in
         ps.PrintLine (header + (sid p.pname) + " " + formals + " =")
         (match tactic with None -> () | Some _ -> ps.PrintLine "(");

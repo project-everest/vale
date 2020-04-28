@@ -58,6 +58,7 @@ rule lextoken = parse
 | "~>" { TILDERARROW (curLoc lexbuf) }
 | "$$" { DOLLARDOLLAR (curLoc lexbuf) }
 | "[@" { LBRACKETAT (curLoc lexbuf) }
+| "[@@" { LBRACKETAT (curLoc lexbuf) }
 | "{:" { LBRACECOLON (curLoc lexbuf) }
 | "\\/" { BACKSLASHSLASH (curLoc lexbuf) }
 | "u#" { UNIVERSE (curLoc lexbuf) }

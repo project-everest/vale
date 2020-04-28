@@ -17,14 +17,14 @@ type mod_t =
 unfold let mods_t = list mod_t
 unfold let va_mods_t = mods_t
 
-[@va_qattr] unfold let va_Mod_None = Mod_None
-[@va_qattr] unfold let va_Mod_ok = Mod_ok
-[@va_qattr] unfold let va_Mod_reg = Mod_reg
-[@va_qattr] unfold let va_Mod_xmm = Mod_xmm
-[@va_qattr] unfold let va_Mod_flags = Mod_flags
-[@va_qattr] unfold let va_Mod_mem = Mod_mem
+[@@va_qattr] unfold let va_Mod_None = Mod_None
+[@@va_qattr] unfold let va_Mod_ok = Mod_ok
+[@@va_qattr] unfold let va_Mod_reg = Mod_reg
+[@@va_qattr] unfold let va_Mod_xmm = Mod_xmm
+[@@va_qattr] unfold let va_Mod_flags = Mod_flags
+[@@va_qattr] unfold let va_Mod_mem = Mod_mem
 
-[@va_qattr "opaque_to_smt"]
+[@@va_qattr; "opaque_to_smt"]
 let mod_eq (x y:mod_t) : Pure bool (requires True) (ensures fun b -> b == (x = y)) =
   match x with
   | Mod_None -> (match y with Mod_None -> true | _ -> false)
@@ -34,7 +34,7 @@ let mod_eq (x y:mod_t) : Pure bool (requires True) (ensures fun b -> b == (x = y
   | Mod_flags -> (match y with Mod_flags -> true | _ -> false)
   | Mod_mem -> (match y with Mod_mem -> true | _ -> false)
 
-[@va_qattr]
+[@@va_qattr]
 let update_state_mod (m:mod_t) (sM sK:state) : state =
   match m with
   | Mod_None -> sK
@@ -44,13 +44,13 @@ let update_state_mod (m:mod_t) (sM sK:state) : state =
   | Mod_flags -> va_update_flags sM sK
   | Mod_mem -> va_update_mem sM sK
 
-[@va_qattr]
+[@@va_qattr]
 let rec update_state_mods (mods:mods_t) (sM sK:state) : state =
   match mods with
   | [] -> sK
   | m::mods -> update_state_mod m sM (update_state_mods mods sM sK)
 
-[@va_qattr]
+[@@va_qattr]
 unfold let update_state_mods_norm (mods:mods_t) (sM sK:state) : state =
   norm [iota; zeta; delta_attr [`%qmodattr]; delta_only [`%update_state_mods; `%update_state_mod]] (update_state_mods mods sM sK)
 
@@ -58,21 +58,21 @@ let va_lemma_norm_mods (mods:mods_t) (sM sK:state) : Lemma
   (ensures update_state_mods mods sM sK == update_state_mods_norm mods sM sK)
   = ()
 
-[@va_qattr qmodattr]
+[@@va_qattr; qmodattr]
 let va_mod_dst_opr64 (o:operand) : mod_t =
   match o with
   | OConst n -> Mod_None
   | OReg r -> Mod_reg r
   | OMem m -> Mod_mem
 
-[@va_qattr qmodattr]
+[@@va_qattr; qmodattr]
 let va_mod_reg_opr64 (o:operand) : mod_t =
   match o with
   | OConst n -> Mod_None
   | OReg r -> Mod_reg r
   | OMem m -> Mod_None
 
-[@va_qattr qmodattr] let va_mod_xmm (x:xmm) : mod_t = Mod_xmm x
+[@@va_qattr; qmodattr] let va_mod_xmm (x:xmm) : mod_t = Mod_xmm x
 
 let quickProc_wp (a:Type0) : Type u#1 = (s0:state) -> (wp_continue:state -> a -> Type0) -> Type0
 
@@ -88,7 +88,7 @@ let t_proof (#a:Type0) (c:va_code) (mods:mods_t) (wp:quickProc_wp a) : Type =
     (ensures va_t_ensure c mods s0 k)
 
 // Code that returns a ghost value of type a
-[@va_qattr]
+[@@va_qattr]
 noeq type quickCode (a:Type0) : va_code -> Type =
 | QProc:
     c:va_code ->
@@ -97,8 +97,8 @@ noeq type quickCode (a:Type0) : va_code -> Type =
     proof:t_proof c mods wp ->
     quickCode a c
 
-[@va_qattr]
+[@@va_qattr]
 unfold let va_quickCode = quickCode
 
-[@va_qattr]
+[@@va_qattr]
 unfold let va_QProc = QProc
