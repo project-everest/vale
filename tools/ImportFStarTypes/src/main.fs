@@ -255,9 +255,10 @@ let rec parse_exp (e:raw_exp):f_exp =
         EArrow (a, x, parse_exp e1, parse_exp e2)
       )
       with Err s -> EUnsupported s
-  | RList [RColon _; e1; RId (_, ("Tm_type" | "Tm_delayed"))] -> parse_exp e1
-  | RList [RColon _; e1; RList [RColon _; RId (_, ("Tm_name" | "Tm_fvar")); _]] -> parse_exp e1
-  | RList [RColon _; e1; e2] -> ETyped (parse_exp e1, parse_exp e2)
+//  | RList [RColon _; e1; RId (_, ("Tm_type" | "Tm_delayed"))] -> parse_exp e1
+//  | RList [RColon _; e1; RList [RColon _; RId (_, ("Tm_name" | "Tm_fvar")); _]] -> parse_exp e1
+//  | RList [RColon _; e1; e2] -> ETyped (parse_exp e1, parse_exp e2)
+  | RList [RColon _; e1; _] -> parse_exp e1
   | RList [RRefine _; RList [RColon _; RId (_, x); e1]; e2] -> ERefine (parse_id x, parse_exp e1, parse_exp e2)
   | RList [RAscribed _; e1; e2] -> ETyped (parse_exp e1, parse_exp e2)
   | RList [RPattern _; RList pats; e] ->
@@ -1185,7 +1186,7 @@ let main (argv:string array) =
       let modules = List.filter (fun (x:string list) -> match x with s::_ when s = sModule -> true | _ -> false) modules in
       let get_module_blocks (lines:string list):string list list =
         let lines = List.filter (fun (x:string) -> not (x.StartsWith("#") || x.Contains("): (Warning "))) lines in
-        match splitWhere (fun (x:string) -> x.StartsWith("Exports:")) lines with
+        match splitWhere (fun (x:string) -> x.StartsWith("Declarations:")) lines with
         | [_; (_::lines)] ->
             splitWhere
               (fun (x:string) ->
