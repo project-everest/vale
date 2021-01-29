@@ -94,7 +94,7 @@ procedure WhileTest()
         invariant
             0 <= eax <= ebx + 1;
             2 * ebx - eax == old(2 * ebx - eax);
-        decreases 1 + ebx - eax;
+        decreases 99, 1 + ebx - eax, true, 100;
     {
         Increment(eax);
         Increment(eax);
