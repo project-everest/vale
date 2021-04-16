@@ -89,7 +89,9 @@ let rec string_of_exp_prec prec e =
     | EOp (Update, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " := " + (r 90 e3) + "]", 90)
 
     | EOp (Slice, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " .. " + (r 90 e3) + "]", 90)
-
+    | EOp (SlicePrefix, [e1; e2; e3], _) -> ((r 90 e1) + "[" + " .. " + (r 90 e2) + "]", 90)
+    | EOp (SliceSuffix, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " .. " + "]", 90)
+  
     | EOp (Cond, [e1; e2; e3], _) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e], _) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2], _) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
