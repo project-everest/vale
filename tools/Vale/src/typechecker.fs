@@ -1461,6 +1461,20 @@ and infer_exp (env:env) (u:unifier) (e:exp) (expected_typ:typ option):(typ * aex
       | (AE_ApplyX (_, _, _, es), _, _) -> ret t (AE_Op (Update, es))
       | _ -> internalErr ("EOp Update")
     )
+  | EOp (Slice, [e1; e2; e3], _) ->
+    (
+      let (t1, ae1) = infer_exp_force env u e1 expected_typ in
+      let x =
+        match t1 with
+        | TName (Id x) | TApply (Id x, _) -> x
+        | _ -> err (sprintf "cannot find overloaded operator([..]) function for collection of type %s" (string_of_typ t1))
+        in
+      let e = eapply (Operator (x + "[..]")) [e1; e2; e3] in
+      let (t, ae) = infer_exp env u e expected_typ in
+      match ae with
+      | (AE_ApplyX (_, _, _, es), _, _) -> ret t (AE_Op (Slice, es))
+      | _ -> internalErr ("EOp Slice")
+    )
   | EOp (Bop BIn, [e1; e2], _) ->
     (
       let (t2, ae2) = infer_exp_force env u e2 expected_typ in
@@ -2101,6 +2115,10 @@ let tc_decl (env:env) (decl:((loc * decl) * bool)):(env * ((loc * decl) * bool) 
           | (Operator "[]", _) -> err "operator([]) expects two arguments (the first argument must be a named type)"
           | (Operator "[:=]", [(_, Some (TName (Id x) | (TApply (Id x, _)))); _; _]) -> Operator (x + "[:=]")
           | (Operator "[:=]", _) -> err "operator([:=]) expects three arguments (the first argument must be a named type)"
+
+          | (Operator "[..]", [(_, Some (TName (Id x) | (TApply (Id x, _)))); _; _]) -> Operator (x + "[..]")
+          | (Operator "[..]", _) -> err "operator([..]) expects three arguments (the first argument must be a named type)"
+
           | (Operator "?[]", [(_, Some (TName (Id x) | (TApply (Id x, _)))); _]) -> Operator (x + "?[]")
           | (Operator "?[]", _) -> err "operator(?[]) expects two arguments (the first argument must be a named type)"
           | (Operator xf, [(_, Some (TName (Id xt) | (TApply (Id xt, _)))); _])
