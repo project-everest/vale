@@ -1050,14 +1050,25 @@ let hoist_while_loops (env:env) (loc:loc) (p:proc_decl):decl list =
         let e_exit = eop (Uop (UNot BpProp)) [eCond] in
         let spec_exit = inv_to_spec in_reads (REnsures Unrefined) (loc, e_exit) in
         let spec_enter_body = inv_to_spec ins (RRequires Unrefined) (loc, eCond) in
-        // ed << old(ed)
-        // precedes(ed, old(ed))
-        let lexList (es:exp list) = List.foldBack (fun e ls -> eapply (Id "lexCons") [e; ls]) es (evar (Id "LexTop")) in
+        // [ed1, ..., edn] << old([ed1, ..., edn])
+        //   -->
+        // ed1 << old(ed1) || (ed1 == old(ed1) && ... (edn << old(edn)) ...)
+        let rec f_precede (es:exp list) : exp =
+          let precede cmp e =
+            let edIn = eop (Uop UOld) [subst_ins ins e] in
+            let edOut = subst_ins in_reads e in
+            if cmp then eapply (Id "precedes_wrap") [edOut; edIn] else EOp (Bop (BEq BpProp), [edOut; edIn], None)
+            in
+          match es with
+          | [] -> EBool false
+          | [e] -> precede true e // edn << old(edn)
+          | e::es ->
+              // edk << old(edk) || (edk == old(edk) && ...)
+              let conj = EOp (Bop (BAnd BpProp), [precede false e; f_precede es], None) in
+              EOp (Bop (BOr BpProp), [precede true e; conj], None)
+          in
         let (lEd, eds) = ed in
-        let edIn = eop (Uop UOld) [subst_ins ins (lexList eds)] in
-        let edOut = subst_ins in_reads (lexList eds) in
-        let precedes = eapply (Id "precedes_wrap") [edOut; edIn] in
-        let spec_precedes = inv_to_spec [] (REnsures Unrefined) (lEd, precedes) in
+        let spec_precedes = inv_to_spec [] (REnsures Unrefined) (lEd, f_precede eds) in
         let sInitIn (x:id) = SVar (x, Some (getType x), Mutable, XGhost, [], Some (evar (in_id x))) in
         let sInitOut (x:id) = SAssign ([(x, None)], (evar (in_id x))) in
         let in_reads_init = List.filter (fun x -> match find_var x with InlineLocal _ -> false | _ -> true) in_reads in

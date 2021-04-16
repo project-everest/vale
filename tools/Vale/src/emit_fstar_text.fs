@@ -302,7 +302,7 @@ let rec emit_stmt (ps:print_state) (outs:(bool * formal list) option) (s:stmt):u
       let () =
         match (ed, outs) with
         | ([], Some (_, ((x, _)::_))) -> ps.PrintLine ("(decreases " + (sid x) + ")")
-        | (_::_, _) -> ps.PrintLine ("(decreases (" + (String.concat ", " (List.map string_of_exp ed)) + "))")
+        | (_::_, _) -> ps.PrintLine ("(decreases %[" + (String.concat "; " (List.map string_of_exp ed)) + "])")
         | ([], _) -> ()
         in
       ps.PrintLine "=";
