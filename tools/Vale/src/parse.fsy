@@ -174,8 +174,8 @@ Exp1
   | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5], None)) }
 
   | Exp1 LBRACKET Exp DOTDOT Exp RBRACKET { expAt $2 (EOp (Slice, [$1; $3; $5], None)) }
-  | Exp1 LBRACKET Exp DOTDOT RBRACKET { expAt $2 (EOp (SlicePrefix, [$1; $3], None)) } 
-  | Exp1 LBRACKET DOTDOT Exp RBRACKET { expAt $2 (EOp (SliceSuffix, [$1; $4], None)) } 
+  | Exp1 LBRACKET DOTDOT Exp RBRACKET { expAt $2 (EOp (SlicePrefix, [$1; $4], None)) } 
+  | Exp1 LBRACKET Exp DOTDOT RBRACKET { expAt $2 (EOp (SliceSuffix, [$1; $3], None)) } 
 
   | Exp1 DOT AnyId { expAt $2 (EOp (FieldOp $3, [$1], None)) }
   | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (EVar (exp2id $1 $3, None), None, $5, None)) }
