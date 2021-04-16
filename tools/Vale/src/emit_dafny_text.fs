@@ -152,7 +152,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ("ghost var " + (String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
   | SAssign _ -> emit_stmts ps (eliminate_assign_lhss s)
   | SLetUpdates _ -> internalErr "SLetUpdates"
-  | SBlock ss -> notImplemented "block"
+  | SBlock ss -> emit_block ps ss
   | SIfElse (_, e, ss1, []) ->
       ps.PrintLine ("if (" + (string_of_exp e) + ")");
       emit_block ps ss1
