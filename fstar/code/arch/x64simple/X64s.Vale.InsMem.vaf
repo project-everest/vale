@@ -1,0 +1,82 @@
+include "X64.Vale.InsBasic.vaf"
+include{:fstar}{:open} "X64.Machine_s"
+include{:fstar}{:open} "X64.Vale.State"
+include{:fstar}{:open} "X64.Vale.Decls"
+include{:fstar}{:open} "X64.Vale.QuickCode"
+
+module X64.Vale.InsMem
+
+#verbatim{:interface}
+open Defs_s
+open X64.Machine_s
+open X64.Vale.State
+open X64.Vale.Decls
+open X64.Vale.QuickCode
+#endverbatim
+
+#verbatim
+open X64.Machine_s
+open X64.Vale
+open X64.Vale.State
+open X64.Vale.StateLemmas
+open X64.Vale.Decls
+open X64.Vale.InsBasic
+friend X64.Vale.Decls
+module S = X64.Semantics_s
+module P = X64.Print_s
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
+
+procedure Mem64_in(in base:reg_opr64, inline offset:int) returns(o:operand)
+    {:public}
+    {:operand}
+    reads
+        mem;
+    extern;
+
+procedure Mem64_out(in base:reg_opr64, inline offset:int, in o:operand)
+    {:public}
+    {:operand}
+    modifies
+        mem;
+    extern;
+
+procedure Mem64_lemma(ghost base:operand, ghost offset:int)
+    {:public}
+    {:quick exportOnly}
+    {:typecheck false}
+    reads
+        mem;
+    requires
+        base is OReg;
+        valid_mem64(eval_operand(base, this) + offset, mem);
+    ensures
+        valid_operand(va_opr_code_Mem64(base, offset), this);
+{
+}
+
+procedure Load64(out dst:dst_opr64, in src:reg_opr64, inline offset:int)
+    {:public}
+    {:quick exportOnly}
+    reads
+        mem;
+    requires
+        valid_mem64(src + offset, mem);
+    ensures
+        dst == load_mem64(old(src + offset), mem);
+{
+    Mov64(dst, Mem64(src, offset));
+}
+
+procedure Store64(in dst:reg_opr64, in src:opr64, inline offset:int)
+    {:public}
+    {:quick exportOnly}
+    modifies
+        mem;
+    requires
+        valid_mem64(dst + offset, mem);
+    ensures
+        mem == old(store_mem64(dst + offset, src, mem));
+{
+    Mov64(Mem64(dst, offset), src);
+}
