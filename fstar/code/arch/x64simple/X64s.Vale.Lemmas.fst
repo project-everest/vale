@@ -1,7 +1,7 @@
-module X64.Vale.Lemmas
+module X64s.Vale.Lemmas
 open FStar.Mul
 open X64.Machine_s
-open X64.Vale.State
+open X64s.Vale.State
 module S = X64.Semantics_s
 
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"

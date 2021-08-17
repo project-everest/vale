@@ -1,16 +1,15 @@
-include "X64.Vale.InsBasic.vaf"
-include "X64.Vale.InsMem.vaf"
+include "X64s.Vale.InsBasic.vaf"
+include "X64s.Vale.InsMem.vaf"
 include{:fstar}{:open} "Words_s"
 include{:fstar}{:open} "Words.Two_s"
 include{:fstar}{:open} "Words.Four_s"
 include{:fstar}{:open} "Types_s"
 include{:fstar}{:open} "Arch.Types"
 include{:fstar}{:open} "X64.Machine_s"
-include{:fstar}{:open} "X64.Vale.State"
-include{:fstar}{:open} "X64.Vale.Decls"
-include{:fstar}{:open} "X64.Vale.QuickCode"
+include{:fstar}{:open} "X64s.Vale.State"
+include{:fstar}{:open} "X64s.Vale.Decls"
 
-module X64.Vale.InsVector
+module X64s.Vale.InsVector
 
 #verbatim{:interface}
 open FStar.Mul
@@ -21,12 +20,10 @@ open Words.Four_s
 open Types_s
 open Arch.Types
 open X64.Machine_s
-open X64.Vale.State
-open X64.Vale.Decls
-open X64.Vale.QuickCode
-open X64.Vale.QuickCodes
-open X64.Vale.InsBasic
-open X64.Vale.InsMem
+open X64s.Vale.State
+open X64s.Vale.Decls
+open X64s.Vale.InsBasic
+open X64s.Vale.InsMem
 
 // Annoying type problem workaround
 let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = let m:nat = n in m
@@ -39,11 +36,11 @@ function nat64_to_nat32 (n:nat64) : nat32
 #verbatim
 open Types_s
 open X64.Machine_s
-open X64.Vale
-open X64.Vale.State
-open X64.Vale.StateLemmas
-open X64.Vale.Decls
-friend X64.Vale.Decls
+open X64s.Vale
+open X64s.Vale.State
+open X64s.Vale.StateLemmas
+open X64s.Vale.Decls
+friend X64s.Vale.Decls
 module S = X64.Semantics_s
 module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
@@ -76,7 +73,6 @@ operand_type xmm:quad32 :=
 procedure Paddd(inout dst:xmm, in src:xmm)
     {:public}
     {:instruction Ins(S.Paddd(dst, src))}
-    {:quick exportOnly} 
     modifies efl;
     ensures
         dst == old(Mkfour(
@@ -90,7 +86,6 @@ procedure Paddd(inout dst:xmm, in src:xmm)
 procedure Pxor(inout dst:xmm, in src:xmm)
     {:public}
     {:instruction Ins(S.Pxor(dst, src))}
-    {:quick exportOnly}
     ensures
         dst == old(quad32_xor(dst, src));
 {
@@ -99,7 +94,6 @@ procedure Pxor(inout dst:xmm, in src:xmm)
 procedure Pslld(inout dst:xmm, inline amt:int)
     {:public}
     {:instruction Ins(S.Pslld(dst, amt))}
-    {:quick exportOnly}
     requires
         0 <= amt < 32;
     ensures
@@ -110,7 +104,6 @@ procedure Pslld(inout dst:xmm, inline amt:int)
 procedure Psrld(inout dst:xmm, inline amt:int)
     {:public}
     {:instruction Ins(S.Psrld(dst, amt))}
-    {:quick exportOnly}
     requires
         0 <= amt < 32;
     ensures
@@ -121,7 +114,6 @@ procedure Psrld(inout dst:xmm, inline amt:int)
 procedure Pshufd(inout dst:xmm, in src:xmm, inline permutation:imm8)
     {:public}
     {:instruction Ins(S.Pshufd(dst, src, permutation))}
-    {:quick exportOnly}
     ensures
         dst == old(Mkfour(
             select_word(src, byte_to_twobits(permutation).lo0),
@@ -134,7 +126,6 @@ procedure Pshufd(inout dst:xmm, in src:xmm, inline permutation:imm8)
 procedure Pcmpeqd(inout dst:xmm, in src:xmm)
     {:public}
     {:instruction Ins(S.Pcmpeqd(dst, src))}
-    {:quick exportOnly}
     ensures
         dst == old(Mkfour(
             if src.lo0 = dst.lo0 then 0xFFFFFFFF else 0,
@@ -147,7 +138,6 @@ procedure Pcmpeqd(inout dst:xmm, in src:xmm)
 procedure Pextrq(out dst:dst_opr64, in src:xmm, inline index:imm8)
     {:public}
     {:instruction Ins(S.Pextrq(dst, src, index))}
-    {:quick exportOnly}
     requires
         index < 2;
     ensures
@@ -158,7 +148,6 @@ procedure Pextrq(out dst:dst_opr64, in src:xmm, inline index:imm8)
 procedure Pinsrd(inout dst:xmm, in src:opr64, inline index:imm8)
     {:public}
     {:instruction Ins(S.Pinsrd(dst, src, index))}
-    {:quick exportOnly}
     requires
         src < pow2_32;
         index < 4;
@@ -169,7 +158,6 @@ procedure Pinsrd(inout dst:xmm, in src:opr64, inline index:imm8)
 
 procedure PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, out tmp:reg_opr64)
     {:public}
-    {:quick exportOnly}
     requires
         index < 4;
     ensures
@@ -182,7 +170,6 @@ procedure PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, ou
 procedure Pinsrq(inout dst:xmm, in src:opr64, inline index:imm8)
     {:public}
     {:instruction Ins(S.Pinsrq(dst, src, index))}
-    {:quick exportOnly}
     requires
         index < 2;
     ensures
@@ -192,7 +179,6 @@ procedure Pinsrq(inout dst:xmm, in src:opr64, inline index:imm8)
 
 procedure PinsrqImm(inout dst:xmm, inline immediate:nat64, inline index:imm8, out tmp:reg_opr64)
     {:public}
-    {:quick exportOnly}
     requires
         index < 2;
     ensures
@@ -205,7 +191,6 @@ procedure PinsrqImm(inout dst:xmm, inline immediate:nat64, inline index:imm8, ou
 procedure VPSLLDQ4(inout dst:xmm, in src:xmm)
     {:public}
     {:instruction Ins(S.VPSLLDQ(dst, src, 4))}
-    {:quick exportOnly}
     ensures
         dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
 {

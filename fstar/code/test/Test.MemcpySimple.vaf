@@ -1,23 +1,21 @@
-include "../arch/x64/X64.Vale.InsBasic.vaf"
-include "../arch/x64/X64.Vale.InsMem.vaf"
-include "../arch/x64/X64.Vale.InsVector.vaf"
+include "../arch/x64simple/X64s.Vale.InsBasic.vaf"
+include "../arch/x64simple/X64s.Vale.InsMem.vaf"
+include "../arch/x64simple/X64s.Vale.InsVector.vaf"
 
-module Test.Memcpy
+module Test.MemcpySimple
 
 #verbatim{:interface}{:implementation}
 open Defs_s
 open X64.Machine_s
-open X64.Vale.State
-open X64.Vale.Decls
-open X64.Vale.QuickCode
-open X64.Vale.QuickCodes
-open X64.Vale.InsBasic
-open X64.Vale.InsMem
-open X64.Vale.InsVector
+open X64s.Vale.State
+open X64s.Vale.Decls
+open X64s.Vale.InsBasic
+open X64s.Vale.InsMem
+open X64s.Vale.InsVector
 #endverbatim
 
 procedure Copy16()
-//    {:options z3rlimit(20), debug(Test.Memcpy), debug_level(print_normalized_terms)}
+    {:options z3rlimit(50)}
     requires/ensures
         valid_mem64(rsi, mem);
         valid_mem64(rsi + 8, mem);
@@ -39,7 +37,7 @@ procedure Copy16()
 }
 
 procedure Copy16Q()
-    {:quick}
+    {:options z3rlimit(50)}
     requires/ensures
         valid_mem64(rsi, mem);
         valid_mem64(rsi + 8, mem);
@@ -73,7 +71,7 @@ procedure benchmark_quick_modifies(
         ghost old_xmm14:quad32,
         ghost old_xmm15:quad32
         )
-    {:quick}
+    {:options z3rlimit(50)}
     requires
         win ==> old_xmm15 == xmm6;
         win ==> old_xmm15 == xmm6;

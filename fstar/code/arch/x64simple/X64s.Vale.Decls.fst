@@ -1,9 +1,9 @@
-module X64.Vale.Decls
+module X64s.Vale.Decls
 open FStar.Mul
 open X64.Machine_s
-open X64.Vale
-open X64.Vale.State
-open X64.Vale.StateLemmas
+open X64s.Vale
+open X64s.Vale.State
+open X64s.Vale.StateLemmas
 open FStar.UInt
 module S = X64.Semantics_s
 module P = X64.Print_s

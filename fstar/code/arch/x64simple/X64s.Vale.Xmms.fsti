@@ -1,4 +1,4 @@
-module X64.Vale.Xmms
+module X64s.Vale.Xmms
 // This interface should not refer to Semantics_s
 
 open FStar.Mul

@@ -1,27 +1,25 @@
-include "X64.Vale.InsBasic.vaf"
+include "X64s.Vale.InsBasic.vaf"
 include{:fstar}{:open} "X64.Machine_s"
-include{:fstar}{:open} "X64.Vale.State"
-include{:fstar}{:open} "X64.Vale.Decls"
-include{:fstar}{:open} "X64.Vale.QuickCode"
+include{:fstar}{:open} "X64s.Vale.State"
+include{:fstar}{:open} "X64s.Vale.Decls"
 
-module X64.Vale.InsMem
+module X64s.Vale.InsMem
 
 #verbatim{:interface}
 open Defs_s
 open X64.Machine_s
-open X64.Vale.State
-open X64.Vale.Decls
-open X64.Vale.QuickCode
+open X64s.Vale.State
+open X64s.Vale.Decls
 #endverbatim
 
 #verbatim
 open X64.Machine_s
-open X64.Vale
-open X64.Vale.State
-open X64.Vale.StateLemmas
-open X64.Vale.Decls
-open X64.Vale.InsBasic
-friend X64.Vale.Decls
+open X64s.Vale
+open X64s.Vale.State
+open X64s.Vale.StateLemmas
+open X64s.Vale.Decls
+open X64s.Vale.InsBasic
+friend X64s.Vale.Decls
 module S = X64.Semantics_s
 module P = X64.Print_s
 #reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
@@ -43,7 +41,6 @@ procedure Mem64_out(in base:reg_opr64, inline offset:int, in o:operand)
 
 procedure Mem64_lemma(ghost base:operand, ghost offset:int)
     {:public}
-    {:quick exportOnly}
     {:typecheck false}
     reads
         mem;
@@ -57,7 +54,6 @@ procedure Mem64_lemma(ghost base:operand, ghost offset:int)
 
 procedure Load64(out dst:dst_opr64, in src:reg_opr64, inline offset:int)
     {:public}
-    {:quick exportOnly}
     reads
         mem;
     requires
@@ -70,7 +66,6 @@ procedure Load64(out dst:dst_opr64, in src:reg_opr64, inline offset:int)
 
 procedure Store64(in dst:reg_opr64, in src:opr64, inline offset:int)
     {:public}
-    {:quick exportOnly}
     modifies
         mem;
     requires

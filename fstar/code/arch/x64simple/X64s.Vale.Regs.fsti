@@ -1,4 +1,4 @@
-module X64.Vale.Regs
+module X64s.Vale.Regs
 // This interface should not refer to Semantics_s
 
 open FStar.Mul

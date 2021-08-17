@@ -1,4 +1,4 @@
-module X64.Vale.Xmms
+module X64s.Vale.Xmms
 open FStar.Mul
 open X64.Machine_s
 open FStar.FunctionalExtensionality

@@ -1,1 +1,1 @@
-module X64.Vale.State
+module X64s.Vale.State

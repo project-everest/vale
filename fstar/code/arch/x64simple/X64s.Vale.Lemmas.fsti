@@ -1,10 +1,10 @@
-module X64.Vale.Lemmas
+module X64s.Vale.Lemmas
 open FStar.Mul
 open Defs_s
 open Prop_s
 open X64.Machine_s
-open X64.Vale.State
-open X64.Vale.StateLemmas
+open X64s.Vale.State
+open X64s.Vale.StateLemmas
 module S = X64.Semantics_s
 
 unfold let code = S.code

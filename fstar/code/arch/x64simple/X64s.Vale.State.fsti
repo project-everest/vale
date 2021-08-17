@@ -1,4 +1,4 @@
-module X64.Vale.State
+module X64s.Vale.State
 // This interface should not refer to Semantics_s
 
 open FStar.Mul

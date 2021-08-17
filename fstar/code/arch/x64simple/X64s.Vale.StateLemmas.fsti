@@ -1,7 +1,7 @@
-module X64.Vale.StateLemmas
+module X64s.Vale.StateLemmas
 open FStar.Mul
 open X64.Machine_s
-open X64.Vale.State
+open X64s.Vale.State
 open FStar.FunctionalExtensionality
 module S = X64.Semantics_s
 
