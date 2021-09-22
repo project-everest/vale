@@ -1185,7 +1185,7 @@ let main (argv:string array) =
       let modules = splitWhere line_is_new_module lines in
       let modules = List.filter (fun (x:string list) -> match x with s::_ when s = sModule -> true | _ -> false) modules in
       let get_module_blocks (lines:string list):string list list =
-        let lines = List.filter (fun (x:string) -> not (x.StartsWith("#") || x.Contains("): (Warning "))) lines in
+        let lines = List.filter (fun (x:string) -> not (x.StartsWith("#") || x.Contains("): (Warning ") || x.StartsWith("Exports:"))) lines in
         match splitWhere (fun (x:string) -> x.StartsWith("Declarations:")) lines with
         | [_; (_::lines)] ->
             splitWhere
