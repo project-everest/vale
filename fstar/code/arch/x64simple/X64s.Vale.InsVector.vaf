@@ -1,0 +1,197 @@
+include "X64s.Vale.InsBasic.vaf"
+include "X64s.Vale.InsMem.vaf"
+include{:fstar}{:open} "Words_s"
+include{:fstar}{:open} "Words.Two_s"
+include{:fstar}{:open} "Words.Four_s"
+include{:fstar}{:open} "Types_s"
+include{:fstar}{:open} "Arch.Types"
+include{:fstar}{:open} "X64.Machine_s"
+include{:fstar}{:open} "X64s.Vale.State"
+include{:fstar}{:open} "X64s.Vale.Decls"
+
+module X64s.Vale.InsVector
+
+#verbatim{:interface}
+open FStar.Mul
+open Defs_s
+open Words_s
+open Words.Two_s
+open Words.Four_s
+open Types_s
+open Arch.Types
+open X64.Machine_s
+open X64s.Vale.State
+open X64s.Vale.Decls
+open X64s.Vale.InsBasic
+open X64s.Vale.InsMem
+
+// Annoying type problem workaround
+let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = let m:nat = n in m
+#endverbatim
+
+function nat64_to_nat32 (n:nat64) : nat32
+  requires n < pow2_32;
+  extern;
+
+#verbatim
+open Types_s
+open X64.Machine_s
+open X64s.Vale
+open X64s.Vale.State
+open X64s.Vale.StateLemmas
+open X64s.Vale.Decls
+friend X64s.Vale.Decls
+module S = X64.Semantics_s
+module P = X64.Print_s
+#reset-options "--initial_fuel 2 --max_fuel 2 --z3rlimit 20"
+#endverbatim
+
+var xmm0:quad32 {:state xmm(0)};
+var xmm1:quad32 {:state xmm(1)};
+var xmm2:quad32 {:state xmm(2)};
+var xmm3:quad32 {:state xmm(3)};
+var xmm4:quad32 {:state xmm(4)};
+var xmm5:quad32 {:state xmm(5)};
+var xmm6:quad32 {:state xmm(6)};
+var xmm7:quad32 {:state xmm(7)};
+var xmm8:quad32 {:state xmm(8)};
+var xmm9:quad32 {:state xmm(9)};
+var xmm10:quad32 {:state xmm(10)};
+var xmm11:quad32 {:state xmm(11)};
+var xmm12:quad32 {:state xmm(12)};
+var xmm13:quad32 {:state xmm(13)};
+var xmm14:quad32 {:state xmm(14)};
+var xmm15:quad32 {:state xmm(15)};
+
+operand_type xmm:quad32 :=
+| inout xmm0 | inout xmm1 | inout xmm2 | inout xmm3
+| inout xmm4 | inout xmm5 | inout xmm6 | inout xmm7
+| inout xmm8 | inout xmm9 | inout xmm10 | inout xmm11
+| inout xmm12 | inout xmm13 | inout xmm14 | inout xmm15
+;
+
+procedure Paddd(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.Paddd(dst, src))}
+    modifies efl;
+    ensures
+        dst == old(Mkfour(
+            add_wrap32(dst.lo0, src.lo0),
+            add_wrap32(dst.lo1, src.lo1),
+            add_wrap32(dst.hi2, src.hi2),
+            add_wrap32(dst.hi3, src.hi3)));
+{
+}
+
+procedure Pxor(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.Pxor(dst, src))}
+    ensures
+        dst == old(quad32_xor(dst, src));
+{
+}
+
+procedure Pslld(inout dst:xmm, inline amt:int)
+    {:public}
+    {:instruction Ins(S.Pslld(dst, amt))}
+    requires
+        0 <= amt < 32;
+    ensures
+        dst == four_map((fun(i:nat32) ishl32(i, amt)), old(dst));
+{
+}
+
+procedure Psrld(inout dst:xmm, inline amt:int)
+    {:public}
+    {:instruction Ins(S.Psrld(dst, amt))}
+    requires
+        0 <= amt < 32;
+    ensures
+        dst == four_map((fun(i:nat32) ishr32(i, amt)), old(dst));
+{
+}
+
+procedure Pshufd(inout dst:xmm, in src:xmm, inline permutation:imm8)
+    {:public}
+    {:instruction Ins(S.Pshufd(dst, src, permutation))}
+    ensures
+        dst == old(Mkfour(
+            select_word(src, byte_to_twobits(permutation).lo0),
+            select_word(src, byte_to_twobits(permutation).lo1),
+            select_word(src, byte_to_twobits(permutation).hi2),
+            select_word(src, byte_to_twobits(permutation).hi3)));
+{
+}
+
+procedure Pcmpeqd(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.Pcmpeqd(dst, src))}
+    ensures
+        dst == old(Mkfour(
+            if src.lo0 = dst.lo0 then 0xFFFFFFFF else 0,
+            if src.lo1 = dst.lo1 then 0xFFFFFFFF else 0,
+            if src.hi2 = dst.hi2 then 0xFFFFFFFF else 0,
+            if src.hi3 = dst.hi3 then 0xFFFFFFFF else 0));
+{
+}
+
+procedure Pextrq(out dst:dst_opr64, in src:xmm, inline index:imm8)
+    {:public}
+    {:instruction Ins(S.Pextrq(dst, src, index))}
+    requires
+        index < 2;
+    ensures
+        dst == (if index = 0 then lo64(src) else hi64(src));
+{
+}
+
+procedure Pinsrd(inout dst:xmm, in src:opr64, inline index:imm8)
+    {:public}
+    {:instruction Ins(S.Pinsrd(dst, src, index))}
+    requires
+        src < pow2_32;
+        index < 4;
+    ensures
+        dst == insert_nat32(old(dst), nat64_to_nat32(old(src)), #nat2(index));
+{
+}
+
+procedure PinsrdImm(inout dst:xmm, inline immediate:nat32, inline index:imm8, out tmp:reg_opr64)
+    {:public}
+    requires
+        index < 4;
+    ensures
+        dst == insert_nat32(old(dst), immediate, #nat2(index));
+{
+    Mov64(tmp, immediate);
+    Pinsrd(dst, tmp, index);
+}
+
+procedure Pinsrq(inout dst:xmm, in src:opr64, inline index:imm8)
+    {:public}
+    {:instruction Ins(S.Pinsrq(dst, src, index))}
+    requires
+        index < 2;
+    ensures
+        dst == insert_nat64(old(dst), src, #nat1(index));
+{
+}
+
+procedure PinsrqImm(inout dst:xmm, inline immediate:nat64, inline index:imm8, out tmp:reg_opr64)
+    {:public}
+    requires
+        index < 2;
+    ensures
+        dst == insert_nat64(old(dst), immediate, #nat1(index));
+{
+    Mov64(tmp, immediate);
+    Pinsrq(dst, tmp, index);
+}
+
+procedure VPSLLDQ4(inout dst:xmm, in src:xmm)
+    {:public}
+    {:instruction Ins(S.VPSLLDQ(dst, src, 4))}
+    ensures
+        dst == old(Mkfour(0, src.lo0, src.lo1, src.hi2));
+{
+}
