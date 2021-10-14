@@ -215,6 +215,10 @@ decls
     {
       [RList [RList $2; $3; RId $4; RList $5; RList $6; $8; $9]]
     }
+  | attrs_opt QUALIFIER ID udecls binder1s SCOLON exp1 body_opt
+    {
+      [RList [RList []; (RDecl (fst $2, "unsupported")); RId $3; RList $4; RList $5; $7; $8]]
+    }
   | attrs_opt qualifiers category ID udecls binder1s SCOLON exp1 body_opt AND any
     {
       [RList [RList $2; $3; RId $4; RList $5; RList $6; $8; RList []]]
