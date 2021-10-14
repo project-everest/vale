@@ -5,7 +5,7 @@
 
 set -e
 
-SCONS_PYTHON_MAJOR_MINOR=3
+SCONS_PYTHON_MAJOR_MINOR=3.6
 
 # Windows-only: print out the directory of the Python associated to SCons
 windows_scons_python_dir () {
