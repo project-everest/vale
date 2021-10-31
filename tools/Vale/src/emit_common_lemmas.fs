@@ -15,6 +15,7 @@ type build_env =
     proc:proc_decl;
     loc:loc;
     is_instruction:bool;
+    is_no_inline:bool;
     is_quick:bool;
     is_operand:bool;
     is_framed:bool;
@@ -69,6 +70,11 @@ and build_code_stmts (env:env) (benv:build_env) (stmts:stmt list):exp =
   List.fold cons empty (List.rev slist)
 and build_code_block (env:env) (benv:build_env) (stmts:stmt list):exp =
   vaApp "Block" [build_code_stmts env benv stmts]
+and build_function (env:env) (benv:build_env) (stmts:stmt list):exp =
+  // printfn "this is where we emit va_Function";
+    match benv.proc.pname with
+    | Id(id) -> vaApp "Function" [EString id; build_code_stmts env benv stmts]
+    | _ -> internalErr "Function call unexpected ID"
 
 (* Build codegen_success value for body of procedure Q *)
 let rec build_codegen_success_stmt (q:id) (env:env) (s:stmt):exp option list =
@@ -458,6 +464,7 @@ let build_pre_code_via_transform (loc:loc) (env:env) (benv:build_env) (stmts:stm
     {
       fname = Reserved ("transform_" + string_of_id p.pname);
       fghost = NotGhost;
+      // finline = benv.binline;
       ftargs = [];
       fargs = fParams;
       fret_name = None;
@@ -482,6 +489,7 @@ function method{:opaque} va_code_Q(iii:int, dummy:va_operand_reg, dummy2:va_oper
 let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * decl) list =
   let p = benv.proc in
   let isTransform = List_mem_assoc (Id "transform") p.pattrs in
+  let isNoInline = benv.is_no_inline in
   let precode = if isTransform then build_pre_code_via_transform loc env benv stmts else [] in
   if p.pghost = Ghost then [] else
   let fParams = make_fun_params p.prets p.pargs in
@@ -498,6 +506,7 @@ let build_code (loc:loc) (env:env) (benv:build_env) (stmts:stmt list):(loc * dec
       fbody =
         if benv.is_instruction then Some (attrs_get_exp (Id "instruction") p.pattrs)
         else if isTransform then Some (eapply (Reserved "get_result") [vaApp ("transform_" + string_of_id p.pname) (List.map EVar fParams)])
+        else if isNoInline then Some(build_function env benv stmts)
         else Some (build_code_block env benv stmts);
       fattrs =
         if benv.is_quick then
@@ -753,6 +762,8 @@ let rec build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
     else []
     in
   let isInstruction = List_mem_assoc (Id "instruction") p.pattrs in
+  let isNoInline = List_mem_assoc (Id "noInline") p.pattrs in
+  // printfn "setting no inline: %b" isNoInline;
   let isOperand = List_mem_assoc (Id "operand") p.pattrs in
   let codeName prefix = Reserved ("code_" + prefix + (string_of_id p.pname)) in
   let isQuick = is_quick_body p.pattrs in
@@ -786,6 +797,7 @@ let rec build_proc (envBody:env) (env:env) (loc:loc) (p:proc_decl):decls =
             proc = p;
             loc = loc;
             is_instruction = isInstruction;
+            is_no_inline = isNoInline;
             is_quick = isQuick;
             is_operand = isOperand;
             is_framed = attrs_get_bool (Id "frame") (p.pghost = NotGhost) p.pattrs;
