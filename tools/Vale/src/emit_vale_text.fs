@@ -1,5 +1,6 @@
 module Emit_vale_text
 
+open System
 open Ast
 open Ast_util
 open Parse_util
@@ -145,8 +146,13 @@ and string_of_var_storage (g:var_storage) =
   | XState e -> "{:state" + (string_of_exp_prec 5 e) + "}"
 and string_of_formal (x:id, t:typ option) = (sid x) + (match t with None -> "" | Some t -> ":" + (string_of_typ t))
 and string_of_formals (xs:formal list):string = String.concat ", " (List.map string_of_formal xs)
+
 and string_of_pformal (x:id, t:typ, g:var_storage, _, _) = (string_of_var_storage g) + (sid x) + ":" + (string_of_typ t)
+and ast_of_pformal (x:id, t:typ, g:var_storage, _, _) = ("{'storage':'" + string_of_var_storage g) + "','name':'" + (sid x) + "','type':'" + (string_of_typ t) + "'}"
+
 and string_of_pformals (xs:pformal list):string = String.concat ", " (List.map string_of_pformal xs)
+and ast_of_pformals (xs:pformal list):string = String.concat ", " (List.map ast_of_pformal xs)
+
 and string_of_trigger (es:exp list):string = "{:trigger " + (string_of_exps es) + "}"
 and string_of_triggers (ts:exp list list):string = String.concat " " (List.map string_of_trigger ts)
 and string_of_exp (e:exp):string = string_of_exp_prec 5 e
@@ -228,6 +234,33 @@ and emit_block (ps:print_state) (stmts:stmt list) =
   ps.Unindent ();
   ps.PrintLine "}"
 
+let rec dump_exp_ast (e:exp): string =
+  let r = dump_exp_ast in
+  match e with
+  | ELoc (loc, ee) -> try (r ee) with err -> raise (LocErr (loc, err))
+  | EOp (op, es, _) -> 
+      String.Format("{{'ntype':'EOp', 'op':'{0}', 'es':{1}}}", op, dump_exps_ast es)
+  | EVar (var, _) ->
+    String.Format("{{'ntype':'EVar', 'name':'{0}'}}", (sid var))
+  | EInt (value) -> 
+    String.Format("{{'ntype':'EInt', 'value':'{0}'}}", value)
+  | EApply (e, _, es, _) ->
+    String.Format("{{'ntype':'EApply', 'fun':{0}, 'formals':{1}}}", (dump_exp_ast e), dump_exps_ast es)
+  | ECast (_, e, _) ->
+      String.Format("{{'ntype':'ECast', 'exp':{0}}}", (dump_exp_ast e))
+  | _ ->  failwith (String.Format("unhandled {0}", e))
+and dump_exps_ast (es:exp list) = "[" + String.concat "," (List.map dump_exp_ast es) + "]"
+
+let rec dump_stmt_ast (s:stmt):string =
+  match s with
+    | SLoc (loc, s) -> try dump_stmt_ast s with err -> raise (LocErr (loc, err))
+    | SAssign ([], e) -> dump_exp_ast e
+    // ps.PrintLine ((string_of_exp e) + ";")
+    // | SAssign (lhss, e) ->
+    //     ps.PrintLine ((String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
+    | _ -> failwith (String.Format("unhandled {0}", s.GetType()))
+and dump_stmts_ast (stmts:stmt list) = "[" + String.concat "," (List.map dump_stmt_ast stmts) + "]"
+
 let string_of_raw_spec_kind (r:raw_spec_kind) =
   match r with
   | RRequires r -> "requires"
@@ -262,13 +295,13 @@ let rec emit_lets (ps:print_state) (ls:lets list) (aliases:(id * id) list):unit 
 let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
   try
     match s with
-    | Requires (r, e) ->
-        ps.PrintLine ("requires" + " " + (string_of_exp e) + ";")
-    | Ensures (r, e) ->
-        ps.PrintLine ("ensures" + "  " + (string_of_exp e) + ";")
-    | Modifies (Read, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
-    | Modifies (Modify, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
-    | Modifies (Preserve, e) -> ps.PrintLine ("preserves " + (string_of_exp e) + ";")
+    // | Requires (r, e) ->
+    //     ps.PrintLine ("requires" + " " + (string_of_exp e) + ";")
+    // | Ensures (r, e) ->
+    //     ps.PrintLine ("ensures" + "  " + (string_of_exp e) + ";")
+    // | Modifies (Read, e) -> ps.PrintLine ("reads " + (string_of_exp e) + ";")
+    // | Modifies (Modify, e) -> ps.PrintLine ("modifies " + (string_of_exp e) + ";")
+    // | Modifies (Preserve, e) -> ps.PrintLine ("preserves " + (string_of_exp e) + ";")
     | SpecRaw (RawSpec ((RModifies _) as r, es)) ->
         ps.PrintLine (string_of_raw_spec_kind r);
         ps.Indent ();
@@ -281,11 +314,13 @@ let emit_spec (ps:print_state) (loc:loc, s:spec):unit =
         ps.Indent ();
         List.iter (emit_spec_exp ps) es;
         ps.Unindent()
-    | SpecRaw (Lets ls) ->
-        ps.PrintLine "lets";
-        ps.Indent ();
-        emit_lets ps (List.map snd ls) [];
-        ps.Unindent()
+    | _ -> failwith (String.Format("unhandled {0}", s.GetType()))
+    // | SpecRaw (Lets ls) ->
+    //     ps.PrintLine "lets";
+    //     ps.Indent ();
+    //     emit_lets ps (List.map snd ls) [];
+    //     ps.Unindent()
+
   with err -> raise (LocErr (loc, err))
 
 let string_of_attr (x:id, es:exp list):string =
@@ -306,15 +341,41 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
         ps.PrintLine "}"
   )
 
+let map_requires (p: loc * spec):(loc * spec_exp) list = 
+  let (_, s) = p in 
+  match s with
+  | SpecRaw (RawSpec (r, es)) ->
+    match r with
+    | RRequires (_) -> es
+    | REnsures (_) -> []
+    | RRequiresEnsures -> failwith "requires/ensures"
+    | RModifies (kind) ->  []
+  | _ -> failwith "unhandled spec"
+
+let dump_spec (p: loc * spec_exp): string =
+  let (_, s) = p in 
+  match s with
+  | SpecExp e -> dump_exp_ast e
+  | SpecLet _ -> failwith "unhandled spec"
+
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
   gen_lemma_sym_count := 0;
   (if !reprint_blank_lines then ps.PrintLine (""));
   let sAttrs = string_of_attrs p.pattrs in
   let sProc = string_of_ghost p.pghost + "procedure" in
+  ps.DumpAST("{'ntype':'proc','name':'" + sid p.pname + "',");
+  ps.DumpAST("'formals':[" + (ast_of_pformals p.pargs) + "],");
   ps.PrintLine (sProc + sAttrs + " " + (sid p.pname) + "(" + (string_of_pformals p.pargs) + ")");
   ps.Indent ();
+  assert (p.prets = []);
   (match p.prets with [] -> () | rs -> ps.PrintLine ("returns (" + (string_of_pformals rs) + ")"));
   List.iter (emit_spec ps) p.pspecs;
+
+  let reqs = List.concat (List.map map_requires p.pspecs);
+  ps.DumpAST("'requires':[")
+  ps.DumpAST(String.concat "," (List.map dump_spec reqs));
+  ps.DumpAST("],");
+
   ps.Unindent ();
   ( match p.pbody with
     | None -> ()
@@ -322,9 +383,11 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         ps.PrintLine "{";
         ps.Indent ();
         emit_stmts ps ss;
+        ps.DumpAST("'body':" + (dump_stmts_ast ss));
         ps.Unindent ();
         ps.PrintLine "}"
   )
+  ps.DumpAST("}")
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try

@@ -429,6 +429,7 @@ let qprefix (s:string) (t:string):string = s + (t.Replace(".", "__"))
 type print_state =
   {
     print_out:System.IO.TextWriter;
+    ast_wr:System.IO.TextWriter;
     print_interface:print_state option;
     cur_loc:loc ref;
     cur_indent:string ref;
@@ -436,6 +437,8 @@ type print_state =
   member this.PrintUnbrokenLine (s:string) =
     let {loc_file = f; loc_line = i} = !this.cur_loc in (this.cur_loc := {loc_file = f; loc_line = i + 1; loc_col = 1; loc_pos = 0});
     this.print_out.WriteLine (!this.cur_indent + s);
+  member this.DumpAST (s:string) = 
+    this.ast_wr.Write(s)
   member this.PrintLine (s:string) = this.PrintBreakLine true s
   member this.PrintBreakLine (isFirst:bool) (s:string) =
     let breakCol = 100 in
@@ -488,6 +491,7 @@ type print_state =
 let debug_print_state ():print_state =
   {
     print_out = System.Console.Out;
+    ast_wr = System.Console.Out;
     print_interface = None;
     cur_loc = ref {loc_file = "<stdout>"; loc_line = 0; loc_col = 0; loc_pos = 0};
     cur_indent = ref "";

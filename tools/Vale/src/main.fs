@@ -160,7 +160,7 @@ let main (argv) =
     let flagsSuffixMap = List.rev !suffixMap_rev in
     let debugIncludes = Set.contains "includes" !debug_flags in
     let parse_file comment name =
-      //printfn "%sparsing %s" comment name
+      // printfn "%sparsing %s" comment name
       cur_file := name
       let stream_in = System.IO.File.OpenRead(name) in
       let parse_in = new System.IO.BinaryReader(stream_in) in
@@ -321,6 +321,7 @@ let main (argv) =
       | Some s ->
           Some {
             print_out = s;
+            ast_wr = null;
             print_interface = None;
             cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
             cur_indent = ref "";
@@ -329,6 +330,7 @@ let main (argv) =
     let ps =
       {
         print_out = stream;
+        ast_wr = null;
         print_interface = ps_i;
         cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
         cur_indent = ref "";
@@ -369,6 +371,7 @@ let main (argv) =
             let rps =
               {
                 print_out = rstream;
+                ast_wr = System.Console.Out;
                 print_interface = None;
                 cur_loc = ref { loc_file = ""; loc_line = 1; loc_col = 1; loc_pos = 0 };
                 cur_indent = ref "";
