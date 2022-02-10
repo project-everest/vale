@@ -151,7 +151,7 @@ and string_of_pformal (x:id, t:typ, g:var_storage, _, _) = (string_of_var_storag
 and ast_of_pformal (x:id, t:typ, g:var_storage, _, _) = ("{'storage':'" + string_of_var_storage g) + "','name':'" + (sid x) + "','type':'" + (string_of_typ t) + "'}"
 
 and string_of_pformals (xs:pformal list):string = String.concat ", " (List.map string_of_pformal xs)
-and ast_of_pformals (xs:pformal list):string = String.concat ", " (List.map ast_of_pformal xs)
+
 
 and string_of_trigger (es:exp list):string = "{:trigger " + (string_of_exps es) + "}"
 and string_of_triggers (ts:exp list list):string = String.concat " " (List.map string_of_trigger ts)
@@ -341,41 +341,65 @@ let emit_fun (ps:print_state) (loc:loc) (f:fun_decl):unit =
         ps.PrintLine "}"
   )
 
-let map_requires (p: loc * spec):(loc * spec_exp) list = 
+let map_requires (p: loc * spec): spec_exp list = 
   let (_, s) = p in 
   match s with
   | SpecRaw (RawSpec (r, es)) ->
     match r with
-    | RRequires (_) -> es
+    | RRequires (_) -> List.map snd es
     | REnsures (_) -> []
     | RRequiresEnsures -> failwith "requires/ensures"
     | RModifies (kind) ->  []
   | _ -> failwith "unhandled spec"
 
-let dump_spec (p: loc * spec_exp): string =
+let map_mods (m: mod_kind) (p: loc * spec): spec_exp list = 
   let (_, s) = p in 
+  match s with
+  | SpecRaw (RawSpec (r, es)) ->
+    match r with
+    | RRequires (_) -> []
+    | REnsures (_) -> []
+    | RRequiresEnsures -> failwith "requires/ensures"
+    | RModifies (m) ->  List.map snd es
+  | _ -> failwith "unhandled spec"
+
+let dump_spec (s: spec_exp): string =
   match s with
   | SpecExp e -> dump_exp_ast e
   | SpecLet _ -> failwith "unhandled spec"
 
+let dump_list (a: string list): string = 
+  "[" + (String.concat "," a) + "],"
+
+let dump_proc (ps:print_state) (p:proc_decl):unit =
+  ps.DumpAST("{'ntype':'proc','name':'" + sid p.pname + "',");
+  ps.DumpAST(String.Format("'formals':{0}", dump_list (List.map ast_of_pformal p.pargs)));
+  let reqs = List.concat (List.map map_requires p.pspecs);
+  ps.DumpAST(String.Format("'requires':{0}", dump_list (List.map dump_spec reqs)))
+  let reads = List.concat (List.map (map_mods Read) p.pspecs);
+  ps.DumpAST(String.Format("'reads':{0}", dump_list (List.map dump_spec reads)))
+  let writes = List.concat (List.map (map_mods Modify) p.pspecs);
+  ps.DumpAST(String.Format("'modifies':{0}", dump_list (List.map dump_spec reads)))
+
+  ps.DumpAST("'body':");
+  ( match p.pbody with
+    | None -> ps.DumpAST("{}")
+    | Some ss ->
+        ps.DumpAST(dump_stmts_ast ss)
+  )
+  ps.DumpAST("}")
+
 let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
+  dump_proc ps p;
   gen_lemma_sym_count := 0;
   (if !reprint_blank_lines then ps.PrintLine (""));
   let sAttrs = string_of_attrs p.pattrs in
   let sProc = string_of_ghost p.pghost + "procedure" in
-  ps.DumpAST("{'ntype':'proc','name':'" + sid p.pname + "',");
-  ps.DumpAST("'formals':[" + (ast_of_pformals p.pargs) + "],");
   ps.PrintLine (sProc + sAttrs + " " + (sid p.pname) + "(" + (string_of_pformals p.pargs) + ")");
   ps.Indent ();
   assert (p.prets = []);
   (match p.prets with [] -> () | rs -> ps.PrintLine ("returns (" + (string_of_pformals rs) + ")"));
   List.iter (emit_spec ps) p.pspecs;
-
-  let reqs = List.concat (List.map map_requires p.pspecs);
-  ps.DumpAST("'requires':[")
-  ps.DumpAST(String.concat "," (List.map dump_spec reqs));
-  ps.DumpAST("],");
-
   ps.Unindent ();
   ( match p.pbody with
     | None -> ()
@@ -383,11 +407,9 @@ let emit_proc (ps:print_state) (loc:loc) (p:proc_decl):unit =
         ps.PrintLine "{";
         ps.Indent ();
         emit_stmts ps ss;
-        ps.DumpAST("'body':" + (dump_stmts_ast ss));
         ps.Unindent ();
         ps.PrintLine "}"
   )
-  ps.DumpAST("}")
 
 let emit_decl (ps:print_state) (loc:loc, d:decl):unit =
   try
