@@ -1,0 +1,32 @@
+include "../arch/ppc64le/PPC64LE.Vale.InsBasic.vaf"
+include "../arch/ppc64le/PPC64LE.Vale.InsMem.vaf"
+
+module PPC64LE.Test.Memcpy
+
+#verbatim{:interface}{:implementation}
+open PPC64LE.Machine_s
+open PPC64LE.Vale.Decls
+open PPC64LE.Vale.InsBasic
+open PPC64LE.Vale.InsMem
+#endverbatim
+
+procedure Copy16()
+    requires/ensures
+        valid_mem64(r3, mem);
+        valid_mem64(r3 + 8, mem);
+        valid_mem64(r4, mem);
+        valid_mem64(r4 + 8, mem);
+        r3 + 16 <= r4 || r4 + 16 <= r3;
+    ensures
+        forall(i) 0 <= i && i < 16 && i % 8 = 0 ==> load_mem64(r3 + i, mem) == load_mem64(r4 + i, mem);
+    reads
+        r3; r4;
+    modifies
+        r5; r6;
+        mem;
+{
+    Load64(r5, Mem64(r3, 0));  // equivalent to: MemLoad64(r5, r3, 0);
+    Load64(r6, Mem64(r3, 8));  // equivalent to: MemLoad64(r6, r3, 8);
+    Store64(r5, Mem64(r4, 0)); // equivalent to: MemStore64(r5, r4, 0);
+    Store64(r6, Mem64(r4, 8)); // equivalent to: MemStore64(r6, r4, 8);
+}

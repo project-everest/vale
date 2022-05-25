@@ -1,0 +1,56 @@
+include "../arch/ppc64le/PPC64LE.Vale.InsVector.vaf"
+include "../arch/ppc64le/PPC64LE.Vale.InsBasic.vaf"
+include "../arch/ppc64le/PPC64LE.Vale.InsMem.vaf"
+
+module PPC64LE.Test.Basics
+
+#verbatim{:interface}{:implementation}
+open PPC64LE.Machine_s
+open PPC64LE.Vale.Decls
+open PPC64LE.Vale.InsVector
+open PPC64LE.Vale.InsBasic
+open PPC64LE.Vale.InsMem
+#endverbatim
+
+procedure MulIf()
+    ensures
+        old(r3) <= 10 ==> r3 == (old(r3) * 5) % pow2_64;
+        old(r3) > 10 ==> r3 == 5;
+    modifies
+        r3; r4; cr0;
+{
+    LoadImm64(r4, 5);
+    if (r3 <= 10) {
+        MulLow64Wrap(r3, r3, r4);
+    } else {
+        Move(r3, r4);
+    }
+}
+
+procedure AddLoop()
+    requires
+        0 < r4 <= 100;
+    modifies
+        r3; r4; cr0;
+{
+    while (r4 > 0)
+        invariant
+            0 <= r4 <= old(r4);
+        decreases r4;
+    {
+        AddImmWrap(r3, r3, 5);
+        SubImm(r4, r4, 1);
+    }
+}
+
+procedure VecXor()
+    reads
+        r4;
+    modifies
+        r3; v0; v1; v2;
+{
+    Mtvsrdd(v0, r3, r3);
+    Mtvsrdd(v1, r4, r4);
+    Vxor(v2, v0, v1);
+    Mfvsrld(r3, v2);
+}

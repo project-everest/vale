@@ -1,0 +1,181 @@
+include "PPC64LE.Vale.InsBasic.vaf"
+include "PPC64LE.Vale.InsMem.vaf"
+include{:fstar}{:open} "Words_s"
+include{:fstar}{:open} "Words.Two_s"
+include{:fstar}{:open} "Words.Four_s"
+include{:fstar}{:open} "Types_s"
+include{:fstar}{:open} "PPC64LE.Machine_s"
+include{:fstar}{:open} "PPC64LE.Vale.State"
+include{:fstar}{:open} "PPC64LE.Vale.Decls"
+
+module PPC64LE.Vale.InsVector
+
+#verbatim{:interface}
+open FStar.Mul
+open Words_s
+open Words.Two_s
+open Words.Four_s
+open Types_s
+open PPC64LE.Machine_s
+open PPC64LE.Vale.State
+open PPC64LE.Vale.Decls
+open PPC64LE.Vale.InsBasic
+open PPC64LE.Vale.InsMem
+
+// Annoying type problem workaround
+let nat64_to_nat32 (n:nat64 { n < pow2_32 }) : nat32 = let m:nat = n in m
+#endverbatim
+
+function nat64_to_nat32 (n:nat64) : nat32
+  requires n < pow2_32;
+  extern;
+
+#verbatim
+open Types_s
+open PPC64LE.Machine_s
+open PPC64LE.Vale
+open PPC64LE.Vale.State
+open PPC64LE.Vale.Decls
+friend PPC64LE.Vale.Decls
+module S = PPC64LE.Semantics_s
+#endverbatim
+
+var v0:quad32 {:state vec(V0)};
+var v1:quad32 {:state vec(V1)};
+var v2:quad32 {:state vec(V2)};
+var v3:quad32 {:state vec(V3)};
+var v4:quad32 {:state vec(V4)};
+var v5:quad32 {:state vec(V5)};
+var v6:quad32 {:state vec(V6)};
+var v7:quad32 {:state vec(V7)};
+var v8:quad32 {:state vec(V8)};
+var v9:quad32 {:state vec(V9)};
+var v10:quad32 {:state vec(V10)};
+var v11:quad32 {:state vec(V11)};
+var v12:quad32 {:state vec(V12)};
+var v13:quad32 {:state vec(V13)};
+var v14:quad32 {:state vec(V14)};
+var v15:quad32 {:state vec(V15)};
+var v16:quad32 {:state vec(V16)};
+var v17:quad32 {:state vec(V17)};
+var v18:quad32 {:state vec(V18)};
+var v19:quad32 {:state vec(V19)};
+var v20:quad32 {:state vec(V20)};
+var v21:quad32 {:state vec(V21)};
+var v22:quad32 {:state vec(V22)};
+var v23:quad32 {:state vec(V23)};
+var v24:quad32 {:state vec(V24)};
+var v25:quad32 {:state vec(V25)};
+var v26:quad32 {:state vec(V26)};
+var v27:quad32 {:state vec(V27)};
+var v28:quad32 {:state vec(V28)};
+var v29:quad32 {:state vec(V29)};
+var v30:quad32 {:state vec(V30)};
+var v31:quad32 {:state vec(V31)};
+
+// Input operands of vector registers
+operand_type vec_opr:quad32 :=
+| in v0 | in v1 | in v2 | in v3
+| in v4 | in v5 | in v6 | in v7
+| in v8 | in v9 | in v10 | in v11
+| in v12 | in v13 | in v14 | in v15
+| in v16 | in v17 | in v18 | in v19
+| in v20 | in v21 | in v22 | in v23
+| in v24 | in v25 | in v26 | in v27
+| in v28 | in v29 | in v30 | in v31
+;
+// Output operands of vector registers
+operand_type dst_vec_opr:quad32 :=
+| out v0 | out v1 | out v2 | out v3 | out v4
+| out v5 | out v6 | out v7 | out v8 | out v9
+| out v10 | out v11 | out v12 | out v13 | out v14
+| out v15 | out v16 | out v17 | out v18 | out v19
+| out v20 | out v21 | out v22 | out v23 | out v24
+| out v25 | out v26 | out v27 | out v28 | out v29
+| out v30 | out v31
+;
+
+// Move high 64-bit of vector register to general-purpose register
+procedure Mfvsrd(out dst:dst_reg_opr, in src:vec_opr)
+    {:public}
+    {:instruction Ins(S.Mfvsrd(dst, src))}
+    ensures
+        dst == hi64(src);
+{
+}
+
+// Move low 64-bit of vector register to general-purpose register
+procedure Mfvsrld(out dst:dst_reg_opr, in src:vec_opr)
+    {:public}
+    {:instruction Ins(S.Mfvsrld(dst, src))}
+    ensures
+        dst == lo64(src);
+{
+}
+
+// Move joint of two general-purpose registers to vector register
+procedure Mtvsrdd(out dst:dst_vec_opr, in src1:reg_opr, in src2:reg_opr)
+    {:public}
+    {:instruction Ins(S.Mtvsrdd(dst, src1, src2))}
+    ensures
+        pow2_32 * dst.hi3 + dst.hi2 == old(src1);
+        pow2_32 * dst.lo1 + dst.lo0 == old(src2);
+{
+}
+
+// XOR operation of two vector registers
+procedure Vxor(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+    {:public}
+    {:instruction Ins(S.Vxor(dst, src1, src2))}
+    ensures
+        dst == old(quad32_xor(src1, src2));
+{
+}
+
+// Shift left word elements of vector register with correspinding bit values in word elements of vector register
+procedure Vslw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+    {:public}
+    {:instruction Ins(S.Vslw(dst, src1, src2))}
+    ensures
+        dst == old(Mkfour(
+            ishl32(src1.lo0, src2.lo0 % 32),
+            ishl32(src1.lo1, src2.lo1 % 32),
+            ishl32(src1.hi2, src2.hi2 % 32),
+            ishl32(src1.hi3, src2.hi3 % 32)));
+{
+}
+
+// Shift right word elements of vector register with corresponding bit values in word elements of vector register
+procedure Vsrw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+    {:public}
+    {:instruction Ins(S.Vsrw(dst, src1, src2))}
+    ensures
+        dst == old(Mkfour(
+            ishr32(src1.lo0, src2.lo0 % 32),
+            ishr32(src1.lo1, src2.lo1 % 32),
+            ishr32(src1.hi2, src2.hi2 % 32),
+            ishr32(src1.hi3, src2.hi3 % 32)));
+{
+}
+
+//  Compare equal word elements of vector register and store either ones or zeros in the corresponding elements of destination register
+procedure Vcmpequw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+    {:public}
+    {:instruction Ins(S.Vcmpequw(dst, src1, src2))}
+    ensures
+        dst == old(Mkfour(
+            if src1.lo0 = src2.lo0 then 0xFFFFFFFF else 0,
+            if src1.lo1 = src2.lo1 then 0xFFFFFFFF else 0,
+            if src1.hi2 = src2.hi2 then 0xFFFFFFFF else 0,
+            if src1.hi3 = src2.hi3 then 0xFFFFFFFF else 0));
+{
+}
+
+// Joint of last one word of vector register with first 3 words of vector register
+procedure Vsldoi4(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+    {:public}
+    {:instruction Ins(S.Vsldoi(dst, src1, src2, 4))}
+    ensures
+        dst == old(Mkfour(src2.hi3, src1.lo0, src1.lo1, src1.hi2));
+{
+}

@@ -161,6 +161,8 @@ AddOptYesNo('DUMP-ARGS', dest = 'dump_args', default = False,
   help = "Print arguments that will be passed to the verification tools")
 AddOptYesNo('PROFILE', dest = 'profile', default = False,
   help = "Turn on profile options to measure verification performance (note: --NO-USE-HINTS is recommended when profiling)")
+AddOptYesNo('ASM-TEST', dest = 'assembly_test', default = False,
+  help = "Execute test functions of verified assembly files in test directory")
 
 do_help = GetOption('help')
 do_clean = GetOption('clean')
@@ -181,7 +183,13 @@ z3_my_version = GetOption('z3_my_version')
 do_color = GetOption('do_color')
 dump_args = GetOption('dump_args')
 profile = GetOption('profile')
+assembly_test = GetOption('assembly_test')
 
+ppc64le_test = False
+if assembly_test:
+  if shutil.which('powerpc64le-linux-gnu-gcc') is not None and shutil.which('qemu-ppc64le') is not None:
+    ppc64le_test = True
+  do_fstar = True
 verify = do_dafny or do_fstar
 
 ##################################################################################################
@@ -261,6 +269,11 @@ manual_dependencies = {
 ulib_cache = f'{fstar_path}/ulib/.cache'
 external_paths = [ulib_cache]
 
+ppc64le_test_files = [
+  'fstar/code/test/PPC64LE.Test.Memcpy.vaf',
+  'fstar/code/test/PPC64LE.Test.Basics.vaf',
+]
+
 #
 # Table of special-case sources which requires non-default arguments
 #
@@ -314,6 +327,17 @@ if verify and do_dafny:
   else:
     dafny_z3_path = f'/z3exe:{z3_exe}'
 
+if assembly_test:
+  if win32:
+    opam_result = [s for s in os.environ['PATH'].split(';') if ".opam" in s]
+  else:
+    opam_result = [s for s in os.environ['PATH'].split(':') if ".opam" in s]
+  opam_path = [i for i in opam_result if len(os.path.normpath(i).split(os.sep)) >= 3 and os.path.normpath(i).split(os.sep)[-3] == '.opam' and os.path.normpath(i).split(os.sep)[-1] == 'bin']
+  if opam_path:
+    ocamlfind = f'{opam_path[0]}/ocamlfind'
+  else:
+    ocamlfind = ''
+
 vale_exe = File('bin/vale.exe')
 import_fstar_types_exe = File('bin/importFStarTypes.exe')
 dafny_exe = File(f'{dafny_path}/Dafny.exe')
@@ -332,6 +356,8 @@ fsti_map = {}  # map module names to .fsti File nodes (or .fst File nodes if no 
 dump_deps = {}  # map F* type .dump file names x.dump to sets of .dump file names that x.dump depends on
 vaf_dump_deps = {} # map .vaf file names x.vaf to sets of .dump file names that x.vaf depends on
 vaf_vaf_deps = {} # map .vaf file names x.vaf to sets of y.vaf file names that x.vaf depends on
+full_deps = {}
+ml_sources = []
 
 dafny_include_re = re.compile(r'^\s*include\s+"(\S+)"', re.M)
 # match 'include {:attr1} ... {:attrn} "filename"'
@@ -387,6 +413,12 @@ def to_obj_dir(file):
     return file
   else:
     return File(f'obj/{file}')
+
+def to_ml_dir(file):
+  return File(f'obj/ml/{file}')
+
+def to_cmx_dir(file):
+  return File(f'obj/cmx/{file}')
 
 def to_hint_file(file):
   return File(f'hints/{file.name}.hints')
@@ -945,6 +977,93 @@ def compute_fstar_deps(env, src_directories, fstar_includes):
     print('F* dependency analysis failed')
     Exit(1)
 
+def generate_ml_file(env, targetfile, sourcefile, fstar_includes):
+  modulename = file_module_name(File(sourcefile))
+  ml_flags = "--odir obj/ml --cache_checked_modules --cmi --already_cached 'Prims FStar' --warn_error '+241@247-272-274@332' --cache_dir obj/cache_checked --trivial_pre_for_unannotated_effectful_fns false"
+  env.Command(to_ml_dir(targetfile), sourcefile,
+    f'{fstar_exe} {fstar_z3_path} {fstar_includes} {ml_flags} {sourcefile} --codegen OCaml --extract_module {modulename}')
+
+def generate_cmx_file(env, targetfile, sourcefile):
+  cmx_flags = "opt -package fstarlib -linkpkg -g -I obj/cmx -w -8-20-26"
+  env.Command(targetfile, sourcefile,
+    f'{ocamlfind} {cmx_flags} -c {sourcefile} -o {targetfile}')
+
+def process_ml_file(env, source, fstar_includes):
+  if source in full_deps:
+    Depends(to_obj_dir(File(source)), to_obj_dir(file_drop_extension(File(full_deps[source].path)) + '.verified'))
+    generate_ml_file(env, File(source), file_drop_extension(File(full_deps[source].path)), fstar_includes)
+    generate_cmx_file(env, to_cmx_dir(file_drop_extension(File(source)) + '.cmx'), to_ml_dir(file_drop_extension(File(source)) + '.ml'))
+
+def verify_test_deps(env, target):
+  fstar_includes = compute_includes(src_include_paths, obj_include_paths, 'obj')
+  for idx, source in enumerate(ml_sources):
+    if idx > 0:
+      Depends(to_cmx_dir(file_drop_extension(File(source)) + '.cmx'), to_cmx_dir(file_drop_extension(File(ml_sources[idx - 1])) + '.cmx'))
+    process_ml_file(env, source, fstar_includes)
+  cmx_flags = "opt -package fstarlib -linkpkg -g -I obj/cmx -w -8-20-26"
+  cmx_sources = [file_drop_extension(to_cmx_dir(ml)) + '.cmx' for ml in ml_sources]
+  cmx_sources.append('fstar/code/test/PowerTest.ml')
+  env.Command('obj/test/power_asm_test.exe', cmx_sources,
+    f'{ocamlfind} {cmx_flags} {" ".join(str(x) for x in cmx_sources)} -o $TARGET')
+  env.Command('obj/test/power_asm_test.s', 'obj/test/power_asm_test.exe',
+    f'$SOURCE > $TARGET')
+  test_sources = ['obj/test/power_asm_test.s', 'fstar/code/test/PowerTest.c']
+  env.Command(None, test_sources,
+    f'powerpc64le-linux-gnu-gcc -static {" ".join(str(x) for x in test_sources)} -o {target} && qemu-ppc64le {target}')
+
+def remove_line_continuation(file):
+  if file[-len('\\')] == '\\':
+    file = file[:-len('\\')]
+  if file[-len(' ')] == ' ':
+    file = file[:-len(' ')]
+  return file
+
+def compute_test_deps(target, source, env):
+  import subprocess
+  # call fstar --dep full
+  includes = []
+  for include in compute_include_paths(src_include_paths, obj_include_paths, 'obj'):
+    includes += ["--include", include]
+  lines = []
+  depsBackupFile = 'obj/fstarDepsFullBackup.d'
+  args = ["--dep", "full", "--warn_error", "+241@247-272-274@332-285", "--already_cached", "Prims FStar", "--extract", "OCaml:-* +Prop_s +Vale +Words_s +Words +Types_s +Defs_s +PPC64LE"] + includes + [file_drop_extension(to_obj_dir(vaf)) + '.fst' for vaf in ppc64le_test_files]
+  cmd = [fstar_exe] + args
+  cmd = [str(x) for x in cmd]
+  #print(" ".join(cmd)) # note: this won't work without '' around Prims FStar
+  try:
+    print('F* dependency analysis starting')
+    o = subprocess.check_output(cmd, stderr = subprocess.STDOUT).decode('ascii')
+    print('F* dependency analysis finished')
+  except (subprocess.CalledProcessError) as e:
+    print(f'F* dependency analysis: error: {e.output}')
+    Exit(1)
+  fstar_deps_ok = True
+  lines = o.splitlines()
+  current_target = ''
+  for line in lines:
+    if 'Warning:' in line:
+      print(line)
+      fstar_deps_ok = False
+    elif '(Warning ' in line:
+      # example: "(Warning 307) logic qualifier is deprecated"
+      pass
+    elif len(line) == 0 or line == '\t':
+      current_target = ''
+    elif ': ' in line:
+      target_file, source_file = line.split(': ', 1)
+      if file_extension(File(target_file)) == '.ml':
+        full_deps[target_file] = File(remove_line_continuation(source_file))
+    elif line == 'ALL_ML_FILES=\\':
+      current_target = line[:-len('=\\')]
+    elif line[:len('\t')] == '\t':
+      if current_target == 'ALL_ML_FILES':
+        ml_sources.append(remove_line_continuation(line[len('\t'):]))
+  verify_test_deps(env, target[0])
+  # Save results in depsBackupFile
+  with open(depsBackupFile, 'w') as myfile:
+    for line in lines:
+      myfile.write(line + '\n')
+
 ##################################################################################################
 #
 #   Top-level commands
@@ -996,3 +1115,12 @@ if do_build:
 
   if dump_args:
     print_dump_args()
+
+  if ppc64le_test:
+    env.PrependENVPath('OCAMLPATH', f'{fstar_path}/bin')
+    env.PrependENVPath('PATH', f'{fstar_path}/bin')
+    vafs = []
+    for d in verify_paths:
+      vafs.extend(recursive_glob(env, d + '/*.vaf', strings = True))
+    vafs_dep = [[file_drop_extension(to_obj_dir(vaf)) + '.fst', file_drop_extension(to_obj_dir(vaf)) + '.fsti'] for vaf in vafs if get_build_options(vaf) != None]
+    env.Command('obj/test/power_test.exe', [vafs_dep, 'fstar/code/test/PowerTest.ml', 'fstar/code/test/PowerTest.c'], action=compute_test_deps)
