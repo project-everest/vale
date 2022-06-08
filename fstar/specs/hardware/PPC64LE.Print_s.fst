@@ -19,82 +19,12 @@ noeq type printer = {
   ret        : string -> string;
 }
 
-let print_reg_name (r:reg) =
-  match r with
-  | R0 -> "0"
-  | R1 -> "1"
-  | R2 -> "2"
-  | R3 -> "3"
-  | R4 -> "4"
-  | R5 -> "5"
-  | R6 -> "6"
-  | R7 -> "7"
-  | R8 -> "8"
-  | R9 -> "9"
-  | R10 -> "10"
-  | R11 -> "11"
-  | R12 -> "12"
-  | R13 -> "13"
-  | R14 -> "14"
-  | R15 -> "15"
-  | R16 -> "16"
-  | R17 -> "17"
-  | R18 -> "18"
-  | R19 -> "19"
-  | R20 -> "20"
-  | R21 -> "21"
-  | R22 -> "22"
-  | R23 -> "23"
-  | R24 -> "24"
-  | R25 -> "25"
-  | R26 -> "26"
-  | R27 -> "27"
-  | R28 -> "28"
-  | R29 -> "29"
-  | R30 -> "30"
-  | R31 -> "31"
-
-let print_vec_name (v:vec) =
-  match v with
-  | V0 -> "0"
-  | V1 -> "1"
-  | V2 -> "2"
-  | V3 -> "3"
-  | V4 -> "4"
-  | V5 -> "5"
-  | V6 -> "6"
-  | V7 -> "7"
-  | V8 -> "8"
-  | V9 -> "9"
-  | V10 -> "10"
-  | V11 -> "11"
-  | V12 -> "12"
-  | V13 -> "13"
-  | V14 -> "14"
-  | V15 -> "15"
-  | V16 -> "16"
-  | V17 -> "17"
-  | V18 -> "18"
-  | V19 -> "19"
-  | V20 -> "20"
-  | V21 -> "21"
-  | V22 -> "22"
-  | V23 -> "23"
-  | V24 -> "24"
-  | V25 -> "25"
-  | V26 -> "26"
-  | V27 -> "27"
-  | V28 -> "28"
-  | V29 -> "29"
-  | V30 -> "30"
-  | V31 -> "31"
-
 let print_reg (r:reg) (p:printer) =
-  p.reg_prefix() ^ print_reg_name r
+  p.reg_prefix() ^ string_of_int r
 
 let print_vec (v:vec) (vsr:bool) (p:printer) =
-  if vsr then p.vsr_prefix() ^ "32+" ^ print_vec_name v
-  else p.vec_prefix() ^ print_vec_name v
+  if vsr then p.vsr_prefix() ^ "32+" ^ string_of_int v
+  else p.vec_prefix() ^ string_of_int v
 
 let print_maddr (m:maddr) (p:printer) =
   p.maddr (string_of_int m.offset) (print_reg m.address p)

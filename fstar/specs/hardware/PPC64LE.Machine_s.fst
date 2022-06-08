@@ -11,73 +11,8 @@ let int_to_nat64 (i:int) : n:nat64{0 <= i && i < pow2_64 ==> i == n} =
   Words_s.int_to_natN pow2_64 i
 unfold let quad32 = Types_s.quad32
 
-type reg =
-  | R0
-  | R1
-  | R2
-  | R3
-  | R4
-  | R5
-  | R6
-  | R7
-  | R8
-  | R9
-  | R10
-  | R11
-  | R12
-  | R13
-  | R14
-  | R15
-  | R16
-  | R17
-  | R18
-  | R19
-  | R20
-  | R21
-  | R22
-  | R23
-  | R24
-  | R25
-  | R26
-  | R27
-  | R28
-  | R29
-  | R30
-  | R31
-
-type vec =
-  | V0
-  | V1
-  | V2
-  | V3
-  | V4
-  | V5
-  | V6
-  | V7
-  | V8
-  | V9
-  | V10
-  | V11
-  | V12
-  | V13
-  | V14
-  | V15
-  | V16
-  | V17
-  | V18
-  | V19
-  | V20
-  | V21
-  | V22
-  | V23
-  | V24
-  | V25
-  | V26
-  | V27
-  | V28
-  | V29
-  | V30
-  | V31
+type reg = i:int{0 <= i /\ i < 32}
+type vec = i:int{0 <= i /\ i < 32}
 
 // Immediate operand of logical compare, and, or, and xor instructions
 type imm16 = i:int{0 <= i && i <= 65535}
