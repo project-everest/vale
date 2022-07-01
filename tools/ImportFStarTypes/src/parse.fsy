@@ -120,6 +120,7 @@ exp1
 
 exp2
   : LPAREN exp RPAREN { match $2 with RList [] -> RUnitValue $1 | e -> e }
+  | LPAREN LBRACKETAT attrs RBRACKET exp RPAREN { match $5 with RList [] -> RUnitValue $1 | e -> e }
   | LBRACKET exp RBRACKET { RList [] }
   | LPAREN ATTRIBUTES exp1s RPAREN { RList [RAttributes $2; RList $3] }
   | SCOLON { RSColon $1 } /* used in match and let */
