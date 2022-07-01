@@ -30,6 +30,6 @@
     "ValeProject": {
         "recommended_z3_version": "4.8.5",
         "recommended_fstar_version": "a46a208c59b502b427e300e7a9e7b7cf9fb58ad7",
-        "binary_release_vale_version": "0.3.18"
+        "binary_release_vale_version": "0.3.19"
     }
 }
