@@ -82,6 +82,8 @@ rule lextoken = parse
 | "MonadicLift-Tm_quoted (dynamic)" { META (curLoc lexbuf, lexeme lexbuf) }
 | "Monadic-"['_''A'-'Z''a'-'z']+ { META (curLoc lexbuf, lexeme lexbuf) }
 | "MonadicLift-"['_''A'-'Z''a'-'z']+ { META (curLoc lexbuf, lexeme lexbuf) }
+| "MetaMonadic-" { META (curLoc lexbuf, lexeme lexbuf) }
+| "MetaMonadicLift-" { META (curLoc lexbuf, lexeme lexbuf) }
 | "assume" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "new" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
 | "abstract" { QUALIFIER (curLoc lexbuf, lexeme lexbuf) }
