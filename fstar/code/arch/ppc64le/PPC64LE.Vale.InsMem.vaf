@@ -1,0 +1,74 @@
+include "PPC64LE.Vale.InsBasic.vaf"
+include{:fstar}{:open} "PPC64LE.Machine_s"
+include{:fstar}{:open} "PPC64LE.Vale.State"
+include{:fstar}{:open} "PPC64LE.Vale.Decls"
+
+module PPC64LE.Vale.InsMem
+
+#verbatim{:interface}
+open PPC64LE.Machine_s
+open PPC64LE.Vale.State
+open PPC64LE.Vale.Decls
+#endverbatim
+
+#verbatim
+open PPC64LE.Machine_s
+open PPC64LE.Vale.State
+open PPC64LE.Vale.Decls
+open PPC64LE.Vale.InsBasic
+#endverbatim
+
+procedure Mem64_in(in address:reg_opr, inline offset:int) returns(r:reg_opr)
+    {:public}
+    {:operand}
+    reads
+        mem;
+    extern;
+
+procedure Mem64_out(in address:reg_opr, inline offset:int, in r:reg_opr)
+    {:public}
+    {:operand}
+    modifies
+        mem;
+    extern;
+
+procedure Mem64_lemma(ghost address:reg_opr, ghost offset:int)
+    {:public}
+    {:typecheck false}
+    reads
+        mem;
+    requires
+        valid_maddr_offset64(offset);
+        valid_mem64(eval_reg(address, this) + offset, mem);
+    ensures
+        valid_maddr64(va_opr_code_Mem64(address, offset), this);
+{
+}
+
+// Load from 64-bit memory to general-purpose register
+procedure MemLoad64(out dst:dst_reg_opr, in src:reg_opr, inline offset:int)
+    {:public}
+    reads
+        mem;
+    requires
+        valid_maddr_offset64(offset);
+        valid_mem64(src + offset, mem);
+    ensures
+        dst == load_mem64(old(src + offset), mem);
+{
+    Load64(dst, Mem64(src, offset));
+}
+
+// Store general-purpose register to 64-bit memory
+procedure MemStore64(in src:reg_opr, in dst:reg_opr, inline offset:int)
+    {:public}
+    modifies
+        mem;
+    requires
+        valid_maddr_offset64(offset);
+        valid_mem64(dst + offset, mem);
+    ensures
+        mem == old(store_mem64(dst + offset, src, mem));
+{
+    Store64(src, Mem64(dst, offset));
+}
