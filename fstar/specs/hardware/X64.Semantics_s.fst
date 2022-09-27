@@ -163,7 +163,7 @@ let return (#a:Type) (x:a) :st a =
   fun s -> x, s
 
 unfold
-let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :st b =
+let (let?) (#a:Type) (#b:Type) (m:st a) (f:a -> st b) : st b =
 fun s0 ->
   let x, s1 = m s0 in
   let y, s2 = f x s1 in
@@ -190,7 +190,7 @@ let check_imm (valid:bool) : st unit =
 
 unfold
 let check (valid: state -> bool) : st unit =
-  s <-- get;
+  let? s = get in
   if valid s then
     return ()
   else
@@ -202,120 +202,120 @@ let run (f:st unit) (s:state) : state = snd (f s)
 // Monadic update operations
 unfold
 let update_operand_preserve_flags (dst:operand) (v:nat64) :st unit =
-  check (valid_dst_operand dst);;
-  s <-- get;
+  check (valid_dst_operand dst);?
+  let? s = get in
   set (update_operand_preserve_flags' dst v s)
 
 // Default version havocs flags
 unfold
 let update_operand (dst:operand) (ins:ins) (v:nat64) :st unit =
-  check (valid_dst_operand dst);;
-  s <-- get;
+  check (valid_dst_operand dst);?
+  let? s = get in
   set (update_operand' dst ins v s)
 
 let update_reg (r:reg) (v:nat64) :st unit =
-  s <-- get;
+  let? s = get in
   set (update_reg' r v s)
 
 let update_xmm (x:xmm)  (ins:ins) (v:quad32) :st unit =
-  s <-- get;
+  let? s = get in
   set (  { (update_xmm' x v s) with flags = havoc s ins } )
 
 let update_xmm_preserve_flags (x:xmm) (v:quad32) :st unit =
-  s <-- get;
+  let? s = get in
   set ( update_xmm' x v s )
 
 let update_flags (new_flags:nat64) :st unit =
-  s <-- get;
+  let? s = get in
   set ( { s with flags = new_flags } )
 
 let update_cf_of (new_cf new_of:bool) :st unit =
-  s <-- get;
+  let? s = get in
   set ( { s with flags = update_cf (update_of s.flags new_of) new_cf } )
 
 // Core definition of instruction semantics
 let eval_ins (ins:ins) : st unit =
-  s <-- get;
+  let? s = get in
   match ins with
   | Mov64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     update_operand_preserve_flags dst (eval_operand src s)
 
   | Add64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let sum = (eval_operand dst s) + (eval_operand src s) in
     let new_carry = sum >= pow2_64 in
-    update_operand dst ins ((eval_operand dst s + eval_operand src s) % pow2_64);;
+    update_operand dst ins ((eval_operand dst s + eval_operand src s) % pow2_64);?
     update_flags (update_cf s.flags new_carry)
 
   | AddLea64 dst src1 src2 ->
-    check (valid_operand src1);;
-    check (valid_operand src2);;
+    check (valid_operand src1);?
+    check (valid_operand src2);?
     update_operand_preserve_flags dst ((eval_operand src1 s + eval_operand src2 s) % pow2_64)
 
   | AddCarry64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let old_carry = if cf(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
     let new_carry = sum >= pow2_64 in
-    update_operand dst ins (sum % pow2_64);;
-    update_flags (havoc s ins);;
+    update_operand dst ins (sum % pow2_64);?
+    update_flags (havoc s ins);?
     update_flags (update_cf s.flags new_carry)  // We specify cf, but underspecify everything else
 
   | Adcx64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let old_carry = if cf(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
     let new_carry = sum >= pow2_64 in
-    update_operand dst ins (sum % pow2_64);;
+    update_operand dst ins (sum % pow2_64);?
     update_flags (update_cf s.flags new_carry)  // Explicitly touches only CF
 
   | Adox64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let old_carry = if overflow(s.flags) then 1 else 0 in
     let sum = (eval_operand dst s) + (eval_operand src s) + old_carry in
     let new_carry = sum >= pow2_64 in
-    update_operand dst ins (sum % pow2_64);;
+    update_operand dst ins (sum % pow2_64);?
     update_flags (update_of s.flags new_carry)  // Explicitly touches only OF
 
   | Sub64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     update_operand dst ins ((eval_operand dst s - eval_operand src s) % pow2_64)
 
   | Mul64 src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let hi = FStar.UInt.mul_div #64 (eval_reg Rax s) (eval_operand src s) in
     let lo = FStar.UInt.mul_mod #64 (eval_reg Rax s) (eval_operand src s) in
-    update_reg Rax lo;;
-    update_reg Rdx hi;;
+    update_reg Rax lo;?
+    update_reg Rdx hi;?
     update_flags (havoc s ins)
 
   | Mulx64 dst_hi dst_lo src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let hi = FStar.UInt.mul_div #64 (eval_reg Rdx s) (eval_operand src s) in
     let lo = FStar.UInt.mul_mod #64 (eval_reg Rdx s) (eval_operand src s) in
-    update_operand_preserve_flags dst_lo lo;;
+    update_operand_preserve_flags dst_lo lo;?
     update_operand_preserve_flags dst_hi hi
 
   | IMul64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     update_operand dst ins ((eval_operand dst s * eval_operand src s) % 0x10000000000000000)
 
   | Xor64 dst src ->
-    check (valid_operand src);;
-    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s));;
+    check (valid_operand src);?
+    update_operand dst ins (Types_s.ixor (eval_operand dst s) (eval_operand src s));?
     update_cf_of false false
 
   | And64 dst src ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     update_operand dst ins (Types_s.iand (eval_operand dst s) (eval_operand src s))
 
   | Shr64 dst amt ->
-    check (valid_shift_operand amt);;
+    check (valid_shift_operand amt);?
     update_operand dst ins (Types_s.ishr (eval_operand dst s) (eval_operand amt s))
 
   | Shl64 dst amt ->
-    check (valid_shift_operand amt);;
+    check (valid_shift_operand amt);?
     update_operand dst ins (Types_s.ishl (eval_operand dst s) (eval_operand amt s))
 
   | Paddd dst src ->
@@ -331,11 +331,11 @@ let eval_ins (ins:ins) : st unit =
     update_xmm_preserve_flags dst (quad32_xor (eval_xmm dst s) (eval_xmm src s))
 
   | Pslld dst amt ->
-    check_imm (0 <= amt && amt < 32);;
+    check_imm (0 <= amt && amt < 32);?
     update_xmm_preserve_flags dst (four_map (fun i -> ishl i amt) (eval_xmm dst s))
 
   | Psrld dst amt ->
-    check_imm (0 <= amt && amt < 32);;
+    check_imm (0 <= amt && amt < 32);?
     update_xmm_preserve_flags dst (four_map (fun i -> ishr i amt) (eval_xmm dst s))
 
   | Pshufd dst src permutation ->
@@ -368,17 +368,17 @@ let eval_ins (ins:ins) : st unit =
     update_operand_preserve_flags dst extracted_nat64
 
   | Pinsrd dst src index ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let dst_q = eval_xmm dst s in
     update_xmm_preserve_flags dst  (insert_nat32 dst_q ((eval_operand src s) % pow2_32) (index % 4))
 
   | Pinsrq dst src index ->
-    check (valid_operand src);;
+    check (valid_operand src);?
     let dst_q = eval_xmm dst s in
     update_xmm_preserve_flags dst (insert_nat64 dst_q (eval_operand src s) (index % 2))
 
   | VPSLLDQ dst src count ->
-    check (fun s -> count = 4);;  // We only spec the one very special case we need
+    check (fun s -> count = 4);?  // We only spec the one very special case we need
     let src_q = eval_xmm src s in
     let shifted_xmm = Mkfour 0 src_q.lo0 src_q.lo1 src_q.hi2 in
     update_xmm_preserve_flags dst shifted_xmm

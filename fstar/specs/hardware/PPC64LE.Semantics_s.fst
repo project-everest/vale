@@ -121,7 +121,7 @@ let return (#a:Type) (x:a) :st a =
   fun s -> x, s
 
 unfold
-let bind (#a:Type) (#b:Type) (m:st a) (f:a -> st b) :st b =
+let (let?) (#a:Type) (#b:Type) (m:st a) (f:a -> st b) : st b =
 fun s0 ->
   let x, s1 = m s0 in
   let y, s2 = f x s1 in
@@ -141,7 +141,7 @@ let fail :st unit =
 
 unfold
 let check (valid: state -> bool) : st unit =
-  s <-- get;
+  let? s = get in
   if valid s then
     return ()
   else
@@ -151,38 +151,38 @@ unfold
 let run (f:st unit) (s:state) : state = snd (f s)
 
 let update_reg (r:reg) (v:nat64) :st unit =
-  s <-- get;
+  let? s = get in
   set (update_reg' r v s)
 
 let update_vec (vr:vec) (v:quad32) :st unit =
-  s <-- get;
+  let? s = get in
   set (update_vec' vr v s)
 
 let update_mem64 (ptr:int) (v:nat64) :st unit =
-  s <-- get;
+  let? s = get in
   set (update_mem64' ptr v s)
 
 let update_xer (new_xer:xer_t) :st unit =
-  s <-- get;
+  let? s = get in
   set ( { s with xer = new_xer } )
 
 let update_cr0 (new_cr0:cr0_t) :st unit =
-  s <-- get;
+  let? s = get in
   set ( { s with cr0 = new_cr0 } )
 
 // Core definition of instruction semantics
 let eval_ins (ins:ins) : st unit =
-  s <-- get;
+  let? s = get in
   match ins with
   | Move dst src ->
     update_reg dst (eval_reg src s)
 
   | Load64 dst src ->
-    check (valid_maddr64 src);;
+    check (valid_maddr64 src);?
     update_reg dst (eval_mem64 (eval_maddr src s) s)
 
   | Store64 src dst ->
-    check (valid_maddr64 dst);;
+    check (valid_maddr64 dst);?
     update_mem64 (eval_maddr dst s) (eval_reg src s)
 
   | LoadImm64 dst src ->
@@ -201,14 +201,14 @@ let eval_ins (ins:ins) : st unit =
     let old_carry = if xer_ca(s.xer) then 1 else 0 in
     let sum = (eval_reg src1 s) + (eval_reg src2 s) + old_carry in
     let new_carry = sum >= pow2_64 in
-    update_reg dst (sum % pow2_64);;
+    update_reg dst (sum % pow2_64);?
     update_xer (update_xer_ca s.xer new_carry)
 
   | AddExtendedOV dst src1 src2 ->
     let old_carry = if xer_ov(s.xer) then 1 else 0 in
     let sum = (eval_reg src1 s) + (eval_reg src2 s) + old_carry in
     let new_carry = sum >= pow2_64 in
-    update_reg dst (sum % pow2_64);;
+    update_reg dst (sum % pow2_64);?
     update_xer (update_xer_ov s.xer new_carry)
 
   | Sub dst src1 src2 ->
@@ -290,7 +290,7 @@ let eval_ins (ins:ins) : st unit =
     update_vec dst eq_val
   
   | Vsldoi dst src1 src2 count ->
-    check (fun s -> count = 4);;  // We only spec the one very special case we need
+    check (fun s -> count = 4);?  // We only spec the one very special case we need
     let src1_q = eval_vec src1 s in
     let src2_q = eval_vec src2 s in
     let shifted_vec = Mkfour src2_q.hi3 src1_q.lo0 src1_q.lo1 src1_q.hi2 in
