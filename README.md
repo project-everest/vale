@@ -37,6 +37,7 @@ Jay Bosamiya, Sydney Gibson, Yao Li, Bryan Parno, Chris Hawblitzel. In Proceedin
 For cryptography implementations verified with Vale/F*, see [HACL*](https://github.com/project-everest/hacl-star/tree/master/vale).  
 For cryptography implementations verified with Vale/Dafny, see the [Dafny legacy branch](https://github.com/project-everest/vale/tree/legacy_dafny).  
 For the Komodo secure enclave reference monitor, see [here](https://github.com/Microsoft/Komodo) and [here](https://www.microsoft.com/en-us/research/project/komodo/).  
+For developing verified low-level cryptography on heterogeneous hardware, see the [Galápagos project repository](https://github.com/secure-foundations/veri-titan).
 
 # License
 
