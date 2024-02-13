@@ -48,6 +48,9 @@ type op =
 | Bop of bop
 | TupleOp of typ list option
 | Subscript
+| Slice
+| SlicePrefix
+| SliceSuffix
 | Update
 | Cond
 | FieldOp of id

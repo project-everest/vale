@@ -57,6 +57,7 @@ let storageAttrs (a:attrs):(var_storage * attrs) =
 %token <loc * (bool * string)> PLUS MINUS STAR SLASH PERCENT
 %token <loc * (bool * string)> AMPAMP BARBAR LTEQEQ EQEQGT LTEQEQGT
 %token <loc * (bool * string)> ATEQ COLONEQ
+%token <loc * (bool * string)> DOTDOT
 %token <loc> HAVOC OLD THIS
 %token <loc> IS THEN ELSE LET IN OUT INOUT REVEAL GHOST INLINE
 %token <loc> TTYPE TYPE OPERAND_TYPE VAR CONST READONLY FUNCTION AXIOM EXTERN PROCEDURE STATIC MODULE IMPORT OPERATOR
@@ -171,6 +172,11 @@ Exp1
   | Exp1 QLBRACKET Exp RBRACKET { expAt $2 (EOp (Bop BIn, [$3; $1], None)) }
   | Exp1 LBRACKET Exp RBRACKET { expAt $2 (EOp (Subscript, [$1; $3], None)) }
   | Exp1 LBRACKET Exp COLONEQ Exp RBRACKET { expAt $2 (EOp (Update, [$1; $3; $5], None)) }
+
+  | Exp1 LBRACKET Exp DOTDOT Exp RBRACKET { expAt $2 (EOp (Slice, [$1; $3; $5], None)) }
+  | Exp1 LBRACKET DOTDOT Exp RBRACKET { expAt $2 (EOp (SlicePrefix, [$1; $4], None)) } 
+  | Exp1 LBRACKET Exp DOTDOT RBRACKET { expAt $2 (EOp (SliceSuffix, [$1; $3], None)) } 
+
   | Exp1 DOT AnyId { expAt $2 (EOp (FieldOp $3, [$1], None)) }
   | Exp1 DOT AnyId LPAREN Exps RPAREN { expAt $4 (EApply (EVar (exp2id $1 $3, None), None, $5, None)) }
   | Exp1 DOT LPAREN AnyId COLONEQ Exp RPAREN { expAt $2 (EOp (FieldUpdate $4, [$1; $6], None)) }
@@ -233,6 +239,9 @@ OpToken
   | LTEQEQGT { $1 }
   | LBRACKET RBRACKET { ($1, (false, "[]")) }
   | LBRACKET COLONEQ RBRACKET { ($1, (false, "[:=]")) }
+
+  | LBRACKET DOTDOT RBRACKET { ($1, (false, "[..]")) }
+
   | QLBRACKET RBRACKET { ($1, (false, "?[]")) }
   | DOT ID { ($1, (false, "." + snd $2 )) }
   | DOT ID COLONEQ { ($1, (false, "." + snd $2 + ":=")) }

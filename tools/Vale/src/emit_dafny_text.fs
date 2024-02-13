@@ -87,6 +87,11 @@ let rec string_of_exp_prec prec e =
     | EApply (e, _, es, _)  when is_id e && id_of_exp e = (Id "set") -> ("{" + (String.concat ", " (List.map (r 5) es)) + "}", 90)
     | EOp (Subscript, [e1; e2], _) -> ((r 90 e1) + "[" + (r 90 e2) + "]", 90)
     | EOp (Update, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " := " + (r 90 e3) + "]", 90)
+
+    | EOp (Slice, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " .. " + (r 90 e3) + "]", 90)
+    | EOp (SlicePrefix, [e1; e2; e3], _) -> ((r 90 e1) + "[" + " .. " + (r 90 e2) + "]", 90)
+    | EOp (SliceSuffix, [e1; e2; e3], _) -> ((r 90 e1) + "[" + (r 90 e2) + " .. " + "]", 90)
+  
     | EOp (Cond, [e1; e2; e3], _) -> ("if " + (r 90 e1) + " then " + (r 90 e2) + " else " + (r 90 e3), 0)
     | EOp (FieldOp x, [e], _) -> ((r 90 e) + "." + (sid x), 90)
     | EOp (FieldUpdate x, [e1; e2], _) -> ((r 90 e1) + ".(" + (sid x) + " := " + (r 90 e2) + ")", 90)
@@ -149,7 +154,7 @@ let rec emit_stmt (ps:print_state) (s:stmt):unit =
       ps.PrintLine ("ghost var " + (String.concat ", " (List.map string_of_lhs_formal lhss)) + " := " + (string_of_exp e) + ";")
   | SAssign _ -> emit_stmts ps (eliminate_assign_lhss s)
   | SLetUpdates _ -> internalErr "SLetUpdates"
-  | SBlock ss -> notImplemented "block"
+  | SBlock ss -> emit_block ps ss
   | SIfElse (_, e, ss1, []) ->
       ps.PrintLine ("if (" + (string_of_exp e) + ")");
       emit_block ps ss1
