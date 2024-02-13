@@ -255,7 +255,7 @@ let rec build_lemma_stmt (senv:stmt_env) (s:stmt):ghost * bool * stmt list =
       let codeBody = vaApp "get_whileBody" [code] in
       let i1 = string (gen_lemma_sym ()) in
       let i2 = string (gen_lemma_sym ()) in
-      let (n1, s1, sw1, fw1) = (Reserved ("n" + i1), Reserved ("s" + i1), Reserved ("sW" + i1), Reserved ("fW" + i1)) in
+      let (n1, s1, sw1, fw1) = (Id "loop_ctr", Reserved ("s" + i1), Reserved ("sW" + i1), Reserved ("fW" + i1)) in
       let (sw2, fw2) = (Reserved ("sW" + i2), Reserved ("fW" + i2)) in
       let (codeCond, codeBody, sCodeVars) =
         if !fstar then

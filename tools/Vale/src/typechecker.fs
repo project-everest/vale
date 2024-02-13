@@ -1931,6 +1931,7 @@ let rec tc_stmt (env:env) (s:stmt):stmt =
       SIfElse (g, e, b1, b2)
   | SWhile (e, invs, ed, b) ->
       let (t, e) = tc_exp env e (Some tBool) in
+      let env = push_id env (Id "loop_ctr") (TInt (NegInf, Inf)) in
       let invs = List_mapSnd (fun e -> let (_, e) = tc_exp env e (Some tProp) in e) invs in
       let ed = mapSnd (List.map (fun e -> let (_, e) = tc_exp env e None in e)) ed in
       let (_, b) = tc_stmts env b in
