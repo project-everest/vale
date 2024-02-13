@@ -58,34 +58,24 @@ var cr0:cr0_t {:state cr0()};
 var xer:xer_t {:state xer()};
 var mem:memory {:state mem()};
 
-// Input operands of general-purpose registers
+// Operands of general-purpose registers
 operand_type reg_opr:nat64 :=
-| in r0 | in r1 | in r2 | in r3
-| in r4 | in r5 | in r6 | in r7
-| in r8 | in r9 | in r10 | in r11
-| in r12 | in r13 | in r14 | in r15
-| in r16 | in r17 | in r18 | in r19
-| in r20 | in r21 | in r22 | in r23
-| in r24 | in r25 | in r26 | in r27
-| in r28 | in r29 | in r30 | in r31
+| inout r0 | inout r1 | inout r2 | inout r3
+| inout r4 | inout r5 | inout r6 | inout r7
+| inout r8 | inout r9 | inout r10 | inout r11
+| inout r12 | inout r13 | inout r14 | inout r15
+| inout r16 | inout r17 | inout r18 | inout r19
+| inout r20 | inout r21 | inout r22 | inout r23
+| inout r24 | inout r25 | inout r26 | inout r27
+| inout r28 | inout r29 | inout r30 | inout r31
 ;
-// Output operands of general-purpose registers
-operand_type dst_reg_opr:nat64 :=
-| out r0 | out r1 | out r2 | out r3
-| out r4 | out r5 | out r6 | out r7
-| out r8 | out r9 | out r10 | out r11
-| out r12 | out r13 | out r14 | out r15
-| out r16 | out r17 | out r18 | out r19
-| out r20 | out r21 | out r22 | out r23
-| out r24 | out r25 | out r26 | out r27
-| out r28 | out r29 | out r30 | out r31
-;
+
 // 64-bit Memory operand
 operand_type Mem64(in address:reg_opr, inline offset:int):nat64;
 type simm16:Type(0) := int_range((-32768), 32767);
 type nsimm16:Type(0) := int_range((-32767), 32768);
 
-procedure Move(out dst:dst_reg_opr, in src:reg_opr)
+procedure Move(out dst:reg_opr, in src:reg_opr)
     {:public}
     {:instruction Ins(S.Move(dst, src))}
     ensures
@@ -94,7 +84,7 @@ procedure Move(out dst:dst_reg_opr, in src:reg_opr)
 }
 
 // Load from 64-bit memory to general-purpose register
-procedure Load64(out dst:dst_reg_opr, in src:Mem64)
+procedure Load64(out dst:reg_opr, in src:Mem64)
     {:public}
     {:instruction Ins(S.Load64(dst, src))}
     ensures
@@ -112,7 +102,7 @@ procedure Store64(in src:reg_opr, out dst:Mem64)
 }
 
 // Load Immediate to general-purpose register
-procedure LoadImm64(out dst:dst_reg_opr, inline src:simm16)
+procedure LoadImm64(out dst:reg_opr, inline src:simm16)
     {:public}
     {:instruction Ins(S.LoadImm64(dst, src))}
     ensures
@@ -121,7 +111,7 @@ procedure LoadImm64(out dst:dst_reg_opr, inline src:simm16)
 }
 
 // Load address
-procedure AddLa(out dst:dst_reg_opr, in src1:reg_opr, inline src2:simm16)
+procedure AddLa(out dst:reg_opr, in src1:reg_opr, inline src2:simm16)
     {:public}
     {:instruction Ins(S.AddLa(dst, src1, src2))}
     requires
@@ -132,7 +122,7 @@ procedure AddLa(out dst:dst_reg_opr, in src1:reg_opr, inline src2:simm16)
 }
 
 // Add two general-purpose registers. Assuming the result has no carry
-procedure Add(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure Add(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.Add(dst, src1, src2))}
     requires
@@ -143,7 +133,7 @@ procedure Add(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Add two general-purpose registers with wrapping
-procedure AddWrap(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure AddWrap(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.Add(dst, src1, src2))}
     ensures
@@ -152,7 +142,7 @@ procedure AddWrap(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Add general-purpose register amd immediate. Assuming the result has no carry
-procedure AddImm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:simm16)
+procedure AddImm(out dst:reg_opr, in src1:reg_opr, inline src2:simm16)
     {:public}
     {:instruction Ins(S.AddImm(dst, src1, src2))}
     requires
@@ -163,7 +153,7 @@ procedure AddImm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:simm16)
 }
 
 // Add general-purpose register amd immediate with wrapping
-procedure AddImmWrap(out dst:dst_reg_opr, in src1:reg_opr, inline src2:simm16)
+procedure AddImmWrap(out dst:reg_opr, in src1:reg_opr, inline src2:simm16)
     {:public}
     {:instruction Ins(S.AddImm(dst, src1, src2))}
     ensures
@@ -172,7 +162,7 @@ procedure AddImmWrap(out dst:dst_reg_opr, in src1:reg_opr, inline src2:simm16)
 }
 
 // Add two general-purpose registers  plus carry with wrapping and store status of carry occurrence in XER register
-procedure AddExtended(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure AddExtended(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.AddExtended(dst, src1, src2))}
     modifies
@@ -184,7 +174,7 @@ procedure AddExtended(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Add two general-purpose registers plus overflow with wrapping and store status of overflow occurrence in XER register
-procedure AddExtendedOV(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure AddExtendedOV(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.AddExtendedOV(dst, src1, src2))}
     modifies
@@ -196,7 +186,7 @@ procedure AddExtendedOV(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Subtract two general-purpose registers. Assuming the result has no borrow
-procedure Sub(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure Sub(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.Sub(dst, src1, src2))}
     requires
@@ -207,7 +197,7 @@ procedure Sub(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Subtract two general-purpose registers with wrapping
-procedure SubWrap(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure SubWrap(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.Sub(dst, src1, src2))}
     ensures
@@ -216,7 +206,7 @@ procedure SubWrap(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Subtract general-purpose register amd immediate. Assuming the result has no borrow
-procedure SubImm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:nsimm16)
+procedure SubImm(out dst:reg_opr, in src1:reg_opr, inline src2:nsimm16)
     {:public}
     {:instruction Ins(S.SubImm(dst, src1, src2))}
     requires
@@ -227,7 +217,7 @@ procedure SubImm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:nsimm16)
 }
 
 // Subtract general-purpose register amd immediate with wrapping
-procedure SubImmWrap(out dst:dst_reg_opr, in src1:reg_opr, inline src2:nsimm16)
+procedure SubImmWrap(out dst:reg_opr, in src1:reg_opr, inline src2:nsimm16)
     {:public}
     {:instruction Ins(S.SubImm(dst, src1, src2))}
     ensures
@@ -236,7 +226,7 @@ procedure SubImmWrap(out dst:dst_reg_opr, in src1:reg_opr, inline src2:nsimm16)
 }
 
 // Mutiply two general-purpose registers. Assuming the product fits in 64-bit
-procedure MulLow64(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure MulLow64(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.MulLow64(dst, src1, src2))}
     requires
@@ -247,7 +237,7 @@ procedure MulLow64(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Mutiply two general-purpose registers ans store the low 64-bit of product in the destination register
-procedure MulLow64Wrap(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure MulLow64Wrap(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.MulLow64(dst, src1, src2))}
     ensures
@@ -256,7 +246,7 @@ procedure MulLow64Wrap(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Mutiply two general-purpose registers ans store the high 64-bit of product in the destination register
-procedure MulHigh64U(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure MulHigh64U(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.MulHigh64U(dst, src1, src2))}
     ensures
@@ -265,7 +255,7 @@ procedure MulHigh64U(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // XOR operation of two general-purpose registers
-procedure Xor(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure Xor(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.Xor(dst, src1, src2))}
     ensures
@@ -274,7 +264,7 @@ procedure Xor(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // AND operation of two general-purpose registers
-procedure And(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
+procedure And(out dst:reg_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.And(dst, src1, src2))}
     ensures
@@ -283,7 +273,7 @@ procedure And(out dst:dst_reg_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // Shift right general-purpose register with immediate bit value
-procedure Sr64Imm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:bits64)
+procedure Sr64Imm(out dst:reg_opr, in src1:reg_opr, inline src2:bits64)
     {:public}
     {:instruction Ins(S.Sr64Imm(dst, src1, src2))}
     ensures
@@ -292,7 +282,7 @@ procedure Sr64Imm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:bits64)
 }
 
 // Shift left general-purpose register with immediate bit value
-procedure Sl64Imm(out dst:dst_reg_opr, in src1:reg_opr, inline src2:bits64)
+procedure Sl64Imm(out dst:reg_opr, in src1:reg_opr, inline src2:bits64)
     {:public}
     {:instruction Ins(S.Sl64Imm(dst, src1, src2))}
     ensures

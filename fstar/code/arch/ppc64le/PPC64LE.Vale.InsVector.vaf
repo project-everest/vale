@@ -73,30 +73,20 @@ var v29:quad32 {:state vec(29)};
 var v30:quad32 {:state vec(30)};
 var v31:quad32 {:state vec(31)};
 
-// Input operands of vector registers
+// Operands of vector registers
 operand_type vec_opr:quad32 :=
-| in v0 | in v1 | in v2 | in v3
-| in v4 | in v5 | in v6 | in v7
-| in v8 | in v9 | in v10 | in v11
-| in v12 | in v13 | in v14 | in v15
-| in v16 | in v17 | in v18 | in v19
-| in v20 | in v21 | in v22 | in v23
-| in v24 | in v25 | in v26 | in v27
-| in v28 | in v29 | in v30 | in v31
-;
-// Output operands of vector registers
-operand_type dst_vec_opr:quad32 :=
-| out v0 | out v1 | out v2 | out v3 | out v4
-| out v5 | out v6 | out v7 | out v8 | out v9
-| out v10 | out v11 | out v12 | out v13 | out v14
-| out v15 | out v16 | out v17 | out v18 | out v19
-| out v20 | out v21 | out v22 | out v23 | out v24
-| out v25 | out v26 | out v27 | out v28 | out v29
-| out v30 | out v31
+| inout v0 | inout v1 | inout v2 | inout v3
+| inout v4 | inout v5 | inout v6 | inout v7
+| inout v8 | inout v9 | inout v10 | inout v11
+| inout v12 | inout v13 | inout v14 | inout v15
+| inout v16 | inout v17 | inout v18 | inout v19
+| inout v20 | inout v21 | inout v22 | inout v23
+| inout v24 | inout v25 | inout v26 | inout v27
+| inout v28 | inout v29 | inout v30 | inout v31
 ;
 
 // Move high 64-bit of vector register to general-purpose register
-procedure Mfvsrd(out dst:dst_reg_opr, in src:vec_opr)
+procedure Mfvsrd(out dst:reg_opr, in src:vec_opr)
     {:public}
     {:instruction Ins(S.Mfvsrd(dst, src))}
     ensures
@@ -105,7 +95,7 @@ procedure Mfvsrd(out dst:dst_reg_opr, in src:vec_opr)
 }
 
 // Move low 64-bit of vector register to general-purpose register
-procedure Mfvsrld(out dst:dst_reg_opr, in src:vec_opr)
+procedure Mfvsrld(out dst:reg_opr, in src:vec_opr)
     {:public}
     {:instruction Ins(S.Mfvsrld(dst, src))}
     ensures
@@ -114,7 +104,7 @@ procedure Mfvsrld(out dst:dst_reg_opr, in src:vec_opr)
 }
 
 // Move joint of two general-purpose registers to vector register
-procedure Mtvsrdd(out dst:dst_vec_opr, in src1:reg_opr, in src2:reg_opr)
+procedure Mtvsrdd(out dst:vec_opr, in src1:reg_opr, in src2:reg_opr)
     {:public}
     {:instruction Ins(S.Mtvsrdd(dst, src1, src2))}
     ensures
@@ -124,7 +114,7 @@ procedure Mtvsrdd(out dst:dst_vec_opr, in src1:reg_opr, in src2:reg_opr)
 }
 
 // XOR operation of two vector registers
-procedure Vxor(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+procedure Vxor(out dst:vec_opr, in src1:vec_opr, in src2:vec_opr)
     {:public}
     {:instruction Ins(S.Vxor(dst, src1, src2))}
     ensures
@@ -133,7 +123,7 @@ procedure Vxor(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
 }
 
 // Shift left word elements of vector register with correspinding bit values in word elements of vector register
-procedure Vslw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+procedure Vslw(out dst:vec_opr, in src1:vec_opr, in src2:vec_opr)
     {:public}
     {:instruction Ins(S.Vslw(dst, src1, src2))}
     ensures
@@ -146,7 +136,7 @@ procedure Vslw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
 }
 
 // Shift right word elements of vector register with corresponding bit values in word elements of vector register
-procedure Vsrw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+procedure Vsrw(out dst:vec_opr, in src1:vec_opr, in src2:vec_opr)
     {:public}
     {:instruction Ins(S.Vsrw(dst, src1, src2))}
     ensures
@@ -159,7 +149,7 @@ procedure Vsrw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
 }
 
 //  Compare equal word elements of vector register and store either ones or zeros in the corresponding elements of destination register
-procedure Vcmpequw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+procedure Vcmpequw(out dst:vec_opr, in src1:vec_opr, in src2:vec_opr)
     {:public}
     {:instruction Ins(S.Vcmpequw(dst, src1, src2))}
     ensures
@@ -172,10 +162,14 @@ procedure Vcmpequw(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
 }
 
 // Joint of last one word of vector register with first 3 words of vector register
-procedure Vsldoi4(out dst:dst_vec_opr, in src1:vec_opr, in src2:vec_opr)
+procedure Vsldoi(out dst:vec_opr, in src1:vec_opr, in src2:vec_opr, inline count:quad32bytes)
     {:public}
-    {:instruction Ins(S.Vsldoi(dst, src1, src2, 4))}
+    {:instruction Ins(S.Vsldoi(dst, src1, src2, count))}
+    requires
+        count == 4 || count == 8 || count == 12;
     ensures
-        dst == old(Mkfour(src2.hi3, src1.lo0, src1.lo1, src1.hi2));
+        count == 4 ==> dst == old(Mkfour(src2.hi3, src1.lo0, src1.lo1, src1.hi2));
+        count == 8 ==> dst == old(Mkfour(src2.hi2, src2.hi3, src1.lo0, src1.lo1));
+        count == 12 ==> dst == old(Mkfour(src2.lo1, src2.hi2, src2.hi3, src1.lo0));
 {
 }

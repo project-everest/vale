@@ -45,13 +45,9 @@ unfold let va_state = state
 val va_fuel : Type0
 unfold let reg_opr = reg
 unfold let va_operand_reg_opr = reg
-unfold let va_operand_dst_reg_opr = reg
-unfold let dst_reg_opr = reg
 unfold let va_operand_Mem64 = maddr
 unfold let vec_opr = vec
-unfold let dst_vec_opr = vec
 unfold let va_operand_vec_opr = vec
-unfold let va_operand_dst_vec_opr = vec
 
 val va_pbool : Type0
 val va_ttrue (_:unit) : va_pbool
@@ -68,11 +64,9 @@ val mul_nat_helper (x y:nat) : Lemma (x * y >= 0)
 // Constructors
 val va_fuel_default : unit -> va_fuel
 [@va_qattr] unfold let va_op_reg_opr_reg (r:reg) : reg_opr = r
-[@va_qattr] unfold let va_op_dst_reg_opr_reg (r:reg) : dst_reg_opr = r
 [@va_qattr] unfold let va_op_cmp_reg (r:reg) : cmp_opr = CReg r
 [@va_qattr] unfold let va_const_cmp (n:imm16) : cmp_opr = CImm n
 [@va_qattr] unfold let va_op_vec_opr_vec (v:vec) : vec_opr = v
-[@va_qattr] unfold let va_op_dst_vec_opr_vec (v:vec) : dst_vec_opr = v
 
 [@va_qattr]
 unfold let va_opr_code_Mem64 (r:reg) (n:int) : maddr =
@@ -82,18 +76,16 @@ unfold let va_opr_code_Mem64 (r:reg) (n:int) : maddr =
 [@va_qattr] unfold let va_eval_reg        (s:va_state) (r:reg)    : GTot nat64 = eval_reg r s
 [@va_qattr] unfold let va_eval_Mem64   (s:va_state) (m:maddr)    : GTot nat64 = eval_mem64 (eval_maddr m s) s
 [@va_qattr] unfold let va_eval_reg_opr    (s:va_state) (r:reg_opr)     : GTot nat64 = eval_reg r s
-[@va_qattr] unfold let va_eval_dst_reg_opr    (s:va_state) (r:dst_reg_opr)     : GTot nat64 = eval_reg r s
 [@va_qattr] unfold let va_eval_cmp_opr   (s:va_state) (o:cmp_opr)         : GTot nat64 = eval_cmp_opr o s
 [@va_qattr] unfold let va_eval_vec_opr   (s:va_state) (v:vec_opr)         : GTot quad32 = eval_vec v s
-[@va_qattr] unfold let va_eval_dst_vec_opr   (s:va_state) (v:dst_vec_opr)         : GTot quad32 = eval_vec v s
 
 // Predicates
 [@va_qattr] unfold let va_is_src_reg_opr (r:reg_opr) (s:va_state) = True
-[@va_qattr] unfold let va_is_dst_dst_reg_opr (r:dst_reg_opr) (s:va_state) = True
+[@va_qattr] unfold let va_is_dst_reg_opr (r:reg_opr) (s:va_state) = True
 [@va_qattr] unfold let va_is_src_Mem64 (m:maddr) (s:va_state) = valid_maddr64 m s
 [@va_qattr] unfold let va_is_dst_Mem64 (m:maddr) (s:va_state) = valid_maddr64 m s
 [@va_qattr] unfold let va_is_src_vec_opr (v:vec_opr) (s:va_state) = True
-[@va_qattr] unfold let va_is_dst_dst_vec_opr (v:dst_vec_opr) (s:va_state) = True
+[@va_qattr] unfold let va_is_dst_vec_opr (v:vec_opr) (s:va_state) = True
 
 // Getters
 [@va_qattr] unfold let va_get_ok (s:va_state) : bool = s.ok
@@ -123,7 +115,7 @@ unfold let va_opr_code_Mem64 (r:reg) (n:int) : maddr =
   va_upd_vec x (eval_vec x sM) sK
 
 [@va_qattr] unfold
-let va_update_operand_dst_reg_opr (r:reg) (sM:va_state) (sK:va_state) : va_state =
+let va_update_operand_reg_opr (r:reg) (sM:va_state) (sK:va_state) : va_state =
   va_update_reg r sM sK
 
 [@va_qattr] unfold
@@ -131,7 +123,7 @@ let va_update_operand_Mem64 (m:maddr) (sM:va_state) (sK:va_state) : va_state =
   va_update_maddr m sM sK
 
 [@va_qattr] unfold
-let va_update_operand_dst_vec_opr (x:vec) (sM:va_state) (sK:va_state) : va_state =
+let va_update_operand_vec_opr (x:vec) (sM:va_state) (sK:va_state) : va_state =
   va_update_vec x sM sK
 
 // Constructors for va_codes

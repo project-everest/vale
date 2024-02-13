@@ -290,11 +290,13 @@ let eval_ins (ins:ins) : st unit =
     update_vec dst eq_val
   
   | Vsldoi dst src1 src2 count ->
-    check (fun s -> count = 4);?  // We only spec the one very special case we need
+    check (fun s -> (count = 4 || count = 8 || count = 12));;  // We only spec the one very special case we need
     let src1_q = eval_vec src1 s in
     let src2_q = eval_vec src2 s in
-    let shifted_vec = Mkfour src2_q.hi3 src1_q.lo0 src1_q.lo1 src1_q.hi2 in
-    update_vec dst shifted_vec
+    if count = 4 then update_vec dst (Mkfour src2_q.hi3 src1_q.lo0 src1_q.lo1 src1_q.hi2)
+    else if count = 8 then update_vec dst (Mkfour src2_q.hi2 src2_q.hi3 src1_q.lo0 src1_q.lo1)
+    else if count = 12 then update_vec dst (Mkfour src2_q.lo1 src2_q.hi2 src2_q.hi3 src1_q.lo0)
+    else fail
 
 let run_ocmp (s:state) (c:ocmp) : state & bool =
   let s = run (check (valid_ocmp c)) s in
