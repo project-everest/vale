@@ -63,7 +63,7 @@ Note that the mono package includes F\#.
 
 Once these tools are installed, running SCons in the top-level directory will build the Vale tool:
 
-```python.exe scons.py```
+```./build_local.sh```
 
 To verify all Dafny sources in the [src](./src) directory, run:
 
