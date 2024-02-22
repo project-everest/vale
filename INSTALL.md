@@ -63,15 +63,15 @@ Note that the mono package includes F\#.
 
 Once these tools are installed, running SCons in the top-level directory will build the Vale tool:
 
-```python.exe scons.py```
+```./run_scons.sh```
 
 To verify all Dafny sources in the [src](./src) directory, run:
 
-```python.exe scons.py --DAFNY```
+```./run_scons.sh --DAFNY```
 
 To verify all F* sources in the [src](./src) directory (this requires an installation of [F*](https://github.com/FStarLang/FStar)), run:
 
-```python.exe scons.py --FSTAR```
+```./run_scons.sh --FSTAR```
 
 NOTE: You can override tools/Kremlin by setting the KREMLIN_HOME
 environment variable to point to the directory where KreMLin is
